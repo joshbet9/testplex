@@ -2,6 +2,8 @@
 
 The build workflow publishes a versioned set of compiled plugin JARs and, when explicitly enabled, deploys them to a **dedicated Mineplex Reborn test server on your Hyper-V host** using the same Tailscale + SSH route as the existing Monster Maze deployment. It never deploys to the production server, and a deploy is rejected unless the destination contains a test-only marker.
 
+For the planned per-game cosmetic sets and staged win effects, see the [Arcade Cosmetics roadmap](ARCADE-COSMETICS-ROADMAP.md). It records the proposed menu structure, each game's cosmetic concept, win effect, and test acceptance checklist.
+
 ## What the workflow does
 
 1. Builds the Maven reactor using Java 8.
