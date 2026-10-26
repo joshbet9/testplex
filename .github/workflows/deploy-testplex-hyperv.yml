@@ -151,6 +151,6 @@ jobs:
           printf '%s\n' "$download_url" | ssh -p "$port" -i "$HOME/.ssh/testplex_hyperv" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=10 \
             "$HYPERV_SSH_USER@$HYPERV_SSH_HOST" \
             "sudo -n /usr/local/sbin/deploy-testplex-hyperv.sh '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'"
