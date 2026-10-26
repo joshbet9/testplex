@@ -134,3 +134,15 @@ Run each game type from the normal Reborn game selector/admin game tooling, not 
 - Verify Safe Pad bounds from every edge and test beacon persistence disabled (default) and enabled; only the central objective beacon may be restored by the optional persistence feature.
 
 Gameplay parity, player-facing PB writes, mob cleanup and performance remain runtime checks. A successful Maven build alone does not mark these scenarios as passed.
+
+
+### Quick administrator launch path
+
+On the isolated test server, once the server-group game list has been updated and the new Arcade JAR is installed, an administrator with the existing game-command permission can select and start the variants through Reborn's own commands:
+
+```text
+/game set MonsterMazeSpeed
+/game start 10
+```
+
+Repeat with `/game set MonsterMazeModern`. To test a fixed layout, set `monstermaze.pattern` to `1`, `2`, or `3` in the Arcade plugin config before the round/server starts; `0` is random. The current layout number is shown on the in-game scoreboard. While a Monster Maze game is selected, use `/game pb` to display the caller's saved PB for each of the three layouts for their selected kit. The command is part of Reborn's normal `/game` command tree, not a standalone Monster Maze command.
