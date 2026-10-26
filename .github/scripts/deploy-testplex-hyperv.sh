@@ -83,7 +83,8 @@ grep -Fxq "Arcade.jar" <<< "$BUNDLE_LIST" || {
   exit 2
 }
 while IFS= read -r entry; do
-  [[ "$entry" =~ ^[A-Za-z0-9._+() -]+\.jar$ ]] || {
+JAR_ENTRY_RE='^[A-Za-z0-9._+() -]+\\.jar$'
+  [[ "$entry" =~ $JAR_ENTRY_RE ]] || {
     echo "Unexpected entry in plugin bundle: $entry" >&2
     exit 2
   }
