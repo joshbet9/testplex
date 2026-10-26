@@ -41,6 +41,23 @@ Use a separate Hyper-V VM or other isolated Windows host. Do not point this at a
 6. Initially, leave automatic deployment disabled. Open **Actions → Testplex Java 8 build → Run workflow**, select branch `feat/testbed-bootstrap`, and set `deploy_to_test_server` to true to exercise the guarded deployment. The runner must already be online and the variables above must be set.
 7. After a successful isolated test, set the repository variable `TESTPLEX_AUTO_DEPLOY` to the literal value `true` to deploy automatically when commits are pushed to `feat/testbed-bootstrap`. Pull-request builds never run on the self-hosted deployment runner.
 
+## Optional Monster Maze safe-pad settings
+
+In the test server's existing Arcade plugin config, merge this YAML into the root configuration (don't replace unrelated settings). Both enhancement switches are off by default:
+
+```yaml
+monstermaze:
+  safe-pad-enhancements:
+    enabled: false
+    surface-colour-enabled: false
+    surface-colour-data: 5
+```
+
+- Set `enabled: true` to run one objective-beacon-only check about 2–3 seconds after the initial pad is built during recruit, then re-check the active and preview objective beacons once per second while live. The code repairs the central beacon only; it does not rebuild surrounding clay or the pad base.
+- Set `surface-colour-enabled: true` to select the starting stained-clay surface colour. `surface-colour-data` accepts Minecraft 1.8 dye data values 0–15; default 5 keeps the existing green surface.
+- These options are separate from diagnostics. They do not enable or change diagnostic logging. Restart the test server after editing config to ensure the running Arcade plugin loads the new values.
+- Use the optional behaviour only on the isolated test server and verify old-pad decay and objective transitions using the in-game test plan.
+
 ## Safety and troubleshooting
 
 - The destination marker and existing `plugins` directory are mandatory. If either check fails, no deployment occurs.
