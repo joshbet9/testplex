@@ -91,21 +91,21 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
 
     private void openMain(Player player) {
         Inventory inventory = Bukkit.createInventory(null, 27, MAIN_TITLE);
-        put(inventory, 10, gameIcon("runner", "Runner", Material.STAINED_CLAY, (short) 14));
-        put(inventory, 11, gameIcon("baconbrawl", "Bacon Brawl", Material.PORK, (short) 0));
-        put(inventory, 12, gameIcon("dragonescape", "Dragon Escape", Material.BEACON, (short) 0));
-        put(inventory, 14, gameIcon("evolution", "Evolution", Material.DRAGON_EGG, (short) 0));
-        put(inventory, 15, gameIcon("microbattles", "Micro Battles", Material.STAINED_GLASS, (short) 3));
-        put(inventory, 16, gameIcon("snake", "Snake", Material.MONSTER_EGG, (short) 91));
+        put(inventory, 10, gameIcon(player, "runner", "Runner", Material.STAINED_CLAY, (short) 14));
+        put(inventory, 11, gameIcon(player, "baconbrawl", "Bacon Brawl", Material.PORK, (short) 0));
+        put(inventory, 12, gameIcon(player, "dragonescape", "Dragon Escape", Material.BEACON, (short) 0));
+        put(inventory, 14, gameIcon(player, "evolution", "Evolution", Material.DRAGON_EGG, (short) 0));
+        put(inventory, 15, gameIcon(player, "microbattles", "Micro Battles", Material.STAINED_GLASS, (short) 3));
+        put(inventory, 16, gameIcon(player, "snake", "Snake", Material.MONSTER_EGG, (short) 91));
         player.openInventory(inventory);
     }
 
-    private ItemStack gameIcon(String game, String label, Material material, short durability) {
+    private ItemStack gameIcon(Player player, String game, String label, Material material, short durability) {
         ItemStack item = new ItemStack(material, 1, durability);
         ItemMeta meta = item.getItemMeta();
         meta.setDisplayName(ChatColor.YELLOW + label);
         List<String> lore = new ArrayList<String>();
-        String equipped = getEquippedChoice(nullSafeIdForLore(), game);
+        String equipped = getEquippedChoice(player.getUniqueId(), game);
         lore.add(ChatColor.GRAY + "Equipped: " + (equipped.isEmpty() ? "Default" : pretty(equipped)));
         lore.add(ChatColor.GRAY + "Click to view choices");
         meta.setLore(lore);
@@ -113,10 +113,6 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         return item;
     }
 
-    // A separate helper keeps menu item construction independent of player state.
-    private UUID nullSafeIdForLore() {
-        return new UUID(0L, 0L);
-    }
 
     private void openCategory(Player player, String game) {
         List<String> options = choices.get(game);
