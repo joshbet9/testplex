@@ -17,6 +17,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Sheep;
 import org.bukkit.entity.Slime;
+import org.bukkit.entity.MagmaCube;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.entity.EntityCombustEvent;
@@ -76,6 +77,36 @@ public class Snake extends SoloGame
 
 	private HashMap<Player, Location> _move = new HashMap<Player, Location>();
 	private HashMap<Player, Long> _moveTime = new HashMap<Player, Long>();
+
+	// Mario-Kart-style roulette: one temporary steering debuff per player, rerolled during long rounds.
+	private enum ControlDebuff {
+		TURN_LAG("Turn Lag", "Turns take time to catch up with your input."),
+		DRIFT("Drift", "Your snake keeps sliding in its previous direction."),
+		OVERSHOOT("Overshoot", "Sharp turns swing further than intended."),
+		WEAK_SHARP_TURN("Weak Sharp Turning", "Quick, sharp turns are less responsive.");
+
+		final String display;
+		final String description;
+		ControlDebuff(String display, String description) {
+			this.display = display;
+			this.description = description;
+		}
+	}
+	private final HashMap<Player, ControlDebuff> _controlDebuffs = new HashMap<Player, ControlDebuff>();
+	private final HashMap<Player, Float> _lastRawYaw = new HashMap<Player, Float>();
+	private final HashMap<Player, Float> _laggedYaw = new HashMap<Player, Float>();
+	private final HashMap<Player, Vector> _lastTravelDirection = new HashMap<Player, Vector>();
+
+	// Hazards arrive progressively so early Snake play is still readable.
+	private final HashSet<MagmaCube> _magmaCubes = new HashSet<MagmaCube>();
+	private long _snakeLiveStartedAt;
+	private long _nextMagmaHazardAt;
+	private long _lastRouletteRound;
+	private int _hazardSteeringTick;
+	private static final long ROULETTE_INTERVAL_MS = 25000L;
+	private static final long FIRST_MAGMA_HAZARD_MS = 45000L;
+	private static final long MAGMA_HAZARD_INTERVAL_MS = 30000L;
+	private static final int MAX_MAGMA_HAZARDS = 4;
 
 	public Snake(ArcadeManager manager)
 	{
@@ -158,7 +189,18 @@ public class Snake extends SoloGame
 		if (event.GetState() != GameState.Live)
 			return;
 
+		_snakeLiveStartedAt = System.currentTimeMillis();
+		_nextMagmaHazardAt = _snakeLiveStartedAt + FIRST_MAGMA_HAZARD_MS;
+		_lastRouletteRound = 0L;
+		_hazardSteeringTick = 0;
+		_controlDebuffs.clear();
+		_lastRawYaw.clear();
+		_laggedYaw.clear();
+		_lastTravelDirection.clear();
+		removeMagmaCubes();
+
 		this.Announce(C.cYellow + C.Scramble + "@@" + C.cAqua + C.Bold + " Snake is best played in 3rd Person! (Push F5) " + C.cYellow + C.Scramble + "@@");
+		this.Announce(C.cGold + C.Bold + "Hazards and the steering roulette ramp up as the round goes on!");
 	}
 
 	@EventHandler
@@ -225,7 +267,7 @@ public class Snake extends SoloGame
 			if (_speed.containsKey(player))
 				mult = mult * 1.5;
 
-			Vector vel = player.getLocation().getDirection().setY(0).normalize().multiply(4);
+			Vector vel = getDebuffedDirection(player).multiply(4);
 
 			Creature before = null;
 			for (int i = 0; i < _tail.get(player).size(); i++)
@@ -258,6 +300,204 @@ public class Snake extends SoloGame
 				before = tail;
 			}
 		}
+	}
+
+	/**
+	 * Roulette effects are per-player and last until the next 25-second roll.
+	 * Magma Cubes start after 45 seconds and additional hazards arrive every 30 seconds.
+	 */
+	@EventHandler
+	public void SnakeRouletteAndHazardSpawn(UpdateEvent event)
+	{
+		if (!IsLive() || event.getType() != UpdateType.SEC || _snakeLiveStartedAt <= 0L)
+			return;
+
+		long now = System.currentTimeMillis();
+		long elapsed = now - _snakeLiveStartedAt;
+		long rouletteRound = elapsed / ROULETTE_INTERVAL_MS;
+		if (rouletteRound > _lastRouletteRound)
+		{
+			_lastRouletteRound = rouletteRound;
+			for (Player player : GetPlayers(true))
+			{
+				ControlDebuff previous = _controlDebuffs.get(player);
+				ControlDebuff[] all = ControlDebuff.values();
+				ControlDebuff next = all[(int) (Math.random() * all.length)];
+				if (previous != null && all.length > 1)
+				{
+					while (next == previous) next = all[(int) (Math.random() * all.length)];
+				}
+				_controlDebuffs.put(player, next);
+				_laggedYaw.put(player, Float.valueOf(player.getLocation().getYaw()));
+				_lastRawYaw.put(player, Float.valueOf(player.getLocation().getYaw()));
+				_lastTravelDirection.remove(player);
+				player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "SNAKE ROULETTE! "
+						+ ChatColor.LIGHT_PURPLE + next.display + ChatColor.GRAY + " — " + next.description);
+				player.playSound(player.getLocation(), Sound.NOTE_PLING, 1.0f, 1.35f);
+			}
+		}
+
+		if (now >= _nextMagmaHazardAt && _magmaCubes.size() < MAX_MAGMA_HAZARDS)
+		{
+			spawnMagmaCubeHazard();
+			_nextMagmaHazardAt = now + MAGMA_HAZARD_INTERVAL_MS;
+		}
+	}
+
+	/** Apply one of the roulette's steering changes without changing the player's camera input. */
+	private Vector getDebuffedDirection(Player player)
+	{
+		float rawYaw = player.getLocation().getYaw();
+		Float previousYawValue = _lastRawYaw.put(player, Float.valueOf(rawYaw));
+		float previousYaw = previousYawValue == null ? rawYaw : previousYawValue.floatValue();
+		ControlDebuff debuff = _controlDebuffs.get(player);
+		float effectiveYaw = rawYaw;
+
+		if (debuff == ControlDebuff.TURN_LAG)
+		{
+			Float lagValue = _laggedYaw.get(player);
+			float lagYaw = lagValue == null ? rawYaw : lagValue.floatValue();
+			float delta = wrapYaw(rawYaw - lagYaw);
+			lagYaw += clamp(delta, -8.0f, 8.0f);
+			_laggedYaw.put(player, Float.valueOf(lagYaw));
+			effectiveYaw = lagYaw;
+		}
+		else if (debuff == ControlDebuff.OVERSHOOT)
+		{
+			float delta = wrapYaw(rawYaw - previousYaw);
+			effectiveYaw = rawYaw + (delta * 0.65f);
+		}
+		else if (debuff == ControlDebuff.WEAK_SHARP_TURN)
+		{
+			float delta = wrapYaw(rawYaw - previousYaw);
+			effectiveYaw = previousYaw + clamp(delta, -10.0f, 10.0f);
+		}
+
+		Location heading = player.getLocation().clone();
+		heading.setYaw(effectiveYaw);
+		Vector current = heading.getDirection().setY(0);
+		if (current.lengthSquared() < 1.0e-6) current = new Vector(0, 0, 1);
+		current.normalize();
+
+		if (debuff == ControlDebuff.DRIFT)
+		{
+			Vector previous = _lastTravelDirection.get(player);
+			Vector blended = previous == null
+					? current.clone()
+					: current.clone().multiply(0.62).add(previous.clone().multiply(0.38));
+			if (blended.lengthSquared() < 1.0e-6) blended = current.clone();
+			blended.normalize();
+			_lastTravelDirection.put(player, current.clone());
+			return blended;
+		}
+		return current;
+	}
+
+	private float wrapYaw(float angle)
+	{
+		while (angle <= -180.0f) angle += 360.0f;
+		while (angle > 180.0f) angle -= 360.0f;
+		return angle;
+	}
+
+	private float clamp(float value, float min, float max)
+	{
+		return Math.max(min, Math.min(max, value));
+	}
+
+	/** Spawns a progressively larger visible hazard away from the nearest player's current position. */
+	private void spawnMagmaCubeHazard()
+	{
+		ArrayList<Player> players = GetPlayers(true);
+		if (players.isEmpty() || GetTeamList().isEmpty() || GetTeamList().get(0).GetSpawns().isEmpty())
+			return;
+
+		Player target = players.get((int) (Math.random() * players.size()));
+		Location center = GetSpectatorLocation();
+		if (center == null || center.getWorld() == null) center = GetTeamList().get(0).GetSpawns().get(0).clone();
+
+		double angle = Math.random() * Math.PI * 2.0;
+		double distance = 22.0 + (_magmaCubes.size() * 3.0);
+		double x = target.getLocation().getX() + Math.cos(angle) * distance;
+		double z = target.getLocation().getZ() + Math.sin(angle) * distance;
+		x = Math.max(center.getX() - 45.0, Math.min(center.getX() + 45.0, x));
+		z = Math.max(center.getZ() - 45.0, Math.min(center.getZ() + 45.0, z));
+		Location spawn = new Location(target.getWorld(), x, target.getLocation().getY(), z);
+		MagmaCube cube = target.getWorld().spawn(spawn, MagmaCube.class);
+		cube.setSize(Math.min(4, _magmaCubes.size() + 1));
+		cube.setCustomName(ChatColor.RED + "Snake Hazard");
+		cube.setCustomNameVisible(false);
+		cube.setRemoveWhenFarAway(false);
+		_magmaCubes.add(cube);
+
+		String count = String.valueOf(_magmaCubes.size());
+		for (Player player : GetPlayers(true))
+		{
+			player.sendMessage(ChatColor.RED + "" + ChatColor.BOLD + "MAGMA CUBE! "
+					+ ChatColor.GRAY + "A size " + cube.getSize() + " hazard has entered the arena (" + count + "/" + MAX_MAGMA_HAZARDS + ").");
+			player.playSound(player.getLocation(), Sound.MAGMACUBE_JUMP, 0.8f, 0.8f);
+		}
+	}
+
+	/** Track, steer and collide the hazards. Invulnerability still protects against a cube hit. */
+	@EventHandler
+	public void SnakeMagmaCubeTick(UpdateEvent event)
+	{
+		if (!IsLive() || event.getType() != UpdateType.TICK || _magmaCubes.isEmpty())
+			return;
+
+		_hazardSteeringTick++;
+		Iterator<MagmaCube> iterator = _magmaCubes.iterator();
+		while (iterator.hasNext())
+		{
+			MagmaCube cube = iterator.next();
+			if (cube == null || !cube.isValid() || cube.isDead())
+			{
+				if (cube != null && cube.isValid()) cube.remove();
+				iterator.remove();
+				continue;
+			}
+
+			Player nearest = null;
+			double nearestDistance = Double.MAX_VALUE;
+			for (Player player : GetPlayers(true))
+			{
+				double distance = UtilMath.offset(cube, player);
+				if (distance < nearestDistance)
+				{
+					nearestDistance = distance;
+					nearest = player;
+				}
+				if (distance < 1.65 && !_invul.containsKey(player))
+				{
+					KillPlayer(player, null, "Magma Cube");
+					cube.remove();
+					iterator.remove();
+					nearest = null;
+					break;
+				}
+			}
+			if (nearest != null && (_hazardSteeringTick % 4 == 0))
+			{
+				Vector direction = nearest.getLocation().toVector().subtract(cube.getLocation().toVector());
+				direction.setY(0);
+				if (direction.lengthSquared() > 1.0e-6)
+				{
+					Vector velocity = direction.normalize().multiply(0.12);
+					velocity.setY(cube.getVelocity().getY());
+					cube.setVelocity(velocity);
+				}
+			}
+		}
+	}
+
+	private void removeMagmaCubes()
+	{
+		for (MagmaCube cube : _magmaCubes)
+		{
+			if (cube != null && cube.isValid()) cube.remove();
+		}
+		_magmaCubes.clear();
 	}
 
 	@EventHandler
@@ -740,7 +980,15 @@ public class Snake extends SoloGame
 			_reverse.clear();
 			_move.clear();
 			_moveTime.clear();
-			
+			_controlDebuffs.clear();
+			_lastRawYaw.clear();
+			_laggedYaw.clear();
+			_lastTravelDirection.clear();
+			_snakeLiveStartedAt = 0L;
+			_nextMagmaHazardAt = 0L;
+			_lastRouletteRound = 0L;
+			removeMagmaCubes();
+
 			HandlerList.unregisterAll(this);
 		}
 	}
