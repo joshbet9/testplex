@@ -146,3 +146,10 @@ On the isolated test server, once the server-group game list has been updated an
 ```
 
 Repeat with `/game set MonsterMazeModern`. To test a fixed layout, set `monstermaze.pattern` to `1`, `2`, or `3` in the Arcade plugin config before the round/server starts; `0` is random. The current layout number is shown on the in-game scoreboard. While a Monster Maze game is selected, use `/game pb` to display the caller's saved PB for each of the three layouts for their selected kit. The command is part of Reborn's normal `/game` command tree, not a standalone Monster Maze command.
+
+
+### Additional global regression fixes
+
+- Right-click the objective beacon on an active pad. It should not open the vanilla Beacon UI. After the pad becomes an old/decaying pad, its interaction listener should be removed; confirm this across several transitions and after the game ends.
+- As Jumper, get bumped by a monster and repeatedly press jump while still airborne/being knocked. The bump grace window should prevent an accidental charged-jump deduction for 2 seconds after the hit. Then confirm normal charged jumps resume after the window.
+- Test Pilot: being bumped while already standing on a Safe Pad must not set up a Pilot attempt. Being knocked from away from the pad and landing directly on the active pad within the knock window may qualify. Repeat at the edge and after an unsuccessful landing to ensure stale bumps don't award the stat later.
