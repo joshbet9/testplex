@@ -27,7 +27,7 @@ The target must be an already-installed, working **Mineplex Reborn** test instan
    ```
 
    The deployment rejects the request if the marker is missing or differs.
-3. Add/configure the service so it starts the Reborn server from that root, runs under the intended server account, and writes logs to `logs/latest.log`. The SSH account used by the current Monster Maze Hyper-V workflow must be able to run `sudo -n systemctl stop/start <service>` without prompting.
+3. Add/configure the service so it starts the Reborn server from that root, runs under the intended server account, and writes logs to `logs/latest.log`. Install the fixed deployment script as a root-owned executable at `/usr/local/sbin/deploy-testplex-hyperv.sh` (review `.github/scripts/deploy-testplex-hyperv.sh` first). Grant the SSH account permission to run only that fixed script through passwordless sudo; do not grant passwordless sudo to arbitrary `bash`. For the `monstermaze` SSH account, a sudoers drop-in can contain `monstermaze ALL=(root) NOPASSWD: /usr/local/sbin/deploy-testplex-hyperv.sh`. Set the drop-in to mode `0440` and validate it with `visudo -cf /etc/sudoers.d/testplex-deploy`. The script itself validates the server-root marker and limits accepted paths/service names.
 4. In **the `testplex` repository's own Settings → Environments → `hyperv`**, configure these secrets. GitHub secrets are scoped to a repository/environment, so the values from `MonsterMaze` are not automatically inherited by `testplex`:
 
    | Secret | Purpose |
