@@ -70,44 +70,73 @@ jobs:
           find Plugins/out -maxdepth 1 -type f -name '*.jar' -printf '%f %s bytes\n' | sort
           test -s Plugins/out/Arcade.jar
 
-      - name: Smoke-check native Snake mechanics and Monster Maze pad bounds
+      - name: Smoke-check native gameplay and cosmetic hooks
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
 
-          snake = Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/game/games/snake/Snake.java").read_text(encoding="utf-8")
-          safe_pad = Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/game/games/monstermaze/SafePad.java").read_text(encoding="utf-8")
-
-          snake_contract = {
-              "progressive magma hazard schedule": "FIRST_MAGMA_HAZARD_MS = 45000L",
-              "repeating magma hazard schedule": "MAGMA_HAZARD_INTERVAL_MS = 30000L",
-              "four-hazard cap": "MAX_MAGMA_HAZARDS = 4",
-              "roulette control effect set": "enum ControlDebuff",
-              "steering uses roulette result": "getDebuffedDirection(player).multiply(4)",
-              "persistent drift heading": "_lastTravelDirection.put(player, blended.clone())",
-              "persistent weak-turn heading": "appliedYaw += clamp(remaining, -4.0f, 4.0f)",
-              "hazards removed with round cleanup": "removeMagmaCubes();",
+          base = Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade")
+          sources = {
+              "Snake": (base / "game/games/snake/Snake.java").read_text(encoding="utf-8"),
+              "Monster Maze SafePad": (base / "game/games/monstermaze/SafePad.java").read_text(encoding="utf-8"),
+              "Runner": (base / "game/games/runner/Runner.java").read_text(encoding="utf-8"),
+              "Bacon Brawl": (base / "game/games/baconbrawl/BaconBrawl.java").read_text(encoding="utf-8"),
+              "Dragon Escape": (base / "game/games/dragonescape/DragonEscape.java").read_text(encoding="utf-8"),
+              "Evolution": (base / "game/games/evolution/Evolution.java").read_text(encoding="utf-8"),
+              "Micro Battles": (base / "game/games/micro/Micro.java").read_text(encoding="utf-8"),
+              "Cosmetic selector": (base / "cosmetics/ArcadeCosmeticsMenu.java").read_text(encoding="utf-8"),
           }
-          safe_pad_contract = {
-              "safe-pad rejects other worlds": "e.getWorld() != _loc.getWorld()",
-              "symmetric X bounds": "dx > -2.5 && dx < 2.5",
-              "symmetric Z bounds": "dz > -2.5 && dz < 2.5",
-              "safe-pad vertical bounds": "dy > 0.0 && dy < 5.0",
+
+          contracts = {
+              "Snake": {
+                  "progressive hazard start": "FIRST_MAGMA_HAZARD_MS = 45000L",
+                  "repeating hazard interval": "MAGMA_HAZARD_INTERVAL_MS = 30000L",
+                  "four-hazard cap": "MAX_MAGMA_HAZARDS = 4",
+                  "roulette steering hook": "getDebuffedDirection(player).multiply(4)",
+                  "persistent drift": "_lastTravelDirection.put(player, blended.clone())",
+                  "persistent sharp-turn state": "appliedYaw += clamp(remaining, -4.0f, 4.0f)",
+                  "hazard cleanup": "removeMagmaCubes();",
+              },
+              "Monster Maze SafePad": {
+                  "world check": "e.getWorld() != _loc.getWorld()",
+                  "symmetric X bounds": "dx > -2.5 && dx < 2.5",
+                  "symmetric Z bounds": "dz > -2.5 && dz < 2.5",
+                  "vertical bounds": "dy > 0.0 && dy < 5.0",
+              },
+              "Runner": {
+                  "player-specific trail choice": "getEquippedChoice(owner.getUniqueId(), \"runner\")",
+                  "custom trail blocks": "_blockColours.put(block, Byte.valueOf(colour))",
+              },
+              "Bacon Brawl": {
+                  "themed sparkle trail": "getEquippedColourData(player.getUniqueId(), \"baconbrawl\")",
+              },
+              "Dragon Escape": {
+                  "coloured running trail": "getEquippedColourData(player.getUniqueId(), \"dragonescape\")",
+              },
+              "Evolution": {
+                  "dragon egg evolution effect": "\"dragon-egg\".equals(ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), \"evolution\"))",
+              },
+              "Micro Battles": {
+                  "player-specific theme trail": "getEquippedColourData(player.getUniqueId(), \"microbattles\")",
+              },
+              "Cosmetic selector": {
+                  "persistent per-player storage": "cosmetics.yml",
+                  "shared colour resolver": "getEquippedColourData(UUID playerId, String game)",
+              },
           }
 
           missing = []
-          for label, source in snake_contract.items():
-              if source not in snake:
-                  missing.append("Snake: " + label)
-          for label, source in safe_pad_contract.items():
-              if source not in safe_pad:
-                  missing.append("Monster Maze SafePad: " + label)
+          for game, checks in contracts.items():
+              source = sources[game]
+              for label, expected in checks.items():
+                  if expected not in source:
+                      missing.append(f"{game}: {label}")
 
           if missing:
-              raise SystemExit("Native gameplay smoke checks failed:\n- " + "\n- ".join(missing))
-          print("Native Snake and Monster Maze smoke checks passed.")
+              raise SystemExit("Native gameplay/cosmetic smoke checks failed:\\n- " + "\\n- ".join(missing))
+          print("Native Snake, Monster Maze and six-game cosmetic smoke checks passed.")
           PY
 
       - name: Upload compiled plugin set
