@@ -70,13 +70,18 @@ For every roulette type, check that steering changes the actual travel direction
 
 For hazards, check that each cube spawns away from the player's current position, moves toward living players, eliminates on contact, respects the existing Snake invulnerability window, and disappears at game end. Note unexpected spawn positions, collisions through walls, stuck cubes, or any TPS impact.
 
-## Monster Maze safe-pad bounds
+## Monster Maze safe-pad bounds and optional persistence
 
+- With `monstermaze.safe-pad-enhancements.enabled: false` (the default), confirm the original beacon lifecycle is unchanged.
 - Reach a safe pad from its centre and each of the four edges.
 - Check a player near the left/right and front/back edge is counted consistently; the boundary should be symmetric around the beacon.
 - Stand just outside each edge and confirm it is not counted as on the pad.
 - Confirm normal safe-pad countdown, first-player reward, old-pad decay and next-pad transition are unchanged.
-- Confirm no non-beacon clay blocks are modified by the new boundary logic.
+- With beacon persistence explicitly enabled, remove/replace only the objective beacon during recruit and verify the one-time audit repairs it roughly 2–3 seconds after the first pad is created.
+- While live, remove/replace the active objective beacon and verify it is restored by the once-per-second check. Repeat for the preview pad.
+- Confirm adjacent stained clay, pad base, stairs and decaying old pads are never rebuilt by beacon persistence.
+- For optional colour testing, set `surface-colour-enabled: true` and `surface-colour-data` to a valid dye value (0–15). Confirm only the new pad's stained-clay surface uses the chosen starting colour and that the normal decay colours still function.
+- Confirm beacon persistence is independently controlled from any diagnostics setting.
 
 ## Report template
 
