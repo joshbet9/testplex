@@ -50,6 +50,7 @@ import nautilus.game.arcade.game.games.minestrike.Minestrike;
 import nautilus.game.arcade.game.games.mineware.BawkBawkBattles;
 import nautilus.game.arcade.game.games.moba.MobaClassic;
 import nautilus.game.arcade.game.games.monstermaze.MonsterMaze;
+import nautilus.game.arcade.game.games.monstermaze.MonsterMazeModern;
 import nautilus.game.arcade.game.games.paintball.Paintball;
 import nautilus.game.arcade.game.games.quiver.Quiver;
 import nautilus.game.arcade.game.games.quiver.QuiverTeamBase;
@@ -202,6 +203,7 @@ public enum GameType implements Voteable
 	Skywars(SoloSkywars.class, GameDisplay.Skywars),
 	SkywarsTeams(TeamSkywars.class, GameDisplay.SkywarsTeams, new GameType[]{GameType.Skywars}, false),
 	MonsterMaze(MonsterMaze.class, GameDisplay.MonsterMaze),
+	MonsterMazeModern(MonsterMazeModern.class, GameDisplay.MonsterMazeModern, new GameType[]{GameType.MonsterMaze}, false),
 	Gladiators(Gladiators.class, GameDisplay.Gladiators),
 	Skyfall(SoloSkyfall.class, GameDisplay.Skyfall),
 	SkyfallTeams(TeamSkyfall.class, GameDisplay.SkyfallTeams, new GameType[]{GameType.Skyfall}, false),
