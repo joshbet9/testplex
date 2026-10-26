@@ -138,7 +138,7 @@ Gameplay parity, player-facing PB writes, mob cleanup and performance remain run
 
 ### Quick administrator launch path
 
-On the isolated test server, once the server-group game list has been updated and the new Arcade JAR is installed, an administrator with the existing game-command permission can select and start the variants through Reborn's own commands:
+On the isolated test server, after the new Arcade JAR is installed, an administrator with the existing game-command permission can select and start the variants through Reborn's own commands:
 
 ```text
 /game set MonsterMazeSpeed
