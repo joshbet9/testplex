@@ -7,6 +7,7 @@ import mineplex.core.command.CommandBase;
 import nautilus.game.arcade.ArcadeManager;
 import nautilus.game.arcade.game.Game;
 import nautilus.game.arcade.game.games.monstermaze.MonsterMaze;
+import nautilus.game.arcade.game.games.monstermaze.MonsterMazePersonalBestManager;
 
 /** Native Reborn command to inspect the current player's Monster Maze PBs. */
 public class MonsterMazePBCommand extends CommandBase<ArcadeManager>
