@@ -128,7 +128,7 @@ Run each game type from the normal Reborn game selector/admin game tooling, not 
 
 - Allow a player to use Cryo Blitz while monsters are moving. Affected monsters should stop movement and contact behaviour for 3s, then resume.
 - Test Body Rush against a monster contact while normal hit cooldown is active; the active ability should intercept the hit, launch the monster away and shorten its remaining duration by 2s.
-- Test Maverick's knockback direction toward the preview/next Safe Pad.
+- Test Maverick's knockback direction toward the active Safe Pad (and toward the preview pad only when no active pad exists).
 - Stop/end games repeatedly. Confirm active/preview/old Safe Pads restore their original blocks, active mobs are removed, and no stuck/frozen entities leak into the next game.
 - Set a fixed pattern and check the same layout in Original, Speed and Modern.
 - Verify Safe Pad bounds from every edge and test beacon persistence disabled (default) and enabled; only the central objective beacon may be restored by the optional persistence feature.
