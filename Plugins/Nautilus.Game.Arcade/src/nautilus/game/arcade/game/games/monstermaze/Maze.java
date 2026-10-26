@@ -1,6 +1,7 @@
 package nautilus.game.arcade.game.games.monstermaze;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -74,6 +75,8 @@ public class Maze implements Listener
 	private ArrayList<Player> _playersOnPad = new ArrayList<Player>();
 	private HashMap<LivingEntity, MazeMobWaypoint> _ents = new HashMap<LivingEntity, MazeMobWaypoint>();
 	private final HashMap<LivingEntity, Long> _frozenUntil = new HashMap<LivingEntity, Long>();
+	private final LinkedList<Location> _pendingSpawnLocations = new LinkedList<Location>();
+	private static final int MAX_MOB_SPAWNS_PER_TICK = 25;
 
 	private HashSet<Block> _movementWaypoints = new HashSet<Block>();
 	private HashSet<Block> _movementWaypointsDisabled = new HashSet<Block>();
@@ -618,106 +621,113 @@ public class Maze implements Listener
 //		}
 //	}
 	
+	/**
+	 * Queue starter/Modern mobs in exact-count batches. Creating 150–225 disguised
+	 * entities in the Recruit event's single server tick can create an avoidable
+	 * join/startup spike; the standalone 1.8 implementation spreads these over ticks.
+	 */
 	public void fillSpawn(int numToSpawn)
 	{
-		System.out.println("spawning " + numToSpawn + " entities on map");
-		
+		if (numToSpawn <= 0 || getPreset() == null)
+			return;
+
+		ArrayList<Location> validSpawns = new ArrayList<Location>(getPreset().getMaze());
+		Iterator<Location> iter = validSpawns.iterator();
+		while (iter.hasNext())
+		{
+			Location candidate = iter.next();
+			if (UtilMath.offset(candidate, _location) < 7.5)
+				iter.remove();
+		}
+		if (validSpawns.isEmpty())
+		{
+			System.out.println("Monster Maze: no valid maze locations remain for mob spawning.");
+			return;
+		}
+
+		Collections.shuffle(validSpawns);
 		int spawned = 0;
-		
 		while (spawned < numToSpawn)
 		{
-			ArrayList<Location> validSpawns = new ArrayList<Location>(getPreset().getMaze());
-			
-			Iterator<Location> iter = validSpawns.iterator();
-			while (iter.hasNext()) {
-				Location b = iter.next();
-				if(UtilMath.offset(b, _location) < 7.5)
-				{
-					iter.remove();
-				}
-			}
-			if (validSpawns.isEmpty())
-			{
-				System.out.println("Monster Maze: no valid maze locations remain for mob spawning; stopping at " + spawned + ".");
-				break;
-			}
-			Location loc = UtilAlg.Random(validSpawns);
+			Location loc = validSpawns.get(spawned % validSpawns.size());
 			if (loc == null || loc.getWorld() == null)
 			{
-				System.out.println("Monster Maze: selected an invalid mob spawn location; aborting this spawn batch.");
+				System.out.println("Monster Maze: invalid location in the spawn list; stopping the batch.");
 				break;
 			}
-			
+			_pendingSpawnLocations.add(loc.clone());
+			spawned++;
+		}
+	}
+
+	/** Spawn a bounded number each server tick without capping or discarding the mob population. */
+	@EventHandler
+	public void processPendingMonsterSpawns(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.TICK)
+			return;
+
+		GameState state = _host.GetState();
+		if (state == GameState.End || state == GameState.Dead)
+		{
+			_pendingSpawnLocations.clear();
+			return;
+		}
+
+		int spawned = 0;
+		while (spawned < MAX_MOB_SPAWNS_PER_TICK && !_pendingSpawnLocations.isEmpty())
+		{
+			Location loc = _pendingSpawnLocations.removeFirst();
+			spawnOne(loc);
+			spawned++;
+		}
+	}
+
+	private void spawnOne(Location loc)
+	{
+		if (loc == null || loc.getWorld() == null)
+			return;
+
+		try
+		{
 			_host.CreatureAllowOverride = true;
 			Snowman ent = loc.getWorld().spawn(loc, Snowman.class);
-			
 			DisguiseBase disguise = DisguiseFactory.createDisguise(ent, _host.getMonsterType());
 
 			if (disguise instanceof DisguiseSlime)
-			{
 				((DisguiseSlime) disguise).SetSize(3);
-			}
-
 			if (disguise instanceof DisguiseMagmaCube)
-			{
 				((DisguiseMagmaCube) disguise).SetSize(3);
-			}
-
-			_host.CreatureAllowOverride = false;
 
 			UtilEnt.vegetate(ent, true);
 			UtilEnt.ghost(ent, true, false);
 			_ents.put(ent, new MazeMobWaypoint(ent.getLocation()));
 
 			if (disguise != null && !(disguise instanceof DisguiseSnowman))
-			{
 				_host.Manager.GetDisguise().disguise(disguise);
-			}
-
-			spawned++;
+		}
+		finally
+		{
+			_host.CreatureAllowOverride = false;
 		}
 	}
-	
+
 	private void spawn(int numToSpawn)
 	{
 		ArrayList<Location> spawnLocations = new ArrayList<Location>(getPreset().getSpawns());
 		if (spawnLocations.isEmpty() || numToSpawn <= 0)
 			return;
-		java.util.Collections.shuffle(spawnLocations);
+
+		Collections.shuffle(spawnLocations);
 		int spawned = 0;
 		while (spawned < numToSpawn)
 		{
 			Location loc = spawnLocations.get(spawned % spawnLocations.size());
-			_host.CreatureAllowOverride = true;
-			Snowman ent = loc.getWorld().spawn(loc, Snowman.class);
-						
-			DisguiseBase disguise = DisguiseFactory.createDisguise(ent, _host.getMonsterType());
-			
-			if (disguise instanceof DisguiseSlime)
-			{
-				((DisguiseSlime) disguise).SetSize(3);
-			}
-			
-			if (disguise instanceof DisguiseMagmaCube)
-			{
-				((DisguiseMagmaCube) disguise).SetSize(3);
-			}
-			
-			_host.CreatureAllowOverride = false;
-	
-			UtilEnt.vegetate(ent, true);
-			UtilEnt.ghost(ent, true, false);
-			_ents.put(ent, new MazeMobWaypoint(ent.getLocation()));
-			
-			if (disguise != null && !(disguise instanceof DisguiseSnowman))
-			{
-				_host.Manager.GetDisguise().disguise(disguise);
-			}
-			
+			spawnOne(loc);
 			spawned++;
 		}
 	}
-	
+
 	private Location pickNextLocForSafePad() // short method name
 	{
 		if (_safePad != null || !_oldSafePads.isEmpty())
@@ -1221,6 +1231,7 @@ public class Maze implements Listener
 		}
 		_ents.clear();
 		_frozenUntil.clear();
+		_pendingSpawnLocations.clear();
 		_playersOnPad.clear();
 
 		if (_safePad != null)
