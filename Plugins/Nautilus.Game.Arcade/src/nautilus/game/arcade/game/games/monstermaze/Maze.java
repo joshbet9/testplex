@@ -1081,7 +1081,7 @@ public class Maze implements Listener
 			if (_host.isActualModernMode())
 				_phaseTimerStart = Math.max(15, 35 - (_curSafe * 20 / 9));
 			else
-				_phaseTimerStart = Math.max(15, 60 - ((_curSafe - 1) * 2));
+				_phaseTimerStart = Math.max(15, 60 - (_curSafe * 2));
 			_phaseTimer = _phaseTimerStart;
 			
 			if (_nextSafePad == null)
