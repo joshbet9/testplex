@@ -320,6 +320,18 @@ public class SafePad
 		}
 	}
 
+	/**
+	 * Restore every block originally snapshotted by this pad. Used during whole-game
+	 * cleanup, including pads that were partially decayed at the time the game ended.
+	 */
+	public void restoreAll()
+	{
+		for (SafePadBlock block : _blocks)
+		{
+			block.restore();
+		}
+	}
+
 	public Location getLocation()
 	{
 		return _loc;
