@@ -33,6 +33,7 @@ import mineplex.core.updater.event.UpdateEvent;
 
 import nautilus.game.arcade.ArcadeManager;
 import nautilus.game.arcade.GameType;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import nautilus.game.arcade.game.SoloGame;
 import nautilus.game.arcade.game.games.runner.kits.KitArcher;
 import nautilus.game.arcade.game.games.runner.kits.KitFrosty;
@@ -56,6 +57,7 @@ public class Runner extends SoloGame implements IThrown
 	private static final long BLOCK_LIFETIME = 1200;
 
 	private final Map<Block, Long> _blocks = new HashMap<>();
+	private final Map<Block, Byte> _blockColours = new HashMap<>();
 
 	public Runner(ArcadeManager manager)
 	{
@@ -102,24 +104,43 @@ public class Runner extends SoloGame implements IThrown
 
 			double radius = 2.5;
 
+			Player owner = ((Arrow) entity).getShooter() instanceof Player ? (Player) ((Arrow) entity).getShooter() : null;
 			for (Block other : UtilBlock.getInRadius(block.getLocation().add(0.5, 0.5, 0.5), radius).keySet())
 			{
-				addBlock(other);
+				addBlock(other, owner);
 			}
 
 			entity.remove();
 		}, 0);
 	}
 
-	private void addBlock(Block block)
+	private void addBlock(Block block, Player owner)
 	{
 		if (block == null || block.getType() == Material.AIR || block.getType() == Material.BEDROCK || block.isLiquid() || block.getRelative(BlockFace.UP).getTypeId() != 0 || _blocks.containsKey(block))
 		{
 			return;
 		}
 
+		byte colour = getTrailColour(owner);
 		_blocks.put(block, System.currentTimeMillis());
-		MapUtil.QuickChangeBlockAt(block.getLocation(), Material.STAINED_CLAY, (byte) 14);
+		_blockColours.put(block, Byte.valueOf(colour));
+		MapUtil.QuickChangeBlockAt(block.getLocation(), Material.STAINED_CLAY, colour);
+	}
+
+	/** No selection keeps Reborn's original red trail; equipped colours are visible to everyone. */
+	private byte getTrailColour(Player owner)
+	{
+		if (owner == null) return (byte) 14;
+		String selected = ArcadeCosmeticsMenu.getEquippedChoice(owner.getUniqueId(), "runner");
+		if ("white".equals(selected)) return (byte) 0;
+		if ("orange".equals(selected)) return (byte) 1;
+		if ("magenta".equals(selected)) return (byte) 2;
+		if ("lightblue".equals(selected)) return (byte) 3;
+		if ("yellow".equals(selected)) return (byte) 4;
+		if ("lime".equals(selected)) return (byte) 5;
+		if ("pink".equals(selected)) return (byte) 6;
+		if ("gray".equals(selected)) return (byte) 7;
+		return (byte) 14;
 	}
 
 	@EventHandler
@@ -139,7 +160,7 @@ public class Runner extends SoloGame implements IThrown
 			{
 				for (int z = min.getBlockZ(); z <= max.getBlockZ(); z++)
 				{
-					addBlock(player.getLocation().add(x, -0.5, z).getBlock());
+					addBlock(player.getLocation().add(x, -0.5, z).getBlock(), player);
 				}
 			}
 		}
@@ -155,7 +176,9 @@ public class Runner extends SoloGame implements IThrown
 			}
 
 			MapUtil.QuickChangeBlockAt(block.getLocation(), Material.AIR);
-			FallingBlock ent = block.getWorld().spawnFallingBlock(block.getLocation(), Material.STAINED_CLAY, (byte) 14);
+			Byte selectedColour = _blockColours.remove(block);
+			byte fallingColour = selectedColour == null ? (byte) 14 : selectedColour.byteValue();
+			FallingBlock ent = block.getWorld().spawnFallingBlock(block.getLocation(), Material.STAINED_CLAY, fallingColour);
 			Manager.GetProjectile().AddThrow(ent, null, this, BLOCK_LIFETIME, true, false, false, false, 0.3F);
 			return true;
 		});
