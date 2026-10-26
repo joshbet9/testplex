@@ -156,7 +156,7 @@ jobs:
               "Deployment guide": {
                   "manual setup guide": "One-time Windows test-server setup",
                   "test-only warning": "Do not point this at a production server.",
-                  "safe-pad toggle documented": "monstermaze.safe-pad-enhancements",
+                  "safe-pad toggle documented": "safe-pad-enhancements",
               },
               "In-game test plan": {
                   "manual runtime testing disclosed": "these scenarios still require an actual 1.8.x server",
