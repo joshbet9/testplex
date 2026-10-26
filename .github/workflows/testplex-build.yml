@@ -195,7 +195,7 @@ jobs:
               "Monster Maze GameType": {
                   "native Speed registration": "MonsterMazeSpeed(MonsterMazeSpeedGame.class, GameDisplay.MonsterMazeSpeed",
                   "native Modern registration": "MonsterMazeModern(MonsterMazeModern.class, GameDisplay.MonsterMazeModern",
-                  "reuses original map pool": "new GameType[]{GameType.MonsterMaze}, false",
+                  "supports dedicated maps and falls back to original pool": "new GameType[]{GameType.MonsterMaze}, true",
               },
               "Monster Maze Display": {
                   "Speed label": "MonsterMazeSpeed(\"Monster Maze Speed\"",
