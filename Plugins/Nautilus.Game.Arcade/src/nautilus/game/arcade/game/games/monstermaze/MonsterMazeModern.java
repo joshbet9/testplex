@@ -12,6 +12,6 @@ public class MonsterMazeModern extends MonsterMaze
 {
     public MonsterMazeModern(ArcadeManager manager)
     {
-        super(manager, GameType.MonsterMazeModern, true);
+        super(manager, GameType.MonsterMazeModern, MonsterMazeMode.MODERN);
     }
 }
