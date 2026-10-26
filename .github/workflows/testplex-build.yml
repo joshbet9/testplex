@@ -448,7 +448,7 @@ jobs:
             -H "Accept: application/vnd.github+json" \
             "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip"
 
-          download_url="$(awk 'tolower($1) == "location:" { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\\r$/, ""); value = $0 } END { print value }' "$headers")"
+          download_url="$(awk 'tolower($1) == "location:" { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); value = $0 } END { print value }' "$headers")"
           case "$download_url" in
             https://*.blob.core.windows.net/*|https://*.actions.githubusercontent.com/*|https://*.githubusercontent.com/*|https://github.com/*) ;;
             *) echo "GitHub did not return a recognised HTTPS artifact download URL." >&2; exit 1 ;;
