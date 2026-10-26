@@ -377,7 +377,12 @@ public class GameCreationManager implements Listener
 		// Map
 		for (GameType type : Game.getWorldHostNames(gameType))
 		{
-			_maps.put(type, Manager.LoadFiles(type.getName()));
+			List<String> maps = Manager.LoadFiles(type.getName());
+			// A map-source variant may have its own catalog folder without any maps yet.
+			// Skip empty sources so getMapFile() never randomly selects an empty list;
+			// source types that do have maps (e.g. original Monster Maze) remain available.
+			if (maps != null && !maps.isEmpty())
+				_maps.put(type, maps);
 		}
 
 		if (MapPref != null)
