@@ -148,7 +148,7 @@ jobs:
 
           port="${HYPERV_SSH_PORT:-22}"
           echo "Sending signed download URL to the test VM; plugin bytes will download directly over HTTPS."
-          printf '%s\\n' "$download_url" | ssh -p "$port" -i "$HOME/.ssh/testplex_hyperv" \
+          printf '%s\n' "$download_url" | ssh -p "$port" -i "$HOME/.ssh/testplex_hyperv" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
