@@ -54,8 +54,12 @@ function Wait-ForServerProcessState {
 function Invoke-ConfiguredScript {
     param([Parameter(Mandatory = $true)][string]$Path)
     Write-Host "Running configured server script: $Path"
+    $global:LASTEXITCODE = 0
     & $Path
-    if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+    if (-not $?) {
+        throw ("Configured PowerShell script failed: " + $Path)
+    }
+    if ($LASTEXITCODE -ne 0) {
         throw ("Configured script failed with exit code " + $LASTEXITCODE + ": " + $Path)
     }
 }
@@ -101,9 +105,11 @@ $backupRoot = Join-Path $serverRoot (Join-Path ".testplex-backups" $timestamp)
 $copiedNames = @()
 $deploymentStarted = $false
 
+$serverWasRunning = $false
 try {
     $before = Get-TestServerProcesses -Match $processMatch
-    if ($before.Count -gt 0) {
+    $serverWasRunning = $before.Count -gt 0
+    if ($serverWasRunning) {
         Invoke-ConfiguredScript -Path $stopScript
         Wait-ForServerProcessState -Match $processMatch -ShouldBeRunning $false -TimeoutSeconds 180
     }
@@ -118,8 +124,8 @@ try {
 
     foreach ($jar in $jarFiles) {
         $destination = Join-Path $pluginsDir $jar.Name
-        Copy-Item -LiteralPath $jar.FullName -Destination $destination -Force
         $copiedNames += $jar.Name
+        Copy-Item -LiteralPath $jar.FullName -Destination $destination -Force
     }
     $deploymentStarted = $true
 
@@ -133,7 +139,7 @@ catch {
     $deploymentError = $_
     Write-Error "Deployment failed: $deploymentError"
 
-    if ($deploymentStarted -or $copiedNames.Count -gt 0) {
+    if ($deploymentStarted -or $copiedNames.Count -gt 0 -or $serverWasRunning) {
         try {
             $running = Get-TestServerProcesses -Match $processMatch
             if ($running.Count -gt 0) {
