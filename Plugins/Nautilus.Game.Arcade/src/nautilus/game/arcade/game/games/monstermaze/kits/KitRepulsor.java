@@ -29,7 +29,12 @@ public class KitRepulsor extends Kit
 
 	public KitRepulsor(ArcadeManager manager)
 	{
-		super(manager, GameKit.MONSTER_MAZE_REPULSOR, PERKS);
+		this(manager, GameKit.MONSTER_MAZE_REPULSOR);
+	}
+
+	protected KitRepulsor(ArcadeManager manager, GameKit gameKit)
+	{
+		super(manager, gameKit, PERKS);
 	}
 
 	@Override
