@@ -1,6 +1,7 @@
 package nautilus.game.arcade.game.games.monstermaze.kits;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 
@@ -62,7 +63,7 @@ public class KitSlowballModern extends KitSlowball
         _nextUse.put(player.getUniqueId(), now + COOLDOWN_MS);
         player.sendMessage(C.cAqua + C.Bold + "Cryo Blitz! " + C.cGray
                 + frozen + " monster(s) frozen for 3 seconds.");
-        player.playSound(player.getLocation(), org.bukkit.Sound.GLASS, 1.0f, 1.5f);
+        player.playSound(player.getLocation(), org.bukkit.Sound.SUCCESSFUL_HIT, 1.0f, 1.5f);
         org.bukkit.Bukkit.getPluginManager().callEvent(new AbilityUseEvent(player));
     }
 
@@ -73,11 +74,17 @@ public class KitSlowballModern extends KitSlowball
             return;
 
         long now = System.currentTimeMillis();
-        for (Map.Entry<UUID, Long> entry : _nextUse.entrySet())
+        Iterator<Map.Entry<UUID, Long>> iterator = _nextUse.entrySet().iterator();
+        while (iterator.hasNext())
         {
+            Map.Entry<UUID, Long> entry = iterator.next();
+            if (entry.getValue().longValue() > now)
+                continue;
+
             Player player = org.bukkit.Bukkit.getPlayer(entry.getKey());
-            if (player != null && HasKit(player) && entry.getValue().longValue() <= now)
+            if (player != null && player.isOnline() && HasKit(player))
                 player.sendMessage(C.cAqua + "Cryo Blitz is ready.");
+            iterator.remove();
         }
     }
 
