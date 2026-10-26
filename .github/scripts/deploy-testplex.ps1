@@ -137,7 +137,7 @@ try {
 }
 catch {
     $deploymentError = $_
-    Write-Error "Deployment failed: $deploymentError"
+    Write-Warning "Deployment failed: $deploymentError"
 
     if ($deploymentStarted -or $copiedNames.Count -gt 0 -or $serverWasRunning) {
         try {
@@ -163,7 +163,7 @@ catch {
             Write-Warning "Rollback attempted. Previous JARs were restored from $backupRoot where available."
         }
         catch {
-            Write-Error "Rollback or server restart also failed: $_"
+            Write-Warning "Rollback or server restart also failed: $_"
         }
     }
     throw $deploymentError
