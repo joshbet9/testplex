@@ -11,10 +11,16 @@ import net.minecraft.server.v1_8_R3.PacketPlayOutBlockBreakAnimation;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.player.PlayerInteractEvent;
 
-public class SafePad
+public class SafePad implements Listener
 {
 	private MonsterMaze Host;
 //	private Maze _maze;
@@ -32,6 +38,7 @@ public class SafePad
 //		_maze = maze;
 		
 		_loc = loc;
+		Bukkit.getPluginManager().registerEvents(this, Host.Manager.getPlugin());
 
 		// Optional cosmetic tint; stock green (data 5) remains the default.
 		if (Host.Manager.getPlugin().getConfig().getBoolean("monstermaze.safe-pad-enhancements.surface-colour-enabled", false))
@@ -200,6 +207,32 @@ public class SafePad
 				bl.setData(_surfaceColour);
 			}
 		}
+		unregisterListener();
+	}
+
+	private void unregisterListener()
+	{
+		HandlerList.unregisterAll(this);
+	}
+
+	/** Prevent the vanilla Beacon UI opening when a player right-clicks this pad's objective. */
+	@EventHandler
+	public void onInteract(PlayerInteractEvent event)
+	{
+		if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null)
+			return;
+
+		if (event.getClickedBlock().getType() != Material.BEACON)
+			return;
+
+		Location clicked = event.getClickedBlock().getLocation();
+		if (clicked.getWorld() == _loc.getWorld()
+				&& clicked.getBlockX() == _loc.getBlockX()
+				&& clicked.getBlockY() == _loc.getBlockY()
+				&& clicked.getBlockZ() == _loc.getBlockZ())
+		{
+			event.setCancelled(true);
+		}
 	}
 
 	public boolean decay()
@@ -330,6 +363,7 @@ public class SafePad
 		{
 			block.restore();
 		}
+		unregisterListener();
 	}
 
 	public Location getLocation()
