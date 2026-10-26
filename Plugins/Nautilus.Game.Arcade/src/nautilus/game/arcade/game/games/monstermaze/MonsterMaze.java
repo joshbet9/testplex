@@ -66,37 +66,50 @@ public class MonsterMaze extends SoloGame
 	
 	private static final int JUMP_POTION_AMPLIFIER = -10;
 	private int _potionMult = JUMP_POTION_AMPLIFIER;
+	private final boolean _modernVariant;
 		
 	@SuppressWarnings("unchecked")
-	public MonsterMaze(ArcadeManager manager) 
+	public MonsterMaze(ArcadeManager manager)
 	{
-		super(manager, GameType.MonsterMaze,
+		this(manager, GameType.MonsterMaze, false);
+	}
 
-				new Kit[]
-						{
-				new KitJumper(manager),
-				new KitSlowball(manager),
-				new KitBodyBuilder(manager),
-				new KitRepulsor(manager)
-						},
-
-						new String[]
+	/**
+	 * Shared native Reborn game lifecycle. The modern variant differs by its
+	 * kit roster and enhanced mechanics; original Monster Maze keeps its legacy kit roster.
+	 */
+	protected MonsterMaze(ArcadeManager manager, GameType gameType, boolean modernVariant)
+	{
+		super(manager, gameType,
+				modernVariant
+						? new Kit[]
 								{
-				"Run over the maze and don't fall off,",
-				"but make sure you avoid the monsters!",
-				"Make it to a Safe Pad or be killed!"
-								});
+									new KitJumperModern(manager),
+									new KitSlowballModern(manager),
+									new KitBodyBuilderModern(manager),
+									new KitRepulsor(manager),
+									new KitMaverick(manager)
+								}
+						: new Kit[]
+								{
+									new KitJumper(manager),
+									new KitSlowball(manager),
+									new KitBodyBuilder(manager),
+									new KitRepulsor(manager)
+								},
+				new String[]
+							{
+								"Run over the maze and don't fall off,",
+								"but make sure you avoid the monsters!",
+								"Make it to a Safe Pad or be killed!"
+							});
 
+		_modernVariant = modernVariant;
 		DamagePvP = false;
 		DamagePvE = false;
-		
 		DamageFall = false;
-
 		HungerSet = 20;
-		
 		PrepareFreeze = false;
-		
-		HungerSet = 20;
 
 		registerStatTrackers(
 				new SnowmanHitTracker(this),
@@ -104,10 +117,9 @@ public class MonsterMaze extends SoloGame
 				new FirstToSafepadTracker(this),
 				new PilotTracker(this),
 				new SurvivePast10thSafepadTracker(this)
-				);
-		//_maze = new SnowmanMaze(this, WorldData.GetDataLocs("GRAY")/*, WorldData.GetCustomLocs("103")*/);
+		);
 
-		registerChatStats(//first to beacon
+		registerChatStats(
 				new ChatStatData("Ninja", "Times Hit", true),
 				new ChatStatData("Speed", "First to safe pad", true),
 				BlankLine,
@@ -120,10 +132,22 @@ public class MonsterMaze extends SoloGame
 				.setGiveCompassToAlive(false)
 				.register(this);
 	}
-	
+
 	public Maze getMaze()
 	{
 		return _maze;
+	}
+
+	public boolean isModernVariant()
+	{
+		return _modernVariant;
+	}
+
+	/** Refill the enhanced Jumper kit when its player reaches a Safe Pad. */
+	public void resetModernJumperCharges(Player player)
+	{
+		if (_modernVariant && GetKit(player) instanceof KitJumperModern)
+			setJumpsLeft(player, 3);
 	}
 
 	@EventHandler
@@ -236,6 +260,9 @@ public class MonsterMaze extends SoloGame
 		
 		for (Player p : GetPlayers(true))
 		{
+			if (_modernVariant && _maze != null && _maze.isOnPad(p, true))
+				continue; // Speed/QOL variant: jumps on any Safe Pad are free.
+
 			if (!UtilInv.contains(p, "Jumps Remaining", Material.FEATHER, (byte) 0, 1) || p.getLocation().getY()-_center.getY() <= 0 || !Recharge.Instance.usable(p, "MM Player Jump") || isLaunched(p))
 				continue;
 			
