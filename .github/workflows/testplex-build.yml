@@ -285,7 +285,7 @@ jobs:
                       missing.append(f"{game}: {label}")
 
           if missing:
-              raise SystemExit("Native gameplay/cosmetic smoke checks failed:\\n- " + "\\n- ".join(missing))
+              raise SystemExit("Native gameplay/cosmetic smoke checks failed:\n- " + "\n- ".join(missing))
           print("Native gameplay, six-game cosmetics and guarded deployment smoke checks passed.")
           PY
 
@@ -345,8 +345,8 @@ jobs:
           test -n "$SSH_KNOWN_HOSTS" || { echo 'HYPERV_SSH_KNOWN_HOSTS is not configured.' >&2; exit 1; }
           mkdir -p "$HOME/.ssh"
           chmod 700 "$HOME/.ssh"
-          printf '%s\\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/testplex_hyperv"
-          printf '%s\\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/testplex_hyperv"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/testplex_hyperv" "$HOME/.ssh/known_hosts"
 
       - name: Validate isolated Hyper-V target configuration
@@ -360,7 +360,7 @@ jobs:
             /home/monstermaze/servers/testplex|/home/monstermaze/servers/testplex-*) ;;
             *) echo "TESTPLEX_SERVER_DIR must be a dedicated /home/monstermaze/servers/testplex[-name] directory." >&2; exit 1 ;;
           esac
-          [[ "$TESTPLEX_SYSTEMD_SERVICE" =~ ^testplex-[A-Za-z0-9_.@-]+\\.service$ ]] || {
+          [[ "$TESTPLEX_SYSTEMD_SERVICE" =~ ^testplex-[A-Za-z0-9_.@-]+\.service$ ]] || {
             echo "TESTPLEX_SYSTEMD_SERVICE must be a testplex-*.service unit." >&2
             exit 1
           }
@@ -378,7 +378,7 @@ jobs:
           [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] || { echo "source_run_id must be numeric." >&2; exit 1; }
           run_json="$RUNNER_TEMP/testplex-source-run.json"
           artifacts_json="$RUNNER_TEMP/testplex-source-artifacts.json"
-          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \\
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
             "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" -o "$run_json"
           jq -e --arg repo "$GITHUB_REPOSITORY" --arg branch "feat/testbed-bootstrap" '
             .status == "completed" and .conclusion == "success" and
@@ -389,7 +389,7 @@ jobs:
             echo "Source run must be a successful Testplex build from feat/testbed-bootstrap in this repository." >&2
             exit 1
           }
-          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \\
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
             "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts" -o "$artifacts_json"
           artifact_name="$(jq -er '[.artifacts[] | select(.expired == false and (.name | startswith("testplex-plugin-set-")))] | if length == 1 then .[0].name else error("Expected exactly one unexpired testplex-plugin-set artifact") end' "$artifacts_json")"
           echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
@@ -442,10 +442,10 @@ jobs:
           test -n "$HYPERV_SSH_HOST" || { echo 'HYPERV_SSH_HOST is not configured.' >&2; exit 1; }
           test -n "$HYPERV_SSH_USER" || { echo 'HYPERV_SSH_USER is not configured.' >&2; exit 1; }
           port="${HYPERV_SSH_PORT:-22}"
-          scp -P "$port" -i "$HOME/.ssh/testplex_hyperv" \\
-            -o BatchMode=yes -o StrictHostKeyChecking=yes \\
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \\
-            "$RUNNER_TEMP/testplex-plugin-set-$BUILD_SHA.tar.gz" \\
+          scp -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$RUNNER_TEMP/testplex-plugin-set-$BUILD_SHA.tar.gz" \
             "$HYPERV_SSH_USER@$HYPERV_SSH_HOST:/tmp/testplex-plugin-set-$BUILD_SHA.tar.gz"
 
       - name: Install, restart and verify isolated Reborn server
@@ -461,9 +461,9 @@ jobs:
         run: |
           set -euo pipefail
           port="${HYPERV_SSH_PORT:-22}"
-          ssh -p "$port" -i "$HOME/.ssh/testplex_hyperv" \\
-            -o BatchMode=yes -o StrictHostKeyChecking=yes \\
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \\
-            "$HYPERV_SSH_USER@$HYPERV_SSH_HOST" \\
-            "sudo -n bash -s -- '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'" \\
+          ssh -p "$port" -i "$HOME/.ssh/testplex_hyperv" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$HYPERV_SSH_USER@$HYPERV_SSH_HOST" \
+            "sudo -n bash -s -- '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'" \
             < .github/scripts/deploy-testplex-hyperv.sh
