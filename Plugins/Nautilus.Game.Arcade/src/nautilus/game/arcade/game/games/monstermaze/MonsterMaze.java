@@ -73,6 +73,8 @@ public class MonsterMaze extends SoloGame
 	private Location _center;
 	
 	private HashMap<Player, Long> _launched = new HashMap<Player, Long>();
+	// Retain the bump window even after the velocity/grounded tracker clears.
+	private HashMap<Player, Long> _recentMonsterBump = new HashMap<Player, Long>();
 	
 	private static final int JUMP_POTION_AMPLIFIER = -10;
 	private int _potionMult = JUMP_POTION_AMPLIFIER;
@@ -395,7 +397,9 @@ public class MonsterMaze extends SoloGame
 		if (!IsLive())
 			return;
 		
-		_launched.put(event.getPlayer(), System.currentTimeMillis());
+		long now = System.currentTimeMillis();
+		_launched.put(event.getPlayer(), now);
+		_recentMonsterBump.put(event.getPlayer(), now);
 	}
 	
 	@EventHandler
@@ -405,8 +409,22 @@ public class MonsterMaze extends SoloGame
 			return;
 		
 		if (!IsLive())
+		{
+			_launched.clear();
+			_recentMonsterBump.clear();
 			return;
-		
+		}
+
+		Iterator<Map.Entry<Player, Long>> recent = _recentMonsterBump.entrySet().iterator();
+		while (recent.hasNext())
+		{
+			Map.Entry<Player, Long> entry = recent.next();
+			Player player = entry.getKey();
+			if (player == null || !player.isOnline()
+					|| UtilTime.elapsed(entry.getValue(), 2000))
+				recent.remove();
+		}
+
 		HashMap<Player, Long> copy = new HashMap<Player, Long>();
 		copy.putAll(_launched);
 		
@@ -444,7 +462,11 @@ public class MonsterMaze extends SoloGame
 	
 	public boolean isLaunched(Player player)
 	{
-		return _launched.containsKey(player);
+		if (_launched.containsKey(player))
+			return true;
+
+		Long bumpedAt = _recentMonsterBump.get(player);
+		return bumpedAt != null && !UtilTime.elapsed(bumpedAt, 2000);
 	}
 	
 	@EventHandler
