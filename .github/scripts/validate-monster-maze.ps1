@@ -14,7 +14,7 @@ function Assert-Contains {
     )
 
     if (-not (Test-Path -LiteralPath $File)) {
-        throw "$Name: source file not found: $File"
+        throw "${Name}: source file not found: $File"
     }
 
     $content = Get-Content -LiteralPath $File -Raw
