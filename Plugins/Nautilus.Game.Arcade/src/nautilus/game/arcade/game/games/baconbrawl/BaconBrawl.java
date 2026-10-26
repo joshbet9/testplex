@@ -3,6 +3,7 @@ package nautilus.game.arcade.game.games.baconbrawl;
 import java.util.concurrent.TimeUnit;
 
 import org.bukkit.GameMode;
+import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
