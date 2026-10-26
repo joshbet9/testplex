@@ -644,8 +644,8 @@ public class Maze implements Listener
 			Location loc = UtilAlg.Random(validSpawns);
 			if (loc == null || loc.getWorld() == null)
 			{
-				System.out.println("Monster Maze: selected an invalid mob spawn location; skipping this spawn.");
-				continue;
+				System.out.println("Monster Maze: selected an invalid mob spawn location; aborting this spawn batch.");
+				break;
 			}
 			
 			_host.CreatureAllowOverride = true;
