@@ -73,14 +73,17 @@ public class PilotTracker extends StatTracker<MonsterMaze>
 			}
 			
 			if (UtilEnt.isGrounded(player))
-			{				
+			{
 				_launched.remove(player);
-								
-				if (getGame().getMaze().isOnPad(player, false))
-				{			
+
+				// Pilot is only valid when the landing follows the bump within 2 seconds.
+				if (!UtilTime.elapsed(copy.get(player), 2000)
+						&& getGame().getMaze() != null
+						&& getGame().getMaze().isOnPad(player, false))
+				{
 					addStat(player);
 				}
-				
+
 				continue;
 			}
 
