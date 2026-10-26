@@ -370,8 +370,22 @@ public class Snake extends SoloGame
 		}
 		else if (debuff == ControlDebuff.WEAK_SHARP_TURN)
 		{
-			float delta = wrapYaw(rawYaw - previousYaw);
-			effectiveYaw = previousYaw + clamp(delta, -10.0f, 10.0f);
+			// Keep this state across ticks so a sharp turn stays sluggish until the
+			// snake catches up, rather than weakening only the first input packet.
+			Float appliedValue = _laggedYaw.get(player);
+			float appliedYaw = appliedValue == null ? previousYaw : appliedValue.floatValue();
+			float remaining = wrapYaw(rawYaw - appliedYaw);
+			if (Math.abs(remaining) > 15.0f)
+			{
+				appliedYaw += clamp(remaining, -4.0f, 4.0f);
+				_laggedYaw.put(player, Float.valueOf(appliedYaw));
+				effectiveYaw = appliedYaw;
+			}
+			else
+			{
+				_laggedYaw.put(player, Float.valueOf(rawYaw));
+				effectiveYaw = rawYaw;
+			}
 		}
 
 		Location heading = player.getLocation().clone();
@@ -388,7 +402,9 @@ public class Snake extends SoloGame
 					: current.clone().multiply(0.62).add(previous.clone().multiply(0.38));
 			if (blended.lengthSquared() < 1.0e-6) blended = current.clone();
 			blended.normalize();
-			_lastTravelDirection.put(player, current.clone());
+			// Keep the blended heading as the next tick's momentum. Saving the raw
+			// camera direction here made Drift last for only one tick.
+			_lastTravelDirection.put(player, blended.clone());
 			return blended;
 		}
 		return current;
