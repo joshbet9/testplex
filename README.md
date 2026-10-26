@@ -39,3 +39,13 @@ Feel free to add them back by checking git diff or even better recompile everyth
 ```
 
 3. ``mvn install``
+
+## Arcade testbed (experimental)
+
+The `Testplex Java 8 build` GitHub Actions workflow compiles the Maven reactor, validates the native gameplay/cosmetic hooks, and uploads the resulting `Plugins/out/*.jar` plugin set as a versioned artifact.
+
+- [In-game acceptance checklist](docs/IN-GAME-TEST-PLAN.md)
+- [Isolated Windows test-server setup and gated deployment](docs/testbed-deployment.md)
+- [Current testbed pull request](https://github.com/joshbet9/testplex/pull/1)
+
+The workflow does **not** change a live server by default. Automatic deployment requires an isolated Windows self-hosted runner and the server-specific variables/scripts described in the setup guide. Build success is not a substitute for running the in-game checklist on that isolated server.
