@@ -1,0 +1,180 @@
+name: Deploy Testplex Reborn to Hyper-V
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy_to_test_server:
+        description: Deploy the selected successful artifact to the isolated Reborn test server
+        required: true
+        type: boolean
+        default: false
+      source_run_id:
+        description: Successful Testplex build run ID containing the plugin artifact
+        required: true
+        type: string
+        default: "40301889733"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: testplex-manual-hyperv-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy_test_server:
+    name: Deploy isolated Reborn test server to Hyper-V
+    if: ${{ github.ref == 'refs/heads/feat/testbed-bootstrap' && inputs.deploy_to_test_server }}
+    runs-on: ubuntu-22.04
+    environment: hyperv
+    timeout-minutes: 25
+    concurrency:
+      group: testplex-isolated-hyperv-server
+      cancel-in-progress: false
+    steps:
+      - name: Check out deployment script
+        uses: actions/checkout@v4
+
+      - name: Connect runner to Hyper-V over Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:github-actions
+          ping: 100.98.188.97
+
+      - name: Prepare SSH credentials
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.HYPERV_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.HYPERV_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY" || { echo 'HYPERV_SSH_PRIVATE_KEY is not configured.' >&2; exit 1; }
+          test -n "$SSH_KNOWN_HOSTS" || { echo 'HYPERV_SSH_KNOWN_HOSTS is not configured.' >&2; exit 1; }
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/testplex_hyperv"
+          printf '%s\\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/testplex_hyperv" "$HOME/.ssh/known_hosts"
+
+      - name: Validate isolated Hyper-V target configuration
+        shell: bash
+        env:
+          TESTPLEX_SERVER_DIR: ${{ vars.TESTPLEX_SERVER_DIR }}
+          TESTPLEX_SYSTEMD_SERVICE: ${{ vars.TESTPLEX_SYSTEMD_SERVICE }}
+        run: |
+          set -euo pipefail
+          case "$TESTPLEX_SERVER_DIR" in
+            /home/monstermaze/servers/testplex|/home/monstermaze/servers/testplex-*) ;;
+            *) echo "TESTPLEX_SERVER_DIR must be a dedicated /home/monstermaze/servers/testplex[-name] directory." >&2; exit 1 ;;
+          esac
+          [[ "$TESTPLEX_SYSTEMD_SERVICE" =~ ^testplex-[A-Za-z0-9_.@-]+\\.service$ ]] || {
+            echo "TESTPLEX_SYSTEMD_SERVICE must be a testplex-*.service unit." >&2
+            exit 1
+          }
+          [[ "$TESTPLEX_SYSTEMD_SERVICE" != "monstermaze-18.service" && "$TESTPLEX_SYSTEMD_SERVICE" != "monstermaze-21.service" ]]
+
+      - name: Select existing successful build artifact
+        id: source-artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.source_run_id != '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] || { echo "source_run_id must be numeric." >&2; exit 1; }
+          run_json="$RUNNER_TEMP/testplex-source-run.json"
+          artifacts_json="$RUNNER_TEMP/testplex-source-artifacts.json"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \\
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" -o "$run_json"
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg branch "feat/testbed-bootstrap" '
+            .status == "completed" and .conclusion == "success" and
+            .head_branch == $branch and
+            ((.head_repository.full_name // "") | ascii_downcase) == ($repo | ascii_downcase) and
+            .path == ".github/workflows/testplex-build.yml"
+          ' "$run_json" >/dev/null || {
+            echo "Source run must be a successful Testplex build from feat/testbed-bootstrap in this repository." >&2
+            exit 1
+          }
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \\
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts" -o "$artifacts_json"
+          artifact_name="$(jq -er '[.artifacts[] | select(.expired == false and (.name | startswith("testplex-plugin-set-")))] | if length == 1 then .[0].name else error("Expected exactly one unexpired testplex-plugin-set artifact") end' "$artifacts_json")"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+          echo "artifact_sha=${artifact_name#testplex-plugin-set-}" >> "$GITHUB_OUTPUT"
+          echo "Selected $artifact_name from successful run $SOURCE_RUN_ID"
+
+      - name: Download artifact from this workflow build
+        if: ${{ inputs.source_run_id == '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: testplex-plugin-set-${{ github.sha }}
+          path: ${{ runner.temp }}/testplex-plugin-set
+
+      - name: Download artifact from previous successful build
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.source_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.source-artifact.outputs.artifact_name }}
+          path: ${{ runner.temp }}/testplex-plugin-set
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate and package the exact plugin set
+        shell: bash
+        env:
+          ARTIFACT_DIR: ${{ runner.temp }}/testplex-plugin-set
+          BUILD_SHA: ${{ steps.source-artifact.outputs.artifact_sha }}
+        run: |
+          set -euo pipefail
+          test -s "$ARTIFACT_DIR/Arcade.jar" || { echo "Downloaded artifact must contain Arcade.jar." >&2; exit 1; }
+          count="$(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name '*.jar' | wc -l)"
+          test "$count" -gt 0 || { echo "Artifact contains no plugin JARs." >&2; exit 1; }
+          tarball="$RUNNER_TEMP/testplex-plugin-set-$BUILD_SHA.tar.gz"
+          (
+            cd "$ARTIFACT_DIR"
+            tar -czf "$tarball" -- *.jar
+          )
+          test -s "$tarball"
+          sha256sum "$tarball"
+
+      - name: Upload plugin set to Hyper-V
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          BUILD_SHA: ${{ steps.source-artifact.outputs.artifact_sha }}
+        run: |
+          set -euo pipefail
+          test -n "$HYPERV_SSH_HOST" || { echo 'HYPERV_SSH_HOST is not configured.' >&2; exit 1; }
+          test -n "$HYPERV_SSH_USER" || { echo 'HYPERV_SSH_USER is not configured.' >&2; exit 1; }
+          port="${HYPERV_SSH_PORT:-22}"
+          scp -P "$port" -i "$HOME/.ssh/testplex_hyperv" \\
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \\
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \\
+            "$RUNNER_TEMP/testplex-plugin-set-$BUILD_SHA.tar.gz" \\
+            "$HYPERV_SSH_USER@$HYPERV_SSH_HOST:/tmp/testplex-plugin-set-$BUILD_SHA.tar.gz"
+
+      - name: Install, restart and verify isolated Reborn server
+        shell: bash
+        timeout-minutes: 8
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          TESTPLEX_SERVER_DIR: ${{ vars.TESTPLEX_SERVER_DIR }}
+          TESTPLEX_SYSTEMD_SERVICE: ${{ vars.TESTPLEX_SYSTEMD_SERVICE }}
+          BUILD_SHA: ${{ steps.source-artifact.outputs.artifact_sha }}
+        run: |
+          set -euo pipefail
+          port="${HYPERV_SSH_PORT:-22}"
+          ssh -p "$port" -i "$HOME/.ssh/testplex_hyperv" \\
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \\
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \\
+            "$HYPERV_SSH_USER@$HYPERV_SSH_HOST" \\
+            "sudo -n bash -s -- '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'" \\
+            < .github/scripts/deploy-testplex-hyperv.sh
