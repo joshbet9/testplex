@@ -153,3 +153,11 @@ Repeat with `/game set MonsterMazeModern`. To test a fixed layout, set `monsterm
 - Right-click the objective beacon on an active pad. It should not open the vanilla Beacon UI. After the pad becomes an old/decaying pad, its interaction listener should be removed; confirm this across several transitions and after the game ends.
 - As Jumper, get bumped by a monster and repeatedly press jump while still airborne/being knocked. The bump grace window should prevent an accidental charged-jump deduction for 2 seconds after the hit. Then confirm normal charged jumps resume after the window.
 - Test Pilot: being bumped while already standing on a Safe Pad must not set up a Pilot attempt. Being knocked from away from the pad and landing directly on the active pad within the knock window may qualify. Repeat at the edge and after an unsuccessful landing to ensure stale bumps don't award the stat later.
+
+
+### Mob-spawn performance regression
+
+- Start each variant from Recruit and observe monster population over the first several ticks. The initial population should appear in small bursts (up to 25 entities per tick), rather than all 150/225 appearing in one server tick.
+- Count the starter population after queued spawning settles: Original = 150; Speed = 150; Modern = 225. Do not use the short-lived intermediate count to judge the result.
+- Leave the game before the queue has finished, then start a fresh round. The prior round's pending spawns must be cleared, and no late mob should appear in the ended game or leak into the next round.
+- Check console/TPS while spawning. The change reduces the creation burst but intentionally does not trim nearby mobs or reduce the total population.
