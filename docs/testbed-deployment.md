@@ -69,6 +69,16 @@ monstermaze:
 - Do not enable auto-deploy until the runner and paths have been verified on the isolated VM. Self-hosted runners execute repository code, so only trusted project members should be able to push to the deployment branch or enable the deployment variable.
 
 
+## Local validation without GitHub Actions
+
+On a Windows development machine with **JDK 8** and Maven on `PATH`, run this from the repository root:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .github/scripts/validate-monster-maze.ps1
+```
+
+The script builds the full Maven reactor, verifies that `Plugins/out/Arcade.jar` contains the native Speed, Modern and PB classes, and checks the key port contracts. For a source-only pass without Maven, use `-SkipBuild`; source checks do not replace the Java build. No server is stopped, deployed to, or restarted by this local script.
+
 ## Native Monster Maze test variants
 
 The new games are part of the Reborn Arcade plugin, not a standalone JAR. For manual tests, use `/game set MonsterMaze`, `/game set MonsterMazeSpeed`, or `/game set MonsterMazeModern`, then `/game start` when the game is not already running. On a Reborn test server, `/game set` updates the active test game list. For a persistent rotating server group, add `MonsterMazeSpeed` and `MonsterMazeModern` to that group's configured games list while retaining `MonsterMaze`. All variants reuse the original Reborn Monster Maze map pool and kit/stat infrastructure. Do not install the standalone `MonsterMazeStandalone.jar`.
