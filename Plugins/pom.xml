@@ -107,7 +107,7 @@
                 <artifactId>bungeecord-bootstrap</artifactId>
                 <version>1.8-SNAPSHOT</version>
                 <scope>system</scope>
-                <systemPath>${mineplex.libs.dir}\bungeecord-bootstrap-1.8-SNAPSHOT.jar</systemPath>
+                <systemPath>${mineplex.libs.dir}/bungeecord-bootstrap-1.8-SNAPSHOT.jar</systemPath>
             </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>
@@ -150,7 +150,7 @@
                 <artifactId>spigot</artifactId>
                 <version>1.8.8-1.9-SNAPSHOT</version>
                 <scope>system</scope>
-                <systemPath>${mineplex.libs.dir}\spigot-1.8.8-1.9-SNAPSHOT.jar</systemPath>
+                <systemPath>${mineplex.libs.dir}/spigot-1.8.8-1.9-SNAPSHOT.jar</systemPath>
             </dependency>
             <dependency>
                 <groupId>redis.clients</groupId>
