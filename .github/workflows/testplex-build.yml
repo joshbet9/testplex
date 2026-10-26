@@ -137,14 +137,18 @@ jobs:
                   "Maverick pad-directed knockback": "getMobKnockTarget()",
               },
               "Monster Maze Core": {
-                  "mode distinguishes Original Speed and Modern": "MonsterMazeMode.ORIGINAL" and "MonsterMazeMode.SPEED" and "MonsterMazeMode.MODERN",
+                  "Original ruleset is separate": "mode == MonsterMazeMode.ORIGINAL",
+                  "Speed ruleset is separate": "mode == MonsterMazeMode.SPEED",
+                  "Modern ruleset is separate": "mode == MonsterMazeMode.MODERN",
                   "Modern has higher starter mob total": "_maze.fillSpawn(isActualModernMode() ? 225 : 150)",
                   "uses configurable/repeatable pattern selection": "getPatternMapPreset(_center, getMazeBlockData(), requestedPattern)",
                   "Speed keeps original pacing by mode predicate": "return _mode != MonsterMazeMode.ORIGINAL;",
                   "separate personal best support": "resetModernJumperCharges",
               },
               "Monster Maze Mode": {
-                  "three native rulesets": "ORIGINAL" and "SPEED" and "MODERN",
+                  "Original mode exists": "ORIGINAL",
+                  "Speed mode exists": "SPEED",
+                  "Modern mode exists": "MODERN",
               },
               "Monster Maze Speed": {
                   "native Speed game type": "GameType.MonsterMazeSpeed",
@@ -229,7 +233,7 @@ jobs:
               "Deployment guide": {
                   "native game names documented": "MonsterMazeSpeed",
                   "requires account database for PBs": "account custom data",
-                  "pattern configuration documented": "monstermaze.pattern",
+                  "pattern configuration documented": "pattern: 0 # 0=random",
               },
           }
 
