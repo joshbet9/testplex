@@ -80,6 +80,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          bash -n .github/scripts/deploy-testplex-hyperv.sh
           python3 - <<'PY'
           from pathlib import Path
 
