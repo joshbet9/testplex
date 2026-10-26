@@ -28,7 +28,12 @@ public class KitBodyBuilder extends Kit
 
 	public KitBodyBuilder(ArcadeManager manager)
 	{
-		super(manager, GameKit.MONSTER_MAZE_BODY_BUILDER, PERKS);
+		this(manager, GameKit.MONSTER_MAZE_BODY_BUILDER);
+	}
+
+	protected KitBodyBuilder(ArcadeManager manager, GameKit gameKit)
+	{
+		super(manager, gameKit, PERKS);
 	}
 
 	@Override
