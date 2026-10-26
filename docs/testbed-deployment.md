@@ -71,7 +71,7 @@ monstermaze:
 
 ## Native Monster Maze test variants
 
-The new games are part of the Reborn Arcade plugin, not a standalone JAR. In the dedicated test server's server-group configuration, add the enum values `MonsterMazeSpeed` and `MonsterMazeModern` to its configured games list while retaining `MonsterMaze`. These entries share the existing Reborn Monster Maze map pool and kit/stat systems. Do not install the standalone `MonsterMazeStandalone.jar`.
+The new games are part of the Reborn Arcade plugin, not a standalone JAR. For manual tests, use `/game set MonsterMaze`, `/game set MonsterMazeSpeed`, or `/game set MonsterMazeModern`, then `/game start` when the game is not already running. On a Reborn test server, `/game set` updates the active test game list. For a persistent rotating server group, add `MonsterMazeSpeed` and `MonsterMazeModern` to that group's configured games list while retaining `MonsterMaze`. All variants reuse the original Reborn Monster Maze map pool and kit/stat infrastructure. Do not install the standalone `MonsterMazeStandalone.jar`.
 
 To reproduce a layout, merge this into the Arcade plugin's config without replacing other settings:
 
