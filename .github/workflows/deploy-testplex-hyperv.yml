@@ -101,79 +101,56 @@ jobs:
           }
           curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
             "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts" -o "$artifacts_json"
-          artifact_name="$(jq -er '[.artifacts[] | select(.expired == false and (.name | startswith("testplex-plugin-set-")))] | if length == 1 then .[0].name else error("Expected exactly one unexpired testplex-plugin-set artifact") end' "$artifacts_json")"
+          artifact_record="$(jq -ce '[.artifacts[] | select(.expired == false and (.name | startswith("testplex-plugin-set-")))] | if length == 1 then .[0] else error("Expected exactly one unexpired testplex-plugin-set artifact") end' "$artifacts_json")"
+          artifact_name="$(jq -er '.name' <<< "$artifact_record")"
+          artifact_id="$(jq -er '.id | tostring' <<< "$artifact_record")"
+          artifact_sha="${artifact_name#testplex-plugin-set-}"
           echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
-          echo "artifact_sha=${artifact_name#testplex-plugin-set-}" >> "$GITHUB_OUTPUT"
+          echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
+          echo "artifact_sha=$artifact_sha" >> "$GITHUB_OUTPUT"
           echo "Selected $artifact_name from successful run $SOURCE_RUN_ID"
 
-      - name: Download artifact from this workflow build
-        if: ${{ inputs.source_run_id == '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: testplex-plugin-set-${{ github.sha }}
-          path: ${{ runner.temp }}/testplex-plugin-set
-
-      - name: Download artifact from previous successful build
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.source_run_id != '' }}
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ steps.source-artifact.outputs.artifact_name }}
-          path: ${{ runner.temp }}/testplex-plugin-set
-          repository: ${{ github.repository }}
-          run-id: ${{ inputs.source_run_id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Validate and package the exact plugin set
+      - name: Download artifact directly on Hyper-V and deploy
         shell: bash
+        timeout-minutes: 15
         env:
-          ARTIFACT_DIR: ${{ runner.temp }}/testplex-plugin-set
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ARTIFACT_ID: ${{ steps.source-artifact.outputs.artifact_id }}
           BUILD_SHA: ${{ steps.source-artifact.outputs.artifact_sha }}
-        run: |
-          set -euo pipefail
-          test -s "$ARTIFACT_DIR/Arcade.jar" || { echo "Downloaded artifact must contain Arcade.jar." >&2; exit 1; }
-          count="$(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name '*.jar' | wc -l)"
-          test "$count" -gt 0 || { echo "Artifact contains no plugin JARs." >&2; exit 1; }
-          tarball="$RUNNER_TEMP/testplex-plugin-set-$BUILD_SHA.tar.gz"
-          (
-            cd "$ARTIFACT_DIR"
-            tar -czf "$tarball" -- *.jar
-          )
-          test -s "$tarball"
-          sha256sum "$tarball"
-
-      - name: Upload plugin set to Hyper-V
-        shell: bash
-        env:
-          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
-          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
-          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
-          BUILD_SHA: ${{ steps.source-artifact.outputs.artifact_sha }}
-        run: |
-          set -euo pipefail
-          test -n "$HYPERV_SSH_HOST" || { echo 'HYPERV_SSH_HOST is not configured.' >&2; exit 1; }
-          test -n "$HYPERV_SSH_USER" || { echo 'HYPERV_SSH_USER is not configured.' >&2; exit 1; }
-          port="${HYPERV_SSH_PORT:-22}"
-          scp -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
-            -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            "$RUNNER_TEMP/testplex-plugin-set-$BUILD_SHA.tar.gz" \
-            "$HYPERV_SSH_USER@$HYPERV_SSH_HOST:/tmp/testplex-plugin-set-$BUILD_SHA.tar.gz"
-
-      - name: Install, restart and verify isolated Reborn server
-        shell: bash
-        timeout-minutes: 8
-        env:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           TESTPLEX_SERVER_DIR: ${{ vars.TESTPLEX_SERVER_DIR }}
           TESTPLEX_SYSTEMD_SERVICE: ${{ vars.TESTPLEX_SYSTEMD_SERVICE }}
-          BUILD_SHA: ${{ steps.source-artifact.outputs.artifact_sha }}
         run: |
           set -euo pipefail
+          [[ "$ARTIFACT_ID" =~ ^[0-9]+$ ]] || { echo "Missing numeric artifact ID." >&2; exit 1; }
+          [[ "$BUILD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Missing valid build SHA." >&2; exit 1; }
+          test -n "$HYPERV_SSH_HOST" || { echo 'HYPERV_SSH_HOST is not configured.' >&2; exit 1; }
+          test -n "$HYPERV_SSH_USER" || { echo 'HYPERV_SSH_USER is not configured.' >&2; exit 1; }
+
+          # Resolve a short-lived signed URL through the authenticated GitHub API.
+          # The server then downloads the artifact over HTTPS rather than sending
+          # the entire plugin bundle through the Tailscale SSH relay.
+          headers="$(mktemp)"
+          trap 'rm -f "$headers"' EXIT
+          curl --silent --show-error --fail \
+            --dump-header "$headers" --output /dev/null \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip"
+
+          download_url="$(awk 'tolower($1) == "location:" { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); value = $0 } END { print value }' "$headers")"
+          case "$download_url" in
+            https://*.blob.core.windows.net/*|https://*.actions.githubusercontent.com/*|https://*.githubusercontent.com/*|https://github.com/*) ;;
+            *) echo "GitHub did not return a recognised HTTPS artifact download URL." >&2; exit 1 ;;
+          esac
+
           port="${HYPERV_SSH_PORT:-22}"
-          ssh -p "$port" -i "$HOME/.ssh/testplex_hyperv" \
+          echo "Sending signed download URL to the test VM; plugin bytes will download directly over HTTPS."
+          printf '%s\\n' "$download_url" | ssh -p "$port" -i "$HOME/.ssh/testplex_hyperv" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
             "$HYPERV_SSH_USER@$HYPERV_SSH_HOST" \
             "sudo -n /usr/local/sbin/deploy-testplex-hyperv.sh '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'"
