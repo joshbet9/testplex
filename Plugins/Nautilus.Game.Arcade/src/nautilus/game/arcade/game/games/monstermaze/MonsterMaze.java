@@ -25,6 +25,11 @@ import nautilus.game.arcade.game.games.monstermaze.events.AbilityUseEvent;
 import nautilus.game.arcade.game.games.monstermaze.events.MonsterBumpPlayerEvent;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitBodyBuilder;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitJumper;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitJumperModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitBodyBuilderModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitMaverick;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitRepulsorModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitSlowballModern;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitRepulsor;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitSlowball;
 import nautilus.game.arcade.game.games.monstermaze.trackers.AbilityUseTracker;
@@ -87,7 +92,7 @@ public class MonsterMaze extends SoloGame
 									new KitJumperModern(manager),
 									new KitSlowballModern(manager),
 									new KitBodyBuilderModern(manager),
-									new KitRepulsor(manager),
+									new KitRepulsorModern(manager),
 									new KitMaverick(manager)
 								}
 						: new Kit[]
