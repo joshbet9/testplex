@@ -1133,6 +1133,8 @@ public class Maze implements Listener
 
 			UtilPlayer.message(p, F.main("Game", "You made it to the Safe Pad!"));
 			_playersOnPad.add(p);
+			// Persist a personal best per native game mode, selected kit, and original maze pattern.
+			MonsterMazePersonalBestManager.record(_host, p, _curSafe, _preset.getPatternId());
 			if (_host.isModernVariant())
 				_host.resetModernJumperCharges(p);
 
