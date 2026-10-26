@@ -99,7 +99,7 @@ Before testing, ensure the isolated Arcade server group's configured **Games** l
 | Maze and lifecycle | Existing native Reborn game | Same Reborn maze/map/lifecycle | Same Reborn maze/map/lifecycle |
 | Starter monsters | 150 | 150 | 225 |
 | Safe Pad timing | Original pacing | Original pacing | Starts at 35s, decreases by 2s per stage to a 15s floor |
-| Additional transition wave | Original 15-mob wave | Original 15-mob wave | Original 15-mob wave plus 30 additional monsters |
+| Additional transition wave | Original 15-mob wave | Original 15-mob wave | 30-mob transition wave (not stacked with the Original 15) |
 | Jumper | 5 charges; original rules | 3 charges; Safe Pads refill charges; jumps while on a Safe Pad are free | Same enhanced Jumper mechanics as Speed |
 | Slowballer | Slowball only | Cryo Blitz freezes monsters within 6 blocks for 3s; 30s cooldown | Same enhanced Slowballer mechanics as Speed |
 | Body Builder | Original max-health reward | Two Body Rush activations per run, 10s each; monster contacts deflect the monster and cost 2s of duration | Same enhanced Body Builder mechanics as Speed |
