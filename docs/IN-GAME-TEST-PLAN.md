@@ -145,7 +145,7 @@ On the isolated test server, after the new Arcade JAR is installed, an administr
 /game start 10
 ```
 
-Repeat with `/game set MonsterMazeModern`. To test a fixed layout, set `monstermaze.pattern` to `1`, `2`, or `3` in the Arcade plugin config before the round/server starts; `0` is random. The current layout number is shown on the in-game scoreboard. While a Monster Maze game is selected, use `/game pb` to display the caller's saved PB for each of the three layouts for their selected kit. The command is part of Reborn's normal `/game` command tree, not a standalone Monster Maze command.
+Repeat with `/game set MonsterMazeModern`. To test a fixed layout, set `monstermaze.pattern` to `1`, `2`, or `3` in the Arcade plugin config before the round/server starts; `0` is random. The current layout number is shown on the in-game scoreboard. While a Monster Maze game is selected, use `/game pb` to display the caller's saved PB for each of the three layouts for their selected kit. The command is part of Reborn's normal `/game` command tree, not a standalone Monster Maze command. The new types prefer their own native map folder when it has maps, and otherwise fall back to the original Monster Maze map catalog; duplicate map folders are not required for initial testing.
 
 
 ### Additional global regression fixes
