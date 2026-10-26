@@ -65,3 +65,21 @@ monstermaze:
 - Replaced JARs are backed up under `.testplex-backups/<timestamp>/` inside the test server root. Retain a known-good backup until the new version has been tested.
 - If the server process does not stop or return within three minutes, deployment fails. Startup failure triggers a best-effort rollback, but the workflow cannot guarantee recovery from a broken server launcher or host-level failure; keep VM snapshots and a tested manual recovery path.
 - Do not enable auto-deploy until the runner and paths have been verified on the isolated VM. Self-hosted runners execute repository code, so only trusted project members should be able to push to the deployment branch or enable the deployment variable.
+
+
+## Native Monster Maze test variants
+
+The new games are part of the Reborn Arcade plugin, not a standalone JAR. In the dedicated test server's server-group configuration, add the enum values `MonsterMazeSpeed` and `MonsterMazeModern` to its configured games list while retaining `MonsterMaze`. These entries share the existing Reborn Monster Maze map pool and kit/stat systems. Do not install the standalone `MonsterMazeStandalone.jar`.
+
+To reproduce a layout, merge this into the Arcade plugin's config without replacing other settings:
+
+```yaml
+monstermaze:
+  pattern: 0 # 0=random; 1, 2, or 3=force that original maze pattern
+  safe-pad-enhancements:
+    enabled: false
+    surface-colour-enabled: false
+    surface-colour-data: 5
+```
+
+The personal-best port writes per-player records through Mineplex account custom data, separated by game display/mode, pattern and kit. The isolated test server therefore needs a functioning Mineplex account/custom-data database. No Monster Maze competitive backend/API credentials are required for this PB feature.
