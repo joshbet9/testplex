@@ -177,11 +177,31 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         return 0;
     }
 
-    private int colourData(String choice) {
+    /** Resolve the visible Minecraft 1.8 stained-glass/clay colour for an equipped cosmetic. */
+    public static int getEquippedColourData(UUID playerId, String game) {
+        String selected = getEquippedChoice(playerId, game);
+        if (selected.isEmpty()) return -1;
+
+        if ("microbattles".equalsIgnoreCase(game)) {
+            if ("aqua".equals(selected)) return 3;
+            if ("ember".equals(selected)) return 14;
+            if ("forest".equals(selected)) return 5;
+            if ("royal".equals(selected)) return 10;
+            if ("sunset".equals(selected)) return 6;
+            if ("solar".equals(selected)) return 4;
+            if ("frost".equals(selected)) return 0;
+            if ("void".equals(selected)) return 15;
+            return -1;
+        }
+
+        return colourData(selected);
+    }
+
+    public static int colourData(String choice) {
         String[] colours = {"white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
                 "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"};
         for (int i = 0; i < colours.length; i++) if (colours[i].equals(choice)) return i;
-        return 14;
+        return -1;
     }
 
     private String describeChoice(String game, String choice) {
@@ -191,10 +211,10 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             return "Red Super, pink Speed, orange Reverse";
         }
         if ("runner".equals(game)) return "Custom colour for your disappearing running trail";
-        if ("baconbrawl".equals(game)) return "Accessory shown on the Bacon Brawl leader pig";
-        if ("dragonescape".equals(game)) return "Custom stained-glass colour for the Dragon Escape beacon filter";
+        if ("baconbrawl".equals(game)) return "Themed sparkle trail around your pig disguise, visible to other players";
+        if ("dragonescape".equals(game)) return "Custom stained-glass dust trail while running, visible to other players";
         if ("evolution".equals(game)) return "Dragon-egg particle effect when evolving";
-        return "Personal centre-glass tint and matching border particles";
+        return "Personal stained-glass dust trail, visible to other players";
     }
 
     private ItemStack named(Material material, String name, String loreLine) {
