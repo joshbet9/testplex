@@ -1,0 +1,65 @@
+name: Testplex Java 8 build
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "Plugins/**"
+      - ".github/workflows/testplex-build.yml"
+  pull_request:
+    paths:
+      - "Plugins/**"
+      - ".github/workflows/testplex-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testplex-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Mineplex Reborn modules
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "8"
+          cache: maven
+          cache-dependency-path: Plugins/pom.xml
+
+      - name: Verify bundled legacy server dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s libs/spigot-1.8.8-1.9-SNAPSHOT.jar
+          test -s libs/bungeecord-bootstrap-1.8-SNAPSHOT.jar
+          grep -Fq '${mineplex.libs.dir}/spigot-1.8.8-1.9-SNAPSHOT.jar' Plugins/pom.xml
+          grep -Fq '${mineplex.libs.dir}/bungeecord-bootstrap-1.8-SNAPSHOT.jar' Plugins/pom.xml
+
+      - name: Build and install all Maven modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn --batch-mode --no-transfer-progress \
+            -f Plugins/pom.xml \
+            -Dmineplex.libs.dir="${GITHUB_WORKSPACE}/libs" \
+            -DskipTests \
+            install
+
+      - name: Verify Arcade artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Built artifacts:"
+          find Plugins/out -maxdepth 1 -type f -name '*.jar' -printf '%f %s bytes\n' | sort
+          test -s Plugins/out/Arcade.jar
