@@ -48,6 +48,9 @@ import mineplex.core.common.util.UtilFirework;
 import mineplex.core.common.util.UtilInv;
 import mineplex.core.common.util.UtilMath;
 import mineplex.core.common.util.UtilPlayer;
+import mineplex.core.common.util.UtilParticle;
+import mineplex.core.common.util.UtilParticle.ParticleType;
+import mineplex.core.common.util.UtilParticle.ViewDist;
 import mineplex.core.common.util.UtilServer;
 import mineplex.core.common.util.UtilTextBottom;
 import mineplex.core.common.util.UtilTextTop;
@@ -58,6 +61,7 @@ import mineplex.core.updater.UpdateType;
 import mineplex.core.updater.event.UpdateEvent;
 
 import nautilus.game.arcade.ArcadeManager;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import nautilus.game.arcade.GameType;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.events.PlayerKitGiveEvent;
@@ -117,6 +121,7 @@ public class DragonEscape extends SoloGame
 
 	private long _started;
 	private long _ended;
+	private int _cosmeticTrailTick;
 
 	public DragonEscape(ArcadeManager manager)
 	{
@@ -242,6 +247,31 @@ public class DragonEscape extends SoloGame
 	public void invisibility(PlayerKitGiveEvent event)
 	{
 		event.getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, Integer.MAX_VALUE, 0, false, false));
+	}
+
+	/**
+	 * Per-player stained-glass dust trails are server-visible: each runner's choice
+	 * is rendered to all clients, rather than only to the player wearing it.
+	 */
+	@EventHandler
+	public void cosmeticTrail(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.TICK || !IsLive())
+			return;
+
+		if (++_cosmeticTrailTick % 4 != 0)
+			return;
+
+		for (Player player : GetPlayers(true))
+		{
+			int colour = ArcadeCosmeticsMenu.getEquippedColourData(player.getUniqueId(), "dragonescape");
+			if (colour < 0)
+				continue;
+
+			Location trail = player.getLocation().clone().add(0, 0.2, 0);
+			UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) colour),
+					trail, 0.08F, 0.08F, 0.08F, 0.01F, 2, ViewDist.NORMAL, UtilServer.getPlayers());
+		}
 	}
 
 	@EventHandler
