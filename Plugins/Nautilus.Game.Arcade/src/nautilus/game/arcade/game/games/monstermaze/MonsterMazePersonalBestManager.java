@@ -1,6 +1,7 @@
 package nautilus.game.arcade.game.games.monstermaze;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 
