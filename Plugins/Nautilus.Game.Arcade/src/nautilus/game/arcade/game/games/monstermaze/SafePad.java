@@ -305,6 +305,19 @@ public class SafePad
 	
 	public boolean isOn(Entity e)
 	{
-		return UtilAlg.inBoundingBox(e.getLocation(), getLocation().clone().add(2.999, 5, 2), getLocation().clone().add(-2, 0, -2.999));
+		if (e == null || e.getWorld() != _loc.getWorld())
+			return false;
+
+		Location entityLocation = e.getLocation();
+		double dx = entityLocation.getX() - _loc.getX();
+		double dz = entityLocation.getZ() - _loc.getZ();
+		double dy = entityLocation.getY() - _loc.getY();
+
+		// Match the visible 5x5 safe-pad surface symmetrically on both axes.
+		// The old bounding-box corners were reversed/asymmetric for Z, so players
+		// could stand on one edge of the beacon pad and still be considered off-pad.
+		return dx > -2.5 && dx < 2.5
+				&& dz > -2.5 && dz < 2.5
+				&& dy > 0.0 && dy < 5.0;
 	}
 }
