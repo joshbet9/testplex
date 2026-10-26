@@ -78,7 +78,8 @@ public enum GameDisplay implements Display
 	Skywars("Skywars", Material.FEATHER, (byte) 0, GameCategory.INTERMEDIATE, 52, true),
 	SkywarsTeams("Skywars Teams", "Skywars", Material.FEATHER, (byte)0, GameCategory.INTERMEDIATE, 53, false),
 	MonsterMaze("Monster Maze", Material.ROTTEN_FLESH, (byte)0, GameCategory.NONE, 55, true),
-	MonsterMazeModern("Monster Maze Modern", Material.BEACON, (byte)0, GameCategory.NONE, 76, false),
+	MonsterMazeSpeed("Monster Maze Speed", Material.SUGAR, (byte)0, GameCategory.NONE, 76, false),
+	MonsterMazeModern("Monster Maze Modern", Material.BEACON, (byte)0, GameCategory.NONE, 77, false),
 	MonsterLeague("Monster League", Material.MINECART, (byte)0, GameCategory.NONE, 56, false),
 	
 	Lobbers("Bomb Lobbers", Material.FIREBALL, (byte) 0, GameCategory.NONE, 54, true),
