@@ -23,11 +23,16 @@ import mineplex.core.common.util.MapUtil;
 import mineplex.core.common.util.UtilAlg;
 import mineplex.core.common.util.UtilItem;
 import mineplex.core.common.util.UtilTime;
+import mineplex.core.common.util.UtilParticle;
+import mineplex.core.common.util.UtilParticle.ParticleType;
+import mineplex.core.common.util.UtilParticle.ViewDist;
+import mineplex.core.common.util.UtilServer;
 import mineplex.core.updater.UpdateType;
 import mineplex.core.updater.event.UpdateEvent;
 import mineplex.minecraft.game.core.damage.CustomDamageEvent;
 
 import nautilus.game.arcade.ArcadeManager;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import nautilus.game.arcade.GameType;
 import nautilus.game.arcade.game.GameTeam;
 import nautilus.game.arcade.game.TeamGame;
@@ -55,6 +60,7 @@ public class Micro extends TeamGame
 
 	private final Set<Block> _glass = new HashSet<>();
 	private final Map<GameTeam, Location> _teamCenters = new HashMap<>();
+	private int _cosmeticTrailTick;
 
 	public Micro(ArcadeManager manager)
 	{
@@ -143,6 +149,31 @@ public class Micro extends TeamGame
 		if (UtilItem.isSword(itemStack))
 		{
 			event.setCancelled(true);
+		}
+	}
+
+	/**
+	 * Optional theme trail for equipped Micro Battles cosmetics. Particle data is
+	 * rendered for every viewer so the selection is visible to opponents too.
+	 */
+	@EventHandler
+	public void cosmeticTrail(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.TICK || !IsLive())
+			return;
+
+		if (++_cosmeticTrailTick % 4 != 0)
+			return;
+
+		for (Player player : GetPlayers(true))
+		{
+			int colour = ArcadeCosmeticsMenu.getEquippedColourData(player.getUniqueId(), "microbattles");
+			if (colour < 0)
+				continue;
+
+			Location trail = player.getLocation().clone().add(0, 0.15, 0);
+			UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) colour),
+					trail, 0.08F, 0.08F, 0.08F, 0.01F, 2, ViewDist.NORMAL, UtilServer.getPlayers());
 		}
 	}
 
