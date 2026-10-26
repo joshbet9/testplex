@@ -2,6 +2,7 @@ package nautilus.game.arcade.game.games.monstermaze;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import mineplex.core.common.util.C;
