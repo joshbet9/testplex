@@ -12,6 +12,12 @@ on:
       - "Plugins/**"
       - ".github/workflows/testplex-build.yml"
   workflow_dispatch:
+    inputs:
+      deploy_to_test_server:
+        description: Deploy this successful build to the isolated Windows test server
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -126,3 +132,36 @@ jobs:
             echo
             echo "This artifact contains the compiled plugin set only, not a runnable server bundle. The server still needs its own runtime files, maps, configuration, Redis/MySQL, and API service."
           } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy_test_server:
+    name: Deploy to isolated Windows test server
+    needs: build
+    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/feat/testbed-bootstrap' && vars.TESTPLEX_AUTO_DEPLOY == 'true') || (github.event_name == 'workflow_dispatch' && inputs.deploy_to_test_server) }}
+    runs-on:
+      - self-hosted
+      - windows
+      - x64
+      - testplex
+    timeout-minutes: 15
+    concurrency:
+      group: testplex-isolated-test-server
+      cancel-in-progress: false
+    steps:
+      - name: Check out deployment script
+        uses: actions/checkout@v4
+
+      - name: Download the exact build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: testplex-plugin-set-${{ github.sha }}
+          path: ${{ runner.temp }}\testplex-plugin-set
+
+      - name: Deploy with backup and restart verification
+        shell: pwsh
+        env:
+          TESTPLEX_SERVER_DIR: ${{ vars.TESTPLEX_SERVER_DIR }}
+          TESTPLEX_STOP_SCRIPT: ${{ vars.TESTPLEX_STOP_SCRIPT }}
+          TESTPLEX_START_SCRIPT: ${{ vars.TESTPLEX_START_SCRIPT }}
+          TESTPLEX_PROCESS_MATCH: ${{ vars.TESTPLEX_PROCESS_MATCH }}
+          TESTPLEX_ARTIFACT_DIR: ${{ runner.temp }}\testplex-plugin-set
+        run: .\.github\scripts\deploy-testplex.ps1
