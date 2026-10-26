@@ -2001,6 +2001,25 @@ public enum GameKit
 					getAchievementsFor(AchievementCategory.MONSTER_MAZE)
 			),
 
+	MONSTER_MAZE_MAVERICK
+			(
+					4,
+					GameDisplay.MonsterMazeModern,
+					"Maverick",
+					"monstermazemaverick",
+					new String[]
+							{
+									"Monster hits launch you toward the next Safe Pad.",
+									"Available in Monster Maze Modern."
+							},
+					new KitEntityData<>
+							(
+									Skeleton.class,
+									new ItemStack(Material.ARROW)
+							),
+					getAchievementsFor(AchievementCategory.MONSTER_MAZE)
+			),
+
 	// Paintball
 
 	PAINTBALL_RIFLE
