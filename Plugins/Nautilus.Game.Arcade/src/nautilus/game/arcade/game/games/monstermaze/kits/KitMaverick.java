@@ -18,7 +18,12 @@ public class KitMaverick extends Kit
 {
     public KitMaverick(ArcadeManager manager)
     {
-        super(manager, GameKit.MONSTER_MAZE_MAVERICK,
+        this(manager, GameKit.MONSTER_MAZE_MAVERICK);
+    }
+
+    protected KitMaverick(ArcadeManager manager, GameKit gameKit)
+    {
+        super(manager, gameKit,
                 new Perk[]
                 {
                     new PerkDummy("Maverick", new String[]
