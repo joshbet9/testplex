@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 
 import mineplex.core.common.util.MapUtil;
-import mineplex.core.common.util.UtilAlg;
 import mineplex.core.common.util.UtilPlayer;
 import net.minecraft.server.v1_8_R3.BlockPosition;
 import net.minecraft.server.v1_8_R3.Packet;
