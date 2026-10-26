@@ -9,6 +9,8 @@ The build workflow can publish a versioned set of compiled plugin JARs and, when
 3. Uploads every JAR produced in `Plugins/out/` as `testplex-plugin-set-<commit-sha>` for 14 days.
 4. Optionally, a Windows self-hosted runner copies those JARs into the test server's `plugins` directory, backs up any JARs it will replace, stops the matching test server process, installs the files, starts the server, and checks that the process returns. If startup verification fails, it attempts to restore the previous JARs and start the server again.
 
+To add the standalone-themed maps later, package each converted Mineplex-compatible map as a `.zip` under the respective `../../update/maps/MonsterMazeSpeed/` or `../../update/maps/MonsterMazeModern/` folder, including the native `ORANGE` center marker, any supported `E=` mob type tag, and `B1`/`B2`/`B3` palette tags. Existing original Monster Maze map zips remain the fallback until those new folders have entries. The current integration uses the source-compatible Reborn map pool; it does not automatically convert standalone world folders into Mineplex map metadata.
+
 The artifact is **not a complete server distribution**. A test instance still needs its own server/runtime files, maps, configuration, Java 8, Redis/MySQL and a compatible API service.
 
 ## One-time Windows test-server setup
