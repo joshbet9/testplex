@@ -26,10 +26,15 @@ import nautilus.game.arcade.game.games.monstermaze.events.MonsterBumpPlayerEvent
 import nautilus.game.arcade.game.games.monstermaze.kits.KitBodyBuilder;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitJumper;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitJumperModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitJumperSpeed;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitBodyBuilderModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitBodyBuilderSpeed;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitMaverick;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitMaverickSpeed;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitRepulsorModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitRepulsorSpeed;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitSlowballModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitSlowballSpeed;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitRepulsor;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitSlowball;
 import nautilus.game.arcade.game.games.monstermaze.trackers.AbilityUseTracker;
@@ -71,37 +76,46 @@ public class MonsterMaze extends SoloGame
 	
 	private static final int JUMP_POTION_AMPLIFIER = -10;
 	private int _potionMult = JUMP_POTION_AMPLIFIER;
-	private final boolean _modernVariant;
+	private final MonsterMazeMode _mode;
 		
 	@SuppressWarnings("unchecked")
 	public MonsterMaze(ArcadeManager manager)
 	{
-		this(manager, GameType.MonsterMaze, false);
+		this(manager, GameType.MonsterMaze, MonsterMazeMode.ORIGINAL);
 	}
 
 	/**
 	 * Shared native Reborn game lifecycle. The modern variant differs by its
 	 * kit roster and enhanced mechanics; original Monster Maze keeps its legacy kit roster.
 	 */
-	protected MonsterMaze(ArcadeManager manager, GameType gameType, boolean modernVariant)
+	protected MonsterMaze(ArcadeManager manager, GameType gameType, MonsterMazeMode mode)
 	{
 		super(manager, gameType,
-				modernVariant
+				mode == MonsterMazeMode.ORIGINAL
 						? new Kit[]
-								{
-									new KitJumperModern(manager),
-									new KitSlowballModern(manager),
-									new KitBodyBuilderModern(manager),
-									new KitRepulsorModern(manager),
-									new KitMaverick(manager)
-								}
-						: new Kit[]
 								{
 									new KitJumper(manager),
 									new KitSlowball(manager),
 									new KitBodyBuilder(manager),
 									new KitRepulsor(manager)
-								},
+								}
+						: mode == MonsterMazeMode.SPEED
+								? new Kit[]
+									{
+										new KitJumperSpeed(manager),
+										new KitSlowballSpeed(manager),
+										new KitBodyBuilderSpeed(manager),
+										new KitRepulsorSpeed(manager),
+										new KitMaverickSpeed(manager)
+									}
+								: new Kit[]
+									{
+										new KitJumperModern(manager),
+										new KitSlowballModern(manager),
+										new KitBodyBuilderModern(manager),
+										new KitRepulsorModern(manager),
+										new KitMaverick(manager)
+									},
 				new String[]
 							{
 								"Run over the maze and don't fall off,",
@@ -109,7 +123,7 @@ public class MonsterMaze extends SoloGame
 								"Make it to a Safe Pad or be killed!"
 							});
 
-		_modernVariant = modernVariant;
+		_mode = mode;
 		DamagePvP = false;
 		DamagePvE = false;
 		DamageFall = false;
@@ -145,7 +159,18 @@ public class MonsterMaze extends SoloGame
 
 	public boolean isModernVariant()
 	{
-		return _modernVariant;
+		return _mode != MonsterMazeMode.ORIGINAL;
+	}
+
+	/** True only for Modern pacing/spawn rules; Speed keeps original pacing and mob counts. */
+	public boolean isActualModernMode()
+	{
+		return _mode == MonsterMazeMode.MODERN;
+	}
+
+	public MonsterMazeMode getMazeMode()
+	{
+		return _mode;
 	}
 
 	/** Refill the enhanced Jumper kit when its player reaches a Safe Pad. */
@@ -175,7 +200,7 @@ public class MonsterMaze extends SoloGame
 			_preset.build();
 			_maze = new Maze(this, _preset);
 			
-			_maze.fillSpawn(150);
+			_maze.fillSpawn(isActualModernMode() ? 225 : 150);
 		}
 	}
 	
