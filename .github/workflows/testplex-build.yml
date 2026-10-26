@@ -26,6 +26,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: testplex-build-${{ github.ref }}
@@ -322,6 +323,9 @@ jobs:
       group: testplex-isolated-hyperv-server
       cancel-in-progress: false
     steps:
+      - name: Check out deployment script
+        uses: actions/checkout@v4
+
       - name: Connect runner to Hyper-V over Tailscale
         uses: tailscale/github-action@v4
         with:
