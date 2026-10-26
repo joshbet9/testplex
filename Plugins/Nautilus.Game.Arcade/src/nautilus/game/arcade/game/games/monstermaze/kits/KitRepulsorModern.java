@@ -8,6 +8,11 @@ public class KitRepulsorModern extends KitRepulsor
 {
     public KitRepulsorModern(ArcadeManager manager)
     {
-        super(manager, GameKit.MONSTER_MAZE_MODERN_REPULSOR);
+        this(manager, GameKit.MONSTER_MAZE_MODERN_REPULSOR);
+    }
+
+    protected KitRepulsorModern(ArcadeManager manager, GameKit gameKit)
+    {
+        super(manager, gameKit);
     }
 }
