@@ -81,6 +81,7 @@ jobs:
           sources = {
               "Snake": (base / "game/games/snake/Snake.java").read_text(encoding="utf-8"),
               "Monster Maze SafePad": (base / "game/games/monstermaze/SafePad.java").read_text(encoding="utf-8"),
+              "Monster Maze": (base / "game/games/monstermaze/Maze.java").read_text(encoding="utf-8"),
               "Runner": (base / "game/games/runner/Runner.java").read_text(encoding="utf-8"),
               "Bacon Brawl": (base / "game/games/baconbrawl/BaconBrawl.java").read_text(encoding="utf-8"),
               "Dragon Escape": (base / "game/games/dragonescape/DragonEscape.java").read_text(encoding="utf-8"),
@@ -108,6 +109,15 @@ jobs:
                   "symmetric X bounds": "dx > -2.5 && dx < 2.5",
                   "symmetric Z bounds": "dz > -2.5 && dz < 2.5",
                   "vertical bounds": "dy > 0.0 && dy < 5.0",
+                  "repairs only objective beacon": "MapUtil.QuickChangeBlockAt(_loc, Material.BEACON.getId(), (byte) 0)",
+                  "optional surface tint": "surface-colour-enabled",
+                  "valid dye data range": "configuredColour >= 0 && configuredColour <= 15",
+              },
+              "Monster Maze": {
+                  "persistence opt-in defaults off": 'getBoolean("monstermaze.safe-pad-enhancements.enabled", false)',
+                  "pre-round audit timing": "now - _initialSafePadCreatedAt >= 2000L",
+                  "active objective repair": "_safePad.restoreObjectiveBeaconIfMissing()",
+                  "preview objective repair": "_nextSafePad.restoreObjectiveBeaconIfMissing()",
               },
               "Runner": {
                   "player-specific trail choice": "getEquippedChoice(owner.getUniqueId(), \"runner\")",
@@ -146,6 +156,7 @@ jobs:
               "Deployment guide": {
                   "manual setup guide": "One-time Windows test-server setup",
                   "test-only warning": "Do not point this at a production server.",
+                  "safe-pad toggle documented": "monstermaze.safe-pad-enhancements",
               },
               "In-game test plan": {
                   "manual runtime testing disclosed": "these scenarios still require an actual 1.8.x server",
