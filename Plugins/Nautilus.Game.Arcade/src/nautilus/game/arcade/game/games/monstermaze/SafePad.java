@@ -20,6 +20,7 @@ public class SafePad
 //	private Maze _maze;
 	
 	private Location  _loc;
+	private byte _surfaceColour = (byte) 5;
 	
 	private int _decayCount = 11;
 	
@@ -31,6 +32,14 @@ public class SafePad
 //		_maze = maze;
 		
 		_loc = loc;
+
+		// Optional cosmetic tint; stock green (data 5) remains the default.
+		if (Host.Manager.getPlugin().getConfig().getBoolean("monstermaze.safe-pad-enhancements.surface-colour-enabled", false))
+		{
+			int configuredColour = Host.Manager.getPlugin().getConfig().getInt("monstermaze.safe-pad-enhancements.surface-colour-data", 5);
+			if (configuredColour >= 0 && configuredColour <= 15)
+				_surfaceColour = (byte) configuredColour;
+		}
 		
 		//beacon surface
 		for (int x = -2 ; x < 3 ; x++)
@@ -40,7 +49,7 @@ public class SafePad
 				if (x == 0 && z == 0)
 					continue;
 				
-				_blocks.add(new SafePadBlock(loc.clone().add(x, 0, z), Material.STAINED_CLAY, (byte) 5));
+				_blocks.add(new SafePadBlock(loc.clone().add(x, 0, z), Material.STAINED_CLAY, _surfaceColour));
 			}
 		}
 		
@@ -164,6 +173,20 @@ public class SafePad
 		}
 	}
 	
+	/**
+	 * Repairs only the center objective beacon. Surrounding stained clay, stairs,
+	 * base blocks and the pad's decay state are deliberately left untouched.
+	 */
+	@SuppressWarnings("deprecation")
+	public boolean restoreObjectiveBeaconIfMissing()
+	{
+		if (_loc == null || _loc.getWorld() == null || _loc.getBlock().getType() == Material.BEACON)
+			return false;
+
+		MapUtil.QuickChangeBlockAt(_loc, Material.BEACON.getId(), (byte) 0);
+		return true;
+	}
+
 	public void turnOffBeacon()
 	{
 		for (SafePadBlock bl : _blocks)
@@ -174,7 +197,7 @@ public class SafePad
 			if (bl.getBlockMaterial() == Material.BEACON)
 			{
 				bl.setMaterial(Material.STAINED_CLAY);
-				bl.setData((byte) 5);
+				bl.setData(_surfaceColour);
 			}
 		}
 	}
