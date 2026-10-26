@@ -85,12 +85,20 @@ public class Maze implements Listener
 
 	private int _phaseTimer = 60;
 	private int _phaseTimerStart = 60;
+
+	// Independent, opt-in objective-beacon repair. Diagnostics remain a separate setting.
+	private final boolean _safePadBeaconEnhancementsEnabled;
+	private long _initialSafePadCreatedAt;
+	private long _lastSafePadBeaconCheckAt;
+	private boolean _preRoundBeaconCheckDone;
 			
 	@SuppressWarnings("deprecation")
 	public Maze(MonsterMaze host, MazePreset maze)
 	{
 		_host = host;
 		_preset = maze;
+		_safePadBeaconEnhancementsEnabled = _host.Manager.getPlugin().getConfig()
+				.getBoolean("monstermaze.safe-pad-enhancements.enabled", false);
 		
 		for (Location loc : getPreset().getMaze())
 		{
@@ -119,6 +127,7 @@ public class Maze implements Listener
 		spawnSafePad();
 		_safePad = _nextSafePad;
 		_nextSafePad = null;
+		_initialSafePadCreatedAt = System.currentTimeMillis();
 		
 		Bukkit.getPluginManager().registerEvents(this, _host.Manager.getPlugin());
 	}
@@ -224,6 +233,40 @@ public class Maze implements Listener
 		}
 	}
 	
+	/**
+	 * When explicitly enabled, audit only the central objective beacon. During
+	 * recruit, run one repair check 2–3 seconds after the first pad is created;
+	 * while live, check the active and preview objective beacons once per second.
+	 * No stained clay or other pad block is repaired by this feature.
+	 */
+	@EventHandler
+	public void updateSafePadBeaconPersistence(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.SEC || !_safePadBeaconEnhancementsEnabled)
+			return;
+
+		long now = System.currentTimeMillis();
+		if (!_host.IsLive())
+		{
+			if (!_preRoundBeaconCheckDone && now - _initialSafePadCreatedAt >= 2000L)
+			{
+				_preRoundBeaconCheckDone = true;
+				if (_safePad != null)
+					_safePad.restoreObjectiveBeaconIfMissing();
+			}
+			return;
+		}
+
+		if (now - _lastSafePadBeaconCheckAt < 1000L)
+			return;
+		_lastSafePadBeaconCheckAt = now;
+
+		if (_safePad != null)
+			_safePad.restoreObjectiveBeaconIfMissing();
+		if (_nextSafePad != null)
+			_nextSafePad.restoreObjectiveBeaconIfMissing();
+	}
+
 	@EventHandler
 	public void updateExperience(UpdateEvent event)
 	{
