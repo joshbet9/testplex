@@ -81,6 +81,16 @@ jobs:
               "Snake": (base / "game/games/snake/Snake.java").read_text(encoding="utf-8"),
               "Monster Maze SafePad": (base / "game/games/monstermaze/SafePad.java").read_text(encoding="utf-8"),
               "Monster Maze": (base / "game/games/monstermaze/Maze.java").read_text(encoding="utf-8"),
+              "Monster Maze Core": (base / "game/games/monstermaze/MonsterMaze.java").read_text(encoding="utf-8"),
+              "Monster Maze Mode": (base / "game/games/monstermaze/MonsterMazeMode.java").read_text(encoding="utf-8"),
+              "Monster Maze Speed": (base / "game/games/monstermaze/MonsterMazeSpeedGame.java").read_text(encoding="utf-8"),
+              "Monster Maze Modern": (base / "game/games/monstermaze/MonsterMazeModern.java").read_text(encoding="utf-8"),
+              "Monster Maze Layouts": (base / "game/games/monstermaze/MMMazes.java").read_text(encoding="utf-8"),
+              "Monster Maze PB": (base / "game/games/monstermaze/MonsterMazePersonalBestManager.java").read_text(encoding="utf-8"),
+              "Monster Maze GameType": Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/GameType.java").read_text(encoding="utf-8"),
+              "Monster Maze Display": Path("Plugins/Mineplex.Core/src/mineplex/core/game/GameDisplay.java").read_text(encoding="utf-8"),
+              "Monster Maze Kit registry": Path("Plugins/Mineplex.Core/src/mineplex/core/game/kit/GameKit.java").read_text(encoding="utf-8"),
+              "Custom Data Manager": Path("Plugins/Mineplex.Core/src/mineplex/core/customdata/CustomDataManager.java").read_text(encoding="utf-8"),
               "Runner": (base / "game/games/runner/Runner.java").read_text(encoding="utf-8"),
               "Bacon Brawl": (base / "game/games/baconbrawl/BaconBrawl.java").read_text(encoding="utf-8"),
               "Dragon Escape": (base / "game/games/dragonescape/DragonEscape.java").read_text(encoding="utf-8"),
@@ -111,12 +121,64 @@ jobs:
                   "repairs only objective beacon": "MapUtil.QuickChangeBlockAt(_loc, Material.BEACON.getId(), (byte) 0)",
                   "optional surface tint": "surface-colour-enabled",
                   "valid dye data range": "configuredColour >= 0 && configuredColour <= 15",
+                  "full snapshot restoration for cleanup": "public void restoreAll()",
               },
               "Monster Maze": {
                   "persistence opt-in defaults off": 'getBoolean("monstermaze.safe-pad-enhancements.enabled", false)',
                   "pre-round audit timing": "now - _initialSafePadCreatedAt >= 2000L",
                   "active objective repair": "_safePad.restoreObjectiveBeaconIfMissing()",
                   "preview objective repair": "_nextSafePad.restoreObjectiveBeaconIfMissing()",
+                  "exact mob counts and safe empty spawn lists": "while (spawned < numToSpawn)",
+                  "Modern adds thirty mobs per transition": "fillSpawn(30)",
+                  "removes active mobs on death": "_ents.clear();",
+                  "records PBs in native account data": "MonsterMazePersonalBestManager.record(_host, p, _curSafe, _preset.getPatternId())",
+                  "frozen mobs skip collision": "isMonsterFrozen(ent) || UtilMath.offset(player, ent) >= 1",
+                  "body rush intercepts contacts": "bodyRushKit.consumeMonsterHit(player)",
+                  "Maverick pad-directed knockback": "getMobKnockTarget()",
+              },
+              "Monster Maze Core": {
+                  "mode distinguishes Original Speed and Modern": "MonsterMazeMode.ORIGINAL" and "MonsterMazeMode.SPEED" and "MonsterMazeMode.MODERN",
+                  "Modern has higher starter mob total": "_maze.fillSpawn(isActualModernMode() ? 225 : 150)",
+                  "uses configurable/repeatable pattern selection": "getPatternMapPreset(_center, getMazeBlockData(), requestedPattern)",
+                  "Speed keeps original pacing by mode predicate": "return _mode != MonsterMazeMode.ORIGINAL;",
+                  "separate personal best support": "resetModernJumperCharges",
+              },
+              "Monster Maze Mode": {
+                  "three native rulesets": "ORIGINAL" and "SPEED" and "MODERN",
+              },
+              "Monster Maze Speed": {
+                  "native Speed game type": "GameType.MonsterMazeSpeed",
+              },
+              "Monster Maze Modern": {
+                  "native Modern game type": "GameType.MonsterMazeModern",
+              },
+              "Monster Maze Layouts": {
+                  "fixed pattern selection": "getPatternMapPreset",
+                  "identified layout pattern": "getPatternId()",
+                  "uses selected map rather than a second random choice": "return selected;",
+              },
+              "Monster Maze PB": {
+                  "mode/pattern/kit separated PB key": "displayPrefix + \"pb.pattern\" + pattern + \".\" + slug(kitName)",
+                  "persists through Mineplex custom data": "customData.setData(player, key, bestToSave)",
+                  "new PB notification": "New Monster Maze personal best: Stage",
+              },
+              "Monster Maze GameType": {
+                  "native Speed registration": "MonsterMazeSpeed(MonsterMazeSpeedGame.class, GameDisplay.MonsterMazeSpeed",
+                  "native Modern registration": "MonsterMazeModern(MonsterMazeModern.class, GameDisplay.MonsterMazeModern",
+                  "reuses original map pool": "new GameType[]{GameType.MonsterMaze}, false",
+              },
+              "Monster Maze Display": {
+                  "Speed label": "MonsterMazeSpeed(\"Monster Maze Speed\"",
+                  "Modern label": "MonsterMazeModern(\"Monster Maze Modern\"",
+              },
+              "Monster Maze Kit registry": {
+                  "Speed owns kit identities": "MONSTER_MAZE_SPEED_JUMPER",
+                  "Modern owns kit identities": "MONSTER_MAZE_MODERN_JUMPER",
+                  "Maverick is registered for Modern": "MONSTER_MAZE_MAVERICK",
+              },
+              "Custom Data Manager": {
+                  "public safe PB setter": "public void setData(Player player, String key, int value)",
+                  "PB update saved to account data": "saveData(player);",
               },
               "Runner": {
                   "player-specific trail choice": "getEquippedChoice(owner.getUniqueId(), \"runner\")",
@@ -160,6 +222,14 @@ jobs:
               "In-game test plan": {
                   "manual runtime testing disclosed": "these scenarios still require an actual 1.8.x server",
                   "Snake hazard schedule": "135 seconds",
+                  "native Speed and Modern test matrix": "MonsterMazeSpeed",
+                  "pattern selector documented": "monstermaze.pattern",
+                  "PB validation documented": "personal best",
+              },
+              "Deployment guide": {
+                  "native game names documented": "MonsterMazeSpeed",
+                  "requires account database for PBs": "account custom data",
+                  "pattern configuration documented": "monstermaze.pattern",
               },
           }
 
