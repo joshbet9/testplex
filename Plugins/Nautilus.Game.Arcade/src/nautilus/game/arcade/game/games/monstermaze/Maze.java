@@ -39,6 +39,9 @@ import nautilus.game.arcade.game.games.monstermaze.events.FirstToSafepadEvent;
 import nautilus.game.arcade.game.games.monstermaze.events.MonsterBumpPlayerEvent;
 import nautilus.game.arcade.game.games.monstermaze.events.SafepadBuildEvent;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitBodyBuilder;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitBodyBuilderModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitJumperModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitMaverick;
 import net.minecraft.server.v1_8_R3.BlockPosition;
 import net.minecraft.server.v1_8_R3.Packet;
 import net.minecraft.server.v1_8_R3.PacketPlayOutAnimation;
@@ -70,6 +73,7 @@ public class Maze implements Listener
 	
 	private ArrayList<Player> _playersOnPad = new ArrayList<Player>();
 	private HashMap<LivingEntity, MazeMobWaypoint> _ents = new HashMap<LivingEntity, MazeMobWaypoint>();
+	private final HashMap<LivingEntity, Long> _frozenUntil = new HashMap<LivingEntity, Long>();
 
 	private HashSet<Block> _movementWaypoints = new HashSet<Block>();
 	private HashSet<Block> _movementWaypointsDisabled = new HashSet<Block>();
@@ -342,7 +346,11 @@ public class Maze implements Listener
 		//Hit Players
 		for (Player player : _host.GetPlayers(true))
 		{
-			if (!Recharge.Instance.usable(player, "Monster Hit"))
+			KitBodyBuilderModern bodyRushKit = _host.isModernVariant()
+					&& _host.GetKit(player) instanceof KitBodyBuilderModern
+					? (KitBodyBuilderModern) _host.GetKit(player) : null;
+			boolean bodyRushActive = bodyRushKit != null && bodyRushKit.isBodyRushActive(player);
+			if (!Recharge.Instance.usable(player, "Monster Hit") && !bodyRushActive)
 				continue;
 			
 			if (isOnPad(player, true))
@@ -351,14 +359,42 @@ public class Maze implements Listener
 			//Hit Snowman
 			for (LivingEntity ent : _ents.keySet())
 			{
-				if (UtilMath.offset(player, ent) >= 1)
+				if (isMonsterFrozen(ent) || UtilMath.offset(player, ent) >= 1)
 					continue;
+
+				// Body Rush intercepts the contact before normal knockback/damage.
+				if (bodyRushKit != null && bodyRushKit.consumeMonsterHit(player))
+				{
+					ent.playEffect(org.bukkit.EntityEffect.HURT);
+					UtilAction.velocity(ent, UtilAlg.getTrajectory2d(player, ent), 1, true, 0, 0.8, 2, true);
+					bodyRushKit.trackLaunched(ent);
+					Bukkit.getPluginManager().callEvent(new EntityLaunchEvent(ent));
+					player.playSound(player.getLocation(), Sound.SUCCESSFUL_HIT, 1.0f, 1.35f);
+					// EntityLaunchEvent removes the mob from _ents, so break before
+					// the enhanced-for iterator advances.
+					break;
+				}
 
 				Recharge.Instance.useForce(player, "Monster Hit", 1000);
 
-				//Velocity
-				//UtilAction.velocity(player, new Vector(1,0,0), 4, false, 0, 1.2, 1.2, true);
-				UtilAction.velocity(player, UtilAlg.getTrajectory(ent, player), 1, false, 0, 0.75, 1.2, true);
+				// Maverick redirects knockback toward the preview Safe Pad when present.
+				if (_host.isModernVariant() && _host.GetKit(player) instanceof KitMaverick)
+				{
+					Location target = getMobKnockTarget();
+					if (target != null && target.getWorld() == player.getWorld())
+					{
+						org.bukkit.util.Vector direction = target.toVector().subtract(player.getLocation().toVector());
+						direction.setY(0);
+						if (direction.lengthSquared() > 0.001)
+							UtilAction.velocity(player, direction.normalize(), 1, false, 0, 0.75, 1.2, true);
+						else
+							UtilAction.velocity(player, UtilAlg.getTrajectory(ent, player), 1, false, 0, 0.75, 1.2, true);
+					}
+					else
+						UtilAction.velocity(player, UtilAlg.getTrajectory(ent, player), 1, false, 0, 0.75, 1.2, true);
+				}
+				else
+					UtilAction.velocity(player, UtilAlg.getTrajectory(ent, player), 1, false, 0, 0.75, 1.2, true);
 
 				//Damage Event
 				_host.Manager.GetDamage().NewDamageEvent(player, null, null, 
@@ -393,6 +429,11 @@ public class Maze implements Listener
 		while (entIterator.hasNext())
 		{
 			Entry<LivingEntity, MazeMobWaypoint> data = entIterator.next();
+			if (isMonsterFrozen(data.getKey()))
+			{
+				data.getKey().setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+				continue;
+			}
 			
 			//New or Fallen
 			if (data.getValue().Target == null || data.getKey().getLocation().getY() < data.getValue().Target.getBlockY())
@@ -477,6 +518,45 @@ public class Maze implements Listener
 		}
 	}
 	
+	/** Freeze monsters in a radius for Cryo Blitz. Returns the number affected. */
+	public int freezeMonsters(Location origin, double radius, long durationMs)
+	{
+		if (origin == null || origin.getWorld() == null || durationMs <= 0)
+			return 0;
+		long until = System.currentTimeMillis() + durationMs;
+		double radiusSquared = radius * radius;
+		int count = 0;
+		for (LivingEntity entity : new ArrayList<LivingEntity>(_ents.keySet()))
+		{
+			if (entity == null || !entity.isValid() || entity.getWorld() != origin.getWorld())
+				continue;
+			if (entity.getLocation().distanceSquared(origin) > radiusSquared)
+				continue;
+			_frozenUntil.put(entity, until);
+			entity.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+			count++;
+		}
+		return count;
+	}
+
+	private boolean isMonsterFrozen(LivingEntity entity)
+	{
+		Long until = _frozenUntil.get(entity);
+		if (until == null)
+			return false;
+		if (until.longValue() > System.currentTimeMillis())
+			return true;
+		_frozenUntil.remove(entity);
+		return false;
+	}
+
+	/** Target used by the enhanced Maverick kit: preview pad first, then active pad. */
+	public Location getMobKnockTarget()
+	{
+		SafePad target = _nextSafePad != null ? _nextSafePad : _safePad;
+		return target == null ? null : target.getLocation();
+	}
+
 	private Block getTarget(Block start, Block cur, BlockFace face)
 	{	
 		if (cur == null)
@@ -1032,6 +1112,8 @@ public class Maze implements Listener
 
 			UtilPlayer.message(p, F.main("Game", "You made it to the Safe Pad!"));
 			_playersOnPad.add(p);
+			if (_host.isModernVariant())
+				_host.resetModernJumperCharges(p);
 
 			_host.AddGems(p, 2, "Safe Pads Reached", true, true);
 
@@ -1104,6 +1186,7 @@ public class Maze implements Listener
 		if (event.GetState() != GameState.Dead)
 			return;
 		
+		_frozenUntil.clear();
 		HandlerList.unregisterAll(this);
 	}
 	
@@ -1122,6 +1205,7 @@ public class Maze implements Listener
 	@EventHandler
 	public void onEntityLaunch(EntityLaunchEvent event)
 	{
+		_frozenUntil.remove(event.getEntity());
 		if (!_ents.containsKey(event.getEntity()))
 			return;
 		
