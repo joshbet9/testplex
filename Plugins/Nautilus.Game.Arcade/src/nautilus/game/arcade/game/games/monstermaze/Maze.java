@@ -101,6 +101,8 @@ public class Maze implements Listener
 	{
 		_host = host;
 		_preset = maze;
+		_phaseTimerStart = _host.isActualModernMode() ? 35 : 60;
+		_phaseTimer = _phaseTimerStart;
 		_safePadBeaconEnhancementsEnabled = _host.Manager.getPlugin().getConfig()
 				.getBoolean("monstermaze.safe-pad-enhancements.enabled", false);
 		
@@ -622,7 +624,7 @@ public class Maze implements Listener
 		
 		int spawned = 0;
 		
-		while(spawned <= numToSpawn)
+		while (spawned < numToSpawn)
 		{
 			ArrayList<Location> validSpawns = new ArrayList<Location>(getPreset().getMaze());
 			
@@ -634,7 +636,17 @@ public class Maze implements Listener
 					iter.remove();
 				}
 			}
+			if (validSpawns.isEmpty())
+			{
+				System.out.println("Monster Maze: no valid maze locations remain for mob spawning; stopping at " + spawned + ".");
+				break;
+			}
 			Location loc = UtilAlg.Random(validSpawns);
+			if (loc == null || loc.getWorld() == null)
+			{
+				System.out.println("Monster Maze: selected an invalid mob spawn location; skipping this spawn.");
+				continue;
+			}
 			
 			_host.CreatureAllowOverride = true;
 			Snowman ent = loc.getWorld().spawn(loc, Snowman.class);
@@ -668,12 +680,14 @@ public class Maze implements Listener
 	
 	private void spawn(int numToSpawn)
 	{
-		Location loc = UtilAlg.Random(getPreset().getSpawns());
-		
+		ArrayList<Location> spawnLocations = new ArrayList<Location>(getPreset().getSpawns());
+		if (spawnLocations.isEmpty() || numToSpawn <= 0)
+			return;
+		java.util.Collections.shuffle(spawnLocations);
 		int spawned = 0;
-		
-		while (spawned <= numToSpawn)
+		while (spawned < numToSpawn)
 		{
+			Location loc = spawnLocations.get(spawned % spawnLocations.size());
 			_host.CreatureAllowOverride = true;
 			Snowman ent = loc.getWorld().spawn(loc, Snowman.class);
 						
@@ -1059,7 +1073,10 @@ public class Maze implements Listener
 						
 			_playersOnPad.clear();
 
-			_phaseTimerStart = Math.max(15, 60 - ((_curSafe - 1) * 2));
+			if (_host.isActualModernMode())
+				_phaseTimerStart = Math.max(15, 35 - (_curSafe * 2));
+			else
+				_phaseTimerStart = Math.max(15, 60 - ((_curSafe - 1) * 2));
 			_phaseTimer = _phaseTimerStart;
 			
 			if (_nextSafePad == null)
@@ -1083,6 +1100,10 @@ public class Maze implements Listener
 			
 			_safePad = _nextSafePad;
 			_nextSafePad = null;
+
+			// Modern scales the wave by exactly 30 monsters at each Safe Pad transition.
+			if (_host.isActualModernMode())
+				fillSpawn(30);
 			
 			
 		}
