@@ -555,10 +555,10 @@ public class Maze implements Listener
 		return false;
 	}
 
-	/** Target used by the enhanced Maverick kit: preview pad first, then active pad. */
+	/** Target used by the enhanced Maverick kit, matching standalone behaviour: active pad first. */
 	public Location getMobKnockTarget()
 	{
-		SafePad target = _nextSafePad != null ? _nextSafePad : _safePad;
+		SafePad target = _safePad != null ? _safePad : _nextSafePad;
 		return target == null ? null : target.getLocation();
 	}
 
