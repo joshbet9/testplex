@@ -1208,8 +1208,30 @@ public class Maze implements Listener
 	{
 		if (event.GetState() != GameState.Dead)
 			return;
-		
+
+		// The arena/world may be reused by another round. Remove every mob and restore
+		// the exact Safe Pad block snapshots so entities, ice states, and decayed pads
+		// cannot leak into the next game.
+		for (LivingEntity entity : new ArrayList<LivingEntity>(_ents.keySet()))
+		{
+			if (entity != null && entity.isValid())
+				entity.remove();
+		}
+		_ents.clear();
 		_frozenUntil.clear();
+		_playersOnPad.clear();
+
+		if (_safePad != null)
+			_safePad.restoreAll();
+		if (_nextSafePad != null)
+			_nextSafePad.restoreAll();
+		for (SafePad oldPad : _oldSafePads)
+			oldPad.restoreAll();
+
+		_safePad = null;
+		_nextSafePad = null;
+		_oldSafePads.clear();
+		removePlayerContainmentUnit();
 		HandlerList.unregisterAll(this);
 	}
 	
