@@ -64,6 +64,46 @@ jobs:
           find Plugins/out -maxdepth 1 -type f -name '*.jar' -printf '%f %s bytes\n' | sort
           test -s Plugins/out/Arcade.jar
 
+      - name: Smoke-check native Snake mechanics and Monster Maze pad bounds
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          snake = Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/game/games/snake/Snake.java").read_text(encoding="utf-8")
+          safe_pad = Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/game/games/monstermaze/SafePad.java").read_text(encoding="utf-8")
+
+          snake_contract = {
+              "progressive magma hazard schedule": "FIRST_MAGMA_HAZARD_MS = 45000L",
+              "repeating magma hazard schedule": "MAGMA_HAZARD_INTERVAL_MS = 30000L",
+              "four-hazard cap": "MAX_MAGMA_HAZARDS = 4",
+              "roulette control effect set": "enum ControlDebuff",
+              "steering uses roulette result": "getDebuffedDirection(player).multiply(4)",
+              "persistent drift heading": "_lastTravelDirection.put(player, blended.clone())",
+              "persistent weak-turn heading": "appliedYaw += clamp(remaining, -4.0f, 4.0f)",
+              "hazards removed with round cleanup": "removeMagmaCubes();",
+          }
+          safe_pad_contract = {
+              "safe-pad rejects other worlds": "e.getWorld() != _loc.getWorld()",
+              "symmetric X bounds": "dx > -2.5 && dx < 2.5",
+              "symmetric Z bounds": "dz > -2.5 && dz < 2.5",
+              "safe-pad vertical bounds": "dy > 0.0 && dy < 5.0",
+          }
+
+          missing = []
+          for label, source in snake_contract.items():
+              if source not in snake:
+                  missing.append("Snake: " + label)
+          for label, source in safe_pad_contract.items():
+              if source not in safe_pad:
+                  missing.append("Monster Maze SafePad: " + label)
+
+          if missing:
+              raise SystemExit("Native gameplay smoke checks failed:\n- " + "\n- ".join(missing))
+          print("Native Snake and Monster Maze smoke checks passed.")
+          PY
+
       - name: Upload compiled plugin set
         uses: actions/upload-artifact@v4
         with:
