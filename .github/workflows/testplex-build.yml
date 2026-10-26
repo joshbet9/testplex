@@ -80,6 +80,7 @@ jobs:
           sources = {
               "Snake": (base / "game/games/snake/Snake.java").read_text(encoding="utf-8"),
               "Monster Maze SafePad": (base / "game/games/monstermaze/SafePad.java").read_text(encoding="utf-8"),
+              "Monster Maze Pilot": (base / "game/games/monstermaze/trackers/PilotTracker.java").read_text(encoding="utf-8"),
               "Monster Maze": (base / "game/games/monstermaze/Maze.java").read_text(encoding="utf-8"),
               "Monster Maze Core": (base / "game/games/monstermaze/MonsterMaze.java").read_text(encoding="utf-8"),
               "Monster Maze Mode": (base / "game/games/monstermaze/MonsterMazeMode.java").read_text(encoding="utf-8"),
@@ -124,6 +125,8 @@ jobs:
                   "optional surface tint": "surface-colour-enabled",
                   "valid dye data range": "configuredColour >= 0 && configuredColour <= 15",
                   "full snapshot restoration for cleanup": "public void restoreAll()",
+                  "prevent vanilla beacon GUI": "public void onInteract(PlayerInteractEvent event)",
+                  "unregister interaction listener after pad deactivation": "unregisterListener();",
               },
               "Monster Maze": {
                   "persistence opt-in defaults off": 'getBoolean("monstermaze.safe-pad-enhancements.enabled", false)',
@@ -149,6 +152,8 @@ jobs:
                   "uses configurable/repeatable pattern selection": "getPatternMapPreset(_center, getMazeBlockData(), requestedPattern)",
                   "Speed keeps original pacing by mode predicate": "return _mode != MonsterMazeMode.ORIGINAL;",
                   "separate personal best support": "resetModernJumperCharges",
+                  "recent monster bump prevents jump-charge loss": "_recentMonsterBump.put(event.getPlayer(), now)",
+                  "two-second bump grace window": "!UtilTime.elapsed(bumpedAt, 2000)",
               },
               "Monster Maze Mode": {
                   "Original mode exists": "ORIGINAL",
@@ -171,6 +176,10 @@ jobs:
                   "persists through Mineplex custom data": "customData.setData(player, key, bestToSave)",
                   "new PB notification": "New Monster Maze personal best: Stage",
                   "native PB inspection": "public static void show(final MonsterMaze game, final Player player)",
+              },
+              "Monster Maze Pilot": {
+                  "does not start Pilot while already on Safe Pad": "getGame().getMaze().isOnPad(event.getPlayer(), false)",
+                  "clears launch tracking on death": "event.GetState() != GameState.Dead",
               },
               "Monster Maze PB Command": {
                   "native subcommand command": "\"pb\"",
