@@ -77,15 +77,6 @@ monstermaze:
 - These options are separate from diagnostics. They do not enable or change diagnostic logging. Restart the test server after editing config to ensure the running Arcade plugin loads the new values.
 - Use the optional behaviour only on the isolated test server and verify old-pad decay and objective transitions using the in-game test plan.
 
-## Safety and troubleshooting
-
-- The destination marker and existing `plugins` directory are mandatory. If either check fails, no deployment occurs.
-- The deploy job only accepts the versioned JAR artifact created by the successful build in the same workflow run.
-- Replaced JARs are backed up under `.testplex-backups/<timestamp>/` inside the test server root. Retain a known-good backup until the new version has been tested.
-- If the server process does not stop or return within three minutes, deployment fails. Startup failure triggers a best-effort rollback, but the workflow cannot guarantee recovery from a broken server launcher or host-level failure; keep VM snapshots and a tested manual recovery path.
-- Do not enable auto-deploy until the runner and paths have been verified on the isolated VM. Self-hosted runners execute repository code, so only trusted project members should be able to push to the deployment branch or enable the deployment variable.
-
-
 ## Local validation without GitHub Actions
 
 On a Windows development machine with **JDK 8** and Maven on `PATH`, run this from the repository root:
