@@ -176,7 +176,7 @@ public class MonsterMaze extends SoloGame
 	/** Refill the enhanced Jumper kit when its player reaches a Safe Pad. */
 	public void resetModernJumperCharges(Player player)
 	{
-		if (_modernVariant && GetKit(player) instanceof KitJumperModern)
+		if (isModernVariant() && GetKit(player) instanceof KitJumperModern)
 			setJumpsLeft(player, 3);
 	}
 
@@ -290,7 +290,7 @@ public class MonsterMaze extends SoloGame
 		
 		for (Player p : GetPlayers(true))
 		{
-			if (_modernVariant && _maze != null && _maze.isOnPad(p, true))
+			if (isModernVariant() && _maze != null && _maze.isOnPad(p, true))
 				continue; // Speed/QOL variant: jumps on any Safe Pad are free.
 
 			if (!UtilInv.contains(p, "Jumps Remaining", Material.FEATHER, (byte) 0, 1) || p.getLocation().getY()-_center.getY() <= 0 || !Recharge.Instance.usable(p, "MM Player Jump") || isLaunched(p))
