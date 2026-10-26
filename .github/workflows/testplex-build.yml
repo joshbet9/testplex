@@ -64,11 +64,11 @@ jobs:
           find Plugins/out -maxdepth 1 -type f -name '*.jar' -printf '%f %s bytes\n' | sort
           test -s Plugins/out/Arcade.jar
 
-      - name: Upload compiled Arcade JAR
+      - name: Upload compiled plugin set
         uses: actions/upload-artifact@v4
         with:
-          name: testplex-arcade-${{ github.sha }}
-          path: Plugins/out/Arcade.jar
+          name: testplex-plugin-set-${{ github.sha }}
+          path: Plugins/out/*.jar
           if-no-files-found: error
           retention-days: 14
 
@@ -80,9 +80,9 @@ jobs:
             echo "## Testplex Arcade build"
             echo
             echo "- Commit: \`${GITHUB_SHA}\`"
-            echo "- Artifact: \`testplex-arcade-${GITHUB_SHA}\`"
-            echo "- File: \`Plugins/out/Arcade.jar\`"
+            echo "- Artifact: \`testplex-plugin-set-${GITHUB_SHA}\`"
+            echo "- Files: all JARs under \`Plugins/out/\`"
             echo "- Validation: full Maven reactor build and non-empty Arcade JAR"
             echo
-            echo "This build artifact contains the compiled plugin only; it is not a runnable server bundle."
+            echo "This artifact contains the compiled plugin set only, not a runnable server bundle. The server still needs its own runtime files, maps, configuration, Redis/MySQL, and API service."
           } >> "$GITHUB_STEP_SUMMARY"
