@@ -1,9 +1,7 @@
 package nautilus.game.arcade.game.games.monstermaze;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
 import mineplex.core.customdata.CustomDataManager;
@@ -107,11 +105,7 @@ public final class MonsterMazePersonalBestManager
                         if (bestToSave <= currentBest)
                             return;
 
-                        Map<String, Integer> values = new HashMap<String, Integer>(
-                                customData.Get(player.getUniqueId()));
-                        values.put(key, Integer.valueOf(bestToSave));
-                        customData.Set(player.getUniqueId(), values);
-                        customData.saveData(player);
+                        customData.setData(player, key, bestToSave);
 
                         if (player.isOnline())
                         {
