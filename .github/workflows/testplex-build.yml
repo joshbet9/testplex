@@ -87,6 +87,7 @@ jobs:
               "Monster Maze Speed": (base / "game/games/monstermaze/MonsterMazeSpeedGame.java").read_text(encoding="utf-8"),
               "Monster Maze Modern": (base / "game/games/monstermaze/MonsterMazeModern.java").read_text(encoding="utf-8"),
               "Monster Maze Layouts": (base / "game/games/monstermaze/MMMazes.java").read_text(encoding="utf-8"),
+              "Monster Maze Map Fallback": (base / "managers/GameCreationManager.java").read_text(encoding="utf-8"),
               "Monster Maze PB": (base / "game/games/monstermaze/MonsterMazePersonalBestManager.java").read_text(encoding="utf-8"),
               "Monster Maze PB Command": (Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/command/MonsterMazePBCommand.java")).read_text(encoding="utf-8"),
               "Monster Maze Game Command": (Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/command/GameCommand.java")).read_text(encoding="utf-8"),
@@ -173,6 +174,10 @@ jobs:
                   "fixed pattern selection": "getPatternMapPreset",
                   "identified layout pattern": "getPatternId()",
                   "uses selected map rather than a second random choice": "return selected;",
+              },
+              "Monster Maze Map Fallback": {
+                  "uses variant and source map catalogs": "Game.getWorldHostNames(gameType)",
+                  "skips empty variant map catalogs safely": "if (maps != null && !maps.isEmpty())",
               },
               "Monster Maze PB": {
                   "mode/pattern/kit separated PB key": "displayPrefix + \"pb.pattern\" + pattern + \".\" + slug(kitName)",
