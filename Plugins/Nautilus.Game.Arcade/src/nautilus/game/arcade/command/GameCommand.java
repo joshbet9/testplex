@@ -28,6 +28,7 @@ public class GameCommand extends MultiCommandBase<ArcadeManager>
 		AddCommand(new StartCommand(Plugin));
 		AddCommand(new StopCommand(Plugin));
 		AddCommand(new SetCommand(Plugin));
+		AddCommand(new MonsterMazePBCommand(Plugin));
 
 		PermissionGroup.PLAYER.setPermission(Perm.GAME_COMMAND_DUMMY_PERM, true, true);
 	}
@@ -41,6 +42,7 @@ public class GameCommand extends MultiCommandBase<ArcadeManager>
 			UtilPlayer.message(caller, F.help("/game start", "Start the current game", ChatColor.DARK_RED));
 			UtilPlayer.message(caller, F.help("/game stop", "Stop the current game", ChatColor.DARK_RED));
 			caller.sendMessage(F.help(String.format("/game set <gametype> [%s(gamemode)] [%s(mapsource)] [%s(mapname)]", MODE_PREFIX, SOURCE_PREFIX, MAP_PREFIX), "Set the current game or next game", ChatColor.DARK_RED));
+			caller.sendMessage(F.help("/game pb", "Show your Monster Maze kit personal bests", ChatColor.DARK_RED));
 		}
 	}
 }

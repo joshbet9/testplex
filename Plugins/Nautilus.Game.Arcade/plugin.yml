@@ -2,3 +2,9 @@ name: Arcade
 main: nautilus.game.arcade.Arcade
 version: 0.1
 loadbefore: [MineplexAnticheat]
+
+commands:
+  cosmetics:
+    aliases: [cosmeticmenu, arcadecosmetics]
+    description: Open the Arcade cosmetic selector
+    usage: /cosmetics

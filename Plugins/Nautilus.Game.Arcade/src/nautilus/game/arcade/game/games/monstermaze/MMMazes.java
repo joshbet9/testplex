@@ -22,12 +22,31 @@ public class MMMazes
 	
 	public static MazePreset getRandomMapPreset(Location loc, MazeBlockData data)
 	{
-		return new MazePreset(getRandomMap(), loc, data);		
+		return new MazePreset(getRandomMap(), loc, data);
+	}
+
+	/**
+	 * Select a fixed original 99x99 layout for reproducible parity tests.
+	 * Values are player-facing pattern numbers 1-3; invalid values fall back to random.
+	 */
+	public static MazePreset getPatternMapPreset(Location loc, MazeBlockData data, int pattern)
+	{
+		int[][] selected;
+		switch (pattern)
+		{
+			case 1: selected = Maze1.MAZE; break;
+			case 2: selected = Maze2.MAZE; break;
+			case 3: selected = Maze3.MAZE; break;
+			default: return getRandomMapPreset(loc, data);
+		}
+		_lastSelected = selected;
+		return new MazePreset(selected, loc, data);
 	}
 	
 	public static class MazePreset
 	{
 		private MazeBlockData _data;
+		private int _patternId;
 		
 		private boolean _built = false;
 		
@@ -47,7 +66,7 @@ public class MMMazes
 		public MazePreset(int[][] rawMaze, Location loc, MazeBlockData data)
 		{
 			int[][] maze = rawMaze;
-			
+			_patternId = rawMaze == Maze1.MAZE ? 1 : rawMaze == Maze2.MAZE ? 2 : rawMaze == Maze3.MAZE ? 3 : 0;
 			_data = data;
 			
 			_center = loc;
@@ -262,6 +281,11 @@ public class MMMazes
 		{
 			return _center;
 		}
+
+		public int getPatternId()
+		{
+			return _patternId;
+		}
 	}
 
 	// PARSED MAZES
@@ -285,9 +309,11 @@ public class MMMazes
 		if (selected == null)
 			selected = maps.get(UtilMath.r(maps.size()));
 
-		//This makes it work between different games.
+		// This makes it work between different games. Return the selected map;
+		// the old code accidentally chose a fresh random map here and ignored
+		// the no-repeat selection above.
 		_lastSelected = selected;
-		return maps.get(UtilMath.r(maps.size()));
+		return selected;
 	}
 	
 	//0 = Air

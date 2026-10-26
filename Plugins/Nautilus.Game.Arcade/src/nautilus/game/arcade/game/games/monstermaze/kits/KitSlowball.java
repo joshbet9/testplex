@@ -32,7 +32,12 @@ public class KitSlowball extends Kit
 
 	public KitSlowball(ArcadeManager manager)
 	{
-		super(manager, GameKit.MONSTER_MAZE_SLOW_BALL, PERKS);
+		this(manager, GameKit.MONSTER_MAZE_SLOW_BALL);
+	}
+
+	protected KitSlowball(ArcadeManager manager, GameKit gameKit)
+	{
+		super(manager, gameKit, PERKS);
 	}
 
 	@Override

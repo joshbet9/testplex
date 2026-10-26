@@ -78,6 +78,7 @@ import mineplex.minecraft.game.core.combat.CombatManager;
 import mineplex.minecraft.game.core.damage.DamageManager;
 
 import nautilus.game.arcade.game.GameServerConfig;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import static mineplex.core.Managers.require;
 
 public class Arcade extends JavaPlugin
@@ -178,6 +179,9 @@ public class Arcade extends JavaPlugin
 		//Arcade Manager
 		PollManager pollManager = new PollManager(this, clientManager, donationManager);
 		_gameManager = new ArcadeManager(this, serverStatusManager, ReadServerConfig(), clientManager, donationManager, damageManager, statsManager, incognito, achievementManager, disguiseManager, creature, teleport, new Blood(this), chat, portal, preferenceManager, inventoryManager, packetHandler, cosmeticManager, projectileManager, petManager, hologramManager, pollManager, npcmanager, customDataManager, punish, eloManager, thankManager, boosterManager);
+
+		// Persistent per-player selector for game cosmetic prototypes.
+		new ArcadeCosmeticsMenu(this);
 
 		//new BroadcastManager(this, _gameManager);
 

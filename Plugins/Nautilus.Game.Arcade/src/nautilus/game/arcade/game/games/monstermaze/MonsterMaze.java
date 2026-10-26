@@ -2,6 +2,7 @@ package nautilus.game.arcade.game.games.monstermaze;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import mineplex.core.common.util.C;
@@ -25,6 +26,16 @@ import nautilus.game.arcade.game.games.monstermaze.events.AbilityUseEvent;
 import nautilus.game.arcade.game.games.monstermaze.events.MonsterBumpPlayerEvent;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitBodyBuilder;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitJumper;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitJumperModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitJumperSpeed;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitBodyBuilderModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitBodyBuilderSpeed;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitMaverick;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitMaverickSpeed;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitRepulsorModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitRepulsorSpeed;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitSlowballModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitSlowballSpeed;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitRepulsor;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitSlowball;
 import nautilus.game.arcade.game.games.monstermaze.trackers.AbilityUseTracker;
@@ -63,40 +74,64 @@ public class MonsterMaze extends SoloGame
 	private Location _center;
 	
 	private HashMap<Player, Long> _launched = new HashMap<Player, Long>();
+	// Retain the bump window even after the velocity/grounded tracker clears.
+	private HashMap<Player, Long> _recentMonsterBump = new HashMap<Player, Long>();
 	
 	private static final int JUMP_POTION_AMPLIFIER = -10;
 	private int _potionMult = JUMP_POTION_AMPLIFIER;
+	private final MonsterMazeMode _mode;
 		
 	@SuppressWarnings("unchecked")
-	public MonsterMaze(ArcadeManager manager) 
+	public MonsterMaze(ArcadeManager manager)
 	{
-		super(manager, GameType.MonsterMaze,
+		this(manager, GameType.MonsterMaze, MonsterMazeMode.ORIGINAL);
+	}
 
-				new Kit[]
-						{
-				new KitJumper(manager),
-				new KitSlowball(manager),
-				new KitBodyBuilder(manager),
-				new KitRepulsor(manager)
-						},
-
-						new String[]
+	/**
+	 * Shared native Reborn game lifecycle. The modern variant differs by its
+	 * kit roster and enhanced mechanics; original Monster Maze keeps its legacy kit roster.
+	 */
+	protected MonsterMaze(ArcadeManager manager, GameType gameType, MonsterMazeMode mode)
+	{
+		super(manager, gameType,
+				mode == MonsterMazeMode.ORIGINAL
+						? new Kit[]
 								{
-				"Run over the maze and don't fall off,",
-				"but make sure you avoid the monsters!",
-				"Make it to a Safe Pad or be killed!"
-								});
+									new KitJumper(manager),
+									new KitSlowball(manager),
+									new KitBodyBuilder(manager),
+									new KitRepulsor(manager)
+								}
+						: mode == MonsterMazeMode.SPEED
+								? new Kit[]
+									{
+										new KitJumperSpeed(manager),
+										new KitSlowballSpeed(manager),
+										new KitBodyBuilderSpeed(manager),
+										new KitRepulsorSpeed(manager),
+										new KitMaverickSpeed(manager)
+									}
+								: new Kit[]
+									{
+										new KitJumperModern(manager),
+										new KitSlowballModern(manager),
+										new KitBodyBuilderModern(manager),
+										new KitRepulsorModern(manager),
+										new KitMaverick(manager)
+									},
+				new String[]
+							{
+								"Run over the maze and don't fall off,",
+								"but make sure you avoid the monsters!",
+								"Make it to a Safe Pad or be killed!"
+							});
 
+		_mode = mode;
 		DamagePvP = false;
 		DamagePvE = false;
-		
 		DamageFall = false;
-
 		HungerSet = 20;
-		
 		PrepareFreeze = false;
-		
-		HungerSet = 20;
 
 		registerStatTrackers(
 				new SnowmanHitTracker(this),
@@ -104,10 +139,9 @@ public class MonsterMaze extends SoloGame
 				new FirstToSafepadTracker(this),
 				new PilotTracker(this),
 				new SurvivePast10thSafepadTracker(this)
-				);
-		//_maze = new SnowmanMaze(this, WorldData.GetDataLocs("GRAY")/*, WorldData.GetCustomLocs("103")*/);
+		);
 
-		registerChatStats(//first to beacon
+		registerChatStats(
 				new ChatStatData("Ninja", "Times Hit", true),
 				new ChatStatData("Speed", "First to safe pad", true),
 				BlankLine,
@@ -120,10 +154,33 @@ public class MonsterMaze extends SoloGame
 				.setGiveCompassToAlive(false)
 				.register(this);
 	}
-	
+
 	public Maze getMaze()
 	{
 		return _maze;
+	}
+
+	public boolean isModernVariant()
+	{
+		return _mode != MonsterMazeMode.ORIGINAL;
+	}
+
+	/** True only for Modern pacing/spawn rules; Speed keeps original pacing and mob counts. */
+	public boolean isActualModernMode()
+	{
+		return _mode == MonsterMazeMode.MODERN;
+	}
+
+	public MonsterMazeMode getMazeMode()
+	{
+		return _mode;
+	}
+
+	/** Refill the enhanced Jumper kit when its player reaches a Safe Pad. */
+	public void resetModernJumperCharges(Player player)
+	{
+		if (isModernVariant() && GetKit(player) instanceof KitJumperModern)
+			setJumpsLeft(player, 3);
 	}
 
 	@EventHandler
@@ -142,11 +199,14 @@ public class MonsterMaze extends SoloGame
 		{
 			_monsterType = loadEntityType();
 			_center = WorldData.GetDataLocs("ORANGE").get(0);
-			_preset = MMMazes.getRandomMapPreset(_center, getMazeBlockData());
+			int requestedPattern = Manager.getPlugin().getConfig().getInt("monstermaze.pattern", 0);
+			_preset = requestedPattern >= 1 && requestedPattern <= 3
+					? MMMazes.getPatternMapPreset(_center, getMazeBlockData(), requestedPattern)
+					: MMMazes.getRandomMapPreset(_center, getMazeBlockData());
 			_preset.build();
 			_maze = new Maze(this, _preset);
 			
-			_maze.fillSpawn(150);
+			_maze.fillSpawn(isActualModernMode() ? 225 : 150);
 		}
 	}
 	
@@ -236,6 +296,9 @@ public class MonsterMaze extends SoloGame
 		
 		for (Player p : GetPlayers(true))
 		{
+			if (isModernVariant() && _maze != null && _maze.isOnPad(p, true))
+				continue; // Speed/QOL variant: jumps on any Safe Pad are free.
+
 			if (!UtilInv.contains(p, "Jumps Remaining", Material.FEATHER, (byte) 0, 1) || p.getLocation().getY()-_center.getY() <= 0 || !Recharge.Instance.usable(p, "MM Player Jump") || isLaunched(p))
 				continue;
 			
@@ -335,7 +398,9 @@ public class MonsterMaze extends SoloGame
 		if (!IsLive())
 			return;
 		
-		_launched.put(event.getPlayer(), System.currentTimeMillis());
+		long now = System.currentTimeMillis();
+		_launched.put(event.getPlayer(), now);
+		_recentMonsterBump.put(event.getPlayer(), now);
 	}
 	
 	@EventHandler
@@ -345,8 +410,22 @@ public class MonsterMaze extends SoloGame
 			return;
 		
 		if (!IsLive())
+		{
+			_launched.clear();
+			_recentMonsterBump.clear();
 			return;
-		
+		}
+
+		Iterator<Map.Entry<Player, Long>> recent = _recentMonsterBump.entrySet().iterator();
+		while (recent.hasNext())
+		{
+			Map.Entry<Player, Long> entry = recent.next();
+			Player player = entry.getKey();
+			if (player == null || !player.isOnline()
+					|| UtilTime.elapsed(entry.getValue(), 2000))
+				recent.remove();
+		}
+
 		HashMap<Player, Long> copy = new HashMap<Player, Long>();
 		copy.putAll(_launched);
 		
@@ -384,7 +463,11 @@ public class MonsterMaze extends SoloGame
 	
 	public boolean isLaunched(Player player)
 	{
-		return _launched.containsKey(player);
+		if (_launched.containsKey(player))
+			return true;
+
+		Long bumpedAt = _recentMonsterBump.get(player);
+		return bumpedAt != null && !UtilTime.elapsed(bumpedAt, 2000);
 	}
 	
 	@EventHandler
@@ -452,6 +535,10 @@ public class MonsterMaze extends SoloGame
 		Scoreboard.write(C.cGold + C.Bold + "Stage");
 		
 		Scoreboard.write(C.cWhite + getMaze().getCurrentSafePadCount());
+
+		Scoreboard.writeNewLine();
+		Scoreboard.write(C.cAqua + C.Bold + "Maze Pattern");
+		Scoreboard.write(C.cWhite + getMaze().getPreset().getPatternId());
 		
 		Scoreboard.draw();
 	}

@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 
 import mineplex.core.common.util.MapUtil;
-import mineplex.core.common.util.UtilAlg;
 import mineplex.core.common.util.UtilPlayer;
 import net.minecraft.server.v1_8_R3.BlockPosition;
 import net.minecraft.server.v1_8_R3.Packet;
@@ -12,15 +11,22 @@ import net.minecraft.server.v1_8_R3.PacketPlayOutBlockBreakAnimation;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.event.player.PlayerInteractEvent;
 
-public class SafePad
+public class SafePad implements Listener
 {
 	private MonsterMaze Host;
 //	private Maze _maze;
 	
 	private Location  _loc;
+	private byte _surfaceColour = (byte) 5;
 	
 	private int _decayCount = 11;
 	
@@ -32,6 +38,15 @@ public class SafePad
 //		_maze = maze;
 		
 		_loc = loc;
+		Bukkit.getPluginManager().registerEvents(this, Host.Manager.getPlugin());
+
+		// Optional cosmetic tint; stock green (data 5) remains the default.
+		if (Host.Manager.getPlugin().getConfig().getBoolean("monstermaze.safe-pad-enhancements.surface-colour-enabled", false))
+		{
+			int configuredColour = Host.Manager.getPlugin().getConfig().getInt("monstermaze.safe-pad-enhancements.surface-colour-data", 5);
+			if (configuredColour >= 0 && configuredColour <= 15)
+				_surfaceColour = (byte) configuredColour;
+		}
 		
 		//beacon surface
 		for (int x = -2 ; x < 3 ; x++)
@@ -41,7 +56,7 @@ public class SafePad
 				if (x == 0 && z == 0)
 					continue;
 				
-				_blocks.add(new SafePadBlock(loc.clone().add(x, 0, z), Material.STAINED_CLAY, (byte) 5));
+				_blocks.add(new SafePadBlock(loc.clone().add(x, 0, z), Material.STAINED_CLAY, _surfaceColour));
 			}
 		}
 		
@@ -165,6 +180,20 @@ public class SafePad
 		}
 	}
 	
+	/**
+	 * Repairs only the center objective beacon. Surrounding stained clay, stairs,
+	 * base blocks and the pad's decay state are deliberately left untouched.
+	 */
+	@SuppressWarnings("deprecation")
+	public boolean restoreObjectiveBeaconIfMissing()
+	{
+		if (_loc == null || _loc.getWorld() == null || _loc.getBlock().getType() == Material.BEACON)
+			return false;
+
+		MapUtil.QuickChangeBlockAt(_loc, Material.BEACON.getId(), (byte) 0);
+		return true;
+	}
+
 	public void turnOffBeacon()
 	{
 		for (SafePadBlock bl : _blocks)
@@ -175,8 +204,34 @@ public class SafePad
 			if (bl.getBlockMaterial() == Material.BEACON)
 			{
 				bl.setMaterial(Material.STAINED_CLAY);
-				bl.setData((byte) 5);
+				bl.setData(_surfaceColour);
 			}
+		}
+		unregisterListener();
+	}
+
+	private void unregisterListener()
+	{
+		HandlerList.unregisterAll(this);
+	}
+
+	/** Prevent the vanilla Beacon UI opening when a player right-clicks this pad's objective. */
+	@EventHandler
+	public void onInteract(PlayerInteractEvent event)
+	{
+		if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null)
+			return;
+
+		if (event.getClickedBlock().getType() != Material.BEACON)
+			return;
+
+		Location clicked = event.getClickedBlock().getLocation();
+		if (clicked.getWorld() == _loc.getWorld()
+				&& clicked.getBlockX() == _loc.getBlockX()
+				&& clicked.getBlockY() == _loc.getBlockY()
+				&& clicked.getBlockZ() == _loc.getBlockZ())
+		{
+			event.setCancelled(true);
 		}
 	}
 
@@ -298,6 +353,19 @@ public class SafePad
 		}
 	}
 
+	/**
+	 * Restore every block originally snapshotted by this pad. Used during whole-game
+	 * cleanup, including pads that were partially decayed at the time the game ended.
+	 */
+	public void restoreAll()
+	{
+		for (SafePadBlock block : _blocks)
+		{
+			block.restore();
+		}
+		unregisterListener();
+	}
+
 	public Location getLocation()
 	{
 		return _loc;
@@ -305,6 +373,19 @@ public class SafePad
 	
 	public boolean isOn(Entity e)
 	{
-		return UtilAlg.inBoundingBox(e.getLocation(), getLocation().clone().add(2.999, 5, 2), getLocation().clone().add(-2, 0, -2.999));
+		if (e == null || e.getWorld() != _loc.getWorld())
+			return false;
+
+		Location entityLocation = e.getLocation();
+		double dx = entityLocation.getX() - _loc.getX();
+		double dz = entityLocation.getZ() - _loc.getZ();
+		double dy = entityLocation.getY() - _loc.getY();
+
+		// Match the visible 5x5 safe-pad surface symmetrically on both axes.
+		// The old bounding-box corners were reversed/asymmetric for Z, so players
+		// could stand on one edge of the beacon pad and still be considered off-pad.
+		return dx > -2.5 && dx < 2.5
+				&& dz > -2.5 && dz < 2.5
+				&& dy > 0.0 && dy < 5.0;
 	}
 }

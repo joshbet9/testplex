@@ -1,6 +1,7 @@
 package nautilus.game.arcade.game.games.monstermaze;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -39,6 +40,9 @@ import nautilus.game.arcade.game.games.monstermaze.events.FirstToSafepadEvent;
 import nautilus.game.arcade.game.games.monstermaze.events.MonsterBumpPlayerEvent;
 import nautilus.game.arcade.game.games.monstermaze.events.SafepadBuildEvent;
 import nautilus.game.arcade.game.games.monstermaze.kits.KitBodyBuilder;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitBodyBuilderModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitJumperModern;
+import nautilus.game.arcade.game.games.monstermaze.kits.KitMaverick;
 import net.minecraft.server.v1_8_R3.BlockPosition;
 import net.minecraft.server.v1_8_R3.Packet;
 import net.minecraft.server.v1_8_R3.PacketPlayOutAnimation;
@@ -70,6 +74,9 @@ public class Maze implements Listener
 	
 	private ArrayList<Player> _playersOnPad = new ArrayList<Player>();
 	private HashMap<LivingEntity, MazeMobWaypoint> _ents = new HashMap<LivingEntity, MazeMobWaypoint>();
+	private final HashMap<LivingEntity, Long> _frozenUntil = new HashMap<LivingEntity, Long>();
+	private final LinkedList<Location> _pendingSpawnLocations = new LinkedList<Location>();
+	private static final int MAX_MOB_SPAWNS_PER_TICK = 25;
 
 	private HashSet<Block> _movementWaypoints = new HashSet<Block>();
 	private HashSet<Block> _movementWaypointsDisabled = new HashSet<Block>();
@@ -85,12 +92,22 @@ public class Maze implements Listener
 
 	private int _phaseTimer = 60;
 	private int _phaseTimerStart = 60;
+
+	// Independent, opt-in objective-beacon repair. Diagnostics remain a separate setting.
+	private final boolean _safePadBeaconEnhancementsEnabled;
+	private long _initialSafePadCreatedAt;
+	private long _lastSafePadBeaconCheckAt;
+	private boolean _preRoundBeaconCheckDone;
 			
 	@SuppressWarnings("deprecation")
 	public Maze(MonsterMaze host, MazePreset maze)
 	{
 		_host = host;
 		_preset = maze;
+		_phaseTimerStart = _host.isActualModernMode() ? 35 : 60;
+		_phaseTimer = _phaseTimerStart;
+		_safePadBeaconEnhancementsEnabled = _host.Manager.getPlugin().getConfig()
+				.getBoolean("monstermaze.safe-pad-enhancements.enabled", false);
 		
 		for (Location loc : getPreset().getMaze())
 		{
@@ -119,6 +136,7 @@ public class Maze implements Listener
 		spawnSafePad();
 		_safePad = _nextSafePad;
 		_nextSafePad = null;
+		_initialSafePadCreatedAt = System.currentTimeMillis();
 		
 		Bukkit.getPluginManager().registerEvents(this, _host.Manager.getPlugin());
 	}
@@ -224,6 +242,40 @@ public class Maze implements Listener
 		}
 	}
 	
+	/**
+	 * When explicitly enabled, audit only the central objective beacon. During
+	 * recruit, run one repair check 2–3 seconds after the first pad is created;
+	 * while live, check the active and preview objective beacons once per second.
+	 * No stained clay or other pad block is repaired by this feature.
+	 */
+	@EventHandler
+	public void updateSafePadBeaconPersistence(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.SEC || !_safePadBeaconEnhancementsEnabled)
+			return;
+
+		long now = System.currentTimeMillis();
+		if (!_host.IsLive())
+		{
+			if (!_preRoundBeaconCheckDone && now - _initialSafePadCreatedAt >= 2000L)
+			{
+				_preRoundBeaconCheckDone = true;
+				if (_safePad != null)
+					_safePad.restoreObjectiveBeaconIfMissing();
+			}
+			return;
+		}
+
+		if (now - _lastSafePadBeaconCheckAt < 1000L)
+			return;
+		_lastSafePadBeaconCheckAt = now;
+
+		if (_safePad != null)
+			_safePad.restoreObjectiveBeaconIfMissing();
+		if (_nextSafePad != null)
+			_nextSafePad.restoreObjectiveBeaconIfMissing();
+	}
+
 	@EventHandler
 	public void updateExperience(UpdateEvent event)
 	{
@@ -299,7 +351,11 @@ public class Maze implements Listener
 		//Hit Players
 		for (Player player : _host.GetPlayers(true))
 		{
-			if (!Recharge.Instance.usable(player, "Monster Hit"))
+			KitBodyBuilderModern bodyRushKit = _host.isModernVariant()
+					&& _host.GetKit(player) instanceof KitBodyBuilderModern
+					? (KitBodyBuilderModern) _host.GetKit(player) : null;
+			boolean bodyRushActive = bodyRushKit != null && bodyRushKit.isBodyRushActive(player);
+			if (!Recharge.Instance.usable(player, "Monster Hit") && !bodyRushActive)
 				continue;
 			
 			if (isOnPad(player, true))
@@ -308,14 +364,42 @@ public class Maze implements Listener
 			//Hit Snowman
 			for (LivingEntity ent : _ents.keySet())
 			{
-				if (UtilMath.offset(player, ent) >= 1)
+				if (isMonsterFrozen(ent) || UtilMath.offset(player, ent) >= 1)
 					continue;
+
+				// Body Rush intercepts the contact before normal knockback/damage.
+				if (bodyRushKit != null && bodyRushKit.consumeMonsterHit(player))
+				{
+					ent.playEffect(org.bukkit.EntityEffect.HURT);
+					UtilAction.velocity(ent, UtilAlg.getTrajectory2d(player, ent), 1, true, 0, 0.8, 2, true);
+					bodyRushKit.trackLaunched(ent);
+					Bukkit.getPluginManager().callEvent(new EntityLaunchEvent(ent));
+					player.playSound(player.getLocation(), Sound.SUCCESSFUL_HIT, 1.0f, 1.35f);
+					// EntityLaunchEvent removes the mob from _ents, so break before
+					// the enhanced-for iterator advances.
+					break;
+				}
 
 				Recharge.Instance.useForce(player, "Monster Hit", 1000);
 
-				//Velocity
-				//UtilAction.velocity(player, new Vector(1,0,0), 4, false, 0, 1.2, 1.2, true);
-				UtilAction.velocity(player, UtilAlg.getTrajectory(ent, player), 1, false, 0, 0.75, 1.2, true);
+				// Maverick redirects knockback toward the preview Safe Pad when present.
+				if (_host.isModernVariant() && _host.GetKit(player) instanceof KitMaverick)
+				{
+					Location target = getMobKnockTarget();
+					if (target != null && target.getWorld() == player.getWorld())
+					{
+						org.bukkit.util.Vector direction = target.toVector().subtract(player.getLocation().toVector());
+						direction.setY(0);
+						if (direction.lengthSquared() > 0.001)
+							UtilAction.velocity(player, direction.normalize(), 1, false, 0, 0.75, 1.2, true);
+						else
+							UtilAction.velocity(player, UtilAlg.getTrajectory(ent, player), 1, false, 0, 0.75, 1.2, true);
+					}
+					else
+						UtilAction.velocity(player, UtilAlg.getTrajectory(ent, player), 1, false, 0, 0.75, 1.2, true);
+				}
+				else
+					UtilAction.velocity(player, UtilAlg.getTrajectory(ent, player), 1, false, 0, 0.75, 1.2, true);
 
 				//Damage Event
 				_host.Manager.GetDamage().NewDamageEvent(player, null, null, 
@@ -350,6 +434,11 @@ public class Maze implements Listener
 		while (entIterator.hasNext())
 		{
 			Entry<LivingEntity, MazeMobWaypoint> data = entIterator.next();
+			if (isMonsterFrozen(data.getKey()))
+			{
+				data.getKey().setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+				continue;
+			}
 			
 			//New or Fallen
 			if (data.getValue().Target == null || data.getKey().getLocation().getY() < data.getValue().Target.getBlockY())
@@ -434,6 +523,45 @@ public class Maze implements Listener
 		}
 	}
 	
+	/** Freeze monsters in a radius for Cryo Blitz. Returns the number affected. */
+	public int freezeMonsters(Location origin, double radius, long durationMs)
+	{
+		if (origin == null || origin.getWorld() == null || durationMs <= 0)
+			return 0;
+		long until = System.currentTimeMillis() + durationMs;
+		double radiusSquared = radius * radius;
+		int count = 0;
+		for (LivingEntity entity : new ArrayList<LivingEntity>(_ents.keySet()))
+		{
+			if (entity == null || !entity.isValid() || entity.getWorld() != origin.getWorld())
+				continue;
+			if (entity.getLocation().distanceSquared(origin) > radiusSquared)
+				continue;
+			_frozenUntil.put(entity, until);
+			entity.setVelocity(new org.bukkit.util.Vector(0, 0, 0));
+			count++;
+		}
+		return count;
+	}
+
+	private boolean isMonsterFrozen(LivingEntity entity)
+	{
+		Long until = _frozenUntil.get(entity);
+		if (until == null)
+			return false;
+		if (until.longValue() > System.currentTimeMillis())
+			return true;
+		_frozenUntil.remove(entity);
+		return false;
+	}
+
+	/** Target used by the enhanced Maverick kit, matching standalone behaviour: active pad first. */
+	public Location getMobKnockTarget()
+	{
+		SafePad target = _safePad != null ? _safePad : _nextSafePad;
+		return target == null ? null : target.getLocation();
+	}
+
 	private Block getTarget(Block start, Block cur, BlockFace face)
 	{	
 		if (cur == null)
@@ -493,94 +621,113 @@ public class Maze implements Listener
 //		}
 //	}
 	
+	/**
+	 * Queue starter/Modern mobs in exact-count batches. Creating 150–225 disguised
+	 * entities in the Recruit event's single server tick can create an avoidable
+	 * join/startup spike; the standalone 1.8 implementation spreads these over ticks.
+	 */
 	public void fillSpawn(int numToSpawn)
 	{
-		System.out.println("spawning " + numToSpawn + " entities on map");
-		
-		int spawned = 0;
-		
-		while(spawned <= numToSpawn)
+		if (numToSpawn <= 0 || getPreset() == null)
+			return;
+
+		ArrayList<Location> validSpawns = new ArrayList<Location>(getPreset().getMaze());
+		Iterator<Location> iter = validSpawns.iterator();
+		while (iter.hasNext())
 		{
-			ArrayList<Location> validSpawns = new ArrayList<Location>(getPreset().getMaze());
-			
-			Iterator<Location> iter = validSpawns.iterator();
-			while (iter.hasNext()) {
-				Location b = iter.next();
-				if(UtilMath.offset(b, _location) < 7.5)
-				{
-					iter.remove();
-				}
+			Location candidate = iter.next();
+			if (UtilMath.offset(candidate, _location) < 7.5)
+				iter.remove();
+		}
+		if (validSpawns.isEmpty())
+		{
+			System.out.println("Monster Maze: no valid maze locations remain for mob spawning.");
+			return;
+		}
+
+		Collections.shuffle(validSpawns);
+		int spawned = 0;
+		while (spawned < numToSpawn)
+		{
+			Location loc = validSpawns.get(spawned % validSpawns.size());
+			if (loc == null || loc.getWorld() == null)
+			{
+				System.out.println("Monster Maze: invalid location in the spawn list; stopping the batch.");
+				break;
 			}
-			Location loc = UtilAlg.Random(validSpawns);
-			
+			_pendingSpawnLocations.add(loc.clone());
+			spawned++;
+		}
+	}
+
+	/** Spawn a bounded number each server tick without capping or discarding the mob population. */
+	@EventHandler
+	public void processPendingMonsterSpawns(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.TICK)
+			return;
+
+		GameState state = _host.GetState();
+		if (state == GameState.End || state == GameState.Dead)
+		{
+			_pendingSpawnLocations.clear();
+			return;
+		}
+
+		int spawned = 0;
+		while (spawned < MAX_MOB_SPAWNS_PER_TICK && !_pendingSpawnLocations.isEmpty())
+		{
+			Location loc = _pendingSpawnLocations.removeFirst();
+			spawnOne(loc);
+			spawned++;
+		}
+	}
+
+	private void spawnOne(Location loc)
+	{
+		if (loc == null || loc.getWorld() == null)
+			return;
+
+		try
+		{
 			_host.CreatureAllowOverride = true;
 			Snowman ent = loc.getWorld().spawn(loc, Snowman.class);
-			
 			DisguiseBase disguise = DisguiseFactory.createDisguise(ent, _host.getMonsterType());
 
 			if (disguise instanceof DisguiseSlime)
-			{
 				((DisguiseSlime) disguise).SetSize(3);
-			}
-
 			if (disguise instanceof DisguiseMagmaCube)
-			{
 				((DisguiseMagmaCube) disguise).SetSize(3);
-			}
-
-			_host.CreatureAllowOverride = false;
 
 			UtilEnt.vegetate(ent, true);
 			UtilEnt.ghost(ent, true, false);
 			_ents.put(ent, new MazeMobWaypoint(ent.getLocation()));
 
 			if (disguise != null && !(disguise instanceof DisguiseSnowman))
-			{
 				_host.Manager.GetDisguise().disguise(disguise);
-			}
-
-			spawned++;
+		}
+		finally
+		{
+			_host.CreatureAllowOverride = false;
 		}
 	}
-	
+
 	private void spawn(int numToSpawn)
 	{
-		Location loc = UtilAlg.Random(getPreset().getSpawns());
-		
+		ArrayList<Location> spawnLocations = new ArrayList<Location>(getPreset().getSpawns());
+		if (spawnLocations.isEmpty() || numToSpawn <= 0)
+			return;
+
+		Collections.shuffle(spawnLocations);
 		int spawned = 0;
-		
-		while (spawned <= numToSpawn)
+		while (spawned < numToSpawn)
 		{
-			_host.CreatureAllowOverride = true;
-			Snowman ent = loc.getWorld().spawn(loc, Snowman.class);
-						
-			DisguiseBase disguise = DisguiseFactory.createDisguise(ent, _host.getMonsterType());
-			
-			if (disguise instanceof DisguiseSlime)
-			{
-				((DisguiseSlime) disguise).SetSize(3);
-			}
-			
-			if (disguise instanceof DisguiseMagmaCube)
-			{
-				((DisguiseMagmaCube) disguise).SetSize(3);
-			}
-			
-			_host.CreatureAllowOverride = false;
-	
-			UtilEnt.vegetate(ent, true);
-			UtilEnt.ghost(ent, true, false);
-			_ents.put(ent, new MazeMobWaypoint(ent.getLocation()));
-			
-			if (disguise != null && !(disguise instanceof DisguiseSnowman))
-			{
-				_host.Manager.GetDisguise().disguise(disguise);
-			}
-			
+			Location loc = spawnLocations.get(spawned % spawnLocations.size());
+			spawnOne(loc);
 			spawned++;
 		}
 	}
-	
+
 	private Location pickNextLocForSafePad() // short method name
 	{
 		if (_safePad != null || !_oldSafePads.isEmpty())
@@ -930,13 +1077,21 @@ public class Maze implements Listener
 				}
 			}
 
-			spawn(15);
+			// The source's Speed mode retains the original 15-mob wave; Modern adds
+			// 30 instead of stacking a legacy 15-mob wave on top of it.
+			if (_host.isActualModernMode())
+				fillSpawn(30);
+			else
+				spawn(15);
 
 			stopSafePad();
 						
 			_playersOnPad.clear();
 
-			_phaseTimerStart = Math.max(15, 60 - ((_curSafe - 1) * 2));
+			if (_host.isActualModernMode())
+				_phaseTimerStart = Math.max(15, 35 - (_curSafe * 20 / 9));
+			else
+				_phaseTimerStart = Math.max(15, 60 - (_curSafe * 2));
 			_phaseTimer = _phaseTimerStart;
 			
 			if (_nextSafePad == null)
@@ -960,6 +1115,7 @@ public class Maze implements Listener
 			
 			_safePad = _nextSafePad;
 			_nextSafePad = null;
+
 			
 			
 		}
@@ -989,6 +1145,10 @@ public class Maze implements Listener
 
 			UtilPlayer.message(p, F.main("Game", "You made it to the Safe Pad!"));
 			_playersOnPad.add(p);
+			// Persist a personal best per native game mode, selected kit, and original maze pattern.
+			MonsterMazePersonalBestManager.record(_host, p, _curSafe, _preset.getPatternId());
+			if (_host.isModernVariant())
+				_host.resetModernJumperCharges(p);
 
 			_host.AddGems(p, 2, "Safe Pads Reached", true, true);
 
@@ -1060,7 +1220,31 @@ public class Maze implements Listener
 	{
 		if (event.GetState() != GameState.Dead)
 			return;
-		
+
+		// The arena/world may be reused by another round. Remove every mob and restore
+		// the exact Safe Pad block snapshots so entities, ice states, and decayed pads
+		// cannot leak into the next game.
+		for (LivingEntity entity : new ArrayList<LivingEntity>(_ents.keySet()))
+		{
+			if (entity != null && entity.isValid())
+				entity.remove();
+		}
+		_ents.clear();
+		_frozenUntil.clear();
+		_pendingSpawnLocations.clear();
+		_playersOnPad.clear();
+
+		if (_safePad != null)
+			_safePad.restoreAll();
+		if (_nextSafePad != null)
+			_nextSafePad.restoreAll();
+		for (SafePad oldPad : _oldSafePads)
+			oldPad.restoreAll();
+
+		_safePad = null;
+		_nextSafePad = null;
+		_oldSafePads.clear();
+		removePlayerContainmentUnit();
 		HandlerList.unregisterAll(this);
 	}
 	
@@ -1079,6 +1263,7 @@ public class Maze implements Listener
 	@EventHandler
 	public void onEntityLaunch(EntityLaunchEvent event)
 	{
+		_frozenUntil.remove(event.getEntity());
 		if (!_ents.containsKey(event.getEntity()))
 			return;
 		

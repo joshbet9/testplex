@@ -69,4 +69,20 @@ public class CustomDataManager extends MiniDbClientPlugin<Map<String, Integer>>
 	{
 		return Get(player).getOrDefault(key, -1);
 	}
+
+	/**
+	 * Update one persistent account custom-data value and queue it for saving.
+	 * Callers must register new keys with getRepository().registerKey(key) first.
+	 */
+	public void setData(Player player, String key, int value)
+	{
+		if (player == null || key == null || key.isEmpty())
+			return;
+
+		Map<String, Integer> values = Get(player.getUniqueId());
+		values = values == null ? new HashMap<>() : new HashMap<>(values);
+		values.put(key, value);
+		Set(player.getUniqueId(), values);
+		saveData(player);
+	}
 }

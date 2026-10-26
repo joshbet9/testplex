@@ -50,6 +50,7 @@ import mineplex.minecraft.game.core.condition.ConditionActive;
 import mineplex.minecraft.game.core.damage.CustomDamageEvent;
 
 import nautilus.game.arcade.ArcadeManager;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import nautilus.game.arcade.GameType;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.events.PlayerPrepareTeleportEvent;
@@ -378,7 +379,15 @@ public class Evolution extends SoloGame
 	
 	@EventHandler
 	public void endEvolve(final EvolutionPostEvolveEvent event)
-	{				
+	{
+		Player player = event.getPlayer();
+		if ("dragon-egg".equals(ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "evolution")))
+		{
+			UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.DRAGON_EGG, (byte) 0),
+					player.getLocation().clone().add(0, 1, 0), 0.35F, 0.55F, 0.35F, 0.08F,
+					20, ViewDist.NORMAL, UtilServer.getPlayers());
+		}
+
 		//Make sure they're not invis when they're done evolving
 		while (Manager.GetCondition().IsCloaked(event.getPlayer()))
 		{

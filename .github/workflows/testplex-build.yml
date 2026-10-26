@@ -1,0 +1,470 @@
+name: Testplex Java 8 build
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "Plugins/**"
+      - ".github/workflows/testplex-build.yml"
+  pull_request:
+    paths:
+      - "Plugins/**"
+      - ".github/workflows/testplex-build.yml"
+  workflow_dispatch:
+    inputs:
+      deploy_to_test_server:
+        description: Deploy this successful build to the isolated Reborn test server on Hyper-V
+        required: false
+        type: boolean
+        default: false
+      source_run_id:
+        description: Successful build run ID to deploy; defaults to the already-verified native-port build. Clear to rebuild from this branch.
+        required: false
+        type: string
+        default: "40301889733"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: testplex-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Mineplex Reborn modules
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.source_run_id == '' }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "8"
+          cache: maven
+          cache-dependency-path: Plugins/pom.xml
+
+      - name: Verify bundled legacy server dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s libs/spigot-1.8.8-1.9-SNAPSHOT.jar
+          test -s libs/bungeecord-bootstrap-1.8-SNAPSHOT.jar
+          grep -Fq '${mineplex.libs.dir}/spigot-1.8.8-1.9-SNAPSHOT.jar' Plugins/pom.xml
+          grep -Fq '${mineplex.libs.dir}/bungeecord-bootstrap-1.8-SNAPSHOT.jar' Plugins/pom.xml
+
+      - name: Build and install all Maven modules
+        shell: bash
+        run: |
+          set -euo pipefail
+          mvn --batch-mode --no-transfer-progress \
+            -f Plugins/pom.xml \
+            -Dmineplex.libs.dir="${GITHUB_WORKSPACE}/libs" \
+            -DskipTests \
+            install
+
+      - name: Verify Arcade artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Built artifacts:"
+          find Plugins/out -maxdepth 1 -type f -name '*.jar' -printf '%f %s bytes\n' | sort
+          test -s Plugins/out/Arcade.jar
+      - name: Smoke-check native gameplay and cosmetic hooks
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n .github/scripts/deploy-testplex-hyperv.sh
+          python3 - <<'PY'
+          from pathlib import Path
+
+          base = Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade")
+          sources = {
+              "Snake": (base / "game/games/snake/Snake.java").read_text(encoding="utf-8"),
+              "Monster Maze SafePad": (base / "game/games/monstermaze/SafePad.java").read_text(encoding="utf-8"),
+              "Monster Maze Pilot": (base / "game/games/monstermaze/trackers/PilotTracker.java").read_text(encoding="utf-8"),
+              "Monster Maze": (base / "game/games/monstermaze/Maze.java").read_text(encoding="utf-8"),
+              "Monster Maze Core": (base / "game/games/monstermaze/MonsterMaze.java").read_text(encoding="utf-8"),
+              "Monster Maze Mode": (base / "game/games/monstermaze/MonsterMazeMode.java").read_text(encoding="utf-8"),
+              "Monster Maze Speed": (base / "game/games/monstermaze/MonsterMazeSpeedGame.java").read_text(encoding="utf-8"),
+              "Monster Maze Modern": (base / "game/games/monstermaze/MonsterMazeModern.java").read_text(encoding="utf-8"),
+              "Monster Maze Layouts": (base / "game/games/monstermaze/MMMazes.java").read_text(encoding="utf-8"),
+              "Monster Maze Map Fallback": (base / "managers/GameCreationManager.java").read_text(encoding="utf-8"),
+              "Monster Maze PB": (base / "game/games/monstermaze/MonsterMazePersonalBestManager.java").read_text(encoding="utf-8"),
+              "Monster Maze PB Command": (Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/command/MonsterMazePBCommand.java")).read_text(encoding="utf-8"),
+              "Monster Maze Game Command": (Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/command/GameCommand.java")).read_text(encoding="utf-8"),
+              "Monster Maze GameType": Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/GameType.java").read_text(encoding="utf-8"),
+              "Monster Maze Display": Path("Plugins/Mineplex.Core/src/mineplex/core/game/GameDisplay.java").read_text(encoding="utf-8"),
+              "Monster Maze Kit registry": Path("Plugins/Mineplex.Core/src/mineplex/core/game/kit/GameKit.java").read_text(encoding="utf-8"),
+              "Custom Data Manager": Path("Plugins/Mineplex.Core/src/mineplex/core/customdata/CustomDataManager.java").read_text(encoding="utf-8"),
+              "Runner": (base / "game/games/runner/Runner.java").read_text(encoding="utf-8"),
+              "Bacon Brawl": (base / "game/games/baconbrawl/BaconBrawl.java").read_text(encoding="utf-8"),
+              "Dragon Escape": (base / "game/games/dragonescape/DragonEscape.java").read_text(encoding="utf-8"),
+              "Evolution": (base / "game/games/evolution/Evolution.java").read_text(encoding="utf-8"),
+              "Micro Battles": (base / "game/games/micro/Micro.java").read_text(encoding="utf-8"),
+              "Cosmetic selector": (base / "cosmetics/ArcadeCosmeticsMenu.java").read_text(encoding="utf-8"),
+              "Deployment script": Path(".github/scripts/deploy-testplex-hyperv.sh").read_text(encoding="utf-8"),
+              "Deploy workflow": Path(".github/workflows/testplex-build.yml").read_text(encoding="utf-8"),
+              "Deployment guide": Path("docs/testbed-deployment.md").read_text(encoding="utf-8"),
+              "In-game test plan": Path("docs/IN-GAME-TEST-PLAN.md").read_text(encoding="utf-8"),
+          }
+
+          contracts = {
+              "Snake": {
+                  "progressive hazard start": "FIRST_MAGMA_HAZARD_MS = 45000L",
+                  "repeating hazard interval": "MAGMA_HAZARD_INTERVAL_MS = 30000L",
+                  "four-hazard cap": "MAX_MAGMA_HAZARDS = 4",
+                  "roulette steering hook": "getDebuffedDirection(player).multiply(4)",
+                  "persistent drift": "_lastTravelDirection.put(player, blended.clone())",
+                  "persistent sharp-turn state": "appliedYaw += clamp(remaining, -4.0f, 4.0f)",
+                  "hazard cleanup": "removeMagmaCubes();",
+              },
+              "Monster Maze SafePad": {
+                  "world check": "e.getWorld() != _loc.getWorld()",
+                  "symmetric X bounds": "dx > -2.5 && dx < 2.5",
+                  "symmetric Z bounds": "dz > -2.5 && dz < 2.5",
+                  "vertical bounds": "dy > 0.0 && dy < 5.0",
+                  "repairs only objective beacon": "MapUtil.QuickChangeBlockAt(_loc, Material.BEACON.getId(), (byte) 0)",
+                  "optional surface tint": "surface-colour-enabled",
+                  "valid dye data range": "configuredColour >= 0 && configuredColour <= 15",
+                  "full snapshot restoration for cleanup": "public void restoreAll()",
+                  "prevent vanilla beacon GUI": "public void onInteract(PlayerInteractEvent event)",
+                  "unregister interaction listener after pad deactivation": "unregisterListener();",
+              },
+              "Monster Maze": {
+                  "persistence opt-in defaults off": 'getBoolean("monstermaze.safe-pad-enhancements.enabled", false)',
+                  "pre-round audit timing": "now - _initialSafePadCreatedAt >= 2000L",
+                  "active objective repair": "_safePad.restoreObjectiveBeaconIfMissing()",
+                  "preview objective repair": "_nextSafePad.restoreObjectiveBeaconIfMissing()",
+                  "exact mob counts and safe empty spawn lists": "while (spawned < numToSpawn)",
+                  "starter spawns are batched per tick": "MAX_MOB_SPAWNS_PER_TICK = 25",
+                  "pending spawns cleared on shutdown": "_pendingSpawnLocations.clear();",
+                  "creature override always reset": "finally\n\t\t{\n\t\t\t_host.CreatureAllowOverride = false;",
+                  "Modern adds thirty mobs per transition": "fillSpawn(30)",
+                  "Modern uses the standalone timer curve": "35 - (_curSafe * 20 / 9)",
+                  "Original and Speed progress by two seconds per stage": "60 - (_curSafe * 2)",
+                  "Modern does not stack a second 15-mob transition wave": "if (_host.isActualModernMode())\n\t\t\t\tfillSpawn(30);\n\t\t\telse\n\t\t\t\tspawn(15);",
+                  "removes active mobs on death": "_ents.clear();",
+                  "records PBs in native account data": "MonsterMazePersonalBestManager.record(_host, p, _curSafe, _preset.getPatternId())",
+                  "frozen mobs skip collision": "isMonsterFrozen(ent) || UtilMath.offset(player, ent) >= 1",
+                  "body rush intercepts contacts": "bodyRushKit.consumeMonsterHit(player)",
+                  "Maverick pad-directed knockback": "getMobKnockTarget()",
+              },
+              "Monster Maze Core": {
+                  "Original ruleset is separate": "mode == MonsterMazeMode.ORIGINAL",
+                  "Speed ruleset is separate": "mode == MonsterMazeMode.SPEED",
+                  "Modern ruleset is separate": "mode == MonsterMazeMode.MODERN",
+                  "Modern has higher starter mob total": "_maze.fillSpawn(isActualModernMode() ? 225 : 150)",
+                  "uses configurable/repeatable pattern selection": "getPatternMapPreset(_center, getMazeBlockData(), requestedPattern)",
+                  "Speed keeps original pacing by mode predicate": "return _mode != MonsterMazeMode.ORIGINAL;",
+                  "separate personal best support": "resetModernJumperCharges",
+                  "recent monster bump prevents jump-charge loss": "_recentMonsterBump.put(event.getPlayer(), now)",
+                  "two-second bump grace window": "!UtilTime.elapsed(bumpedAt, 2000)",
+              },
+              "Monster Maze Mode": {
+                  "Original mode exists": "ORIGINAL",
+                  "Speed mode exists": "SPEED",
+                  "Modern mode exists": "MODERN",
+              },
+              "Monster Maze Speed": {
+                  "native Speed game type": "GameType.MonsterMazeSpeed",
+              },
+              "Monster Maze Modern": {
+                  "native Modern game type": "GameType.MonsterMazeModern",
+              },
+              "Monster Maze Layouts": {
+                  "fixed pattern selection": "getPatternMapPreset",
+                  "identified layout pattern": "getPatternId()",
+                  "uses selected map rather than a second random choice": "return selected;",
+              },
+              "Monster Maze Map Fallback": {
+                  "uses variant and source map catalogs": "Game.getWorldHostNames(gameType)",
+                  "skips empty variant map catalogs safely": "if (maps != null && !maps.isEmpty())",
+              },
+              "Monster Maze PB": {
+                  "mode/pattern/kit separated PB key": "displayPrefix + \"pb.pattern\" + pattern + \".\" + slug(kitName)",
+                  "persists through Mineplex custom data": "customData.setData(player, key, bestToSave)",
+                  "new PB notification": "New Monster Maze personal best: Stage",
+                  "native PB inspection": "public static void show(final MonsterMaze game, final Player player)",
+              },
+              "Monster Maze Pilot": {
+                  "does not start Pilot while already on Safe Pad": "getGame().getMaze().isOnPad(event.getPlayer(), false)",
+                  "clears launch tracking on death": "event.GetState() != GameState.Dead",
+              },
+              "Monster Maze PB Command": {
+                  "native subcommand command": "\"pb\"",
+                  "restricts output to Monster Maze": "current instanceof MonsterMaze",
+                  "shows local player records": "MonsterMazePersonalBestManager.show((MonsterMaze) current, caller)",
+              },
+              "Monster Maze Game Command": {
+                  "registers PB command": "AddCommand(new MonsterMazePBCommand(Plugin));",
+              },
+              "Monster Maze GameType": {
+                  "native Speed registration": "MonsterMazeSpeed(MonsterMazeSpeedGame.class, GameDisplay.MonsterMazeSpeed",
+                  "native Modern registration": "MonsterMazeModern(MonsterMazeModern.class, GameDisplay.MonsterMazeModern",
+                  "supports dedicated maps and falls back to original pool": "new GameType[]{GameType.MonsterMaze}, true",
+              },
+              "Monster Maze Display": {
+                  "Speed label": "MonsterMazeSpeed(\"Monster Maze Speed\"",
+                  "Modern label": "MonsterMazeModern(\"Monster Maze Modern\"",
+              },
+              "Monster Maze Kit registry": {
+                  "Speed owns kit identities": "MONSTER_MAZE_SPEED_JUMPER",
+                  "Modern owns kit identities": "MONSTER_MAZE_MODERN_JUMPER",
+                  "Maverick is registered for Modern": "MONSTER_MAZE_MAVERICK",
+              },
+              "Custom Data Manager": {
+                  "public safe PB setter": "public void setData(Player player, String key, int value)",
+                  "PB update saved to account data": "saveData(player);",
+              },
+              "Runner": {
+                  "player-specific trail choice": "getEquippedChoice(owner.getUniqueId(), \"runner\")",
+                  "custom trail blocks": "_blockColours.put(block, Byte.valueOf(colour))",
+              },
+              "Bacon Brawl": {
+                  "themed sparkle trail": "getEquippedColourData(player.getUniqueId(), \"baconbrawl\")",
+              },
+              "Dragon Escape": {
+                  "coloured running trail": "getEquippedColourData(player.getUniqueId(), \"dragonescape\")",
+              },
+              "Evolution": {
+                  "dragon egg evolution effect": "\"dragon-egg\".equals(ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), \"evolution\"))",
+              },
+              "Micro Battles": {
+                  "player-specific theme trail": "getEquippedColourData(player.getUniqueId(), \"microbattles\")",
+              },
+              "Cosmetic selector": {
+                  "persistent per-player storage": "cosmetics.yml",
+                  "shared colour resolver": "getEquippedColourData(UUID playerId, String game)",
+              },
+              "Deployment script": {
+                  "test-only marker required": ".testplex-sandbox",
+                  "exact sandbox marker": "TESTPLEX ISOLATED TEST SERVER - NOT PRODUCTION",
+                  "versioned backups": ".testplex-backups",
+                  "stops only the configured test service": 'systemctl stop "$SERVICE"',
+                  "rollback remains reachable on failure": "rollback() {",
+                  "requires Arcade JAR": 'grep -Fxq "Arcade.jar"',
+                  "rejects the existing standalone service namespace": "monstermaze-18.service",
+              },
+              "Deploy workflow": {
+                  "test branch guard": "github.ref == 'refs/heads/feat/testbed-bootstrap'",
+                  "manual opt-in": "inputs.deploy_to_test_server",
+                  "auto-deploy opt-in": "vars.TESTPLEX_AUTO_DEPLOY == 'true'",
+                  "reuses the established Hyper-V Tailscale route": "tailscale/github-action@v4",
+                  "can deploy an existing successful build": "inputs.source_run_id",
+              },
+              "Deployment guide": {
+                  "manual setup guide": "One-time Windows test-server setup",
+                  "test-only warning": "Do not point this at a production server.",
+                  "safe-pad toggle documented": "safe-pad-enhancements",
+              },
+              "In-game test plan": {
+                  "manual runtime testing disclosed": "these scenarios still require an actual 1.8.x server",
+                  "Snake hazard schedule": "135 seconds",
+                  "native Speed and Modern test matrix": "MonsterMazeSpeed",
+                  "pattern selector documented": "monstermaze.pattern",
+                  "PB validation documented": "personal best",
+              },
+              "Deployment guide": {
+                  "native game names documented": "MonsterMazeSpeed",
+                  "requires account database for PBs": "account custom data",
+                  "pattern configuration documented": "pattern: 0 # 0=random",
+              },
+          }
+
+          missing = []
+          for game, checks in contracts.items():
+              source = sources[game]
+              for label, expected in checks.items():
+                  if expected not in source:
+                      missing.append(f"{game}: {label}")
+
+          if missing:
+              raise SystemExit("Native gameplay/cosmetic smoke checks failed:\n- " + "\n- ".join(missing))
+          print("Native gameplay, six-game cosmetics and guarded deployment smoke checks passed.")
+          PY
+
+      - name: Upload compiled plugin set
+        uses: actions/upload-artifact@v4
+        with:
+          name: testplex-plugin-set-${{ github.sha }}
+          path: Plugins/out/*.jar
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write build summary
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo "## Testplex Arcade build"
+            echo
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Artifact: \`testplex-plugin-set-${GITHUB_SHA}\`"
+            echo "- Files: all JARs under \`Plugins/out/\`"
+            echo "- Validation: full Maven reactor build and non-empty Arcade JAR"
+            echo
+            echo "This artifact contains the compiled plugin set only, not a runnable server bundle. The server still needs its own runtime files, maps, configuration, Redis/MySQL, and API service."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy_test_server:
+    name: Deploy isolated Reborn test server to Hyper-V
+    needs: build
+    if: ${{ always() && github.ref == 'refs/heads/feat/testbed-bootstrap' && ((github.event_name == 'push' && vars.TESTPLEX_AUTO_DEPLOY == 'true' && needs.build.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.deploy_to_test_server && (needs.build.result == 'success' || inputs.source_run_id != ''))) }}
+    runs-on: ubuntu-22.04
+    environment: hyperv
+    timeout-minutes: 25
+    concurrency:
+      group: testplex-isolated-hyperv-server
+      cancel-in-progress: false
+    steps:
+      - name: Check out deployment script
+        uses: actions/checkout@v4
+
+      - name: Connect runner to Hyper-V over Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:github-actions
+          ping: 100.98.188.97
+
+      - name: Prepare SSH credentials
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.HYPERV_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.HYPERV_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY" || { echo 'HYPERV_SSH_PRIVATE_KEY is not configured.' >&2; exit 1; }
+          test -n "$SSH_KNOWN_HOSTS" || { echo 'HYPERV_SSH_KNOWN_HOSTS is not configured.' >&2; exit 1; }
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/testplex_hyperv"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/testplex_hyperv" "$HOME/.ssh/known_hosts"
+
+      - name: Validate isolated Hyper-V target configuration
+        shell: bash
+        env:
+          TESTPLEX_SERVER_DIR: ${{ vars.TESTPLEX_SERVER_DIR }}
+          TESTPLEX_SYSTEMD_SERVICE: ${{ vars.TESTPLEX_SYSTEMD_SERVICE }}
+        run: |
+          set -euo pipefail
+          case "$TESTPLEX_SERVER_DIR" in
+            /home/monstermaze/servers/testplex|/home/monstermaze/servers/testplex-*) ;;
+            *) echo "TESTPLEX_SERVER_DIR must be a dedicated /home/monstermaze/servers/testplex[-name] directory." >&2; exit 1 ;;
+          esac
+          [[ "$TESTPLEX_SYSTEMD_SERVICE" =~ ^testplex-[A-Za-z0-9_.@-]+\.service$ ]] || {
+            echo "TESTPLEX_SYSTEMD_SERVICE must be a testplex-*.service unit." >&2
+            exit 1
+          }
+          [[ "$TESTPLEX_SYSTEMD_SERVICE" != "monstermaze-18.service" && "$TESTPLEX_SYSTEMD_SERVICE" != "monstermaze-21.service" ]]
+
+      - name: Select existing successful build artifact
+        id: source-artifact
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.source_run_id != '' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_RUN_ID: ${{ inputs.source_run_id }}
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] || { echo "source_run_id must be numeric." >&2; exit 1; }
+          run_json="$RUNNER_TEMP/testplex-source-run.json"
+          artifacts_json="$RUNNER_TEMP/testplex-source-artifacts.json"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" -o "$run_json"
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg branch "feat/testbed-bootstrap" '
+            .status == "completed" and .conclusion == "success" and
+            .head_branch == $branch and
+            ((.head_repository.full_name // "") | ascii_downcase) == ($repo | ascii_downcase) and
+            .path == ".github/workflows/testplex-build.yml"
+          ' "$run_json" >/dev/null || {
+            echo "Source run must be a successful Testplex build from feat/testbed-bootstrap in this repository." >&2
+            exit 1
+          }
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts" -o "$artifacts_json"
+          artifact_name="$(jq -er '[.artifacts[] | select(.expired == false and (.name | startswith("testplex-plugin-set-")))] | if length == 1 then .[0].name else error("Expected exactly one unexpired testplex-plugin-set artifact") end' "$artifacts_json")"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+          echo "Selected $artifact_name from successful run $SOURCE_RUN_ID"
+
+      - name: Download artifact from this workflow build
+        if: ${{ inputs.source_run_id == '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: testplex-plugin-set-${{ github.sha }}
+          path: ${{ runner.temp }}/testplex-plugin-set
+
+      - name: Download artifact from previous successful build
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.source_run_id != '' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.source-artifact.outputs.artifact_name }}
+          path: ${{ runner.temp }}/testplex-plugin-set
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate and package the exact plugin set
+        shell: bash
+        env:
+          ARTIFACT_DIR: ${{ runner.temp }}/testplex-plugin-set
+          BUILD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test -s "$ARTIFACT_DIR/Arcade.jar" || { echo "Downloaded artifact must contain Arcade.jar." >&2; exit 1; }
+          count="$(find "$ARTIFACT_DIR" -maxdepth 1 -type f -name '*.jar' | wc -l)"
+          test "$count" -gt 0 || { echo "Artifact contains no plugin JARs." >&2; exit 1; }
+          tarball="$RUNNER_TEMP/testplex-plugin-set-$BUILD_SHA.tar.gz"
+          (
+            cd "$ARTIFACT_DIR"
+            tar -czf "$tarball" -- *.jar
+          )
+          test -s "$tarball"
+          sha256sum "$tarball"
+
+      - name: Upload plugin set to Hyper-V
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          BUILD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test -n "$HYPERV_SSH_HOST" || { echo 'HYPERV_SSH_HOST is not configured.' >&2; exit 1; }
+          test -n "$HYPERV_SSH_USER" || { echo 'HYPERV_SSH_USER is not configured.' >&2; exit 1; }
+          port="${HYPERV_SSH_PORT:-22}"
+          scp -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$RUNNER_TEMP/testplex-plugin-set-$BUILD_SHA.tar.gz" \
+            "$HYPERV_SSH_USER@$HYPERV_SSH_HOST:/tmp/testplex-plugin-set-$BUILD_SHA.tar.gz"
+
+      - name: Install, restart and verify isolated Reborn server
+        shell: bash
+        timeout-minutes: 8
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          TESTPLEX_SERVER_DIR: ${{ vars.TESTPLEX_SERVER_DIR }}
+          TESTPLEX_SYSTEMD_SERVICE: ${{ vars.TESTPLEX_SYSTEMD_SERVICE }}
+          BUILD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          port="${HYPERV_SSH_PORT:-22}"
+          ssh -p "$port" -i "$HOME/.ssh/testplex_hyperv" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$HYPERV_SSH_USER@$HYPERV_SSH_HOST" \
+            "sudo -n bash -s -- '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'" \
+            < .github/scripts/deploy-testplex-hyperv.sh

@@ -3,6 +3,7 @@ package nautilus.game.arcade.game.games.baconbrawl;
 import java.util.concurrent.TimeUnit;
 
 import org.bukkit.GameMode;
+import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -13,11 +14,15 @@ import mineplex.core.common.util.C;
 import mineplex.core.common.util.UtilPlayer;
 import mineplex.core.common.util.UtilServer;
 import mineplex.core.common.util.UtilTime;
+import mineplex.core.common.util.UtilParticle;
+import mineplex.core.common.util.UtilParticle.ParticleType;
+import mineplex.core.common.util.UtilParticle.ViewDist;
 import mineplex.core.updater.UpdateType;
 import mineplex.core.updater.event.UpdateEvent;
 import mineplex.minecraft.game.core.damage.CustomDamageEvent;
 
 import nautilus.game.arcade.ArcadeManager;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import nautilus.game.arcade.GameType;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.game.SoloGame;
@@ -39,6 +44,7 @@ public class BaconBrawl extends SoloGame
 					"Knockback increases over time!"
 			};
 
+	private int _cosmeticTrailTick;
 	private double _knockbackMagnitude = 1.5;
 	private long _increaseLast, _increaseTime = TimeUnit.SECONDS.toMillis(50);
 
@@ -117,6 +123,31 @@ public class BaconBrawl extends SoloGame
 				player.sendMessage(message);
 				player.playSound(player.getLocation(), Sound.ENDERDRAGON_WINGS, 1, 0.5F);
 			}
+		}
+	}
+
+	/**
+	 * Cosmetic themes render as a lightweight, server-visible sparkle trail around
+	 * each player's pig disguise. Players without a selection keep the stock look.
+	 */
+	@EventHandler
+	public void cosmeticTrail(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.TICK || !IsLive())
+			return;
+
+		if (++_cosmeticTrailTick % 4 != 0)
+			return;
+
+		for (Player player : GetPlayers(true))
+		{
+			int colour = ArcadeCosmeticsMenu.getEquippedColourData(player.getUniqueId(), "baconbrawl");
+			if (colour < 0)
+				continue;
+
+			UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) colour),
+					player.getLocation().clone().add(0, 0.7, 0), 0.12F, 0.16F, 0.12F, 0.015F,
+					2, ViewDist.NORMAL, UtilServer.getPlayers());
 		}
 	}
 
