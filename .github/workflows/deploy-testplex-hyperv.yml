@@ -12,7 +12,7 @@ on:
         description: Successful Testplex build run ID containing the plugin artifact
         required: true
         type: string
-        default: "40301889733"
+        default: "40322898077"
 
 permissions:
   contents: read
