@@ -1,47 +1,64 @@
 # Isolated Mineplex Reborn testbed deployment
 
-The build workflow can publish a versioned set of compiled plugin JARs and, when explicitly enabled, deploy them to a **dedicated Windows test server**. It never deploys to the production server, and a deploy is rejected unless the destination contains a test-only marker.
+The build workflow publishes a versioned set of compiled plugin JARs and, when explicitly enabled, deploys them to a **dedicated Mineplex Reborn test server on your Hyper-V host** using the same Tailscale + SSH route as the existing Monster Maze deployment. It never deploys to the production server, and a deploy is rejected unless the destination contains a test-only marker.
 
 ## What the workflow does
 
 1. Builds the Maven reactor using Java 8.
 2. Checks that `Plugins/out/Arcade.jar` exists and runs source smoke checks for Snake's magma hazards/roulette and Monster Maze's safe-pad bounds.
 3. Uploads every JAR produced in `Plugins/out/` as `testplex-plugin-set-<commit-sha>` for 14 days.
-4. Optionally, a Windows self-hosted runner copies those JARs into the test server's `plugins` directory, backs up any JARs it will replace, stops the matching test server process, installs the files, starts the server, and checks that the process returns. If startup verification fails, it attempts to restore the previous JARs and start the server again.
+4. Optionally, the workflow connects to Hyper-V through Tailscale and SSH, copies the compiled plugin set to a temporary location, backs up JARs it will replace, stops only the dedicated Reborn test-server systemd service, installs the files, starts the service, and verifies that Arcade enabled successfully. If startup verification fails, it attempts to restore the previous JARs and restart the service.
 
 To add the standalone-themed maps later, package each converted Mineplex-compatible map as a `.zip` under the respective `../../update/maps/MonsterMazeSpeed/` or `../../update/maps/MonsterMazeModern/` folder, including the native `ORANGE` center marker, any supported `E=` mob type tag, and `B1`/`B2`/`B3` palette tags. Existing original Monster Maze map zips remain the fallback until those new folders have entries. The current integration uses the source-compatible Reborn map pool; it does not automatically convert standalone world folders into Mineplex map metadata.
 
 The artifact is **not a complete server distribution**. A test instance still needs its own server/runtime files, maps, configuration, Java 8, Redis/MySQL and a compatible API service.
 
-## One-time Windows test-server setup
+## One-time Hyper-V test-server setup
 
-Use a separate Hyper-V VM or other isolated Windows host. Do not point this at a production server.
+The deploy job deliberately reuses the established `MonsterMaze` deployment route: Ubuntu-hosted GitHub Actions runner, Tailscale, SSH with a pinned known-hosts file, `sudo systemctl`, timestamped backups and rollback. It **must not target** the standalone Spigot/Paper servers at `/home/monstermaze/servers/1.8` or `/home/monstermaze/servers/1.21`; those cannot load the native Mineplex Reborn `Arcade.jar`.
 
-1. Prepare a working Reborn server instance and verify it can be started and stopped safely by hand. Ensure the expected plugin folder is named `plugins`.
-2. In the root server folder, create a file named `.testplex-sandbox` containing exactly this line:
+The target must be an already-installed, working **Mineplex Reborn** test instance on the Hyper-V host. This workflow deploys plugin JARs only: it does not provision the server runtime, maps, configuration, Redis/MySQL, or the compatible API service.
+
+1. Prepare a separate test-server root, recommended path `/home/monstermaze/servers/testplex-reborn`. It must have the normal Reborn server layout, including `plugins/` and `logs/latest.log`, and be managed by its own running systemd unit, recommended name `testplex-reborn.service`. Verify by hand that this unit starts and stops only that test instance.
+2. In the test-server root, create `.testplex-sandbox` containing exactly:
 
    ```text
    TESTPLEX ISOLATED TEST SERVER - NOT PRODUCTION
    ```
 
-3. Create two **server-specific PowerShell scripts** on that isolated host:
-   - A stop script that requests a graceful shutdown of this test server only and exits with an error if shutdown fails.
-   - A start script that launches this test server only and exits with an error if startup could not be initiated.
+   The deployment rejects the request if the marker is missing or differs.
+3. Add/configure the service so it starts the Reborn server from that root, runs under the intended server account, and writes logs to `logs/latest.log`. The SSH account used by the current Monster Maze Hyper-V workflow must be able to run `sudo -n systemctl stop/start <service>` without prompting.
+4. In **the `testplex` repository's own Settings → Environments → `hyperv`**, configure these secrets. GitHub secrets are scoped to a repository/environment, so the values from `MonsterMaze` are not automatically inherited by `testplex`:
 
-   The deployment workflow does not guess the server's launcher, RCON arrangement or Windows service name. Point the variables below at the scripts you've verified. The deploy script also waits for the Java process matching `TESTPLEX_PROCESS_MATCH` to disappear and return, respectively.
-4. Register a GitHub Actions **self-hosted Windows x64 runner** on the test host (or on a dedicated Windows deployment host that can access the test server files). Give it the custom label `testplex`. Run it under an account with access to the test-server folder and the stop/start mechanism.
-5. In the repository's **Settings → Secrets and variables → Actions → Variables**, configure these repository variables:
-
-   | Variable | Value |
+   | Secret | Purpose |
    | --- | --- |
-   | `TESTPLEX_SERVER_DIR` | Full path to the isolated server root |
-   | `TESTPLEX_STOP_SCRIPT` | Full path to the verified stop PowerShell script |
-   | `TESTPLEX_START_SCRIPT` | Full path to the verified start PowerShell script |
-   | `TESTPLEX_PROCESS_MATCH` | A unique, case-insensitive substring in that server's Java command line, at least 8 characters long |
+   | `TS_OAUTH_CLIENT_ID` | Tailscale GitHub Actions connection |
+   | `TS_OAUTH_SECRET` | Tailscale GitHub Actions connection |
+   | `HYPERV_SSH_HOST` | Hyper-V host reachable over Tailscale |
+   | `HYPERV_SSH_USER` | SSH deployment account |
+   | `HYPERV_SSH_PORT` | SSH port; optional, defaults to `22` |
+   | `HYPERV_SSH_PRIVATE_KEY` | Private key matching the server's authorised key |
+   | `HYPERV_SSH_KNOWN_HOSTS` | Pinned SSH host-key entries |
 
-   The deploy workflow uses the runner labels `self-hosted`, `windows`, `x64`, and `testplex`. Do not put credentials in the repository or in these path variables.
-6. Initially, leave automatic deployment disabled. Open **Actions → Testplex Java 8 build → Run workflow**, select branch `feat/testbed-bootstrap`, and set `deploy_to_test_server` to true to exercise the guarded deployment. The runner must already be online and the variables above must be set.
-7. After a successful isolated test, set the repository variable `TESTPLEX_AUTO_DEPLOY` to the literal value `true` to deploy automatically when commits are pushed to `feat/testbed-bootstrap`. Pull-request builds never run on the self-hosted deployment runner.
+5. In the same `hyperv` environment's variables, set:
+
+   | Variable | Recommended value |
+   | --- | --- |
+   | `TESTPLEX_SERVER_DIR` | `/home/monstermaze/servers/testplex-reborn` |
+   | `TESTPLEX_SYSTEMD_SERVICE` | `testplex-reborn.service` |
+
+   The script additionally restricts the path to the `/home/monstermaze/servers/testplex[-name]` namespace, requires the exact marker, and accepts only `testplex-*.service` unit names. It explicitly refuses the existing Monster Maze standalone services.
+
+6. To deploy the already-verified build without spending Actions minutes on another Maven build, open **Actions → Testplex Java 8 build → Run workflow**, select `feat/testbed-bootstrap`, set `deploy_to_test_server` to `true`, and leave `source_run_id` at its default `40301889733`. The job validates that the source run succeeded on this branch, locates its unexpired `testplex-plugin-set-*` artifact, and installs that exact artifact. The artifact retention is 14 days from upload. To build and deploy a fresh version instead, clear `source_run_id` and dispatch with deployment enabled.
+7. Automatic deployment is off by default. Only after a manual deployment succeeds and runtime testing is acceptable, set the **repository variable** `TESTPLEX_AUTO_DEPLOY` to the literal `true` to deploy future trusted pushes to `feat/testbed-bootstrap`. Pull-request runs never deploy.
+
+## Safety and troubleshooting
+
+- The workflow refuses to deploy if the sandbox marker, `plugins/` directory, running systemd service, or `Arcade.jar` artifact is missing.
+- Only plugin JARs present in the selected build artifact are replaced. Previous versions are backed up under `.testplex-backups/<timestamp>-<sha>/` within the test root.
+- After restart, the job looks for the `Enabling Arcade` startup log marker. If the service doesn't become ready, it attempts to restore the previous JARs and restart the server, then emits recent unit logs.
+- Keep a Hyper-V VM snapshot and a known-good backup until actual in-game acceptance testing is complete. Rollback is best-effort; it cannot recover a failed host, broken systemd unit, missing server dependencies, or unavailable database/API services.
+- Self-hosted runners and the Tailscale/SSH route execute code and operate on a server. Only trusted maintainers should be allowed to dispatch a deployment or enable auto-deployment.
 
 ## Optional Monster Maze safe-pad settings
 
