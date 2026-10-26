@@ -6,8 +6,8 @@ The build workflow publishes a versioned set of compiled plugin JARs and, when e
 
 1. Builds the Maven reactor using Java 8.
 2. Checks that `Plugins/out/Arcade.jar` exists and runs source smoke checks for Snake's magma hazards/roulette and Monster Maze's safe-pad bounds.
-3. Uploads every JAR produced in `Plugins/out/` as `testplex-plugin-set-<commit-sha>` for 14 days.
-4. Optionally, the workflow connects to Hyper-V through Tailscale and SSH, requests a short-lived signed download URL from GitHub, sends only that URL to the VM, and has the VM download the artifact directly over HTTPS. It validates the ZIP and JAR names, backs up JARs it will replace, stops only the dedicated Reborn test-server systemd service, installs the files, starts the service, and verifies that Arcade enabled successfully. If startup verification fails, it attempts to restore the previous JARs and restart the service. This avoids transferring the large plugin bundle through the Tailscale SSH relay.
+3. Uploads only `Plugins/out/Arcade.jar` as `testplex-plugin-set-<commit-sha>` for 14 days. Other Maven modules are built but are not co-installed on this single Arcade instance.
+4. Optionally, the workflow connects to Hyper-V through Tailscale and SSH, requests a short-lived signed download URL from GitHub, sends only that URL to the VM, and has the VM download the artifact directly over HTTPS. It validates the ZIP and its flat JAR filenames, extracts and installs `Arcade.jar` only, and backs up/removes the other Mineplex server-mode JARs known to this artifact (Hub, Clans, NanoGames, StaffServer, and related modules) so they are not loaded together on the test server. It stops only the dedicated Reborn test-server systemd service, starts it again, and checks for a fresh Arcade startup marker. If startup verification fails, it captures service/journal/latest.log/memory/disk/OOM diagnostics before attempting rollback. Non-Mineplex plugin JARs are left alone.
 
 To add the standalone-themed maps later, package each converted Mineplex-compatible map as a `.zip` under the respective `../../update/maps/MonsterMazeSpeed/` or `../../update/maps/MonsterMazeModern/` folder, including the native `ORANGE` center marker, any supported `E=` mob type tag, and `B1`/`B2`/`B3` palette tags. Existing original Monster Maze map zips remain the fallback until those new folders have entries. The current integration uses the source-compatible Reborn map pool; it does not automatically convert standalone world folders into Mineplex map metadata.
 
@@ -55,8 +55,8 @@ The target must be an already-installed, working **Mineplex Reborn** test instan
 ## Safety and troubleshooting
 
 - The workflow refuses to deploy if the sandbox marker, `plugins/` directory, running systemd service, or `Arcade.jar` artifact is missing.
-- Only plugin JARs present in the selected build artifact are replaced. Previous versions are backed up under `.testplex-backups/<timestamp>-<sha>/` within the test root.
-- After restart, the job looks for the `Enabling Arcade` startup log marker. If the service doesn't become ready, it attempts to restore the previous JARs and restart the server, then emits recent unit logs.
+- `Arcade.jar` is the only plugin installed from the artifact. The script backs up all managed server-mode JAR names before removing sibling Mineplex modules and installing Arcade; backups are stored under `.testplex-backups/<timestamp>-<sha>/` within the test root. Non-Mineplex JARs are preserved.
+- After restart, the job requires the `Enabling Arcade` marker in a log file updated by the new startup. If it is missing, it reports service status, recent systemd logs, the last lines of `logs/latest.log`, memory/disk usage, and kernel OOM messages before rolling back. If the VM itself stops responding, automated rollback cannot be guaranteed and the Hyper-V/VM console must be used to recover it.
 - Keep a Hyper-V VM snapshot and a known-good backup until actual in-game acceptance testing is complete. Rollback is best-effort; it cannot recover a failed host, broken systemd unit, missing server dependencies, or unavailable database/API services.
 - Self-hosted runners and the Tailscale/SSH route execute code and operate on a server. Only trusted maintainers should be allowed to dispatch a deployment or enable auto-deployment.
 
