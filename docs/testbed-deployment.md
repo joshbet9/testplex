@@ -81,7 +81,7 @@ The script builds the full Maven reactor, verifies that `Plugins/out/Arcade.jar`
 
 ## Native Monster Maze test variants
 
-The new games are part of the Reborn Arcade plugin, not a standalone JAR. For manual tests, use `/game set MonsterMaze`, `/game set MonsterMazeSpeed`, or `/game set MonsterMazeModern`, then `/game start` when the game is not already running. On a Reborn test server, `/game set` updates the active test game list. For a persistent rotating server group, add `MonsterMazeSpeed` and `MonsterMazeModern` to that group's configured games list while retaining `MonsterMaze`. All variants reuse the original Reborn Monster Maze map pool and kit/stat infrastructure. Do not install the standalone `MonsterMazeStandalone.jar`.
+The new games are part of the Reborn Arcade plugin, not a standalone JAR. For manual tests, use `/game set MonsterMaze`, `/game set MonsterMazeSpeed`, or `/game set MonsterMazeModern`, then `/game start` when the game is not already running. On a Reborn test server, `/game set` updates the active test game list. For a persistent rotating server group, add `MonsterMazeSpeed` and `MonsterMazeModern` to that group's configured games list while retaining `MonsterMaze`. Variants use their own map folder when it contains maps and otherwise fall back to the original Reborn Monster Maze map pool. Kit/stat infrastructure is native in both cases. Do not install the standalone `MonsterMazeStandalone.jar`.
 
 To reproduce a layout, merge this into the Arcade plugin's config without replacing other settings:
 
