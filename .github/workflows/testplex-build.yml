@@ -136,7 +136,7 @@ jobs:
   deploy_test_server:
     name: Deploy to isolated Windows test server
     needs: build
-    if: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/feat/testbed-bootstrap' && vars.TESTPLEX_AUTO_DEPLOY == 'true') || (github.event_name == 'workflow_dispatch' && inputs.deploy_to_test_server) }}
+    if: ${{ github.ref == 'refs/heads/feat/testbed-bootstrap' && ((github.event_name == 'push' && vars.TESTPLEX_AUTO_DEPLOY == 'true') || (github.event_name == 'workflow_dispatch' && inputs.deploy_to_test_server)) }}
     runs-on:
       - self-hosted
       - windows
