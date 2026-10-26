@@ -31,7 +31,12 @@ public class KitSlowballModern extends KitSlowball
 
     public KitSlowballModern(nautilus.game.arcade.ArcadeManager manager)
     {
-        super(manager, GameKit.MONSTER_MAZE_MODERN_SLOW_BALL);
+        this(manager, GameKit.MONSTER_MAZE_MODERN_SLOW_BALL);
+    }
+
+    protected KitSlowballModern(nautilus.game.arcade.ArcadeManager manager, GameKit gameKit)
+    {
+        super(manager, gameKit);
     }
 
     @EventHandler
