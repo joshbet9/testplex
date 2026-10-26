@@ -45,6 +45,7 @@ import mineplex.core.updater.event.UpdateEvent;
 import mineplex.minecraft.game.core.damage.CustomDamageEvent;
 import nautilus.game.arcade.ArcadeManager;
 import nautilus.game.arcade.GameType;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import nautilus.game.arcade.events.GamePrepareCountdownCommence;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.game.SoloGame;
@@ -541,33 +542,16 @@ public class Snake extends SoloGame
 
 			if (UtilTime.elapsed(_invul.get(player), 2000))
 			{
-				//Self Color
-				DisguiseBase disguise = Manager.GetDisguise().getDisguise(player);
-				if (disguise != null && disguise instanceof DisguiseSheep)
-					((DisguiseSheep) disguise).setColor(_color.get(player));
-
-				//Tail Color
-				if (_tail.containsKey(player))
-					for (Creature ent : _tail.get(player))
-						if (ent instanceof Sheep)
-							((Sheep) ent).setColor(_color.get(player));
-
+				applySnakeColour(player, _color.get(player));
 				invIterator.remove();
 				continue;
 			}
 
-			DyeColor col = GetColor();
-
-			//Self Color
-			DisguiseBase disguise = Manager.GetDisguise().getDisguise(player);
-			if (disguise != null && disguise instanceof DisguiseSheep)
-				((DisguiseSheep) disguise).setColor(col);
-
-			//Tail Color
-			if (_tail.containsKey(player))
-				for (Creature ent : _tail.get(player))
-					if (ent instanceof Sheep)
-						((Sheep) ent).setColor(col);
+			// Without an equipped Snake line, preserve the original random rainbow.
+			// An equipped line replaces the rainbow with its Super Snake colour.
+			DyeColor col = abilityColour(player, "super");
+			if (col == null) col = GetColor();
+			applySnakeColour(player, col);
 		}
 	}
 
@@ -579,6 +563,62 @@ public class Snake extends SoloGame
 		else if (r > 0.5) return DyeColor.YELLOW;
 		else if (r > 0.25) return DyeColor.GREEN;
 		else return DyeColor.BLUE;
+	}
+
+	/** Returns the selected line's server-visible colour for an active ability. */
+	private DyeColor abilityColour(Player player, String ability)
+	{
+		String line = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "snake");
+		if ("elemental".equals(line))
+		{
+			if ("super".equals(ability)) return DyeColor.BLUE;
+			if ("speed".equals(ability)) return DyeColor.YELLOW;
+			if ("reverse".equals(ability)) return DyeColor.PURPLE;
+		}
+		else if ("neon".equals(line))
+		{
+			if ("super".equals(ability)) return DyeColor.CYAN;
+			if ("speed".equals(ability)) return DyeColor.LIME;
+			if ("reverse".equals(ability)) return DyeColor.MAGENTA;
+		}
+		else if ("sunset".equals(line))
+		{
+			if ("super".equals(ability)) return DyeColor.RED;
+			if ("speed".equals(ability)) return DyeColor.PINK;
+			if ("reverse".equals(ability)) return DyeColor.ORANGE;
+		}
+		return null;
+	}
+
+	/** Applies sheep colours through Bukkit entities and the player disguise so every viewer sees them. */
+	private void applySnakeColour(Player player, DyeColor colour)
+	{
+		if (player == null || colour == null) return;
+		DisguiseBase disguise = Manager.GetDisguise().getDisguise(player);
+		if (disguise instanceof DisguiseSheep) ((DisguiseSheep) disguise).setColor(colour);
+		if (_tail.containsKey(player))
+		{
+			for (Creature ent : _tail.get(player))
+			{
+				if (ent instanceof Sheep && ent.isValid()) ((Sheep) ent).setColor(colour);
+			}
+		}
+	}
+
+	/** Speed and Reverse get their equipped line colour, then return to the player's base tail colour. */
+	@EventHandler
+	public void AbilityCosmeticColours(UpdateEvent event)
+	{
+		if (!IsLive() || event.getType() != UpdateType.TICK) return;
+		for (Player player : GetPlayers(true))
+		{
+			if (!_tail.containsKey(player) || _tail.get(player).isEmpty() || _invul.containsKey(player)) continue;
+			DyeColor colour = null;
+			if (_speed.containsKey(player)) colour = abilityColour(player, "speed");
+			else if (_reverse.containsKey(player)) colour = abilityColour(player, "reverse");
+			if (colour == null) colour = _color.get(player);
+			applySnakeColour(player, colour);
+		}
 	}
 
 	@EventHandler
