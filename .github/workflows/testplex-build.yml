@@ -80,8 +80,8 @@ jobs:
             echo "## Testplex Arcade build"
             echo
             echo "- Commit: \`${GITHUB_SHA}\`"
-            echo "- Artifact: \\`testplex-arcade-${GITHUB_SHA}\\`"
-            echo "- File: \\`Plugins/out/Arcade.jar\\`"
+            echo "- Artifact: \`testplex-arcade-${GITHUB_SHA}\`"
+            echo "- File: \`Plugins/out/Arcade.jar\`"
             echo "- Validation: full Maven reactor build and non-empty Arcade JAR"
             echo
             echo "This build artifact contains the compiled plugin only; it is not a runnable server bundle."
