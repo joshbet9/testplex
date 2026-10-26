@@ -28,6 +28,7 @@ public class GameCommand extends MultiCommandBase<ArcadeManager>
 		AddCommand(new StartCommand(Plugin));
 		AddCommand(new StopCommand(Plugin));
 		AddCommand(new SetCommand(Plugin));
+		AddCommand(new MonsterMazePBCommand(Plugin));
 
 		PermissionGroup.PLAYER.setPermission(Perm.GAME_COMMAND_DUMMY_PERM, true, true);
 	}
