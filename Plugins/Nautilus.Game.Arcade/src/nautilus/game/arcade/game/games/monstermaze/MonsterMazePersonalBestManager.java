@@ -120,6 +120,38 @@ public final class MonsterMazePersonalBestManager
         });
     }
 
+    /** Show the selected kit's local/native PB for each original maze pattern. */
+    public static void show(final MonsterMaze game, final Player player)
+    {
+        if (game == null || player == null)
+            return;
+
+        final CustomDataManager customData = game.Manager.getCustomDataManager();
+        if (customData == null)
+        {
+            player.sendMessage(ChatColor.RED + "Monster Maze personal-best storage is unavailable on this server.");
+            return;
+        }
+
+        String kitName = game.GetKit(player) == null ? "unknown" : game.GetKit(player).GetName();
+        if ("unknown".equals(kitName))
+        {
+            player.sendMessage(ChatColor.YELLOW + "Select a Monster Maze kit first to view its personal bests.");
+            return;
+        }
+
+        String prefix = game.GetType().getDisplay().getCustomDataKeyName();
+        player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + game.GetType().getDisplay().getName()
+                + ChatColor.GRAY + " PBs for " + ChatColor.AQUA + kitName + ChatColor.GRAY + ":");
+        for (int pattern = 1; pattern <= 3; pattern++)
+        {
+            String key = prefix + "pb.pattern" + pattern + "." + slug(kitName);
+            int best = customData.getData(player, key);
+            String value = best < 1 ? ChatColor.DARK_GRAY + "Not set" : ChatColor.GREEN + "Stage " + best;
+            player.sendMessage(ChatColor.GRAY + "Maze " + pattern + ": " + value);
+        }
+    }
+
     private static String kitName(MonsterMaze game, Player player)
     {
         return game.GetKit(player) == null ? "Unknown" : game.GetKit(player).GetName();
