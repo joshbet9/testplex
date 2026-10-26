@@ -194,6 +194,14 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             return -1;
         }
 
+        if ("baconbrawl".equalsIgnoreCase(game)) {
+            if ("crown".equals(selected)) return 4;
+            if ("top_hat".equals(selected)) return 15;
+            if ("chef".equals(selected)) return 8;
+            if ("diamond".equals(selected)) return 3;
+            return -1;
+        }
+
         return colourData(selected);
     }
 
