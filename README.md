@@ -54,3 +54,6 @@ The workflow does **not** change a live server by default. Automatic deployment 
 ### Monster Maze native variants
 
 The experimental branch also registers `MonsterMazeSpeed` and `MonsterMazeModern` in Reborn's existing Arcade schema. Both reuse the native map pool, game lifecycle and kit infrastructure; the original `MonsterMaze` remains registered. Do **not** install the standalone Monster Maze plugin on this server. See [the native Monster Maze test section](docs/IN-GAME-TEST-PLAN.md) for the exact matrix, pattern setting and PB checks.
+
+
+When GitHub Actions minutes are unavailable, run the local Java 8 build and source checks with `powershell -ExecutionPolicy Bypass -File .github/scripts/validate-monster-maze.ps1`. Use `-SkipBuild` only for a quick source-contract check; it does not replace compiling `Arcade.jar`.
