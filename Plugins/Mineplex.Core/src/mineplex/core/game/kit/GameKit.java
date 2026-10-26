@@ -2001,6 +2001,50 @@ public enum GameKit
 					getAchievementsFor(AchievementCategory.MONSTER_MAZE)
 			),
 
+	MONSTER_MAZE_MODERN_JUMPER
+			(
+					0,
+					GameDisplay.MonsterMazeModern,
+					"Jumper",
+					"monstermazemodernjumper",
+					new String[] { "Three charged jumps; refreshed by Safe Pads.", "Jumping on a Safe Pad is free." },
+					new KitEntityData<>(Skeleton.class, new ItemStack(Material.FEATHER)),
+					getAchievementsFor(AchievementCategory.MONSTER_MAZE)
+			),
+
+	MONSTER_MAZE_MODERN_SLOW_BALL
+			(
+					1,
+					GameDisplay.MonsterMazeModern,
+					"Slowballer",
+					"monstermazemodernslowballer",
+					new String[] { "Snowballs slow enemies.", "Drop to use Cryo Blitz." },
+					new KitEntityData<>(Skeleton.class, new ItemStack(Material.SNOW_BALL)),
+					4000
+			),
+
+	MONSTER_MAZE_MODERN_BODY_BUILDER
+			(
+					2,
+					GameDisplay.MonsterMazeModern,
+					"Body Builder",
+					"monstermazemodernbodybuilder",
+					new String[] { "Gain max health when first to a Safe Pad.", "Drop an apple to activate Body Rush." },
+					new KitEntityData<>(Skeleton.class, new ItemStack(Material.IRON_PLATE)),
+					2000
+			),
+
+	MONSTER_MAZE_MODERN_REPULSOR
+			(
+					3,
+					GameDisplay.MonsterMazeModern,
+					"Repulsor",
+					"monstermazemodernrepulsor",
+					new String[] { "Three charges launch monsters away.", "Repulsed monsters are removed after launch." },
+					new KitEntityData<>(Skeleton.class, new ItemStack(Material.COAL)),
+					getAchievementsFor(AchievementCategory.MONSTER_MAZE)
+			),
+
 	MONSTER_MAZE_MAVERICK
 			(
 					4,
