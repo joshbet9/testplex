@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Run on the Hyper-V host as root through the existing Tailscale/SSH deployment path.
 set -Eeuo pipefail
+umask 077
 
 if [[ $# -ne 3 ]]; then
   echo "Usage: deploy-testplex-hyperv.sh <40-char-build-sha> <server-root> <systemd-service>" >&2
@@ -44,16 +45,39 @@ EXPECTED_MARKER="TESTPLEX ISOLATED TEST SERVER - NOT PRODUCTION"
 
 PLUGINS="$ROOT/plugins"
 LOG="$ROOT/logs/latest.log"
-INCOMING="/tmp/testplex-plugin-set-$SHA.tar.gz"
+INCOMING="/tmp/testplex-plugin-set-$SHA.zip"
+STAGE=""
+cleanup_preflight() {
+  rm -f "$INCOMING"
+  if [[ -n "$STAGE" ]]; then rm -rf "$STAGE"; fi
+}
+trap cleanup_preflight EXIT
+
 [[ -d "$PLUGINS" ]] || { echo "Missing plugins directory: $PLUGINS" >&2; exit 2; }
-[[ -s "$INCOMING" ]] || { echo "Missing transferred build bundle: $INCOMING" >&2; exit 2; }
+IFS= read -r DOWNLOAD_URL || {
+  echo "Missing one-time GitHub artifact download URL on standard input." >&2
+  exit 2
+}
+case "$DOWNLOAD_URL" in
+  https://*.blob.core.windows.net/*|https://*.actions.githubusercontent.com/*|https://*.githubusercontent.com/*|https://github.com/*) ;;
+  *)
+    echo "Refusing artifact URL outside GitHub's download hosts." >&2
+    exit 2
+    ;;
+esac
 systemctl cat "$SERVICE" >/dev/null
 systemctl is-active --quiet "$SERVICE" || {
   echo "Refusing to deploy because $SERVICE is not active before deployment." >&2
   exit 2
 }
 
-BUNDLE_LIST="$(tar -tzf "$INCOMING")"
+echo "Downloading selected GitHub artifact directly to the test VM."
+curl --fail --location --silent --show-error \
+  --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 600 \
+  --output "$INCOMING" "$DOWNLOAD_URL"
+[[ -s "$INCOMING" ]] || { echo "GitHub artifact download is empty." >&2; exit 2; }
+unzip -tq "$INCOMING" >/dev/null
+BUNDLE_LIST="$(unzip -Z1 "$INCOMING")"
 grep -Fxq "Arcade.jar" <<< "$BUNDLE_LIST" || {
   echo "Build bundle does not contain Arcade.jar." >&2
   exit 2
@@ -66,7 +90,7 @@ while IFS= read -r entry; do
 done <<< "$BUNDLE_LIST"
 
 STAGE="$(mktemp -d "/tmp/testplex-stage-$SHA.XXXXXX")"
-tar -xzf "$INCOMING" -C "$STAGE"
+unzip -q "$INCOMING" -d "$STAGE"
 mapfile -t JAR_PATHS < <(find "$STAGE" -mindepth 1 -maxdepth 1 -type f -name "*.jar" -print | sort)
 (( ${#JAR_PATHS[@]} > 0 )) || { echo "No plugin JARs found after extraction." >&2; exit 2; }
 [[ -s "$STAGE/Arcade.jar" ]] || { echo "Extracted Arcade.jar is empty." >&2; exit 2; }
