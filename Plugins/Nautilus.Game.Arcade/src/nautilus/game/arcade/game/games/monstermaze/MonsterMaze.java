@@ -512,6 +512,10 @@ public class MonsterMaze extends SoloGame
 		Scoreboard.write(C.cGold + C.Bold + "Stage");
 		
 		Scoreboard.write(C.cWhite + getMaze().getCurrentSafePadCount());
+
+		Scoreboard.writeNewLine();
+		Scoreboard.write(C.cAqua + C.Bold + "Maze Pattern");
+		Scoreboard.write(C.cWhite + getMaze().getPreset().getPatternId());
 		
 		Scoreboard.draw();
 	}
