@@ -97,7 +97,7 @@ Write-Host "Checking native integration contracts..." -ForegroundColor Cyan
 Assert-Contains "Original Monster Maze remains registered" $gameTypeFile "MonsterMaze(MonsterMaze.class, GameDisplay.MonsterMaze)"
 Assert-Contains "Monster Maze Speed registered" $gameTypeFile "MonsterMazeSpeed(MonsterMazeSpeedGame.class, GameDisplay.MonsterMazeSpeed"
 Assert-Contains "Monster Maze Modern registered" $gameTypeFile "MonsterMazeModern(MonsterMazeModern.class, GameDisplay.MonsterMazeModern"
-Assert-Contains "Both variants reuse the original map pool" $gameTypeFile "new GameType[]{GameType.MonsterMaze}, false"
+Assert-Contains "Variants can use dedicated maps and fall back to original pool" $gameTypeFile "new GameType[]{GameType.MonsterMaze}, true"
 Assert-Contains "Original ruleset exists" (Join-Path $mazeDir "MonsterMazeMode.java") "ORIGINAL"
 Assert-Contains "Speed ruleset exists" (Join-Path $mazeDir "MonsterMazeMode.java") "SPEED"
 Assert-Contains "Modern ruleset exists" (Join-Path $mazeDir "MonsterMazeMode.java") "MODERN"
