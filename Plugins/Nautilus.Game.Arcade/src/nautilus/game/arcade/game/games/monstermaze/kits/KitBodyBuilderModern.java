@@ -22,6 +22,7 @@ import mineplex.core.updater.UpdateType;
 import mineplex.core.updater.event.UpdateEvent;
 
 import nautilus.game.arcade.ArcadeManager;
+import mineplex.core.game.kit.GameKit;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.game.Game.GameState;
 import nautilus.game.arcade.game.games.monstermaze.events.AbilityUseEvent;
@@ -42,7 +43,7 @@ public class KitBodyBuilderModern extends KitBodyBuilder
 
     public KitBodyBuilderModern(ArcadeManager manager)
     {
-        super(manager);
+        super(manager, GameKit.MONSTER_MAZE_MODERN_BODY_BUILDER);
     }
 
     @Override
