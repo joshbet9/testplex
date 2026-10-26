@@ -81,6 +81,20 @@ jobs:
         run: |
           set -euo pipefail
           bash -n .github/scripts/deploy-testplex-hyperv.sh
+          grep -Fq "JAR_ENTRY_RE='^[A-Za-z0-9._+() -]+[.]jar$'" .github/scripts/deploy-testplex-hyperv.sh
+          bash <<'BASH'
+          set -euo pipefail
+          JAR_ENTRY_RE='^[A-Za-z0-9._+() -]+[.]jar$'
+          for entry in "Arcade.jar" "Google Sheets.jar" "Foo (1).jar"; do
+            [[ "$entry" =~ $JAR_ENTRY_RE ]] || { echo "Allowed JAR name rejected: $entry" >&2; exit 1; }
+          done
+          for entry in "../Arcade.jar" "subdir/Arcade.jar" 'bad$.jar'; do
+            if [[ "$entry" =~ $JAR_ENTRY_RE ]]; then
+              echo "Unsafe JAR name was accepted: $entry" >&2
+              exit 1
+            fi
+          done
+          BASH
           python3 - <<'PY'
           from pathlib import Path
 
@@ -294,7 +308,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: testplex-plugin-set-${{ github.sha }}
-          path: Plugins/out/*.jar
+          path: Plugins/out/Arcade.jar
           if-no-files-found: error
           retention-days: 14
 
@@ -307,10 +321,10 @@ jobs:
             echo
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Artifact: \`testplex-plugin-set-${GITHUB_SHA}\`"
-            echo "- Files: all JARs under \`Plugins/out/\`"
-            echo "- Validation: full Maven reactor build and non-empty Arcade JAR"
+            echo "- Files: \`Plugins/out/Arcade.jar\` only"
+            echo "- Validation: full Maven reactor build, native gameplay/cosmetic smoke checks, and safe deployment filename tests"
             echo
-            echo "This artifact contains the compiled plugin set only, not a runnable server bundle. The server still needs its own runtime files, maps, configuration, Redis/MySQL, and API service."
+            echo "This artifact is intentionally Arcade-only for the dedicated test instance; Hub, Clans, StaffServer and other server-mode plugins are not co-installed. It is not a runnable server bundle. The server still needs its own runtime files, maps, configuration, Redis/MySQL, and compatible API/service configuration."
           } >> "$GITHUB_STEP_SUMMARY"
 
   deploy_test_server:
@@ -459,6 +473,6 @@ jobs:
           printf '%s\n' "$download_url" | ssh -p "$port" -i "$HOME/.ssh/testplex_hyperv" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 \
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=10 \
             "$HYPERV_SSH_USER@$HYPERV_SSH_HOST" \
             "sudo -n /usr/local/sbin/deploy-testplex-hyperv.sh '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'"
