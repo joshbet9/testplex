@@ -176,5 +176,4 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
             "$HYPERV_SSH_USER@$HYPERV_SSH_HOST" \
-            "sudo -n bash -s -- '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'" \
-            < .github/scripts/deploy-testplex-hyperv.sh
+            "sudo -n /usr/local/sbin/deploy-testplex-hyperv.sh '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'"
