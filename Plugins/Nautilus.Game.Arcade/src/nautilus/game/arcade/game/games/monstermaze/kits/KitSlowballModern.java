@@ -17,6 +17,7 @@ import mineplex.core.updater.event.UpdateEvent;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.game.Game.GameState;
 import nautilus.game.arcade.game.games.monstermaze.MonsterMaze;
+import mineplex.core.game.kit.GameKit;
 import nautilus.game.arcade.game.games.monstermaze.events.AbilityUseEvent;
 
 /** Slowballer variant with a Q-drop Cryo Blitz secondary ability. */
@@ -30,7 +31,7 @@ public class KitSlowballModern extends KitSlowball
 
     public KitSlowballModern(nautilus.game.arcade.ArcadeManager manager)
     {
-        super(manager);
+        super(manager, GameKit.MONSTER_MAZE_MODERN_SLOW_BALL);
     }
 
     @EventHandler
