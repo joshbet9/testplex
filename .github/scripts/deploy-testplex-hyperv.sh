@@ -70,6 +70,14 @@ systemctl is-active --quiet "$SERVICE" || {
   echo "Refusing to deploy because $SERVICE is not active before deployment." >&2
   exit 2
 }
+WORKING_DIR="$(systemctl show "$SERVICE" --property=WorkingDirectory --value)"
+[[ "$WORKING_DIR" == "$ROOT" ]] || {
+  echo "Refusing deployment: $SERVICE WorkingDirectory is '$WORKING_DIR', expected '$ROOT'." >&2
+  exit 2
+}
+echo "Pre-deployment memory and disk:"
+free -h
+df -h "$ROOT"
 
 echo "Downloading selected GitHub artifact directly to the test VM."
 curl --fail --location --silent --show-error \
@@ -78,25 +86,63 @@ curl --fail --location --silent --show-error \
 [[ -s "$INCOMING" ]] || { echo "GitHub artifact download is empty." >&2; exit 2; }
 unzip -tq "$INCOMING" >/dev/null
 BUNDLE_LIST="$(unzip -Z1 "$INCOMING")"
-grep -Fxq "Arcade.jar" <<< "$BUNDLE_LIST" || {
-  echo "Build bundle does not contain Arcade.jar." >&2
+[[ "$(grep -Fxc "Arcade.jar" <<< "$BUNDLE_LIST" || true)" == "1" ]] || {
+  echo "Build bundle must contain exactly one Arcade.jar." >&2
   exit 2
 }
+BUNDLE_NAMES=()
+declare -A BUNDLE_SEEN=()
+JAR_ENTRY_RE='^[A-Za-z0-9._+() -]+[.]jar$'
 while IFS= read -r entry; do
-  JAR_ENTRY_RE='^[A-Za-z0-9._+() -]+[.]jar$'
   [[ "$entry" =~ $JAR_ENTRY_RE ]] || {
     echo "Unexpected entry in plugin bundle: $entry" >&2
     exit 2
   }
+  if [[ -n "${BUNDLE_SEEN[$entry]:-}" ]]; then
+    echo "Duplicate entry in plugin bundle: $entry" >&2
+    exit 2
+  fi
+  BUNDLE_SEEN["$entry"]=1
+  BUNDLE_NAMES+=("$entry")
 done <<< "$BUNDLE_LIST"
 
+# This is a single Arcade test instance, not a combined Hub/Clans/NanoGames server.
+# Also clean up sibling modules potentially left by earlier full-set deployment attempts.
+LEGACY_SERVER_MODULE_JARS=(
+  "BungeeRotator.jar"
+  "Clans.jar"
+  "ClansCompensation.jar"
+  "ClansGenerator.jar"
+  "ClansHub.jar"
+  "ClansQueue.jar"
+  "DDoSProtectionSwitcher.jar"
+  "EnjinTranslator.jar"
+  "GemHunters.jar"
+  "Google Sheets.jar"
+  "Hub.jar"
+  "MapParser.jar"
+  "Mineplexer.jar"
+  "NanoGames.jar"
+  "ServerMonitor.jar"
+  "StaffServer.jar"
+  "UHC WorldGen.jar"
+  "mavericks-review-hub.jar"
+)
+MANAGED_NAMES=()
+declare -A MANAGED_SEEN=()
+for name in "${BUNDLE_NAMES[@]}" "${LEGACY_SERVER_MODULE_JARS[@]}"; do
+  if [[ -z "${MANAGED_SEEN[$name]:-}" ]]; then
+    MANAGED_SEEN["$name"]=1
+    MANAGED_NAMES+=("$name")
+  fi
+done
+
 STAGE="$(mktemp -d "/tmp/testplex-stage-$SHA.XXXXXX")"
-unzip -q "$INCOMING" -d "$STAGE"
-mapfile -t JAR_PATHS < <(find "$STAGE" -mindepth 1 -maxdepth 1 -type f -name "*.jar" -print | sort)
-(( ${#JAR_PATHS[@]} > 0 )) || { echo "No plugin JARs found after extraction." >&2; exit 2; }
+unzip -p "$INCOMING" "Arcade.jar" > "$STAGE/Arcade.jar"
 [[ -s "$STAGE/Arcade.jar" ]] || { echo "Extracted Arcade.jar is empty." >&2; exit 2; }
-JAR_NAMES=()
-for path in "${JAR_PATHS[@]}"; do JAR_NAMES+=("$(basename "$path")"); done
+JAR_PATHS=("$STAGE/Arcade.jar")
+JAR_NAMES=("Arcade.jar")
+echo "Validated ${#BUNDLE_NAMES[@]} artifact JARs; this test server will install Arcade.jar only."
 
 if [[ -f "$PLUGINS/Arcade.jar" ]]; then
   OWNER_GROUP="$(stat -c '%U:%G' "$PLUGINS/Arcade.jar")"
@@ -109,7 +155,7 @@ STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_DIR="$ROOT/.testplex-backups/$STAMP-$SHA"
 install -d -m 0750 "$BACKUP_DIR"
 declare -A EXISTED=()
-for name in "${JAR_NAMES[@]}"; do
+for name in "${MANAGED_NAMES[@]}"; do
   if [[ -f "$PLUGINS/$name" ]]; then
     cp -p "$PLUGINS/$name" "$BACKUP_DIR/$name"
     EXISTED["$name"]=1
@@ -123,9 +169,19 @@ rollback() {
   local status=$?
   trap - EXIT
   if [[ "$status" -ne 0 && "$DEPLOYMENT_TOUCHED" -eq 1 ]]; then
-    echo "Deployment failed; attempting to restore the previous plugin set." >&2
-    timeout 60 systemctl stop "$SERVICE" || true
-    for name in "${JAR_NAMES[@]}"; do
+    echo "Deployment failed; attempting to restore the previous plugin files." >&2
+    if ! timeout 20 systemctl stop "$SERVICE"; then
+      echo "Graceful stop timed out; force-killing only the test service cgroup." >&2
+      timeout 10 systemctl kill --kill-who=all --signal=KILL "$SERVICE" || true
+    fi
+    if systemctl is-active --quiet "$SERVICE"; then
+      echo "ERROR: $SERVICE still appears active; refusing to overwrite plugin files while Java may be using them." >&2
+      timeout 10 systemctl status "$SERVICE" --no-pager --full || true
+      rm -f "$INCOMING"
+      rm -rf "$STAGE"
+      exit "$status"
+    fi
+    for name in "${MANAGED_NAMES[@]}"; do
       if [[ -f "$BACKUP_DIR/$name" ]]; then
         cp -p "$BACKUP_DIR/$name" "$PLUGINS/$name" || true
       elif [[ "${EXISTED[$name]:-0}" -eq 0 ]]; then
@@ -150,32 +206,60 @@ if systemctl is-active --quiet "$SERVICE"; then
   exit 1
 fi
 
+for name in "${MANAGED_NAMES[@]}"; do
+  if [[ "$name" != "Arcade.jar" ]]; then
+    rm -f "$PLUGINS/$name"
+  fi
+done
 for path in "${JAR_PATHS[@]}"; do
   name="$(basename "$path")"
   install -o "$PLUGIN_OWNER" -g "$PLUGIN_GROUP" -m 0644 "$path" "$PLUGINS/$name"
 done
 
+START_MARKER="$STAGE/.startup-check-started"
+touch "$START_MARKER"
 echo "Starting isolated Reborn test server $SERVICE."
 timeout 90 systemctl start "$SERVICE"
 
+dump_diagnostics() {
+  echo "===== startup failure diagnostics: service status =====" >&2
+  timeout 8 systemctl status "$SERVICE" --no-pager --full >&2 || true
+  echo "===== startup failure diagnostics: recent systemd journal =====" >&2
+  timeout 8 journalctl -u "$SERVICE" -n 80 --no-pager >&2 || true
+  echo "===== startup failure diagnostics: latest.log =====" >&2
+  if [[ -s "$LOG" ]]; then
+    tail -n 120 "$LOG" >&2 || true
+  else
+    echo "Missing or empty log file: $LOG" >&2
+  fi
+  echo "===== startup failure diagnostics: memory and disk =====" >&2
+  free -h >&2 || true
+  df -h "$ROOT" >&2 || true
+  echo "===== startup failure diagnostics: kernel OOM messages =====" >&2
+  timeout 5 dmesg -T 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 20 >&2 || true
+}
+
 ready=0
-for attempt in $(seq 1 90); do
-  if systemctl is-active --quiet "$SERVICE" \
-    && [[ -s "$LOG" ]] \
-    && tail -n 1500 "$LOG" | grep -Fq "Enabling Arcade"; then
+for attempt in $(seq 1 180); do
+  if ! systemctl is-active --quiet "$SERVICE"; then
+    echo "$SERVICE became inactive during startup at ${attempt}s." >&2
+    break
+  fi
+  if [[ -s "$LOG" && "$LOG" -nt "$START_MARKER" ]] \
+    && tail -n 2500 "$LOG" | grep -Fq "Enabling Arcade"; then
     ready=1
     break
   fi
   sleep 1
 done
 if [[ "$ready" -ne 1 ]]; then
-  echo "Arcade startup marker not found within 90 seconds; rollback will run." >&2
-  tail -n 160 "$LOG" >&2 || true
+  echo "Arcade did not produce a fresh startup marker within 180 seconds; diagnostics follow before rollback." >&2
+  dump_diagnostics
   exit 1
 fi
 
-echo "Hyper-V Reborn test deployment succeeded for build $SHA."
-echo "Installed JAR count: ${#JAR_PATHS[@]}"
+echo "Hyper-V Reborn Arcade test deployment succeeded for build $SHA."
+echo "Installed JAR count: ${#JAR_PATHS[@]} (Arcade only)"
 echo "Arcade.jar SHA-256:"
 sha256sum "$PLUGINS/Arcade.jar"
 echo "Rollback backup: $BACKUP_DIR"
