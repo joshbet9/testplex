@@ -49,3 +49,8 @@ The `Testplex Java 8 build` GitHub Actions workflow compiles the Maven reactor, 
 - [Current testbed pull request](https://github.com/joshbet9/testplex/pull/1)
 
 The workflow does **not** change a live server by default. Automatic deployment requires an isolated Windows self-hosted runner and the server-specific variables/scripts described in the setup guide. Build success is not a substitute for running the in-game checklist on that isolated server.
+
+
+### Monster Maze native variants
+
+The experimental branch also registers `MonsterMazeSpeed` and `MonsterMazeModern` in Reborn's existing Arcade schema. Both reuse the native map pool, game lifecycle and kit infrastructure; the original `MonsterMaze` remains registered. Do **not** install the standalone Monster Maze plugin on this server. See [the native Monster Maze test section](docs/IN-GAME-TEST-PLAN.md) for the exact matrix, pattern setting and PB checks.
