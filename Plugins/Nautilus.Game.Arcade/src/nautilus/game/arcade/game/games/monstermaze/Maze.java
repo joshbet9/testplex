@@ -1067,14 +1067,19 @@ public class Maze implements Listener
 				}
 			}
 
-			spawn(15);
+			// The source's Speed mode retains the original 15-mob wave; Modern adds
+			// 30 instead of stacking a legacy 15-mob wave on top of it.
+			if (_host.isActualModernMode())
+				fillSpawn(30);
+			else
+				spawn(15);
 
 			stopSafePad();
 						
 			_playersOnPad.clear();
 
 			if (_host.isActualModernMode())
-				_phaseTimerStart = Math.max(15, 35 - (_curSafe * 2));
+				_phaseTimerStart = Math.max(15, 35 - (_curSafe * 20 / 9));
 			else
 				_phaseTimerStart = Math.max(15, 60 - ((_curSafe - 1) * 2));
 			_phaseTimer = _phaseTimerStart;
@@ -1101,9 +1106,6 @@ public class Maze implements Listener
 			_safePad = _nextSafePad;
 			_nextSafePad = null;
 
-			// Modern scales the wave by exactly 30 monsters at each Safe Pad transition.
-			if (_host.isActualModernMode())
-				fillSpawn(30);
 			
 			
 		}
