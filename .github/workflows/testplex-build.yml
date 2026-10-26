@@ -87,6 +87,10 @@ jobs:
               "Evolution": (base / "game/games/evolution/Evolution.java").read_text(encoding="utf-8"),
               "Micro Battles": (base / "game/games/micro/Micro.java").read_text(encoding="utf-8"),
               "Cosmetic selector": (base / "cosmetics/ArcadeCosmeticsMenu.java").read_text(encoding="utf-8"),
+              "Deployment script": Path(".github/scripts/deploy-testplex.ps1").read_text(encoding="utf-8"),
+              "Deploy workflow": Path(".github/workflows/testplex-build.yml").read_text(encoding="utf-8"),
+              "Deployment guide": Path("docs/testbed-deployment.md").read_text(encoding="utf-8"),
+              "In-game test plan": Path("docs/IN-GAME-TEST-PLAN.md").read_text(encoding="utf-8"),
           }
 
           contracts = {
@@ -125,6 +129,28 @@ jobs:
                   "persistent per-player storage": "cosmetics.yml",
                   "shared colour resolver": "getEquippedColourData(UUID playerId, String game)",
               },
+              "Deployment script": {
+                  "test-only marker required": ".testplex-sandbox",
+                  "exact sandbox marker": "TESTPLEX ISOLATED TEST SERVER - NOT PRODUCTION",
+                  "versioned backups": ".testplex-backups",
+                  "checks server stop/start": "Wait-ForServerProcessState",
+                  "rollback remains reachable on failure": 'Write-Warning "Deployment failed: $deploymentError"',
+                  "requires Arcade JAR": 'Name -ieq "Arcade.jar"',
+              },
+              "Deploy workflow": {
+                  "test branch guard": "github.ref == 'refs/heads/feat/testbed-bootstrap'",
+                  "manual opt-in": "inputs.deploy_to_test_server",
+                  "auto-deploy opt-in": "vars.TESTPLEX_AUTO_DEPLOY == 'true'",
+                  "dedicated runner label": "- testplex",
+              },
+              "Deployment guide": {
+                  "manual setup guide": "One-time Windows test-server setup",
+                  "test-only warning": "Do not point this at a production server.",
+              },
+              "In-game test plan": {
+                  "manual runtime testing disclosed": "these scenarios still require an actual 1.8.x server",
+                  "Snake hazard schedule": "135 seconds",
+              },
           }
 
           missing = []
@@ -136,7 +162,7 @@ jobs:
 
           if missing:
               raise SystemExit("Native gameplay/cosmetic smoke checks failed:\\n- " + "\\n- ".join(missing))
-          print("Native Snake, Monster Maze and six-game cosmetic smoke checks passed.")
+          print("Native gameplay, six-game cosmetics and guarded deployment smoke checks passed.")
           PY
 
       - name: Upload compiled plugin set
