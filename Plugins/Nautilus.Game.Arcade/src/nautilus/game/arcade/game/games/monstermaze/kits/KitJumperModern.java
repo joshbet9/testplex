@@ -19,7 +19,12 @@ public class KitJumperModern extends Kit
 {
     public KitJumperModern(ArcadeManager manager)
     {
-        super(manager, GameKit.MONSTER_MAZE_MODERN_JUMPER,
+        this(manager, GameKit.MONSTER_MAZE_MODERN_JUMPER);
+    }
+
+    protected KitJumperModern(ArcadeManager manager, GameKit gameKit)
+    {
+        super(manager, gameKit,
                 new Perk[]
                 {
                     new PerkDummy("Jumper", new String[]
