@@ -86,3 +86,51 @@ For hazards, check that each cube spawns away from the player's current position
 ## Report template
 
 For each check, record **Pass / Fail / Not tested**, the game/map, number of players, the approximate live time, and any relevant console exception. Gameplay/visual checks are not considered complete until they have been performed on the running isolated server; compile success alone does not validate them.
+
+
+## Native Monster Maze modes and globally ported systems
+
+Before testing, ensure the isolated Arcade server group's configured **Games** list includes the new enum names `MonsterMazeSpeed` and `MonsterMazeModern` alongside `MonsterMaze`. The variants are built into `Arcade.jar`; no standalone Monster Maze plugin or extra JAR should be installed.
+
+### Original, Speed and Modern
+
+| Check | Original `MonsterMaze` | `MonsterMazeSpeed` | `MonsterMazeModern` |
+| --- | --- | --- | --- |
+| Maze and lifecycle | Existing native Reborn game | Same Reborn maze/map/lifecycle | Same Reborn maze/map/lifecycle |
+| Starter monsters | 150 | 150 | 225 |
+| Safe Pad timing | Original pacing | Original pacing | Starts at 35s, decreases by 2s per stage to a 15s floor |
+| Additional transition wave | Original 15-mob wave | Original 15-mob wave | Original 15-mob wave plus 30 additional monsters |
+| Jumper | 5 charges; original rules | 3 charges; Safe Pads refill charges; jumps while on a Safe Pad are free | Same enhanced Jumper mechanics as Speed |
+| Slowballer | Slowball only | Cryo Blitz freezes monsters within 6 blocks for 3s; 30s cooldown | Same enhanced Slowballer mechanics as Speed |
+| Body Builder | Original max-health reward | Two Body Rush activations per run, 10s each; monster contacts deflect the monster and cost 2s of duration | Same enhanced Body Builder mechanics as Speed |
+| Repulsor | Original kit | Native registered enhanced-game kit entry | Native registered enhanced-game kit entry |
+| Maverick | Not available | Monster-hit knockback targets the next Safe Pad | Same Maverick mechanics as Speed |
+
+Run each game type from the normal Reborn game selector/admin game tooling, not through a standalone-plugin selector. Confirm the **original** Monster Maze's timer, kit roster and behaviour are unchanged.
+
+### Pattern selection and original maze layouts
+
+- Set `monstermaze.pattern: 0` in the Arcade plugin config for random layout selection, or `1`, `2`, or `3` to force an original layout for repeatable testing; restart/reload via the server's normal safe procedure after changing config.
+- Run the same forced pattern twice. The scoreboard's **Maze Pattern** field should match the requested pattern both times.
+- Return to `0` and verify normal selection works and the chooser does not return a different layout than the one it selected.
+- Confirm maze geometry, spawn markers, central safe area and Safe Pad spawn positions are still derived through Reborn's native map/world data. The port deliberately reuses the original three layouts and does not add a second world/map manager.
+
+### Personal bests and Mineplex infrastructure
+
+- Reach Safe Pad 1 and later reach a higher Safe Pad using a particular kit.
+- Confirm a “New Monster Maze personal best” message is shown when the recorded value improves.
+- Switch kits, patterns and game types and confirm the records are separate by native game display, pattern and kit.
+- Replay a lower stage with the same mode/pattern/kit; it must not replace the stored PB.
+- Rejoin and verify the record remains stored by Mineplex account custom data. This feature uses Mineplex's custom-data manager; it does not use the standalone project's competitive backend.
+- If the test server lacks a functioning account/custom-data database, record that as a test-environment blocker rather than assuming PB persistence passed.
+
+### Global lifecycle and regression checks
+
+- Allow a player to use Cryo Blitz while monsters are moving. Affected monsters should stop movement and contact behaviour for 3s, then resume.
+- Test Body Rush against a monster contact while normal hit cooldown is active; the active ability should intercept the hit, launch the monster away and shorten its remaining duration by 2s.
+- Test Maverick's knockback direction toward the preview/next Safe Pad.
+- Stop/end games repeatedly. Confirm active/preview/old Safe Pads restore their original blocks, active mobs are removed, and no stuck/frozen entities leak into the next game.
+- Set a fixed pattern and check the same layout in Original, Speed and Modern.
+- Verify Safe Pad bounds from every edge and test beacon persistence disabled (default) and enabled; only the central objective beacon may be restored by the optional persistence feature.
+
+Gameplay parity, player-facing PB writes, mob cleanup and performance remain runtime checks. A successful Maven build alone does not mark these scenarios as passed.
