@@ -196,7 +196,10 @@ public class MonsterMaze extends SoloGame
 		{
 			_monsterType = loadEntityType();
 			_center = WorldData.GetDataLocs("ORANGE").get(0);
-			_preset = MMMazes.getRandomMapPreset(_center, getMazeBlockData());
+			int requestedPattern = Manager.getPlugin().getConfig().getInt("monstermaze.pattern", 0);
+			_preset = requestedPattern >= 1 && requestedPattern <= 3
+					? MMMazes.getPatternMapPreset(_center, getMazeBlockData(), requestedPattern)
+					: MMMazes.getRandomMapPreset(_center, getMazeBlockData());
 			_preset.build();
 			_maze = new Maze(this, _preset);
 			
