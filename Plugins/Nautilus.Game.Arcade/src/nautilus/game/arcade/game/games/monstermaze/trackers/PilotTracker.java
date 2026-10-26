@@ -34,6 +34,11 @@ public class PilotTracker extends StatTracker<MonsterMaze>
 		if (!getGame().IsLive())
 			return;
 		
+		// A bump that happens while the player is already standing on a Safe Pad
+		// is not a Pilot attempt; only a landing after the knock can qualify.
+		if (getGame().getMaze() == null || getGame().getMaze().isOnPad(event.getPlayer(), false))
+			return;
+
 		if (isLaunched(event.getPlayer()))
 			return;
 		
@@ -90,7 +95,7 @@ public class PilotTracker extends StatTracker<MonsterMaze>
 	@EventHandler
 	public void clearLaunched(GameStateChangeEvent event)
 	{
-		if (event.GetState() != GameState.End)
+		if (event.GetState() != GameState.End && event.GetState() != GameState.Dead)
 			return;
 		
 		_launched.clear();
