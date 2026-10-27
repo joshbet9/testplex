@@ -36,6 +36,7 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
@@ -62,6 +63,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private static final String TITLE_PREFIX = "Arcade Cosmetics | ";
     private static final int NORMAL_WIN_EFFECTS_SLOT = 51;
     private static final String WIN_EFFECTS_TITLE = "Arcade Win Effects | Games";
+    private static final String BACON_SHOWCASE_TAG = "TESTPLEX_BACON_BRAWL_SHOWCASE:";
     private static final String[] COLOUR_OPTIONS = {
             "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
             "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"
@@ -1187,6 +1189,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
 
         if (event.GetState() == GameState.Recruit) {
             clearBaconBrawlShowcase();
+            World lobbyWorld = getLobbyWorld();
+            if (lobbyWorld != null) removePersistedBaconBrawlShowcase(lobbyWorld);
             if ("Bacon Brawl".equalsIgnoreCase(event.GetGame().GetName())) {
                 createBaconBrawlShowcase();
             }
@@ -1199,6 +1203,13 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         }
     }
 
+    private World getLobbyWorld() {
+        if (!(plugin instanceof Arcade)) return null;
+        ArcadeManager manager = ((Arcade) plugin).getArcadeManager();
+        if (manager == null || manager.GetLobby() == null || manager.GetLobby().getSpawn() == null) return null;
+        return manager.GetLobby().getSpawn().getWorld();
+    }
+
     private void createBaconBrawlShowcase() {
         if (!(plugin instanceof Arcade)) return;
         ArcadeManager manager = ((Arcade) plugin).getArcadeManager();
@@ -1207,6 +1218,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         Location lobbySpawn = manager.GetLobby().getSpawn();
         World world = lobbySpawn.getWorld();
         if (world == null) return;
+        removePersistedBaconBrawlShowcase(world);
 
         // The test plane's spawn is (0,104,0); this puts the display forward of
         // spawn and clear of the legacy kit/team stands on either side.
@@ -1253,12 +1265,35 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 stand.setArms(false);
                 stand.setMarker(true);
                 stand.setCanPickupItems(false);
+                stand.setCustomName(BACON_SHOWCASE_TAG + choices[column]);
                 stand.setHelmet(getBaconBrawlAccessory(choices[column]));
                 baconBrawlShowcaseAccessories.add(stand);
             }
         }
 
         plugin.getLogger().info("Created Bacon Brawl pregame cosmetic showcase (4 pig styles and 4 pink sheep styles).");
+    }
+
+    private void removePersistedBaconBrawlShowcase(World world) {
+        if (world == null) return;
+        for (Entity entity : new ArrayList<Entity>(world.getEntities())) {
+            String name = entity.getCustomName();
+            if (name == null) continue;
+            if (entity instanceof ArmorStand && name.startsWith(BACON_SHOWCASE_TAG)) {
+                entity.remove();
+            } else if (entity instanceof Pig && name.startsWith(ChatColor.GOLD + "Pig - ")) {
+                entity.remove();
+            } else if (entity instanceof Sheep && name.startsWith(ChatColor.LIGHT_PURPLE + "Pink Sheep - ")) {
+                entity.remove();
+            }
+        }
+    }
+
+    @EventHandler
+    public void cleanupShowcaseOnPluginDisable(PluginDisableEvent event) {
+        if (event.getPlugin() == plugin) {
+            clearBaconBrawlShowcase();
+        }
     }
 
     public static ItemStack getBaconBrawlAccessory(String choice) {
