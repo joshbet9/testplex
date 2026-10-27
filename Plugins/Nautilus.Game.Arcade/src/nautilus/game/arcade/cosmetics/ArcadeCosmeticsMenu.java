@@ -741,6 +741,9 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             data.set(featurePath(id, game.key, setting.key), null);
             if (setting.legacyGameKey != null) data.set("players." + id + "." + setting.legacyGameKey, null);
         }
+        if ("monstermaze".equals(game.key) && "mob-line".equals(feature.key)) {
+            data.set("players." + id + ".arcade.monstermaze.mob-sets-customized", null);
+        }
         save();
     }
 
