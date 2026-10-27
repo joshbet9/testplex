@@ -148,7 +148,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         registerGame("dragons", "Dragons", Material.FIREWORK, (short) 0,
                 "Use a Pyro platform; the winner is hit by a dragon while everyone else falls.",
                 feature("pyro-particles", "Pyro Ability Particles", Material.BLAZE_POWDER,
-                        "Choose a visual style for Pyro and other ability particles. Presentation only; hook remains prototype work.",
+                        "Choose a server-visible Pyro particle style. Visual only; it does not change dragon targeting or damage.",
                         null, false, "ember", "frost", "ender", "spark", "aurora"));
 
         registerGame("evolution", "Evolution", Material.DRAGON_EGG, (short) 0,
@@ -159,13 +159,13 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                                 "The existing dragon-egg evolution effect remains selectable for compatibility with the current gameplay hook.",
                                 "evolution", false, "dragon-egg"),
                         setting("egg-appearance", "Dragon Egg Appearance", Material.DRAGON_EGG,
-                                "Prototype alternative dragon-egg appearances and evolving particles. Extra visual hooks are not yet connected.",
+                                "Choose the particle burst shown when an evolution completes. Classic preserves the existing egg burst.",
                                 null, false, "classic", "charged", "void", "nature")));
 
         registerGame("gladiators", "Gladiators", Material.IRON_SWORD, (short) 0,
                 "Ironic rod/bow spam at an iconic final-fight location.",
                 feature("combat-messages", "Kill & Death Messages", Material.NAME_TAG,
-                        "Prototype custom combat message styles. Message replacement hook is not yet connected.",
+                        "Choose a combat elimination-message style. Silent hides the normal message; no combat rules change.",
                         null, false, "classic", "ironic", "champion", "dramatic", "silent"));
 
         registerGame("microbattles", "Micro Battles", Material.STAINED_GLASS, (short) 3,
@@ -176,7 +176,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                                 "The existing player-specific theme colour selection. It must only recolour that player's starting glass.",
                                 "microbattles", false, "aqua", "ember", "forest", "royal", "sunset", "solar", "frost", "void"),
                         setting("border-particles", "Border Particles", Material.FIREWORK,
-                                "Prototype matching-colour particles when you are within three blocks of the border.",
+                                "Choose the visual cue shown beside the stained-glass starting barrier while it remains active.",
                                 null, false, "matching", "spark", "soft", "off")));
 
         registerGame("monstermaze", "Monster Maze", Material.ROTTEN_FLESH, (short) 0,
@@ -194,7 +194,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         registerGame("oneinthequiver", "One In The Quiver", Material.ARROW, (short) 0,
                 "An archery bullseye.",
                 feature("death-streak", "Death Location Effects", Material.FIREWORK,
-                        "Prototype death-location effects that scale with the killer's current streak. No gameplay outcome is changed.",
+                        "Choose the visual burst shown at the eliminated player's location after a kill.",
                         null, false, "subtle", "burst", "bullseye", "grand-finale"));
 
         registerGame("paintball", "Paintball", Material.FIREBALL, (short) 0,
@@ -202,10 +202,10 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 compositeFeature("paintball-style", "Weapon Skins & Impact Effects", Material.IRON_HOE,
                         "Customise weapon appearance and pellet impact effects independently within one cosmetic line.",
                         setting("pellet-impact", "Pellet Impact Effects", Material.FIREWORK,
-                                "Research placeholder: confirm whether pellet impacts can be exposed independently before implementing this cosmetic.",
+                                "Choose the particle shown on an existing paintball impact; damage and block-painting stay unchanged.",
                                 null, false, "paint-splash", "spark", "burst", "classic"),
                         setting("weapon-skin", "Weapon Skins", Material.IRON_HOE,
-                                "Research placeholder: validate the native 1.8 item/rendering hooks before implementing weapon skins.",
+                                "Give supported held weapons a Chrome, Ember or Frost label. The weapon type and behaviour do not change.",
                                 null, false, "classic", "chrome", "ember", "frost")));
 
         registerGame("runner", "Runner", Material.LEATHER_BOOTS, (short) 0,
@@ -218,7 +218,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         registerGame("sheepquest", "Sheep Quest", Material.WOOL, (short) 4,
                 "A game-winning capture with 0.1 seconds remaining.",
                 feature("capture-effects", "Sheep Capture Effects", Material.FIREWORK,
-                        "Prototype capture particles resolved from the player who captures the sheep. Hook not yet connected.",
+                        "Reserved for a future Sheep Quest port: no native Sheep Quest game class exists in this Reborn build, so these selections are not active yet.",
                         null, false, "pastel", "spark", "rainbow", "golden"));
 
         registerGame("snake", "Snake", Material.WOOL, (short) 11,
@@ -229,19 +229,19 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                                 "Select a snake colour family. With no selection equipped, the existing random/rainbow palette remains unchanged.",
                                 "snake", false, "elemental", "neon", "sunset"),
                         setting("ability-visuals", "Ability Visuals", Material.FIREWORK,
-                                "Prototype distinct visuals for Super, Speed and Reverse. Skin/ability visuals should remain visible to other players.",
+                                "Choose server-visible particles for the active Super, Speed or Reverse ability.",
                                 null, false, "classic", "colour-coded", "neon", "subtle")));
 
         registerGame("spleef", "Spleef", Material.IRON_SPADE, (short) 0,
                 "Axe-spleef a dense group of players in a small area, then leap back up.",
                 feature("block-break-effects", "Block Break Effects", Material.FIREWORK,
-                        "Prototype particles when a block is broken. Effect must not change block break or hit rules.",
+                        "Choose particles emitted when Spleef breaks a block; block and hunger rules stay unchanged.",
                         null, false, "snow", "shards", "spark", "burst"));
 
         registerGame("turfwars", "Turf Wars", Material.BOW, (short) 0,
                 "A 360 no-scope shot off a mid-bounce.",
                 feature("arrow-impact", "Arrow Floor Impact Effects", Material.FIREWORK,
-                        "Prototype floor-impact effects when an arrow lands. Must not alter arrow collision or team visibility.",
+                        "Choose the particle shown when an arrow hits a block. Arrow collision and team rules stay unchanged.",
                         null, false, "dust", "spark", "burst", "team-colour"));
     }
 

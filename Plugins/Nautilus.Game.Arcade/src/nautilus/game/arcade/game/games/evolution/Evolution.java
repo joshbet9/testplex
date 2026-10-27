@@ -389,7 +389,7 @@ public class Evolution extends SoloGame
 		if ("charged".equalsIgnoreCase(appearance)) effectType = ParticleType.FIREWORKS_SPARK;
 		else if ("void".equalsIgnoreCase(appearance)) effectType = ParticleType.PORTAL;
 		else if ("nature".equalsIgnoreCase(appearance)) effectType = ParticleType.HAPPY_VILLAGER;
-		else if ("dragon-egg".equalsIgnoreCase(legacyEffect))
+		else if ("dragon-egg".equals(ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "evolution")))
 			effectParticle = ParticleType.BLOCK_DUST.getParticle(Material.DRAGON_EGG, (byte) 0);
 		if (effectType != null)
 			UtilParticle.PlayParticle(effectType, effectLocation, 0.35F, 0.55F, 0.35F, 0.08F, 20, ViewDist.NORMAL, UtilServer.getPlayers());
