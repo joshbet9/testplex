@@ -891,7 +891,7 @@ public class MonsterMaze extends SoloGame
 			else
 			{
 				((CraftPlayer) observer).getHandle().playerConnection.sendPacket(
-						new PacketPlayOutRemoveEntityEffect(target.getEntityId(), MobEffectList.INVISIBILITY));
+						new PacketPlayOutRemoveEntityEffect(target.getEntityId(), new MobEffect(MobEffectList.INVISIBILITY.id, 1, 0)));
 			}
 		}
 		catch (Exception ex)
