@@ -153,6 +153,7 @@ Assert-Contains "Micro Battle category aliases resolve" $arcadeManagerFile "trim
 Assert-Contains "Spleef typo in the legacy map bundle resolves" $arcadeManagerFile '"speef".equals(actual)'
 Assert-Contains "Deployment fixes restrictive map directory modes" $deployScriptFile 'find "$MAP_DEST" -type d -exec chmod 0755 {} +'
 Assert-Contains "Deployment keeps map ZIPs readable" $deployScriptFile 'find "$MAP_DEST" -type f -iname ''*.zip'' -exec chmod 0644 {} +'
+Assert-Contains "Deployment checks map ZIPs as the service account" $deployScriptFile 'runuser -u monstermaze -- find "$MAP_DEST" -type f -iname ''*.zip'' -print | wc -l'
 Assert-Contains "Set Game selection continues without detected maps" $setGameFile "boolean mapsAvailable = hasMapArchive(type);"
 Assert-Contains "Set Game warns when no maps are detected instead of rejecting selection" $setGameFile "It will not start until a map is available."
 Assert-NotContains "Set Game no longer blocks selection when the map check is empty" $setGameFile "The game has not been selected."
