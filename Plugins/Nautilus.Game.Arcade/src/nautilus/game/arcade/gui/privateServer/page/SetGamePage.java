@@ -87,12 +87,7 @@ public class SetGamePage extends BasePage
 		{
 			if (clickType == ClickType.LEFT)
 			{
-				if (!hasMapArchive(type))
-				{
-					UtilPlayer.message(player, C.cRed + "No installed map ZIPs were found for " + type.getName()
-							+ ". The game has not been selected.");
-					return;
-				}
+				boolean mapsAvailable = hasMapArchive(type);
 
 				GameCreationManager creation = getPlugin().GetGameCreationManager();
 				creation.MapPref = null;
@@ -113,7 +108,15 @@ public class SetGamePage extends BasePage
 					getPlugin().GetGame().setGame(type, player, true);
 				}
 
-				UtilPlayer.message(player, C.cGreen + "Selected " + type.getName() + " with a random installed map.");
+				if (mapsAvailable)
+				{
+					UtilPlayer.message(player, C.cGreen + "Selected " + type.getName() + " with a random installed map.");
+				}
+				else
+				{
+					UtilPlayer.message(player, C.cYellow + "Selected " + type.getName()
+							+ ", but no compatible map ZIPs were detected. It will not start until a map is available.");
+				}
 				player.closeInventory();
 			}
 			else if (clickType == ClickType.RIGHT)
