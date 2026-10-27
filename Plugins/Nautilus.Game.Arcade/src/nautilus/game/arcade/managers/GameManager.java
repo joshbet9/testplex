@@ -289,9 +289,13 @@ public class GameManager implements Listener
 				break;
 			case Recruit:
 				int validPlayers = Manager.getValidPlayersForGameStart().size();
+				// Testplex is a private cosmetic/gameplay sandbox: one player must be enough
+				// to start any selected minigame. Production servers retain their configured
+				// minimum player requirement.
+				int minimumPlayers = Manager.isTestplexSandbox() ? 1 : Manager.GetPlayerMin();
 
 				//Stop Countdown!
-				if (game.GetCountdown() != -1 && validPlayers < Manager.GetPlayerMin() && !game.GetCountdownForce())
+				if (game.GetCountdown() != -1 && validPlayers < minimumPlayers && !game.GetCountdownForce())
 				{
 					game.SetCountdown(-1);
 					Manager.GetLobby().displayWaiting(false);
@@ -307,7 +311,7 @@ public class GameManager implements Listener
 					{
 						StateCountdown(game, 30, false);
 					}
-					else if (validPlayers >= Manager.GetPlayerMin())
+					else if (validPlayers >= minimumPlayers)
 					{
 						StateCountdown(game, 60, false);
 					}
@@ -341,7 +345,8 @@ public class GameManager implements Listener
 							}
 						}
 
-						if (players < 2)
+						int minimumStartPlayers = Manager.isTestplexSandbox() ? 1 : 2;
+						if (players < minimumStartPlayers)
 						{
 							game.Announce(C.cWhiteB + game.GetName() + " ended, not enough players!");
 							game.SetState(GameState.Dead);
