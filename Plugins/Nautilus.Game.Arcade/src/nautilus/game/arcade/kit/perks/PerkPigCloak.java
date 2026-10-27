@@ -18,6 +18,8 @@ import mineplex.core.common.util.UtilEvent.ActionType;
 import mineplex.core.recharge.Recharge;
 import mineplex.minecraft.game.core.damage.CustomDamageEvent;
 import nautilus.game.arcade.kit.Perk;
+import nautilus.game.arcade.GameType;
+import nautilus.game.arcade.game.games.baconbrawl.BaconBrawlCosmeticEffects;
 
 public class PerkPigCloak extends Perk
 {
@@ -50,6 +52,8 @@ public class PerkPigCloak extends Perk
 
 		//Action
 		Manager.GetCondition().Factory().Cloak(GetName(), player, player, 5, false, false);
+		if (Manager.GetGame().GetType() == GameType.BaconBrawl)
+			BaconBrawlCosmeticEffects.play(player, "cloak-activation");
 
 		for (int i=0 ; i<3 ; i++)
 		{

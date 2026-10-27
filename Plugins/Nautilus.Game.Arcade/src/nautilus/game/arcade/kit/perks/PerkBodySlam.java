@@ -22,6 +22,8 @@ import mineplex.core.updater.UpdateType;
 import mineplex.core.updater.event.UpdateEvent;
 import mineplex.minecraft.game.core.damage.CustomDamageEvent;
 import nautilus.game.arcade.kit.Perk;
+import nautilus.game.arcade.GameType;
+import nautilus.game.arcade.game.games.baconbrawl.BaconBrawlCosmeticEffects;
 
 public class PerkBodySlam extends Perk
 {
@@ -71,6 +73,8 @@ public class PerkBodySlam extends Perk
 
 		//Record
 		_live.put(player, System.currentTimeMillis());
+		if (Manager.GetGame().GetType() == GameType.BaconBrawl)
+			BaconBrawlCosmeticEffects.play(player, "body-slam-activation");
 
 		//Inform
 		UtilPlayer.message(player, F.main("Game", "You used " + F.skill(GetName()) + "."));
@@ -81,6 +85,11 @@ public class PerkBodySlam extends Perk
 	{
 		if (event.getType() != UpdateType.TICK)
 			return;
+
+		if (Manager.GetGame().GetType() == GameType.BaconBrawl)
+			for (Player player : Manager.GetGame().GetPlayers(true))
+				if (_live.containsKey(player))
+					BaconBrawlCosmeticEffects.play(player, "body-slam-trail");
 
 		//Collide
 		for (Player player : Manager.GetGame().GetPlayers(true))
@@ -108,6 +117,13 @@ public class PerkBodySlam extends Perk
 	
 	public void DoSlam(Player damager, LivingEntity damagee)
 	{
+		if (Manager.GetGame().GetType() == GameType.BaconBrawl)
+		{
+			BaconBrawlCosmeticEffects.play(damager, "body-slam-impact");
+			if (damagee instanceof Player)
+				BaconBrawlCosmeticEffects.play((Player) damagee, "body-slam-hit");
+		}
+
 		//Damage Event
 		Manager.GetDamage().NewDamageEvent(damager, damagee, null, 
 				DamageCause.CUSTOM, _damage/3d, true, true, false,
