@@ -20,6 +20,8 @@ public final class TestLobbyPlaneBuilder
 {
 	private static final int MIN = -50;
 	private static final int MAX = 50;
+	private static final int CLEAR_MIN = -60;
+	private static final int CLEAR_MAX = 60;
 	private static final int FLOOR_Y = 100;
 	private static final String MARKER = "world/TEST_LOBBY_PLANE.dat";
 
@@ -44,20 +46,31 @@ public final class TestLobbyPlaneBuilder
 		System.out.println("Creating one-time 100x100 Arcade test lobby plane in world at Y=" + FLOOR_Y + ".");
 		System.out.println("This is a simple cosmetics/test lobby; the kit and team datapoints remain owned by LegacyGameLobbyManager.");
 
-		for (int x = MIN; x < MAX; x++)
+		for (int x = CLEAR_MIN; x < CLEAR_MAX; x++)
 		{
-			for (int z = MIN; z < MAX; z++)
+			for (int z = CLEAR_MIN; z < CLEAR_MAX; z++)
 			{
-				// Clear generated terrain above the new surface so trees and hills
-				// cannot interfere with kit/team selectors or cosmetic testing.
+				// Hollow out the old survival terrain beneath the platform and add
+				// a small void buffer around its edge. Clear only down to the
+				// highest generated block rather than touching every empty block.
+				int highest = Math.min(FLOOR_Y - 3, world.getHighestBlockYAt(x, z));
+				for (int y = 1; y <= highest; y++)
+				{
+					world.getBlockAt(x, y, z).setType(Material.AIR, false);
+				}
+
+				// Keep the platform and its immediate surrounds clear above floor level.
 				for (int y = FLOOR_Y + 1; y <= 160; y++)
 				{
 					world.getBlockAt(x, y, z).setType(Material.AIR, false);
 				}
 
-				world.getBlockAt(x, FLOOR_Y - 2, z).setType(Material.BEDROCK, false);
-				world.getBlockAt(x, FLOOR_Y - 1, z).setType(Material.STONE, false);
-				world.getBlockAt(x, FLOOR_Y, z).setType(Material.GRASS, false);
+				if (x >= MIN && x < MAX && z >= MIN && z < MAX)
+				{
+					world.getBlockAt(x, FLOOR_Y - 2, z).setType(Material.BEDROCK, false);
+					world.getBlockAt(x, FLOOR_Y - 1, z).setType(Material.STONE, false);
+					world.getBlockAt(x, FLOOR_Y, z).setType(Material.GRASS, false);
+				}
 			}
 		}
 
@@ -66,7 +79,8 @@ public final class TestLobbyPlaneBuilder
 		for (Entity entity : world.getEntities())
 		{
 			Location location = entity.getLocation();
-			if (Math.abs(location.getBlockX()) < MAX && Math.abs(location.getBlockZ()) < MAX
+			if (location.getBlockX() >= CLEAR_MIN && location.getBlockX() < CLEAR_MAX
+					&& location.getBlockZ() >= CLEAR_MIN && location.getBlockZ() < CLEAR_MAX
 					&& location.getBlockY() <= 160
 					&& (entity instanceof Creature || entity instanceof Slime))
 			{
@@ -98,6 +112,6 @@ public final class TestLobbyPlaneBuilder
 			throw new RuntimeException("Could not mark generated test lobby plane", e);
 		}
 
-		System.out.println("Created flat Arcade test lobby plane: X/Z -50..49, surface Y=100.");
+		System.out.println("Created flat Arcade test lobby plane: X/Z -50..49, surface Y=100, with the old terrain hollowed out and a 10-block void buffer.");
 	}
 }
