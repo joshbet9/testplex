@@ -1256,7 +1256,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 baconBrawlShowcaseEntities.add(animal);
 
                 // Only the helmet is visible; marker stands have no collision.
-                Location hatLoc = display.clone().subtract(0, 0.82, 0);
+                Location hatLoc = display.clone().subtract(0, 0.18, 0);
                 ArmorStand stand = world.spawn(hatLoc, ArmorStand.class);
                 stand.setVisible(false);
                 stand.setSmall(true);
