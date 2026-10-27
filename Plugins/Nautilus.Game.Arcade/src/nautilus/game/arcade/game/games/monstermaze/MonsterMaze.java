@@ -94,6 +94,8 @@ public class MonsterMaze extends SoloGame
 	// Each player needs their own sidebar because distance and Safe Pad status are viewer-specific.
 	private final Map<UUID, GameScoreboard> _viewerScoreboards = new HashMap<UUID, GameScoreboard>();
 	private final Map<UUID, org.bukkit.scoreboard.Scoreboard> _previousScoreboards = new HashMap<UUID, org.bukkit.scoreboard.Scoreboard>();
+	private final Map<UUID, ItemStack> _previousCompassItems = new HashMap<UUID, ItemStack>();
+	private final Map<UUID, ItemStack> _previousVisibilityItems = new HashMap<UUID, ItemStack>();
 	private final Map<UUID, Integer> _visibilityModeData = new HashMap<UUID, Integer>();
 	private static final int VISIBILITY_SLOT = 7;
 	private static final int SAFE_PAD_COMPASS_SLOT = 1;
@@ -754,9 +756,12 @@ public class MonsterMaze extends SoloGame
 
 	private void ensureGameplayItems(Player player)
 	{
+		UUID id = player.getUniqueId();
 		ItemStack compass = player.getInventory().getItem(SAFE_PAD_COMPASS_SLOT);
-		if (compass == null)
+		if (!isSafePadCompassItem(compass))
 		{
+			if (!_previousCompassItems.containsKey(id))
+				_previousCompassItems.put(id, compass == null ? null : compass.clone());
 			ItemStack locator = new ItemStack(Material.COMPASS, 1);
 			ItemMeta meta = locator.getItemMeta();
 			meta.setDisplayName(SAFE_PAD_COMPASS_NAME);
@@ -765,10 +770,14 @@ public class MonsterMaze extends SoloGame
 			player.getInventory().setItem(SAFE_PAD_COMPASS_SLOT, locator);
 		}
 
-		int modeData = getVisibilityModeData(player.getUniqueId());
+		int modeData = getVisibilityModeData(id);
 		ItemStack visibility = player.getInventory().getItem(VISIBILITY_SLOT);
-		if (visibility == null)
+		if (!isVisibilityItem(visibility))
+		{
+			if (!_previousVisibilityItems.containsKey(id))
+				_previousVisibilityItems.put(id, visibility == null ? null : visibility.clone());
 			player.getInventory().setItem(VISIBILITY_SLOT, createVisibilityItem(modeData));
+		}
 	}
 
 	private boolean isSafePadCompassItem(ItemStack item)
@@ -931,8 +940,13 @@ public class MonsterMaze extends SoloGame
 			Player viewer = Bukkit.getPlayer(id);
 			if (viewer != null && viewer.isOnline())
 				for (Player target : Bukkit.getOnlinePlayers())
-					if (!viewer.equals(target))
-						viewer.showPlayer(target);
+				{
+					if (viewer.equals(target))
+						continue;
+					if (viewer.getWorld() == target.getWorld() && Integer.valueOf(5).equals(_visibilityModeData.get(id)))
+						sendClientInvisibility(viewer, target, false);
+					viewer.showPlayer(target);
+				}
 		}
 
 		for (Map.Entry<UUID, org.bukkit.scoreboard.Scoreboard> entry : _previousScoreboards.entrySet())
@@ -942,15 +956,23 @@ public class MonsterMaze extends SoloGame
 				continue;
 			if (entry.getValue() != null)
 				player.setScoreboard(entry.getValue());
-			ItemStack visibility = player.getInventory().getItem(VISIBILITY_SLOT);
-			if (isVisibilityItem(visibility))
-				player.getInventory().setItem(VISIBILITY_SLOT, null);
-			ItemStack compass = player.getInventory().getItem(SAFE_PAD_COMPASS_SLOT);
-			if (isSafePadCompassItem(compass))
-				player.getInventory().setItem(SAFE_PAD_COMPASS_SLOT, null);
+		}
+		for (Map.Entry<UUID, ItemStack> entry : _previousVisibilityItems.entrySet())
+		{
+			Player player = Bukkit.getPlayer(entry.getKey());
+			if (player != null && player.isOnline())
+				player.getInventory().setItem(VISIBILITY_SLOT, entry.getValue() == null ? null : entry.getValue().clone());
+		}
+		for (Map.Entry<UUID, ItemStack> entry : _previousCompassItems.entrySet())
+		{
+			Player player = Bukkit.getPlayer(entry.getKey());
+			if (player != null && player.isOnline())
+				player.getInventory().setItem(SAFE_PAD_COMPASS_SLOT, entry.getValue() == null ? null : entry.getValue().clone());
 		}
 		_viewerScoreboards.clear();
 		_previousScoreboards.clear();
+		_previousCompassItems.clear();
+		_previousVisibilityItems.clear();
 		_visibilityModeData.clear();
 	}
 }
