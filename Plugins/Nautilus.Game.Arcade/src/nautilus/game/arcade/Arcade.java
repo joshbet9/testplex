@@ -79,6 +79,10 @@ import mineplex.minecraft.game.core.damage.DamageManager;
 
 import nautilus.game.arcade.game.GameServerConfig;
 import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
+import nautilus.game.arcade.wineffect.WinEffectBaconBrawl;
+import nautilus.game.arcade.wineffect.WinEffectBombLobbers;
+import nautilus.game.arcade.wineffect.WinEffectDeathTag;
+import nautilus.game.arcade.wineffect.WinEffectDragonEscape;
 import static mineplex.core.Managers.require;
 
 public class Arcade extends JavaPlugin
@@ -166,6 +170,14 @@ public class Arcade extends JavaPlugin
 		CastleManager castleManager = new CastleManager(this, clientManager, hologramManager, false);
 		PetManager petManager = new PetManager(this, clientManager, donationManager, inventoryManager, disguiseManager, creature, blockRestore);
 		GadgetManager gadgetManager = require(GadgetManager.class);
+		if (gadgetManager.getGadget(WinEffectBaconBrawl.class) == null)
+			gadgetManager.addGadget(new WinEffectBaconBrawl(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectBombLobbers.class) == null)
+			gadgetManager.addGadget(new WinEffectBombLobbers(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectDeathTag.class) == null)
+			gadgetManager.addGadget(new WinEffectDeathTag(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectDragonEscape.class) == null)
+			gadgetManager.addGadget(new WinEffectDragonEscape(gadgetManager));
 		ThankManager thankManager = new ThankManager(this, clientManager, donationManager);
 		BoosterManager boosterManager = new BoosterManager(this, _serverConfiguration.getServerGroup().getBoosterGroup(), clientManager, donationManager, inventoryManager, thankManager);
 		CosmeticManager cosmeticManager = new CosmeticManager(this, clientManager, donationManager, inventoryManager, gadgetManager, petManager, null, boosterManager, punish);
