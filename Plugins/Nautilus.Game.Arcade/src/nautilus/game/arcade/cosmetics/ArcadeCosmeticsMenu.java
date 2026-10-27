@@ -571,8 +571,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         meta.setDisplayName((equipped ? ChatColor.GREEN : ChatColor.YELLOW)
                 + game.displayName + " — Body Slam");
         List<String> lore = new ArrayList<String>();
-        lore.add(ChatColor.GRAY + "The winner charges four pig-shaped targets");
-        lore.add(ChatColor.GRAY + "and sends them flying from the podium.");
+        lore.add(ChatColor.GRAY + "Body-slam four opponents off a bare-dirt arena");
+        lore.add(ChatColor.GRAY + "inspired by Mighty Lava Arena.");
         lore.add(equipped ? ChatColor.GREEN + "Equipped for this game" : ChatColor.YELLOW + "Click to equip");
         lore.add(ChatColor.DARK_GRAY + "WinEffect: " + game.key + ":body-slam");
         meta.setLore(lore);
@@ -631,23 +631,6 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         }
         lore.add(ChatColor.GREEN + "Click to view options");
         lore.add(ChatColor.DARK_GRAY + "Feature: " + feature.key);
-        meta.setLore(lore);
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    private ItemStack winEffectItem(Player player, GameDefinition game) {
-        ItemStack item = new ItemStack(Material.FIREWORK);
-        ItemMeta meta = item.getItemMeta();
-        boolean marked = "planned".equalsIgnoreCase(data.getString(
-                "players." + player.getUniqueId() + ".arcade." + game.key + ".win-effect", ""));
-        meta.setDisplayName((marked ? ChatColor.GREEN : ChatColor.LIGHT_PURPLE) + "Planned Win Effect (Placeholder)");
-        List<String> lore = new ArrayList<String>();
-        lore.add(ChatColor.GRAY + "Planned sequence (not live yet):");
-        appendWrapped(lore, game.winEffect, ChatColor.GRAY, 34);
-        lore.add(ChatColor.DARK_GRAY + "WinEffect: " + game.key);
-        lore.add(marked ? ChatColor.GREEN + "Marked for implementation" : ChatColor.YELLOW + "Click to mark this plan");
-        lore.add(ChatColor.RED + "This does not execute a win sequence.");
         meta.setLore(lore);
         item.setItemMeta(meta);
         return item;
