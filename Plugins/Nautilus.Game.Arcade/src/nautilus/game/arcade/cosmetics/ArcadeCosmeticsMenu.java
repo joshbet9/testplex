@@ -1193,6 +1193,119 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         return "Arcade Win Effects".equals(name);
     }
 
+    /**
+     * The showcase follows the selected game in the pregame lobby. Clear any old
+     * display on game changes, and remove the current display before players are
+     * teleported into the game map.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void updatePregameCosmeticShowcase(GameStateChangeEvent event) {
+        if (event == null || event.GetGame() == null) return;
+
+        if (event.GetState() == GameState.Recruit) {
+            clearBaconBrawlShowcase();
+            if ("Bacon Brawl".equalsIgnoreCase(event.GetGame().GetName())) {
+                createBaconBrawlShowcase();
+            }
+            return;
+        }
+
+        if (event.GetState() == GameState.Prepare || event.GetState() == GameState.Live
+                || event.GetState() == GameState.End || event.GetState() == GameState.Dead) {
+            clearBaconBrawlShowcase();
+        }
+    }
+
+    private void createBaconBrawlShowcase() {
+        if (!(plugin instanceof Arcade)) return;
+        ArcadeManager manager = ((Arcade) plugin).getArcadeManager();
+        if (manager == null || manager.GetLobby() == null || manager.GetLobby().getSpawn() == null) return;
+
+        Location lobbySpawn = manager.GetLobby().getSpawn();
+        World world = lobbySpawn.getWorld();
+        if (world == null) return;
+
+        // The test plane's spawn is (0,104,0); this puts the display forward of
+        // spawn and clear of the legacy kit/team stands on either side.
+        int[] xOffsets = { -6, -2, 2, 6 };
+        int[] zOffsets = { 18, 26 };
+        String[] choices = { "crown", "top_hat", "chef", "diamond" };
+
+        for (int row = 0; row < 2; row++) {
+            for (int column = 0; column < choices.length; column++) {
+                int x = lobbySpawn.getBlockX() + xOffsets[column];
+                int z = lobbySpawn.getBlockZ() + zOffsets[row];
+                int y = world.getHighestBlockYAt(x, z) + 1;
+                Location display = new Location(world, x + 0.5, y, z + 0.5);
+                display.setDirection(lobbySpawn.toVector().subtract(display.toVector()));
+
+                Entity animal;
+                if (row == 0) {
+                    Pig pig = world.spawn(display, Pig.class);
+                    pig.setCustomName(ChatColor.GOLD + "Pig - " + pretty(choices[column]));
+                    pig.setCustomNameVisible(true);
+                    pig.setRemoveWhenFarAway(false);
+                    UtilEnt.vegetate(pig, true);
+                    UtilEnt.ghost(pig, true, false);
+                    animal = pig;
+                } else {
+                    Sheep sheep = world.spawn(display, Sheep.class);
+                    sheep.setColor(DyeColor.PINK);
+                    sheep.setCustomName(ChatColor.LIGHT_PURPLE + "Pink Sheep - " + pretty(choices[column]));
+                    sheep.setCustomNameVisible(true);
+                    sheep.setRemoveWhenFarAway(false);
+                    UtilEnt.vegetate(sheep, true);
+                    UtilEnt.ghost(sheep, true, false);
+                    animal = sheep;
+                }
+                baconBrawlShowcaseEntities.add(animal);
+
+                // Only the helmet is visible; marker stands have no collision.
+                Location hatLoc = display.clone().subtract(0, 0.82, 0);
+                ArmorStand stand = world.spawn(hatLoc, ArmorStand.class);
+                stand.setVisible(false);
+                stand.setSmall(true);
+                stand.setGravity(false);
+                stand.setBasePlate(false);
+                stand.setArms(false);
+                stand.setMarker(true);
+                stand.setCanPickupItems(false);
+                stand.setHelmet(baconBrawlAccessoryItem(choices[column]));
+                baconBrawlShowcaseAccessories.add(stand);
+            }
+        }
+
+        plugin.getLogger().info("Created Bacon Brawl pregame cosmetic showcase (4 pig styles and 4 pink sheep styles).");
+    }
+
+    private ItemStack baconBrawlAccessoryItem(String choice) {
+        if ("crown".equalsIgnoreCase(choice)) return new ItemStack(Material.GOLD_HELMET);
+        if ("top_hat".equalsIgnoreCase(choice)) return new ItemStack(Material.WOOL, 1, (short) 15);
+        if ("chef".equalsIgnoreCase(choice)) return new ItemStack(Material.WOOL, 1, (short) 0);
+        if ("diamond".equalsIgnoreCase(choice)) return new ItemStack(Material.DIAMOND_HELMET);
+        return new ItemStack(Material.AIR);
+    }
+
+    private void clearBaconBrawlShowcase() {
+        for (ArmorStand stand : new ArrayList<ArmorStand>(baconBrawlShowcaseAccessories)) {
+            if (stand != null && !stand.isDead()) stand.remove();
+        }
+        baconBrawlShowcaseAccessories.clear();
+
+        for (Entity entity : new ArrayList<Entity>(baconBrawlShowcaseEntities)) {
+            if (entity != null && !entity.isDead()) entity.remove();
+        }
+        baconBrawlShowcaseEntities.clear();
+    }
+
+    @EventHandler
+    public void protectPregameShowcase(EntityDamageEvent event) {
+        if (baconBrawlShowcaseEntities.contains(event.getEntity())
+                || baconBrawlShowcaseAccessories.contains(event.getEntity())) {
+            event.setCancelled(true);
+        }
+    }
+
     public static int getEquippedColourData(UUID playerId, String game) {
         String selected = getEquippedChoice(playerId, game);
         if (selected.isEmpty()) return -1;
