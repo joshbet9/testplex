@@ -393,6 +393,7 @@ jobs:
                   "can deploy an existing successful build": "inputs.source_run_id",
                   "uses deployed map-source baseline to avoid repeated ZIP scans": ".testplex-map-source-commit",
                   "only updates maps when source paths changed": 'git diff --quiet "$map_baseline" "$BUILD_SHA" -- update/maps/',
+                  "uploads the small Arcade JAR through retrying SCP": "Arcade.jar SCP attempt $attempt/3 failed.",
                   "skips the bundle when all installed ZIPs match": 'MAPS_MODE="installed"',
                   "passes map-source mode to the deployment script": "'$TESTPLEX_SYSTEMD_SERVICE' '$MAPS_MODE'",
               },
@@ -657,18 +658,24 @@ jobs:
             echo "Cannot compare map-source revisions safely; using the verified bundle."
           fi
 
-          echo "Uploading Arcade.jar separately so deployment doesn't depend on a long idle connection."          echo "Uploading Arcade.jar separately so deployment doesn't depend on a long idle connection."
-          if ssh "${ssh_opts[@]}" "$remote" "command -v rsync >/dev/null 2>&1"; then
-            rsync --archive --checksum --partial --timeout=180 --info=progress2 \
-              -e "ssh -p $port -i $HOME/.ssh/testplex_hyperv -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30" \
-              "$ARTIFACT_DIR/Arcade.jar" "$remote:$upload_dir/"
-          else
-            scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
+          echo "Uploading Arcade.jar via SCP; avoid the remote rsync receiver that has been stalling."
+          jar_upload_ok=0
+          for attempt in 1 2 3; do
+            if scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
               -o BatchMode=yes -o StrictHostKeyChecking=yes \
               -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-              -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30 \
-              "$ARTIFACT_DIR/Arcade.jar" "$remote:$upload_dir/"
-          fi
+              -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
+              "$ARTIFACT_DIR/Arcade.jar" "$remote:$upload_dir/Arcade.jar"; then
+              jar_upload_ok=1
+              break
+            fi
+            echo "Arcade.jar SCP attempt $attempt/3 failed." >&2
+            if [[ "$attempt" -lt 3 ]]; then sleep 3; fi
+          done
+          [[ "$jar_upload_ok" -eq 1 ]] || {
+            echo "Could not upload Arcade.jar after three SCP attempts; the running service has not been touched." >&2
+            exit 1
+          }
 
           local_arcade_sha="$(sha256sum "$ARTIFACT_DIR/Arcade.jar" | cut -d ' ' -f1)"
           remote_arcade_sha="$(ssh "${ssh_opts[@]}" "$remote" "sha256sum '$upload_dir/Arcade.jar' | cut -d ' ' -f1")"
