@@ -365,16 +365,28 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         save();
     }
 
-    /** Connect this to the actual Custom Pack entitlement when the live unlock adapter is available. */
+    /**
+     * Grant a per-player unlock on normal servers. On the explicitly marked
+     * Testplex sandbox, every tester has the Custom Pack unlocked so the feature
+     * can be tested without a manual per-account grant.
+     */
     public static void setMonsterMazeCustomPackUnlocked(UUID playerId, boolean unlocked) {
         if (instance == null || playerId == null) return;
         instance.data.set("players." + playerId.toString() + ".arcade.monstermaze.custom-pack-unlocked", unlocked);
         instance.save();
     }
 
+    private boolean isTestplexSandbox() {
+        if (!(plugin instanceof nautilus.game.arcade.Arcade)) return false;
+        nautilus.game.arcade.Arcade arcade = (nautilus.game.arcade.Arcade) plugin;
+        nautilus.game.arcade.ArcadeManager manager = arcade.getArcadeManager();
+        return manager != null && manager.isTestplexSandbox();
+    }
+
     public static boolean isMonsterMazeCustomPackUnlocked(UUID playerId) {
-        return instance != null && playerId != null && instance.data.getBoolean(
-                "players." + playerId.toString() + ".arcade.monstermaze.custom-pack-unlocked", false);
+        return instance != null && playerId != null && (instance.isTestplexSandbox()
+                || instance.data.getBoolean(
+                        "players." + playerId.toString() + ".arcade.monstermaze.custom-pack-unlocked", false));
     }
 
     /**
