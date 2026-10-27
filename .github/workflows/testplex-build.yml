@@ -19,10 +19,10 @@ on:
         type: boolean
         default: false
       source_run_id:
-        description: Successful build run ID to deploy; defaults to the already-verified native-port build. Clear to rebuild from this branch.
+        description: Successful build run ID to reuse; leave blank to build this branch including its map archive bundle.
         required: false
         type: string
-        default: "40301889733"
+        default: ""
 
 permissions:
   contents: read
@@ -76,6 +76,16 @@ jobs:
           echo "Built artifacts:"
           find Plugins/out -maxdepth 1 -type f -name '*.jar' -printf '%f %s bytes\n' | sort
           test -s Plugins/out/Arcade.jar
+          test -s Plugins/out/testplex-map-assets.zip
+          python3 -m py_compile .github/scripts/create-testplex-map-bundle.py
+      - name: Package all Mineplex map archives for the isolated test server
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/create-testplex-map-bundle.py Plugins/out/testplex-map-assets.zip
+          unzip -tq Plugins/out/testplex-map-assets.zip >/dev/null
+          ls -lh Plugins/out/testplex-map-assets.zip
+
       - name: Smoke-check native gameplay and cosmetic hooks
         shell: bash
         run: |
@@ -308,7 +318,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: testplex-plugin-set-${{ github.sha }}
-          path: Plugins/out/Arcade.jar
+          path: |
+            Plugins/out/Arcade.jar
+            Plugins/out/testplex-map-assets.zip
           if-no-files-found: error
           retention-days: 14
 

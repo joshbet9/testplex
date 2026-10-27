@@ -4,13 +4,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 
 import mineplex.core.common.util.C;
-import mineplex.core.shop.item.IButton;
 import nautilus.game.arcade.ArcadeManager;
+import nautilus.game.arcade.game.Game;
 import nautilus.game.arcade.game.Game.GameState;
+import mineplex.core.shop.item.IButton;
 
 public class StopGameButton implements IButton
 {
-	private ArcadeManager _arcadeManager;
+	private final ArcadeManager _arcadeManager;
 
 	public StopGameButton(ArcadeManager arcadeManager)
 	{
@@ -20,21 +21,28 @@ public class StopGameButton implements IButton
 	@Override
 	public void onClick(Player player, ClickType clickType)
 	{
-		if (_arcadeManager.GetGame().GetState() == GameState.End || _arcadeManager.GetGame().GetState() == GameState.End)
+		Game game = _arcadeManager.GetGame();
+		if (game == null)
 		{
-			player.sendMessage("Game is already ending..."); 
+			player.sendMessage(C.cRed + "No game is loaded to stop.");
 			return;
 		}
-		else if (_arcadeManager.GetGame().GetState() == GameState.Recruit)
+
+		if (game.GetState() == GameState.End || game.GetState() == GameState.Dead)
 		{
-			_arcadeManager.GetGame().SetState(GameState.Dead);
+			player.sendMessage(C.cRed + "The game is already ending.");
+			return;
+		}
+
+		if (game.inLobby())
+		{
+			game.SetState(GameState.Dead);
 		}
 		else
 		{
-			_arcadeManager.GetGame().SetState(GameState.End);
+			game.SetState(GameState.End);
 		}
 
-
-		_arcadeManager.GetGame().Announce(C.cAqua + C.Bold + player.getName() + " has stopped the game.");
+		game.Announce(C.cAqua + C.Bold + player.getName() + " has stopped the game.");
 	}
 }

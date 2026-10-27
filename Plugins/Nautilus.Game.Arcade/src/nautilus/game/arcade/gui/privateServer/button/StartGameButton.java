@@ -4,13 +4,14 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 
 import mineplex.core.common.util.C;
-import mineplex.core.shop.item.IButton;
 import nautilus.game.arcade.ArcadeManager;
+import nautilus.game.arcade.game.Game;
 import nautilus.game.arcade.game.Game.GameState;
+import mineplex.core.shop.item.IButton;
 
 public class StartGameButton implements IButton
 {
-	private ArcadeManager _arcadeManager;
+	private final ArcadeManager _arcadeManager;
 
 	public StartGameButton(ArcadeManager arcadeManager)
 	{
@@ -20,14 +21,20 @@ public class StartGameButton implements IButton
 	@Override
 	public void onClick(Player player, ClickType clickType)
 	{
-		if (_arcadeManager.GetGame().GetState() != GameState.Recruit)
+		Game game = _arcadeManager.GetGame();
+		if (game == null)
 		{
-			player.sendMessage("Game is already in progress...");
+			player.sendMessage(C.cRed + "No game is loaded. Select a game in the Game Panel first.");
 			return;
 		}
 
-		_arcadeManager.GetGameManager().StateCountdown(_arcadeManager.GetGame(), 20, true);
+		if (game.GetState() != GameState.Recruit)
+		{
+			player.sendMessage(C.cRed + "The game is not in the recruiting lobby and cannot be started manually.");
+			return;
+		}
 
-		_arcadeManager.GetGame().Announce(C.cAqua + C.Bold + player.getName() + " has started the game.");
+		_arcadeManager.GetGameManager().StateCountdown(game, 20, true);
+		game.Announce(C.cAqua + C.Bold + player.getName() + " has started the game.");
 	}
 }

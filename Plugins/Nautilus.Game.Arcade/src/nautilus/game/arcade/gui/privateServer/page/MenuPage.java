@@ -34,17 +34,27 @@ public class MenuPage extends BasePage
 {
 	public MenuPage(ArcadeManager plugin, PrivateServerShop shop, Player player)
 	{
-		super(plugin, shop, "Private Server Menu", player, 9*4);
+		super(plugin, shop, "Game Panel", player, 9*4);
 		buildPage();
 	}
 
 	@Override
 	protected void buildPage()
 	{
-		addButton(4, getOwnerHead(), new PlayerHeadButton(getPlugin(), this));
+		if (UtilServer.isTestServer() && (getPlugin().GetHost() == null || getPlugin().GetHost().isEmpty()))
+		{
+			addItem(4, getOwnerHead());
+		}
+		else
+		{
+			addButton(4, getOwnerHead(), new PlayerHeadButton(getPlugin(), this));
+		}
 
 		boolean host = _manager.isHost(getPlayer());
-		boolean disableChangeButtons = !getClientManager().Get(getPlayer()).hasPermission(ArcadeManager.Perm.USE_MENU_DURING_GAME) && getPlugin().isGameInProgress();
+		boolean canChangeDuringGame = getClientManager().Get(getPlayer()).hasPermission(ArcadeManager.Perm.USE_MENU_DURING_GAME)
+				|| (UtilServer.isTestServer() && (getPlayer().isOp()
+				|| getClientManager().Get(getPlayer()).hasPermission(ArcadeManager.Perm.GAME_COMMAND)));
+		boolean disableChangeButtons = !canChangeDuringGame && getPlugin().isGameInProgress();
 
 		{
 			// Change Buttons - If a game is in progress and user isn't Youtube+ rank, they cannot
@@ -119,6 +129,22 @@ public class MenuPage extends BasePage
 
 	private ShopItem getOwnerHead()
 	{
+		if (UtilServer.isTestServer() && (getPlugin().GetHost() == null || getPlugin().GetHost().isEmpty()))
+		{
+			String title = C.cGreen + C.Bold + "Testplex Arcade Game Panel";
+			ItemStack item = new ItemStack(Material.BEACON);
+			ItemMeta meta = item.getItemMeta();
+			meta.setDisplayName(ChatColor.RESET + title);
+			List<String> lore = new ArrayList<>();
+			lore.add(" ");
+			lore.add(ChatColor.RESET + C.cYellow + "Players Online: " + C.cWhite + UtilServer.getPlayers().length);
+			lore.add(ChatColor.RESET + C.cYellow + "Players Max: " + C.cWhite + getPlugin().GetServerConfig().MaxPlayers);
+			lore.add(ChatColor.RESET + C.cGray + "Use this panel to select games and maps.");
+			meta.setLore(lore);
+			item.setItemMeta(meta);
+			return new ShopItem(item, title, title, 1, false, false);
+		}
+
 		if (_manager.isCommunityServer())
 		{
 			String title = C.cGreen + C.Bold + _manager.getOwner().getName() + "'s Mineplex Community Server";

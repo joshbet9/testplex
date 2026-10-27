@@ -36,9 +36,17 @@ public class GameCommand extends MultiCommandBase<ArcadeManager>
 	@Override
 	protected void Help(Player caller, String[] args)
 	{
+		if (args == null || args.length == 0
+				|| (args.length == 1 && "panel".equalsIgnoreCase(args[0])))
+		{
+			Plugin.GetGameHostManager().openGamePanel(caller);
+			return;
+		}
+
 		if (Plugin.canPlayerUseGameCmd(caller))
 		{
 			UtilPlayer.message(caller, F.main("Game", "Available Commands"));
+			UtilPlayer.message(caller, F.help("/game", "Open the Game Panel", ChatColor.DARK_RED));
 			UtilPlayer.message(caller, F.help("/game start", "Start the current game", ChatColor.DARK_RED));
 			UtilPlayer.message(caller, F.help("/game stop", "Stop the current game", ChatColor.DARK_RED));
 			caller.sendMessage(F.help(String.format("/game set <gametype> [%s(gamemode)] [%s(mapsource)] [%s(mapname)]", MODE_PREFIX, SOURCE_PREFIX, MAP_PREFIX), "Set the current game or next game", ChatColor.DARK_RED));
