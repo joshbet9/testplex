@@ -113,17 +113,19 @@ df -h "$ROOT"
   echo "Missing/empty map asset bundle in the remote artifact cache." >&2
   exit 2
 }
-STAGE="$(mktemp -d "/tmp/testplex-stage-$SHA.XXXXXX")"
+# /tmp is a constrained temporary filesystem on this VM. Keep staging and
+# extracted map ZIPs on the server root filesystem, which has sufficient
+# capacity, and use the verified cache's 400 MB map bundle in place.
+STAGE="$(mktemp -d "$ROOT/.testplex-stage-$SHA.XXXXXX")"
 cp -- "$ARTIFACT_CACHE/Arcade.jar" "$STAGE/Arcade.jar"
-cp -- "$ARTIFACT_CACHE/testplex-map-assets.zip" "$STAGE/testplex-map-assets.zip"
 
 echo "Validating Arcade.jar integrity before touching the running server."
 if ! unzip -tq "$STAGE/Arcade.jar" >/dev/null; then
   echo "Arcade.jar failed ZIP/JAR integrity validation; the running service has not been stopped." >&2
   exit 2
 fi
-echo "Validating the map asset bundle before touching the running server."
-if ! unzip -tq "$STAGE/testplex-map-assets.zip" >/dev/null; then
+echo "Validating the cached map asset bundle in place before touching the running server."
+if ! unzip -tq "$ARTIFACT_CACHE/testplex-map-assets.zip" >/dev/null; then
   echo "The map asset bundle failed ZIP integrity validation; the running service has not been stopped." >&2
   exit 2
 fi
@@ -170,11 +172,12 @@ while IFS= read -r map_entry; do
       exit 2
       ;;
   esac
-done < <(unzip -Z1 "$STAGE/testplex-map-assets.zip")
+done < <(unzip -Z1 "$ARTIFACT_CACHE/testplex-map-assets.zip")
 
 MAP_STAGE="$STAGE/map-assets"
+echo "Extracting validated map ZIPs onto the server root filesystem: $MAP_STAGE"
 mkdir -p "$MAP_STAGE"
-unzip -q "$STAGE/testplex-map-assets.zip" -d "$MAP_STAGE"
+unzip -q "$ARTIFACT_CACHE/testplex-map-assets.zip" -d "$MAP_STAGE"
 mapfile -d '' -t MAP_FILES < <(find "$MAP_STAGE/maps" -type f -name '*.zip' -print0 | sort -z)
 [[ "${#MAP_FILES[@]}" -gt 0 ]] || { echo "Map asset bundle contains no map ZIPs." >&2; exit 2; }
 for map_file in "${MAP_FILES[@]}"; do
