@@ -29,8 +29,8 @@ import mineplex.core.updater.event.UpdateEvent;
 
 /**
  * Bomb Lobbers' selected round-end effect.
- * Reuses the generic winner-room schematic and stages three player-disguised
- * targets with a Turtles-inspired prismarine rim. No live player is hit.
+ * Builds a standalone miniature Turtles island with a prismarine shell and ocean moat.
+ * Three player-disguised targets are knocked away by animated TNT; no live player is hit.
  */
 public class WinEffectBombLobbers extends WinEffectGadget
 {
@@ -63,24 +63,69 @@ public class WinEffectBombLobbers extends WinEffectGadget
     @Override
     public void buildWinnerRoom()
     {
-        super.buildWinnerRoom();
         Location base = getBaseLocation();
-        int floorY = base.getBlockY() - 1;
-        int centerX = base.getBlockX();
-        int centerZ = base.getBlockZ();
-        for (int i = 0; i < 20; i++)
-        {
-            double angle = Math.PI * 2 * i / 20.0;
-            int x = centerX + (int) Math.round(Math.cos(angle) * 4.7);
-            int z = centerZ + (int) Math.round(Math.sin(angle) * 4.7);
-            org.bukkit.block.Block block = base.getWorld().getBlockAt(x, floorY, z);
-            if (i % 5 == 0) block.setType(Material.SEA_LANTERN, false);
-            else
+        WinEffectRoomUtil.clear(base, 24, 3, 18);
+        World world = base.getWorld();
+        int bx = base.getBlockX(), bz = base.getBlockZ(), y = base.getBlockY() - 1;
+
+        // A sandy island surrounded by a stationary-water ocean.
+        for (int x = -15; x <= 15; x++)
+            for (int z = -15; z <= 15; z++)
             {
-                block.setType(Material.PRISMARINE, false);
-                block.setData((byte) (i % 3));
+                if (x * x + z * z > 225) continue;
+                world.getBlockAt(bx + x, y - 1, bz + z).setType(Material.SANDSTONE, false);
+                world.getBlockAt(bx + x, y, bz + z).setType(Material.STATIONARY_WATER, false);
+                if (x * x + z * z <= 100)
+                    world.getBlockAt(bx + x, y, bz + z).setType((x * x + z * z > 80) ? Material.SAND : Material.SANDSTONE, false);
             }
-        }
+
+        // Four green legs and a small head frame the central turtle.
+        for (int sx : new int[]{-1, 1})
+            for (int sz : new int[]{-1, 1})
+            {
+                int lx = bx + sx * 7, lz = bz + sz * 5;
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dz = -1; dz <= 1; dz++)
+                    {
+                        org.bukkit.block.Block leg = world.getBlockAt(lx + dx, y + 1, lz + dz);
+                        leg.setType(Material.STAINED_CLAY, false);
+                        leg.setData((byte) 5);
+                    }
+            }
+        int hx = bx, hz = bz - 9;
+        for (int dx = -1; dx <= 1; dx++)
+            for (int dz = -2; dz <= 1; dz++)
+            {
+                org.bukkit.block.Block head = world.getBlockAt(hx + dx, y + 1, hz + dz);
+                head.setType(Material.STAINED_CLAY, false);
+                head.setData((byte) 5);
+            }
+        world.getBlockAt(hx - 1, y + 2, hz - 1).setType(Material.SEA_LANTERN, false);
+        world.getBlockAt(hx + 1, y + 2, hz - 1).setType(Material.SEA_LANTERN, false);
+
+        // A domed, segmented prismarine shell.
+        for (int dx = -5; dx <= 5; dx++)
+            for (int dz = -4; dz <= 4; dz++)
+            {
+                double norm = (dx * dx / 25.0) + (dz * dz / 16.0);
+                if (norm > 1.0) continue;
+                int height = norm < 0.18 ? 3 : norm < 0.48 ? 2 : norm < 0.78 ? 1 : 0;
+                for (int h = 0; h <= height; h++)
+                {
+                    org.bukkit.block.Block shell = world.getBlockAt(bx + dx, y + 1 + h, bz + dz);
+                    shell.setType((h == height && (dx == 0 || dz == 0)) ? Material.SEA_LANTERN : Material.PRISMARINE, false);
+                    if (shell.getType() == Material.PRISMARINE)
+                        shell.setData((byte) ((Math.abs(dx) + Math.abs(dz)) % 3));
+                }
+            }
+    }
+
+    @Override
+    public void teleport()
+    {
+        Location view = getBaseLocation().clone().add(0, 3, 20);
+        view.setDirection(getBaseLocation().clone().subtract(view).toVector());
+        teleport(view);
     }
 
     @Override
@@ -91,9 +136,9 @@ public class WinEffectBombLobbers extends WinEffectGadget
         _bomb = null;
         _targets.clear();
         _targetDisguises.clear();
-        _winnerNpc = getNPC(_player, getBaseLocation());
+        _winnerNpc = getNPC(_player, getBaseLocation().clone().add(0, 0, -9));
 
-        List<Location> positions = UtilShapes.getPointsInCircle(getBaseLocation(), TARGET_COUNT, 3.15);
+        List<Location> positions = UtilShapes.getPointsInCircle(getBaseLocation(), TARGET_COUNT, 7.2);
         List<Player> skins = new ArrayList<Player>();
         if (_other != null)
         {

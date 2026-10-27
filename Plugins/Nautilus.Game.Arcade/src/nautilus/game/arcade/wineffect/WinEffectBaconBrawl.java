@@ -3,78 +3,93 @@ package nautilus.game.arcade.wineffect;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
-import org.bukkit.entity.ArmorStand;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.Player;
+import org.bukkit.World;
+import org.bukkit.entity.Pig;
 import org.bukkit.event.EventHandler;
 import org.bukkit.util.Vector;
-
 import mineplex.core.common.util.C;
 import mineplex.core.common.util.LineFormat;
 import mineplex.core.common.util.UtilShapes;
 import mineplex.core.common.util.UtilText;
-import mineplex.core.disguise.disguises.DisguisePlayer;
 import mineplex.core.gadget.GadgetManager;
 import mineplex.core.gadget.types.WinEffectGadget;
 import mineplex.core.updater.UpdateType;
 import mineplex.core.updater.event.UpdateEvent;
 
-/**
- * Bacon Brawl's game-specific winner celebration.
- *
- * It runs inside the normal Reborn winner room, using player-disguised armour
- * stands as visual stand-ins. The targets are not live players, so the effect
- * cannot damage, kill, or move real players.
- */
+/** A true pig-versus-pig body slam on a standalone Mighty Lava Arena-inspired island. */
 public class WinEffectBaconBrawl extends WinEffectGadget
 {
     private static final int TARGET_COUNT = 4;
     private static final long FIRST_IMPACT_DELAY_MS = 800L;
     private static final long IMPACT_INTERVAL_MS = 850L;
-
-    private DisguisePlayer _winnerNpc;
-    private final List<DisguisePlayer> _targetDisguises = new ArrayList<>();
-    private final List<ArmorStand> _targets = new ArrayList<>();
+    private Pig _winnerPig;
+    private final List<Pig> _targets = new ArrayList<Pig>();
     private int _nextTarget;
     private long _nextImpact;
     private boolean _cleaned;
 
     public WinEffectBaconBrawl(GadgetManager manager)
     {
-        super(manager, "Arcade Bacon Brawl Body Slam",
-                UtilText.splitLineToArray(C.cGray + "Body-slam four opponents off a bare-dirt arena inspired by Mighty Lava Arena.",
-                        LineFormat.LORE),
-                -2, Material.IRON_AXE, (byte) 0, true);
-
-        // Keep WinEffectGadget's generic WinRoomPodium schematic. Bacon Brawl
-        // decorates its floor with a small, bare-dirt Mighty Lava Arena-inspired
-        // fighting area; it does not replace the generic winner room.
+        super(manager, "Arcade Bacon Brawl - Mighty Lava Arena",
+                UtilText.splitLineToArray(C.cGray + "A pig body-slams four pigs from a miniature Mighty Lava Arena.", LineFormat.LORE),
+                -2, Material.PORK, (byte) 0, true);
         _length = TimeUnit.SECONDS.toMillis(8);
     }
 
     @Override
     public void buildWinnerRoom()
     {
-        super.buildWinnerRoom();
-
         Location base = getBaseLocation();
-        int centerX = base.getBlockX();
-        int centerZ = base.getBlockZ();
-        int floorY = base.getBlockY() - 1;
-
-        // Mighty Lava Arena's visual language for this effect is deliberately
-        // just dirt blocks: no grass layer, fences, lava, or extra decoration.
-        for (int x = -6; x <= 6; x++)
+        WinEffectRoomUtil.clear(base, 24, 3, 18);
+        World world = base.getWorld();
+        int bx = base.getBlockX(), bz = base.getBlockZ(), y = base.getBlockY() - 1;
+        for (int x = -8; x <= 8; x++)
         {
-            for (int z = -6; z <= 6; z++)
+            for (int z = -8; z <= 8; z++)
             {
-                base.getWorld().getBlockAt(centerX + x, floorY, centerZ + z).setType(Material.DIRT, false);
+                int d2 = x * x + z * z;
+                if (d2 > 64) continue;
+                org.bukkit.block.Block floor = world.getBlockAt(bx + x, y, bz + z);
+                if (d2 >= 49) floor.setType(Material.SMOOTH_BRICK, false);
+                else
+                {
+                    floor.setType(Material.SMOOTH_BRICK, false);
+                    if ((x + z) % 7 == 0) floor.setData((byte) 2);
+                }
+                world.getBlockAt(bx + x, y - 1, bz + z).setType(Material.NETHERRACK, false);
             }
         }
+        // A raised stone-brick ring holds the lower stationary-lava moat outside the arena.
+        for (int x = -11; x <= 11; x++)
+        {
+            for (int z = -11; z <= 11; z++)
+            {
+                int d2 = x * x + z * z;
+                if (d2 < 81 || d2 > 121) continue;
+                world.getBlockAt(bx + x, y - 1, bz + z).setType(Material.NETHERRACK, false);
+                world.getBlockAt(bx + x, y, bz + z).setType(Material.STATIONARY_LAVA, false);
+            }
+        }
+        // Four volcanic corner pylons make the room instantly distinct from the default podium.
+        for (int sx : new int[]{-1, 1})
+            for (int sz : new int[]{-1, 1})
+            {
+                int px = bx + sx * 7, pz = bz + sz * 7;
+                for (int h = 0; h < 4; h++)
+                    world.getBlockAt(px, y + h, pz).setType(h == 3 ? Material.GLASS : Material.NETHERRACK, false);
+                world.getBlockAt(px, y + 3, pz).setType(Material.STATIONARY_LAVA, false);
+            }
+    }
+
+    @Override
+    public void teleport()
+    {
+        Location view = getBaseLocation().clone().add(0, 3, 19);
+        view.setDirection(getBaseLocation().clone().subtract(view).toVector());
+        teleport(view);
     }
 
     @Override
@@ -83,91 +98,52 @@ public class WinEffectBaconBrawl extends WinEffectGadget
         _cleaned = false;
         _nextTarget = 0;
         _targets.clear();
-        _targetDisguises.clear();
-
-        _winnerNpc = getNPC(_player, getBaseLocation());
-
-        List<Location> positions = UtilShapes.getPointsInCircle(getBaseLocation(), TARGET_COUNT, 3.1);
-        List<Player> skins = new ArrayList<>();
-        if (_other != null)
-        {
-            for (Player player : _other)
-            {
-                if (player != null && player.isOnline() && !skins.contains(player))
-                {
-                    skins.add(player);
-                }
-            }
-        }
-        if (skins.isEmpty())
-        {
-            skins.add(_player);
-        }
-
-        for (int i = 0; i < TARGET_COUNT; i++)
-        {
-            Location loc = positions.get(i).clone();
-            loc.setDirection(getBaseLocation().toVector().subtract(loc.toVector()));
-
-            DisguisePlayer disguise = getNPC(skins.get(i % skins.size()), loc, true);
-            ArmorStand stand = (ArmorStand) disguise.getEntity().getBukkitEntity();
-            stand.setGravity(true);
-            stand.setVelocity(new Vector(0, 0, 0));
-            _targetDisguises.add(disguise);
-            _targets.add(stand);
-        }
-
+        Location base = getBaseLocation();
+        _winnerPig = spawnPig(base.clone().add(0, 0, 5.5));
+        for (Location position : UtilShapes.getPointsInCircle(base, TARGET_COUNT, 4.2))
+            _targets.add(spawnPig(position));
         _nextImpact = System.currentTimeMillis() + FIRST_IMPACT_DELAY_MS;
+    }
+
+    private Pig spawnPig(Location at)
+    {
+        Pig pig = at.getWorld().spawn(at, Pig.class);
+        pig.setSaddle(true);
+        pig.setVelocity(new Vector(0, 0, 0));
+        return pig;
     }
 
     @EventHandler
     public void onUpdate(UpdateEvent event)
     {
-        if (event.getType() != UpdateType.TICK || _cleaned || !isRunning())
-        {
-            return;
-        }
-
-        if (_nextTarget >= _targets.size() || System.currentTimeMillis() < _nextImpact)
-        {
-            return;
-        }
-
-        ArmorStand target = _targets.get(_nextTarget);
+        if (event.getType() != UpdateType.TICK || _cleaned || !isRunning()) return;
+        if (_nextTarget >= _targets.size() || System.currentTimeMillis() < _nextImpact) return;
+        Pig target = _targets.get(_nextTarget);
         if (target == null || target.isDead() || !target.isValid())
         {
             _nextTarget++;
             _nextImpact = System.currentTimeMillis() + IMPACT_INTERVAL_MS;
             return;
         }
-
-        Entity winnerEntity = _winnerNpc == null ? null : _winnerNpc.getEntity().getBukkitEntity();
-        if (winnerEntity != null && winnerEntity.isValid())
+        if (_winnerPig != null && _winnerPig.isValid())
         {
-            Location winnerLoc = target.getLocation().clone();
-            Vector chargeDirection = target.getLocation().toVector().subtract(getBaseLocation().toVector());
-            if (chargeDirection.lengthSquared() < 0.01)
-            {
-                chargeDirection = new Vector(1, 0, 0);
-            }
-            chargeDirection.setY(0).normalize();
-            winnerLoc.subtract(chargeDirection.clone().multiply(1.0));
-            winnerLoc.setDirection(target.getLocation().toVector().subtract(winnerLoc.toVector()));
-            winnerEntity.teleport(winnerLoc);
-            _winnerNpc.sendHit();
+            Vector approach = target.getLocation().toVector().subtract(getBaseLocation().toVector());
+            approach.setY(0);
+            if (approach.lengthSquared() < 0.01) approach = new Vector(1, 0, 0);
+            Location winnerSpot = target.getLocation().clone().subtract(approach.clone().normalize().multiply(1.3));
+            winnerSpot.setY(target.getLocation().getY());
+            winnerSpot.setDirection(target.getLocation().toVector().subtract(winnerSpot.toVector()));
+            _winnerPig.teleport(winnerSpot);
+            _winnerPig.getWorld().playSound(winnerSpot, Sound.VILLAGER_HIT, 1.0F, 1.1F);
         }
-
         Vector flight = target.getLocation().toVector().subtract(getBaseLocation().toVector());
         flight.setY(0);
-        if (flight.lengthSquared() < 0.01)
-        {
-            flight = new Vector(1, 0, 0);
-        }
-        flight.normalize().multiply(1.55).setY(0.82);
+        if (flight.lengthSquared() < 0.01) flight = new Vector(1, 0, 0);
+        flight.normalize().multiply(1.55);
+        flight.setY(0.82);
         target.setVelocity(flight);
         target.getWorld().playSound(target.getLocation(), Sound.VILLAGER_HIT, 1.6F, 0.8F);
         target.getWorld().playSound(target.getLocation(), Sound.EXPLODE, 0.7F, 1.5F);
-
         _nextTarget++;
         _nextImpact = System.currentTimeMillis() + IMPACT_INTERVAL_MS;
     }
@@ -175,35 +151,11 @@ public class WinEffectBaconBrawl extends WinEffectGadget
     @Override
     public void finish()
     {
-        if (_cleaned)
-        {
-            return;
-        }
+        if (_cleaned) return;
         _cleaned = true;
-
-        for (DisguisePlayer disguise : _targetDisguises)
-        {
-            removeDisguisedStand(disguise);
-        }
-        _targetDisguises.clear();
+        if (_winnerPig != null && !_winnerPig.isDead()) _winnerPig.remove();
+        for (Pig target : _targets) if (target != null && !target.isDead()) target.remove();
         _targets.clear();
-
-        removeDisguisedStand(_winnerNpc);
-        _winnerNpc = null;
-    }
-
-    private void removeDisguisedStand(DisguisePlayer disguise)
-    {
-        if (disguise == null)
-        {
-            return;
-        }
-
-        Entity entity = disguise.getEntity() == null ? null : disguise.getEntity().getBukkitEntity();
-        Manager.getDisguiseManager().undisguise(disguise);
-        if (entity != null && !entity.isDead())
-        {
-            entity.remove();
-        }
+        _winnerPig = null;
     }
 }
