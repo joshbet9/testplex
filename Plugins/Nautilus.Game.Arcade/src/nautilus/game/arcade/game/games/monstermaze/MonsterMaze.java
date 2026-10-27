@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -72,6 +74,8 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
 
@@ -87,10 +91,11 @@ public class MonsterMaze extends SoloGame
 	// Each player needs their own sidebar because distance and Safe Pad status are viewer-specific.
 	private final Map<UUID, GameScoreboard> _viewerScoreboards = new HashMap<UUID, GameScoreboard>();
 	private final Map<UUID, org.bukkit.scoreboard.Scoreboard> _previousScoreboards = new HashMap<UUID, org.bukkit.scoreboard.Scoreboard>();
-	private final Map<UUID, Boolean> _visibilityHidden = new HashMap<UUID, Boolean>();
+	private final Map<UUID, Integer> _visibilityModeData = new HashMap<UUID, Integer>();
+	private final Set<UUID> _visibilityInvisibilityTargets = new HashSet<UUID>();
 	private static final int VISIBILITY_SLOT = 7;
 	private static final int SAFE_PAD_COMPASS_SLOT = 1;
-	private static final String VISIBILITY_ITEM_NAME = ChatColor.AQUA + "Player Visibility";
+	private static final String VISIBILITY_ITEM_NAME = "Player Visibility:";
 	private static final String SAFE_PAD_COMPASS_NAME = ChatColor.GREEN + "Safe Pad Locator";
 	
 	private HashMap<Player, Long> _launched = new HashMap<Player, Long>();
@@ -653,7 +658,7 @@ public class MonsterMaze extends SoloGame
 			GameScoreboard board = getViewerScoreboard(viewer);
 			if (viewer.getScoreboard() != board.getScoreboard())
 				viewer.setScoreboard(board.getScoreboard());
-			syncViewerScoreboardTeams(board);
+			syncViewerScoreboardTeams(board, viewer);
 
 			board.reset();
 			board.write(C.cYellow + C.Bold + "Players");
@@ -712,12 +717,11 @@ public class MonsterMaze extends SoloGame
 			board = new GameScoreboard(this, player);
 			_viewerScoreboards.put(id, board);
 			player.setScoreboard(board.getScoreboard());
-			refreshPlayerVisibility(player);
 		}
 		return board;
 	}
 
-	private void syncViewerScoreboardTeams(GameScoreboard board)
+	private void syncViewerScoreboardTeams(GameScoreboard board, Player viewer)
 	{
 		for (Player target : GetPlayers(false))
 		{
@@ -729,6 +733,18 @@ public class MonsterMaze extends SoloGame
 		}
 		for (Team team : board.getScoreboard().getTeams())
 			team.setCanSeeFriendlyInvisibles(true);
+
+		Team ghosts = ensureGhostTeam(board);
+		int modeData = getVisibilityModeData(viewer.getUniqueId());
+		for (Player target : GetPlayers(false))
+		{
+			if (target.equals(viewer))
+				continue;
+			if (modeData == 5)
+				addGhostEntry(ghosts, target);
+			else
+				ghosts.removeEntry(target.getName());
+		}
 	}
 
 	private void ensureGameplayItems(Player player)
@@ -744,10 +760,10 @@ public class MonsterMaze extends SoloGame
 			player.getInventory().setItem(SAFE_PAD_COMPASS_SLOT, locator);
 		}
 
-		boolean hidden = Boolean.TRUE.equals(_visibilityHidden.get(player.getUniqueId()));
+		int modeData = getVisibilityModeData(player.getUniqueId());
 		ItemStack visibility = player.getInventory().getItem(VISIBILITY_SLOT);
 		if (visibility == null)
-			player.getInventory().setItem(VISIBILITY_SLOT, createVisibilityItem(hidden));
+			player.getInventory().setItem(VISIBILITY_SLOT, createVisibilityItem(modeData));
 	}
 
 	private boolean isSafePadCompassItem(ItemStack item)
@@ -758,12 +774,14 @@ public class MonsterMaze extends SoloGame
 		return meta != null && SAFE_PAD_COMPASS_NAME.equals(meta.getDisplayName());
 	}
 
-	private ItemStack createVisibilityItem(boolean hidden)
+	private ItemStack createVisibilityItem(int modeData)
 	{
-		ItemStack item = new ItemStack(Material.INK_SACK, 1, (short) (hidden ? 8 : 10));
+		ItemStack item = new ItemStack(Material.INK_SACK, 1, (short) modeData);
 		ItemMeta meta = item.getItemMeta();
-		meta.setDisplayName(VISIBILITY_ITEM_NAME + ChatColor.WHITE + ": " + (hidden ? ChatColor.GRAY + "Hidden" : ChatColor.GREEN + "Visible"));
-		meta.setLore(java.util.Collections.singletonList(ChatColor.GRAY + "Right-click to toggle player visibility"));
+		String state = modeData == 8 ? ChatColor.GRAY + "Hidden"
+				: modeData == 5 ? ChatColor.LIGHT_PURPLE + "Transparent" : ChatColor.GREEN + "Visible";
+		meta.setDisplayName(state + " " + VISIBILITY_ITEM_NAME);
+		meta.setLore(java.util.Collections.singletonList(ChatColor.GRAY + "Right-click to cycle player visibility"));
 		item.setItemMeta(meta);
 		return item;
 	}
@@ -773,7 +791,7 @@ public class MonsterMaze extends SoloGame
 		if (item == null || item.getType() != Material.INK_SACK || !item.hasItemMeta())
 			return false;
 		ItemMeta meta = item.getItemMeta();
-		return meta != null && meta.hasDisplayName() && meta.getDisplayName().startsWith(VISIBILITY_ITEM_NAME);
+		return meta != null && meta.hasDisplayName() && meta.getDisplayName().contains(VISIBILITY_ITEM_NAME);
 	}
 
 	@EventHandler
@@ -789,42 +807,105 @@ public class MonsterMaze extends SoloGame
 
 		event.setCancelled(true);
 		UUID id = player.getUniqueId();
-		boolean hidden = !Boolean.TRUE.equals(_visibilityHidden.get(id));
-		_visibilityHidden.put(id, hidden);
-		player.getInventory().setItem(VISIBILITY_SLOT, createVisibilityItem(hidden));
+		int current = getVisibilityModeData(id);
+		int next = current == 10 ? 8 : current == 8 ? 5 : 10;
+		if (next == 10)
+			_visibilityModeData.remove(id);
+		else
+			_visibilityModeData.put(id, next);
+		player.getInventory().setItem(VISIBILITY_SLOT, createVisibilityItem(next));
 		refreshAllPlayerVisibility();
-		player.playSound(player.getLocation(), Sound.CLICK, 0.8F, hidden ? 0.8F : 1.2F);
+		player.playSound(player.getLocation(), Sound.CLICK, 0.8F, next == 8 ? 0.8F : next == 5 ? 1.0F : 1.2F);
+	}
+
+	private int getVisibilityModeData(UUID id)
+	{
+		Integer data = _visibilityModeData.get(id);
+		return data == null ? 10 : data.intValue();
 	}
 
 	private void refreshAllPlayerVisibility()
 	{
-		for (Player viewer : GetPlayers(false))
+		for (Player player : GetPlayers(false))
+			ensureGameplayItems(player);
+		refreshVisibilityViews();
+	}
+
+	/** Keep the per-viewer visible/hidden/ghost view matrix in sync with the global invisibility effect. */
+	private void refreshVisibilityViews()
+	{
+		List<Player> players = GetPlayers(false);
+		Set<UUID> needInvisibility = new HashSet<UUID>();
+		for (Player observer : players)
 		{
-			ensureGameplayItems(viewer);
-			refreshPlayerVisibility(viewer);
+			if (getVisibilityModeData(observer.getUniqueId()) != 5)
+				continue;
+			for (Player target : players)
+				if (!observer.equals(target))
+					needInvisibility.add(target.getUniqueId());
+		}
+
+		for (Player target : players)
+		{
+			UUID targetId = target.getUniqueId();
+			if (needInvisibility.contains(targetId))
+			{
+				target.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 9999999, 1, true, false), true);
+				_visibilityInvisibilityTargets.add(targetId);
+			}
+			else if (_visibilityInvisibilityTargets.remove(targetId))
+			{
+				target.removePotionEffect(PotionEffectType.INVISIBILITY);
+			}
+		}
+
+		for (Player observer : players)
+		{
+			int modeData = getVisibilityModeData(observer.getUniqueId());
+			GameScoreboard board = getViewerScoreboard(observer);
+			Team ghosts = ensureGhostTeam(board);
+			for (Player target : players)
+			{
+				if (observer.equals(target))
+					continue;
+				if (modeData == 8)
+					observer.hidePlayer(target);
+				else
+					observer.showPlayer(target);
+				if (modeData == 5)
+					addGhostEntry(ghosts, target);
+				else
+					ghosts.removeEntry(target.getName());
+			}
 		}
 	}
 
-	private void refreshPlayerVisibility(Player viewer)
+	private Team ensureGhostTeam(GameScoreboard board)
 	{
-		if (viewer == null || !viewer.isOnline())
-			return;
-		boolean hidden = Boolean.TRUE.equals(_visibilityHidden.get(viewer.getUniqueId()));
-		for (Player target : GetPlayers(false))
+		org.bukkit.scoreboard.Scoreboard scoreboard = board.getScoreboard();
+		Team ghosts = scoreboard.getTeam("mm_ghosts");
+		if (ghosts == null)
+			ghosts = scoreboard.registerNewTeam("mm_ghosts");
+		ghosts.setCanSeeFriendlyInvisibles(true);
+		return ghosts;
+	}
+
+	private void addGhostEntry(Team ghosts, Player target)
+	{
+		GameTeam targetTeam = GetTeam(target);
+		if (targetTeam != null && targetTeam.GetDisplaytag())
 		{
-			if (viewer.equals(target))
-				continue;
-			if (hidden)
-				viewer.hidePlayer(target);
-			else
-				viewer.showPlayer(target);
+			ghosts.setPrefix(targetTeam.GetColor() + C.Bold + targetTeam.GetName() + targetTeam.GetColor() + " ");
+			ghosts.setSuffix(C.Reset);
 		}
+		if (!ghosts.hasEntry(target.getName()))
+			ghosts.addEntry(target.getName());
 	}
 
 	private void clearPersonalScoreboardsAndVisibility()
 	{
 		// Undo per-viewer hide state even if the game has already removed players from its teams.
-		for (UUID id : new ArrayList<UUID>(_visibilityHidden.keySet()))
+		for (UUID id : new ArrayList<UUID>(_visibilityModeData.keySet()))
 		{
 			Player viewer = Bukkit.getPlayer(id);
 			if (viewer != null && viewer.isOnline())
@@ -832,6 +913,14 @@ public class MonsterMaze extends SoloGame
 					if (!viewer.equals(target))
 						viewer.showPlayer(target);
 		}
+
+		for (UUID id : new ArrayList<UUID>(_visibilityInvisibilityTargets))
+		{
+			Player player = Bukkit.getPlayer(id);
+			if (player != null && player.isOnline())
+				player.removePotionEffect(PotionEffectType.INVISIBILITY);
+		}
+		_visibilityInvisibilityTargets.clear();
 
 		for (Map.Entry<UUID, org.bukkit.scoreboard.Scoreboard> entry : _previousScoreboards.entrySet())
 		{
@@ -849,6 +938,6 @@ public class MonsterMaze extends SoloGame
 		}
 		_viewerScoreboards.clear();
 		_previousScoreboards.clear();
-		_visibilityHidden.clear();
+		_visibilityModeData.clear();
 	}
 }
