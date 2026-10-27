@@ -376,7 +376,7 @@ jobs:
                   "custom trail blocks": "_blockColours.put(block, Byte.valueOf(colour))",
               },
               "Bacon Brawl": {
-                  "themed sparkle trail": "getEquippedColourData(player.getUniqueId(), \"baconbrawl\")",
+                  "player-specific wearable accessory": "getBaconBrawlAccessory(choice)",
               },
               "Dragon Escape": {
                   "coloured running trail": "getEquippedColourData(player.getUniqueId(), \"dragonescape\")",
@@ -391,7 +391,7 @@ jobs:
                   "persistent per-player storage": "cosmetics.yml",
                   "shared colour resolver": "getEquippedColourData(UUID playerId, String game)",
                   "does not override the regular cosmetics command": 'getCommand("arcadecosmetics")',
-                  "planned win effects appear as explicit placeholders": "Planned Win Effect (Placeholder)",
+                  "win effects menu only shows implemented effects": "if (!hasImplementedWinEffect(game.key)) continue;",
                   "Monster Maze cosmetic categories": 'registerGame("monstermaze", "Monster Maze"',
                   "Bacon Brawl cosmetic entry": 'registerGame("baconbrawl", "Bacon Brawl"',
                   "Bomb Lobbers cosmetic entry": 'registerGame("bomblobbers", "Bomb Lobbers"',
