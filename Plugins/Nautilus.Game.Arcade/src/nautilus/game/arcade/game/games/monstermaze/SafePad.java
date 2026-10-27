@@ -28,6 +28,7 @@ public class SafePad implements Listener
 	
 	private Location  _loc;
 	private byte _surfaceColour = (byte) 5;
+	private byte _breakColour = (byte) 5;
 	
 	private int _decayCount = 11;
 	
@@ -48,6 +49,7 @@ public class SafePad implements Listener
 			if (configuredColour >= 0 && configuredColour <= 15)
 				_surfaceColour = (byte) configuredColour;
 		}
+		_breakColour = _surfaceColour;
 		
 		//beacon surface
 		for (int x = -2 ; x < 3 ; x++)
@@ -171,6 +173,7 @@ public class SafePad implements Listener
 	
 	private void setBreakData(byte newData)
 	{
+		_breakColour = newData;
 		for (SafePadBlock spb : _blocks)
 		{
 			if (spb.getBlockMaterial() != Material.STAINED_CLAY)
@@ -231,7 +234,9 @@ public class SafePad implements Listener
 				if (block.getBlockMaterial() != Material.STAINED_CLAY)
 					continue;
 
-				byte data = customPack
+				// Keep the game's green -> yellow -> orange -> red warning sequence visible.
+				boolean warningTintActive = _breakColour != (byte) 5;
+				byte data = customPack && !warningTintActive
 						? (byte) ArcadeCosmeticsMenu.getMonsterMazeSafePadColourData(viewer.getUniqueId(), mobSet)
 						: block.getBlockData();
 				viewer.sendBlockChange(block.getLocation(), Material.STAINED_CLAY, data);
