@@ -1,5 +1,8 @@
 package nautilus.game.arcade.game.games.baconbrawl.kits.perks;
 
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import org.bukkit.Location;
@@ -21,6 +24,10 @@ import mineplex.core.common.util.UtilParticle.ParticleType;
 import mineplex.core.common.util.UtilParticle.ViewDist;
 import mineplex.core.itemstack.ItemBuilder;
 import mineplex.core.recharge.Recharge;
+import mineplex.core.updater.UpdateType;
+import mineplex.core.updater.event.UpdateEvent;
+import nautilus.game.arcade.GameType;
+import nautilus.game.arcade.game.games.baconbrawl.BaconBrawlCosmeticEffects;
 import mineplex.minecraft.game.core.damage.CustomDamageEvent;
 
 import nautilus.game.arcade.kit.Perk;
@@ -29,6 +36,8 @@ public class PerkCrispyBacon extends Perk
 {
 
 	private static final long COOLDOWN = TimeUnit.SECONDS.toMillis(5);
+	private final Map<Item, Player> _cosmeticItems = new HashMap<Item, Player>();
+	private final Map<Item, Long> _cosmeticExpiry = new HashMap<Item, Long>();
 
 	public PerkCrispyBacon()
 	{
@@ -54,6 +63,8 @@ public class PerkCrispyBacon extends Perk
 		Location location = player.getLocation().add(0, 1.5, 0);
 		location.getWorld().playSound(location, Sound.EXPLODE, 1, 0.2F);
 		UtilParticle.PlayParticleToAll(ParticleType.LAVA, location, 0.5F, 0.5F, 0.5F, 0, 4, ViewDist.NORMAL);
+		if (Manager.GetGame().GetType() == GameType.BaconBrawl)
+			BaconBrawlCosmeticEffects.play(player, location, "crispy-bacon-activation");
 
 		for (int i = 0; i < 3; i++)
 		{
@@ -61,7 +72,28 @@ public class PerkCrispyBacon extends Perk
 					.setTitle(String.valueOf(UtilMath.r(1000)))
 					.build());
 			item.setVelocity(new Vector((Math.random() - 0.5) * 0.5, 0.4, (Math.random() - 0.5) * 0.5));
+			if (Manager.GetGame().GetType() == GameType.BaconBrawl) {
+				_cosmeticItems.put(item, player);
+				_cosmeticExpiry.put(item, System.currentTimeMillis() + TimeUnit.SECONDS.toMillis(8));
+			}
 			Manager.GetFire().Add(item, player, 10, 1, 2, 2, GetName(), false);
+		}
+	}
+
+	@EventHandler
+	public void updateCosmeticTrail(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.TICK || Manager.GetGame().GetType() != GameType.BaconBrawl) return;
+		long now = System.currentTimeMillis();
+		Iterator<Map.Entry<Item, Player>> iterator = _cosmeticItems.entrySet().iterator();
+		while (iterator.hasNext()) {
+			Map.Entry<Item, Player> entry = iterator.next();
+			Item item = entry.getKey(); Player owner = entry.getValue();
+			Long expiry = _cosmeticExpiry.get(item);
+			if (item == null || !item.isValid() || owner == null || !owner.isOnline() || expiry == null || now > expiry.longValue()) {
+				_cosmeticExpiry.remove(item); iterator.remove(); continue;
+			}
+			BaconBrawlCosmeticEffects.play(owner, item.getLocation(), "crispy-bacon-trail");
 		}
 	}
 

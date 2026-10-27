@@ -1,9 +1,14 @@
 package nautilus.game.arcade.kit.perks;
 
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -24,10 +29,14 @@ import mineplex.core.projectile.IThrown;
 import mineplex.core.projectile.ProjectileUser;
 import mineplex.core.recharge.Recharge;
 import mineplex.core.updater.UpdateType;
+import mineplex.core.updater.event.UpdateEvent;
+import nautilus.game.arcade.GameType;
+import nautilus.game.arcade.game.games.baconbrawl.BaconBrawlCosmeticEffects;
 import nautilus.game.arcade.kit.Perk;
 
 public class PerkBaconBlast extends Perk implements IThrown
 {
+	private final Map<Item, Player> _cosmeticItems = new HashMap<Item, Player>();
 	public PerkBaconBlast() 
 	{
 		super("Bacon Blast", new String[] 
@@ -65,7 +74,11 @@ public class PerkBaconBlast extends Perk implements IThrown
 		UtilInv.Update(player);
 
 		org.bukkit.entity.Item ent = player.getWorld().dropItem(player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.5)), ItemStackFactory.Instance.CreateStack(Material.PORK, (byte)0, 16));
-
+		if (Manager.GetGame().GetType() == GameType.BaconBrawl)
+		{
+			_cosmeticItems.put(ent, player);
+			BaconBrawlCosmeticEffects.play(player, ent.getLocation(), "bacon-blast-activation");
+		}
 		UtilAction.velocity(ent, player.getLocation().getDirection(), 1, false, 0, 0.2, 10, false);	
 
 		Manager.GetProjectile().AddThrow(ent, player, this, -1, true, true, true, true, 
@@ -109,11 +122,32 @@ public class PerkBaconBlast extends Perk implements IThrown
 	@Override
 	public void ChunkUnload(ProjectileUser data)
 	{
+		if (data.getThrown() instanceof Item) _cosmeticItems.remove((Item) data.getThrown());
 		data.getThrown().remove();
+	}
+
+	@EventHandler
+	public void updateCosmeticTrail(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.TICK || Manager.GetGame().GetType() != GameType.BaconBrawl) return;
+		Iterator<Map.Entry<Item, Player>> iterator = _cosmeticItems.entrySet().iterator();
+		while (iterator.hasNext())
+		{
+			Map.Entry<Item, Player> entry = iterator.next();
+			Item item = entry.getKey(); Player owner = entry.getValue();
+			if (item == null || !item.isValid() || owner == null || !owner.isOnline()) { iterator.remove(); continue; }
+			BaconBrawlCosmeticEffects.play(owner, item.getLocation(), "bacon-blast-trail");
+		}
 	}
 
 	public void Explode(ProjectileUser data)
 	{
+		if (data.getThrown() instanceof Item)
+		{
+			Item item = (Item) data.getThrown(); Player owner = _cosmeticItems.remove(item);
+			if (owner != null && Manager.GetGame().GetType() == GameType.BaconBrawl)
+				BaconBrawlCosmeticEffects.play(owner, item.getLocation(), "bacon-blast-impact");
+		}
 		// for whatever reason, you can't put a location in createExplosion if you don't want it to break blocks >.>
 		Location loc = data.getThrown().getLocation();
 		data.getThrown().getWorld().createExplosion(loc.getX(), loc.getY(), loc.getZ(), 0.5f, false, false);
