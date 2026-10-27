@@ -83,6 +83,7 @@ import nautilus.game.arcade.wineffect.WinEffectBaconBrawl;
 import nautilus.game.arcade.wineffect.WinEffectBombLobbers;
 import nautilus.game.arcade.wineffect.WinEffectDeathTag;
 import nautilus.game.arcade.wineffect.WinEffectDragonEscape;
+import nautilus.game.arcade.wineffect.WinEffectArcadeDemo;
 import static mineplex.core.Managers.require;
 
 public class Arcade extends JavaPlugin
@@ -178,6 +179,30 @@ public class Arcade extends JavaPlugin
 			gadgetManager.addGadget(new WinEffectDeathTag(gadgetManager));
 		if (gadgetManager.getGadget(WinEffectDragonEscape.class) == null)
 			gadgetManager.addGadget(new WinEffectDragonEscape(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectArcadeDemo.Dragons.class) == null)
+			gadgetManager.addGadget(new WinEffectArcadeDemo.Dragons(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectArcadeDemo.Evolution.class) == null)
+			gadgetManager.addGadget(new WinEffectArcadeDemo.Evolution(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectArcadeDemo.Gladiators.class) == null)
+			gadgetManager.addGadget(new WinEffectArcadeDemo.Gladiators(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectArcadeDemo.MicroBattles.class) == null)
+			gadgetManager.addGadget(new WinEffectArcadeDemo.MicroBattles(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectArcadeDemo.MonsterMaze.class) == null)
+			gadgetManager.addGadget(new WinEffectArcadeDemo.MonsterMaze(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectArcadeDemo.OneInTheQuiver.class) == null)
+			gadgetManager.addGadget(new WinEffectArcadeDemo.OneInTheQuiver(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectArcadeDemo.Paintball.class) == null)
+			gadgetManager.addGadget(new WinEffectArcadeDemo.Paintball(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectArcadeDemo.Runner.class) == null)
+			gadgetManager.addGadget(new WinEffectArcadeDemo.Runner(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectArcadeDemo.SheepQuest.class) == null)
+			gadgetManager.addGadget(new WinEffectArcadeDemo.SheepQuest(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectArcadeDemo.Snake.class) == null)
+			gadgetManager.addGadget(new WinEffectArcadeDemo.Snake(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectArcadeDemo.Spleef.class) == null)
+			gadgetManager.addGadget(new WinEffectArcadeDemo.Spleef(gadgetManager));
+		if (gadgetManager.getGadget(WinEffectArcadeDemo.TurfWars.class) == null)
+			gadgetManager.addGadget(new WinEffectArcadeDemo.TurfWars(gadgetManager));
 		ThankManager thankManager = new ThankManager(this, clientManager, donationManager);
 		BoosterManager boosterManager = new BoosterManager(this, _serverConfiguration.getServerGroup().getBoosterGroup(), clientManager, donationManager, inventoryManager, thankManager);
 		CosmeticManager cosmeticManager = new CosmeticManager(this, clientManager, donationManager, inventoryManager, gadgetManager, petManager, null, boosterManager, punish);
