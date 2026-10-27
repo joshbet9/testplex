@@ -44,6 +44,11 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import mineplex.core.common.util.UtilEnt;
+import mineplex.core.common.util.UtilParticle;
+import mineplex.core.common.util.UtilParticle.ParticleType;
+import mineplex.core.common.util.UtilParticle.ViewDist;
+import mineplex.core.updater.UpdateType;
+import mineplex.core.updater.event.UpdateEvent;
 import nautilus.game.arcade.Arcade;
 import nautilus.game.arcade.ArcadeManager;
 import nautilus.game.arcade.events.GameStateChangeEvent;
@@ -56,7 +61,7 @@ import nautilus.game.arcade.game.Game.GameState;
  * The normal Mineplex Cosmetic Menu remains owned by Mineplex Core. This class
  * adds separate Arcade Cosmetics and Arcade Win Effects entries. It also owns
  * the selected game's pregame showcase display; the first implemented showcase
- * is the Bacon Brawl pig/sheep accessory lineup.
+ * is the Bacon Brawl pig/sheep accessory lineup, plus Bomb Lobbers TNT impact styles.
  */
 public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private static final String MAIN_TITLE = "Arcade Cosmetics | Games";
@@ -64,6 +69,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private static final int NORMAL_WIN_EFFECTS_SLOT = 51;
     private static final String WIN_EFFECTS_TITLE = "Arcade Win Effects | Games";
     private static final String BACON_SHOWCASE_TAG = "TESTPLEX_BACON_BRAWL_SHOWCASE:";
+    private static final String BOMB_LOBBERS_SHOWCASE_TAG = "TESTPLEX_BOMB_LOBBERS_SHOWCASE:";
+    private static final String BOMB_LOBBERS_LABEL_PREFIX = "TNT Impact: ";
     private static final String[] COLOUR_OPTIONS = {
             "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
             "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"
@@ -79,6 +86,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private final Map<String, GameDefinition> games = new LinkedHashMap<String, GameDefinition>();
     private final List<Entity> baconBrawlShowcaseEntities = new ArrayList<Entity>();
     private final List<ArmorStand> baconBrawlShowcaseAccessories = new ArrayList<ArmorStand>();
+    private final List<ArmorStand> bombLobbersShowcaseEntities = new ArrayList<ArmorStand>();
 
     public ArcadeCosmeticsMenu(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -103,9 +111,9 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                         "baconbrawl", false, "crown", "top_hat", "chef", "diamond"));
 
         registerGame("bomblobbers", "Bomb Lobbers", Material.TNT, (short) 0,
-                "Land three direct lob hits on the map's turtles, with suitable sound effects.",
+                "Land three direct TNT hits on three player targets, using the Turtles map theme.",
                 feature("tnt-impact", "TNT Impact Effects", Material.TNT,
-                        "Prototype TNT explosion and impact presentation. Cosmetic particles must not change damage or explosion rules.",
+                        "Choose how your own TNT impacts appear to everyone. These visual effects never change damage or explosion rules.",
                         null, false, "classic", "ember", "shockwave", "spark", "confetti"));
 
         registerGame("deathtag", "Death Tag", Material.SKULL_ITEM, (short) 0,
@@ -561,22 +569,40 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     }
 
     private boolean hasImplementedWinEffect(String gameKey) {
-        // Add a game only after its sequence is wired into the native end-of-round flow.
-        return "baconbrawl".equalsIgnoreCase(gameKey);
+        return "baconbrawl".equalsIgnoreCase(gameKey) || "bomblobbers".equalsIgnoreCase(gameKey);
     }
 
     private ItemStack winEffectItem(Player player, GameDefinition game) {
+        String gameKey = game.key.toLowerCase(Locale.ROOT);
+        String effectKey;
+        String effectName;
+        String[] description;
+        if ("baconbrawl".equals(gameKey)) {
+            effectKey = "body-slam";
+            effectName = "Body Slam";
+            description = new String[] {
+                    "Body-slam four player targets off a bare-dirt arena",
+                    "inspired by Mighty Lava Arena."
+            };
+        } else {
+            effectKey = "tnt-triple-hit";
+            effectName = "Triple Lob";
+            description = new String[] {
+                    "Land three direct TNT hits on player targets,",
+                    "with the Turtles map theme in the winner room."
+            };
+        }
+
         String selected = getEquippedWinEffect(player.getUniqueId(), game.key);
-        boolean equipped = "body-slam".equalsIgnoreCase(selected);
-        ItemStack item = new ItemStack(Material.IRON_AXE);
+        boolean equipped = effectKey.equalsIgnoreCase(selected);
+        ItemStack item = new ItemStack("baconbrawl".equals(gameKey) ? Material.IRON_AXE : Material.TNT);
         ItemMeta meta = item.getItemMeta();
         meta.setDisplayName((equipped ? ChatColor.GREEN : ChatColor.YELLOW)
-                + game.displayName + " — Body Slam");
+                + game.displayName + " — " + effectName);
         List<String> lore = new ArrayList<String>();
-        lore.add(ChatColor.GRAY + "Body-slam four opponents off a bare-dirt arena");
-        lore.add(ChatColor.GRAY + "inspired by Mighty Lava Arena.");
+        for (String line : description) lore.add(ChatColor.GRAY + line);
         lore.add(equipped ? ChatColor.GREEN + "Equipped for this game" : ChatColor.YELLOW + "Click to equip");
-        lore.add(ChatColor.DARK_GRAY + "WinEffect: " + game.key + ":body-slam");
+        lore.add(ChatColor.DARK_GRAY + "WinEffect: " + game.key + ":" + effectKey);
         meta.setLore(lore);
         item.setItemMeta(meta);
         return item;
@@ -606,8 +632,9 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             boolean equip = !parts[1].equalsIgnoreCase(current);
             data.set(path, equip ? parts[1].toLowerCase(Locale.ROOT) : null);
             save();
+            String effectName = "baconbrawl".equalsIgnoreCase(parts[0]) ? "Body Slam" : "Triple Lob";
             player.sendMessage((equip ? ChatColor.GREEN + "Equipped " : ChatColor.YELLOW + "Unequipped ")
-                    + game.displayName + " win effect: Body Slam.");
+                    + game.displayName + " win effect: " + effectName + ".");
             openWinEffects(player);
             return;
         }
@@ -1189,10 +1216,13 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
 
         if (event.GetState() == GameState.Recruit) {
             clearBaconBrawlShowcase();
+            clearBombLobbersShowcase();
             World lobbyWorld = getLobbyWorld();
             if (lobbyWorld != null) removePersistedBaconBrawlShowcase(lobbyWorld);
             if ("Bacon Brawl".equalsIgnoreCase(event.GetGame().GetName())) {
                 createBaconBrawlShowcase();
+            } else if ("Bomb Lobbers".equalsIgnoreCase(event.GetGame().GetName())) {
+                createBombLobbersShowcase();
             }
             return;
         }
@@ -1200,6 +1230,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         if (event.GetState() == GameState.Prepare || event.GetState() == GameState.Live
                 || event.GetState() == GameState.End || event.GetState() == GameState.Dead) {
             clearBaconBrawlShowcase();
+            clearBombLobbersShowcase();
         }
     }
 
@@ -1274,12 +1305,105 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         plugin.getLogger().info("Created Bacon Brawl pregame cosmetic showcase (4 pig styles and 4 pink sheep styles).");
     }
 
+    private void createBombLobbersShowcase() {
+        if (!(plugin instanceof Arcade)) return;
+        ArcadeManager manager = ((Arcade) plugin).getArcadeManager();
+        if (manager == null || manager.GetLobby() == null || manager.GetLobby().getSpawn() == null) return;
+        Location lobbySpawn = manager.GetLobby().getSpawn();
+        World world = lobbySpawn.getWorld();
+        if (world == null) return;
+        removePersistedBaconBrawlShowcase(world);
+
+        int[] xOffsets = { -8, -4, 0, 4, 8 };
+        String[] choices = { "classic", "ember", "shockwave", "spark", "confetti" };
+        for (int i = 0; i < choices.length; i++) {
+            int x = lobbySpawn.getBlockX() + xOffsets[i];
+            int z = lobbySpawn.getBlockZ() + 20;
+            int y = world.getHighestBlockYAt(x, z) + 1;
+            Location display = new Location(world, x + 0.5, y, z + 0.5);
+            display.setDirection(lobbySpawn.toVector().subtract(display.toVector()));
+
+            ArmorStand tnt = world.spawn(display.clone().subtract(0, 0.18, 0), ArmorStand.class);
+            tnt.setVisible(false);
+            tnt.setSmall(true);
+            tnt.setGravity(false);
+            tnt.setBasePlate(false);
+            tnt.setArms(false);
+            tnt.setMarker(true);
+            tnt.setCanPickupItems(false);
+            tnt.setHelmet(new ItemStack(Material.TNT));
+            tnt.setCustomName(BOMB_LOBBERS_SHOWCASE_TAG + "TNT:" + choices[i]);
+            tnt.setCustomNameVisible(false);
+            bombLobbersShowcaseEntities.add(tnt);
+
+            ArmorStand label = world.spawn(display.clone().add(0, 0.75, 0), ArmorStand.class);
+            label.setVisible(false);
+            label.setSmall(false);
+            label.setGravity(false);
+            label.setBasePlate(false);
+            label.setArms(false);
+            label.setMarker(true);
+            label.setCanPickupItems(false);
+            label.setCustomName(ChatColor.GOLD + BOMB_LOBBERS_LABEL_PREFIX + pretty(choices[i]));
+            label.setCustomNameVisible(true);
+            bombLobbersShowcaseEntities.add(label);
+        }
+        plugin.getLogger().info("Created Bomb Lobbers pregame showcase (five TNT impact styles).");
+    }
+
+    @EventHandler
+    public void updateBombLobbersShowcase(UpdateEvent event) {
+        if (event.getType() != UpdateType.TICK || event.getTick() % 10 != 0
+                || bombLobbersShowcaseEntities.isEmpty()) return;
+        for (ArmorStand stand : new ArrayList<ArmorStand>(bombLobbersShowcaseEntities)) {
+            if (stand == null || stand.isDead() || !stand.isValid()) continue;
+            String name = stand.getCustomName();
+            if (name == null || !name.startsWith(BOMB_LOBBERS_SHOWCASE_TAG + "TNT:")) continue;
+            String choice = name.substring((BOMB_LOBBERS_SHOWCASE_TAG + "TNT:").length());
+            Location point = stand.getLocation().clone().add(0, 0.7, 0);
+            switch (choice.toLowerCase(Locale.ROOT)) {
+                case "ember":
+                    UtilParticle.PlayParticle(ParticleType.FLAME, point, 0.2F, 0.25F, 0.2F, 0.01F, 5, ViewDist.NORMAL);
+                    break;
+                case "shockwave":
+                    for (int j = 0; j < 8; j++) {
+                        double angle = Math.PI * 2 * j / 8.0;
+                        Location ringPoint = point.clone().add(Math.cos(angle) * 0.75, 0, Math.sin(angle) * 0.75);
+                        UtilParticle.PlayParticle(ParticleType.CRIT, ringPoint, 0, 0, 0, 0.01F, 2, ViewDist.NORMAL);
+                    }
+                    break;
+                case "spark":
+                    UtilParticle.PlayParticle(ParticleType.FIREWORKS_SPARK, point, 0.18F, 0.18F, 0.18F, 0.02F, 7, ViewDist.NORMAL);
+                    break;
+                case "confetti":
+                    UtilParticle.PlayParticle(ParticleType.NOTE, point, 0.8F, 0.8F, 0.8F, 1.0F, 7, ViewDist.NORMAL);
+                    UtilParticle.PlayParticle(ParticleType.HAPPY_VILLAGER, point, 0.25F, 0.25F, 0.25F, 0.02F, 3, ViewDist.NORMAL);
+                    break;
+                default:
+                    UtilParticle.PlayParticle(ParticleType.LARGE_EXPLODE, point, 0.1F, 0.1F, 0.1F, 0, 1, ViewDist.NORMAL);
+                    UtilParticle.PlayParticle(ParticleType.SMOKE, point, 0.2F, 0.2F, 0.2F, 0.01F, 4, ViewDist.NORMAL);
+                    break;
+            }
+        }
+    }
+
+    private void clearBombLobbersShowcase() {
+        for (ArmorStand stand : new ArrayList<ArmorStand>(bombLobbersShowcaseEntities)) {
+            if (stand != null && !stand.isDead()) stand.remove();
+        }
+        bombLobbersShowcaseEntities.clear();
+    }
+
     private void removePersistedBaconBrawlShowcase(World world) {
         if (world == null) return;
         for (Entity entity : new ArrayList<Entity>(world.getEntities())) {
             String name = entity.getCustomName();
             if (name == null) continue;
-            if (entity instanceof ArmorStand && name.startsWith(BACON_SHOWCASE_TAG)) {
+            String plainName = ChatColor.stripColor(name);
+            if (entity instanceof ArmorStand
+                    && (name.startsWith(BACON_SHOWCASE_TAG)
+                    || name.startsWith(BOMB_LOBBERS_SHOWCASE_TAG)
+                    || (plainName != null && plainName.startsWith(BOMB_LOBBERS_LABEL_PREFIX)))) {
                 entity.remove();
             } else if (entity instanceof Pig && name.startsWith(ChatColor.GOLD + "Pig - ")) {
                 entity.remove();
@@ -1293,6 +1417,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     public void cleanupShowcaseOnPluginDisable(PluginDisableEvent event) {
         if (event.getPlugin() == plugin) {
             clearBaconBrawlShowcase();
+            clearBombLobbersShowcase();
         }
     }
 
@@ -1319,7 +1444,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     @EventHandler
     public void protectPregameShowcase(EntityDamageEvent event) {
         if (baconBrawlShowcaseEntities.contains(event.getEntity())
-                || baconBrawlShowcaseAccessories.contains(event.getEntity())) {
+                || baconBrawlShowcaseAccessories.contains(event.getEntity())
+                || bombLobbersShowcaseEntities.contains(event.getEntity())) {
             event.setCancelled(true);
         }
     }

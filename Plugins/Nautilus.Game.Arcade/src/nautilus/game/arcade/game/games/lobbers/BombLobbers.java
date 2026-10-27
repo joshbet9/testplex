@@ -303,9 +303,57 @@ public class BombLobbers extends TeamGame implements IThrown
 			{
 				Manager.GetCondition().Factory().Explosion("Throwing TNT", other, thrower, 50, 0.1, false, false);
 			}
+			playTNTImpactEffect(thrower, tnt.getLocation());
 		}
 
 		_tnt.remove(tnt);
+	}
+
+	private void playTNTImpactEffect(Player thrower, Location impact)
+	{
+		if (thrower == null || impact == null || impact.getWorld() == null)
+		{
+			return;
+		}
+		String choice = nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu.getEquippedChoice(
+				thrower.getUniqueId(), "bomblobbers", "tnt-impact");
+		if (choice == null || choice.isEmpty() || "classic".equalsIgnoreCase(choice))
+		{
+			return;
+		}
+		Location center = impact.clone().add(0, 0.2, 0);
+		float pitch = 1.0F;
+		switch (choice.toLowerCase(java.util.Locale.ROOT))
+		{
+			case "ember":
+				UtilParticle.PlayParticle(ParticleType.FLAME, center, 0.35F, 0.25F, 0.35F, 0.02F, 22, ViewDist.NORMAL);
+				UtilParticle.PlayParticle(ParticleType.DRIP_LAVA, center, 0.2F, 0.25F, 0.2F, 0.01F, 8, ViewDist.NORMAL);
+				pitch = 0.85F;
+				break;
+			case "shockwave":
+				for (int i = 0; i < 20; i++)
+				{
+					double angle = Math.PI * 2 * i / 20.0;
+					Location point = center.clone().add(Math.cos(angle) * 2.0, 0.1, Math.sin(angle) * 2.0);
+					UtilParticle.PlayParticle(ParticleType.CRIT, point, 0, 0, 0, 0.02F, 3, ViewDist.NORMAL);
+				}
+				UtilParticle.PlayParticle(ParticleType.EXPLODE, center, 0.15F, 0.15F, 0.15F, 0, 1, ViewDist.NORMAL);
+				pitch = 0.65F;
+				break;
+			case "spark":
+				UtilParticle.PlayParticle(ParticleType.FIREWORKS_SPARK, center, 0.5F, 0.4F, 0.5F, 0.08F, 32, ViewDist.NORMAL);
+				UtilParticle.PlayParticle(ParticleType.CRIT, center, 0.3F, 0.35F, 0.3F, 0.04F, 16, ViewDist.NORMAL);
+				pitch = 1.55F;
+				break;
+			case "confetti":
+				UtilParticle.PlayParticle(ParticleType.NOTE, center, 1.0F, 1.0F, 1.0F, 1.0F, 24, ViewDist.NORMAL);
+				UtilParticle.PlayParticle(ParticleType.HAPPY_VILLAGER, center, 0.55F, 0.45F, 0.55F, 0.03F, 18, ViewDist.NORMAL);
+				pitch = 1.9F;
+				break;
+			default:
+				return;
+		}
+		impact.getWorld().playSound(center, org.bukkit.Sound.EXPLODE, 0.65F, pitch);
 	}
 
 	@EventHandler

@@ -26,6 +26,7 @@ public class WinEffectManager
 	private List<Player> _team;
 	private List<Player> _nonTeam;
 	private WinEffectBaconBrawl _baconBrawlEffect;
+	private WinEffectBombLobbers _bombLobbersEffect;
 	private WinEffectGadget _activeEffect;
 	
 	public void prePlay(Game game, Player winner, List<Player> team, List<Player> nonTeam) 
@@ -126,6 +127,18 @@ public class WinEffectManager
                 _baconBrawlEffect = new WinEffectBaconBrawl(arcadeGadgets);
             }
             return _baconBrawlEffect;
+        }
+
+        if (_winner != null && _game.GetType() == GameType.Lobbers
+                && "tnt-triple-hit".equals(ArcadeCosmeticsMenu.getEquippedWinEffect(
+                        _winner.getUniqueId(), "bomblobbers")))
+        {
+            if (_bombLobbersEffect == null)
+            {
+                GadgetManager arcadeGadgets = _game.getArcadeManager().getCosmeticManager().getGadgetManager();
+                _bombLobbersEffect = new WinEffectBombLobbers(arcadeGadgets);
+            }
+            return _bombLobbersEffect;
         }
 
 		GadgetManager manager = _game.getArcadeManager().getCosmeticManager().getGadgetManager();
