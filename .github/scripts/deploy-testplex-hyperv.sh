@@ -88,6 +88,25 @@ case "$SERVICE_STATE" in
     ;;
 esac
 WORKING_DIR="$(timeout 8 systemctl show "$SERVICE" --property=WorkingDirectory --value)"
+
+# Return 0 when active, 1 when confirmed inactive/failed, 2 when the service
+# state cannot be determined. Callers must never treat a timeout as "stopped".
+service_active_safe() {
+  local state rc
+  if state="$(timeout 5 systemctl is-active "$SERVICE" 2>/dev/null)"; then
+    :
+  else
+    rc=$?
+    case "$rc" in
+      124|125|137) return 2 ;;
+    esac
+  fi
+  case "$state" in
+    active) return 0 ;;
+    inactive|failed) return 1 ;;
+    *) return 2 ;;
+  esac
+}
 [[ "$WORKING_DIR" == "$ROOT" ]] || {
   echo "Refusing deployment: $SERVICE WorkingDirectory is '$WORKING_DIR', expected '$ROOT'." >&2
   exit 2
@@ -228,8 +247,14 @@ rollback() {
       echo "Graceful stop timed out; force-killing only the test service cgroup." >&2
       timeout 10 systemctl kill --kill-who=all --signal=KILL "$SERVICE" || true
     fi
-    if timeout 5 systemctl is-active --quiet "$SERVICE"; then
-      echo "ERROR: $SERVICE still appears active; refusing to overwrite plugin files while Java may be using them." >&2
+    service_active_safe
+    service_state_rc=$?
+    if [[ "$service_state_rc" -ne 1 ]]; then
+      if [[ "$service_state_rc" -eq 0 ]]; then
+        echo "ERROR: $SERVICE still appears active; refusing to overwrite plugin files while Java may be using them." >&2
+      else
+        echo "ERROR: $SERVICE state is unknown; refusing to overwrite plugin files because Java may still be using them." >&2
+      fi
       timeout 10 systemctl status "$SERVICE" --no-pager --full || true
       rm -f "$INCOMING"
       rm -rf "$STAGE"
@@ -275,8 +300,13 @@ trap rollback EXIT
 DEPLOYMENT_TOUCHED=1
 echo "Stopping isolated test service $SERVICE."
 timeout 60 systemctl stop "$SERVICE"
-if timeout 5 systemctl is-active --quiet "$SERVICE"; then
+service_active_safe
+service_state_rc=$?
+if [[ "$service_state_rc" -eq 0 ]]; then
   echo "$SERVICE still reports active after stop." >&2
+  exit 1
+elif [[ "$service_state_rc" -ne 1 ]]; then
+  echo "Cannot confirm that $SERVICE stopped cleanly; refusing to overwrite plugin files." >&2
   exit 1
 fi
 
@@ -360,8 +390,15 @@ arcade_log_ready=0
 lobby_marker_ready=0
 ready=0
 for attempt in $(seq 1 180); do
-  if ! timeout 5 systemctl is-active --quiet "$SERVICE"; then
-    echo "$SERVICE became inactive or systemd did not respond during startup at ${attempt}s." >&2
+  if service_active_safe; then
+    :
+  else
+    service_state_rc=$?
+    if [[ "$service_state_rc" -eq 1 ]]; then
+      echo "$SERVICE became inactive during startup at ${attempt}s." >&2
+    else
+      echo "Could not confirm $SERVICE is active during startup at ${attempt}s." >&2
+    fi
     break
   fi
   if [[ "$arcade_log_ready" -eq 0 && -s "$LOG" && "$LOG" -nt "$START_MARKER" ]] \
