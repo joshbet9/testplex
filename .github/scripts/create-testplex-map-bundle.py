@@ -24,7 +24,7 @@ def main() -> int:
     with ZipFile(output, "w", compression=ZIP_STORED, allowZip64=True) as archive:
         for path in map_files:
             relative = path.relative_to(map_root)
-            if len(relative.parts) != 2 or path.suffix.lower() != ".zip":
+            if len(relative.parts) < 2 or path.suffix.lower() != ".zip":
                 raise SystemExit(f"Unexpected map ZIP layout: {path}")
             archive.write(path, "maps/" + relative.as_posix())
             total_bytes += path.stat().st_size

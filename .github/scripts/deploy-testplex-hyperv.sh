@@ -156,7 +156,7 @@ unzip -p "$INCOMING" "testplex-map-assets.zip" > "$STAGE/testplex-map-assets.zip
 [[ -s "$STAGE/testplex-map-assets.zip" ]] || { echo "Extracted Mineplex map asset bundle is empty." >&2; exit 2; }
 unzip -tq "$STAGE/testplex-map-assets.zip" >/dev/null
 while IFS= read -r map_entry; do
-  [[ "$map_entry" =~ ^maps/[^/]+/[^/]+[.]zip$ ]] || {
+  [[ "$map_entry" =~ ^maps/[^/]+(/[^/]+)*[.]zip$ ]] || {
     echo "Unexpected entry in Mineplex map bundle: $map_entry" >&2
     exit 2
   }

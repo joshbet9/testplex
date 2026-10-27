@@ -76,13 +76,13 @@ jobs:
           echo "Built artifacts:"
           find Plugins/out -maxdepth 1 -type f -name '*.jar' -printf '%f %s bytes\n' | sort
           test -s Plugins/out/Arcade.jar
-          test -s Plugins/out/testplex-map-assets.zip
           python3 -m py_compile .github/scripts/create-testplex-map-bundle.py
       - name: Package all Mineplex map archives for the isolated test server
         shell: bash
         run: |
           set -euo pipefail
           python3 .github/scripts/create-testplex-map-bundle.py Plugins/out/testplex-map-assets.zip
+          test -s Plugins/out/testplex-map-assets.zip
           unzip -tq Plugins/out/testplex-map-assets.zip >/dev/null
           ls -lh Plugins/out/testplex-map-assets.zip
 
