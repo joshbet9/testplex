@@ -52,7 +52,7 @@ public class SetGamePage extends BasePage
 			});
 		}
 
-		if (types.size() == GAMES_PER_PAGE)
+		if (gameIndex + types.size() < _manager.getGames().size())
 		{
 			addButton(53, NEXT_PAGE, (player, clickType) ->
 			{

@@ -160,6 +160,13 @@ while IFS= read -r map_entry; do
     echo "Unexpected entry in Mineplex map bundle: $map_entry" >&2
     exit 2
   }
+  map_rel="${map_entry#maps/}"
+  case "/$map_rel/" in
+    *"/../"*|*"/./"*|*"//"*)
+      echo "Refusing unsafe path in Mineplex map bundle: $map_entry" >&2
+      exit 2
+      ;;
+  esac
 done < <(unzip -Z1 "$STAGE/testplex-map-assets.zip")
 MAP_STAGE="$STAGE/map-assets"
 mkdir -p "$MAP_STAGE"
