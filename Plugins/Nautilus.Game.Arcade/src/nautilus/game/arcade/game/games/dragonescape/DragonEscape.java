@@ -29,6 +29,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
@@ -290,6 +291,46 @@ public class DragonEscape extends SoloGame
 				UtilParticle.PlayParticle(ParticleType.CLOUD, center, 0.25F, 0.35F, 0.25F, 0.02F, 8, ViewDist.NORMAL);
 				player.playSound(center, Sound.LEVEL_UP, 0.8F, 1.0F); break;
 		}
+	}
+
+	@EventHandler(priority = EventPriority.HIGH)
+	public void cosmeticDeathMessage(PlayerDeathEvent event)
+	{
+		Player player = event.getEntity();
+		if (!IsLive() || !IsPlaying(player)) return;
+		String choice = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "dragonescape", "death-chat");
+		if (choice == null || choice.isEmpty() || "off".equalsIgnoreCase(choice)) return;
+		String name = ChatColor.YELLOW + player.getName() + ChatColor.GRAY;
+		switch (choice.toLowerCase(java.util.Locale.ROOT))
+		{
+			case "dragon": event.setDeathMessage(name + " was caught by Douglas the Dragon!"); break;
+			case "fall": event.setDeathMessage(name + " fell from the Skylands course!"); break;
+			case "course-failed": event.setDeathMessage(name + " couldn't escape the dragon!"); break;
+			default: break;
+		}
+	}
+
+	@EventHandler
+	public void cosmeticLeaderBeacon(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.TICK || !IsLive() || event.getTick() % 5 != 0 || _ranks.isEmpty()) return;
+		SortScores();
+		Player leader = null;
+		for (DragonScore score : _ranks)
+			if (score != null && score.Player != null && IsAlive(score.Player)) { leader = score.Player; break; }
+		if (leader == null) return;
+		String choice = ArcadeCosmeticsMenu.getEquippedChoice(leader.getUniqueId(), "dragonescape", "leader-beacon");
+		int colour = ArcadeCosmeticsMenu.colourData(choice == null || choice.isEmpty() ? "white" : choice);
+		if (colour < 0) colour = 0;
+		Location center = leader.getLocation().clone().add(0, 0.45, 0);
+		ParticleType dust = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) colour);
+		for (int i = 0; i < 12; i++)
+		{
+			double angle = Math.PI * 2 * i / 12.0;
+			Location point = center.clone().add(Math.cos(angle) * 0.8, 0.12 * (i % 2), Math.sin(angle) * 0.8);
+			UtilParticle.PlayParticle(dust, point, 0.02F, 0.02F, 0.02F, 0.01F, 1, ViewDist.NORMAL);
+		}
+		UtilParticle.PlayParticle(dust, center.clone().add(0, 0.55, 0), 0.04F, 0.12F, 0.04F, 0.01F, 3, ViewDist.NORMAL);
 	}
 
 	@EventHandler

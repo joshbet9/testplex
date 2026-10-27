@@ -131,9 +131,18 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                                 null, false, "classic", "soul", "sparks", "smoke", "ender", "hearts")));
 
         registerGame("dragonescape", "Dragon Escape", Material.DRAGON_EGG, (short) 0,
-                "Celebrate your finish with effects inspired by the final jumps of Skylands.",
+                "Race Douglas the Dragon, customise your death message and leader beacon, then celebrate the Skylands finish.",
+                compositeFeature("finish-presentation", "Death Messages & Leader Beacon", Material.BEACON,
+                        "Choose your elimination message and the particle colour marking the current course leader.",
+                        setting("death-chat", "Death Messages", Material.NAME_TAG,
+                                "Select the message shown when you are eliminated. Off keeps the normal server message.",
+                                null, false, "off", "dragon", "fall", "course-failed"),
+                        setting("leader-beacon", "Leader Beacon Colour", Material.BEACON,
+                                "Select the visual beacon colour around the player currently leading the course.",
+                                null, false, "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
+                                "silver", "cyan", "purple", "blue", "brown", "green", "red", "black")),
                 feature("finish-celebration", "Finish Celebrations", Material.FIREWORK,
-                        "Choose the particle-and-sound burst that plays only when you finish.",
+                        "Choose the particle-and-sound burst that plays when you finish.",
                         null, false, "classic", "skyburst", "dragon-roar", "starlight", "cloud-ring", "ender-flare", "confetti"));
 
         registerGame("dragons", "Dragons", Material.FIREWORK, (short) 0,

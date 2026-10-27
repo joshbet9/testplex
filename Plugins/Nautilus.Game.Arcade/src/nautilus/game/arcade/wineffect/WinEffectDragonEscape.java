@@ -68,7 +68,7 @@ public class WinEffectDragonEscape extends WinEffectGadget
         }
 
         // Gold-and-quartz finish arch on the final floating island.
-        int finishX = bx + 16, floor = base.getBlockY() + 2;
+        int finishX = bx + 16, floor = base.getBlockY() + 3;
         for (int side : new int[]{-2, 2})
             for (int h = 0; h <= 3; h++)
                 world.getBlockAt(finishX + side, floor + h, bz).setType(Material.QUARTZ_BLOCK, false);

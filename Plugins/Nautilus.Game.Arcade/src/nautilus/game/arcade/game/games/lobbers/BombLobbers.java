@@ -10,6 +10,7 @@ import java.util.Map.Entry;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -611,6 +612,8 @@ public class BombLobbers extends TeamGame implements IThrown
 		if (GetTeam((Player) target) == GetTeam((Player) data.getThrower()))
 			return;
 
+		// Direct-hit confirmation ding, independent of the TNT explosion.
+		target.getWorld().playSound(target.getLocation(), Sound.NOTE_PLING, 1.2F, 1.65F);
 		UtilAction.velocity(target, UtilAlg.getTrajectory2d(data.getThrown().getLocation(), target.getLocation()), .2, false, 0, 0.2, .4, true);
 		Manager.GetDamage().NewDamageEvent(target, data.getThrower(), null, DamageCause.PROJECTILE, 10.0, false, false, false, "Throwing TNT", "Throwing TNT Direct Hit");
 
