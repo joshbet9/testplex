@@ -20,20 +20,30 @@ public class DisguiseFactory
 				return new DisguiseChicken(disguised);
 			case COW:
 				return new DisguiseCow(disguised);
+			case CAVE_SPIDER:
+				return new DisguiseCaveSpider(disguised);
 			case CREEPER:
 				return new DisguiseCreeper(disguised);
 			case ENDERMAN:
 				return new DisguiseEnderman(disguised);
+			case ENDERMITE:
+				return new DisguiseEndermite(disguised);
 			case HORSE:
 				return new DisguiseHorse(disguised);
 			case IRON_GOLEM:
 				return new DisguiseIronGolem(disguised);
 			case MAGMA_CUBE:
 				return new DisguiseMagmaCube(disguised);
+			case MUSHROOM_COW:
+				return new DisguiseMushroomCow(disguised);
 			case PIG:
 				return new DisguisePig(disguised);
 			case PIG_ZOMBIE:
 				return new DisguisePigZombie(disguised);
+			case RABBIT:
+				return new DisguiseRabbit(disguised);
+			case SILVERFISH:
+				return new DisguiseSilverfish(disguised);
 			case PLAYER:
 				throw new UnsupportedOperationException("Player disguises must be initialized via constructor");
 			case SHEEP:
@@ -50,6 +60,8 @@ public class DisguiseFactory
 				return new DisguiseSquid(disguised);
 			case VILLAGER:
 				return new DisguiseVillager(disguised);
+			case GUARDIAN:
+				return new DisguiseGuardian(disguised);
 			case WITCH:
 				return new DisguiseWitch(disguised);
 			case WOLF:
