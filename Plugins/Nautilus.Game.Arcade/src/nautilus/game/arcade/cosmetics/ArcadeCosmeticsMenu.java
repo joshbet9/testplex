@@ -757,7 +757,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         put(inventory, 26, named(Material.STAINED_CLAY, ChatColor.GREEN + "Safe Pad Colour", "Choose the Safe Pad surface colour for " + pretty(mobSet) + "."));
         String base = "players." + player.getUniqueId() + ".arcade.monstermaze.mob-set-colours." + mobSet;
         String beaconSelected = data.getString(base + ".beacon", "white");
-        String padSelected = data.getString(base + ".safe-pad", "green");
+        String padSelected = data.getString(base + ".safe-pad", "lime");
         for (int i = 0; i < COLOUR_OPTIONS.length; i++) {
             String colour = COLOUR_OPTIONS[i];
             ItemStack beacon = new ItemStack(Material.STAINED_GLASS_PANE, 1, (short) i);
@@ -983,6 +983,10 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                     }
                 } else {
                     setSettingChoice(player.getUniqueId(), game, feature, setting, "");
+                }
+                if ("monstermaze".equals(game.key) && "mob-sets".equals(setting.key)) {
+                    data.set("players." + player.getUniqueId() + ".arcade.monstermaze.mob-sets-customized", null);
+                    save();
                 }
                 openSetting(player, game, feature, setting);
                 return;
