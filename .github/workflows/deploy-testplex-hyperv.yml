@@ -160,6 +160,11 @@ jobs:
           echo "Preparing the disk-backed artifact cache on the test VM."
           ssh "${ssh_opts[@]}" "$remote" "install -d -m 0700 '$upload_dir'"
 
+          scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$GITHUB_WORKSPACE/.github/scripts/deploy-testplex-hyperv.sh" "$remote:$deploy_script"
+
           # A small manifest is enough to decide whether the 400 MB map bundle is
           # needed. If each installed map ZIP matches the build source, reuse it.
           MAPS_MODE="bundle"
@@ -176,14 +181,18 @@ jobs:
               -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
               "$MAP_MANIFEST" "$remote:$map_manifest_remote"
 
-            map_match="$(ssh "${ssh_opts[@]}" "$remote" \
-              "set -eu; if [[ -d /home/monstermaze/update/maps ]]; then installed_count=\$(find /home/monstermaze/update/maps -type f -iname '*.zip' -print | wc -l); manifest_count=\$(wc -l < '$map_manifest_remote'); if [[ \"\$installed_count\" -eq \"\$manifest_count\" ]] && (cd /home/monstermaze/update && sha256sum --check --status '$map_manifest_remote'); then printf installed; else printf bundle; fi; else printf bundle; fi")"
-            if [[ "$map_match" == "installed" ]]; then
+            if ssh "${ssh_opts[@]}" "$remote" "sudo -n bash '$deploy_script' --check-maps '$map_manifest_remote'"; then
               MAPS_MODE="installed"
               manifest_count="$(wc -l < "$MAP_MANIFEST")"
-              echo "Installed map ZIPs match all $manifest_count source checksums; skipping the map bundle transfer."
+              echo "Root-verified all $manifest_count required installed map ZIPs; skipping the bundle transfer."
             else
-              echo "The installed map ZIPs differ from source; a verified map bundle update is required."
+              map_check_rc=$?
+              if [[ "$map_check_rc" -eq 3 ]]; then
+                echo "One or more required map ZIPs differ; a verified map bundle update is required."
+              else
+                echo "Could not run the root map-manifest check (exit $map_check_rc); refusing to guess the map state." >&2
+                exit "$map_check_rc"
+              fi
             fi
           else
             echo "The selected build source tree is unavailable or its map tree differs from checkout; using the build's map bundle."
@@ -244,10 +253,7 @@ jobs:
           echo "Removing the legacy cache from /tmp and reporting remaining capacity."
           ssh "${ssh_opts[@]}" "$remote" "rm -rf '$legacy_upload_dir'; rm -f '$upload_dir/testplex-map-manifest-$BUILD_SHA.sha256'; echo 'Remaining /var/tmp and /tmp capacity:'; df -h '$upload_dir'; df -h /tmp"
 
-          scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
-            -o BatchMode=yes -o StrictHostKeyChecking=yes \
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            "$GITHUB_WORKSPACE/.github/scripts/deploy-testplex-hyperv.sh" "$remote:$deploy_script"
+
 
           echo "Running the checked-out deployment script; the script will verify the sandbox marker, maps and startup."
           ssh "${ssh_opts[@]}" "$remote" \

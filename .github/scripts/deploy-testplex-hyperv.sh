@@ -3,6 +3,26 @@
 set -Eeuo pipefail
 umask 077
 
+# Read-only preflight used by the workflow before it decides whether to upload
+# the large map bundle. Run it as root so existing per-game directory modes do
+# not create false "missing map" results for the restricted SSH user.
+if [[ "${1:-}" == "--check-maps" ]]; then
+  [[ $# -eq 2 ]] || { echo "Usage: deploy-testplex-hyperv.sh --check-maps <manifest-path>" >&2; exit 2; }
+  MAP_MANIFEST="$2"
+  [[ "$MAP_MANIFEST" =~ ^/var/tmp/testplex-artifact-cache/testplex-map-manifest-[0-9a-f]{40}[.]sha256$ ]] || {
+    echo "Refusing unexpected map manifest path: $MAP_MANIFEST" >&2
+    exit 2
+  }
+  [[ -s "$MAP_MANIFEST" ]] || { echo "Missing map manifest: $MAP_MANIFEST" >&2; exit 2; }
+  if [[ -d /home/monstermaze/update/maps ]] \
+      && (cd /home/monstermaze/update && sha256sum --check --status "$MAP_MANIFEST"); then
+    echo "Map manifest matches all required installed ZIPs."
+    exit 0
+  fi
+  echo "Installed maps differ from source; a verified map bundle is required."
+  exit 3
+fi
+
 if [[ $# -lt 3 || $# -gt 4 ]]; then
   echo "Usage: deploy-testplex-hyperv.sh <40-char-build-sha> <server-root> <systemd-service> [bundle|installed]" >&2
   exit 2
