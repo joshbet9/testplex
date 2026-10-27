@@ -205,7 +205,7 @@ Assert-Contains "Players are reseated at the central start after maze constructi
 Assert-Contains "Visibility toggle is implemented as an interact control" $mazeCoreFile "onVisibilityToggle(PlayerInteractEvent event)"
 Assert-Contains "Visibility dye cycles visible hidden and transparent modes" $mazeCoreFile "int next = current == 10 ? 8 : current == 8 ? 5 : 10;"
 Assert-Contains "Transparent mode uses a per-viewer invisibility packet" $mazeCoreFile "PacketPlayOutEntityEffect(target.getEntityId(), invisible)"
-Assert-Contains "Leaving transparent mode removes the client-only effect" $mazeCoreFile "PacketPlayOutRemoveEntityEffect(target.getEntityId(), MobEffectList.INVISIBILITY)"
+Assert-Contains "Leaving transparent mode removes the client-only effect" $mazeCoreFile "PacketPlayOutRemoveEntityEffect(target.getEntityId(), new MobEffect(MobEffectList.INVISIBILITY.id, 1, 0))"
 Assert-Contains "Transparent mode has a per-viewer ghost team" $mazeCoreFile 'registerNewTeam("mm_ghosts")'
 Assert-Contains "Personal scoreboards include active Safe Pad distance" $mazeCoreFile 'board.write(C.cAqua + C.Bold + "Distance");'
 Assert-Contains "Personal scoreboards show whether the player is safe" $mazeCoreFile '(safe ? "SAFE" : "UNSAFE")'
