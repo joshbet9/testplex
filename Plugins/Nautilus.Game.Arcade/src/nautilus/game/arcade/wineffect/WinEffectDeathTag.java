@@ -33,7 +33,7 @@ public class WinEffectDeathTag extends WinEffectGadget
 
     public WinEffectDeathTag(GadgetManager manager)
     {
-        super(manager, "Arcade Death Tag - Barbarians Village",
+        super(manager, "Arcade Death Tag - Barbarians Village Demo",
                 UtilText.splitLineToArray(C.cGray + "A miniature Barbarians Village tree: runners perch in its branches before being knocked down.", LineFormat.LORE),
                 -2, Material.SAPLING, (byte) 1, true);
         _length = TimeUnit.SECONDS.toMillis(8);

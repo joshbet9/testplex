@@ -33,7 +33,7 @@ public class WinEffectBaconBrawl extends WinEffectGadget
 
     public WinEffectBaconBrawl(GadgetManager manager)
     {
-        super(manager, "Arcade Bacon Brawl - Mighty Lava Arena",
+        super(manager, "Arcade Bacon Brawl - Mighty Lava Arena Demo",
                 UtilText.splitLineToArray(C.cGray + "A pig body-slams four pigs from a miniature Mighty Lava Arena.", LineFormat.LORE),
                 -2, Material.PORK, (byte) 0, true);
         _length = TimeUnit.SECONDS.toMillis(8);

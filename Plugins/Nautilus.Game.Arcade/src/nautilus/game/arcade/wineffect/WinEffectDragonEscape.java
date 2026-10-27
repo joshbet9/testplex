@@ -35,7 +35,7 @@ public class WinEffectDragonEscape extends WinEffectGadget
 
     public WinEffectDragonEscape(GadgetManager manager)
     {
-        super(manager, "Arcade Dragon Escape - Skylands Finale",
+        super(manager, "Arcade Dragon Escape - Skylands Demo",
                 UtilText.splitLineToArray(C.cGray + "Start in third place, leap past two runners, and reach the Skylands finish first.", LineFormat.LORE),
                 -2, Material.DRAGON_EGG, (byte) 0, true);
         _length = TimeUnit.SECONDS.toMillis(8);

@@ -52,7 +52,7 @@ public class WinEffectBombLobbers extends WinEffectGadget
 
     public WinEffectBombLobbers(GadgetManager manager)
     {
-        super(manager, "Arcade Bomb Lobbers Triple Lob",
+        super(manager, "Arcade Bomb Lobbers - Turtles Demo",
                 UtilText.splitLineToArray(C.cGray
                         + "Lob three TNT shots into three player targets, with a Turtles map-inspired winner-room accent.",
                         LineFormat.LORE),

@@ -16,6 +16,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TNTPrimed;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.entity.ExplosionPrimeEvent;
@@ -155,6 +156,18 @@ public class BombLobbers extends TeamGame implements IThrown
 	public void addKill(Player player)
 	{
 		_kills.put(player, _kills.getOrDefault(player, 0D) + 1);
+	}
+
+
+	/** Play the classic impact ding only for confirmed direct-hit damage. */
+	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+	public void directHitDing(mineplex.minecraft.game.core.damage.CustomDamageEvent event)
+	{
+		if (!IsLive() || event.GetReason() == null || !event.GetReason().toLowerCase(java.util.Locale.ROOT).contains("direct hit")) return;
+		Player thrower = event.GetDamagerPlayer(true);
+		Player target = event.GetDamageePlayer();
+		if (thrower == null || target == null || !thrower.isOnline() || !IsAlive(thrower)) return;
+		target.getWorld().playSound(target.getLocation(), Sound.ORB_PICKUP, 1.0F, 1.7F);
 	}
 
 	public double getKills(Player player)

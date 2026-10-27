@@ -197,7 +197,15 @@ Assert-Contains "Personal best keys distinguish game mode, pattern and kit" $pbF
 Assert-Contains "Personal bests can be viewed with /game pb" $pbFile "public static void show("
 Assert-Contains "Custom data setter saves through Mineplex storage" $customDataFile "public void setData(Player player, String key, int value)"
 Assert-Contains "Speed and Modern have native display entries" $displayFile "MonsterMazeSpeed("
-Assert-Contains "Speed has separate kit identities" $kitFile "MONSTER_MAZE_SPEED_JUMPER"
+
+Assert-Contains "Maze preset is selected before normal player placement" $mazeCoreFile "selectMazePreset();"
+Assert-Contains "Maze layout void cells are cleared to prevent a second floor" $layoutFile "for (Location loc : _air)"
+Assert-Contains "Monster Maze team start uses the selected preset" $mazeCoreFile "playerTeam.GetSpawns().add(spawn.clone());"
+Assert-Contains "Bomb Lobbers has direct-hit ding hook" (Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\game\games\lobbers\BombLobbers.java") "directHitDing"
+Assert-Contains "Demo effects are registered" (Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\Arcade.java") "new WinEffectArcadeDemo.MonsterMaze(gadgetManager)"
+Assert-Contains "Bacon Brawl effect is clearly labelled a demo" (Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\wineffect\WinEffectBaconBrawl.java") "Mighty Lava Arena Demo"
+
+Assert-Contains "Speed has separate kit identities" $kitFile "MONSTER_MAZE_SPEED_JUMPER"Assert-Contains "Speed has separate kit identities" $kitFile "MONSTER_MAZE_SPEED_JUMPER"
 Assert-Contains "Modern has separate kit identities" $kitFile "MONSTER_MAZE_MODERN_JUMPER"
 
 Write-Host ""
