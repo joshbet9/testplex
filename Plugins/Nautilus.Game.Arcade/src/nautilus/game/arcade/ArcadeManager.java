@@ -362,11 +362,33 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 		_gameCreationManager = new GameCreationManager(this);
 		_gameRewardManager = new GameRewardManager(this);
 		_gameManager = new GameManager(this);
+		if (isTestplexSandbox())
+		{
+			// An MPS testbed must use the legacy in-world datapoints, not a stale
+			// NEW.dat marker from the survival-world installation.
+			File newLobbyMarker = new File("world/NEW.dat");
+			if (newLobbyMarker.isFile())
+			{
+				File backupMarker = new File("world/NEW.dat.disabled-by-testplex");
+				if (backupMarker.exists())
+				{
+					if (!newLobbyMarker.delete())
+					{
+						throw new IllegalStateException("Could not disable stale world/NEW.dat for the isolated test lobby.");
+					}
+				}
+				else if (!newLobbyMarker.renameTo(backupMarker))
+				{
+					throw new IllegalStateException("Could not preserve and disable stale world/NEW.dat for the isolated test lobby.");
+				}
+				System.out.println("Testplex sandbox: disabled stale NEW.dat so legacy lobby datapoints are used.");
+			}
+		}
 		if ((UtilServer.isTestServer() || isTestplexSandbox()) && !new File("world/NEW.dat").exists())
 		{
 			TestLobbyPlaneBuilder.ensure(Bukkit.getWorld("world"));
 		}
-		_gameLobbyManager = new File("world/NEW.dat").exists() ? new NewGameLobbyManager(this) : new LegacyGameLobbyManager(this);
+		_gameLobbyManager = !isTestplexSandbox() && new File("world/NEW.dat").exists() ? new NewGameLobbyManager(this) : new LegacyGameLobbyManager(this);
 		_gameHostManager = new GameHostManager(this);
 		new GameFlagManager(this);
 		_gamePlayerManager = new GamePlayerManager(this);
