@@ -84,7 +84,7 @@ public final class TestLobbyPlaneBuilder
 				Arrays.fill(chunk.heightMap, 0);
 				chunk.tileEntities.clear();
 				chunk.initLighting();
-				chunk.n = true;
+				chunk.e();
 			}
 		}
 

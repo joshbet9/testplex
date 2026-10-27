@@ -92,7 +92,7 @@ jobs:
           grep -Fq 'TESTPLEX_SANDBOX_LOBBY_V3' "$builder"
           grep -Fq 'chunk.getSections()' "$builder"
           grep -Fq 'Arrays.fill(chunk.heightMap, 0)' "$builder"
-          grep -Fq 'chunk.n = true' "$builder"
+          grep -Fq 'chunk.e();' "$builder"
           grep -Fq 'ARTIFACT_CACHE="/tmp/testplex-artifact-cache"' .github/scripts/deploy-testplex-hyperv.sh
           grep -Fq -- '--checksum --partial' .github/workflows/testplex-build.yml
           grep -Fq 'Material.CHEST' Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/managers/GameHostManager.java
