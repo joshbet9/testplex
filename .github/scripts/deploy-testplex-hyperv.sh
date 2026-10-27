@@ -377,8 +377,15 @@ if [[ "$MAP_SOURCE_MODE" == "bundle" ]]; then
   echo "Installed/verified $installed_count Mineplex map ZIPs under $MAP_DEST."
 else
   installed_count="$(find "$MAP_DEST" -type f -iname '*.zip' -print | wc -l)"
-  echo "Reusing the $installed_count already-installed map ZIPs under $MAP_DEST; no map files were overwritten."
+  echo "Reusing the $installed_count already-installed map ZIPs under $MAP_DEST; map directory permissions will still be normalised."
 fi
+
+# This deployment runs with umask 077. Ensure map category directories remain
+# traversable and map archives remain readable by the separate Arcade service
+# user. Run on every deploy, including when the map manifest matches, to repair
+# directories created by earlier deployments with restrictive permissions.
+find "$MAP_DEST" -type d -exec chmod 0755 {} +
+find "$MAP_DEST" -type f -iname '*.zip' -exec chmod 0644 {} +
 
 for name in "${MANAGED_NAMES[@]}"; do
   if [[ "$name" != "Arcade.jar" ]]; then
