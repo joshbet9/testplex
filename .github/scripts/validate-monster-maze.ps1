@@ -165,8 +165,8 @@ Assert-Contains "Snake cosmetics are grouped into one line" $cosmeticsFile 'comp
 Assert-Contains "Paintball cosmetics are grouped into one line" $cosmeticsFile 'compositeFeature("paintball-style", "Weapon Skins & Impact Effects"'
 Assert-Contains "Evolution cosmetics are grouped into one line" $cosmeticsFile 'compositeFeature("evolution-style", "Evolution Appearance & Effects"'
 Assert-Contains "Micro Battles cosmetics are grouped into one line" $cosmeticsFile 'compositeFeature("battle-style", "Glass Colour & Border Effects"'
-Assert-Contains "Dragon Escape keeps a separate trail line and grouped finish line" $cosmeticsFile 'compositeFeature("finish-presentation", "Finish Presentation"'
-Assert-Contains "Win effects have a dedicated catalogue" $cosmeticsFile "private void openWinEffects(Player player)"
+Assert-Contains "Dragon Escape keeps a separate trail line and grouped finish line" $cosmeticsFile 'compositeFeature("finish-presentation", "Death Messages & Leader Beacon"'
+Assert-Contains "Per-game pages keep win effects separate from game cosmetic lines" $cosmeticsFile "Win effects are managed separately in Cosmetics."
 Assert-NotContains "Per-game pages no longer show a separate win-effect placeholder" $cosmeticsFile "Win Effect Plan"
 Assert-Contains "Custom Pack unlock can be provided by the entitlement adapter" $cosmeticsFile "setMonsterMazeCustomPackUnlocked(UUID playerId, boolean unlocked)"
 Assert-Contains "Per-mob-set beacon and Safe Pad colours persist independently" $cosmeticsFile "mob-set-colours."
