@@ -41,9 +41,6 @@ public class BaconBrawl extends SoloGame
 					"Knockback increases over time!"
 			};
 
-	private int _cosmeticAccessoryTick;
-	private final Map<UUID, ArmorStand> _cosmeticAccessories = new HashMap<>();
-	private final Map<UUID, String> _cosmeticAccessoryChoices = new HashMap<>();
 	private double _knockbackMagnitude = 1.5;
 	private long _increaseLast, _increaseTime = TimeUnit.SECONDS.toMillis(50);
 
