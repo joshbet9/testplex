@@ -699,7 +699,6 @@ public class MonsterMaze extends SoloGame
 			board.write(C.cWhite + _maze.getPreset().getPatternId());
 			board.draw();
 
-			refreshPlayerVisibility(viewer);
 		}
 	}
 
@@ -713,6 +712,7 @@ public class MonsterMaze extends SoloGame
 			board = new GameScoreboard(this, player);
 			_viewerScoreboards.put(id, board);
 			player.setScoreboard(board.getScoreboard());
+			refreshPlayerVisibility(player);
 		}
 		return board;
 	}
@@ -734,7 +734,7 @@ public class MonsterMaze extends SoloGame
 	private void ensureGameplayItems(Player player)
 	{
 		ItemStack compass = player.getInventory().getItem(SAFE_PAD_COMPASS_SLOT);
-		if (compass == null || isSafePadCompassItem(compass))
+		if (compass == null)
 		{
 			ItemStack locator = new ItemStack(Material.COMPASS, 1);
 			ItemMeta meta = locator.getItemMeta();
@@ -746,7 +746,7 @@ public class MonsterMaze extends SoloGame
 
 		boolean hidden = Boolean.TRUE.equals(_visibilityHidden.get(player.getUniqueId()));
 		ItemStack visibility = player.getInventory().getItem(VISIBILITY_SLOT);
-		if (visibility == null || isVisibilityItem(visibility))
+		if (visibility == null)
 			player.getInventory().setItem(VISIBILITY_SLOT, createVisibilityItem(hidden));
 	}
 
@@ -823,25 +823,29 @@ public class MonsterMaze extends SoloGame
 
 	private void clearPersonalScoreboardsAndVisibility()
 	{
+		// Undo per-viewer hide state even if the game has already removed players from its teams.
+		for (UUID id : new ArrayList<UUID>(_visibilityHidden.keySet()))
+		{
+			Player viewer = Bukkit.getPlayer(id);
+			if (viewer != null && viewer.isOnline())
+				for (Player target : Bukkit.getOnlinePlayers())
+					if (!viewer.equals(target))
+						viewer.showPlayer(target);
+		}
+
 		for (Map.Entry<UUID, org.bukkit.scoreboard.Scoreboard> entry : _previousScoreboards.entrySet())
 		{
 			Player player = Bukkit.getPlayer(entry.getKey());
-			if (player != null && player.isOnline() && entry.getValue() != null)
+			if (player == null || !player.isOnline())
+				continue;
+			if (entry.getValue() != null)
 				player.setScoreboard(entry.getValue());
-		}
-		for (Player viewer : GetPlayers(false))
-		{
-			for (Player target : GetPlayers(false))
-			{
-				if (!viewer.equals(target))
-					viewer.showPlayer(target);
-			}
-			ItemStack item = viewer.getInventory().getItem(VISIBILITY_SLOT);
-			if (isVisibilityItem(item))
-				viewer.getInventory().setItem(VISIBILITY_SLOT, null);
-			ItemStack compass = viewer.getInventory().getItem(SAFE_PAD_COMPASS_SLOT);
+			ItemStack visibility = player.getInventory().getItem(VISIBILITY_SLOT);
+			if (isVisibilityItem(visibility))
+				player.getInventory().setItem(VISIBILITY_SLOT, null);
+			ItemStack compass = player.getInventory().getItem(SAFE_PAD_COMPASS_SLOT);
 			if (isSafePadCompassItem(compass))
-				viewer.getInventory().setItem(SAFE_PAD_COMPASS_SLOT, null);
+				player.getInventory().setItem(SAFE_PAD_COMPASS_SLOT, null);
 		}
 		_viewerScoreboards.clear();
 		_previousScoreboards.clear();
