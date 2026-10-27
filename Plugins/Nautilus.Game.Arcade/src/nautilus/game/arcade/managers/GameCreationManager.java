@@ -251,15 +251,8 @@ public class GameCreationManager implements Listener
 
 		Class<? extends Game> gameClass = gameType.getGameClass();
 
-		// Reset config/modules only after map preflight succeeds.
-		Manager.GetCreature().SetDisableCustomDrops(false);
-		Manager.GetDamage().resetConfiguration();
-		Manager.GetExplosion().resetConfiguration();
-		Manager.getCosmeticManager().setHideParticles(false);
-		Manager.getCosmeticManager().getGadgetManager().setShowWeaponNames(false);
-		Manager.GetDamage().GetCombatManager().setUseWeaponName(AttackReason.CustomWeaponName);
-		ItemStackFactory.Instance.SetUseCustomNames(false);
-
+		// Resolve mode first, but don't mutate the active game configuration until
+		// the selected game has an available map source.
 		// GameModes
 		if (gameType.hasGameModes())
 		{
