@@ -15,33 +15,47 @@ import mineplex.core.achievement.AchievementCategory;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.DyeColor;
+import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Pig;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Sheep;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import mineplex.core.common.util.UtilEnt;
+import nautilus.game.arcade.Arcade;
+import nautilus.game.arcade.ArcadeManager;
+import nautilus.game.arcade.events.GameStateChangeEvent;
+import nautilus.game.arcade.game.Game.GameState;
+
 /**
- * Testbed-only, persistent selector for the planned per-game Arcade cosmetics.
+ * Testbed-only, persistent selector for per-game Arcade cosmetics and their
+ * separate win-effect choices.
  *
  * The normal Mineplex Cosmetic Menu remains owned by Mineplex Core. This class
- * injects one jukebox into that menu and opens the prototype selector with its
- * own command. Planned win effects are catalogue placeholders, not live game
- * sequences. Existing colour/skin getters remain source-compatible for the
- * gameplay adapters that are already implemented.
+ * adds separate Arcade Cosmetics and Arcade Win Effects entries. It also owns
+ * the selected game's pregame showcase display; the first implemented showcase
+ * is the Bacon Brawl pig/sheep accessory lineup.
  */
 public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private static final String MAIN_TITLE = "Arcade Cosmetics | Games";
@@ -61,6 +75,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private final File dataFile;
     private final FileConfiguration data;
     private final Map<String, GameDefinition> games = new LinkedHashMap<String, GameDefinition>();
+    private final List<Entity> baconBrawlShowcaseEntities = new ArrayList<Entity>();
+    private final List<ArmorStand> baconBrawlShowcaseAccessories = new ArrayList<ArmorStand>();
 
     public ArcadeCosmeticsMenu(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -81,7 +97,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         registerGame("baconbrawl", "Bacon Brawl", Material.PORK, (short) 0,
                 "Torpedo/body-slam into four players, sending them flying off the edge.",
                 feature("accessories", "Pig & Sheep Accessories", Material.GOLD_HELMET,
-                        "Accessory concepts for pigs and sheep. Selection is saved; visual attachment hooks remain prototype work.",
+                        "Equip a Crown, Top Hat, Chef or Diamond accessory on your own pig/sheep disguise. The pregame lobby showcases every style on both models.",
                         "baconbrawl", false, "crown", "top_hat", "chef", "diamond"));
 
         registerGame("bomblobbers", "Bomb Lobbers", Material.TNT, (short) 0,
