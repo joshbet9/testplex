@@ -696,27 +696,142 @@ public class Maze implements Listener
 		if (loc == null || loc.getWorld() == null)
 			return;
 
+		Map<EntityType, Set<UUID>> viewersByMobType = new HashMap<EntityType, Set<UUID>>();
+		for (Player viewer : _host.GetPlayers(false))
+		{
+			EntityType viewerMobType = getMobTypeForPlayer(viewer);
+			Set<UUID> viewers = viewersByMobType.get(viewerMobType);
+			if (viewers == null)
+			{
+				viewers = new HashSet<UUID>();
+				viewersByMobType.put(viewerMobType, viewers);
+			}
+			viewers.add(viewer.getUniqueId());
+		}
+
 		try
 		{
 			_host.CreatureAllowOverride = true;
 			Snowman ent = loc.getWorld().spawn(loc, Snowman.class);
-			DisguiseBase disguise = DisguiseFactory.createDisguise(ent, _host.getMonsterType());
-
-			if (disguise instanceof DisguiseSlime)
-				((DisguiseSlime) disguise).SetSize(3);
-			if (disguise instanceof DisguiseMagmaCube)
-				((DisguiseMagmaCube) disguise).SetSize(3);
-
 			UtilEnt.vegetate(ent, true);
 			UtilEnt.ghost(ent, true, false);
 			_ents.put(ent, new MazeMobWaypoint(ent.getLocation()));
 
-			if (disguise != null && !(disguise instanceof DisguiseSnowman))
-				_host.Manager.GetDisguise().disguise(disguise);
+			if (viewersByMobType.isEmpty())
+			{
+				registerMobDisguise(ent, _host.getMonsterType(), null);
+			}
+			else
+			{
+				for (Entry<EntityType, Set<UUID>> viewerGroup : viewersByMobType.entrySet())
+				{
+					if (viewerGroup.getKey() == EntityType.SNOWMAN)
+						continue; // The backing entity already looks like a snowman to these viewers.
+					registerMobDisguise(ent, viewerGroup.getKey(), viewerGroup.getValue());
+				}
+			}
 		}
 		finally
 		{
 			_host.CreatureAllowOverride = false;
+		}
+	}
+
+	private void registerMobDisguise(Snowman entity, EntityType mobType, final Set<UUID> viewerIds)
+	{
+		if (mobType == null || mobType == EntityType.SNOWMAN)
+			return;
+
+		DisguiseBase disguise = DisguiseFactory.createDisguise(entity, mobType);
+		if (disguise instanceof DisguiseSlime)
+			((DisguiseSlime) disguise).SetSize(3);
+		if (disguise instanceof DisguiseMagmaCube)
+			((DisguiseMagmaCube) disguise).SetSize(3);
+		if (disguise == null)
+		{
+			_host.Manager.GetPlugin().getLogger().warning("Monster Maze has no disguise implementation for " + mobType + ".");
+			return;
+		}
+
+		if (viewerIds == null)
+			_host.Manager.GetDisguise().disguise(disguise);
+		else
+			_host.Manager.GetDisguise().disguise(disguise, viewer -> viewerIds.contains(viewer.getUniqueId()));
+	}
+
+	private EntityType getMobTypeForPlayer(Player player)
+	{
+		String mobSet = getMobSetForPlayer(player);
+		EntityType selected = mobSet == null ? null : _viewerMobTypes.get(player.getUniqueId());
+		return selected == null ? _host.getMonsterType() : selected;
+	}
+
+	/** Returns this viewer's selected mob set, fixed for one game run. */
+	public String getMobSetForPlayer(Player player)
+	{
+		if (player == null)
+			return null;
+
+		UUID playerId = player.getUniqueId();
+		if (_viewerMobSetIds.containsKey(playerId))
+			return _viewerMobSetIds.get(playerId);
+
+		List<String> enabled = ArcadeCosmeticsMenu.getEnabledMonsterMazeMobSets(playerId);
+		if (enabled == null || enabled.isEmpty())
+		{
+			_viewerMobSetIds.put(playerId, null);
+			_viewerMobTypes.put(playerId, _host.getMonsterType());
+			return null;
+		}
+
+		String selected = enabled.get(UtilMath.r(enabled.size()));
+		EntityType type = entityTypeForMobSet(selected);
+		if (type == null)
+		{
+			_viewerMobSetIds.put(playerId, null);
+			_viewerMobTypes.put(playerId, _host.getMonsterType());
+			return null;
+		}
+
+		_viewerMobSetIds.put(playerId, selected);
+		_viewerMobTypes.put(playerId, type);
+		return selected;
+	}
+
+	private EntityType entityTypeForMobSet(String mobSet)
+	{
+		if (mobSet == null)
+			return null;
+		switch (mobSet.toLowerCase(java.util.Locale.ROOT))
+		{
+			case "creeper": return EntityType.CREEPER;
+			case "skeleton": return EntityType.SKELETON;
+			case "spider": return EntityType.SPIDER;
+			case "zombie": return EntityType.ZOMBIE;
+			case "slime": return EntityType.SLIME;
+			case "zombie_pigman": return EntityType.PIG_ZOMBIE;
+			case "enderman": return EntityType.ENDERMAN;
+			case "cave_spider": return EntityType.CAVE_SPIDER;
+			case "silverfish": return EntityType.SILVERFISH;
+			case "blaze": return EntityType.BLAZE;
+			case "magma_cube": return EntityType.MAGMA_CUBE;
+			case "bat": return EntityType.BAT;
+			case "witch": return EntityType.WITCH;
+			case "endermite": return EntityType.ENDERMITE;
+			case "guardian": return EntityType.GUARDIAN;
+			case "pig": return EntityType.PIG;
+			case "sheep": return EntityType.SHEEP;
+			case "cow": return EntityType.COW;
+			case "chicken": return EntityType.CHICKEN;
+			case "squid": return EntityType.SQUID;
+			case "wolf": return EntityType.WOLF;
+			case "mooshroom": return EntityType.MUSHROOM_COW;
+			case "snowman": return EntityType.SNOWMAN;
+			case "ocelot": return EntityType.OCELOT;
+			case "horse": return EntityType.HORSE;
+			case "rabbit": return EntityType.RABBIT;
+			case "villager": return EntityType.VILLAGER;
+			default: return null;
 		}
 	}
 
