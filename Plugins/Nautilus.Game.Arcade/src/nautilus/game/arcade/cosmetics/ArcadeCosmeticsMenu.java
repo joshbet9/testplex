@@ -359,6 +359,9 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private void setSettingToggleEnabled(UUID playerId, GameDefinition game, FeatureDefinition feature,
                                          SettingDefinition setting, String option, boolean enabled) {
         data.set(settingTogglePath(playerId, game, feature, setting, option), enabled);
+        if ("monstermaze".equals(game.key) && "mob-sets".equals(setting.key)) {
+            data.set("players." + playerId + ".arcade.monstermaze.mob-sets-customized", true);
+        }
         save();
     }
 
