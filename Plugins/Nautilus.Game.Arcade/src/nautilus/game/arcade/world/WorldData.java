@@ -201,16 +201,28 @@ public class WorldData
 	{
 		try (BufferedWriter writer = new BufferedWriter(new FileWriter(target)))
 		{
-			writer.write("MAP_NAME:Monster Maze Generated Test Arena\\n");
-			writer.write("MAP_AUTHOR:Testplex Sandbox\\n");
-			writer.write("MIN_X:-50\\nMAX_X:50\\nMIN_Y:0\\nMAX_Y:256\\nMIN_Z:-50\\nMAX_Z:50\\n");
-			writer.write("TEAM_NAME:RED\\n");
-			writer.write("TEAM_SPAWNS:0,100,0:5,100,0:-5,100,0:0,100,5:0,100,-5\\n");
-			writer.write("DATA_NAME:ORANGE\\nDATA_LOCS:0,100,0\\n");
-			writer.write("CUSTOM_NAME:B1=155,0\\nCUSTOM_LOCS:0,100,0\\n");
-			writer.write("CUSTOM_NAME:B2=155,2\\nCUSTOM_LOCS:0,100,0\\n");
-			writer.write("CUSTOM_NAME:B3=44,15\\nCUSTOM_LOCS:0,100,0\\n");
-			writer.write("CUSTOM_NAME:E=SNOWMAN\\nCUSTOM_LOCS:0,100,0\\n");
+			writer.write("MAP_NAME:Monster Maze Generated Test Arena");
+			writer.newLine();
+			writer.write("MAP_AUTHOR:Testplex Sandbox");
+			writer.newLine();
+			writer.write("MIN_X:-50"); writer.newLine();
+			writer.write("MAX_X:50"); writer.newLine();
+			writer.write("MIN_Y:0"); writer.newLine();
+			writer.write("MAX_Y:256"); writer.newLine();
+			writer.write("MIN_Z:-50"); writer.newLine();
+			writer.write("MAX_Z:50"); writer.newLine();
+			writer.write("TEAM_NAME:RED"); writer.newLine();
+			writer.write("TEAM_SPAWNS:0,100,0:5,100,0:-5,100,0:0,100,5:0,100,-5"); writer.newLine();
+			writer.write("DATA_NAME:ORANGE"); writer.newLine();
+			writer.write("DATA_LOCS:0,100,0"); writer.newLine();
+			writer.write("CUSTOM_NAME:B1=155,0"); writer.newLine();
+			writer.write("CUSTOM_LOCS:0,100,0"); writer.newLine();
+			writer.write("CUSTOM_NAME:B2=155,2"); writer.newLine();
+			writer.write("CUSTOM_LOCS:0,100,0"); writer.newLine();
+			writer.write("CUSTOM_NAME:B3=44,15"); writer.newLine();
+			writer.write("CUSTOM_LOCS:0,100,0"); writer.newLine();
+			writer.write("CUSTOM_NAME:E=SNOWMAN"); writer.newLine();
+			writer.write("CUSTOM_LOCS:0,100,0"); writer.newLine();
 		}
 		catch (Exception ex)
 		{
