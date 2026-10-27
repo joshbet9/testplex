@@ -599,7 +599,12 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         Material material;
         short durability = 0;
         if (setting.toggleOptions) {
-            material = active ? Material.EMERALD_BLOCK : Material.REDSTONE_BLOCK;
+            if ("monstermaze".equals(game.key) && "mob-sets".equals(setting.key)) {
+                material = Material.MONSTER_EGG;
+                durability = (short) mobEggData(option);
+            } else {
+                material = active ? Material.EMERALD_BLOCK : Material.REDSTONE_BLOCK;
+            }
         } else {
             material = setting.icon;
             if (setting.icon == Material.STAINED_GLASS || setting.icon == Material.STAINED_CLAY
@@ -630,6 +635,40 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         meta.setLore(lore);
         item.setItemMeta(meta);
         return item;
+    }
+
+    private int mobEggData(String mobSet) {
+        if (mobSet == null) return 97;
+        switch (mobSet.toLowerCase(Locale.ROOT)) {
+            case "creeper": return 50;
+            case "skeleton": return 51;
+            case "spider": return 52;
+            case "zombie": return 54;
+            case "slime": return 55;
+            case "zombie_pigman": return 57;
+            case "enderman": return 58;
+            case "cave_spider": return 59;
+            case "silverfish": return 60;
+            case "blaze": return 61;
+            case "magma_cube": return 62;
+            case "bat": return 65;
+            case "witch": return 66;
+            case "endermite": return 67;
+            case "guardian": return 68;
+            case "pig": return 90;
+            case "sheep": return 91;
+            case "cow": return 92;
+            case "chicken": return 93;
+            case "squid": return 94;
+            case "wolf": return 95;
+            case "mooshroom": return 96;
+            case "snowman": return 97;
+            case "ocelot": return 98;
+            case "horse": return 100;
+            case "rabbit": return 101;
+            case "villager": return 120;
+            default: return 97;
+        }
     }
 
     private short settingOptionDurability(GameDefinition game, SettingDefinition setting, String option) {
