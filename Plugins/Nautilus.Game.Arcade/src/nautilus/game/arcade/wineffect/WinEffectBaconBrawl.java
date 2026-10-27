@@ -46,7 +46,7 @@ public class WinEffectBaconBrawl extends WinEffectGadget
     public WinEffectBaconBrawl(GadgetManager manager)
     {
         super(manager, "Arcade Bacon Brawl Body Slam",
-                UtilText.splitLineToArray(C.cGray + "Charge four pigs and send them flying off the arena!",
+                UtilText.splitLineToArray(C.cGray + "Body-slam four opponents off a bare-dirt arena inspired by Mighty Lava Arena.",
                         LineFormat.LORE),
                 -2, Material.IRON_AXE, (byte) 0, true);
 
