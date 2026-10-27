@@ -1510,23 +1510,46 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 	 */
 	private File resolveMapRoot()
 	{
-		if (_mapRootResolutionAttempted)
+		// Cache only a real directory, never a failed lookup. Maps may be copied
+		// into place after the plugin starts, and that should not permanently make
+		// every game appear to have no installed maps.
+		if (_mapRootResolutionAttempted && _resolvedMapRoot != null && _resolvedMapRoot.isDirectory())
+		{
 			return _resolvedMapRoot;
+		}
+		_mapRootResolutionAttempted = false;
+		_resolvedMapRoot = null;
 
-		_mapRootResolutionAttempted = true;
 		File working = new File(System.getProperty("user.dir", ".")).getAbsoluteFile().toPath().normalize().toFile();
 		List<File> candidates = new ArrayList<File>();
+
+		String configuredMaps = System.getProperty("mineplex.maps.dir");
+		if (configuredMaps != null && !configuredMaps.trim().isEmpty())
+		{
+			candidates.add(new File(configuredMaps.trim()));
+		}
+		String environmentMaps = System.getenv("MINEPLEX_MAPS_DIR");
+		if (environmentMaps != null && !environmentMaps.trim().isEmpty())
+		{
+			candidates.add(new File(environmentMaps.trim()));
+		}
+
 		candidates.add(new File(working, "../../update/maps"));
 		candidates.add(new File(working, "update/maps"));
+		candidates.add(new File(working, "../../update/maps/maps"));
+		candidates.add(new File(working, "update/maps/maps"));
 
 		String homeProperty = System.getProperty("user.home", ".");
 		candidates.add(new File(homeProperty, "update/maps"));
+		candidates.add(new File(homeProperty, "update/maps/maps"));
 
 		File parent = working;
 		for (int depth = 0; parent != null && depth < 6; depth++, parent = parent.getParentFile())
 		{
 			candidates.add(new File(parent, "update/maps"));
+			candidates.add(new File(parent, "update/maps/maps"));
 			candidates.add(new File(parent, "../../update/maps"));
+			candidates.add(new File(parent, "../../update/maps/maps"));
 		}
 
 		Set<String> visited = new HashSet<String>();
@@ -1534,19 +1557,50 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 		{
 			File normal = candidate.getAbsoluteFile().toPath().normalize().toFile();
 			if (!visited.add(normal.getPath()))
+			{
 				continue;
+			}
 
-			if (!normal.isDirectory() || !containsMapArchives(normal))
+			File mapRoot = findMapRoot(normal);
+			if (mapRoot == null)
+			{
 				continue;
+			}
 
-			_resolvedMapRoot = normal;
-			System.out.println("Arcade map loader: resolved map root to " + normal.getAbsolutePath() + ".");
+			_resolvedMapRoot = mapRoot;
+			_mapRootResolutionAttempted = true;
+			System.out.println("Arcade map loader: resolved map root to " + mapRoot.getAbsolutePath()
+					+ " (candidate " + normal.getAbsolutePath() + ").");
 			return _resolvedMapRoot;
 		}
 
 		System.err.println("Arcade map loader: checked " + visited.size()
-				+ " candidate update/maps directories but none contained category/*.zip. user.dir="
-				+ System.getProperty("user.dir", ".") + ", user.home=" + homeProperty + ".");
+				+ " candidate update/maps directories but none contained category/*.zip (or a nested maps/ bundle). user.dir="
+				+ System.getProperty("user.dir", ".") + ", user.home=" + homeProperty
+				+ ", mineplex.maps.dir=" + configuredMaps + ", MINEPLEX_MAPS_DIR=" + environmentMaps + ".");
+		return null;
+	}
+
+	/**
+	 * Resolve either the normal update/maps/<game> layout or a bundle which
+	 * was unpacked one directory too deep as update/maps/maps/<game>.
+	 */
+	private File findMapRoot(File candidate)
+	{
+		if (candidate == null || !candidate.isDirectory())
+		{
+			return null;
+		}
+		if (containsMapArchives(candidate))
+		{
+			return candidate;
+		}
+
+		File nestedMaps = new File(candidate, "maps");
+		if (nestedMaps.isDirectory() && containsMapArchives(nestedMaps))
+		{
+			return nestedMaps;
+		}
 		return null;
 	}
 

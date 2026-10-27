@@ -67,11 +67,7 @@ public class SetGamePage extends BasePage
 		List<String> lore = new ArrayList<>();
 		lore.add(ChatColor.RESET + C.cGray + "Select this as the next game.");
 		lore.add("§1");
-		if (GameCreationManager.usesGeneratedMonsterMazeMap(type))
-		{
-			lore.add(ChatColor.YELLOW + "Left-Click " + C.cGray + "to select (generated test arena; no ZIP required).");
-		}
-		else if (type == GameType.UHC || type == GameType.UHCSolo || type == GameType.UHCSoloSpeed || type == GameType.UHCTeamsSpeed)
+		if (type == GameType.UHC || type == GameType.UHCSolo || type == GameType.UHCSoloSpeed || type == GameType.UHCTeamsSpeed)
 		{
 			lore.add(ChatColor.YELLOW + "Left-Click " + C.cGray + "to select (map generated automatically).");
 		}
@@ -91,8 +87,7 @@ public class SetGamePage extends BasePage
 		{
 			if (clickType == ClickType.LEFT)
 			{
-				boolean generatedMonsterMaze = GameCreationManager.usesGeneratedMonsterMazeMap(type);
-				if (!generatedMonsterMaze && !hasMapArchive(type))
+				if (!hasMapArchive(type))
 				{
 					UtilPlayer.message(player, C.cRed + "No installed map ZIPs were found for " + type.getName()
 							+ ". The game has not been selected.");
@@ -118,17 +113,11 @@ public class SetGamePage extends BasePage
 					getPlugin().GetGame().setGame(type, player, true);
 				}
 
-				UtilPlayer.message(player, C.cGreen + "Selected " + type.getName()
-						+ (generatedMonsterMaze ? " using the generated test arena." : " with a random installed map."));
+				UtilPlayer.message(player, C.cGreen + "Selected " + type.getName() + " with a random installed map.");
 				player.closeInventory();
 			}
 			else if (clickType == ClickType.RIGHT)
 			{
-				if (GameCreationManager.usesGeneratedMonsterMazeMap(type))
-				{
-					UtilPlayer.message(player, C.cGray + type.getName() + " uses a generated test arena; no map ZIP is required.");
-					return;
-				}
 				if (type == GameType.UHC || type == GameType.UHCSolo || type == GameType.UHCSoloSpeed || type == GameType.UHCTeamsSpeed)
 				{
 					UtilPlayer.message(player, C.cGray + type.getName() + " creates its map automatically.");
@@ -141,11 +130,6 @@ public class SetGamePage extends BasePage
 
 	private boolean hasMapArchive(GameType type)
 	{
-		if (GameCreationManager.usesGeneratedMonsterMazeMap(type))
-		{
-			return true;
-		}
-
 		if (type == GameType.UHC || type == GameType.UHCSolo || type == GameType.UHCSoloSpeed || type == GameType.UHCTeamsSpeed)
 		{
 			return true;

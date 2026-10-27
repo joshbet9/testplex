@@ -29,7 +29,6 @@ import mineplex.core.world.MineplexWorld;
 
 import nautilus.game.arcade.GameType;
 import nautilus.game.arcade.game.Game;
-import nautilus.game.arcade.managers.GameCreationManager;
 import nautilus.game.arcade.game.games.uhc.UHC;
 
 /**
@@ -178,13 +177,6 @@ public class WorldData
 		TimingManager.stop("UnzipWorld creating folders");
 
 		TimingManager.start("UnzipWorld UnzipToDirectory");
-		if (GameCreationManager.usesGeneratedMonsterMazeMap(Game))
-		{
-			writeGeneratedMonsterMazeWorldConfig(new File(folder, "WorldConfig.dat"));
-			TimingManager.stop("UnzipWorld UnzipToDirectory");
-			return;
-		}
-
 		File mapArchive = Host.getArcadeManager().getInstalledMapArchive(Game, GetFile());
 		if (mapArchive == null || !mapArchive.isFile())
 		{
@@ -194,40 +186,6 @@ public class WorldData
 		}
 		ZipUtil.UnzipToDirectory(mapArchive.getAbsolutePath(), folder);
 		TimingManager.stop("UnzipWorld UnzipToDirectory");
-	}
-
-	/** Writes the Mineplex datapoints needed by the native, procedurally-built Monster Maze. */
-	private void writeGeneratedMonsterMazeWorldConfig(File target)
-	{
-		try (BufferedWriter writer = new BufferedWriter(new FileWriter(target)))
-		{
-			writer.write("MAP_NAME:Monster Maze Generated Test Arena");
-			writer.newLine();
-			writer.write("MAP_AUTHOR:Testplex Sandbox");
-			writer.newLine();
-			writer.write("MIN_X:-50"); writer.newLine();
-			writer.write("MAX_X:50"); writer.newLine();
-			writer.write("MIN_Y:0"); writer.newLine();
-			writer.write("MAX_Y:256"); writer.newLine();
-			writer.write("MIN_Z:-50"); writer.newLine();
-			writer.write("MAX_Z:50"); writer.newLine();
-			writer.write("TEAM_NAME:RED"); writer.newLine();
-			writer.write("TEAM_SPAWNS:0,100,0:5,100,0:-5,100,0:0,100,5:0,100,-5"); writer.newLine();
-			writer.write("DATA_NAME:ORANGE"); writer.newLine();
-			writer.write("DATA_LOCS:0,100,0"); writer.newLine();
-			writer.write("CUSTOM_NAME:B1=155,0"); writer.newLine();
-			writer.write("CUSTOM_LOCS:0,100,0"); writer.newLine();
-			writer.write("CUSTOM_NAME:B2=155,2"); writer.newLine();
-			writer.write("CUSTOM_LOCS:0,100,0"); writer.newLine();
-			writer.write("CUSTOM_NAME:B3=44,15"); writer.newLine();
-			writer.write("CUSTOM_LOCS:0,100,0"); writer.newLine();
-			writer.write("CUSTOM_NAME:E=SNOWMAN"); writer.newLine();
-			writer.write("CUSTOM_LOCS:0,100,0"); writer.newLine();
-		}
-		catch (Exception ex)
-		{
-			throw new IllegalStateException("Could not create generated Monster Maze test map metadata", ex);
-		}
 	}
 
 	public void Uninitialize()
