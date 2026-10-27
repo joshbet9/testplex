@@ -388,6 +388,19 @@ chmod 0755 "$(dirname "$MAP_DEST")" "$MAP_DEST"
 find "$MAP_DEST" -type d -exec chmod 0755 {} +
 find "$MAP_DEST" -type f -iname '*.zip' -exec chmod 0644 {} +
 
+# Validate visibility as the same account that runs the Java server; a root-only
+# scan can otherwise report maps that Arcade cannot enumerate.
+if ! runuser -u monstermaze -- test -r "$MAP_DEST" || ! runuser -u monstermaze -- test -x "$MAP_DEST"; then
+  echo "The monstermaze service account cannot read/traverse $MAP_DEST." >&2
+  exit 2
+fi
+service_visible_map_count="$(runuser -u monstermaze -- find "$MAP_DEST" -type f -iname '*.zip' -print | wc -l)"
+if [[ "$service_visible_map_count" -lt 1 ]]; then
+  echo "No map ZIPs are visible to the monstermaze service account under $MAP_DEST." >&2
+  exit 2
+fi
+echo "Confirmed $service_visible_map_count map ZIPs are visible to the monstermaze service account."
+
 for name in "${MANAGED_NAMES[@]}"; do
   if [[ "$name" != "Arcade.jar" ]]; then
     rm -f "$PLUGINS/$name"
