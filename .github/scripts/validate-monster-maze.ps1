@@ -212,7 +212,7 @@ Assert-Contains "Personal scoreboards show whether the player is safe" $mazeCore
 Assert-Contains "Personal scoreboards and visibility are restored at round end" $mazeCoreFile "clearPersonalScoreboardsAndVisibility();"
 Assert-Contains "Compass is refreshed immediately when the active Safe Pad changes" $mazeFile "updateCompassTargets();"
 Assert-Contains "First-stage path is generated through walkable maze cells" $mazeFile "Build a genuine walkable breadcrumb"
-Assert-Contains "First-stage path particle effect is emitted" $mazeFile "world.playEffect(point, Effect.HAPPY_VILLAGER, 0)"
+Assert-Contains "First-stage path particle effect is emitted" $mazeFile "point.getWorld().playEffect(point, Effect.HAPPY_VILLAGER, 0)"
 Assert-Contains "The first two Safe Pads get fireworks" $mazeFile "playFirstTwoStagePadFireworks()"
 Assert-Contains "Stale backing Snowmen are swept at startup and cleanup" $mazeFile "clearStaleMazeSnowmen()"
 Assert-Contains "Bomb Lobbers has direct-hit ding hook" (Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\game\games\lobbers\BombLobbers.java") "directHitDing"
