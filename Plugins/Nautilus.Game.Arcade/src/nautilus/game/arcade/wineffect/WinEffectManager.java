@@ -26,6 +26,7 @@ public class WinEffectManager
 	private List<Player> _team;
 	private List<Player> _nonTeam;
 	private WinEffectBaconBrawl _baconBrawlEffect;
+	private WinEffectGadget _activeEffect;
 	
 	public void prePlay(Game game, Player winner, List<Player> team, List<Player> nonTeam) 
 	{
@@ -50,16 +51,16 @@ public class WinEffectManager
 	
 	protected void buildWinnerRoom(Location loc)
 	{
-		WinEffectGadget effect = getWinEffect();
+		_activeEffect = getWinEffect();
 
-		if (effect == null)
+		if (_activeEffect == null)
 		{
 			return;
 		}
 
-		_game.WorldTimeSet = effect.getGameTime();
-		effect.setup(_winner, _team, _nonTeam, loc);
-		effect.buildWinnerRoom();
+		_game.WorldTimeSet = _activeEffect.getGameTime();
+		_activeEffect.setup(_winner, _team, _nonTeam, loc);
+		_activeEffect.buildWinnerRoom();
 	}
 	
 	protected void playEffect()
@@ -69,10 +70,18 @@ public class WinEffectManager
 			return;
 		}
 
+        if (_activeEffect == null)
+        {
+            _activeEffect = getWinEffect();
+        }
+        if (_activeEffect == null)
+        {
+            return;
+        }
+
 		_game.getArcadeManager().getCosmeticManager().getGadgetManager().setHideParticles(true);
-		WinEffectGadget effect = getWinEffect();
-		effect.teleport();
-		effect.runPlay();
+		_activeEffect.teleport();
+		_activeEffect.runPlay();
 	}
 
 	public void end()
@@ -82,10 +91,20 @@ public class WinEffectManager
 			return;
 		}
 
-		WinEffectGadget effect = getWinEffect();
-		effect.runFinish();
-		_game.getArcadeManager().getCosmeticManager().getGadgetManager().setHideParticles(false);
-		_game.CreatureAllowOverride = false;
+        WinEffectGadget effect = _activeEffect == null ? getWinEffect() : _activeEffect;
+        try
+        {
+            if (effect != null)
+            {
+                effect.runFinish();
+            }
+        }
+        finally
+        {
+            _activeEffect = null;
+            _game.getArcadeManager().getCosmeticManager().getGadgetManager().setHideParticles(false);
+            _game.CreatureAllowOverride = false;
+        }
 	}
 	
 	public WinEffectGadget getWinEffect()
