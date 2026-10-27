@@ -94,6 +94,7 @@ public class Snake extends SoloGame
 		}
 	}
 	private final HashMap<Player, ControlDebuff> _controlDebuffs = new HashMap<Player, ControlDebuff>();
+	private int _abilityVisualTick;
 	private final HashMap<Player, Float> _lastRawYaw = new HashMap<Player, Float>();
 	private final HashMap<Player, Float> _laggedYaw = new HashMap<Player, Float>();
 	private final HashMap<Player, Vector> _lastTravelDirection = new HashMap<Player, Vector>();
@@ -864,6 +865,27 @@ public class Snake extends SoloGame
 
 	/** Speed and Reverse get their equipped line colour, then return to the player's base tail colour. */
 	@EventHandler
+
+	/** Small server-visible particles for the active Snake ability's selected style. */
+	@EventHandler
+	public void abilityVisualParticles(UpdateEvent event)
+	{
+		if (!IsLive() || event.getType() != UpdateType.TICK || ++_abilityVisualTick % 4 != 0) return;
+		for (Player player : GetPlayers(true))
+		{
+			String style = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "snake", "ability-visuals");
+			if (style == null || style.isEmpty() || "classic".equalsIgnoreCase(style)) continue;
+			String ability = _invul.containsKey(player) ? "super" : _speed.containsKey(player) ? "speed" : _reverse.containsKey(player) ? "reverse" : null;
+			if (ability == null) continue;
+			ParticleType particle;
+			if ("subtle".equalsIgnoreCase(style)) particle = ParticleType.CLOUD;
+			else if ("neon".equalsIgnoreCase(style)) particle = "reverse".equals(ability) ? ParticleType.WITCH_MAGIC : ParticleType.FIREWORKS_SPARK;
+			else if ("colour-coded".equalsIgnoreCase(style)) particle = "super".equals(ability) ? ParticleType.FIREWORKS_SPARK : "speed".equals(ability) ? ParticleType.HAPPY_VILLAGER : ParticleType.PORTAL;
+			else continue;
+			UtilParticle.PlayParticle(particle, player.getLocation().clone().add(0, 0.25, 0), 0.12F, 0.18F, 0.12F, 0.01F, 3, ViewDist.NORMAL);
+		}
+	}
+
 	public void AbilityCosmeticColours(UpdateEvent event)
 	{
 		if (!IsLive() || event.getType() != UpdateType.TICK) return;

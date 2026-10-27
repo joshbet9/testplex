@@ -168,12 +168,29 @@ public class Micro extends TeamGame
 		for (Player player : GetPlayers(true))
 		{
 			int colour = ArcadeCosmeticsMenu.getEquippedColourData(player.getUniqueId(), "microbattles");
-			if (colour < 0)
-				continue;
-
-			Location trail = player.getLocation().clone().add(0, 0.15, 0);
-			UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) colour),
-					trail, 0.08F, 0.08F, 0.08F, 0.01F, 2, ViewDist.NORMAL, UtilServer.getPlayers());
+			if (colour >= 0)
+			{
+				Location trail = player.getLocation().clone().add(0, 0.15, 0);
+				UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) colour),
+						trail, 0.08F, 0.08F, 0.08F, 0.01F, 2, ViewDist.NORMAL, UtilServer.getPlayers());
+			}
+			String borderStyle = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "microbattles", "border-particles");
+			if (borderStyle == null || borderStyle.isEmpty() || "off".equalsIgnoreCase(borderStyle) || _glass.isEmpty()) continue;
+			Block nearest = null;
+			double nearestDistance = 9.0;
+			for (Block glass : _glass)
+			{
+				if (glass.getType() != Material.STAINED_GLASS) continue;
+				double distance = player.getLocation().distanceSquared(glass.getLocation().add(0.5, 0.5, 0.5));
+				if (distance < nearestDistance) { nearestDistance = distance; nearest = glass; }
+			}
+			if (nearest == null) continue;
+			Location border = nearest.getLocation().add(0.5, 0.55, 0.5);
+			ParticleType particle = "spark".equalsIgnoreCase(borderStyle) ? ParticleType.FIREWORKS_SPARK
+					: "soft".equalsIgnoreCase(borderStyle) ? ParticleType.CLOUD : ParticleType.BLOCK_DUST;
+			int dustColour = colour >= 0 ? colour : 3;
+			if (particle == ParticleType.BLOCK_DUST) particle = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) dustColour);
+			UtilParticle.PlayParticle(particle, border, 0.08F, 0.08F, 0.08F, 0.005F, 2, ViewDist.NORMAL, UtilServer.getPlayers());
 		}
 	}
 

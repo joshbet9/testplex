@@ -43,6 +43,10 @@ import mineplex.core.common.util.UtilBlock;
 import mineplex.core.common.util.UtilEnt;
 import mineplex.core.common.util.UtilMath;
 import mineplex.core.common.util.UtilPlayer;
+import mineplex.core.common.util.UtilParticle;
+import mineplex.core.common.util.UtilParticle.ParticleType;
+import mineplex.core.common.util.UtilParticle.ViewDist;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import mineplex.core.common.util.UtilServer;
 import mineplex.core.common.util.UtilTime;
 import mineplex.core.itemstack.ItemStackFactory;
@@ -125,6 +129,37 @@ public class TurfForts extends TeamGame
 	private final BlockBreakStatTracker _breakStatTracker;
 	private final Map<Player, InfiltrateData> _enemyTurf = new HashMap<>();
 	private final Set<UUID> playersThatNeedBlocks = new HashSet<>();
+
+
+	/** Server-visible cosmetic particles for block impacts in Turf Wars. */
+	@EventHandler
+	public void arcadeArrowImpactCosmetic(ProjectileHitEvent event)
+	{
+		if (!IsLive() || !(event.getEntity() instanceof Arrow)) return;
+		Arrow arrow = (Arrow) event.getEntity();
+		if (!(arrow.getShooter() instanceof Player)) return;
+		Player shooter = (Player) arrow.getShooter();
+		if (!IsAlive(shooter)) return;
+		String choice = ArcadeCosmeticsMenu.getEquippedChoice(shooter.getUniqueId(), "turfwars", "arrow-impact");
+		if (choice == null || choice.isEmpty()) return;
+		Block hit = UtilEnt.getHitBlock(arrow);
+		if (hit == null) return;
+		Location center = hit.getLocation().add(0.5, 0.5, 0.5);
+		ParticleType particle;
+		int count = 12;
+		switch (choice.toLowerCase(java.util.Locale.ROOT))
+		{
+			case "dust": particle = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_CLAY, (byte) 14); break;
+			case "spark": particle = ParticleType.FIREWORKS_SPARK; break;
+			case "burst": particle = ParticleType.EXPLODE; count = 4; break;
+			case "team-colour":
+				byte teamColour = GetTeam(shooter) != null && GetTeam(shooter).GetColor() == ChatColor.BLUE ? (byte) 11 : (byte) 14;
+				particle = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_CLAY, teamColour);
+				break;
+			default: return;
+		}
+		UtilParticle.PlayParticle(particle, center, 0.25F, 0.2F, 0.25F, 0.02F, count, ViewDist.NORMAL, UtilServer.getPlayers());
+	}
 
 	public TurfForts(ArcadeManager manager)
 	{

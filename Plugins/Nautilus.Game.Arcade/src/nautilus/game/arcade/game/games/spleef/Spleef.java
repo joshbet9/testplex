@@ -21,6 +21,10 @@ import mineplex.core.common.util.UtilEnt;
 import mineplex.core.common.util.UtilInv;
 import mineplex.core.common.util.UtilMath;
 import mineplex.core.common.util.UtilPlayer;
+import mineplex.core.common.util.UtilParticle;
+import mineplex.core.common.util.UtilParticle.ParticleType;
+import mineplex.core.common.util.UtilParticle.ViewDist;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import mineplex.core.common.util.UtilServer;
 import mineplex.core.itemstack.ItemStackFactory;
 import mineplex.core.recharge.Recharge;
@@ -271,8 +275,29 @@ public class Spleef extends SoloGame
 		}
 	}
 
+
+	private void playBlockBreakCosmetic(Block block, Player player)
+	{
+		if (block == null || player == null || block.getWorld() == null) return;
+		String choice = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "spleef", "block-break-effects");
+		if (choice == null || choice.isEmpty()) return;
+		ParticleType particle;
+		int count = 8;
+		switch (choice.toLowerCase(java.util.Locale.ROOT))
+		{
+			case "snow": particle = ParticleType.SNOW_SHOVEL; count = 10; break;
+			case "shards": particle = ParticleType.CRIT; count = 12; break;
+			case "spark": particle = ParticleType.FIREWORKS_SPARK; count = 10; break;
+			case "burst": particle = ParticleType.EXPLODE; count = 4; break;
+			default: return;
+		}
+		Location center = block.getLocation().add(0.5, 0.5, 0.5);
+		UtilParticle.PlayParticle(particle, center, 0.22F, 0.22F, 0.22F, 0.02F, count, ViewDist.NORMAL, UtilServer.getPlayers());
+	}
+
 	private void breakBlock(Block block, Player player)
 	{
+		playBlockBreakCosmetic(block, player);
 		block.getWorld().playEffect(block.getLocation(), Effect.STEP_SOUND, block.getTypeId());
 		MapUtil.QuickChangeBlockAt(block.getLocation(), Material.AIR);
 		UtilServer.CallEvent(new SpleefDestroyBlockEvent(block, player));

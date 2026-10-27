@@ -19,6 +19,7 @@ import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.EnderPearl;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
 import org.bukkit.entity.Snowball;
 import org.bukkit.entity.ThrownPotion;
 import org.bukkit.event.Cancellable;
@@ -37,6 +38,7 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerTeleportEvent.TeleportCause;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scoreboard.NameTagVisibility;
@@ -53,6 +55,9 @@ import mineplex.core.common.util.UtilGear;
 import mineplex.core.common.util.UtilInv;
 import mineplex.core.common.util.UtilMath;
 import mineplex.core.common.util.UtilPlayer;
+import mineplex.core.common.util.UtilParticle;
+import mineplex.core.common.util.UtilParticle.ParticleType;
+import mineplex.core.common.util.UtilParticle.ViewDist;
 import mineplex.core.common.util.UtilServer;
 import mineplex.core.hologram.Hologram.HologramTarget;
 import mineplex.core.recharge.Recharge;
@@ -62,6 +67,7 @@ import mineplex.minecraft.game.core.condition.Condition.ConditionType;
 import mineplex.minecraft.game.core.damage.CustomDamageEvent;
 
 import nautilus.game.arcade.ArcadeManager;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import nautilus.game.arcade.GameType;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.events.PlayerPrepareTeleportEvent;
@@ -85,6 +91,7 @@ import nautilus.game.arcade.stats.WinWithoutLosingTeammateStatTracker;
 
 public class Paintball extends TeamGame
 {
+	private int _weaponCosmeticTick;
 	private HashMap<Player, PlayerCopyPaintball> _doubles = new HashMap<Player, PlayerCopyPaintball>();
 
 	@SuppressWarnings("unchecked")
@@ -191,6 +198,7 @@ public class Paintball extends TeamGame
 				return;
 
 			final byte color = (byte) (event.getEntity() instanceof EnderPearl || (event.getEntity() instanceof Arrow && event.getEntity().hasMetadata("color") && ChatColor.values()[event.getEntity().getMetadata("color").get(0).asInt()] == ChatColor.RED) ? 14 : 3);
+			final Player cosmeticShooter = event.getEntity() instanceof Projectile && ((Projectile) event.getEntity()).getShooter() instanceof Player ? (Player) ((Projectile) event.getEntity()).getShooter() : null;
 
 			event.getEntity().setVelocity(event.getEntity().getVelocity().normalize().multiply(1.2));
 
@@ -219,10 +227,76 @@ public class Paintball extends TeamGame
 
 					if (color == 3)		loc.getWorld().playEffect(loc, Effect.STEP_SOUND, 8);
 					else				loc.getWorld().playEffect(loc, Effect.STEP_SOUND, 10);
+					playPaintballImpactCosmetic(cosmeticShooter, loc, color);
 
 					event.getEntity().remove();
 				}
 					}, 0);
+		}
+	}
+
+
+	private void playPaintballImpactCosmetic(Player shooter, Location location, byte colour)
+	{
+		if (shooter == null || location == null || location.getWorld() == null) return;
+		String choice = ArcadeCosmeticsMenu.getEquippedChoice(shooter.getUniqueId(), "paintball", "pellet-impact");
+		if (choice == null || choice.isEmpty() || "classic".equalsIgnoreCase(choice)) return;
+		ParticleType particle;
+		int count = 14;
+		switch (choice.toLowerCase(java.util.Locale.ROOT))
+		{
+			case "paint-splash": particle = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_CLAY, colour); count = 18; break;
+			case "spark": particle = ParticleType.FIREWORKS_SPARK; break;
+			case "burst": particle = ParticleType.EXPLODE; count = 5; break;
+			default: return;
+		}
+		UtilParticle.PlayParticle(particle, location.clone().add(0, 0.15, 0), 0.28F, 0.22F, 0.28F, 0.02F, count, ViewDist.NORMAL, UtilServer.getPlayers());
+	}
+
+	/** The weapon skin is a display label only; it never swaps or buffs a kit item. */
+	@EventHandler
+	public void applyWeaponSkin(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.TICK || !IsLive() || ++_weaponCosmeticTick % 10 != 0) return;
+		for (Player player : GetPlayers(true))
+		{
+			ItemStack item = player.getItemInHand();
+			if (item == null || item.getType() == Material.AIR || !isWeaponSkinMaterial(item.getType())) continue;
+			String skin = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "paintball", "weapon-skin");
+			ItemMeta meta = item.getItemMeta();
+			if (meta == null) continue;
+			String existing = meta.hasDisplayName() ? meta.getDisplayName() : null;
+			String base = existing;
+			String[] prefixes = {ChatColor.WHITE + "Chrome ", ChatColor.GOLD + "Ember ", ChatColor.AQUA + "Frost "};
+			for (String oldPrefix : prefixes)
+				if (base != null && base.startsWith(oldPrefix)) { base = base.substring(oldPrefix.length()); break; }
+			if (skin == null || skin.isEmpty() || "classic".equalsIgnoreCase(skin))
+			{
+				if (existing != null && !existing.equals(base))
+				{
+					if (base == null || base.isEmpty()) meta.setDisplayName(null); else meta.setDisplayName(base);
+					item.setItemMeta(meta);
+				}
+				continue;
+			}
+			String prefix;
+			if ("chrome".equalsIgnoreCase(skin)) prefix = ChatColor.WHITE + "Chrome ";
+			else if ("ember".equalsIgnoreCase(skin)) prefix = ChatColor.GOLD + "Ember ";
+			else if ("frost".equalsIgnoreCase(skin)) prefix = ChatColor.AQUA + "Frost ";
+			else continue;
+			if (base == null || base.isEmpty()) base = item.getType().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+			String desired = prefix + base;
+			if (!desired.equals(existing)) { meta.setDisplayName(desired); item.setItemMeta(meta); }
+		}
+	}
+
+	private boolean isWeaponSkinMaterial(Material material)
+	{
+		switch (material)
+		{
+			case BOW: case IRON_HOE: case WOOD_HOE: case STONE_HOE: case WOOD_SWORD: case STONE_SWORD:
+			case IRON_SWORD: case CARROT_STICK: case FIREBALL: case SNOW_BALL: return true;
+			default: return false;
 		}
 	}
 

@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.entity.Arrow;
@@ -23,6 +24,9 @@ import mineplex.core.common.Pair;
 import mineplex.core.common.util.C;
 import mineplex.core.common.util.F;
 import mineplex.core.common.util.UtilPlayer;
+import mineplex.core.common.util.UtilParticle;
+import mineplex.core.common.util.UtilParticle.ParticleType;
+import mineplex.core.common.util.UtilParticle.ViewDist;
 import mineplex.core.common.util.UtilServer;
 import mineplex.core.common.util.UtilTime;
 import mineplex.core.itemstack.ItemBuilder;
@@ -31,6 +35,7 @@ import mineplex.core.updater.event.UpdateEvent;
 import mineplex.minecraft.game.core.combat.event.CombatDeathEvent;
 import mineplex.minecraft.game.core.damage.CustomDamageEvent;
 import nautilus.game.arcade.ArcadeManager;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import nautilus.game.arcade.GameType;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.game.SoloGame;
@@ -221,6 +226,41 @@ public class Quiver extends SoloGame
 	}
 
 	@EventHandler
+
+	/** Cosmetic streak burst at the eliminated player's location; no scoring changes. */
+	@EventHandler(priority = EventPriority.MONITOR)
+	public void deathStreakCosmetic(CombatDeathEvent event)
+	{
+		if (!IsLive() || event.GetLog() == null || event.GetLog().GetKiller() == null || !event.GetLog().GetKiller().IsPlayer()) return;
+		if (!(event.GetEvent().getEntity() instanceof Player)) return;
+		Player victim = (Player) event.GetEvent().getEntity();
+		Player killer = UtilPlayer.searchExact(event.GetLog().GetKiller().GetName());
+		if (killer == null || !killer.isOnline() || killer.equals(victim)) return;
+		String style = ArcadeCosmeticsMenu.getEquippedChoice(killer.getUniqueId(), "oneinthequiver", "death-streak");
+		if (style == null || style.isEmpty()) return;
+		Location point = victim.getLocation().clone().add(0, 1, 0);
+		int streak = Math.max(1, _combo.getOrDefault(killer, 0) + 1);
+		switch (style.toLowerCase(java.util.Locale.ROOT))
+		{
+			case "subtle": UtilParticle.PlayParticle(ParticleType.CRIT, point, 0.18F, 0.2F, 0.18F, 0.01F, Math.min(8, 3 + streak), ViewDist.NORMAL); break;
+			case "burst": UtilParticle.PlayParticle(ParticleType.FIREWORKS_SPARK, point, 0.35F, 0.35F, 0.35F, 0.06F, Math.min(28, 10 + streak * 2), ViewDist.NORMAL); break;
+			case "bullseye":
+				for (int i = 0; i < 12; i++)
+				{
+					double angle = Math.PI * 2 * i / 12.0;
+					Location ring = point.clone().add(Math.cos(angle) * 0.8, 0.05, Math.sin(angle) * 0.8);
+					UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.WOOL, (byte) 14), ring, 0, 0, 0, 0, 1, ViewDist.NORMAL);
+				}
+				break;
+			case "grand-finale":
+				UtilParticle.PlayParticle(ParticleType.HUGE_EXPLOSION, point, 0.12F, 0.12F, 0.12F, 0, 1, ViewDist.NORMAL);
+				UtilParticle.PlayParticle(ParticleType.NOTE, point, 0.5F, 0.5F, 0.5F, 1.0F, 12, ViewDist.NORMAL);
+				victim.getWorld().playSound(point, Sound.LEVEL_UP, 1.0F, 1.3F);
+				break;
+			default: break;
+		}
+	}
+
 	public void ComboReset(CombatDeathEvent event)
 	{
 		if (!(event.GetEvent().getEntity() instanceof Player))
