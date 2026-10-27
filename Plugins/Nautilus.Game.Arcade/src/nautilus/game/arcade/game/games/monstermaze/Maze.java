@@ -6,8 +6,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.UUID;
 
 import mineplex.core.common.util.C;
 import mineplex.core.common.util.F;
@@ -31,6 +34,7 @@ import mineplex.core.disguise.disguises.DisguiseSnowman;
 import mineplex.core.recharge.Recharge;
 import mineplex.core.updater.UpdateType;
 import mineplex.core.updater.event.UpdateEvent;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.game.Game.GameState;
 import nautilus.game.arcade.game.games.monstermaze.MMMazes.MazePreset;
@@ -55,6 +59,7 @@ import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Snowman;
@@ -75,6 +80,9 @@ public class Maze implements Listener
 	private ArrayList<Player> _playersOnPad = new ArrayList<Player>();
 	private HashMap<LivingEntity, MazeMobWaypoint> _ents = new HashMap<LivingEntity, MazeMobWaypoint>();
 	private final HashMap<LivingEntity, Long> _frozenUntil = new HashMap<LivingEntity, Long>();
+	// Keep one player-specific mob set for the run so Safe Pad colours match it.
+	private final Map<UUID, String> _viewerMobSetIds = new HashMap<UUID, String>();
+	private final Map<UUID, EntityType> _viewerMobTypes = new HashMap<UUID, EntityType>();
 	private final LinkedList<Location> _pendingSpawnLocations = new LinkedList<Location>();
 	private static final int MAX_MOB_SPAWNS_PER_TICK = 25;
 
