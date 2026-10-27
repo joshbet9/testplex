@@ -377,9 +377,7 @@ jobs:
                   "player-specific trail choice": "getEquippedChoice(owner.getUniqueId(), \"runner\")",
                   "custom trail blocks": "_blockColours.put(block, Byte.valueOf(colour))",
               },
-              "Bacon Brawl": {
-                  "ability effects are not wearable accessories": "private void update(UpdateEvent event)",
-              },
+              "Bacon Brawl": {},
               "Bacon Brawl Ability Effects": {
                   "shared theme choice": 'getEquippedChoice(id,"baconbrawl","ability-effects")',
                   "Porky pink stained-clay particles": "Material.STAINED_CLAY,(byte)6",
@@ -489,6 +487,8 @@ jobs:
 
           if 'getCommand("cosmetics")' in sources["Cosmetic selector"]:
               missing.append("Cosmetic selector: must not replace the normal /cosmetics command")
+          if "getBaconBrawlAccessory" in sources["Bacon Brawl"] or "cosmeticAccessories(UpdateEvent event)" in sources["Bacon Brawl"]:
+              missing.append("Bacon Brawl: obsolete wearable-accessory cosmetics must be removed")
           if 'Bukkit.dispatchCommand(event.getPlayer(), "cosmetics")' in sources["Game Host Manager"]:
               missing.append("Game Host Manager: the sandbox chest must not dispatch the prototype menu")
           load_files_body = sources["Map Loader"].split("public ArrayList<String> LoadFiles(String gameName)", 1)[1].split("private File resolveMapRoot()", 1)[0]
