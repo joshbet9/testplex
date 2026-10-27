@@ -784,7 +784,7 @@ public class Maze implements Listener
 			return null;
 		}
 
-		String selected = enabled.get(UtilMath.r(enabled.size()));
+		String selected = enabled.get((int) (Math.random() * enabled.size()));
 		EntityType type = entityTypeForMobSet(selected);
 		if (type == null)
 		{
