@@ -59,17 +59,23 @@ cleanup_preflight() {
 trap cleanup_preflight EXIT
 
 [[ -d "$PLUGINS" ]] || { echo "Missing plugins directory: $PLUGINS" >&2; exit 2; }
-IFS= read -r DOWNLOAD_URL || {
-  echo "Missing one-time GitHub artifact download URL on standard input." >&2
-  exit 2
-}
-case "$DOWNLOAD_URL" in
-  https://*.blob.core.windows.net/*|https://*.actions.githubusercontent.com/*|https://*.githubusercontent.com/*|https://github.com/*) ;;
-  *)
-    echo "Refusing artifact URL outside GitHub's download hosts." >&2
+UPLOAD="${INCOMING}.upload"
+if [[ -s "$UPLOAD" ]]; then
+  echo "Using the plugin/map artifact uploaded over the authenticated SSH route."
+  mv "$UPLOAD" "$INCOMING"
+else
+  IFS= read -r DOWNLOAD_URL || {
+    echo "Missing uploaded artifact and one-time GitHub download URL on standard input." >&2
     exit 2
-    ;;
-esac
+  }
+  case "$DOWNLOAD_URL" in
+    https://*.blob.core.windows.net/*|https://*.actions.githubusercontent.com/*|https://*.githubusercontent.com/*|https://github.com/*) ;;
+    *)
+      echo "Refusing artifact URL outside GitHub's download hosts." >&2
+      exit 2
+      ;;
+  esac
+fi
 systemctl cat "$SERVICE" >/dev/null
 systemctl is-active --quiet "$SERVICE" || {
   echo "Refusing to deploy because $SERVICE is not active before deployment." >&2
@@ -84,10 +90,12 @@ echo "Pre-deployment memory and disk:"
 free -h
 df -h "$ROOT"
 
-echo "Downloading selected GitHub artifact directly to the test VM."
-curl --fail --location --silent --show-error \
-  --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 600 \
-  --output "$INCOMING" "$DOWNLOAD_URL"
+if [[ ! -s "$INCOMING" ]]; then
+  echo "Downloading selected GitHub artifact directly to the test VM."
+  curl --fail --location --silent --show-error \
+    --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 1800 \
+    --output "$INCOMING" "$DOWNLOAD_URL"
+fi
 [[ -s "$INCOMING" ]] || { echo "GitHub artifact download is empty." >&2; exit 2; }
 unzip -tq "$INCOMING" >/dev/null
 BUNDLE_LIST="$(unzip -Z1 "$INCOMING")"
