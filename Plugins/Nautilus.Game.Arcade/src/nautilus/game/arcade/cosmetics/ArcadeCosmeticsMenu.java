@@ -377,6 +377,34 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 "players." + playerId.toString() + ".arcade.monstermaze.custom-pack-unlocked", false);
     }
 
+    /**
+     * Returns the mob sets a player opted into. An untouched selection returns
+     * an empty list so the map's source-defined mob remains the default.
+     */
+    public static List<String> getEnabledMonsterMazeMobSets(UUID playerId) {
+        if (instance == null || playerId == null) return Collections.emptyList();
+        String activePath = "players." + playerId + ".arcade.monstermaze.mob-sets-customized";
+        if (!instance.data.getBoolean(activePath, false)) return Collections.emptyList();
+
+        GameDefinition game = instance.games.get("monstermaze");
+        FeatureDefinition feature = game == null ? null : game.getFeatureContainingSetting("mob-sets");
+        SettingDefinition setting = game == null ? null : game.getSetting("mob-sets");
+        if (feature == null || setting == null) return Collections.emptyList();
+
+        List<String> enabled = new ArrayList<String>();
+        for (String option : setting.options) {
+            if (instance.isSettingToggleEnabled(playerId, game, feature, setting, option)) {
+                enabled.add(option);
+            }
+        }
+        return enabled;
+    }
+
+    public static boolean hasCustomMonsterMazeMobSets(UUID playerId) {
+        return instance != null && playerId != null && instance.data.getBoolean(
+                "players." + playerId + ".arcade.monstermaze.mob-sets-customized", false);
+    }
+
     public static boolean isMonsterMazeMobSetEnabled(UUID playerId, String mobSet) {
         if (instance == null || playerId == null || mobSet == null) return false;
         GameDefinition game = instance.games.get("monstermaze");
