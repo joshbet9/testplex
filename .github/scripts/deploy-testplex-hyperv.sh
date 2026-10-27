@@ -50,7 +50,7 @@ EXPECTED_MARKER="TESTPLEX ISOLATED TEST SERVER - NOT PRODUCTION"
 
 PLUGINS="$ROOT/plugins"
 LOG="$ROOT/logs/latest.log"
-ARTIFACT_CACHE="/tmp/testplex-artifact-cache"
+ARTIFACT_CACHE="/var/tmp/testplex-artifact-cache"
 STAGE=""
 cleanup_preflight() {
   if [[ -n "$STAGE" ]]; then rm -rf "$STAGE"; fi

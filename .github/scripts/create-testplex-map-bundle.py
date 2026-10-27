@@ -4,7 +4,31 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from zipfile import ZIP_STORED, ZipFile
+from stat import S_IFREG
+from zipfile import ZIP_STORED, ZipFile, ZipInfo
+
+
+def package_maps(map_root: Path, output: Path) -> tuple[int, int]:
+    """Write a byte-reproducible archive independent of checkout file mtimes."""
+    map_files = sorted(path for path in map_root.rglob("*.zip") if path.is_file())
+    if not map_files:
+        raise SystemExit(f"No map ZIPs were found under {map_root}")
+
+    total_bytes = 0
+    with ZipFile(output, "w", compression=ZIP_STORED, allowZip64=True) as archive:
+        for path in map_files:
+            relative = path.relative_to(map_root)
+            if len(relative.parts) < 2 or path.suffix.lower() != ".zip":
+                raise SystemExit(f"Unexpected map ZIP layout: {path}")
+
+            info = ZipInfo("maps/" + relative.as_posix(), date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = ZIP_STORED
+            info.create_system = 3
+            info.external_attr = (S_IFREG | 0o644) << 16
+            archive.writestr(info, path.read_bytes())
+            total_bytes += path.stat().st_size
+
+    return len(map_files), total_bytes
 
 
 def main() -> int:
@@ -16,20 +40,8 @@ def main() -> int:
     if not map_root.is_dir():
         raise SystemExit(f"Map source directory is missing: {map_root}")
 
-    map_files = sorted(path for path in map_root.rglob("*.zip") if path.is_file())
-    if not map_files:
-        raise SystemExit(f"No map ZIPs were found under {map_root}")
-
-    total_bytes = 0
-    with ZipFile(output, "w", compression=ZIP_STORED, allowZip64=True) as archive:
-        for path in map_files:
-            relative = path.relative_to(map_root)
-            if len(relative.parts) < 2 or path.suffix.lower() != ".zip":
-                raise SystemExit(f"Unexpected map ZIP layout: {path}")
-            archive.write(path, "maps/" + relative.as_posix())
-            total_bytes += path.stat().st_size
-
-    print(f"Packaged {len(map_files)} map ZIPs ({total_bytes:,} source bytes) into {output}")
+    count, total_bytes = package_maps(map_root, output)
+    print(f"Packaged {count} map ZIPs ({total_bytes:,} source bytes) into {output}")
     return 0
 
 

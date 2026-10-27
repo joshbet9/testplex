@@ -8,11 +8,13 @@ on:
       - "Plugins/**"
       - ".github/workflows/testplex-build.yml"
       - ".github/scripts/deploy-testplex-hyperv.sh"
+      - ".github/scripts/create-testplex-map-bundle.py"
   pull_request:
     paths:
       - "Plugins/**"
       - ".github/workflows/testplex-build.yml"
       - ".github/scripts/deploy-testplex-hyperv.sh"
+      - ".github/scripts/create-testplex-map-bundle.py"
   workflow_dispatch:
     inputs:
       deploy_to_test_server:
@@ -93,7 +95,7 @@ jobs:
           grep -Fq 'chunk.getSections()' "$builder"
           grep -Fq 'Arrays.fill(chunk.heightMap, 0)' "$builder"
           grep -Fq 'chunk.e();' "$builder"
-          grep -Fq 'ARTIFACT_CACHE="/tmp/testplex-artifact-cache"' .github/scripts/deploy-testplex-hyperv.sh
+          grep -Fq 'ARTIFACT_CACHE="/var/tmp/testplex-artifact-cache"' .github/scripts/deploy-testplex-hyperv.sh
           grep -Fq -- '--checksum --partial' .github/workflows/testplex-build.yml
           grep -Fq 'Material.CHEST' Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/managers/GameHostManager.java
           grep -Fq 'Manager.isTestplexSandbox()' Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/managers/GameHostManager.java
@@ -111,12 +113,49 @@ jobs:
           unzip -tq Plugins/out/testplex-map-assets.zip >/dev/null
           ls -lh Plugins/out/testplex-map-assets.zip
 
+      - name: Verify deterministic map bundle packaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          import os
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+
+          script = Path(".github/scripts/create-testplex-map-bundle.py")
+          spec = importlib.util.spec_from_file_location("testplex_map_bundle", script)
+          if spec is None or spec.loader is None:
+              raise SystemExit("Could not load the map bundle packaging module.")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+
+          with TemporaryDirectory() as temp:
+              root = Path(temp)
+              maps = root / "maps"
+              category = maps / "Lobby"
+              category.mkdir(parents=True)
+              source = category / "sample.zip"
+              source.write_bytes(b"same map archive bytes")
+              first = root / "first.zip"
+              second = root / "second.zip"
+
+              os.utime(source, (1700000000, 1700000000))
+              module.package_maps(maps, first)
+              os.utime(source, (1800000000, 1800000000))
+              module.package_maps(maps, second)
+
+              if first.read_bytes() != second.read_bytes():
+                  raise SystemExit("Map bundle changed when only source file mtimes changed.")
+          print("Map bundle packaging is reproducible across checkout mtimes.")
+          PY
+
       - name: Smoke-check native gameplay and cosmetic hooks
         shell: bash
         run: |
           set -euo pipefail
           bash -n .github/scripts/deploy-testplex-hyperv.sh
-          grep -Fq 'ARTIFACT_CACHE="/tmp/testplex-artifact-cache"' .github/scripts/deploy-testplex-hyperv.sh
+          grep -Fq 'ARTIFACT_CACHE="/var/tmp/testplex-artifact-cache"' .github/scripts/deploy-testplex-hyperv.sh
           bash <<'BASH'
           set -euo pipefail
           JAR_ENTRY_RE='^[A-Za-z0-9._+() -]+[.]jar$'
@@ -505,7 +544,8 @@ jobs:
 
           port="${HYPERV_SSH_PORT:-22}"
           remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
-          upload_dir="/tmp/testplex-artifact-cache"
+          upload_dir="/var/tmp/testplex-artifact-cache"
+          legacy_upload_dir="/tmp/testplex-artifact-cache"
           deploy_script="/tmp/testplex-deploy-script-$BUILD_SHA.sh"
           ssh_opts=(-p "$port" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
@@ -514,7 +554,7 @@ jobs:
 
           echo "Preflight: checking SSH reachability, sandbox marker and service responsiveness before transfer."
           ssh "${ssh_opts[@]}" "$remote" \
-            "set -eu; test -f '$TESTPLEX_SERVER_DIR/.testplex-sandbox'; test -d '$TESTPLEX_SERVER_DIR/plugins'; printf 'Remote host: '; hostname; printf 'Test service state: '; timeout 8 systemctl is-active '$TESTPLEX_SYSTEMD_SERVICE' || true; echo 'Memory:'; free -h; echo 'Disk:'; df -h '$TESTPLEX_SERVER_DIR'"
+            "set -eu; test -f '$TESTPLEX_SERVER_DIR/.testplex-sandbox'; test -d '$TESTPLEX_SERVER_DIR/plugins'; printf 'Remote host: '; hostname; printf 'Test service state: '; timeout 8 systemctl is-active '$TESTPLEX_SYSTEMD_SERVICE' || true; echo 'Memory:'; free -h; echo 'Disk:'; df -h '$TESTPLEX_SERVER_DIR'; echo 'Disk-backed upload target:'; df -h /var/tmp"
 
           echo "Preparing a persistent, checksum-verified artifact cache on the test VM."
           ssh "${ssh_opts[@]}" "$remote" "install -d -m 0700 '$upload_dir'"
@@ -546,6 +586,8 @@ jobs:
             exit 1
           }
           echo "Both remote artifacts verified by SHA-256."
+          echo "Removing the legacy cache from /tmp after the disk-backed cache has passed checksums."
+          ssh "${ssh_opts[@]}" "$remote" "rm -rf '$legacy_upload_dir'; echo 'Remaining /var/tmp and /tmp capacity:'; df -h '$upload_dir'; df -h /tmp"
 
           scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
