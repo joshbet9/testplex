@@ -125,7 +125,7 @@ public abstract class LobbyManager implements Listener
 
 	public boolean isMPS()
 	{
-		return _manager.GetHost() != null;
+		return !_manager.isTestplexSandbox() && _manager.GetHost() != null;
 	}
 
 	public void writeGameLine(String text, int line, int id, byte data)
@@ -627,7 +627,10 @@ public abstract class LobbyManager implements Listener
 			_manager.getCosmeticManager().giveInterfaceItem(player);
 			_manager.getBoosterManager().giveInterfaceItem(player);
 			_manager.getTitles().giveBookIfNotExists(player, false);
-			_manager.getPartyManager().giveItemIfNotExists(player);
+			if (!_manager.isTestplexSandbox())
+			{
+				_manager.getPartyManager().giveItemIfNotExists(player);
+			}
 		}
 	}
 

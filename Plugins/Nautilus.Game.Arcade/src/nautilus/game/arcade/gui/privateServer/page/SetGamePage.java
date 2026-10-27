@@ -102,7 +102,7 @@ public class SetGamePage extends BasePage
 				if (getPlugin().GetGame() == null)
 				{
 					creation.setNextGameType(type);
-					if (UtilServer.isTestServer())
+					if (UtilServer.isTestServer() || getPlugin().isTestplexSandbox())
 					{
 						getPlugin().GetGameList().clear();
 						getPlugin().GetGameList().add(type);

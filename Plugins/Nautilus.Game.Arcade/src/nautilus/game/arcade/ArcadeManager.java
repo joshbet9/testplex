@@ -272,6 +272,7 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 
 	// Server Games
 	private GameServerConfig _serverConfig;
+	private boolean _testplexSandbox;
 
 	// Games
 	private Game _game;
@@ -280,7 +281,7 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 
 	private final Titles _titles;
 
-	public boolean isTestplexSandbox()
+	private boolean readTestplexSandboxMarker()
 	{
 		File marker = new File(".testplex-sandbox");
 		if (!marker.isFile())
@@ -297,6 +298,10 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 			return false;
 		}
 	}
+	public boolean isTestplexSandbox()
+	{
+		return _testplexSandbox;
+	}
 
 	public ArcadeManager(Arcade plugin, ServerStatusManager serverStatusManager, GameServerConfig serverConfig,
 						 CoreClientManager clientManager, DonationManager donationManager, DamageManager damageManager,
@@ -308,6 +313,7 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 		super("Game", plugin);
 
 		_serverConfig = serverConfig;
+		_testplexSandbox = readTestplexSandboxMarker();
 
 		// Modules
 		_blockRestore = Managers.get(BlockRestore.class);
@@ -439,7 +445,7 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 		_missionsManager.createNPC(_gameLobbyManager.getMissions());
 		_missionsManager.setCanIncrement(() -> false);
 
-		if (GetHost() != null && !GetHost().isEmpty() && !GetHost().startsWith("COM-"))
+		if (!isTestplexSandbox() && GetHost() != null && !GetHost().isEmpty() && !GetHost().startsWith("COM-"))
 		{
 			Bukkit.getScheduler().runTaskLater(plugin, () -> Portal.transferPlayer(GetHost(), _serverStatusManager.getCurrentServerName()), 80L);
 		}
@@ -1668,7 +1674,7 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 
 	public String GetHost()
 	{
-		return _serverConfig.HostName;
+		return isTestplexSandbox() ? null : _serverConfig.HostName;
 	}
 
 	@EventHandler

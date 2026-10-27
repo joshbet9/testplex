@@ -41,7 +41,7 @@ public class MenuPage extends BasePage
 	@Override
 	protected void buildPage()
 	{
-		if (UtilServer.isTestServer() && (getPlugin().GetHost() == null || getPlugin().GetHost().isEmpty()))
+		if (getPlugin().isTestplexSandbox() || (UtilServer.isTestServer() && (getPlugin().GetHost() == null || getPlugin().GetHost().isEmpty())))
 		{
 			addItem(4, getOwnerHead());
 		}
@@ -52,7 +52,7 @@ public class MenuPage extends BasePage
 
 		boolean host = _manager.isHost(getPlayer());
 		boolean canChangeDuringGame = getClientManager().Get(getPlayer()).hasPermission(ArcadeManager.Perm.USE_MENU_DURING_GAME)
-				|| (UtilServer.isTestServer() && (getPlayer().isOp()
+				|| ((UtilServer.isTestServer() || getPlugin().isTestplexSandbox()) && (getPlayer().isOp()
 				|| getClientManager().Get(getPlayer()).hasPermission(ArcadeManager.Perm.GAME_COMMAND)));
 		boolean disableChangeButtons = !canChangeDuringGame && getPlugin().isGameInProgress();
 
@@ -129,7 +129,7 @@ public class MenuPage extends BasePage
 
 	private ShopItem getOwnerHead()
 	{
-		if (UtilServer.isTestServer() && (getPlugin().GetHost() == null || getPlugin().GetHost().isEmpty()))
+		if (getPlugin().isTestplexSandbox() || (UtilServer.isTestServer() && (getPlugin().GetHost() == null || getPlugin().GetHost().isEmpty())))
 		{
 			String title = C.cGreen + C.Bold + "Testplex Arcade Game Panel";
 			ItemStack item = new ItemStack(Material.BEACON);

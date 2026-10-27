@@ -87,6 +87,11 @@ jobs:
           grep -Fq 'TESTPLEX ISOLATED TEST SERVER - NOT PRODUCTION' "$manager"
           grep -Fq 'TestLobbyPlaneBuilder.ensure(Bukkit.getWorld("world"))' "$manager"
           grep -Fq 'world/TEST_LOBBY_PLANE.dat' "$builder"
+          grep -Fq 'TESTPLEX_SANDBOX_LOBBY_V2' "$builder"
+          grep -Fq 'Material.CHEST' Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/managers/GameHostManager.java
+          grep -Fq 'Manager.isTestplexSandbox()' Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/managers/GameHostManager.java
+          grep -Fq 'getPlugin().isTestplexSandbox()' Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/gui/privateServer/page/SetGamePage.java
+          grep -Fq 'if (!_manager.isTestplexSandbox())' Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/managers/lobby/LobbyManager.java
           grep -Fq 'lobby_marker_ready' .github/scripts/deploy-testplex-hyperv.sh
           echo "Verified the isolated sandbox marker and delayed test-lobby readiness contract."
 
@@ -355,7 +360,7 @@ jobs:
   deploy_test_server:
     name: Deploy isolated Reborn test server to Hyper-V
     needs: build
-    if: ${{ always() && github.ref == 'refs/heads/feat/testbed-bootstrap' && ((github.event_name == 'push' && vars.TESTPLEX_AUTO_DEPLOY == 'true' && needs.build.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.deploy_to_test_server && (needs.build.result == 'success' || inputs.source_run_id != ''))) }}
+    if: ${{ always() && github.ref == 'refs/heads/feat/testbed-bootstrap' && ((github.event_name == 'push' && needs.build.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.deploy_to_test_server && (needs.build.result == 'success' || inputs.source_run_id != ''))) }}
     runs-on: ubuntu-22.04
     environment: hyperv
     timeout-minutes: 45

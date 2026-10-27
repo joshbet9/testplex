@@ -147,7 +147,7 @@ public class GameHostManager implements Listener
 		_games.add(GameType.Barbarians);
 		_games.add(GameType.SmashDomination);
 
-		if (UtilServer.isTestServer())
+		if (UtilServer.isTestServer() || Manager.isTestplexSandbox())
 		{
 			for (GameType type : GameType.values())
 			{
@@ -161,7 +161,7 @@ public class GameHostManager implements Listener
 		_games.sort(Comparator.comparing(GameType::getName));
 
 		//Config Defaults
-		if (Manager.GetHost() != null && Manager.GetHost().length() > 0)
+		if (!Manager.isTestplexSandbox() && Manager.GetHost() != null && Manager.GetHost().length() > 0)
 		{
 			setDefaultConfig();
 		}
@@ -201,8 +201,9 @@ public class GameHostManager implements Listener
 		if (event.getType() != UpdateType.FAST)
 			return;
 
-		//No Host - Not MPS
-		if (Manager.GetHost() == null || Manager.GetHost().length() == 0)
+		// The isolated sandbox intentionally has no MPS host/network identity.
+		// It still needs its local Game Panel and tester hotbar items.
+		if (!Manager.isTestplexSandbox() && (Manager.GetHost() == null || Manager.GetHost().length() == 0))
 			return;
 
 		// Set as event server
@@ -431,14 +432,28 @@ public class GameHostManager implements Listener
 
 	private void giveAdminItem(Player player)
 	{
-		if (Manager.GetGame() == null)
-			return;
-
-		if (UtilGear.isMat(player.getInventory().getItem(8), Material.SPECKLED_MELON))
+		boolean sandbox = Manager.isTestplexSandbox();
+		if (Manager.GetGame() == null && !sandbox)
 			return;
 
 		if (player.getOpenInventory().getType() != InventoryType.CRAFTING &&
 			player.getOpenInventory().getType() != InventoryType.CREATIVE)
+			return;
+
+		if (sandbox)
+		{
+			if (!UtilGear.isMat(player.getInventory().getItem(8), Material.SPECKLED_MELON))
+			{
+				player.getInventory().setItem(8, ItemStackFactory.Instance.CreateStack(Material.SPECKLED_MELON, (byte)0, 1, C.cGreen + C.Bold + "Game Panel"));
+			}
+			if (!UtilGear.isMat(player.getInventory().getItem(7), Material.CHEST))
+			{
+				player.getInventory().setItem(7, ItemStackFactory.Instance.CreateStack(Material.CHEST, (byte)0, 1, C.cGreen + C.Bold + "Cosmetics"));
+			}
+			return;
+		}
+
+		if (UtilGear.isMat(player.getInventory().getItem(8), Material.SPECKLED_MELON))
 			return;
 
 		player.getInventory().setItem(8, ItemStackFactory.Instance.CreateStack(Material.SPECKLED_MELON, (byte)0, 1, C.cGreen + C.Bold + "/menu"));
@@ -544,24 +559,42 @@ public class GameHostManager implements Listener
 		if (!event.getMessage().toLowerCase().startsWith("/menu"))
 			return;
 
-		if (!isPrivateServer())
+		if (!isPrivateServer() && !Manager.isTestplexSandbox())
 			return;
 
 		if (!isAdmin(event.getPlayer(), true))
 			return;
 
 		event.setCancelled(true);
-		openMenu(event.getPlayer());
+		if (Manager.isTestplexSandbox())
+			openGamePanel(event.getPlayer());
+		else
+			openMenu(event.getPlayer());
 	}
 
 	@EventHandler
 	public void menuInteract(PlayerInteractEvent event)
 	{
-		if (!isPrivateServer())
+		if (!isPrivateServer() && !Manager.isTestplexSandbox())
 			return;
 
 		if (!isAdmin(event.getPlayer(), true))
 			return;
+
+		if (Manager.isTestplexSandbox())
+		{
+			if (UtilGear.isMat(event.getPlayer().getItemInHand(), Material.SPECKLED_MELON))
+			{
+				event.setCancelled(true);
+				openGamePanel(event.getPlayer());
+			}
+			else if (UtilGear.isMat(event.getPlayer().getItemInHand(), Material.CHEST))
+			{
+				event.setCancelled(true);
+				Bukkit.dispatchCommand(event.getPlayer(), "cosmetics");
+			}
+			return;
+		}
 
 		if (!UtilGear.isMat(event.getPlayer().getItemInHand(), Material.SPECKLED_MELON))
 			return;
@@ -583,7 +616,7 @@ public class GameHostManager implements Listener
 	public boolean openGamePanel(Player player)
 	{
 		boolean allowed;
-		if (UtilServer.isTestServer())
+		if (UtilServer.isTestServer() || Manager.isTestplexSandbox())
 		{
 			allowed = player.isOp()
 					|| Manager.GetClients().Get(player).hasPermission(ArcadeManager.Perm.GAME_COMMAND);
@@ -610,6 +643,10 @@ public class GameHostManager implements Listener
 
 	public boolean isAdmin(Player player, boolean includeStaff)
 	{
+		if (Manager.isTestplexSandbox())
+		{
+			return player.isOp() || Manager.GetClients().Get(player).hasPermission(ArcadeManager.Perm.GAME_COMMAND);
+		}
 		if (isCommunityServer())
 		{
 			return (getOwner().getMembers().containsKey(player.getUniqueId()) && getOwner().getMembers().get(player.getUniqueId()).Role.ordinal() <= CommunityRole.COLEADER.ordinal()) || (includeStaff && Manager.GetClients().Get(player).hasPermission(Perm.AUTO_ADMIN_ACCESS));
@@ -619,6 +656,10 @@ public class GameHostManager implements Listener
 
 	public boolean isHost(Player player)
 	{
+		if (Manager.isTestplexSandbox())
+		{
+			return false;
+		}
 		if (Manager.GetHost() != null && Manager.GetHost().startsWith("COM-"))
 		{
 			CommunityManager cmanager = Managers.get(CommunityManager.class);
@@ -632,7 +673,9 @@ public class GameHostManager implements Listener
 
 	public boolean isPrivateServer()
 	{
-		return Manager.GetHost() != null && Manager.GetHost().length() > 0;
+		// The sandbox is a single process and must never inherit MPS expiry or
+		// server-transfer behaviour, even if server configuration names a host.
+		return !Manager.isTestplexSandbox() && Manager.GetHost() != null && Manager.GetHost().length() > 0;
 	}
 
 	@EventHandler

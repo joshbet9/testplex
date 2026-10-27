@@ -314,7 +314,7 @@ else
   fi
 fi
 
-if [[ ! -f "$ROOT/world/NEW.dat" && ! -f "$ROOT/world/TEST_LOBBY_PLANE.dat" && -d "$ROOT/world" ]]; then
+if [[ -d "$ROOT/world" ]] && ! grep -Fxq "TESTPLEX_SANDBOX_LOBBY_V2" "$ROOT/world/TEST_LOBBY_PLANE.dat" 2>/dev/null; then
   echo "Backing up the current world before preparing the flat lobby."
   tar -czf "$WORLD_BACKUP" -C "$ROOT" world
   WORLD_BACKUP_CREATED=1
@@ -410,7 +410,7 @@ for attempt in $(seq 1 180); do
     arcade_log_ready=1
     echo "Observed the fresh Arcade enable log; waiting for lobby provisioning to finish."
   fi
-  if [[ -f "$ROOT/world/NEW.dat" || -f "$ROOT/world/TEST_LOBBY_PLANE.dat" ]]; then
+  if [[ -f "$ROOT/world/TEST_LOBBY_PLANE.dat" ]] && grep -Fxq "TESTPLEX_SANDBOX_LOBBY_V2" "$ROOT/world/TEST_LOBBY_PLANE.dat"; then
     lobby_marker_ready=1
   fi
   if [[ "$arcade_log_ready" -eq 1 && "$lobby_marker_ready" -eq 1 ]]; then
@@ -423,7 +423,7 @@ if [[ "$ready" -ne 1 ]]; then
   if [[ "$arcade_log_ready" -ne 1 ]]; then
     echo "Arcade did not produce a fresh startup log marker within 180 seconds; diagnostics follow before rollback." >&2
   else
-    echo "Arcade startup was logged, but neither world/NEW.dat nor world/TEST_LOBBY_PLANE.dat appeared within 180 seconds; diagnostics follow before rollback." >&2
+    echo "Arcade startup was logged, but the versioned TESTPLEX_SANDBOX_LOBBY_V2 plane marker did not appear within 180 seconds; diagnostics follow before rollback." >&2
   fi
   dump_diagnostics
   exit 1

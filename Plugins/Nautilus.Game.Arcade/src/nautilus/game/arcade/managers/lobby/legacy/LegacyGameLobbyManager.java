@@ -48,10 +48,10 @@ public class LegacyGameLobbyManager extends LobbyManager
 				new Location(WORLD, 0, 102.5, -15)
 		);
 
-		setGameText(new Location(WORLD, 0, 130, 50));
+		setGameText(new Location(WORLD, 0, 130, manager.isTestplexSandbox() ? 44 : 50));
 		setKitText(new Location(WORLD, -40, 120, 0));
 		setTeamText(new Location(WORLD, 40, 120, 0));
-		setAdvText(new Location(WORLD, 0, 140, -60));
+		setAdvText(new Location(WORLD, 0, 140, manager.isTestplexSandbox() ? -44 : -60));
 
 		setPodium(new Location(WORLD, 0, 101.5, -15), Material.EMERALD_BLOCK.getId(), (byte) 0);
 
