@@ -1,5 +1,6 @@
 package nautilus.game.arcade.game.games.monstermaze;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -9,6 +10,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.Set;
 import java.util.UUID;
 
@@ -53,6 +55,9 @@ import net.minecraft.server.v1_8_R3.PacketPlayOutAnimation;
 import net.minecraft.server.v1_8_R3.PacketPlayOutBlockBreakAnimation;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Color;
+import org.bukkit.Effect;
+import org.bukkit.FireworkEffect;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
@@ -60,6 +65,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Firework;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Snowman;
@@ -67,6 +73,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.EntityBlockFormEvent;
+import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 
@@ -106,6 +113,9 @@ public class Maze implements Listener
 	private long _initialSafePadCreatedAt;
 	private long _lastSafePadBeaconCheckAt;
 	private boolean _preRoundBeaconCheckDone;
+	private final List<Location> _firstStageParticlePath = new ArrayList<Location>();
+	private final Set<Integer> _celebratedPadStages = new HashSet<Integer>();
+	private int _firstStageParticleTick;
 			
 	@SuppressWarnings("deprecation")
 	public Maze(MonsterMaze host, MazePreset maze)
@@ -139,12 +149,17 @@ public class Maze implements Listener
 			_movementWaypointsDisabled.add(loc.getBlock());
 		}
 		
-		_location = maze.getCenter();		
-		
+		_location = maze.getCenter();
+
+		// Entity tracking is process-local; clear any mobs leaked by a previous instance
+		// before this run constructs its own mob list and first objective.
+		clearStaleMazeSnowmen();
 		spawnSafePad();
 		_safePad = _nextSafePad;
 		_nextSafePad = null;
 		_initialSafePadCreatedAt = System.currentTimeMillis();
+		buildFirstStageParticlePath();
+		updateCompassTargets();
 		
 		Bukkit.getPluginManager().registerEvents(this, _host.Manager.getPlugin());
 	}
@@ -206,14 +221,17 @@ public class Maze implements Listener
 	{
 		if (event.getType() != UpdateType.FASTER)
 			return;
-		
+		updateCompassTargets();
+	}
+
+	/** Retarget immediately when the active objective changes, not only on the next updater tick. */
+	private void updateCompassTargets()
+	{
 		if (_safePad == null)
 			return;
-		
+		Location target = _safePad.getLocation().clone().add(0.5D, 0.0D, 0.5D);
 		for (Player player : _host.GetPlayers(true))
-		{
-			player.setCompassTarget(_safePad.getLocation());
-		}
+			player.setCompassTarget(target);
 	}
 	
 	@EventHandler
@@ -225,6 +243,8 @@ public class Maze implements Listener
 		if (!_host.IsLive())
 			return;
 		
+		// The green particle breadcrumb only exists for stage one.
+		updateFirstStageParticlePath();
 		//Updates
 		checkPlayersOnSafePad();
 		move();
@@ -1228,19 +1248,16 @@ public class Maze implements Listener
 				Entity e = it.next();
 				if (_nextSafePad.isOn(e))
 				{
-					_ents.remove(_ents.get(e));
 					it.remove();
 					e.remove();
 				}
 			}
 			
 			_curSafe++;
-			
 			_safePad = _nextSafePad;
 			_nextSafePad = null;
-
-			
-			
+			buildFirstStageParticlePath();
+			updateCompassTargets();
 		}
 	}
 	
@@ -1276,7 +1293,9 @@ public class Maze implements Listener
 			_host.AddGems(p, 2, "Safe Pads Reached", true, true);
 
 			if (_playersOnPad.size() == 1) // first player
-			{	
+			{
+				if (_curSafe <= 2)
+					playFirstTwoStagePadFireworks();
 				_host.Announce(F.main("Game", F.name(p.getName()) + " made it to the Safe Pad first!"));
 
 				UtilTextMiddle.display("", C.cYellow + C.Bold + "You got to the Safe Pad first!", 5, 40, 5, p);
@@ -1338,24 +1357,184 @@ public class Maze implements Listener
 		return _phaseTimer;
 	}
 	
+	private String pathCellKey(Location location)
+	{
+		return location.getBlockX() + ":" + location.getBlockZ();
+	}
+
+	private Location nearestMazePathCell(Location target, Map<String, Location> locations)
+	{
+		Location nearest = null;
+		double best = Double.MAX_VALUE;
+		for (Location candidate : locations.values())
+		{
+			double dx = candidate.getBlockX() - target.getBlockX();
+			double dz = candidate.getBlockZ() - target.getBlockZ();
+			double distance = dx * dx + dz * dz;
+			if (distance < best)
+			{
+				best = distance;
+				nearest = candidate;
+			}
+		}
+		return nearest;
+	}
+
+	/** Build a genuine walkable breadcrumb from the centre to the first Safe Pad. */
+	private void buildFirstStageParticlePath()
+	{
+		_firstStageParticlePath.clear();
+		_firstStageParticleTick = 0;
+		if (_curSafe != 1 || _safePad == null || _preset == null || _preset.getCenter() == null)
+			return;
+
+		Map<String, Location> cells = new HashMap<String, Location>();
+		for (Location location : _preset.getMaze())
+			cells.put(pathCellKey(location), location.clone());
+		if (cells.isEmpty())
+			return;
+
+		Location centre = _preset.getCenter();
+		Location start = nearestMazePathCell(centre, cells);
+		Location target = nearestMazePathCell(_safePad.getLocation(), cells);
+		if (start == null || target == null)
+			return;
+
+		String startKey = pathCellKey(start);
+		String targetKey = pathCellKey(target);
+		Queue<Location> queue = new ArrayDeque<Location>();
+		Set<String> visited = new HashSet<String>();
+		Map<String, String> previous = new HashMap<String, String>();
+		queue.add(start);
+		visited.add(startKey);
+		int[][] directions = new int[][] {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
+		while (!queue.isEmpty() && !visited.contains(targetKey))
+		{
+			Location current = queue.remove();
+			String currentKey = pathCellKey(current);
+			for (int[] direction : directions)
+			{
+				String nextKey = (current.getBlockX() + direction[0]) + ":" + (current.getBlockZ() + direction[1]);
+				Location next = cells.get(nextKey);
+				if (next == null || !visited.add(nextKey))
+					continue;
+				previous.put(nextKey, currentKey);
+				queue.add(next);
+			}
+		}
+		if (!visited.contains(targetKey))
+			return;
+
+		List<Location> reversed = new ArrayList<Location>();
+		String cursor = targetKey;
+		while (cursor != null)
+		{
+			Location location = cells.get(cursor);
+			if (location != null)
+				reversed.add(location.clone());
+			if (cursor.equals(startKey))
+				break;
+			cursor = previous.get(cursor);
+		}
+		if (reversed.isEmpty() || !pathCellKey(reversed.get(reversed.size() - 1)).equals(startKey))
+			return;
+		Collections.reverse(reversed);
+
+		// Draw a short continuous segment from the exact central marker to the graph.
+		int dx = start.getBlockX() - centre.getBlockX();
+		int dz = start.getBlockZ() - centre.getBlockZ();
+		int steps = Math.max(Math.abs(dx), Math.abs(dz));
+		for (int step = 0; step <= steps; step++)
+		{
+			double fraction = steps == 0 ? 0.0D : (double) step / (double) steps;
+			Location point = centre.clone();
+			point.setX(centre.getBlockX() + 0.5D + dx * fraction);
+			point.setZ(centre.getBlockZ() + 0.5D + dz * fraction);
+			point.setY(centre.getY() + 0.2D);
+			_firstStageParticlePath.add(point);
+		}
+		for (Location location : reversed)
+			_firstStageParticlePath.add(location.clone().add(0.5D, 0.2D, 0.5D));
+	}
+
+	private void updateFirstStageParticlePath()
+	{
+		if (_curSafe != 1 || _firstStageParticlePath.isEmpty())
+			return;
+		if (++_firstStageParticleTick % 10 != 0)
+			return;
+		for (Location point : _firstStageParticlePath)
+		{
+			if (point.getWorld() != null)
+				point.getWorld().playEffect(point, Effect.HAPPY_VILLAGER, 0);
+		}
+	}
+
+	private void playFirstTwoStagePadFireworks()
+	{
+		if (_safePad == null || _curSafe < 1 || _curSafe > 2 || !_celebratedPadStages.add(_curSafe))
+			return;
+		Location location = _safePad.getLocation().clone().add(0.5D, 1.0D, 0.5D);
+		if (location.getWorld() == null)
+			return;
+		Firework firework = location.getWorld().spawn(location, Firework.class);
+		FireworkMeta meta = firework.getFireworkMeta();
+		Color colour = _curSafe == 1 ? Color.LIME : Color.AQUA;
+		FireworkEffect effect = FireworkEffect.builder()
+				.with(FireworkEffect.Type.BALL_LARGE)
+				.withColor(colour)
+				.withFade(Color.WHITE)
+				.trail(true)
+				.flicker(true)
+				.build();
+		meta.addEffect(effect);
+		meta.setPower(0);
+		firework.setFireworkMeta(meta);
+	}
+
+	/** Clear stale hidden Snowman bodies within the current generated maze footprint. */
+	private void clearStaleMazeSnowmen()
+	{
+		if (_preset == null || _preset.getCenter() == null)
+			return;
+		Location centre = _preset.getCenter();
+		if (centre.getWorld() == null)
+			return;
+		for (Entity entity : new ArrayList<Entity>(centre.getWorld().getEntities()))
+		{
+			if (!(entity instanceof Snowman))
+				continue;
+			Location location = entity.getLocation();
+			if (Math.abs(location.getX() - centre.getX()) <= 52.0D
+					&& Math.abs(location.getZ() - centre.getZ()) <= 52.0D
+					&& Math.abs(location.getY() - centre.getY()) <= 24.0D)
+				entity.remove();
+		}
+	}
+
 	@EventHandler
 	public void onGameStateDead(GameStateChangeEvent event)
 	{
 		if (event.GetState() != GameState.Dead)
 			return;
 
-		// The arena/world may be reused by another round. Remove every mob and restore
-		// the exact Safe Pad block snapshots so entities, ice states, and decayed pads
-		// cannot leak into the next game.
+		// The arena/world may be reused by another round. Remove every tracked entity plus
+		// stale backing Snowmen from a previous Maze instance, and restore all objective blocks.
 		for (LivingEntity entity : new ArrayList<LivingEntity>(_ents.keySet()))
 		{
 			if (entity != null && entity.isValid())
 				entity.remove();
 		}
 		_ents.clear();
+		clearStaleMazeSnowmen();
 		_frozenUntil.clear();
 		_pendingSpawnLocations.clear();
 		_playersOnPad.clear();
+		_viewerMobSetIds.clear();
+		_viewerMobTypes.clear();
+		_firstStageParticlePath.clear();
+		_celebratedPadStages.clear();
 
 		if (_safePad != null)
 			_safePad.restoreAll();
