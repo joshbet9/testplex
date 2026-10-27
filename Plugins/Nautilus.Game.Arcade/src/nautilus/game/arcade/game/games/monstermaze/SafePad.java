@@ -5,6 +5,7 @@ import java.util.Iterator;
 
 import mineplex.core.common.util.MapUtil;
 import mineplex.core.common.util.UtilPlayer;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import net.minecraft.server.v1_8_R3.BlockPosition;
 import net.minecraft.server.v1_8_R3.Packet;
 import net.minecraft.server.v1_8_R3.PacketPlayOutBlockBreakAnimation;
@@ -23,7 +24,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 public class SafePad implements Listener
 {
 	private MonsterMaze Host;
-//	private Maze _maze;
+	private Maze _maze;
 	
 	private Location  _loc;
 	private byte _surfaceColour = (byte) 5;
@@ -35,7 +36,7 @@ public class SafePad implements Listener
 	public SafePad(MonsterMaze host, Maze maze, Location loc)
 	{
 		Host = host;
-//		_maze = maze;
+		_maze = maze;
 		
 		_loc = loc;
 		Bukkit.getPluginManager().registerEvents(this, Host.Manager.getPlugin());
@@ -163,21 +164,20 @@ public class SafePad implements Listener
 	
 	public void build()
 	{
-		for(SafePadBlock spb : _blocks)
-		{
+		for (SafePadBlock spb : _blocks)
 			spb.build();
-		}
+		applyViewerCosmeticColours();
 	}
 	
 	private void setBreakData(byte newData)
 	{
 		for (SafePadBlock spb : _blocks)
 		{
-			if (spb.getBlockMaterial() != Material.STAINED_CLAY) 
+			if (spb.getBlockMaterial() != Material.STAINED_CLAY)
 				continue;
-			
 			spb.setData(newData);
 		}
+		applyViewerCosmeticColours();
 	}
 	
 	/**
@@ -191,6 +191,7 @@ public class SafePad implements Listener
 			return false;
 
 		MapUtil.QuickChangeBlockAt(_loc, Material.BEACON.getId(), (byte) 0);
+		applyViewerCosmeticColours();
 		return true;
 	}
 
@@ -200,7 +201,7 @@ public class SafePad implements Listener
 		{
 			if (bl.getBlockMaterial() == Material.IRON_BLOCK)
 				bl.setMaterial(Material.QUARTZ_BLOCK);
-			
+
 			if (bl.getBlockMaterial() == Material.BEACON)
 			{
 				bl.setMaterial(Material.STAINED_CLAY);
@@ -208,6 +209,63 @@ public class SafePad implements Listener
 			}
 		}
 		unregisterListener();
+		applyViewerCosmeticColours();
+	}
+
+	@SuppressWarnings("deprecation")
+	private void applyViewerCosmeticColours()
+	{
+		if (Host == null || _loc == null || _loc.getWorld() == null)
+			return;
+
+		Location beamLocation = _loc.clone().add(0, 1, 0);
+		boolean beaconPresent = _loc.getBlock().getType() == Material.BEACON;
+		boolean beamSpaceIsAir = beamLocation.getBlock().getType() == Material.AIR;
+
+		for (Player viewer : Host.GetPlayers(false))
+		{
+			String mobSet = _maze == null ? null : _maze.getMobSetForPlayer(viewer);
+			boolean customPack = mobSet != null && ArcadeCosmeticsMenu.isMonsterMazeCustomPackUnlocked(viewer.getUniqueId());
+			for (SafePadBlock block : _blocks)
+			{
+				if (block.getBlockMaterial() != Material.STAINED_CLAY)
+					continue;
+
+				byte data = customPack
+						? (byte) ArcadeCosmeticsMenu.getMonsterMazeSafePadColourData(viewer.getUniqueId(), mobSet)
+						: block.getBlockData();
+				viewer.sendBlockChange(block.getLocation(), Material.STAINED_CLAY, data);
+			}
+
+			if (customPack && beaconPresent && beamSpaceIsAir)
+			{
+				byte colour = (byte) ArcadeCosmeticsMenu.getMonsterMazeBeaconColourData(viewer.getUniqueId(), mobSet);
+				// This is a client-only glass block used to tint the beacon beam.
+				viewer.sendBlockChange(beamLocation, Material.STAINED_GLASS, colour);
+			}
+			else
+			{
+				viewer.sendBlockChange(beamLocation, beamLocation.getBlock().getType(), beamLocation.getBlock().getData());
+			}
+		}
+	}
+
+	@SuppressWarnings("deprecation")
+	private void clearViewerCosmeticColours()
+	{
+		if (Host == null || _loc == null || _loc.getWorld() == null)
+			return;
+
+		for (Player viewer : Host.GetPlayers(false))
+		{
+			for (SafePadBlock block : _blocks)
+			{
+				Location location = block.getLocation();
+				viewer.sendBlockChange(location, location.getBlock().getType(), location.getBlock().getData());
+			}
+			Location beamLocation = _loc.clone().add(0, 1, 0);
+			viewer.sendBlockChange(beamLocation, beamLocation.getBlock().getType(), beamLocation.getBlock().getData());
+		}
 	}
 
 	private void unregisterListener()
@@ -344,13 +402,12 @@ public class SafePad implements Listener
 	
 	public void destroySurface()
 	{
-		for (final SafePadBlock bl : _blocks)
-		{			
+		for (SafePadBlock bl : _blocks)
+		{
 			if (bl.getBlockMaterial() == Material.STAINED_CLAY)
-			{		
 				bl.restore();
-			}
 		}
+		clearViewerCosmeticColours();
 	}
 
 	/**
@@ -360,9 +417,8 @@ public class SafePad implements Listener
 	public void restoreAll()
 	{
 		for (SafePadBlock block : _blocks)
-		{
 			block.restore();
-		}
+		clearViewerCosmeticColours();
 		unregisterListener();
 	}
 
