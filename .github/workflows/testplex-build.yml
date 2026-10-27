@@ -77,6 +77,19 @@ jobs:
           find Plugins/out -maxdepth 1 -type f -name '*.jar' -printf '%f %s bytes\n' | sort
           test -s Plugins/out/Arcade.jar
           python3 -m py_compile .github/scripts/create-testplex-map-bundle.py
+      - name: Verify isolated test lobby bootstrap contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          manager="Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/ArcadeManager.java"
+          builder="Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/managers/lobby/legacy/TestLobbyPlaneBuilder.java"
+          grep -Fq 'isTestplexSandbox()' "$manager"
+          grep -Fq 'TESTPLEX ISOLATED TEST SERVER - NOT PRODUCTION' "$manager"
+          grep -Fq 'TestLobbyPlaneBuilder.ensure(Bukkit.getWorld("world"))' "$manager"
+          grep -Fq 'world/TEST_LOBBY_PLANE.dat' "$builder"
+          grep -Fq 'lobby_marker_ready' .github/scripts/deploy-testplex-hyperv.sh
+          echo "Verified the isolated sandbox marker and delayed test-lobby readiness contract."
+
       - name: Package all Mineplex map archives for the isolated test server
         shell: bash
         run: |
@@ -509,6 +522,10 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30)
+
+          echo "Preflight: checking SSH reachability, sandbox marker and service responsiveness before transfer."
+          ssh "${ssh_opts[@]}" "$remote" \
+            "set -eu; test -f '$TESTPLEX_SERVER_DIR/.testplex-sandbox'; test -d '$TESTPLEX_SERVER_DIR/plugins'; printf 'Remote host: '; hostname; printf 'Test service state: '; timeout 8 systemctl is-active '$TESTPLEX_SYSTEMD_SERVICE' || true; echo 'Memory:'; free -h; echo 'Disk:'; df -h '$TESTPLEX_SERVER_DIR'"
 
           echo "Uploading the full plugin/map bundle to the test VM."
           if ssh "${ssh_opts[@]}" "$remote" "command -v rsync >/dev/null 2>&1"; then

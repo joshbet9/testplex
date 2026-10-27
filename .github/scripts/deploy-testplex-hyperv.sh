@@ -76,12 +76,18 @@ else
       ;;
   esac
 fi
-systemctl cat "$SERVICE" >/dev/null
-systemctl is-active --quiet "$SERVICE" || {
-  echo "Refusing to deploy because $SERVICE is not active before deployment." >&2
-  exit 2
-}
-WORKING_DIR="$(systemctl show "$SERVICE" --property=WorkingDirectory --value)"
+timeout 8 systemctl cat "$SERVICE" >/dev/null
+SERVICE_STATE="$(timeout 8 systemctl is-active "$SERVICE" 2>/dev/null || true)"
+case "$SERVICE_STATE" in
+  active|inactive|failed)
+    echo "Verified isolated service unit $SERVICE (state: $SERVICE_STATE)."
+    ;;
+  *)
+    echo "Refusing deployment: could not safely resolve $SERVICE state ('$SERVICE_STATE')." >&2
+    exit 2
+    ;;
+esac
+WORKING_DIR="$(timeout 8 systemctl show "$SERVICE" --property=WorkingDirectory --value)"
 [[ "$WORKING_DIR" == "$ROOT" ]] || {
   echo "Refusing deployment: $SERVICE WorkingDirectory is '$WORKING_DIR', expected '$ROOT'." >&2
   exit 2
@@ -222,7 +228,7 @@ rollback() {
       echo "Graceful stop timed out; force-killing only the test service cgroup." >&2
       timeout 10 systemctl kill --kill-who=all --signal=KILL "$SERVICE" || true
     fi
-    if systemctl is-active --quiet "$SERVICE"; then
+    if timeout 5 systemctl is-active --quiet "$SERVICE"; then
       echo "ERROR: $SERVICE still appears active; refusing to overwrite plugin files while Java may be using them." >&2
       timeout 10 systemctl status "$SERVICE" --no-pager --full || true
       rm -f "$INCOMING"
@@ -269,7 +275,7 @@ trap rollback EXIT
 DEPLOYMENT_TOUCHED=1
 echo "Stopping isolated test service $SERVICE."
 timeout 60 systemctl stop "$SERVICE"
-if systemctl is-active --quiet "$SERVICE"; then
+if timeout 5 systemctl is-active --quiet "$SERVICE"; then
   echo "$SERVICE still reports active after stop." >&2
   exit 1
 fi
@@ -350,26 +356,34 @@ dump_diagnostics() {
   timeout 5 dmesg -T 2>/dev/null | grep -Ei 'out of memory|oom-kill|killed process' | tail -n 20 >&2 || true
 }
 
+arcade_log_ready=0
+lobby_marker_ready=0
 ready=0
 for attempt in $(seq 1 180); do
-  if ! systemctl is-active --quiet "$SERVICE"; then
-    echo "$SERVICE became inactive during startup at ${attempt}s." >&2
+  if ! timeout 5 systemctl is-active --quiet "$SERVICE"; then
+    echo "$SERVICE became inactive or systemd did not respond during startup at ${attempt}s." >&2
     break
   fi
-  if [[ -s "$LOG" && "$LOG" -nt "$START_MARKER" ]] \
+  if [[ "$arcade_log_ready" -eq 0 && -s "$LOG" && "$LOG" -nt "$START_MARKER" ]] \
     && tail -n 2500 "$LOG" | grep -Fq "Enabling Arcade"; then
+    arcade_log_ready=1
+    echo "Observed the fresh Arcade enable log; waiting for lobby provisioning to finish."
+  fi
+  if [[ -f "$ROOT/world/NEW.dat" || -f "$ROOT/world/TEST_LOBBY_PLANE.dat" ]]; then
+    lobby_marker_ready=1
+  fi
+  if [[ "$arcade_log_ready" -eq 1 && "$lobby_marker_ready" -eq 1 ]]; then
     ready=1
     break
   fi
   sleep 1
 done
 if [[ "$ready" -ne 1 ]]; then
-  echo "Arcade did not produce a fresh startup marker within 180 seconds; diagnostics follow before rollback." >&2
-  dump_diagnostics
-  exit 1
-fi
-if [[ ! -f "$ROOT/world/NEW.dat" && ! -f "$ROOT/world/TEST_LOBBY_PLANE.dat" ]]; then
-  echo "Arcade started but the expected test lobby plane marker is missing." >&2
+  if [[ "$arcade_log_ready" -ne 1 ]]; then
+    echo "Arcade did not produce a fresh startup log marker within 180 seconds; diagnostics follow before rollback." >&2
+  else
+    echo "Arcade startup was logged, but neither world/NEW.dat nor world/TEST_LOBBY_PLANE.dat appeared within 180 seconds; diagnostics follow before rollback." >&2
+  fi
   dump_diagnostics
   exit 1
 fi

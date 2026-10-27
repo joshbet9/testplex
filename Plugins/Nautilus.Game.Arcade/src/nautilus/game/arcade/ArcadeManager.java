@@ -280,6 +280,24 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 
 	private final Titles _titles;
 
+	private boolean isTestplexSandbox()
+	{
+		File marker = new File(".testplex-sandbox");
+		if (!marker.isFile())
+		{
+			return false;
+		}
+
+		try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader(marker)))
+		{
+			return "TESTPLEX ISOLATED TEST SERVER - NOT PRODUCTION".equals(reader.readLine());
+		}
+		catch (java.io.IOException e)
+		{
+			return false;
+		}
+	}
+
 	public ArcadeManager(Arcade plugin, ServerStatusManager serverStatusManager, GameServerConfig serverConfig,
 						 CoreClientManager clientManager, DonationManager donationManager, DamageManager damageManager,
 						 StatsManager statsManager, IncognitoManager incognitoManager, AchievementManager achievementManager, DisguiseManager disguiseManager, Creature creature, Teleport teleport, Blood blood, Chat chat,
@@ -344,7 +362,7 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 		_gameCreationManager = new GameCreationManager(this);
 		_gameRewardManager = new GameRewardManager(this);
 		_gameManager = new GameManager(this);
-		if (UtilServer.isTestServer() && !new File("world/NEW.dat").exists())
+		if ((UtilServer.isTestServer() || isTestplexSandbox()) && !new File("world/NEW.dat").exists())
 		{
 			TestLobbyPlaneBuilder.ensure(Bukkit.getWorld("world"));
 		}

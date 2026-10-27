@@ -173,6 +173,10 @@ jobs:
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30)
 
+          echo "Preflight: checking SSH reachability, sandbox marker and service responsiveness before transfer."
+          ssh "${ssh_opts[@]}" "$remote" \
+            "set -eu; test -f '$TESTPLEX_SERVER_DIR/.testplex-sandbox'; test -d '$TESTPLEX_SERVER_DIR/plugins'; printf 'Remote host: '; hostname; printf 'Test service state: '; timeout 8 systemctl is-active '$TESTPLEX_SYSTEMD_SERVICE' || true; echo 'Memory:'; free -h; echo 'Disk:'; df -h '$TESTPLEX_SERVER_DIR'"
+
           echo "Uploading the full plugin/map bundle to the test VM."
           if ssh "${ssh_opts[@]}" "$remote" "command -v rsync >/dev/null 2>&1"; then
             rsync --archive --partial --append-verify --timeout=180 --info=progress2 \
