@@ -253,6 +253,7 @@ jobs:
               "Custom Data Manager": Path("Plugins/Mineplex.Core/src/mineplex/core/customdata/CustomDataManager.java").read_text(encoding="utf-8"),
               "Runner": (base / "game/games/runner/Runner.java").read_text(encoding="utf-8"),
               "Bacon Brawl": (base / "game/games/baconbrawl/BaconBrawl.java").read_text(encoding="utf-8"),
+              "Bacon Brawl Ability Effects": (base / "game/games/baconbrawl/BaconBrawlCosmeticEffects.java").read_text(encoding="utf-8"),
               "Dragon Escape": (base / "game/games/dragonescape/DragonEscape.java").read_text(encoding="utf-8"),
               "Death Tag": (base / "game/games/deathtag/DeathTag.java").read_text(encoding="utf-8"),
               "Evolution": (base / "game/games/evolution/Evolution.java").read_text(encoding="utf-8"),
@@ -377,7 +378,11 @@ jobs:
                   "custom trail blocks": "_blockColours.put(block, Byte.valueOf(colour))",
               },
               "Bacon Brawl": {
-                  "player-specific wearable accessory": "getBaconBrawlAccessory(choice)",
+                  "shared theme choice": 'getEquippedChoice(id,"baconbrawl","ability-effects")',
+              },
+              "Bacon Brawl Ability Effects": {
+                  "Porky pink stained-clay particles": "Material.STAINED_CLAY,(byte)6",
+                  "selectable ability sets": '"confetti"',
               },
               "Dragon Escape": {
                   "finish-only celebration hook": "cosmeticFinishCelebration(PlayerFinishEvent event)",
