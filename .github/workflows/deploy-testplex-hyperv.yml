@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 45
     concurrency:
       group: testplex-isolated-hyperv-server
-      cancel-in-progress: false
+      cancel-in-progress: true
     steps:
       - name: Check out deployment script
         uses: actions/checkout@v4
