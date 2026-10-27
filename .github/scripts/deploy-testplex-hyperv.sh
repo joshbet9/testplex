@@ -380,10 +380,11 @@ else
   echo "Reusing the $installed_count already-installed map ZIPs under $MAP_DEST; map directory permissions will still be normalised."
 fi
 
-# This deployment runs with umask 077. Ensure map category directories remain
-# traversable and map archives remain readable by the separate Arcade service
-# user. Run on every deploy, including when the map manifest matches, to repair
-# directories created by earlier deployments with restrictive permissions.
+# This deployment runs with umask 077. Ensure the map root and its parent
+# directory are traversable, map category directories remain listable, and map
+# archives remain readable by the separate Arcade service user. Run on every
+# deploy (even on a map-manifest hit) to repair restrictive earlier permissions.
+chmod 0755 "$(dirname "$MAP_DEST")" "$MAP_DEST"
 find "$MAP_DEST" -type d -exec chmod 0755 {} +
 find "$MAP_DEST" -type f -iname '*.zip' -exec chmod 0644 {} +
 
