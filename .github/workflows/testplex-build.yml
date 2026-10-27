@@ -33,7 +33,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: testplex-build-${{ github.ref }}-${{ github.sha }}
+  group: testplex-build-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -584,6 +584,7 @@ jobs:
         timeout-minutes: 40
         env:
           BUILD_SHA: ${{ steps.source-artifact.outputs.artifact_sha || steps.current-artifact.outputs.artifact_sha || github.sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
@@ -591,6 +592,16 @@ jobs:
           TESTPLEX_SYSTEMD_SERVICE: ${{ vars.TESTPLEX_SYSTEMD_SERVICE }}
         run: |
           set -euo pipefail
+          # Never let an older queued push roll the shared test service back
+          # after a newer branch commit has already been accepted.
+          current_branch_json="$RUNNER_TEMP/testplex-current-branch.json"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/branches/feat/testbed-bootstrap" -o "$current_branch_json"
+          current_branch_sha="$(jq -er '.commit.sha' "$current_branch_json")"
+          if [[ "$BUILD_SHA" != "$current_branch_sha" ]]; then
+            echo "Skipping stale build $BUILD_SHA; current feat/testbed-bootstrap head is $current_branch_sha."
+            exit 0
+          fi
           [[ "$BUILD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Missing valid build SHA." >&2; exit 1; }
           test -n "$HYPERV_SSH_HOST" || { echo 'HYPERV_SSH_HOST is not configured.' >&2; exit 1; }
           test -n "$HYPERV_SSH_USER" || { echo 'HYPERV_SSH_USER is not configured.' >&2; exit 1; }
