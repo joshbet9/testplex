@@ -51,8 +51,31 @@ public class WinEffectBaconBrawl extends WinEffectGadget
                 -2, Material.IRON_AXE, (byte) 0, true);
 
         setHidden(true);
-        _schematicName = "FlatPodium";
+        // Keep WinEffectGadget's generic WinRoomPodium schematic. Bacon Brawl
+        // decorates its floor with a small, bare-dirt Mighty Lava Arena-inspired
+        // fighting area; it does not replace the generic winner room.
         _length = TimeUnit.SECONDS.toMillis(8);
+    }
+
+    @Override
+    public void buildWinnerRoom()
+    {
+        super.buildWinnerRoom();
+
+        Location base = getBaseLocation();
+        int centerX = base.getBlockX();
+        int centerZ = base.getBlockZ();
+        int floorY = base.getBlockY() - 1;
+
+        // Mighty Lava Arena's visual language for this effect is deliberately
+        // just dirt blocks: no grass layer, fences, lava, or extra decoration.
+        for (int x = -6; x <= 6; x++)
+        {
+            for (int z = -6; z <= 6; z++)
+            {
+                base.getWorld().getBlockAt(centerX + x, floorY, centerZ + z).setType(Material.DIRT, false);
+            }
+        }
     }
 
     @Override
