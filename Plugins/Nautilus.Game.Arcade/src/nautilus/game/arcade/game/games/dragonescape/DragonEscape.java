@@ -323,7 +323,7 @@ public class DragonEscape extends SoloGame
 		int colour = ArcadeCosmeticsMenu.colourData(choice == null || choice.isEmpty() ? "white" : choice);
 		if (colour < 0) colour = 0;
 		Location center = leader.getLocation().clone().add(0, 0.45, 0);
-		ParticleType dust = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) colour);
+		String dust = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) colour);
 		for (int i = 0; i < 12; i++)
 		{
 			double angle = Math.PI * 2 * i / 12.0;
