@@ -448,6 +448,27 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (args.length > 0 && "unlock".equalsIgnoreCase(args[0])) {
+            if (!sender.isOp()) {
+                sender.sendMessage(ChatColor.RED + "Only an operator can grant prototype unlocks.");
+                return true;
+            }
+            if (args.length != 4 || !"monstermaze".equalsIgnoreCase(args[2])
+                    || !"custom-pack".equalsIgnoreCase(args[3])) {
+                sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadecosmetics unlock <online-player> monstermaze custom-pack");
+                return true;
+            }
+            Player target = Bukkit.getPlayerExact(args[1]);
+            if (target == null) {
+                sender.sendMessage(ChatColor.RED + "That player must be online for a test unlock.");
+                return true;
+            }
+            setMonsterMazeCustomPackUnlocked(target.getUniqueId(), true);
+            sender.sendMessage(ChatColor.GREEN + "Unlocked the Monster Maze Custom Pack prototype for " + target.getName() + ".");
+            target.sendMessage(ChatColor.GREEN + "The Monster Maze Custom Pack prototype has been unlocked for you.");
+            return true;
+        }
+
         if (!(sender instanceof Player)) {
             sender.sendMessage("Run /arcadecosmetics in-game to open the Arcade Cosmetics prototype selector.");
             return true;
