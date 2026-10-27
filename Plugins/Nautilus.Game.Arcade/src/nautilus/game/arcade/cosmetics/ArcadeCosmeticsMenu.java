@@ -927,10 +927,6 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 player.closeInventory();
                 return;
             }
-            if ("Win Effects".equalsIgnoreCase(itemName)) {
-                openWinEffects(player);
-                return;
-            }
             GameDefinition game = gameFromDisplayName(itemName);
             if (game != null) openGame(player, game);
             return;
@@ -954,46 +950,6 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 FeatureDefinition feature = game.getFeature(plain.substring("Feature: ".length()));
                 if (feature != null) openFeature(player, game, feature);
                 return;
-            }
-            return;
-        }
-
-        if (titleParts.length == 2 && "Win Effects".equals(titleParts[1])) {
-            if ("Back to Games".equalsIgnoreCase(itemName)) {
-                openMain(player);
-                return;
-            }
-            if ("Close".equalsIgnoreCase(itemName)) {
-                player.closeInventory();
-                return;
-            }
-            GameDefinition effectGame = gameFromWinEffectMeta(meta);
-            if (effectGame != null) {
-                toggleWinEffectPlaceholder(player, effectGame);
-                openWinEffects(player);
-            }
-            return;
-        }
-
-        if (titleParts.length == 3 && "Win Effects".equals(titleParts[1])) {
-            GameDefinition selectedGame = games.get(titleParts[2].toLowerCase(Locale.ROOT));
-            if (selectedGame == null) return;
-            if ("Back to Game".equalsIgnoreCase(itemName)) {
-                openGame(player, selectedGame);
-                return;
-            }
-            if ("Back to Games".equalsIgnoreCase(itemName)) {
-                openMain(player);
-                return;
-            }
-            if ("Close".equalsIgnoreCase(itemName)) {
-                player.closeInventory();
-                return;
-            }
-            GameDefinition effectGame = gameFromWinEffectMeta(meta);
-            if (effectGame != null && effectGame.key.equals(selectedGame.key)) {
-                toggleWinEffectPlaceholder(player, effectGame);
-                openWinEffects(player, selectedGame);
             }
             return;
         }
