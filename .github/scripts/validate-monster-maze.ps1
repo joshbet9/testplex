@@ -200,12 +200,22 @@ Assert-Contains "Speed and Modern have native display entries" $displayFile "Mon
 
 Assert-Contains "Maze preset is selected before normal player placement" $mazeCoreFile "selectMazePreset();"
 Assert-Contains "Maze layout void cells are cleared to prevent a second floor" $layoutFile "for (Location loc : _air)"
-Assert-Contains "Monster Maze team start uses the selected preset" $mazeCoreFile "playerTeam.GetSpawns().add(spawn.clone());"
+Assert-Contains "Monster Maze team start uses the centre marker" $mazeCoreFile "playerTeam.GetSpawns().add(centralSpawn.clone());"
+Assert-Contains "Players are reseated at the central start after maze construction" $mazeCoreFile "player.teleport(centralSpawn);"
+Assert-Contains "Visibility toggle is implemented as an interact control" $mazeCoreFile "onVisibilityToggle(PlayerInteractEvent event)"
+Assert-Contains "Personal scoreboards include active Safe Pad distance" $mazeCoreFile 'board.write(C.cAqua + C.Bold + "Distance");'
+Assert-Contains "Personal scoreboards show whether the player is safe" $mazeCoreFile '(safe ? "SAFE" : "UNSAFE")'
+Assert-Contains "Personal scoreboards and visibility are restored at round end" $mazeCoreFile "clearPersonalScoreboardsAndVisibility();"
+Assert-Contains "Compass is refreshed immediately when the active Safe Pad changes" $mazeFile "updateCompassTargets();"
+Assert-Contains "First-stage path is generated through walkable maze cells" $mazeFile "Build a genuine walkable breadcrumb"
+Assert-Contains "First-stage path particle effect is emitted" $mazeFile "world.playEffect(point, Effect.HAPPY_VILLAGER, 0)"
+Assert-Contains "The first two Safe Pads get fireworks" $mazeFile "playFirstTwoStagePadFireworks()"
+Assert-Contains "Stale backing Snowmen are swept at startup and cleanup" $mazeFile "clearStaleMazeSnowmen()"
 Assert-Contains "Bomb Lobbers has direct-hit ding hook" (Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\game\games\lobbers\BombLobbers.java") "directHitDing"
 Assert-Contains "Demo effects are registered" (Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\Arcade.java") "new WinEffectArcadeDemo.MonsterMaze(gadgetManager)"
 Assert-Contains "Bacon Brawl effect is clearly labelled a demo" (Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\wineffect\WinEffectBaconBrawl.java") "Mighty Lava Arena Demo"
 
-Assert-Contains "Speed has separate kit identities" $kitFile "MONSTER_MAZE_SPEED_JUMPER"Assert-Contains "Speed has separate kit identities" $kitFile "MONSTER_MAZE_SPEED_JUMPER"
+Assert-Contains "Speed has separate kit identities" $kitFile "MONSTER_MAZE_SPEED_JUMPER"
 Assert-Contains "Modern has separate kit identities" $kitFile "MONSTER_MAZE_MODERN_JUMPER"
 
 Write-Host ""
