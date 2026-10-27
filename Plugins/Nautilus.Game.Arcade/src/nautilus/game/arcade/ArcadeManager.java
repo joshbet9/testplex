@@ -280,7 +280,7 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 
 	private final Titles _titles;
 
-	private boolean isTestplexSandbox()
+	public boolean isTestplexSandbox()
 	{
 		File marker = new File(".testplex-sandbox");
 		if (!marker.isFile())
