@@ -137,7 +137,7 @@ public class WinEffectBombLobbers extends WinEffectGadget
         _bomb = null;
         _targets.clear();
         _targetDisguises.clear();
-        _winnerNpc = getNPC(_player, getBaseLocation().clone().add(0, 0, -9));
+        _winnerNpc = getNPC(_player, getBaseLocation().clone().add(0, 0, 8));
 
         List<Location> positions = UtilShapes.getPointsInCircle(getBaseLocation(), TARGET_COUNT, 7.2);
         List<Player> skins = new ArrayList<Player>();
