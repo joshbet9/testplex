@@ -25,6 +25,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.inventory.ClickType;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.inventory.Inventory;
@@ -46,6 +47,10 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private static final String MAIN_TITLE = "Arcade Cosmetics | Games";
     private static final String TITLE_PREFIX = "Arcade Cosmetics | ";
     private static final int WIN_EFFECT_SLOT = 31;
+    private static final String[] COLOUR_OPTIONS = {
+            "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
+            "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"
+    };
     private static final int[] GAME_SLOTS = {
             10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43
     };
@@ -97,13 +102,15 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                         "The existing coloured running trail. This option continues to drive the current Dragon Escape colour hook.",
                         "dragonescape", false, "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
                         "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"),
-                feature("death-chat", "Death Chat Lines", Material.NAME_TAG,
-                        "Choose a custom line to send when you die. This is a menu prototype; the chat adapter is not yet connected.",
-                        null, false, "off", "am-i-cooked", "grok-is-this-true"),
-                feature("leader-beacon", "Leader Beacon Colour", Material.BEACON,
-                        "The shared beacon should follow the leading player and use that player's selected colour. Hook not yet connected.",
-                        null, false, "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
-                        "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"));
+                compositeFeature("finish-presentation", "Finish Presentation", Material.BEACON,
+                        "Customise the death chat line and the leader beacon independently within one cosmetic line.",
+                        setting("death-chat", "Death Chat Lines", Material.NAME_TAG,
+                                "Choose a custom line to send when you die. The chat adapter remains prototype work.",
+                                null, false, "off", "am-i-cooked", "grok-is-this-true"),
+                        setting("leader-beacon", "Leader Beacon Colour", Material.BEACON,
+                                "The shared beacon should follow the leading player and use that player's selected colour. Hook not yet connected.",
+                                null, false, "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
+                                "silver", "cyan", "purple", "blue", "brown", "green", "red", "black")));
 
         registerGame("dragons", "Dragons", Material.FIREWORK, (short) 0,
                 "Use a Pyro platform; the winner is hit by a dragon while everyone else falls.",
@@ -113,12 +120,14 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
 
         registerGame("evolution", "Evolution", Material.DRAGON_EGG, (short) 0,
                 "Fly to the top of a building as a chicken, then evolve at the top.",
-                feature("evolution-effect", "Evolution Effect", Material.DRAGON_EGG,
-                        "The existing dragon-egg evolution effect remains selectable for compatibility with the current gameplay hook.",
-                        "evolution", false, "dragon-egg"),
-                feature("egg-appearance", "Dragon Egg Appearance", Material.DRAGON_EGG,
-                        "Prototype alternative dragon-egg appearances and evolving particles. Extra visual hooks are not yet connected.",
-                        null, false, "classic", "charged", "void", "nature"));
+                compositeFeature("evolution-style", "Evolution Appearance & Effects", Material.DRAGON_EGG,
+                        "Choose the existing evolution effect and customise the egg appearance or evolving particles independently.",
+                        setting("evolution-effect", "Evolution Effect", Material.DRAGON_EGG,
+                                "The existing dragon-egg evolution effect remains selectable for compatibility with the current gameplay hook.",
+                                "evolution", false, "dragon-egg"),
+                        setting("egg-appearance", "Dragon Egg Appearance", Material.DRAGON_EGG,
+                                "Prototype alternative dragon-egg appearances and evolving particles. Extra visual hooks are not yet connected.",
+                                null, false, "classic", "charged", "void", "nature")));
 
         registerGame("gladiators", "Gladiators", Material.IRON_SWORD, (short) 0,
                 "Ironic rod/bow spam at an iconic final-fight location.",
@@ -128,26 +137,26 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
 
         registerGame("microbattles", "Micro Battles", Material.STAINED_GLASS, (short) 3,
                 "Three players fall from the pillar, with the winner being the last to fall.",
-                feature("glass-colour", "Starting Glass Colour", Material.STAINED_GLASS,
-                        "The existing player-specific theme colour selection. It must only recolour that player's starting glass.",
-                        "microbattles", false, "aqua", "ember", "forest", "royal", "sunset", "solar", "frost", "void"),
-                feature("border-particles", "Border Particles", Material.FIREWORK,
-                        "Prototype matching-colour particles when you are within three blocks of the border.",
-                        null, false, "matching", "spark", "soft", "off"));
+                compositeFeature("battle-style", "Glass Colour & Border Effects", Material.STAINED_GLASS,
+                        "Customise your starting glass colour and border particles independently within one cosmetic line.",
+                        setting("glass-colour", "Starting Glass Colour", Material.STAINED_GLASS,
+                                "The existing player-specific theme colour selection. It must only recolour that player's starting glass.",
+                                "microbattles", false, "aqua", "ember", "forest", "royal", "sunset", "solar", "frost", "void"),
+                        setting("border-particles", "Border Particles", Material.FIREWORK,
+                                "Prototype matching-colour particles when you are within three blocks of the border.",
+                                null, false, "matching", "spark", "soft", "off")));
 
         registerGame("monstermaze", "Monster Maze", Material.ROTTEN_FLESH, (short) 0,
                 "After Repulsor, pilot to the top Safe Pad with three seconds remaining, accompanied by the Safe Pad sound.",
-                toggleFeature("mob-set-toggles", "Mob Set Toggles", Material.LEVER,
-                        "Placeholder per-set enable/disable controls. The menu stores these toggles, but the live mob-set rotation adapter is not connected here.",
-                        "set-1", "set-2", "set-3", "set-4", "set-5", "set-6"),
-                feature("custom-pack-beacon", "Custom Pack Beacon Colour", Material.BEACON,
-                        "Choose a beacon colour for the Custom Pack. Values are saved separately and do not overwrite standard sets; live colour application is pending.",
-                        null, false, "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
-                        "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"),
-                feature("custom-pack-safe-pad", "Custom Pack Safe Pad Colour", Material.STAINED_CLAY,
-                        "Choose the Safe Pad surface colour for the Custom Pack. Saved independently from standard sets; live colour application is pending.",
-                        null, false, "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
-                        "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"));
+                compositeFeature("mob-line", "Mob Sets & Custom Colours", Material.LEVER,
+                        "Enable or disable each supported mob set for the in-game rotation. Right-click a set to configure that set's beacon and Safe Pad colours after Custom Pack is unlocked.",
+                        setting("mob-sets", "Mob Sets", Material.MONSTER_EGG,
+                                "Toggle individual mob sets for rotation. Right-click a set to set its beacon and Safe Pad colours when Custom Pack is unlocked.",
+                                null, true,
+                                "creeper", "skeleton", "spider", "zombie", "slime", "zombie_pigman",
+                                "enderman", "cave_spider", "silverfish", "blaze", "magma_cube", "bat",
+                                "witch", "endermite", "guardian", "pig", "sheep", "cow", "chicken",
+                                "squid", "wolf", "mooshroom", "snowman", "ocelot", "horse", "rabbit", "villager")));
 
         registerGame("oneinthequiver", "One In The Quiver", Material.ARROW, (short) 0,
                 "An archery bullseye.",
@@ -157,12 +166,14 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
 
         registerGame("paintball", "Paintball", Material.FIREBALL, (short) 0,
                 "Clutch or Kick: kill eight players with one shotgun shot.",
-                feature("pellet-impact", "Pellet Impact Effects", Material.FIREWORK,
-                        "Research placeholder: confirm whether pellet impacts can be exposed independently before implementing this cosmetic.",
-                        null, false, "paint-splash", "spark", "burst", "classic"),
-                feature("weapon-skin", "Weapon Skins", Material.IRON_HOE,
-                        "Research placeholder: validate the native 1.8 item/rendering hooks before implementing weapon skins.",
-                        null, false, "classic", "chrome", "ember", "frost"));
+                compositeFeature("paintball-style", "Weapon Skins & Impact Effects", Material.IRON_HOE,
+                        "Customise weapon appearance and pellet impact effects independently within one cosmetic line.",
+                        setting("pellet-impact", "Pellet Impact Effects", Material.FIREWORK,
+                                "Research placeholder: confirm whether pellet impacts can be exposed independently before implementing this cosmetic.",
+                                null, false, "paint-splash", "spark", "burst", "classic"),
+                        setting("weapon-skin", "Weapon Skins", Material.IRON_HOE,
+                                "Research placeholder: validate the native 1.8 item/rendering hooks before implementing weapon skins.",
+                                null, false, "classic", "chrome", "ember", "frost")));
 
         registerGame("runner", "Runner", Material.LEATHER_BOOTS, (short) 0,
                 "On Euphoria or Mini Euphoria, the winner runs a red W shape, which then breaks away.",
@@ -179,12 +190,14 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
 
         registerGame("snake", "Snake", Material.WOOL, (short) 11,
                 "The winner rides around in a zigzag pattern while the song plays.",
-                feature("skin", "Snake Skin & Ability Colours", Material.WOOL,
-                        "Select a snake colour family. With no selection equipped, the existing random/rainbow palette remains unchanged.",
-                        "snake", false, "elemental", "neon", "sunset"),
-                feature("ability-visuals", "Ability Visuals", Material.FIREWORK,
-                        "Prototype distinct visuals for Super, Speed and Reverse. Skin/ability visuals should remain visible to other players.",
-                        null, false, "classic", "colour-coded", "neon", "subtle"));
+                compositeFeature("snake-style", "Snake Skin & Ability Effects", Material.WOOL,
+                        "Choose a snake colour family and independently customise ability visuals. The default random/rainbow palette remains unchanged when no skin is equipped.",
+                        setting("skin", "Snake Skin & Ability Colours", Material.WOOL,
+                                "Select a snake colour family. With no selection equipped, the existing random/rainbow palette remains unchanged.",
+                                "snake", false, "elemental", "neon", "sunset"),
+                        setting("ability-visuals", "Ability Visuals", Material.FIREWORK,
+                                "Prototype distinct visuals for Super, Speed and Reverse. Skin/ability visuals should remain visible to other players.",
+                                null, false, "classic", "colour-coded", "neon", "subtle")));
 
         registerGame("spleef", "Spleef", Material.IRON_SPADE, (short) 0,
                 "Axe-spleef a dense group of players in a small area, then leap back up.",
@@ -239,6 +252,18 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 toggleOptions, Arrays.asList(options));
     }
 
+    private FeatureDefinition compositeFeature(String key, String displayName, Material icon, String description,
+                                               SettingDefinition... settings) {
+        return new FeatureDefinition(key, displayName, icon, description, null, false,
+                Collections.<String>emptyList(), Arrays.asList(settings));
+    }
+
+    private SettingDefinition setting(String key, String displayName, Material icon, String description,
+                                      String legacyGameKey, boolean toggleOptions, String... options) {
+        return new SettingDefinition(key, displayName, icon, description, legacyGameKey,
+                toggleOptions, Arrays.asList(options));
+    }
+
     private FeatureDefinition toggleFeature(String key, String displayName, Material icon, String description,
                                             String... options) {
         return feature(key, displayName, icon, description, null, true, options);
@@ -259,15 +284,21 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         if (instance == null || playerId == null || game == null || feature == null) return "";
         String key = game.toLowerCase(Locale.ROOT);
         String value = instance.data.getString(featurePath(playerId, key, feature), "");
-        if (value == null || value.isEmpty()) {
-            GameDefinition definition = instance.games.get(key);
-            FeatureDefinition featureDefinition = definition == null ? null : definition.getFeature(feature);
+        if (value != null && !value.isEmpty()) return value.toLowerCase(Locale.ROOT);
+
+        GameDefinition definition = instance.games.get(key);
+        if (definition != null) {
+            SettingDefinition settingDefinition = definition.getSetting(feature);
+            FeatureDefinition parent = definition.getFeatureContainingSetting(feature);
+            if (settingDefinition != null && parent != null) {
+                return instance.getSettingChoice(playerId, definition, parent, settingDefinition);
+            }
+            FeatureDefinition featureDefinition = definition.getFeature(feature);
             if (featureDefinition != null && featureDefinition.legacyGameKey != null) {
                 return getEquippedChoice(playerId, featureDefinition.legacyGameKey);
             }
-            return "";
         }
-        return value.toLowerCase(Locale.ROOT);
+        return "";
     }
 
     private static String featurePath(UUID playerId, String game, String feature) {
@@ -282,6 +313,86 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             data.set("players." + playerId.toString() + "." + feature.legacyGameKey, normalised);
         }
         save();
+    }
+
+    private String settingChoicePath(UUID playerId, GameDefinition game, FeatureDefinition feature,
+                                     SettingDefinition setting) {
+        return "players." + playerId.toString() + ".arcade." + game.key
+                + ".settings." + feature.key + "." + setting.key;
+    }
+
+    private String getSettingChoice(UUID playerId, GameDefinition game, FeatureDefinition feature,
+                                    SettingDefinition setting) {
+        String value = data.getString(settingChoicePath(playerId, game, feature, setting), "");
+        if (value == null || value.isEmpty()) {
+            value = data.getString(featurePath(playerId, game.key, setting.key), "");
+        }
+        if ((value == null || value.isEmpty()) && setting.legacyGameKey != null) {
+            value = data.getString("players." + playerId.toString() + "." + setting.legacyGameKey, "");
+        }
+        return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    private void setSettingChoice(UUID playerId, GameDefinition game, FeatureDefinition feature,
+                                  SettingDefinition setting, String choice) {
+        String normalised = choice == null ? "" : choice.toLowerCase(Locale.ROOT);
+        data.set(settingChoicePath(playerId, game, feature, setting), normalised.isEmpty() ? null : normalised);
+        data.set(featurePath(playerId, game.key, setting.key), normalised.isEmpty() ? null : normalised);
+        if (setting.legacyGameKey != null) {
+            data.set("players." + playerId.toString() + "." + setting.legacyGameKey,
+                    normalised.isEmpty() ? null : normalised);
+        }
+        save();
+    }
+
+    private String settingTogglePath(UUID playerId, GameDefinition game, FeatureDefinition feature,
+                                     SettingDefinition setting, String option) {
+        return "players." + playerId.toString() + ".arcade." + game.key
+                + ".settings-enabled." + feature.key + "." + setting.key + "." + option;
+    }
+
+    private boolean isSettingToggleEnabled(UUID playerId, GameDefinition game, FeatureDefinition feature,
+                                           SettingDefinition setting, String option) {
+        return data.getBoolean(settingTogglePath(playerId, game, feature, setting, option), true);
+    }
+
+    private void setSettingToggleEnabled(UUID playerId, GameDefinition game, FeatureDefinition feature,
+                                         SettingDefinition setting, String option, boolean enabled) {
+        data.set(settingTogglePath(playerId, game, feature, setting, option), enabled);
+        save();
+    }
+
+    /** Connect this to the actual Custom Pack entitlement when the live unlock adapter is available. */
+    public static void setMonsterMazeCustomPackUnlocked(UUID playerId, boolean unlocked) {
+        if (instance == null || playerId == null) return;
+        instance.data.set("players." + playerId.toString() + ".arcade.monstermaze.custom-pack-unlocked", unlocked);
+        instance.save();
+    }
+
+    public static boolean isMonsterMazeCustomPackUnlocked(UUID playerId) {
+        return instance != null && playerId != null && instance.data.getBoolean(
+                "players." + playerId.toString() + ".arcade.monstermaze.custom-pack-unlocked", false);
+    }
+
+    public static boolean isMonsterMazeMobSetEnabled(UUID playerId, String mobSet) {
+        if (instance == null || playerId == null || mobSet == null) return false;
+        GameDefinition game = instance.games.get("monstermaze");
+        FeatureDefinition feature = game == null ? null : game.getFeatureContainingSetting("mob-sets");
+        SettingDefinition setting = game == null ? null : game.getSetting("mob-sets");
+        if (feature == null || setting == null || !setting.options.contains(mobSet.toLowerCase(Locale.ROOT))) return false;
+        return instance.isSettingToggleEnabled(playerId, game, feature, setting, mobSet.toLowerCase(Locale.ROOT));
+    }
+
+    public static int getMonsterMazeBeaconColourData(UUID playerId, String mobSet) {
+        return instance == null || playerId == null || mobSet == null ? colourData("white")
+                : colourData(instance.data.getString("players." + playerId + ".arcade.monstermaze.mob-set-colours."
+                        + mobSet.toLowerCase(Locale.ROOT) + ".beacon", "white"));
+    }
+
+    public static int getMonsterMazeSafePadColourData(UUID playerId, String mobSet) {
+        return instance == null || playerId == null || mobSet == null ? colourData("green")
+                : colourData(instance.data.getString("players." + playerId + ".arcade.monstermaze.mob-set-colours."
+                        + mobSet.toLowerCase(Locale.ROOT) + ".safe-pad", "green"));
     }
 
     private boolean isToggleEnabled(UUID playerId, GameDefinition game, FeatureDefinition feature, String option) {
@@ -332,7 +443,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         ItemMeta meta = item.getItemMeta();
         meta.setDisplayName(ChatColor.YELLOW + game.displayName);
         List<String> lore = new ArrayList<String>();
-        lore.add(ChatColor.GRAY.toString() + game.features.size() + (game.features.size() == 1 ? " cosmetic category" : " cosmetic categories"));
+        lore.add(ChatColor.GRAY.toString() + game.features.size() + (game.features.size() == 1 ? " cosmetic line" : " cosmetic lines"));
         lore.add(ChatColor.GRAY + "Win-effect concept tracked in the Win Effects section");
         lore.add(ChatColor.GREEN + "Click to open");
         meta.setLore(lore);
@@ -348,9 +459,6 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             FeatureDefinition feature = game.features.get(i);
             put(inventory, slots[i], featureIcon(player, game, feature));
         }
-        put(inventory, WIN_EFFECT_SLOT, namedWithLore(Material.FIREWORK, ChatColor.LIGHT_PURPLE + "Win Effect Plan",
-                Arrays.asList(ChatColor.GRAY + "This game's planned win-effect concept is listed separately.",
-                        ChatColor.YELLOW + "Click to view it in the Win Effects section.")));
         put(inventory, 45, named(Material.ARROW, ChatColor.YELLOW + "Back to Games", "Return to the full game list."));
         put(inventory, 49, named(Material.BARRIER, ChatColor.RED + "Close", "Close the Arcade Cosmetics menu."));
         player.openInventory(inventory);
@@ -420,17 +528,181 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private void openFeature(Player player, GameDefinition game, FeatureDefinition feature) {
         Inventory inventory = Bukkit.createInventory(null, 54,
                 ChatColor.BLACK + TITLE_PREFIX + "Feature | " + game.key + " | " + feature.key);
-        for (int i = 0; i < feature.options.size() && i < 36; i++) {
-            String option = feature.options.get(i);
-            put(inventory, 10 + i, featureChoiceItem(player, game, feature, option));
+        if (feature.isComposite()) {
+            int[] slots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34};
+            for (int i = 0; i < feature.settings.size() && i < slots.length; i++) {
+                SettingDefinition setting = feature.settings.get(i);
+                put(inventory, slots[i], settingIcon(player, game, feature, setting));
+            }
+        } else {
+            for (int i = 0; i < feature.options.size() && i < 36; i++) {
+                String option = feature.options.get(i);
+                put(inventory, 10 + i, featureChoiceItem(player, game, feature, option));
+            }
         }
         put(inventory, 45, named(Material.ARROW, ChatColor.YELLOW + "Back", "Return to " + game.displayName + "."));
         put(inventory, 49, named(Material.BARRIER, ChatColor.RED + "Reset Feature",
-                feature.toggleOptions ? "Enable every placeholder set toggle." : "Remove this choice and restore the default."));
+                feature.isComposite() ? "Reset each setting in this cosmetic line."
+                        : (feature.toggleOptions ? "Enable every toggle." : "Remove this choice and restore the default.")));
         put(inventory, 53, named(Material.BOOK, ChatColor.AQUA + "Prototype Info",
-                feature.toggleOptions
-                        ? "These saved toggles are not yet connected to live gameplay."
-                        : "This choice is saved per player; not every option has a gameplay hook yet."));
+                feature.isComposite()
+                        ? "Each setting is saved independently so you can combine unlocked options."
+                        : feature.toggleOptions
+                                ? "These saved toggles are not yet connected to live gameplay."
+                                : "This choice is saved per player; not every option has a gameplay hook yet."));
+        player.openInventory(inventory);
+    }
+
+    private ItemStack settingIcon(Player player, GameDefinition game, FeatureDefinition feature, SettingDefinition setting) {
+        ItemStack item = new ItemStack(setting.icon);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(ChatColor.YELLOW + setting.displayName);
+        List<String> lore = new ArrayList<String>();
+        appendWrapped(lore, setting.description, ChatColor.GRAY, 36);
+        if (setting.toggleOptions) {
+            int enabled = 0;
+            for (String option : setting.options) {
+                if (isSettingToggleEnabled(player.getUniqueId(), game, feature, setting, option)) enabled++;
+            }
+            lore.add(ChatColor.GRAY + "Enabled: " + enabled + "/" + setting.options.size());
+        } else {
+            String equipped = getSettingChoice(player.getUniqueId(), game, feature, setting);
+            lore.add(ChatColor.GRAY + "Current: " + (equipped.isEmpty() ? "Default" : pretty(equipped)));
+        }
+        lore.add(ChatColor.GREEN + "Click to configure");
+        lore.add(ChatColor.DARK_GRAY + "Setting: " + setting.key);
+        meta.setLore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private void openSetting(Player player, GameDefinition game, FeatureDefinition feature, SettingDefinition setting) {
+        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.BLACK + TITLE_PREFIX
+                + "Setting | " + game.key + " | " + feature.key + " | " + setting.key);
+        for (int i = 0; i < setting.options.size() && i < 36; i++) {
+            put(inventory, 10 + i, settingChoiceItem(player, game, feature, setting, setting.options.get(i)));
+        }
+        put(inventory, 45, named(Material.ARROW, ChatColor.YELLOW + "Back to Settings", "Return to " + feature.displayName + "."));
+        put(inventory, 49, named(Material.BARRIER, ChatColor.RED + "Reset Setting",
+                setting.toggleOptions ? "Enable all options again." : "Restore the default choice."));
+        put(inventory, 53, named(Material.BOOK, ChatColor.AQUA + "Setting Info",
+                setting.toggleOptions ? "Right-click Monster Maze mob sets to customise their colours after unlocking Custom Pack."
+                        : "This option is saved independently from the other settings in this cosmetic line."));
+        player.openInventory(inventory);
+    }
+
+    private ItemStack settingChoiceItem(Player player, GameDefinition game, FeatureDefinition feature,
+                                        SettingDefinition setting, String option) {
+        boolean active = setting.toggleOptions
+                ? isSettingToggleEnabled(player.getUniqueId(), game, feature, setting, option)
+                : option.equalsIgnoreCase(getSettingChoice(player.getUniqueId(), game, feature, setting));
+        Material material;
+        short durability = 0;
+        if (setting.toggleOptions) {
+            material = active ? Material.EMERALD_BLOCK : Material.REDSTONE_BLOCK;
+        } else {
+            material = setting.icon;
+            if (setting.icon == Material.STAINED_GLASS || setting.icon == Material.STAINED_CLAY
+                    || setting.icon == Material.WOOL || setting.icon == Material.STAINED_GLASS_PANE) {
+                int colour = settingOptionDurability(game, setting, option);
+                if (colour >= 0) durability = (short) colour;
+            }
+        }
+        ItemStack item = new ItemStack(material, 1, durability);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName((active ? ChatColor.GREEN + (setting.toggleOptions ? "[ON] " : "EQUIPPED ")
+                : ChatColor.YELLOW.toString()) + pretty(option));
+        List<String> lore = new ArrayList<String>();
+        appendWrapped(lore, setting.description, ChatColor.GRAY, 36);
+        if (setting.toggleOptions) {
+            lore.add(active ? ChatColor.GREEN + "Enabled — click to disable" : ChatColor.RED + "Disabled — click to enable");
+            if ("monstermaze".equals(game.key) && "mob-sets".equals(setting.key)) {
+                lore.add(ChatColor.AQUA + "Right-click to customise this set's beacon and Safe Pad colours");
+                lore.add(ChatColor.GRAY + (isMonsterMazeCustomPackUnlocked(player.getUniqueId())
+                        ? "Custom Pack unlocked"
+                        : "Custom Pack colours require the Custom Pack unlock"));
+            }
+            lore.add(ChatColor.DARK_GRAY + "ToggleSetting: " + game.key + ":" + feature.key + ":" + setting.key + ":" + option);
+        } else {
+            lore.add(active ? ChatColor.GREEN + "Currently equipped" : ChatColor.GRAY + "Click to equip");
+            lore.add(ChatColor.DARK_GRAY + "SettingChoice: " + game.key + ":" + feature.key + ":" + setting.key + ":" + option);
+        }
+        meta.setLore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private short settingOptionDurability(GameDefinition game, SettingDefinition setting, String option) {
+        if ("microbattles".equals(game.key) && "glass-colour".equals(setting.key)) {
+            if ("aqua".equals(option)) return 3;
+            if ("ember".equals(option)) return 14;
+            if ("forest".equals(option)) return 5;
+            if ("royal".equals(option)) return 10;
+            if ("sunset".equals(option)) return 6;
+            if ("solar".equals(option)) return 4;
+            if ("frost".equals(option)) return 0;
+            if ("void".equals(option)) return 15;
+        }
+        int colour = colourData(option);
+        return (short) (colour < 0 ? 0 : colour);
+    }
+
+    private void resetFeature(Player player, GameDefinition game, FeatureDefinition feature) {
+        if (!feature.isComposite()) {
+            if (feature.toggleOptions) {
+                for (String option : feature.options) setToggleEnabled(player.getUniqueId(), game, feature, option, true);
+            } else {
+                setFeatureChoice(player.getUniqueId(), game, feature, "");
+            }
+            return;
+        }
+
+        UUID id = player.getUniqueId();
+        for (SettingDefinition setting : feature.settings) {
+            if (setting.toggleOptions) {
+                for (String option : setting.options) {
+                    data.set(settingTogglePath(id, game, feature, setting, option), true);
+                }
+            } else {
+                data.set(settingChoicePath(id, game, feature, setting), null);
+            }
+            data.set(featurePath(id, game.key, setting.key), null);
+            if (setting.legacyGameKey != null) data.set("players." + id + "." + setting.legacyGameKey, null);
+        }
+        save();
+    }
+
+    private void openMobSetColours(Player player, String mobSet) {
+        if (!isMonsterMazeCustomPackUnlocked(player.getUniqueId())) {
+            player.sendMessage(ChatColor.RED + "Unlock the Monster Maze Custom Pack to customise this set's colours.");
+            return;
+        }
+        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.BLACK + TITLE_PREFIX + "Mob Set Colours | " + mobSet);
+        put(inventory, 4, named(Material.BEACON, ChatColor.AQUA + "Beacon Colour", "Choose the beacon colour for " + pretty(mobSet) + "."));
+        put(inventory, 26, named(Material.STAINED_CLAY, ChatColor.GREEN + "Safe Pad Colour", "Choose the Safe Pad surface colour for " + pretty(mobSet) + "."));
+        String base = "players." + player.getUniqueId() + ".arcade.monstermaze.mob-set-colours." + mobSet;
+        String beaconSelected = data.getString(base + ".beacon", "white");
+        String padSelected = data.getString(base + ".safe-pad", "green");
+        for (int i = 0; i < COLOUR_OPTIONS.length; i++) {
+            String colour = COLOUR_OPTIONS[i];
+            ItemStack beacon = new ItemStack(Material.STAINED_GLASS_PANE, 1, (short) i);
+            ItemMeta beaconMeta = beacon.getItemMeta();
+            beaconMeta.setDisplayName((colour.equalsIgnoreCase(beaconSelected) ? ChatColor.GREEN + "[SELECTED] " : ChatColor.YELLOW.toString()) + pretty(colour));
+            beaconMeta.setLore(Arrays.asList(ChatColor.GRAY + "Beacon colour for " + pretty(mobSet),
+                    ChatColor.DARK_GRAY + "MobColour: beacon:" + mobSet + ":" + colour));
+            beacon.setItemMeta(beaconMeta);
+            put(inventory, 10 + i, beacon);
+
+            ItemStack pad = new ItemStack(Material.STAINED_CLAY, 1, (short) i);
+            ItemMeta padMeta = pad.getItemMeta();
+            padMeta.setDisplayName((colour.equalsIgnoreCase(padSelected) ? ChatColor.GREEN + "[SELECTED] " : ChatColor.YELLOW.toString()) + pretty(colour));
+            padMeta.setLore(Arrays.asList(ChatColor.GRAY + "Safe Pad surface colour for " + pretty(mobSet),
+                    ChatColor.DARK_GRAY + "MobColour: safe-pad:" + mobSet + ":" + colour));
+            pad.setItemMeta(padMeta);
+            put(inventory, 28 + i, pad);
+        }
+        put(inventory, 45, named(Material.ARROW, ChatColor.YELLOW + "Back to Mob Sets", "Return to the Monster Maze mob set toggles."));
+        put(inventory, 49, named(Material.BARRIER, ChatColor.RED + "Close", "Close Arcade Cosmetics."));
         player.openInventory(inventory);
     }
 
@@ -492,7 +764,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         return (short) (colour < 0 ? 0 : colour);
     }
 
-    private void handlePrototypeClick(Player player, String title, ItemStack clicked, ItemMeta meta) {
+    private void handlePrototypeClick(Player player, String title, ItemStack clicked, ItemMeta meta, ClickType clickType) {
         String itemName = ChatColor.stripColor(meta.getDisplayName());
         if (itemName == null) return;
 
@@ -520,10 +792,6 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             }
             if ("Close".equalsIgnoreCase(itemName)) {
                 player.closeInventory();
-                return;
-            }
-            if ("Win Effect Plan".equalsIgnoreCase(itemName)) {
-                openWinEffects(player, game);
                 return;
             }
             for (String line : meta.getLore() == null ? Collections.<String>emptyList() : meta.getLore()) {
@@ -586,12 +854,19 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 return;
             }
             if ("Reset Feature".equalsIgnoreCase(itemName)) {
-                if (feature.toggleOptions) {
-                    for (String option : feature.options) setToggleEnabled(player.getUniqueId(), game, feature, option, true);
-                } else {
-                    setFeatureChoice(player.getUniqueId(), game, feature, "");
-                }
+                resetFeature(player, game, feature);
                 openFeature(player, game, feature);
+                return;
+            }
+
+            if (feature.isComposite()) {
+                for (String line : meta.getLore() == null ? Collections.<String>emptyList() : meta.getLore()) {
+                    String plain = ChatColor.stripColor(line);
+                    if (plain == null || !plain.startsWith("Setting: ")) continue;
+                    SettingDefinition setting = feature.getSetting(plain.substring("Setting: ".length()));
+                    if (setting != null) openSetting(player, game, feature, setting);
+                    return;
+                }
                 return;
             }
 
@@ -613,6 +888,92 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 openFeature(player, game, feature);
                 return;
             }
+        }
+    }
+
+        if (titleParts.length == 5 && "Setting".equals(titleParts[1])) {
+            GameDefinition game = games.get(titleParts[2].toLowerCase(Locale.ROOT));
+            if (game == null) return;
+            FeatureDefinition feature = game.getFeature(titleParts[3]);
+            SettingDefinition setting = feature == null ? null : feature.getSetting(titleParts[4]);
+            if (feature == null || setting == null) return;
+
+            if ("Back to Settings".equalsIgnoreCase(itemName)) {
+                openFeature(player, game, feature);
+                return;
+            }
+            if ("Reset Setting".equalsIgnoreCase(itemName)) {
+                if (setting.toggleOptions) {
+                    for (String option : setting.options) {
+                        setSettingToggleEnabled(player.getUniqueId(), game, feature, setting, option, true);
+                    }
+                } else {
+                    setSettingChoice(player.getUniqueId(), game, feature, setting, "");
+                }
+                openSetting(player, game, feature, setting);
+                return;
+            }
+
+            String prefix = (setting.toggleOptions ? "ToggleSetting: " : "SettingChoice: ")
+                    + game.key + ":" + feature.key + ":" + setting.key + ":";
+            for (String line : meta.getLore() == null ? Collections.<String>emptyList() : meta.getLore()) {
+                String plain = ChatColor.stripColor(line);
+                if (plain == null || !plain.startsWith(prefix)) continue;
+                String option = plain.substring(prefix.length());
+                if (!setting.options.contains(option)) return;
+
+                if (setting.toggleOptions) {
+                    if ("monstermaze".equals(game.key) && "mob-sets".equals(setting.key)
+                            && clickType == ClickType.RIGHT) {
+                        openMobSetColours(player, option);
+                        return;
+                    }
+                    boolean enabled = isSettingToggleEnabled(player.getUniqueId(), game, feature, setting, option);
+                    setSettingToggleEnabled(player.getUniqueId(), game, feature, setting, option, !enabled);
+                    player.sendMessage(ChatColor.GREEN + pretty(option) + " is now " + (!enabled ? "enabled" : "disabled") + ".");
+                } else {
+                    setSettingChoice(player.getUniqueId(), game, feature, setting, option);
+                    player.sendMessage(ChatColor.GREEN + "Selected " + pretty(option) + " for " + setting.displayName + ".");
+                }
+                openSetting(player, game, feature, setting);
+                return;
+            }
+            return;
+        }
+
+        if (titleParts.length == 3 && "Mob Set Colours".equals(titleParts[1])) {
+            String mobSet = titleParts[2].toLowerCase(Locale.ROOT);
+            if (!isMonsterMazeCustomPackUnlocked(player.getUniqueId())) {
+                player.sendMessage(ChatColor.RED + "Unlock the Monster Maze Custom Pack to customise this set's colours.");
+                openSetting(player, games.get("monstermaze"),
+                        games.get("monstermaze").getFeature("mob-line"),
+                        games.get("monstermaze").getSetting("mob-sets"));
+                return;
+            }
+            if ("Back to Mob Sets".equalsIgnoreCase(itemName)) {
+                GameDefinition game = games.get("monstermaze");
+                FeatureDefinition feature = game.getFeature("mob-line");
+                openSetting(player, game, feature, feature.getSetting("mob-sets"));
+                return;
+            }
+            if ("Close".equalsIgnoreCase(itemName)) {
+                player.closeInventory();
+                return;
+            }
+            for (String line : meta.getLore() == null ? Collections.<String>emptyList() : meta.getLore()) {
+                String plain = ChatColor.stripColor(line);
+                if (plain == null || !plain.startsWith("MobColour: ")) continue;
+                String[] parts = plain.substring("MobColour: ".length()).split(":");
+                if (parts.length != 3 || !parts[1].equals(mobSet) || colourData(parts[2]) < 0) return;
+                String path = "players." + player.getUniqueId() + ".arcade.monstermaze.mob-set-colours."
+                        + mobSet + "." + parts[0];
+                data.set(path, parts[2]);
+                save();
+                player.sendMessage(ChatColor.GREEN + pretty(mobSet) + " " + parts[0] + " colour set to " + pretty(parts[2]) + ".");
+                openMobSetColours(player, mobSet);
+                return;
+            }
+            return;
         }
     }
 
@@ -649,7 +1010,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         if (event.getRawSlot() < 0 || event.getRawSlot() >= event.getView().getTopInventory().getSize()) return;
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType() == Material.AIR || !clicked.hasItemMeta()) return;
-        handlePrototypeClick(player, title, clicked, clicked.getItemMeta());
+        handlePrototypeClick(player, title, clicked, clicked.getItemMeta(), event.getClick());
     }
 
     private boolean isNormalCosmeticsMenu(InventoryView view) {
@@ -707,10 +1068,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     /** Resolve the visible Minecraft 1.8 stained-glass/clay colour for a choice. */
     public static int colourData(String choice) {
         if (choice == null) return -1;
-        String[] colours = {"white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
-                "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"};
-        for (int i = 0; i < colours.length; i++) {
-            if (colours[i].equalsIgnoreCase(choice)) return i;
+        for (int i = 0; i < COLOUR_OPTIONS.length; i++) {
+            if (COLOUR_OPTIONS[i].equalsIgnoreCase(choice)) return i;
         }
         return -1;
     }
@@ -773,6 +1132,12 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
 
     private String pretty(String choice) {
         if (choice == null || choice.isEmpty()) return "Default";
+        if ("snowman".equalsIgnoreCase(choice)) return "Snow Golem";
+        if ("lightblue".equalsIgnoreCase(choice)) return "Light Blue";
+        if ("zombie_pigman".equalsIgnoreCase(choice)) return "Zombie Pigman";
+        if ("magma_cube".equalsIgnoreCase(choice)) return "Magma Cube";
+        if ("cave_spider".equalsIgnoreCase(choice)) return "Cave Spider";
+        if ("mooshroom".equalsIgnoreCase(choice)) return "Mooshroom";
         StringBuilder result = new StringBuilder();
         String[] tokens = choice.replace('-', '_').split("_");
         for (String token : tokens) {
@@ -808,6 +1173,23 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             }
             return null;
         }
+
+        private SettingDefinition getSetting(String key) {
+            if (key == null) return null;
+            for (FeatureDefinition feature : features) {
+                SettingDefinition setting = feature.getSetting(key);
+                if (setting != null) return setting;
+            }
+            return null;
+        }
+
+        private FeatureDefinition getFeatureContainingSetting(String key) {
+            if (key == null) return null;
+            for (FeatureDefinition feature : features) {
+                if (feature.getSetting(key) != null) return feature;
+            }
+            return null;
+        }
     }
 
     private static final class FeatureDefinition {
@@ -818,8 +1200,50 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         private final String legacyGameKey;
         private final boolean toggleOptions;
         private final List<String> options;
+        private final List<SettingDefinition> settings;
 
         private FeatureDefinition(String key, String displayName, Material icon, String description,
+                                  String legacyGameKey, boolean toggleOptions, List<String> options) {
+            this(key, displayName, icon, description, legacyGameKey, toggleOptions, options,
+                    Collections.<SettingDefinition>emptyList());
+        }
+
+        private FeatureDefinition(String key, String displayName, Material icon, String description,
+                                  String legacyGameKey, boolean toggleOptions, List<String> options,
+                                  List<SettingDefinition> settings) {
+            this.key = key;
+            this.displayName = displayName;
+            this.icon = icon;
+            this.description = description;
+            this.legacyGameKey = legacyGameKey;
+            this.toggleOptions = toggleOptions;
+            this.options = options;
+            this.settings = settings;
+        }
+
+        private boolean isComposite() {
+            return settings != null && !settings.isEmpty();
+        }
+
+        private SettingDefinition getSetting(String key) {
+            if (key == null) return null;
+            for (SettingDefinition setting : settings) {
+                if (setting.key.equalsIgnoreCase(key)) return setting;
+            }
+            return null;
+        }
+    }
+
+    private static final class SettingDefinition {
+        private final String key;
+        private final String displayName;
+        private final Material icon;
+        private final String description;
+        private final String legacyGameKey;
+        private final boolean toggleOptions;
+        private final List<String> options;
+
+        private SettingDefinition(String key, String displayName, Material icon, String description,
                                   String legacyGameKey, boolean toggleOptions, List<String> options) {
             this.key = key;
             this.displayName = displayName;
