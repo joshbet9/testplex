@@ -174,6 +174,7 @@ import nautilus.game.arcade.managers.chat.GameChatManager;
 import nautilus.game.arcade.managers.lobby.LobbyManager;
 import nautilus.game.arcade.managers.lobby.current.NewGameLobbyManager;
 import nautilus.game.arcade.managers.lobby.legacy.LegacyGameLobbyManager;
+import nautilus.game.arcade.managers.lobby.legacy.TestLobbyPlaneBuilder;
 import nautilus.game.arcade.managers.voting.Vote;
 import nautilus.game.arcade.managers.voting.Voteable;
 
@@ -343,6 +344,10 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 		_gameCreationManager = new GameCreationManager(this);
 		_gameRewardManager = new GameRewardManager(this);
 		_gameManager = new GameManager(this);
+		if (UtilServer.isTestServer() && !new File("world/NEW.dat").exists())
+		{
+			TestLobbyPlaneBuilder.ensure(Bukkit.getWorld("world"));
+		}
 		_gameLobbyManager = new File("world/NEW.dat").exists() ? new NewGameLobbyManager(this) : new LegacyGameLobbyManager(this);
 		_gameHostManager = new GameHostManager(this);
 		new GameFlagManager(this);

@@ -147,6 +147,17 @@ public class GameHostManager implements Listener
 		_games.add(GameType.Barbarians);
 		_games.add(GameType.SmashDomination);
 
+		if (UtilServer.isTestServer())
+		{
+			for (GameType type : GameType.values())
+			{
+				if (!_games.contains(type))
+				{
+					_games.add(type);
+				}
+			}
+		}
+
 		_games.sort(Comparator.comparing(GameType::getName));
 
 		//Config Defaults
@@ -562,6 +573,39 @@ public class GameHostManager implements Listener
 	private void openMenu(Player player)
 	{
 		_shop.attemptShopOpen(player);
+	}
+
+	/**
+	 * Opens the Mineplex-style Game Panel. On a test Arcade server an OP or
+	 * a Mineplex client with GAME_COMMAND permission may open it, even when
+	 * the server is not configured as a traditional private server.
+	 */
+	public boolean openGamePanel(Player player)
+	{
+		boolean allowed;
+		if (UtilServer.isTestServer())
+		{
+			allowed = player.isOp()
+					|| Manager.GetClients().Get(player).hasPermission(ArcadeManager.Perm.GAME_COMMAND);
+		}
+		else
+		{
+			allowed = isPrivateServer() && isAdmin(player, true);
+		}
+
+		if (!allowed)
+		{
+			UtilPlayer.message(player, F.main("Game Panel", "You are not allowed to use the Game Panel."));
+			return false;
+		}
+
+		if (!_shop.attemptShopOpen(player))
+		{
+			UtilPlayer.message(player, F.main("Game Panel", "Close the current menu before opening the Game Panel."));
+			return false;
+		}
+
+		return true;
 	}
 
 	public boolean isAdmin(Player player, boolean includeStaff)

@@ -8,15 +8,18 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.inventory.ClickType;
 
 import mineplex.core.common.util.C;
+import mineplex.core.common.util.UtilPlayer;
+import mineplex.core.common.util.UtilServer;
 import mineplex.core.shop.item.ShopItem;
 
 import nautilus.game.arcade.ArcadeManager;
 import nautilus.game.arcade.GameType;
+import nautilus.game.arcade.game.Game;
 import nautilus.game.arcade.gui.privateServer.PrivateServerShop;
+import nautilus.game.arcade.managers.GameCreationManager;
 
 public class SetGamePage extends BasePage
 {
-
 	private int _page;
 
 	public SetGamePage(ArcadeManager plugin, PrivateServerShop shop, Player player)
@@ -49,7 +52,7 @@ public class SetGamePage extends BasePage
 			});
 		}
 
-		if (types.size() == GAMES_PER_PAGE)
+		if (gameIndex + types.size() < _manager.getGames().size())
 		{
 			addButton(53, NEXT_PAGE, (player, clickType) ->
 			{
@@ -62,16 +65,16 @@ public class SetGamePage extends BasePage
 	private void addGameButton(int slot, final GameType type)
 	{
 		List<String> lore = new ArrayList<>();
-		lore.add(ChatColor.RESET + C.cGray + "Make this next Game Type");
+		lore.add(ChatColor.RESET + C.cGray + "Select this as the next game.");
 		lore.add("§1");
 		if (type == GameType.UHC || type == GameType.UHCSolo || type == GameType.UHCSoloSpeed || type == GameType.UHCTeamsSpeed)
 		{
-			lore.add(ChatColor.YELLOW + "Left-Click " + C.cGray + "to select");
+			lore.add(ChatColor.YELLOW + "Left-Click " + C.cGray + "to select (map generated automatically).");
 		}
 		else
 		{
-			lore.add(ChatColor.YELLOW + "Left-Click " + C.cGray + "for a §fRandom Map§7.");
-			lore.add(ChatColor.YELLOW + "Right-Click " + C.cGray + "to §fChoose Map§7.");
+			lore.add(ChatColor.YELLOW + "Left-Click " + C.cGray + "for a random installed map.");
+			lore.add(ChatColor.YELLOW + "Right-Click " + C.cGray + "to choose an installed map.");
 		}
 		if (_manager.hasWarning().contains(type))
 		{
@@ -84,18 +87,61 @@ public class SetGamePage extends BasePage
 		{
 			if (clickType == ClickType.LEFT)
 			{
-				getPlugin().GetGame().setGame(type, player, true);
+				if (!hasMapArchive(type))
+				{
+					UtilPlayer.message(player, C.cRed + "No installed map ZIPs were found for " + type.getName()
+							+ ". The game has not been selected.");
+					return;
+				}
+
+				GameCreationManager creation = getPlugin().GetGameCreationManager();
+				creation.MapPref = null;
+				creation.MapSource = null;
+				creation.ModePref = null;
+
+				if (getPlugin().GetGame() == null)
+				{
+					creation.setNextGameType(type);
+					if (UtilServer.isTestServer())
+					{
+						getPlugin().GetGameList().clear();
+						getPlugin().GetGameList().add(type);
+					}
+				}
+				else
+				{
+					getPlugin().GetGame().setGame(type, player, true);
+				}
+
+				UtilPlayer.message(player, C.cGreen + "Selected " + type.getName() + " with a random installed map.");
 				player.closeInventory();
 			}
 			else if (clickType == ClickType.RIGHT)
 			{
-				//UHC has auto generating maps.
-				if (type == GameType.UHC)
+				if (type == GameType.UHC || type == GameType.UHCSolo || type == GameType.UHCSoloSpeed || type == GameType.UHCTeamsSpeed)
 				{
+					UtilPlayer.message(player, C.cGray + type.getName() + " creates its map automatically.");
 					return;
 				}
 				getShop().openPageForPlayer(player, new ChooseMapPage(getPlugin(), getShop(), player, type));
 			}
 		});
+	}
+
+	private boolean hasMapArchive(GameType type)
+	{
+		if (type == GameType.UHC || type == GameType.UHCSolo || type == GameType.UHCSoloSpeed || type == GameType.UHCTeamsSpeed)
+		{
+			return true;
+		}
+
+		for (GameType source : Game.getWorldHostNames(type))
+		{
+			if (!getPlugin().LoadFiles(source.getName()).isEmpty())
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 }

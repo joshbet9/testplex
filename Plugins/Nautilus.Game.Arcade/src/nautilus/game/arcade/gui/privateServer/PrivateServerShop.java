@@ -13,7 +13,7 @@ public class PrivateServerShop extends ShopBase<ArcadeManager>
 {
 	public PrivateServerShop(ArcadeManager plugin, CoreClientManager clientManager, DonationManager donationManager)
 	{
-		super(plugin, clientManager, donationManager, "Private Server Menu");
+		super(plugin, clientManager, donationManager, "Game Panel");
 	}
 
 	@Override

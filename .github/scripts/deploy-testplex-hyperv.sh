@@ -35,6 +35,11 @@ ROOT="$(realpath -e "$ROOT_INPUT")"
   exit 2
 }
 [[ -d "$ROOT" ]] || { echo "Server root does not exist: $ROOT" >&2; exit 2; }
+MAP_DEST="$(realpath -m "$ROOT/../../update/maps")"
+[[ "$MAP_DEST" == "/home/monstermaze/update/maps" ]] || {
+  echo "Refusing map destination outside /home/monstermaze/update/maps: $MAP_DEST" >&2
+  exit 2
+}
 MARKER="$ROOT/.testplex-sandbox"
 EXPECTED_MARKER="TESTPLEX ISOLATED TEST SERVER - NOT PRODUCTION"
 [[ -f "$MARKER" ]] || { echo "Refusing deployment: missing $MARKER" >&2; exit 2; }
@@ -90,10 +95,17 @@ BUNDLE_LIST="$(unzip -Z1 "$INCOMING")"
   echo "Build bundle must contain exactly one Arcade.jar." >&2
   exit 2
 }
+[[ "$(grep -Fxc "testplex-map-assets.zip" <<< "$BUNDLE_LIST" || true)" == "1" ]] || {
+  echo "Build bundle must contain exactly one testplex-map-assets.zip from the same source revision." >&2
+  exit 2
+}
 BUNDLE_NAMES=()
 declare -A BUNDLE_SEEN=()
 JAR_ENTRY_RE='^[A-Za-z0-9._+() -]+[.]jar$'
 while IFS= read -r entry; do
+  if [[ "$entry" == "testplex-map-assets.zip" ]]; then
+    continue
+  fi
   [[ "$entry" =~ $JAR_ENTRY_RE ]] || {
     echo "Unexpected entry in plugin bundle: $entry" >&2
     exit 2
@@ -140,9 +152,33 @@ done
 STAGE="$(mktemp -d "/tmp/testplex-stage-$SHA.XXXXXX")"
 unzip -p "$INCOMING" "Arcade.jar" > "$STAGE/Arcade.jar"
 [[ -s "$STAGE/Arcade.jar" ]] || { echo "Extracted Arcade.jar is empty." >&2; exit 2; }
+unzip -p "$INCOMING" "testplex-map-assets.zip" > "$STAGE/testplex-map-assets.zip"
+[[ -s "$STAGE/testplex-map-assets.zip" ]] || { echo "Extracted Mineplex map asset bundle is empty." >&2; exit 2; }
+unzip -tq "$STAGE/testplex-map-assets.zip" >/dev/null
+while IFS= read -r map_entry; do
+  [[ "$map_entry" =~ ^maps/[^/]+(/[^/]+)*[.]zip$ ]] || {
+    echo "Unexpected entry in Mineplex map bundle: $map_entry" >&2
+    exit 2
+  }
+  map_rel="${map_entry#maps/}"
+  case "/$map_rel/" in
+    *"/../"*|*"/./"*|*"//"*)
+      echo "Refusing unsafe path in Mineplex map bundle: $map_entry" >&2
+      exit 2
+      ;;
+  esac
+done < <(unzip -Z1 "$STAGE/testplex-map-assets.zip")
+MAP_STAGE="$STAGE/map-assets"
+mkdir -p "$MAP_STAGE"
+unzip -q "$STAGE/testplex-map-assets.zip" -d "$MAP_STAGE"
+mapfile -d '' -t MAP_FILES < <(find "$MAP_STAGE/maps" -type f -name '*.zip' -print0 | sort -z)
+[[ "${#MAP_FILES[@]}" -gt 0 ]] || { echo "Map asset bundle contains no map ZIPs." >&2; exit 2; }
+for map_file in "${MAP_FILES[@]}"; do
+  unzip -tq "$map_file" >/dev/null || { echo "Invalid map archive: $map_file" >&2; exit 2; }
+done
 JAR_PATHS=("$STAGE/Arcade.jar")
 JAR_NAMES=("Arcade.jar")
-echo "Validated ${#BUNDLE_NAMES[@]} artifact JARs; this test server will install Arcade.jar only."
+echo "Validated ${#BUNDLE_NAMES[@]} artifact JARs and ${#MAP_FILES[@]} Mineplex map archives; this test server will install Arcade.jar only."
 
 if [[ -f "$PLUGINS/Arcade.jar" ]]; then
   OWNER_GROUP="$(stat -c '%U:%G' "$PLUGINS/Arcade.jar")"
@@ -154,6 +190,10 @@ IFS=: read -r PLUGIN_OWNER PLUGIN_GROUP <<< "$OWNER_GROUP"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 BACKUP_DIR="$ROOT/.testplex-backups/$STAMP-$SHA"
 install -d -m 0750 "$BACKUP_DIR"
+WORLD_BACKUP="$BACKUP_DIR/world-before-test-lobby.tar.gz"
+WORLD_BACKUP_CREATED=0
+MAP_ADDED_LIST="$BACKUP_DIR/maps-added.list"
+: > "$MAP_ADDED_LIST"
 declare -A EXISTED=()
 for name in "${MANAGED_NAMES[@]}"; do
   if [[ -f "$PLUGINS/$name" ]]; then
@@ -188,6 +228,26 @@ rollback() {
         rm -f "$PLUGINS/$name" || true
       fi
     done
+
+    if [[ -d "$BACKUP_DIR/maps" ]]; then
+      while IFS= read -r -d '' backup_map; do
+        rel="${backup_map#"$BACKUP_DIR/maps/"}"
+        install -d "$(dirname "$MAP_DEST/$rel")"
+        cp -p "$backup_map" "$MAP_DEST/$rel" || true
+      done < <(find "$BACKUP_DIR/maps" -type f -print0)
+    fi
+    if [[ -s "$MAP_ADDED_LIST" ]]; then
+      while IFS= read -r added_map; do
+        [[ "$added_map" == "$MAP_DEST/"* ]] && rm -f "$added_map" || true
+      done < "$MAP_ADDED_LIST"
+    fi
+
+    if [[ "$WORLD_BACKUP_CREATED" -eq 1 && -s "$WORLD_BACKUP" ]]; then
+      echo "Restoring the pre-deployment world after failure." >&2
+      rm -rf "$ROOT/world"
+      tar -xzf "$WORLD_BACKUP" -C "$ROOT" || true
+    fi
+
     timeout 90 systemctl start "$SERVICE" || true
     sleep 3
     timeout 10 journalctl -u "$SERVICE" -n 60 --no-pager || true
@@ -205,6 +265,49 @@ if systemctl is-active --quiet "$SERVICE"; then
   echo "$SERVICE still reports active after stop." >&2
   exit 1
 fi
+
+if [[ ! -f "$ROOT/world/NEW.dat" && ! -f "$ROOT/world/TEST_LOBBY_PLANE.dat" && -d "$ROOT/world" ]]; then
+  echo "Backing up the current world before preparing the flat lobby."
+  tar -czf "$WORLD_BACKUP" -C "$ROOT" world
+  WORLD_BACKUP_CREATED=1
+fi
+
+install -d -o monstermaze -g monstermaze -m 0755 "$MAP_DEST"
+for source_map in "${MAP_FILES[@]}"; do
+  rel="${source_map#"$MAP_STAGE/maps/"}"
+  [[ "$rel" != "$source_map" && "$rel" != *"/../"* && "$rel" != ../* ]] || {
+    echo "Refusing unsafe extracted map path: $source_map" >&2
+    exit 2
+  }
+  dest="$MAP_DEST/$rel"
+  if [[ -f "$dest" ]] && cmp -s "$source_map" "$dest"; then
+    continue
+  fi
+  if [[ -f "$dest" ]]; then
+    backup_map="$BACKUP_DIR/maps/$rel"
+    install -d -m 0750 "$(dirname "$backup_map")"
+    cp -p "$dest" "$backup_map"
+  else
+    printf '%s\n' "$dest" >> "$MAP_ADDED_LIST"
+  fi
+  install -D -o monstermaze -g monstermaze -m 0644 "$source_map" "$dest"
+done
+
+source_count="${#MAP_FILES[@]}"
+installed_count=0
+while IFS= read -r -d '' installed_map; do
+  rel="${installed_map#"$MAP_STAGE/maps/"}"
+  cmp -s "$installed_map" "$MAP_DEST/$rel" || {
+    echo "Installed map did not match the source bundle: $rel" >&2
+    exit 2
+  }
+  installed_count=$((installed_count + 1))
+done < <(find "$MAP_STAGE/maps" -type f -name '*.zip' -print0)
+[[ "$installed_count" -eq "$source_count" ]] || {
+  echo "Map verification count mismatch: source=$source_count installed=$installed_count" >&2
+  exit 2
+}
+echo "Installed/verified $installed_count Mineplex map ZIPs under $MAP_DEST."
 
 for name in "${MANAGED_NAMES[@]}"; do
   if [[ "$name" != "Arcade.jar" ]]; then
@@ -254,6 +357,11 @@ for attempt in $(seq 1 180); do
 done
 if [[ "$ready" -ne 1 ]]; then
   echo "Arcade did not produce a fresh startup marker within 180 seconds; diagnostics follow before rollback." >&2
+  dump_diagnostics
+  exit 1
+fi
+if [[ ! -f "$ROOT/world/NEW.dat" && ! -f "$ROOT/world/TEST_LOBBY_PLANE.dat" ]]; then
+  echo "Arcade started but the expected test lobby plane marker is missing." >&2
   dump_diagnostics
   exit 1
 fi

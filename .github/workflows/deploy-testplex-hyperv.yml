@@ -9,10 +9,10 @@ on:
         type: boolean
         default: false
       source_run_id:
-        description: Successful Testplex build run ID containing the plugin artifact
+        description: Run ID of a successful build from the updated branch; the artifact must include Arcade.jar and testplex-map-assets.zip
         required: true
         type: string
-        default: "40322898077"
+        default: ""
 
 permissions:
   contents: read
@@ -148,9 +148,16 @@ jobs:
 
           port="${HYPERV_SSH_PORT:-22}"
           echo "Sending signed download URL to the test VM; plugin bytes will download directly over HTTPS."
+          deploy_script="/tmp/testplex-deploy-script-$BUILD_SHA.sh"
+          scp -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
+            -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            .github/scripts/deploy-testplex-hyperv.sh \
+            "$HYPERV_SSH_USER@$HYPERV_SSH_HOST:$deploy_script"
+          echo "Sending signed artifact URL and running the deployment script from this checked-out commit."
           printf '%s\n' "$download_url" | ssh -p "$port" -i "$HOME/.ssh/testplex_hyperv" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30 \
             "$HYPERV_SSH_USER@$HYPERV_SSH_HOST" \
-            "sudo -n /usr/local/sbin/deploy-testplex-hyperv.sh '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'"
+            "chmod 0644 '$deploy_script' && sudo -n bash '$deploy_script' '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'; rc=\$?; rm -f '$deploy_script'; exit \$rc"
