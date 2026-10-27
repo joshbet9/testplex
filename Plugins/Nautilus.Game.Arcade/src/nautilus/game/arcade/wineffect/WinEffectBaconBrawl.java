@@ -50,7 +50,6 @@ public class WinEffectBaconBrawl extends WinEffectGadget
                         LineFormat.LORE),
                 -2, Material.IRON_AXE, (byte) 0, true);
 
-        setHidden(true);
         // Keep WinEffectGadget's generic WinRoomPodium schematic. Bacon Brawl
         // decorates its floor with a small, bare-dirt Mighty Lava Arena-inspired
         // fighting area; it does not replace the generic winner room.

@@ -56,7 +56,6 @@ public class WinEffectBombLobbers extends WinEffectGadget
                         + "Lob three TNT shots into three player targets, with a Turtles map-inspired winner-room accent.",
                         LineFormat.LORE),
                 -2, Material.TNT, (byte) 0, true);
-        setHidden(true);
         _length = TimeUnit.SECONDS.toMillis(7);
         // Keep the default WinRoomPodium schematic.
     }

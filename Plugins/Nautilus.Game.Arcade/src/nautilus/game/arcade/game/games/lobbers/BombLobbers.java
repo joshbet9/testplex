@@ -350,6 +350,16 @@ public class BombLobbers extends TeamGame implements IThrown
 				UtilParticle.PlayParticle(ParticleType.HAPPY_VILLAGER, center, 0.55F, 0.45F, 0.55F, 0.03F, 18, ViewDist.NORMAL);
 				pitch = 1.9F;
 				break;
+			case "frost":
+				UtilParticle.PlayParticle(ParticleType.SNOW_SHOVEL, center, 0.4F, 0.35F, 0.4F, 0.02F, 22, ViewDist.NORMAL);
+				UtilParticle.PlayParticle(ParticleType.SNOWBALL_POOF, center, 0.25F, 0.25F, 0.25F, 0.02F, 12, ViewDist.NORMAL);
+				pitch = 1.25F;
+				break;
+			case "slime":
+				UtilParticle.PlayParticle(ParticleType.SLIME, center, 0.4F, 0.35F, 0.4F, 0.01F, 20, ViewDist.NORMAL);
+				UtilParticle.PlayParticle(ParticleType.HAPPY_VILLAGER, center, 0.2F, 0.2F, 0.2F, 0.02F, 10, ViewDist.NORMAL);
+				pitch = 0.75F;
+				break;
 			default:
 				return;
 		}
