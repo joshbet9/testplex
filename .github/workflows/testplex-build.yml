@@ -525,7 +525,7 @@ jobs:
           fi
 
           local_sha="$(sha256sum "$BUNDLE" | awk '{print $1}')"
-          remote_sha="$(ssh "${ssh_opts[@]}" "$remote" "sha256sum '$upload_path' | awk '{print \\$1}'")"
+          remote_sha="$(ssh "${ssh_opts[@]}" "$remote" "sha256sum '$upload_path' | cut -d ' ' -f1")"
           [[ "$local_sha" == "$remote_sha" ]] || {
             echo "Uploaded bundle checksum mismatch; refusing deployment." >&2
             exit 1
