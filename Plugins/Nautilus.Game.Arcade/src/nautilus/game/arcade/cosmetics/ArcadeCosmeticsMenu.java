@@ -46,7 +46,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private static final String MAIN_TITLE = "Arcade Cosmetics | Games";
     private static final String TITLE_PREFIX = "Arcade Cosmetics | ";
-    private static final int WIN_EFFECT_SLOT = 31;
+    private static final int NORMAL_WIN_EFFECTS_SLOT = 51;
+    private static final String WIN_EFFECTS_TITLE = "Arcade Win Effects | Games";
     private static final String[] COLOUR_OPTIONS = {
             "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
             "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"
@@ -495,9 +496,6 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         for (GameDefinition game : games.values()) {
             put(inventory, GAME_SLOTS[index++], gameIcon(player, game));
         }
-        put(inventory, WIN_EFFECT_SLOT, namedWithLore(Material.FIREWORK, ChatColor.LIGHT_PURPLE + "Win Effects",
-                Arrays.asList(ChatColor.GRAY + "Review the planned win-effect concept for every Arcade game.",
-                        ChatColor.YELLOW + "Click to open the Win Effects section.")));
         put(inventory, 49, named(Material.BARRIER, ChatColor.RED + "Close", "Close the Arcade Cosmetics menu."));
         player.openInventory(inventory);
     }
@@ -508,7 +506,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         meta.setDisplayName(ChatColor.YELLOW + game.displayName);
         List<String> lore = new ArrayList<String>();
         lore.add(ChatColor.GRAY.toString() + game.features.size() + (game.features.size() == 1 ? " cosmetic line" : " cosmetic lines"));
-        lore.add(ChatColor.GRAY + "Win-effect concept tracked in the Win Effects section");
+        lore.add(ChatColor.GRAY + "Win effects are managed separately in Cosmetics.");
         lore.add(ChatColor.GREEN + "Click to open");
         meta.setLore(lore);
         item.setItemMeta(meta);
@@ -528,25 +526,73 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         player.openInventory(inventory);
     }
 
+    /**
+     * This menu is opened from the normal Cosmetics menu, independently from
+     * Arcade Cosmetics. Only effects with a real implementation are listed.
+     */
     private void openWinEffects(Player player) {
-        openWinEffects(player, null);
+        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.BLACK + WIN_EFFECTS_TITLE);
+        int index = 0;
+        for (GameDefinition game : games.values()) {
+            if (!hasImplementedWinEffect(game.key)) continue;
+            if (index >= GAME_SLOTS.length) break;
+            put(inventory, GAME_SLOTS[index++], winEffectItem(player, game));
+        }
+        put(inventory, 49, named(Material.BARRIER, ChatColor.RED + "Close", "Close Arcade Win Effects."));
+        player.openInventory(inventory);
     }
 
-    private void openWinEffects(Player player, GameDefinition selectedGame) {
-        String title = TITLE_PREFIX + "Win Effects" + (selectedGame == null ? "" : " | " + selectedGame.key);
-        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.BLACK + title);
-        if (selectedGame == null) {
-            int index = 0;
-            for (GameDefinition game : games.values()) {
-                put(inventory, GAME_SLOTS[index++], winEffectItem(player, game));
-            }
-            put(inventory, 45, named(Material.ARROW, ChatColor.YELLOW + "Back to Games", "Return to the Arcade Cosmetics game list."));
-        } else {
-            put(inventory, 22, winEffectItem(player, selectedGame));
-            put(inventory, 45, named(Material.ARROW, ChatColor.YELLOW + "Back to Game", "Return to " + selectedGame.displayName + " cosmetics."));
+    private boolean hasImplementedWinEffect(String gameKey) {
+        // Add a game only after its sequence is wired into the native end-of-round flow.
+        return "baconbrawl".equalsIgnoreCase(gameKey);
+    }
+
+    private ItemStack winEffectItem(Player player, GameDefinition game) {
+        String selected = getEquippedWinEffect(player.getUniqueId(), game.key);
+        boolean equipped = "body-slam".equalsIgnoreCase(selected);
+        ItemStack item = new ItemStack(Material.IRON_AXE);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName((equipped ? ChatColor.GREEN : ChatColor.YELLOW)
+                + game.displayName + " — Body Slam");
+        List<String> lore = new ArrayList<String>();
+        lore.add(ChatColor.GRAY + "The winner charges four pig-shaped targets");
+        lore.add(ChatColor.GRAY + "and sends them flying from the podium.");
+        lore.add(equipped ? ChatColor.GREEN + "Equipped for this game" : ChatColor.YELLOW + "Click to equip");
+        lore.add(ChatColor.DARK_GRAY + "WinEffect: " + game.key + ":body-slam");
+        meta.setLore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private static String winEffectPath(UUID playerId, String game) {
+        return "players." + playerId.toString() + ".arcade-win-effects." + game.toLowerCase(Locale.ROOT);
+    }
+
+    public static String getEquippedWinEffect(UUID playerId, String game) {
+        if (instance == null || playerId == null || game == null) return "";
+        String value = instance.data.getString(winEffectPath(playerId, game), "");
+        return value == null ? "" : value.toLowerCase(Locale.ROOT);
+    }
+
+    private void handleWinEffectsClick(Player player, ItemStack clicked) {
+        if (clicked == null || !clicked.hasItemMeta() || clicked.getItemMeta().getLore() == null) return;
+        for (String line : clicked.getItemMeta().getLore()) {
+            String plain = ChatColor.stripColor(line);
+            if (plain == null || !plain.startsWith("WinEffect: ")) continue;
+            String[] parts = plain.substring("WinEffect: ".length()).split(":");
+            if (parts.length != 2 || !hasImplementedWinEffect(parts[0])) return;
+            GameDefinition game = games.get(parts[0].toLowerCase(Locale.ROOT));
+            if (game == null) return;
+            String path = winEffectPath(player.getUniqueId(), parts[0]);
+            String current = data.getString(path, "");
+            boolean equip = !parts[1].equalsIgnoreCase(current);
+            data.set(path, equip ? parts[1].toLowerCase(Locale.ROOT) : null);
+            save();
+            player.sendMessage((equip ? ChatColor.GREEN + "Equipped " : ChatColor.YELLOW + "Unequipped ")
+                    + game.displayName + " win effect: Body Slam.");
+            openWinEffects(player);
+            return;
         }
-        put(inventory, 49, named(Material.BARRIER, ChatColor.RED + "Close", "Close the Arcade Cosmetics menu."));
-        player.openInventory(inventory);
     }
 
     private ItemStack featureIcon(Player player, GameDefinition game, FeatureDefinition feature) {
@@ -1088,18 +1134,10 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         }
     }
 
-    private void toggleWinEffectPlaceholder(Player player, GameDefinition game) {
-        String path = "players." + player.getUniqueId() + ".arcade." + game.key + ".win-effect";
-        boolean currentlyMarked = "planned".equalsIgnoreCase(data.getString(path, ""));
-        data.set(path, currentlyMarked ? null : "planned");
-        save();
-        player.sendMessage(ChatColor.LIGHT_PURPLE + game.displayName + " win effect "
-                + (currentlyMarked ? "unmarked" : "marked") + ". This is a planning placeholder only; no sequence runs.");
-    }
-
     @EventHandler(priority = EventPriority.HIGHEST)
-    public void injectJukeboxIntoNormalCosmeticsMenu(InventoryOpenEvent event) {
+    public void injectArcadeEntriesIntoNormalCosmeticsMenu(InventoryOpenEvent event) {
         if (!(event.getPlayer() instanceof Player) || !isNormalCosmeticsMenu(event.getView())) return;
+        event.getView().getTopInventory().setItem(NORMAL_WIN_EFFECTS_SLOT, normalMenuWinEffects());
         event.getView().getTopInventory().setItem(52, normalMenuJukebox());
     }
 
@@ -1113,6 +1151,22 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         if (isNormalCosmeticsMenu(event.getView()) && event.getRawSlot() == 52 && isArcadeJukebox(event.getCurrentItem())) {
             event.setCancelled(true);
             Bukkit.dispatchCommand(player, "arcadecosmetics");
+            return;
+        }
+        if (isNormalCosmeticsMenu(event.getView()) && event.getRawSlot() == NORMAL_WIN_EFFECTS_SLOT
+                && isArcadeWinEffectsItem(event.getCurrentItem())) {
+            event.setCancelled(true);
+            openWinEffects(player);
+            return;
+        }
+        if (WIN_EFFECTS_TITLE.equals(title)) {
+            event.setCancelled(true);
+            if (event.getRawSlot() < 0 || event.getRawSlot() >= event.getView().getTopInventory().getSize()) return;
+            if (event.getRawSlot() == 49) {
+                player.closeInventory();
+                return;
+            }
+            handleWinEffectsClick(player, event.getCurrentItem());
             return;
         }
 
@@ -1135,8 +1189,20 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         ItemMeta meta = item.getItemMeta();
         meta.setDisplayName(ChatColor.LIGHT_PURPLE + "Arcade Cosmetics");
         List<String> lore = new ArrayList<String>();
-        lore.add(ChatColor.GRAY + "Game-specific cosmetic prototypes");
-        lore.add(ChatColor.GRAY + "and planned win-effect concepts.");
+        lore.add(ChatColor.GRAY + "Game-specific gameplay cosmetics");
+        lore.add(ChatColor.GREEN + "Click to open");
+        meta.setLore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack normalMenuWinEffects() {
+        ItemStack item = new ItemStack(Material.FIREWORK);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(ChatColor.LIGHT_PURPLE + "Arcade Win Effects");
+        List<String> lore = new ArrayList<String>();
+        lore.add(ChatColor.GRAY + "Choose game-specific round-end");
+        lore.add(ChatColor.GRAY + "celebrations, separate from cosmetics.");
         lore.add(ChatColor.GREEN + "Click to open");
         meta.setLore(lore);
         item.setItemMeta(meta);
@@ -1147,6 +1213,12 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         if (item == null || item.getType() != Material.JUKEBOX || !item.hasItemMeta()) return false;
         String name = ChatColor.stripColor(item.getItemMeta().getDisplayName());
         return "Arcade Cosmetics".equals(name);
+    }
+
+    private boolean isArcadeWinEffectsItem(ItemStack item) {
+        if (item == null || item.getType() != Material.FIREWORK || !item.hasItemMeta()) return false;
+        String name = ChatColor.stripColor(item.getItemMeta().getDisplayName());
+        return "Arcade Win Effects".equals(name);
     }
 
     public static int getEquippedColourData(UUID playerId, String game) {
