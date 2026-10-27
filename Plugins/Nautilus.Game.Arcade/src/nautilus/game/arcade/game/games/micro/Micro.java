@@ -189,8 +189,11 @@ public class Micro extends TeamGame
 			ParticleType particle = "spark".equalsIgnoreCase(borderStyle) ? ParticleType.FIREWORKS_SPARK
 					: "soft".equalsIgnoreCase(borderStyle) ? ParticleType.CLOUD : ParticleType.BLOCK_DUST;
 			int dustColour = colour >= 0 ? colour : 3;
-			if (particle == ParticleType.BLOCK_DUST) particle = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) dustColour);
-			UtilParticle.PlayParticle(particle, border, 0.08F, 0.08F, 0.08F, 0.005F, 2, ViewDist.NORMAL, UtilServer.getPlayers());
+						if (particle == ParticleType.BLOCK_DUST)
+				UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) dustColour),
+						border, 0.08F, 0.08F, 0.08F, 0.005F, 2, ViewDist.NORMAL, UtilServer.getPlayers());
+			else
+				UtilParticle.PlayParticle(particle, border, 0.08F, 0.08F, 0.08F, 0.005F, 2, ViewDist.NORMAL, UtilServer.getPlayers());
 		}
 	}
 

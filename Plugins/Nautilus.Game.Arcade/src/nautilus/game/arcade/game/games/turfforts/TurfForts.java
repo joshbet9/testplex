@@ -145,20 +145,24 @@ public class TurfForts extends TeamGame
 		Block hit = UtilEnt.getHitBlock(arrow);
 		if (hit == null) return;
 		Location center = hit.getLocation().add(0.5, 0.5, 0.5);
-		ParticleType particle;
+		ParticleType particle = null;
+		String particleName = null;
 		int count = 12;
 		switch (choice.toLowerCase(java.util.Locale.ROOT))
 		{
-			case "dust": particle = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_CLAY, (byte) 14); break;
+			case "dust": particleName = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_CLAY, (byte) 14); break;
 			case "spark": particle = ParticleType.FIREWORKS_SPARK; break;
 			case "burst": particle = ParticleType.EXPLODE; count = 4; break;
 			case "team-colour":
 				byte teamColour = GetTeam(shooter) != null && GetTeam(shooter).GetColor() == ChatColor.BLUE ? (byte) 11 : (byte) 14;
-				particle = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_CLAY, teamColour);
+				particleName = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_CLAY, teamColour);
 				break;
 			default: return;
 		}
-		UtilParticle.PlayParticle(particle, center, 0.25F, 0.2F, 0.25F, 0.02F, count, ViewDist.NORMAL, UtilServer.getPlayers());
+		if (particleName != null)
+			UtilParticle.PlayParticle(particleName, center, 0.25F, 0.2F, 0.25F, 0.02F, count, ViewDist.NORMAL, UtilServer.getPlayers());
+		else if (particle != null)
+			UtilParticle.PlayParticle(particle, center, 0.25F, 0.2F, 0.25F, 0.02F, count, ViewDist.NORMAL, UtilServer.getPlayers());
 	}
 
 	public TurfForts(ArcadeManager manager)

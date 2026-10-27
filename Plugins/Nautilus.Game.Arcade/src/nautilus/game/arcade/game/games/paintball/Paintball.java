@@ -241,16 +241,21 @@ public class Paintball extends TeamGame
 		if (shooter == null || location == null || location.getWorld() == null) return;
 		String choice = ArcadeCosmeticsMenu.getEquippedChoice(shooter.getUniqueId(), "paintball", "pellet-impact");
 		if (choice == null || choice.isEmpty() || "classic".equalsIgnoreCase(choice)) return;
-		ParticleType particle;
+		ParticleType particle = null;
+		String particleName = null;
 		int count = 14;
 		switch (choice.toLowerCase(java.util.Locale.ROOT))
 		{
-			case "paint-splash": particle = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_CLAY, colour); count = 18; break;
+			case "paint-splash": particleName = ParticleType.BLOCK_DUST.getParticle(Material.STAINED_CLAY, colour); count = 18; break;
 			case "spark": particle = ParticleType.FIREWORKS_SPARK; break;
 			case "burst": particle = ParticleType.EXPLODE; count = 5; break;
 			default: return;
 		}
-		UtilParticle.PlayParticle(particle, location.clone().add(0, 0.15, 0), 0.28F, 0.22F, 0.28F, 0.02F, count, ViewDist.NORMAL, UtilServer.getPlayers());
+		Location impact = location.clone().add(0, 0.15, 0);
+		if (particleName != null)
+			UtilParticle.PlayParticle(particleName, impact, 0.28F, 0.22F, 0.28F, 0.02F, count, ViewDist.NORMAL, UtilServer.getPlayers());
+		else if (particle != null)
+			UtilParticle.PlayParticle(particle, impact, 0.28F, 0.22F, 0.28F, 0.02F, count, ViewDist.NORMAL, UtilServer.getPlayers());
 	}
 
 	/** The weapon skin is a display label only; it never swaps or buffs a kit item. */

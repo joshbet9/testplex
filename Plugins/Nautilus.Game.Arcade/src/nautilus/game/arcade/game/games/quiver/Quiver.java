@@ -225,8 +225,6 @@ public class Quiver extends SoloGame
 			_bestCombo.put(player, combo);
 	}
 
-	@EventHandler
-
 	/** Cosmetic streak burst at the eliminated player's location; no scoring changes. */
 	@EventHandler(priority = EventPriority.MONITOR)
 	public void deathStreakCosmetic(CombatDeathEvent event)
@@ -261,6 +259,7 @@ public class Quiver extends SoloGame
 		}
 	}
 
+	@EventHandler
 	public void ComboReset(CombatDeathEvent event)
 	{
 		if (!(event.GetEvent().getEntity() instanceof Player))

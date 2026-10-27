@@ -863,9 +863,6 @@ public class Snake extends SoloGame
 		}
 	}
 
-	/** Speed and Reverse get their equipped line colour, then return to the player's base tail colour. */
-	@EventHandler
-
 	/** Small server-visible particles for the active Snake ability's selected style. */
 	@EventHandler
 	public void abilityVisualParticles(UpdateEvent event)
@@ -886,6 +883,7 @@ public class Snake extends SoloGame
 		}
 	}
 
+	@EventHandler
 	public void AbilityCosmeticColours(UpdateEvent event)
 	{
 		if (!IsLive() || event.getType() != UpdateType.TICK) return;
