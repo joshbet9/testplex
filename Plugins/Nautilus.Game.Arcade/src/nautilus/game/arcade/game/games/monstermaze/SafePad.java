@@ -218,7 +218,7 @@ public class SafePad implements Listener
 		if (Host == null || _loc == null || _loc.getWorld() == null)
 			return;
 
-		Location beamLocation = _loc.clone().add(0, 1, 0);
+		Location beamLocation = _loc.clone().add(0, 6, 0);
 		boolean beaconPresent = _loc.getBlock().getType() == Material.BEACON;
 		boolean beamSpaceIsAir = beamLocation.getBlock().getType() == Material.AIR;
 
@@ -240,7 +240,7 @@ public class SafePad implements Listener
 			if (customPack && beaconPresent && beamSpaceIsAir)
 			{
 				byte colour = (byte) ArcadeCosmeticsMenu.getMonsterMazeBeaconColourData(viewer.getUniqueId(), mobSet);
-				// This is a client-only glass block used to tint the beacon beam.
+				// Place the client-only filter higher in the beam so it cannot obstruct players on the pad.
 				viewer.sendBlockChange(beamLocation, Material.STAINED_GLASS, colour);
 			}
 			else
@@ -263,7 +263,7 @@ public class SafePad implements Listener
 				Location location = block.getLocation();
 				viewer.sendBlockChange(location, location.getBlock().getType(), location.getBlock().getData());
 			}
-			Location beamLocation = _loc.clone().add(0, 1, 0);
+			Location beamLocation = _loc.clone().add(0, 6, 0);
 			viewer.sendBlockChange(beamLocation, beamLocation.getBlock().getType(), beamLocation.getBlock().getData());
 		}
 	}
