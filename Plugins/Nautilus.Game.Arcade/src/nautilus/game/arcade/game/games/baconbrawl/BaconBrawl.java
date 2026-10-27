@@ -1,11 +1,19 @@
 package nautilus.game.arcade.game.games.baconbrawl;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.bukkit.GameMode;
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
@@ -14,9 +22,6 @@ import mineplex.core.common.util.C;
 import mineplex.core.common.util.UtilPlayer;
 import mineplex.core.common.util.UtilServer;
 import mineplex.core.common.util.UtilTime;
-import mineplex.core.common.util.UtilParticle;
-import mineplex.core.common.util.UtilParticle.ParticleType;
-import mineplex.core.common.util.UtilParticle.ViewDist;
 import mineplex.core.updater.UpdateType;
 import mineplex.core.updater.event.UpdateEvent;
 import mineplex.minecraft.game.core.damage.CustomDamageEvent;
@@ -44,7 +49,9 @@ public class BaconBrawl extends SoloGame
 					"Knockback increases over time!"
 			};
 
-	private int _cosmeticTrailTick;
+	private int _cosmeticAccessoryTick;
+	private final Map<UUID, ArmorStand> _cosmeticAccessories = new HashMap<>();
+	private final Map<UUID, String> _cosmeticAccessoryChoices = new HashMap<>();
 	private double _knockbackMagnitude = 1.5;
 	private long _increaseLast, _increaseTime = TimeUnit.SECONDS.toMillis(50);
 
@@ -127,28 +134,119 @@ public class BaconBrawl extends SoloGame
 	}
 
 	/**
-	 * Cosmetic themes render as a lightweight, server-visible sparkle trail around
-	 * each player's pig disguise. Players without a selection keep the stock look.
+	 * Render each equipped Bacon Brawl accessory above its owner's pig or sheep
+	 * disguise. The invisible, marker armor stand has no gameplay collision; only
+	 * its helmet slot is visible to every client. No choice means the stock look.
 	 */
 	@EventHandler
-	public void cosmeticTrail(UpdateEvent event)
+	public void cosmeticAccessories(UpdateEvent event)
 	{
-		if (event.getType() != UpdateType.TICK || !IsLive())
+		if (event.getType() != UpdateType.TICK)
 			return;
 
-		if (++_cosmeticTrailTick % 4 != 0)
+		if (!IsLive())
+		{
+			removeAllCosmeticAccessories();
+			return;
+		}
+
+		// 10 updates/second is smooth enough for a head accessory and keeps entity
+		// teleport traffic low on the 1.8 server.
+		if (++_cosmeticAccessoryTick % 2 != 0)
 			return;
 
+		Set<UUID> active = new HashSet<>();
 		for (Player player : GetPlayers(true))
 		{
-			int colour = ArcadeCosmeticsMenu.getEquippedColourData(player.getUniqueId(), "baconbrawl");
-			if (colour < 0)
+			UUID id = player.getUniqueId();
+			String choice = ArcadeCosmeticsMenu.getEquippedChoice(id, "baconbrawl");
+			ItemStack accessory = getCosmeticAccessory(choice);
+			if (accessory == null)
 				continue;
 
-			UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) colour),
-					player.getLocation().clone().add(0, 0.7, 0), 0.12F, 0.16F, 0.12F, 0.015F,
-					2, ViewDist.NORMAL, UtilServer.getPlayers());
+			active.add(id);
+			ArmorStand stand = _cosmeticAccessories.get(id);
+			if (stand == null || stand.isDead() || !stand.isValid())
+			{
+				removeCosmeticAccessory(id);
+				Location spawn = player.getLocation().clone().subtract(0, 0.18, 0);
+				stand = spawn.getWorld().spawn(spawn, ArmorStand.class);
+				stand.setVisible(false);
+				stand.setSmall(true);
+				stand.setGravity(false);
+				stand.setBasePlate(false);
+				stand.setArms(false);
+				stand.setMarker(true);
+				stand.setCanPickupItems(false);
+				_cosmeticAccessories.put(id, stand);
+				_cosmeticAccessoryChoices.remove(id);
+			}
+
+			if (!choice.equals(_cosmeticAccessoryChoices.get(id)))
+			{
+				stand.setHelmet(accessory);
+				_cosmeticAccessoryChoices.put(id, choice);
+			}
+
+			Location target = player.getLocation().clone().subtract(0, 0.18, 0);
+			if (!stand.getWorld().equals(target.getWorld()) || stand.getLocation().distanceSquared(target) > 0.0001
+					|| Math.abs(stand.getLocation().getYaw() - target.getYaw()) > 1.0F)
+			{
+				stand.teleport(target);
+			}
 		}
+
+		for (UUID id : new HashSet<>(_cosmeticAccessories.keySet()))
+		{
+			if (!active.contains(id))
+				removeCosmeticAccessory(id);
+		}
+	}
+
+	@EventHandler
+	public void cleanupCosmeticAccessories(GameStateChangeEvent event)
+	{
+		if (event.GetGame() != this)
+			return;
+
+		if (event.GetState() == GameState.End || event.GetState() == GameState.Dead)
+			removeAllCosmeticAccessories();
+	}
+
+	private ItemStack getCosmeticAccessory(String choice)
+	{
+		if (choice == null)
+			return null;
+
+		switch (choice.toLowerCase())
+		{
+			case "crown":
+				return new ItemStack(Material.GOLD_HELMET);
+			case "top_hat":
+				// A black wool block is a visibly distinct top-hat silhouette in the
+				// vanilla 1.8 model set and needs no client resource pack.
+				return new ItemStack(Material.WOOL, 1, (short) 15);
+			case "chef":
+				return new ItemStack(Material.WOOL, 1, (short) 0);
+			case "diamond":
+				return new ItemStack(Material.DIAMOND_HELMET);
+			default:
+				return null;
+		}
+	}
+
+	private void removeCosmeticAccessory(UUID id)
+	{
+		ArmorStand stand = _cosmeticAccessories.remove(id);
+		_cosmeticAccessoryChoices.remove(id);
+		if (stand != null && !stand.isDead())
+			stand.remove();
+	}
+
+	private void removeAllCosmeticAccessories()
+	{
+		for (UUID id : new HashSet<>(_cosmeticAccessories.keySet()))
+			removeCosmeticAccessory(id);
 	}
 
 	@EventHandler
