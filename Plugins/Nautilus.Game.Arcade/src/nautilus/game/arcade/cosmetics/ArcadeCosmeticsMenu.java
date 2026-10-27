@@ -66,8 +66,6 @@ import nautilus.game.arcade.game.Game.GameState;
 public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private static final String MAIN_TITLE = "Arcade Cosmetics | Games";
     private static final String TITLE_PREFIX = "Arcade Cosmetics | ";
-    private static final int NORMAL_WIN_EFFECTS_SLOT = 51;
-    private static final String WIN_EFFECTS_TITLE = "Arcade Win Effects | Games";
     private static final String BACON_SHOWCASE_TAG = "TESTPLEX_BACON_BRAWL_SHOWCASE:";
     private static final String BOMB_LOBBERS_SHOWCASE_TAG = "TESTPLEX_BOMB_LOBBERS_SHOWCASE:";
     private static final String BOMB_LOBBERS_LABEL_PREFIX = "TNT Impact: ";
@@ -106,38 +104,31 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private void registerGames() {
         registerGame("baconbrawl", "Bacon Brawl", Material.PORK, (short) 0,
                 "Torpedo/body-slam into four players, sending them flying off the edge.",
-                feature("accessories", "Pig & Sheep Accessories", Material.GOLD_HELMET,
-                        "Equip a Crown, Top Hat, Chef or Diamond accessory on your own pig/sheep disguise. The pregame lobby showcases every style on both models.",
-                        "baconbrawl", false, "crown", "top_hat", "chef", "diamond"));
+                feature("ability-effects", "Ability Effect Sets", Material.PORK,
+                        "Choose a visual theme for Body Slam, Bacon Blast, Cloak and Crispy Bacon. Cosmetic particles only.",
+                        null, false, "porky", "inferno", "frost", "slime", "royal", "confetti"));
 
         registerGame("bomblobbers", "Bomb Lobbers", Material.TNT, (short) 0,
                 "Land three direct TNT hits on three player targets, using the Turtles map theme.",
                 feature("tnt-impact", "TNT Impact Effects", Material.TNT,
                         "Choose how your own TNT impacts appear to everyone. These visual effects never change damage or explosion rules.",
-                        null, false, "classic", "ember", "shockwave", "spark", "confetti"));
+                        null, false, "classic", "ember", "shockwave", "spark", "confetti", "frost", "slime"));
 
         registerGame("deathtag", "Death Tag", Material.SKULL_ITEM, (short) 0,
-                "Knock three teammates off a shared landmark, such as Pirate Harbour or the flag area on Halfmoon.",
-                feature("runner-trail", "Runner Trails", Material.STAINED_GLASS,
-                        "Expanded trail colours for runners. Prototype selection only until all Death Tag trail hooks are connected.",
-                        null, false, "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
-                        "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"));
+                "Run from the undead with custom trails and a Barbarians Village tree-inspired win effect.",
+                compositeFeature("runner-trails", "Runner Trails", Material.STAINED_GLASS,
+                        "Choose the colour and particle style visible to all runners.",
+                        setting("trail-colour", "Trail Colour", Material.STAINED_GLASS, "Stained-glass trail colour.",
+                                null, false, "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
+                                "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"),
+                        setting("trail-style", "Trail Style", Material.FIREWORK, "Particle style for the runner trail.",
+                                null, false, "classic", "soul", "sparks", "smoke", "ender", "hearts")));
 
         registerGame("dragonescape", "Dragon Escape", Material.DRAGON_EGG, (short) 0,
-                "Two players parkour through the finish; the winner leaps ahead to finish first from third place.",
-                feature("running-trail", "Running Trail Colour", Material.STAINED_GLASS,
-                        "The existing coloured running trail. This option continues to drive the current Dragon Escape colour hook.",
-                        "dragonescape", false, "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
-                        "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"),
-                compositeFeature("finish-presentation", "Finish Presentation", Material.BEACON,
-                        "Customise the death chat line and the leader beacon independently within one cosmetic line.",
-                        setting("death-chat", "Death Chat Lines", Material.NAME_TAG,
-                                "Choose a custom line to send when you die. The chat adapter remains prototype work.",
-                                null, false, "off", "am-i-cooked", "grok-is-this-true"),
-                        setting("leader-beacon", "Leader Beacon Colour", Material.BEACON,
-                                "The shared beacon should follow the leading player and use that player's selected colour. Hook not yet connected.",
-                                null, false, "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
-                                "silver", "cyan", "purple", "blue", "brown", "green", "red", "black")));
+                "Celebrate your finish with effects inspired by the final jumps of Skylands.",
+                feature("finish-celebration", "Finish Celebrations", Material.FIREWORK,
+                        "Choose the particle-and-sound burst that plays only when you finish.",
+                        null, false, "classic", "skyburst", "dragon-roar", "starlight", "cloud-ring", "ender-flare", "confetti"));
 
         registerGame("dragons", "Dragons", Material.FIREWORK, (short) 0,
                 "Use a Pyro platform; the winner is hit by a dragon while everyone else falls.",
@@ -550,94 +541,6 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         put(inventory, 45, named(Material.ARROW, ChatColor.YELLOW + "Back to Games", "Return to the full game list."));
         put(inventory, 49, named(Material.BARRIER, ChatColor.RED + "Close", "Close the Arcade Cosmetics menu."));
         player.openInventory(inventory);
-    }
-
-    /**
-     * This menu is opened from the normal Cosmetics menu, independently from
-     * Arcade Cosmetics. Only effects with a real implementation are listed.
-     */
-    private void openWinEffects(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.BLACK + WIN_EFFECTS_TITLE);
-        int index = 0;
-        for (GameDefinition game : games.values()) {
-            if (!hasImplementedWinEffect(game.key)) continue;
-            if (index >= GAME_SLOTS.length) break;
-            put(inventory, GAME_SLOTS[index++], winEffectItem(player, game));
-        }
-        put(inventory, 49, named(Material.BARRIER, ChatColor.RED + "Close", "Close Arcade Win Effects."));
-        player.openInventory(inventory);
-    }
-
-    private boolean hasImplementedWinEffect(String gameKey) {
-        return "baconbrawl".equalsIgnoreCase(gameKey) || "bomblobbers".equalsIgnoreCase(gameKey);
-    }
-
-    private ItemStack winEffectItem(Player player, GameDefinition game) {
-        String gameKey = game.key.toLowerCase(Locale.ROOT);
-        String effectKey;
-        String effectName;
-        String[] description;
-        if ("baconbrawl".equals(gameKey)) {
-            effectKey = "body-slam";
-            effectName = "Body Slam";
-            description = new String[] {
-                    "Body-slam four player targets off a bare-dirt arena",
-                    "inspired by Mighty Lava Arena."
-            };
-        } else {
-            effectKey = "tnt-triple-hit";
-            effectName = "Triple Lob";
-            description = new String[] {
-                    "Land three direct TNT hits on player targets,",
-                    "with the Turtles map theme in the winner room."
-            };
-        }
-
-        String selected = getEquippedWinEffect(player.getUniqueId(), game.key);
-        boolean equipped = effectKey.equalsIgnoreCase(selected);
-        ItemStack item = new ItemStack("baconbrawl".equals(gameKey) ? Material.IRON_AXE : Material.TNT);
-        ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName((equipped ? ChatColor.GREEN : ChatColor.YELLOW)
-                + game.displayName + " — " + effectName);
-        List<String> lore = new ArrayList<String>();
-        for (String line : description) lore.add(ChatColor.GRAY + line);
-        lore.add(equipped ? ChatColor.GREEN + "Equipped for this game" : ChatColor.YELLOW + "Click to equip");
-        lore.add(ChatColor.DARK_GRAY + "WinEffect: " + game.key + ":" + effectKey);
-        meta.setLore(lore);
-        item.setItemMeta(meta);
-        return item;
-    }
-
-    private static String winEffectPath(UUID playerId, String game) {
-        return "players." + playerId.toString() + ".arcade-win-effects." + game.toLowerCase(Locale.ROOT);
-    }
-
-    public static String getEquippedWinEffect(UUID playerId, String game) {
-        if (instance == null || playerId == null || game == null) return "";
-        String value = instance.data.getString(winEffectPath(playerId, game), "");
-        return value == null ? "" : value.toLowerCase(Locale.ROOT);
-    }
-
-    private void handleWinEffectsClick(Player player, ItemStack clicked) {
-        if (clicked == null || !clicked.hasItemMeta() || clicked.getItemMeta().getLore() == null) return;
-        for (String line : clicked.getItemMeta().getLore()) {
-            String plain = ChatColor.stripColor(line);
-            if (plain == null || !plain.startsWith("WinEffect: ")) continue;
-            String[] parts = plain.substring("WinEffect: ".length()).split(":");
-            if (parts.length != 2 || !hasImplementedWinEffect(parts[0])) return;
-            GameDefinition game = games.get(parts[0].toLowerCase(Locale.ROOT));
-            if (game == null) return;
-            String path = winEffectPath(player.getUniqueId(), parts[0]);
-            String current = data.getString(path, "");
-            boolean equip = !parts[1].equalsIgnoreCase(current);
-            data.set(path, equip ? parts[1].toLowerCase(Locale.ROOT) : null);
-            save();
-            String effectName = "baconbrawl".equalsIgnoreCase(parts[0]) ? "Body Slam" : "Triple Lob";
-            player.sendMessage((equip ? ChatColor.GREEN + "Equipped " : ChatColor.YELLOW + "Unequipped ")
-                    + game.displayName + " win effect: " + effectName + ".");
-            openWinEffects(player);
-            return;
-        }
     }
 
     private ItemStack featureIcon(Player player, GameDefinition game, FeatureDefinition feature) {
@@ -1121,7 +1024,6 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void injectArcadeEntriesIntoNormalCosmeticsMenu(InventoryOpenEvent event) {
         if (!(event.getPlayer() instanceof Player) || !isNormalCosmeticsMenu(event.getView())) return;
-        event.getView().getTopInventory().setItem(NORMAL_WIN_EFFECTS_SLOT, normalMenuWinEffects());
         event.getView().getTopInventory().setItem(52, normalMenuJukebox());
     }
 
@@ -1137,23 +1039,6 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             Bukkit.dispatchCommand(player, "arcadecosmetics");
             return;
         }
-        if (isNormalCosmeticsMenu(event.getView()) && event.getRawSlot() == NORMAL_WIN_EFFECTS_SLOT
-                && isArcadeWinEffectsItem(event.getCurrentItem())) {
-            event.setCancelled(true);
-            openWinEffects(player);
-            return;
-        }
-        if (WIN_EFFECTS_TITLE.equals(title)) {
-            event.setCancelled(true);
-            if (event.getRawSlot() < 0 || event.getRawSlot() >= event.getView().getTopInventory().getSize()) return;
-            if (event.getRawSlot() == 49) {
-                player.closeInventory();
-                return;
-            }
-            handleWinEffectsClick(player, event.getCurrentItem());
-            return;
-        }
-
         if (!title.startsWith("Arcade Cosmetics |")) return;
         event.setCancelled(true);
         if (event.getRawSlot() < 0 || event.getRawSlot() >= event.getView().getTopInventory().getSize()) return;
@@ -1180,29 +1065,10 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         return item;
     }
 
-    private ItemStack normalMenuWinEffects() {
-        ItemStack item = new ItemStack(Material.FIREWORK);
-        ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(ChatColor.LIGHT_PURPLE + "Arcade Win Effects");
-        List<String> lore = new ArrayList<String>();
-        lore.add(ChatColor.GRAY + "Choose game-specific round-end");
-        lore.add(ChatColor.GRAY + "celebrations, separate from cosmetics.");
-        lore.add(ChatColor.GREEN + "Click to open");
-        meta.setLore(lore);
-        item.setItemMeta(meta);
-        return item;
-    }
-
     private boolean isArcadeJukebox(ItemStack item) {
         if (item == null || item.getType() != Material.JUKEBOX || !item.hasItemMeta()) return false;
         String name = ChatColor.stripColor(item.getItemMeta().getDisplayName());
         return "Arcade Cosmetics".equals(name);
-    }
-
-    private boolean isArcadeWinEffectsItem(ItemStack item) {
-        if (item == null || item.getType() != Material.FIREWORK || !item.hasItemMeta()) return false;
-        String name = ChatColor.stripColor(item.getItemMeta().getDisplayName());
-        return "Arcade Win Effects".equals(name);
     }
 
     /**
@@ -1253,9 +1119,9 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
 
         // The test plane's spawn is (0,104,0); this puts the display forward of
         // spawn and clear of the legacy kit/team stands on either side.
-        int[] xOffsets = { -6, -2, 2, 6 };
+        int[] xOffsets = { -9, -6, -3, 0, 3, 6 };
         int[] zOffsets = { 18, 26 };
-        String[] choices = { "crown", "top_hat", "chef", "diamond" };
+        String[] choices = { "porky", "inferno", "frost", "slime", "royal", "confetti" };
 
         for (int row = 0; row < 2; row++) {
             for (int column = 0; column < choices.length; column++) {
@@ -1268,7 +1134,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 Entity animal;
                 if (row == 0) {
                     Pig pig = world.spawn(display, Pig.class);
-                    pig.setCustomName(ChatColor.GOLD + "Pig - " + pretty(choices[column]));
+                    pig.setCustomName(ChatColor.GOLD + "Pig - " + pretty(choices[column]) + " Set");
                     pig.setCustomNameVisible(true);
                     pig.setRemoveWhenFarAway(false);
                     UtilEnt.vegetate(pig, true);
@@ -1277,7 +1143,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 } else {
                     Sheep sheep = world.spawn(display, Sheep.class);
                     sheep.setColor(DyeColor.PINK);
-                    sheep.setCustomName(ChatColor.LIGHT_PURPLE + "Pink Sheep - " + pretty(choices[column]));
+                    sheep.setCustomName(ChatColor.LIGHT_PURPLE + "Pink Sheep - " + pretty(choices[column]) + " Set");
                     sheep.setCustomNameVisible(true);
                     sheep.setRemoveWhenFarAway(false);
                     UtilEnt.vegetate(sheep, true);
@@ -1286,23 +1152,26 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 }
                 baconBrawlShowcaseEntities.add(animal);
 
-                // Only the helmet is visible; marker stands have no collision.
-                Location hatLoc = display.clone().subtract(0, 0.18, 0);
-                ArmorStand stand = world.spawn(hatLoc, ArmorStand.class);
-                stand.setVisible(false);
-                stand.setSmall(true);
-                stand.setGravity(false);
-                stand.setBasePlate(false);
-                stand.setArms(false);
-                stand.setMarker(true);
-                stand.setCanPickupItems(false);
-                stand.setCustomName(BACON_SHOWCASE_TAG + choices[column]);
-                stand.setHelmet(getBaconBrawlAccessory(choices[column]));
-                baconBrawlShowcaseAccessories.add(stand);
+                // Particle previews show the theme; no wearable accessory is attached.
             }
         }
 
-        plugin.getLogger().info("Created Bacon Brawl pregame cosmetic showcase (4 pig styles and 4 pink sheep styles).");
+        plugin.getLogger().info("Created Bacon Brawl pregame showcase (six effect sets on pigs and pink sheep).");
+    }
+
+    @EventHandler
+    public void updateBaconBrawlShowcase(UpdateEvent event) {
+        if (event.getType() != UpdateType.TICK || event.getTick() % 10 != 0) return;
+        for (Entity entity : new ArrayList<Entity>(baconBrawlShowcaseEntities)) {
+            if (!(entity instanceof Pig) && !(entity instanceof Sheep)) continue;
+            String label = ChatColor.stripColor(entity.getCustomName());
+            if (label == null) continue;
+            int dash = label.indexOf(" - ");
+            if (dash < 0) continue;
+            String theme = label.substring(dash + 3).replace(" Set", "").trim().toLowerCase(Locale.ROOT).replace(' ', '-');
+            nautilus.game.arcade.game.games.baconbrawl.BaconBrawlCosmeticEffects.preview(
+                    entity.getLocation().clone().add(0, 1.0, 0), theme, "showcase");
+        }
     }
 
     private void createBombLobbersShowcase() {
@@ -1314,8 +1183,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         if (world == null) return;
         removePersistedBaconBrawlShowcase(world);
 
-        int[] xOffsets = { -8, -4, 0, 4, 8 };
-        String[] choices = { "classic", "ember", "shockwave", "spark", "confetti" };
+        int[] xOffsets = { -9, -6, -3, 0, 3, 6, 9 };
+        String[] choices = { "classic", "ember", "shockwave", "spark", "confetti", "frost", "slime" };
         for (int i = 0; i < choices.length; i++) {
             int x = lobbySpawn.getBlockX() + xOffsets[i];
             int z = lobbySpawn.getBlockZ() + 20;
@@ -1348,7 +1217,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             label.setCustomNameVisible(true);
             bombLobbersShowcaseEntities.add(label);
         }
-        plugin.getLogger().info("Created Bomb Lobbers pregame showcase (five TNT impact styles).");
+        plugin.getLogger().info("Created Bomb Lobbers pregame showcase (seven TNT impact styles).");
     }
 
     @EventHandler
@@ -1378,6 +1247,14 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 case "confetti":
                     UtilParticle.PlayParticle(ParticleType.NOTE, point, 0.8F, 0.8F, 0.8F, 1.0F, 7, ViewDist.NORMAL);
                     UtilParticle.PlayParticle(ParticleType.HAPPY_VILLAGER, point, 0.25F, 0.25F, 0.25F, 0.02F, 3, ViewDist.NORMAL);
+                    break;
+                case "frost":
+                    UtilParticle.PlayParticle(ParticleType.SNOW_SHOVEL, point, 0.25F, 0.25F, 0.25F, 0.02F, 7, ViewDist.NORMAL);
+                    UtilParticle.PlayParticle(ParticleType.SNOWBALL_POOF, point, 0.15F, 0.15F, 0.15F, 0.02F, 3, ViewDist.NORMAL);
+                    break;
+                case "slime":
+                    UtilParticle.PlayParticle(ParticleType.SLIME, point, 0.25F, 0.25F, 0.25F, 0.02F, 7, ViewDist.NORMAL);
+                    UtilParticle.PlayParticle(ParticleType.HAPPY_VILLAGER, point, 0.18F, 0.18F, 0.18F, 0.02F, 3, ViewDist.NORMAL);
                     break;
                 default:
                     UtilParticle.PlayParticle(ParticleType.LARGE_EXPLODE, point, 0.1F, 0.1F, 0.1F, 0, 1, ViewDist.NORMAL);

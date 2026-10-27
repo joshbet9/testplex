@@ -391,7 +391,7 @@ jobs:
                   "persistent per-player storage": "cosmetics.yml",
                   "shared colour resolver": "getEquippedColourData(UUID playerId, String game)",
                   "does not override the regular cosmetics command": 'getCommand("arcadecosmetics")',
-                  "win effects menu only shows implemented effects": "if (!hasImplementedWinEffect(game.key)) continue;",
+                  "native Cosmetics win-effect slot is not replaced": 'event.getView().getTopInventory().setItem(52, normalMenuJukebox());',
                   "Monster Maze cosmetic categories": 'registerGame("monstermaze", "Monster Maze"',
                   "Bacon Brawl cosmetic entry": 'registerGame("baconbrawl", "Bacon Brawl"',
                   "Bomb Lobbers cosmetic entry": 'registerGame("bomblobbers", "Bomb Lobbers"',
