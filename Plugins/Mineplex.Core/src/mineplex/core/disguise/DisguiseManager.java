@@ -378,6 +378,25 @@ public class DisguiseManager extends MiniPlugin implements IPacketHandler
 		return null;
 	}
 
+	/**
+	 * Resolve the disguise that applies to this particular viewer. Multiple
+	 * Monster Maze mob skins can share one server entity while each viewer
+	 * receives only the disguise whose predicate accepts them.
+	 */
+	public DisguiseBase getActiveDisguise(int entityId, Player viewer)
+	{
+		LinkedList<DisguiseBase> list = _spawnPacketMap.get(entityId);
+		if (list == null || viewer == null)
+			return null;
+
+		for (DisguiseBase disguise : list)
+		{
+			if (containsSpawnDisguise(viewer, disguise))
+				return disguise;
+		}
+		return null;
+	}
+
 	public LinkedList<DisguiseBase> getAllDisguises(Entity entity)
 	{
 		return _spawnPacketMap.get(entity.getEntityId());
@@ -427,29 +446,27 @@ public class DisguiseManager extends MiniPlugin implements IPacketHandler
 				entityId = ((PacketPlayOutNamedEntitySpawn) packet).a;
 			}
 
-			DisguiseBase latestDisguise = getActiveDisguise(entityId);
+			DisguiseBase viewerDisguise = getActiveDisguise(entityId, owner);
 
-			if (latestDisguise != null)
+			if (viewerDisguise != null)
 			{
-				if (containsSpawnDisguise(owner, latestDisguise))
-				{
+				packetInfo.setCancelled(true);
+				handleSpawnPackets(packetInfo.getVerifier(), viewerDisguise, protocol);
+			}
+			else
+			{
+				DisguiseBase latestDisguise = getActiveDisguise(entityId);
+				if (latestDisguise != null && latestDisguise.isHideIfNotDisguised())
 					packetInfo.setCancelled(true);
-
-					handleSpawnPackets(packetInfo.getVerifier(), latestDisguise, protocol);
-				}
-				else if (latestDisguise.isHideIfNotDisguised())
-				{
-					packetInfo.setCancelled(true);
-				}
 			}
 		}
 		else if (packet instanceof PacketPlayOutUpdateAttributes)
 		{
 			int entityId = ((PacketPlayOutUpdateAttributes) packet).a;
 
-			DisguiseBase latestDisguise = getActiveDisguise(entityId);
+			DisguiseBase latestDisguise = getActiveDisguise(entityId, owner);
 
-			if (latestDisguise != null && containsSpawnDisguise(owner, latestDisguise))
+			if (latestDisguise != null)
 			{
 				// Crash clients with meta to a block id.
 				if (latestDisguise instanceof DisguiseBlock)
@@ -460,9 +477,9 @@ public class DisguiseManager extends MiniPlugin implements IPacketHandler
 		{
 			int entityId = ((PacketPlayOutEntityMetadata) packet).a;
 
-			DisguiseBase latestDisguise = getActiveDisguise(entityId);
+			DisguiseBase latestDisguise = getActiveDisguise(entityId, owner);
 
-			if (latestDisguise != null && containsSpawnDisguise(owner, latestDisguise) && owner.getEntityId() != entityId)
+			if (latestDisguise != null && owner.getEntityId() != entityId)
 			{
 				packetInfo.setCancelled(true);
 				handlePacket(latestDisguise.modifyMetaPacket(protocol, latestDisguise.getMetadataPacket()), packetVerifier);
@@ -472,21 +489,19 @@ public class DisguiseManager extends MiniPlugin implements IPacketHandler
 		{
 			int entityId = ((PacketPlayOutEntityEquipment) packet).a;
 
-			DisguiseBase latestDisguise = getActiveDisguise(entityId);
+			DisguiseBase latestDisguise = getActiveDisguise(entityId, owner);
 
-			if (latestDisguise != null && containsSpawnDisguise(owner, latestDisguise) && latestDisguise instanceof DisguiseInsentient)
+			if (latestDisguise != null && latestDisguise instanceof DisguiseInsentient)
 			{
 				if (!((DisguiseInsentient) latestDisguise).armorVisible() && ((PacketPlayOutEntityEquipment) packet).b != 0)
-				{
 					packetInfo.setCancelled(true);
-				}
 			}
 		}
 		else if (packet instanceof PacketPlayOutEntityVelocity)
 		{
 			PacketPlayOutEntityVelocity velocityPacket = (PacketPlayOutEntityVelocity) packet;
 
-			DisguiseBase latestDisguise = getActiveDisguise(velocityPacket.a);
+			DisguiseBase latestDisguise = getActiveDisguise(velocityPacket.a, owner);
 
 			// Squids will move using their current velocity every tick. So let's just not give them any velocities
 			if (latestDisguise != null && latestDisguise instanceof DisguiseSquid && getActiveDisguise(owner) != latestDisguise)
@@ -497,7 +512,7 @@ public class DisguiseManager extends MiniPlugin implements IPacketHandler
 		else if (packet instanceof PacketPlayOutEntity)
 		{
 			PacketPlayOutEntity entityPacket = (PacketPlayOutEntity) packet;
-			DisguiseBase latestDisguise = getActiveDisguise(entityPacket.a);
+			DisguiseBase latestDisguise = getActiveDisguise(entityPacket.a, owner);
 
 			if (latestDisguise != null && latestDisguise.isPitchLocked())
 			{
@@ -507,7 +522,7 @@ public class DisguiseManager extends MiniPlugin implements IPacketHandler
 		else if (packet instanceof PacketPlayOutEntityTeleport)
 		{
 			PacketPlayOutEntityTeleport teleportPacket = (PacketPlayOutEntityTeleport) packet;
-			DisguiseBase latestDisguise = getActiveDisguise(teleportPacket.a);
+			DisguiseBase latestDisguise = getActiveDisguise(teleportPacket.a, owner);
 
 			if (latestDisguise != null && latestDisguise.isPitchLocked())
 			{
