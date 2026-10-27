@@ -749,7 +749,7 @@ public class Maze implements Listener
 			((DisguiseMagmaCube) disguise).SetSize(3);
 		if (disguise == null)
 		{
-			_host.Manager.GetPlugin().getLogger().warning("Monster Maze has no disguise implementation for " + mobType + ".");
+			Bukkit.getLogger().warning("Monster Maze has no disguise implementation for " + mobType + ".");
 			return;
 		}
 
