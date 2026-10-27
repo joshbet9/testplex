@@ -23,6 +23,9 @@ import mineplex.core.common.util.MapUtil;
 import mineplex.core.common.util.UtilMath;
 import mineplex.core.common.util.UtilPlayer;
 import mineplex.core.common.util.UtilServer;
+import mineplex.core.common.util.UtilParticle;
+import mineplex.core.common.util.UtilParticle.ParticleType;
+import mineplex.core.common.util.UtilParticle.ViewDist;
 import mineplex.core.updater.UpdateType;
 import mineplex.core.updater.event.UpdateEvent;
 import mineplex.core.visibility.VisibilityManager;
@@ -31,6 +34,7 @@ import nautilus.game.arcade.ArcadeManager;
 import nautilus.game.arcade.GameType;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.game.GameTeam;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import nautilus.game.arcade.game.GameTeam.PlayerState;
 import nautilus.game.arcade.game.SoloGame;
 import nautilus.game.arcade.game.games.deathtag.kits.KitAlphaChaser;
@@ -177,6 +181,26 @@ public class DeathTag extends SoloGame
 		}
 	}
 
+
+	@EventHandler
+	public void updateRunnerCosmeticTrails(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.TICK || !IsLive() || _runners == null || event.getTick() % 3 != 0) return;
+		for (Player player : _runners.GetPlayers(false))
+		{
+			String colourChoice = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "deathtag", "trail-colour");
+			int colour = ArcadeCosmeticsMenu.colourData(colourChoice.isEmpty() ? "white" : colourChoice);
+			String style = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "deathtag", "trail-style");
+			Location point = player.getLocation().clone().add(0, 0.15, 0);
+			UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) Math.max(0, colour)),
+					point, 0.06F, 0.06F, 0.06F, 0.01F, 2, ViewDist.NORMAL);
+			if ("soul".equals(style)) UtilParticle.PlayParticle(ParticleType.WITCH_MAGIC, point, 0.12F, 0.12F, 0.12F, 0.01F, 3, ViewDist.NORMAL);
+			else if ("sparks".equals(style)) UtilParticle.PlayParticle(ParticleType.FIREWORKS_SPARK, point, 0.12F, 0.12F, 0.12F, 0.02F, 3, ViewDist.NORMAL);
+			else if ("smoke".equals(style)) UtilParticle.PlayParticle(ParticleType.SMOKE, point, 0.12F, 0.12F, 0.12F, 0.01F, 3, ViewDist.NORMAL);
+			else if ("ender".equals(style)) UtilParticle.PlayParticle(ParticleType.PORTAL, point, 0.12F, 0.12F, 0.12F, 0.01F, 3, ViewDist.NORMAL);
+			else if ("hearts".equals(style)) UtilParticle.PlayParticle(ParticleType.HEART, point, 0.12F, 0.12F, 0.12F, 0.01F, 2, ViewDist.NORMAL);
+		}
+	}
 
 	@EventHandler
 	public void UpdateSpeed(UpdateEvent event)

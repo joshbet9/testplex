@@ -254,6 +254,7 @@ jobs:
               "Runner": (base / "game/games/runner/Runner.java").read_text(encoding="utf-8"),
               "Bacon Brawl": (base / "game/games/baconbrawl/BaconBrawl.java").read_text(encoding="utf-8"),
               "Dragon Escape": (base / "game/games/dragonescape/DragonEscape.java").read_text(encoding="utf-8"),
+              "Death Tag": (base / "game/games/deathtag/DeathTag.java").read_text(encoding="utf-8"),
               "Evolution": (base / "game/games/evolution/Evolution.java").read_text(encoding="utf-8"),
               "Micro Battles": (base / "game/games/micro/Micro.java").read_text(encoding="utf-8"),
               "Cosmetic selector": (base / "cosmetics/ArcadeCosmeticsMenu.java").read_text(encoding="utf-8"),
@@ -379,7 +380,10 @@ jobs:
                   "player-specific wearable accessory": "getBaconBrawlAccessory(choice)",
               },
               "Dragon Escape": {
-                  "coloured running trail": "getEquippedColourData(player.getUniqueId(), \"dragonescape\")",
+                  "finish-only celebration hook": "cosmeticFinishCelebration(PlayerFinishEvent event)",
+              },
+              "Death Tag": {
+                  "runner trail choices are live": '"deathtag", "trail-style"',
               },
               "Evolution": {
                   "dragon egg evolution effect": "\"dragon-egg\".equals(ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), \"evolution\"))",

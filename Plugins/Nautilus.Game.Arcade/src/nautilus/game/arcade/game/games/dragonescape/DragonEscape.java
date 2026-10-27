@@ -121,7 +121,6 @@ public class DragonEscape extends SoloGame
 
 	private long _started;
 	private long _ended;
-	private int _cosmeticTrailTick;
 
 	public DragonEscape(ArcadeManager manager)
 	{
@@ -249,28 +248,47 @@ public class DragonEscape extends SoloGame
 		event.getPlayer().addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, Integer.MAX_VALUE, 0, false, false));
 	}
 
-	/**
-	 * Per-player stained-glass dust trails are server-visible: each runner's choice
-	 * is rendered to all clients, rather than only to the player wearing it.
-	 */
+	/** Finish-only celebration using the player's selected style. */
 	@EventHandler
-	public void cosmeticTrail(UpdateEvent event)
+	public void cosmeticFinishCelebration(PlayerFinishEvent event)
 	{
-		if (event.getType() != UpdateType.TICK || !IsLive())
-			return;
-
-		if (++_cosmeticTrailTick % 4 != 0)
-			return;
-
-		for (Player player : GetPlayers(true))
+		Player player = event.getPlayer();
+		String choice = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "dragonescape", "finish-celebration");
+		if (choice == null || choice.isEmpty()) choice = "classic";
+		Location center = player.getLocation().clone().add(0, 1.0, 0);
+		switch (choice.toLowerCase(java.util.Locale.ROOT))
 		{
-			int colour = ArcadeCosmeticsMenu.getEquippedColourData(player.getUniqueId(), "dragonescape");
-			if (colour < 0)
-				continue;
-
-			Location trail = player.getLocation().clone().add(0, 0.2, 0);
-			UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) colour),
-					trail, 0.08F, 0.08F, 0.08F, 0.01F, 2, ViewDist.NORMAL, UtilServer.getPlayers());
+			case "skyburst":
+				UtilParticle.PlayParticle(ParticleType.FIREWORKS_SPARK, center, 0.8F, 0.8F, 0.8F, 0.08F, 35, ViewDist.NORMAL);
+				UtilParticle.PlayParticle(ParticleType.CLOUD, center, 0.4F, 0.5F, 0.4F, 0.04F, 18, ViewDist.NORMAL);
+				player.playSound(center, Sound.FIREWORK_LAUNCH, 1.0F, 1.2F); break;
+			case "dragon-roar":
+				UtilParticle.PlayParticle(ParticleType.FLAME, center, 0.6F, 0.6F, 0.6F, 0.02F, 22, ViewDist.NORMAL);
+				UtilParticle.PlayParticle(ParticleType.LARGE_EXPLODE, center, 0.15F, 0.15F, 0.15F, 0, 1, ViewDist.NORMAL);
+				player.playSound(center, Sound.ENDERDRAGON_GROWL, 1.0F, 1.15F); break;
+			case "starlight":
+				UtilParticle.PlayParticle(ParticleType.FIREWORKS_SPARK, center, 0.45F, 0.65F, 0.45F, 0.02F, 28, ViewDist.NORMAL);
+				UtilParticle.PlayParticle(ParticleType.WITCH_MAGIC, center, 0.35F, 0.5F, 0.35F, 0.01F, 16, ViewDist.NORMAL);
+				player.playSound(center, Sound.ORB_PICKUP, 1.0F, 1.7F); break;
+			case "cloud-ring":
+				for (int i = 0; i < 20; i++) {
+					double angle = Math.PI * 2 * i / 20.0;
+					Location point = center.clone().add(Math.cos(angle) * 1.5, 0, Math.sin(angle) * 1.5);
+					UtilParticle.PlayParticle(ParticleType.CLOUD, point, 0.04F, 0.04F, 0.04F, 0.01F, 2, ViewDist.NORMAL);
+				}
+				player.playSound(center, Sound.FIREWORK_LAUNCH, 0.7F, 0.8F); break;
+			case "ender-flare":
+				UtilParticle.PlayParticle(ParticleType.PORTAL, center, 0.5F, 0.6F, 0.5F, 0.02F, 30, ViewDist.NORMAL);
+				UtilParticle.PlayParticle(ParticleType.WITCH_MAGIC, center, 0.35F, 0.35F, 0.35F, 0.01F, 15, ViewDist.NORMAL);
+				player.playSound(center, Sound.ENDERMAN_TELEPORT, 1.0F, 1.1F); break;
+			case "confetti":
+				UtilParticle.PlayParticle(ParticleType.NOTE, center, 0.7F, 0.7F, 0.7F, 1.0F, 30, ViewDist.NORMAL);
+				UtilParticle.PlayParticle(ParticleType.HAPPY_VILLAGER, center, 0.4F, 0.4F, 0.4F, 0.02F, 18, ViewDist.NORMAL);
+				player.playSound(center, Sound.LEVEL_UP, 0.8F, 1.35F); break;
+			case "classic":
+			default:
+				UtilParticle.PlayParticle(ParticleType.CLOUD, center, 0.25F, 0.35F, 0.25F, 0.02F, 8, ViewDist.NORMAL);
+				player.playSound(center, Sound.LEVEL_UP, 0.8F, 1.0F); break;
 		}
 	}
 
