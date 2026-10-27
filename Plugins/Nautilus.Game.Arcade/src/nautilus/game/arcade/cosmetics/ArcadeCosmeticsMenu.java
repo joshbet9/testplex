@@ -299,7 +299,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         ItemMeta meta = item.getItemMeta();
         meta.setDisplayName(ChatColor.YELLOW + game.displayName);
         List<String> lore = new ArrayList<String>();
-        lore.add(ChatColor.GRAY + game.features.size() + (game.features.size() == 1 ? " cosmetic category" : " cosmetic categories"));
+        lore.add(ChatColor.GRAY.toString() + game.features.size() + (game.features.size() == 1 ? " cosmetic category" : " cosmetic categories"));
         lore.add(ChatColor.GRAY + "Includes a planned win-effect placeholder");
         lore.add(ChatColor.GREEN + "Click to open");
         meta.setLore(lore);
