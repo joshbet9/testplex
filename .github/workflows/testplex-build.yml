@@ -345,7 +345,7 @@ jobs:
     if: ${{ always() && github.ref == 'refs/heads/feat/testbed-bootstrap' && ((github.event_name == 'push' && vars.TESTPLEX_AUTO_DEPLOY == 'true' && needs.build.result == 'success') || (github.event_name == 'workflow_dispatch' && inputs.deploy_to_test_server && (needs.build.result == 'success' || inputs.source_run_id != ''))) }}
     runs-on: ubuntu-22.04
     environment: hyperv
-    timeout-minutes: 25
+    timeout-minutes: 45
     concurrency:
       group: testplex-isolated-hyperv-server
       cancel-in-progress: false
@@ -447,12 +447,19 @@ jobs:
           echo "artifact_sha=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
           echo "Selected current-run artifact $artifact_name"
 
-      - name: Download artifact directly on Hyper-V and deploy
+      - name: Download selected artifact to runner
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ steps.source-artifact.outputs.artifact_name || steps.current-artifact.outputs.artifact_name }}
+          path: ${{ runner.temp }}/testplex-upload-source
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.source_run_id != '' && inputs.source_run_id || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact over SSH and deploy
         shell: bash
-        timeout-minutes: 15
+        timeout-minutes: 40
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ARTIFACT_ID: ${{ steps.source-artifact.outputs.artifact_id || steps.current-artifact.outputs.artifact_id }}
           BUILD_SHA: ${{ steps.source-artifact.outputs.artifact_sha || steps.current-artifact.outputs.artifact_sha || github.sha }}
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
@@ -461,30 +468,75 @@ jobs:
           TESTPLEX_SYSTEMD_SERVICE: ${{ vars.TESTPLEX_SYSTEMD_SERVICE }}
         run: |
           set -euo pipefail
-          [[ "$ARTIFACT_ID" =~ ^[0-9]+$ ]] || { echo "Missing numeric artifact ID." >&2; exit 1; }
           [[ "$BUILD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Missing valid build SHA." >&2; exit 1; }
           test -n "$HYPERV_SSH_HOST" || { echo 'HYPERV_SSH_HOST is not configured.' >&2; exit 1; }
           test -n "$HYPERV_SSH_USER" || { echo 'HYPERV_SSH_USER is not configured.' >&2; exit 1; }
 
-          headers="$(mktemp)"
-          trap 'rm -f "$headers"' EXIT
-          curl --silent --show-error --fail \
-            --dump-header "$headers" --output /dev/null \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip"
+          ARTIFACT_DIR="$RUNNER_TEMP/testplex-upload-source"
+          test -s "$ARTIFACT_DIR/Arcade.jar" || { echo "Artifact is missing Arcade.jar." >&2; exit 1; }
+          test -s "$ARTIFACT_DIR/testplex-map-assets.zip" || { echo "Artifact is missing testplex-map-assets.zip." >&2; exit 1; }
+          unzip -tq "$ARTIFACT_DIR/testplex-map-assets.zip" >/dev/null
 
-          download_url="$(awk 'tolower($1) == "location:" { sub(/^[^:]*:[[:space:]]*/, ""); sub(/\r$/, ""); value = $0 } END { print value }' "$headers")"
-          case "$download_url" in
-            https://*.blob.core.windows.net/*|https://*.actions.githubusercontent.com/*|https://*.githubusercontent.com/*|https://github.com/*) ;;
-            *) echo "GitHub did not return a recognised HTTPS artifact download URL." >&2; exit 1 ;;
-          esac
+          BUNDLE="$RUNNER_TEMP/testplex-plugin-set-$BUILD_SHA.zip"
+          python3 - "$ARTIFACT_DIR" "$BUNDLE" <<'PY'
+          from pathlib import Path
+          import sys
+          from zipfile import ZIP_STORED, ZipFile
+
+          source = Path(sys.argv[1])
+          destination = Path(sys.argv[2])
+          names = ("Arcade.jar", "testplex-map-assets.zip")
+          missing = [name for name in names if not (source / name).is_file() or (source / name).stat().st_size == 0]
+          if missing:
+              raise SystemExit("Missing/empty artifact entries: " + ", ".join(missing))
+          with ZipFile(destination, "w", compression=ZIP_STORED, allowZip64=True) as archive:
+              for name in names:
+                  archive.write(source / name, arcname=name)
+          with ZipFile(destination) as archive:
+              if sorted(archive.namelist()) != sorted(names):
+                  raise SystemExit("Packaged artifact contains unexpected entries.")
+              bad = archive.testzip()
+              if bad:
+                  raise SystemExit("Corrupt packaged entry: " + bad)
+          print(f"Packaged {destination.stat().st_size:,} bytes for resumable SSH transfer.")
+          PY
 
           port="${HYPERV_SSH_PORT:-22}"
-          echo "Sending signed artifact URL to the test VM; plugin bytes will download directly over HTTPS."
-          printf '%s\n' "$download_url" | ssh -p "$port" -i "$HOME/.ssh/testplex_hyperv" \
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          upload_path="/tmp/testplex-plugin-set-$BUILD_SHA.zip.upload"
+          deploy_script="/tmp/testplex-deploy-script-$BUILD_SHA.sh"
+          ssh_opts=(-p "$port" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30)
+
+          echo "Uploading the full plugin/map bundle to the test VM."
+          if ssh "${ssh_opts[@]}" "$remote" "command -v rsync >/dev/null 2>&1"; then
+            rsync --archive --partial --append-verify --timeout=180 --info=progress2 \
+              -e "ssh -p $port -i $HOME/.ssh/testplex_hyperv -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30" \
+              "$BUNDLE" "$remote:$upload_path"
+          else
+            echo "rsync is unavailable on the VM; falling back to SCP (not resumable)."
+            scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
+              -o BatchMode=yes -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+              -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30 \
+              "$BUNDLE" "$remote:$upload_path"
+          fi
+
+          local_sha="$(sha256sum "$BUNDLE" | awk '{print $1}')"
+          remote_sha="$(ssh "${ssh_opts[@]}" "$remote" "sha256sum '$upload_path' | awk '{print \\$1}'")"
+          [[ "$local_sha" == "$remote_sha" ]] || {
+            echo "Uploaded bundle checksum mismatch; refusing deployment." >&2
+            exit 1
+          }
+          echo "Bundle upload verified by SHA-256."
+
+          scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=10 \
-            "$HYPERV_SSH_USER@$HYPERV_SSH_HOST" \
-            "sudo -n /usr/local/sbin/deploy-testplex-hyperv.sh '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'"
+            "$GITHUB_WORKSPACE/.github/scripts/deploy-testplex-hyperv.sh" "$remote:$deploy_script"
+
+          echo "Running the checked-out deployment script; the script will verify the sandbox marker, maps and startup."
+          ssh "${ssh_opts[@]}" "$remote" \
+            "chmod 0644 '$deploy_script' && sudo -n bash '$deploy_script' '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'; rc=\$?; rm -f '$deploy_script'; exit \$rc"
