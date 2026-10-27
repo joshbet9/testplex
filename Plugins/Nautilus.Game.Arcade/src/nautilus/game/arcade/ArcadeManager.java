@@ -2,8 +2,10 @@ package nautilus.game.arcade;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 import net.minecraft.server.v1_8_R3.EntityLiving;
@@ -230,6 +232,9 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 	private EloManager _eloManager;
 
 	// Managers
+	private File _resolvedMapRoot;
+	private boolean _mapRootResolutionAttempted;
+
 	private GameCreationManager _gameCreationManager;
 	private GameRewardManager _gameRewardManager;
 	private GameManager _gameManager;
@@ -1427,50 +1432,198 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 	public ArrayList<String> LoadFiles(String gameName)
 	{
 		TimingManager.start("ArcadeManager LoadFiles");
-
-		File folder = new File(".." + File.separatorChar + ".." + File.separatorChar + "update" + File.separatorChar
-				+ "maps" + File.separatorChar + gameName);
-		System.out.println(folder.getAbsolutePath() + " -=-=-=-=-=");
-		if (!folder.exists())
-			folder.mkdirs();
-
 		ArrayList<String> maps = new ArrayList<String>();
 
-		System.out.println("Searching Maps in: " + folder);
-
-		if (folder.listFiles() != null)
+		try
 		{
-			for (File file : folder.listFiles())
+			if (gameName == null || gameName.trim().isEmpty())
 			{
-				if (!file.isFile())
+				System.out.println("Arcade map loader: an empty game name was requested.");
+				return maps;
+			}
+
+			File mapRoot = resolveMapRoot();
+			if (mapRoot == null)
+			{
+				System.err.println("Arcade map loader: no installed map root containing category/*.zip was found. "
+						+ "Working directory: " + new File(".").getAbsolutePath()
+						+ ". Game selection will remain unavailable until the map path is corrected.");
+				return maps;
+			}
+
+			File folder = new File(mapRoot, gameName);
+			if (!folder.isDirectory())
+			{
+				String wanted = normaliseMapFolderName(gameName);
+				File[] directories = mapRoot.listFiles();
+				if (directories != null)
 				{
-					System.out.println(file.getName() + " is not a file!");
-					continue;
+					for (File candidate : directories)
+					{
+						if (candidate.isDirectory() && normaliseMapFolderName(candidate.getName()).equals(wanted))
+						{
+							folder = candidate;
+							break;
+						}
+					}
 				}
+			}
 
-				String name = file.getName();
+			if (!folder.isDirectory())
+			{
+				System.out.println("Arcade map loader: no folder for game '" + gameName
+						+ "' under " + mapRoot.getAbsolutePath() + ".");
+				return maps;
+			}
 
-				if (name.length() < 5)
+			File[] files = folder.listFiles();
+			if (files == null)
+			{
+				System.err.println("Arcade map loader: cannot list " + folder.getAbsolutePath()
+						+ " (check the test-server account's read/execute permissions).");
+				return maps;
+			}
+
+			Arrays.sort(files, (left, right) -> String.CASE_INSENSITIVE_ORDER.compare(left.getName(), right.getName()));
+			for (File file : files)
+			{
+				if (!file.isFile() || !file.getName().toLowerCase(Locale.ROOT).endsWith(".zip"))
 					continue;
-
-				name = name.substring(name.length() - 4, name.length());
-
-				if (!name.equals(".zip"))
-				{
-					System.out.println(file.getName() + " is not a zip.");
-					continue;
-				}
 
 				maps.add(file.getName().substring(0, file.getName().length() - 4));
 			}
+
+			System.out.println("Arcade map loader: found " + maps.size() + " map ZIP(s) for '" + gameName
+					+ "' in " + folder.getAbsolutePath() + ".");
+			return maps;
+		}
+		finally
+		{
+			TimingManager.stop("ArcadeManager LoadFiles");
+		}
+	}
+
+	/**
+	 * Locate the shared Mineplex update/maps folder from the actual server
+	 * working directory. Do not create an empty folder when a candidate path is
+	 * wrong: that hid the deployment/path problem and made every game look empty.
+	 */
+	private File resolveMapRoot()
+	{
+		if (_mapRootResolutionAttempted)
+			return _resolvedMapRoot;
+
+		_mapRootResolutionAttempted = true;
+		File working = new File(System.getProperty("user.dir", ".")).getAbsoluteFile().toPath().normalize().toFile();
+		List<File> candidates = new ArrayList<File>();
+		candidates.add(new File(working, "../../update/maps"));
+		candidates.add(new File(working, "update/maps"));
+
+		String homeProperty = System.getProperty("user.home", ".");
+		candidates.add(new File(homeProperty, "update/maps"));
+
+		File parent = working;
+		for (int depth = 0; parent != null && depth < 6; depth++, parent = parent.getParentFile())
+		{
+			candidates.add(new File(parent, "update/maps"));
+			candidates.add(new File(parent, "../../update/maps"));
 		}
 
-		for (String map : maps)
-			System.out.println("Found Map: " + map);
+		Set<String> visited = new HashSet<String>();
+		for (File candidate : candidates)
+		{
+			File normal = candidate.getAbsoluteFile().toPath().normalize().toFile();
+			if (!visited.add(normal.getPath()))
+				continue;
 
-		TimingManager.stop("ArcadeManager LoadFiles");
+			if (!normal.isDirectory() || !containsMapArchives(normal))
+				continue;
 
-		return maps;
+			_resolvedMapRoot = normal;
+			System.out.println("Arcade map loader: resolved map root to " + normal.getAbsolutePath() + ".");
+			return _resolvedMapRoot;
+		}
+
+		System.err.println("Arcade map loader: checked " + visited.size()
+				+ " candidate update/maps directories but none contained category/*.zip. user.dir="
+				+ System.getProperty("user.dir", ".") + ", user.home=" + homeProperty + ".");
+		return null;
+	}
+
+	public File getInstalledMapArchive(GameType gameType, String mapName)
+	{
+		if (gameType == null || mapName == null || mapName.trim().isEmpty())
+			return null;
+
+		File mapRoot = resolveMapRoot();
+		if (mapRoot == null)
+			return null;
+
+		File folder = new File(mapRoot, gameType.getName());
+		if (!folder.isDirectory())
+		{
+			String wanted = normaliseMapFolderName(gameType.getName());
+			File[] directories = mapRoot.listFiles();
+			if (directories != null)
+			{
+				for (File candidate : directories)
+				{
+					if (candidate.isDirectory() && normaliseMapFolderName(candidate.getName()).equals(wanted))
+					{
+						folder = candidate;
+						break;
+					}
+				}
+			}
+		}
+
+		if (!folder.isDirectory())
+			return null;
+
+		File archive = new File(folder, mapName + ".zip");
+		if (archive.isFile())
+			return archive;
+
+		// Be tolerant of map archive filename casing on Linux installations.
+		File[] maps = folder.listFiles();
+		if (maps != null)
+		{
+			for (File candidate : maps)
+			{
+				if (candidate.isFile() && candidate.getName().equalsIgnoreCase(mapName + ".zip"))
+					return candidate;
+			}
+		}
+		return null;
+	}
+
+	private boolean containsMapArchives(File root)
+	{
+		File[] categories = root.listFiles();
+		if (categories == null)
+			return false;
+
+		for (File category : categories)
+		{
+			if (!category.isDirectory())
+				continue;
+
+			File[] contents = category.listFiles();
+			if (contents == null)
+				continue;
+
+			for (File entry : contents)
+			{
+				if (entry.isFile() && entry.getName().toLowerCase(Locale.ROOT).endsWith(".zip"))
+					return true;
+			}
+		}
+		return false;
+	}
+
+	private String normaliseMapFolderName(String name)
+	{
+		return name == null ? "" : name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]", "");
 	}
 
 	public ClassManager getClassManager()

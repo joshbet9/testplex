@@ -4,7 +4,7 @@ version: 0.1
 loadbefore: [MineplexAnticheat]
 
 commands:
-  cosmetics:
-    aliases: [cosmeticmenu, arcadecosmetics]
-    description: Open the Arcade cosmetic selector
-    usage: /cosmetics
+  arcadecosmetics:
+    aliases: [arcadecosmetic, arcadecosmeticsmenu]
+    description: Open the testbed Arcade cosmetic prototypes
+    usage: /arcadecosmetics

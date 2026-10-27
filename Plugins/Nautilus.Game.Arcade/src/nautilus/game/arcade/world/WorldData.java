@@ -177,7 +177,14 @@ public class WorldData
 		TimingManager.stop("UnzipWorld creating folders");
 
 		TimingManager.start("UnzipWorld UnzipToDirectory");
-		ZipUtil.UnzipToDirectory("../../update/maps/" + Game.getName() + "/" + GetFile() + ".zip", folder);
+		File mapArchive = Host.getArcadeManager().getInstalledMapArchive(Game, GetFile());
+		if (mapArchive == null || !mapArchive.isFile())
+		{
+			String mapTypeName = Game == null ? "unknown" : Game.getName();
+			throw new IllegalStateException("Missing installed map archive for " + mapTypeName + "/" + GetFile()
+					+ ". Check the Arcade map-loader diagnostics and update/maps folder.");
+		}
+		ZipUtil.UnzipToDirectory(mapArchive.getAbsolutePath(), folder);
 		TimingManager.stop("UnzipWorld UnzipToDirectory");
 	}
 

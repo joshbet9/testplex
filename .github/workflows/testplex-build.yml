@@ -184,6 +184,10 @@ jobs:
               "Monster Maze Modern": (base / "game/games/monstermaze/MonsterMazeModern.java").read_text(encoding="utf-8"),
               "Monster Maze Layouts": (base / "game/games/monstermaze/MMMazes.java").read_text(encoding="utf-8"),
               "Monster Maze Map Fallback": (base / "managers/GameCreationManager.java").read_text(encoding="utf-8"),
+              "World Data Map Resolver": (base / "world/WorldData.java").read_text(encoding="utf-8"),
+              "Map Loader": (base / "ArcadeManager.java").read_text(encoding="utf-8"),
+              "Game Host Manager": (base / "managers/GameHostManager.java").read_text(encoding="utf-8"),
+              "Plugin Metadata": Path("Plugins/Nautilus.Game.Arcade/plugin.yml").read_text(encoding="utf-8"),
               "Monster Maze PB": (base / "game/games/monstermaze/MonsterMazePersonalBestManager.java").read_text(encoding="utf-8"),
               "Monster Maze PB Command": (Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/command/MonsterMazePBCommand.java")).read_text(encoding="utf-8"),
               "Monster Maze Game Command": (Path("Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/command/GameCommand.java")).read_text(encoding="utf-8"),
@@ -330,6 +334,42 @@ jobs:
               "Cosmetic selector": {
                   "persistent per-player storage": "cosmetics.yml",
                   "shared colour resolver": "getEquippedColourData(UUID playerId, String game)",
+                  "does not override the regular cosmetics command": 'getCommand("arcadecosmetics")',
+                  "planned win effects appear as explicit placeholders": "Planned Win Effect (Placeholder)",
+                  "Monster Maze cosmetic categories": 'registerGame("monstermaze", "Monster Maze"',
+                  "Bacon Brawl cosmetic entry": 'registerGame("baconbrawl", "Bacon Brawl"',
+                  "Bomb Lobbers cosmetic entry": 'registerGame("bomblobbers", "Bomb Lobbers"',
+                  "Death Tag cosmetic entry": 'registerGame("deathtag", "Death Tag"',
+                  "Dragon Escape cosmetic entry": 'registerGame("dragonescape", "Dragon Escape"',
+                  "Dragons cosmetic entry": 'registerGame("dragons", "Dragons"',
+                  "Evolution cosmetic entry": 'registerGame("evolution", "Evolution"',
+                  "Gladiators cosmetic entry": 'registerGame("gladiators", "Gladiators"',
+                  "Micro Battles cosmetic entry": 'registerGame("microbattles", "Micro Battles"',
+                  "One In The Quiver cosmetic entry": 'registerGame("oneinthequiver", "One In The Quiver"',
+                  "Paintball cosmetic entry": 'registerGame("paintball", "Paintball"',
+                  "Runner cosmetic entry": 'registerGame("runner", "Runner"',
+                  "Sheep Quest cosmetic entry": 'registerGame("sheepquest", "Sheep Quest"',
+                  "Snake cosmetic entry": 'registerGame("snake", "Snake"',
+                  "Spleef cosmetic entry": 'registerGame("spleef", "Spleef"',
+                  "Turf Wars cosmetic entry": 'registerGame("turfwars", "Turf Wars"',
+              },
+              "Map Loader": {
+                  "resolves installed map root dynamically": "resolveMapRoot()",
+                  "normalises game directory names": "normaliseMapFolderName",
+                  "checks ZIP extension case-insensitively": 'getName().toLowerCase(Locale.ROOT).endsWith(".zip")',
+                  "reports map count and path": "Arcade map loader: found ",
+              },
+              "World Data Map Resolver": {
+                  "extracts maps from the same resolved root": "getInstalledMapArchive(Game, GetFile())",
+                  "fails loudly on a missing selected archive": "Missing installed map archive for",
+              },
+              "Game Host Manager": {
+                  "sandbox keeps the Game Panel": 'C.cGreen + C.Bold + "Game Panel"',
+                  "chest passes through to the normal Mineplex cosmetics shop": 'if (UtilGear.isMat(event.getPlayer().getItemInHand(), Material.SPECKLED_MELON))',
+              },
+              "Plugin Metadata": {
+                  "separate prototype command": "arcadecosmetics:",
+                  "prototype command alias": "arcadecosmeticsmenu",
               },
               "Deployment script": {
                   "test-only marker required": ".testplex-sandbox",
@@ -373,9 +413,18 @@ jobs:
                   if expected not in source:
                       missing.append(f"{game}: {label}")
 
+          if 'getCommand("cosmetics")' in sources["Cosmetic selector"]:
+              missing.append("Cosmetic selector: must not replace the normal /cosmetics command")
+          if 'Bukkit.dispatchCommand(event.getPlayer(), "cosmetics")' in sources["Game Host Manager"]:
+              missing.append("Game Host Manager: the sandbox chest must not dispatch the prototype menu")
+          load_files_body = sources["Map Loader"].split("public ArrayList<String> LoadFiles(String gameName)", 1)[1].split("private File resolveMapRoot()", 1)[0]
+          if "folder.mkdirs()" in load_files_body:
+              missing.append("Map Loader: must not create a missing map folder and silently report zero maps")
+          if "Material.JUKEBOX" not in sources["Cosmetic selector"] or 'Bukkit.dispatchCommand(player, "arcadecosmetics")' not in sources["Cosmetic selector"]:
+              missing.append("Cosmetic selector: the normal Cosmetics menu must expose the jukebox entry point")
           if missing:
               raise SystemExit("Native gameplay/cosmetic smoke checks failed:\n- " + "\n- ".join(missing))
-          print("Native gameplay, six-game cosmetics and guarded deployment smoke checks passed.")
+          print("Native gameplay, 16-game cosmetics, map loading and guarded deployment smoke checks passed.")
           PY
 
       - name: Upload compiled plugin set

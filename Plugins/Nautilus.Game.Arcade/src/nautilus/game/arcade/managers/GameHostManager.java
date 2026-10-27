@@ -446,9 +446,15 @@ public class GameHostManager implements Listener
 			{
 				player.getInventory().setItem(8, ItemStackFactory.Instance.CreateStack(Material.SPECKLED_MELON, (byte)0, 1, C.cGreen + C.Bold + "Game Panel"));
 			}
-			if (!UtilGear.isMat(player.getInventory().getItem(7), Material.CHEST))
+
+			// Mineplex Core already provides the normal Cosmetic Menu chest in slot 4.
+			// Remove the old duplicate testbed chest from slot 7 if it survived in player data.
+			org.bukkit.inventory.ItemStack oldCosmeticsChest = player.getInventory().getItem(7);
+			if (oldCosmeticsChest != null && oldCosmeticsChest.getType() == Material.CHEST
+					&& oldCosmeticsChest.hasItemMeta() && oldCosmeticsChest.getItemMeta().hasDisplayName()
+					&& "Cosmetics".equalsIgnoreCase(ChatColor.stripColor(oldCosmeticsChest.getItemMeta().getDisplayName())))
 			{
-				player.getInventory().setItem(7, ItemStackFactory.Instance.CreateStack(Material.CHEST, (byte)0, 1, C.cGreen + C.Bold + "Cosmetics"));
+				player.getInventory().setItem(7, null);
 			}
 			return;
 		}
@@ -587,11 +593,6 @@ public class GameHostManager implements Listener
 			{
 				event.setCancelled(true);
 				openGamePanel(event.getPlayer());
-			}
-			else if (UtilGear.isMat(event.getPlayer().getItemInHand(), Material.CHEST))
-			{
-				event.setCancelled(true);
-				Bukkit.dispatchCommand(event.getPlayer(), "cosmetics");
 			}
 			return;
 		}
