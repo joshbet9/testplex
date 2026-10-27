@@ -1451,25 +1451,8 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 				return maps;
 			}
 
-			File folder = new File(mapRoot, gameName);
-			if (!folder.isDirectory())
-			{
-				String wanted = normaliseMapFolderName(gameName);
-				File[] directories = mapRoot.listFiles();
-				if (directories != null)
-				{
-					for (File candidate : directories)
-					{
-						if (candidate.isDirectory() && normaliseMapFolderName(candidate.getName()).equals(wanted))
-						{
-							folder = candidate;
-							break;
-						}
-					}
-				}
-			}
-
-			if (!folder.isDirectory())
+			File folder = findGameMapFolder(mapRoot, gameName);
+			if (folder == null)
 			{
 				System.out.println("Arcade map loader: no folder for game '" + gameName
 						+ "' under " + mapRoot.getAbsolutePath() + ".");
@@ -1534,6 +1517,11 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 			candidates.add(new File(environmentMaps.trim()));
 		}
 
+		// The isolated Testplex deployment installs the shared map bundle here.
+		// Keep this explicit fallback because service user.home/user.dir can vary
+		// across Java launchers; the deployment script treats this as MAP_DEST.
+		candidates.add(new File("/home/monstermaze/update/maps"));
+		candidates.add(new File("/home/monstermaze/update/maps/maps"));
 		candidates.add(new File(working, "../../update/maps"));
 		candidates.add(new File(working, "update/maps"));
 		candidates.add(new File(working, "../../update/maps/maps"));
@@ -1613,25 +1601,8 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 		if (mapRoot == null)
 			return null;
 
-		File folder = new File(mapRoot, gameType.getName());
-		if (!folder.isDirectory())
-		{
-			String wanted = normaliseMapFolderName(gameType.getName());
-			File[] directories = mapRoot.listFiles();
-			if (directories != null)
-			{
-				for (File candidate : directories)
-				{
-					if (candidate.isDirectory() && normaliseMapFolderName(candidate.getName()).equals(wanted))
-					{
-						folder = candidate;
-						break;
-					}
-				}
-			}
-		}
-
-		if (!folder.isDirectory())
+		File folder = findGameMapFolder(mapRoot, gameType.getName());
+		if (folder == null)
 			return null;
 
 		File archive = new File(folder, mapName + ".zip");
@@ -1649,6 +1620,47 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 			}
 		}
 		return null;
+	}
+
+	private File findGameMapFolder(File root, String gameName)
+	{
+		if (root == null || gameName == null || gameName.trim().isEmpty())
+			return null;
+
+		File exact = new File(root, gameName);
+		if (exact.isDirectory())
+			return exact;
+
+		File[] directories = root.listFiles();
+		if (directories == null)
+			return null;
+
+		String wanted = normaliseMapFolderName(gameName);
+		for (File candidate : directories)
+		{
+			if (candidate.isDirectory() && normaliseMapFolderName(candidate.getName()).equals(wanted))
+				return candidate;
+		}
+
+		// The original map bundle has a few historical category-name differences,
+		// including Micro Battle vs Micro Battles and the legacy Speef directory.
+		for (File candidate : directories)
+		{
+			if (!candidate.isDirectory())
+				continue;
+			String actual = normaliseMapFolderName(candidate.getName());
+			if (trimTrailingS(actual).equals(trimTrailingS(wanted))
+					|| ("spleef".equals(wanted) && "speef".equals(actual))
+					|| ("speef".equals(wanted) && "spleef".equals(actual)))
+				return candidate;
+		}
+
+		return null;
+	}
+
+	private String trimTrailingS(String value)
+	{
+		return value != null && value.endsWith("s") ? value.substring(0, value.length() - 1) : value;
 	}
 
 	private boolean containsMapArchives(File root)
