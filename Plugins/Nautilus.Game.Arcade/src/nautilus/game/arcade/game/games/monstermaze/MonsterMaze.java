@@ -922,12 +922,8 @@ public class MonsterMaze extends SoloGame
 
 	private void addGhostEntry(Team ghosts, Player target)
 	{
-		GameTeam targetTeam = GetTeam(target);
-		if (targetTeam != null && targetTeam.GetDisplaytag())
-		{
-			ghosts.setPrefix(targetTeam.GetColor() + C.Bold + targetTeam.GetName() + targetTeam.GetColor() + " ");
-			ghosts.setSuffix(C.Reset);
-		}
+		// This team only controls whether invisible teammates render as transparent ghosts.
+		// Keeping it free of a shared prefix avoids showing every ghost with one player's tag.
 		if (!ghosts.hasEntry(target.getName()))
 			ghosts.addEntry(target.getName());
 	}
