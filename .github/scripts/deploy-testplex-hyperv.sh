@@ -247,8 +247,11 @@ rollback() {
       echo "Graceful stop timed out; force-killing only the test service cgroup." >&2
       timeout 10 systemctl kill --kill-who=all --signal=KILL "$SERVICE" || true
     fi
-    service_active_safe
-    service_state_rc=$?
+    if service_active_safe; then
+      service_state_rc=0
+    else
+      service_state_rc=$?
+    fi
     if [[ "$service_state_rc" -ne 1 ]]; then
       if [[ "$service_state_rc" -eq 0 ]]; then
         echo "ERROR: $SERVICE still appears active; refusing to overwrite plugin files while Java may be using them." >&2
@@ -300,14 +303,15 @@ trap rollback EXIT
 DEPLOYMENT_TOUCHED=1
 echo "Stopping isolated test service $SERVICE."
 timeout 60 systemctl stop "$SERVICE"
-service_active_safe
-service_state_rc=$?
-if [[ "$service_state_rc" -eq 0 ]]; then
+if service_active_safe; then
   echo "$SERVICE still reports active after stop." >&2
   exit 1
-elif [[ "$service_state_rc" -ne 1 ]]; then
-  echo "Cannot confirm that $SERVICE stopped cleanly; refusing to overwrite plugin files." >&2
-  exit 1
+else
+  service_state_rc=$?
+  if [[ "$service_state_rc" -ne 1 ]]; then
+    echo "Cannot confirm that $SERVICE stopped cleanly; refusing to overwrite plugin files." >&2
+    exit 1
+  fi
 fi
 
 if [[ ! -f "$ROOT/world/NEW.dat" && ! -f "$ROOT/world/TEST_LOBBY_PLANE.dat" && -d "$ROOT/world" ]]; then
