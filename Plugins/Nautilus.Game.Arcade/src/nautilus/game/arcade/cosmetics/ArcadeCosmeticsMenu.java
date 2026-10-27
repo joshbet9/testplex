@@ -544,7 +544,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         List<String> lore = new ArrayList<String>();
         lore.add(ChatColor.GRAY + feature.description);
         if (feature.isComposite()) {
-            lore.add(ChatColor.GRAY + feature.settings.size() + " configurable settings");
+            lore.add(ChatColor.GRAY.toString() + feature.settings.size() + " configurable settings");
         } else if (feature.toggleOptions) {
             int enabled = 0;
             for (String option : feature.options) {
