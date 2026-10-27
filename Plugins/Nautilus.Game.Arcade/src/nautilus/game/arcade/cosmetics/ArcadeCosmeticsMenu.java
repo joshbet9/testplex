@@ -69,6 +69,10 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private static final String BACON_SHOWCASE_TAG = "TESTPLEX_BACON_BRAWL_SHOWCASE:";
     private static final String BOMB_LOBBERS_SHOWCASE_TAG = "TESTPLEX_BOMB_LOBBERS_SHOWCASE:";
     private static final String BOMB_LOBBERS_LABEL_PREFIX = "TNT Impact: ";
+    private static final String DEATHTAG_SHOWCASE_TAG = "TESTPLEX_DEATHTAG_SHOWCASE:STYLE:";
+    private static final String DEATHTAG_LABEL_PREFIX = "Runner Trail: ";
+    private static final String DRAGONESCAPE_SHOWCASE_TAG = "TESTPLEX_DRAGONESCAPE_SHOWCASE:STYLE:";
+    private static final String DRAGONESCAPE_LABEL_PREFIX = "Finish Style: ";
     private static final String[] COLOUR_OPTIONS = {
             "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
             "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"
@@ -85,6 +89,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private final List<Entity> baconBrawlShowcaseEntities = new ArrayList<Entity>();
     private final List<ArmorStand> baconBrawlShowcaseAccessories = new ArrayList<ArmorStand>();
     private final List<ArmorStand> bombLobbersShowcaseEntities = new ArrayList<ArmorStand>();
+    private final List<ArmorStand> deathTagShowcaseEntities = new ArrayList<ArmorStand>();
+    private final List<ArmorStand> dragonEscapeShowcaseEntities = new ArrayList<ArmorStand>();
 
     public ArcadeCosmeticsMenu(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -1079,24 +1085,26 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void updatePregameCosmeticShowcase(GameStateChangeEvent event) {
         if (event == null || event.GetGame() == null) return;
-
         if (event.GetState() == GameState.Recruit) {
             clearBaconBrawlShowcase();
             clearBombLobbersShowcase();
+            clearDeathTagShowcase();
+            clearDragonEscapeShowcase();
             World lobbyWorld = getLobbyWorld();
             if (lobbyWorld != null) removePersistedBaconBrawlShowcase(lobbyWorld);
-            if ("Bacon Brawl".equalsIgnoreCase(event.GetGame().GetName())) {
-                createBaconBrawlShowcase();
-            } else if ("Bomb Lobbers".equalsIgnoreCase(event.GetGame().GetName())) {
-                createBombLobbersShowcase();
-            }
+            String game = event.GetGame().GetName();
+            if ("Bacon Brawl".equalsIgnoreCase(game)) createBaconBrawlShowcase();
+            else if ("Bomb Lobbers".equalsIgnoreCase(game)) createBombLobbersShowcase();
+            else if ("Death Tag".equalsIgnoreCase(game)) createDeathTagShowcase();
+            else if ("Dragon Escape".equalsIgnoreCase(game)) createDragonEscapeShowcase();
             return;
         }
-
         if (event.GetState() == GameState.Prepare || event.GetState() == GameState.Live
                 || event.GetState() == GameState.End || event.GetState() == GameState.Dead) {
             clearBaconBrawlShowcase();
             clearBombLobbersShowcase();
+            clearDeathTagShowcase();
+            clearDragonEscapeShowcase();
         }
     }
 
@@ -1271,6 +1279,104 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         bombLobbersShowcaseEntities.clear();
     }
 
+    private void createDeathTagShowcase() {
+        if (!(plugin instanceof Arcade)) return;
+        ArcadeManager manager = ((Arcade) plugin).getArcadeManager();
+        if (manager == null || manager.GetLobby() == null || manager.GetLobby().getSpawn() == null) return;
+        Location spawn = manager.GetLobby().getSpawn();
+        World world = spawn.getWorld();
+        if (world == null) return;
+        int[] offsets = {-8, -5, -2, 1, 4, 7};
+        String[] styles = {"classic", "soul", "sparks", "smoke", "ender", "hearts"};
+        for (int i = 0; i < styles.length; i++) {
+            Location display = new Location(world, spawn.getBlockX() + offsets[i] + 0.5,
+                    world.getHighestBlockYAt(spawn.getBlockX() + offsets[i], spawn.getBlockZ() + 20) + 1,
+                    spawn.getBlockZ() + 20.5);
+            ArmorStand icon = world.spawn(display.clone().subtract(0, 0.18, 0), ArmorStand.class);
+            icon.setVisible(false); icon.setSmall(true); icon.setGravity(false); icon.setBasePlate(false);
+            icon.setArms(false); icon.setMarker(true); icon.setCanPickupItems(false);
+            icon.setHelmet(new ItemStack(Material.STAINED_GLASS, 1, (short) 14));
+            icon.setCustomName(DEATHTAG_SHOWCASE_TAG + styles[i]);
+            deathTagShowcaseEntities.add(icon);
+            ArmorStand label = world.spawn(display.clone().add(0, 0.65, 0), ArmorStand.class);
+            label.setVisible(false); label.setSmall(false); label.setGravity(false); label.setBasePlate(false);
+            label.setArms(false); label.setMarker(true); label.setCanPickupItems(false);
+            label.setCustomName(ChatColor.GOLD + DEATHTAG_LABEL_PREFIX + pretty(styles[i]));
+            label.setCustomNameVisible(true);
+            deathTagShowcaseEntities.add(label);
+        }
+        plugin.getLogger().info("Created Death Tag pregame showcase (six runner trail styles).");
+    }
+
+    private void createDragonEscapeShowcase() {
+        if (!(plugin instanceof Arcade)) return;
+        ArcadeManager manager = ((Arcade) plugin).getArcadeManager();
+        if (manager == null || manager.GetLobby() == null || manager.GetLobby().getSpawn() == null) return;
+        Location spawn = manager.GetLobby().getSpawn();
+        World world = spawn.getWorld();
+        if (world == null) return;
+        int[] offsets = {-9, -6, -3, 0, 3, 6, 9};
+        String[] styles = {"classic", "skyburst", "dragon-roar", "starlight", "cloud-ring", "ender-flare", "confetti"};
+        for (int i = 0; i < styles.length; i++) {
+            int x = spawn.getBlockX() + offsets[i], z = spawn.getBlockZ() + 20;
+            Location display = new Location(world, x + 0.5, world.getHighestBlockYAt(x, z) + 1, z + 0.5);
+            ArmorStand icon = world.spawn(display.clone().subtract(0, 0.18, 0), ArmorStand.class);
+            icon.setVisible(false); icon.setSmall(true); icon.setGravity(false); icon.setBasePlate(false);
+            icon.setArms(false); icon.setMarker(true); icon.setCanPickupItems(false);
+            icon.setHelmet(new ItemStack(i == 0 ? Material.DRAGON_EGG : Material.FIREWORK));
+            icon.setCustomName(DRAGONESCAPE_SHOWCASE_TAG + styles[i]);
+            dragonEscapeShowcaseEntities.add(icon);
+            ArmorStand label = world.spawn(display.clone().add(0, 0.65, 0), ArmorStand.class);
+            label.setVisible(false); label.setSmall(false); label.setGravity(false); label.setBasePlate(false);
+            label.setArms(false); label.setMarker(true); label.setCanPickupItems(false);
+            label.setCustomName(ChatColor.GOLD + DRAGONESCAPE_LABEL_PREFIX + pretty(styles[i]));
+            label.setCustomNameVisible(true);
+            dragonEscapeShowcaseEntities.add(label);
+        }
+        plugin.getLogger().info("Created Dragon Escape pregame showcase (seven finish celebrations).");
+    }
+
+    @EventHandler
+    public void updateSpecialShowcaseParticles(UpdateEvent event) {
+        if (event.getType() != UpdateType.TICK || event.getTick() % 10 != 0) return;
+        for (ArmorStand stand : new ArrayList<ArmorStand>(deathTagShowcaseEntities)) {
+            if (stand == null || stand.isDead() || !stand.isValid()) continue;
+            String name = stand.getCustomName();
+            if (name == null || !name.startsWith(DEATHTAG_SHOWCASE_TAG)) continue;
+            Location point = stand.getLocation().clone().add(0, 0.7, 0);
+            String style = name.substring(DEATHTAG_SHOWCASE_TAG.length());
+            if ("soul".equals(style)) UtilParticle.PlayParticle(ParticleType.WITCH_MAGIC, point, 0.15F, 0.15F, 0.15F, 0.01F, 4, ViewDist.NORMAL);
+            else if ("sparks".equals(style)) UtilParticle.PlayParticle(ParticleType.FIREWORKS_SPARK, point, 0.15F, 0.15F, 0.15F, 0.02F, 5, ViewDist.NORMAL);
+            else if ("smoke".equals(style)) UtilParticle.PlayParticle(ParticleType.SMOKE, point, 0.15F, 0.15F, 0.15F, 0.01F, 4, ViewDist.NORMAL);
+            else if ("ender".equals(style)) UtilParticle.PlayParticle(ParticleType.PORTAL, point, 0.15F, 0.15F, 0.15F, 0.01F, 4, ViewDist.NORMAL);
+            else if ("hearts".equals(style)) UtilParticle.PlayParticle(ParticleType.HEART, point, 0.15F, 0.15F, 0.15F, 0.01F, 3, ViewDist.NORMAL);
+            else UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) 14), point, 0.12F, 0.12F, 0.12F, 0.01F, 4, ViewDist.NORMAL);
+        }
+        for (ArmorStand stand : new ArrayList<ArmorStand>(dragonEscapeShowcaseEntities)) {
+            if (stand == null || stand.isDead() || !stand.isValid()) continue;
+            String name = stand.getCustomName();
+            if (name == null || !name.startsWith(DRAGONESCAPE_SHOWCASE_TAG)) continue;
+            Location point = stand.getLocation().clone().add(0, 0.7, 0);
+            String style = name.substring(DRAGONESCAPE_SHOWCASE_TAG.length());
+            if ("dragon-roar".equals(style)) UtilParticle.PlayParticle(ParticleType.FLAME, point, 0.18F, 0.2F, 0.18F, 0.01F, 5, ViewDist.NORMAL);
+            else if ("starlight".equals(style)) UtilParticle.PlayParticle(ParticleType.WITCH_MAGIC, point, 0.2F, 0.2F, 0.2F, 0.01F, 5, ViewDist.NORMAL);
+            else if ("cloud-ring".equals(style)) UtilParticle.PlayParticle(ParticleType.CLOUD, point, 0.2F, 0.2F, 0.2F, 0.01F, 5, ViewDist.NORMAL);
+            else if ("ender-flare".equals(style)) UtilParticle.PlayParticle(ParticleType.PORTAL, point, 0.2F, 0.2F, 0.2F, 0.01F, 5, ViewDist.NORMAL);
+            else if ("confetti".equals(style)) UtilParticle.PlayParticle(ParticleType.NOTE, point, 0.3F, 0.3F, 0.3F, 1.0F, 5, ViewDist.NORMAL);
+            else UtilParticle.PlayParticle(ParticleType.FIREWORKS_SPARK, point, 0.2F, 0.2F, 0.2F, 0.02F, 5, ViewDist.NORMAL);
+        }
+    }
+
+    private void clearDeathTagShowcase() {
+        for (ArmorStand stand : new ArrayList<ArmorStand>(deathTagShowcaseEntities)) if (stand != null && !stand.isDead()) stand.remove();
+        deathTagShowcaseEntities.clear();
+    }
+
+    private void clearDragonEscapeShowcase() {
+        for (ArmorStand stand : new ArrayList<ArmorStand>(dragonEscapeShowcaseEntities)) if (stand != null && !stand.isDead()) stand.remove();
+        dragonEscapeShowcaseEntities.clear();
+    }
+
     private void removePersistedBaconBrawlShowcase(World world) {
         if (world == null) return;
         for (Entity entity : new ArrayList<Entity>(world.getEntities())) {
@@ -1280,7 +1386,11 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             if (entity instanceof ArmorStand
                     && (name.startsWith(BACON_SHOWCASE_TAG)
                     || name.startsWith(BOMB_LOBBERS_SHOWCASE_TAG)
-                    || (plainName != null && plainName.startsWith(BOMB_LOBBERS_LABEL_PREFIX)))) {
+                    || name.startsWith(DEATHTAG_SHOWCASE_TAG)
+                    || name.startsWith(DRAGONESCAPE_SHOWCASE_TAG)
+                    || (plainName != null && (plainName.startsWith(BOMB_LOBBERS_LABEL_PREFIX)
+                    || plainName.startsWith(DEATHTAG_LABEL_PREFIX)
+                    || plainName.startsWith(DRAGONESCAPE_LABEL_PREFIX))))) {
                 entity.remove();
             } else if (entity instanceof Pig && name.startsWith(ChatColor.GOLD + "Pig - ")) {
                 entity.remove();
@@ -1295,6 +1405,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         if (event.getPlugin() == plugin) {
             clearBaconBrawlShowcase();
             clearBombLobbersShowcase();
+            clearDeathTagShowcase();
+            clearDragonEscapeShowcase();
         }
     }
 
@@ -1314,7 +1426,9 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     public void protectPregameShowcase(EntityDamageEvent event) {
         if (baconBrawlShowcaseEntities.contains(event.getEntity())
                 || baconBrawlShowcaseAccessories.contains(event.getEntity())
-                || bombLobbersShowcaseEntities.contains(event.getEntity())) {
+                || bombLobbersShowcaseEntities.contains(event.getEntity())
+                || deathTagShowcaseEntities.contains(event.getEntity())
+                || dragonEscapeShowcaseEntities.contains(event.getEntity())) {
             event.setCancelled(true);
         }
     }
