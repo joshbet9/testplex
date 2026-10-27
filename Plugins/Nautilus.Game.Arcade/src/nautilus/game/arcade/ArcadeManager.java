@@ -1513,7 +1513,7 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 		// Cache only a real directory, never a failed lookup. Maps may be copied
 		// into place after the plugin starts, and that should not permanently make
 		// every game appear to have no installed maps.
-		if (_mapRootResolutionAttempted && _resolvedMapRoot != null && _resolvedMapRoot.isDirectory())
+		if (_mapRootResolutionAttempted && _resolvedMapRoot != null && containsMapArchives(_resolvedMapRoot))
 		{
 			return _resolvedMapRoot;
 		}
