@@ -845,7 +845,7 @@ public class MonsterMaze extends SoloGame
 		refreshVisibilityViews();
 	}
 
-	/** Apply each view mode only to the observer's client; one player's setting must not alter everyone else's view. */
+	/** Apply each view mode only to the observer's client. Per-viewer NMS effect packets avoid the global visibility side effects of Bukkit potion effects. */
 	private void refreshVisibilityViews()
 	{
 		List<Player> players = GetPlayers(false);
