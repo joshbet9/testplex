@@ -35,6 +35,8 @@ jobs:
     steps:
       - name: Check out deployment script
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Connect runner to Hyper-V over Tailscale
         uses: tailscale/github-action@v4
@@ -155,38 +157,92 @@ jobs:
           ssh "${ssh_opts[@]}" "$remote" \
             "set -eu; test -f '$TESTPLEX_SERVER_DIR/.testplex-sandbox'; test -d '$TESTPLEX_SERVER_DIR/plugins'; printf 'Remote host: '; hostname; printf 'Test service state: '; timeout 8 systemctl is-active '$TESTPLEX_SYSTEMD_SERVICE' || true; echo 'Memory:'; free -h; echo 'Disk:'; df -h '$TESTPLEX_SERVER_DIR'; echo 'Disk-backed upload target:'; df -h /var/tmp"
 
-          echo "Preparing a persistent, checksum-verified artifact cache on the test VM."
+          echo "Preparing the disk-backed artifact cache on the test VM."
           ssh "${ssh_opts[@]}" "$remote" "install -d -m 0700 '$upload_dir'"
 
-          echo "Syncing the Arcade JAR and map bundle as separate files."
+          # A small manifest is enough to decide whether the 400 MB map bundle is
+          # needed. If each installed map ZIP matches the build source, reuse it.
+          MAPS_MODE="bundle"
+          if git cat-file -e "$BUILD_SHA^{commit}" 2>/dev/null && git diff --quiet "$BUILD_SHA" HEAD -- update/maps/; then
+            MAP_MANIFEST="$RUNNER_TEMP/testplex-map-manifest.sha256"
+            (
+              cd update
+              find maps -type f -name '*.zip' -print0 | sort -z | xargs -0 sha256sum
+            ) > "$MAP_MANIFEST"
+            test -s "$MAP_MANIFEST" || { echo "Map source manifest is empty." >&2; exit 1; }
+            map_manifest_remote="$upload_dir/testplex-map-manifest-$BUILD_SHA.sha256"
+            scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
+              -o BatchMode=yes -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+              "$MAP_MANIFEST" "$remote:$map_manifest_remote"
+
+            map_match="$(ssh "${ssh_opts[@]}" "$remote" \
+              "set -eu; if [[ -d /home/monstermaze/update/maps ]]; then installed_count=\$(find /home/monstermaze/update/maps -type f -iname '*.zip' -print | wc -l); manifest_count=\$(wc -l < '$map_manifest_remote'); if [[ \"\$installed_count\" -eq \"\$manifest_count\" ]] && (cd /home/monstermaze/update && sha256sum --check --status '$map_manifest_remote'); then printf installed; else printf bundle; fi; else printf bundle; fi")"
+            if [[ "$map_match" == "installed" ]]; then
+              MAPS_MODE="installed"
+              manifest_count="$(wc -l < "$MAP_MANIFEST")"
+              echo "Installed map ZIPs match all $manifest_count source checksums; skipping the map bundle transfer."
+            else
+              echo "The installed map ZIPs differ from source; a verified map bundle update is required."
+            fi
+          else
+            echo "The selected build source tree is unavailable or its map tree differs from checkout; using the build's map bundle."
+          fi
+
+          echo "Uploading Arcade.jar separately so deployment doesn't depend on a long idle connection."
           if ssh "${ssh_opts[@]}" "$remote" "command -v rsync >/dev/null 2>&1"; then
             rsync --archive --checksum --partial --timeout=180 --info=progress2 \
               -e "ssh -p $port -i $HOME/.ssh/testplex_hyperv -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30" \
-              "$ARTIFACT_DIR/Arcade.jar" "$ARTIFACT_DIR/testplex-map-assets.zip" "$remote:$upload_dir/"
+              "$ARTIFACT_DIR/Arcade.jar" "$remote:$upload_dir/"
           else
-            echo "rsync is unavailable on the VM; falling back to SCP (not resumable)."
             scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
               -o BatchMode=yes -o StrictHostKeyChecking=yes \
               -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
               -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30 \
-              "$ARTIFACT_DIR/Arcade.jar" "$ARTIFACT_DIR/testplex-map-assets.zip" "$remote:$upload_dir/"
+              "$ARTIFACT_DIR/Arcade.jar" "$remote:$upload_dir/"
           fi
 
           local_arcade_sha="$(sha256sum "$ARTIFACT_DIR/Arcade.jar" | cut -d ' ' -f1)"
-          local_maps_sha="$(sha256sum "$ARTIFACT_DIR/testplex-map-assets.zip" | cut -d ' ' -f1)"
           remote_arcade_sha="$(ssh "${ssh_opts[@]}" "$remote" "sha256sum '$upload_dir/Arcade.jar' | cut -d ' ' -f1")"
-          remote_maps_sha="$(ssh "${ssh_opts[@]}" "$remote" "sha256sum '$upload_dir/testplex-map-assets.zip' | cut -d ' ' -f1")"
           [[ "$local_arcade_sha" == "$remote_arcade_sha" ]] || {
             echo "Arcade.jar checksum mismatch; refusing deployment." >&2
             exit 1
           }
-          [[ "$local_maps_sha" == "$remote_maps_sha" ]] || {
-            echo "Map asset bundle checksum mismatch; refusing deployment." >&2
-            exit 1
-          }
-          echo "Both remote artifacts verified by SHA-256."
-          echo "Removing the legacy cache from /tmp after the disk-backed cache has passed checksums."
-          ssh "${ssh_opts[@]}" "$remote" "rm -rf '$legacy_upload_dir'; echo 'Remaining /var/tmp and /tmp capacity:'; df -h '$upload_dir'; df -h /tmp"
+          echo "Arcade.jar verified by SHA-256."
+
+          if [[ "$MAPS_MODE" == "bundle" ]]; then
+            local_maps_sha="$(sha256sum "$ARTIFACT_DIR/testplex-map-assets.zip" | cut -d ' ' -f1)"
+            remote_maps_sha="$(ssh "${ssh_opts[@]}" "$remote" "if [[ -s '$upload_dir/testplex-map-assets.zip' ]]; then sha256sum '$upload_dir/testplex-map-assets.zip' | cut -d ' ' -f1; else printf missing; fi")"
+            if [[ "$local_maps_sha" != "$remote_maps_sha" ]]; then
+              map_partial="$upload_dir/testplex-map-assets.zip.partial-$BUILD_SHA"
+              echo "Map bundle differs; transferring to a build-specific partial file so failed transfers can resume safely."
+              if ssh "${ssh_opts[@]}" "$remote" "command -v rsync >/dev/null 2>&1"; then
+                rsync --archive --partial --append-verify --timeout=180 --info=progress2 \
+                  -e "ssh -p $port -i $HOME/.ssh/testplex_hyperv -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30" \
+                  "$ARTIFACT_DIR/testplex-map-assets.zip" "$remote:$map_partial"
+              else
+                scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
+                  -o BatchMode=yes -o StrictHostKeyChecking=yes \
+                  -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+                  -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30 \
+                  "$ARTIFACT_DIR/testplex-map-assets.zip" "$remote:$map_partial"
+              fi
+              remote_partial_sha="$(ssh "${ssh_opts[@]}" "$remote" "sha256sum '$map_partial' | cut -d ' ' -f1")"
+              [[ "$local_maps_sha" == "$remote_partial_sha" ]] || {
+                echo "Map bundle checksum mismatch after transfer; the existing installed maps and running service are untouched." >&2
+                exit 1
+              }
+              ssh "${ssh_opts[@]}" "$remote" "mv -f '$map_partial' '$upload_dir/testplex-map-assets.zip'"
+              echo "Map bundle atomically installed in the artifact cache after SHA-256 verification."
+            else
+              echo "Cached map bundle already matches the selected artifact."
+            fi
+          else
+            echo "Skipping the large map bundle: installed map ZIPs match the selected build's map source."
+          fi
+
+          echo "Removing the legacy cache from /tmp and reporting remaining capacity."
+          ssh "${ssh_opts[@]}" "$remote" "rm -rf '$legacy_upload_dir'; rm -f '$upload_dir/testplex-map-manifest-$BUILD_SHA.sha256'; echo 'Remaining /var/tmp and /tmp capacity:'; df -h '$upload_dir'; df -h /tmp"
 
           scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
@@ -195,4 +251,4 @@ jobs:
 
           echo "Running the checked-out deployment script; the script will verify the sandbox marker, maps and startup."
           ssh "${ssh_opts[@]}" "$remote" \
-            "chmod 0644 '$deploy_script' && sudo -n bash '$deploy_script' '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE'; rc=\$?; rm -f '$deploy_script'; exit \$rc"
+            "chmod 0644 '$deploy_script' && sudo -n bash '$deploy_script' '$BUILD_SHA' '$TESTPLEX_SERVER_DIR' '$TESTPLEX_SYSTEMD_SERVICE' '$MAPS_MODE'; rc=\$?; rm -f '$deploy_script' '$upload_dir/testplex-map-manifest-$BUILD_SHA.sha256'; exit \$rc"

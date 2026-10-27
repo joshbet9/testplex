@@ -3,14 +3,19 @@
 set -Eeuo pipefail
 umask 077
 
-if [[ $# -ne 3 ]]; then
-  echo "Usage: deploy-testplex-hyperv.sh <40-char-build-sha> <server-root> <systemd-service>" >&2
+if [[ $# -lt 3 || $# -gt 4 ]]; then
+  echo "Usage: deploy-testplex-hyperv.sh <40-char-build-sha> <server-root> <systemd-service> [bundle|installed]" >&2
   exit 2
 fi
 
 SHA="$1"
 ROOT_INPUT="$2"
 SERVICE="$3"
+MAP_SOURCE_MODE="${4:-bundle}"
+[[ "$MAP_SOURCE_MODE" == "bundle" || "$MAP_SOURCE_MODE" == "installed" ]] || {
+  echo "Refusing unknown map source mode: $MAP_SOURCE_MODE" >&2
+  exit 2
+}
 
 [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Refusing invalid build SHA." >&2; exit 2; }
 # Keep this deployment fenced into a dedicated test-only directory namespace.
@@ -62,10 +67,23 @@ trap cleanup_preflight EXIT
   echo "Missing/empty cached artifact: $ARTIFACT_CACHE/Arcade.jar" >&2
   exit 2
 }
-[[ -s "$ARTIFACT_CACHE/testplex-map-assets.zip" ]] || {
-  echo "Missing/empty cached artifact: $ARTIFACT_CACHE/testplex-map-assets.zip" >&2
-  exit 2
-}
+if [[ "$MAP_SOURCE_MODE" == "bundle" ]]; then
+  [[ -s "$ARTIFACT_CACHE/testplex-map-assets.zip" ]] || {
+    echo "Missing/empty cached artifact: $ARTIFACT_CACHE/testplex-map-assets.zip" >&2
+    exit 2
+  }
+else
+  [[ -d "$MAP_DEST" ]] || {
+    echo "Cannot reuse installed maps: map root does not exist: $MAP_DEST" >&2
+    exit 2
+  }
+  installed_map_count="$(find "$MAP_DEST" -type f -iname '*.zip' -print | wc -l)"
+  [[ "$installed_map_count" -gt 0 ]] || {
+    echo "Cannot reuse installed maps: no ZIP archives exist under $MAP_DEST" >&2
+    exit 2
+  }
+  echo "Map bundle upload skipped by manifest match; $installed_map_count installed ZIPs are present."
+fi
 timeout 8 systemctl cat "$SERVICE" >/dev/null
 SERVICE_STATE="$(timeout 8 systemctl is-active "$SERVICE" 2>/dev/null || true)"
 case "$SERVICE_STATE" in
@@ -109,13 +127,15 @@ df -h "$ROOT"
   echo "Missing/empty Arcade.jar in the remote artifact cache." >&2
   exit 2
 }
-[[ -s "$ARTIFACT_CACHE/testplex-map-assets.zip" ]] || {
-  echo "Missing/empty map asset bundle in the remote artifact cache." >&2
-  exit 2
-}
+if [[ "$MAP_SOURCE_MODE" == "bundle" ]]; then
+  [[ -s "$ARTIFACT_CACHE/testplex-map-assets.zip" ]] || {
+    echo "Missing/empty map asset bundle in the remote artifact cache." >&2
+    exit 2
+  }
+fi
 # /tmp is a constrained temporary filesystem on this VM. Keep staging and
-# extracted map ZIPs on the server root filesystem, which has sufficient
-# capacity, and use the verified cache's 400 MB map bundle in place.
+# extracted map ZIPs on the server root filesystem, and only extract the map
+# bundle when a manifest proves the installed tree is outdated.
 STAGE="$(mktemp -d "$ROOT/.testplex-stage-$SHA.XXXXXX")"
 cp -- "$ARTIFACT_CACHE/Arcade.jar" "$STAGE/Arcade.jar"
 
@@ -124,10 +144,41 @@ if ! unzip -tq "$STAGE/Arcade.jar" >/dev/null; then
   echo "Arcade.jar failed ZIP/JAR integrity validation; the running service has not been stopped." >&2
   exit 2
 fi
-echo "Validating the cached map asset bundle in place before touching the running server."
-if ! unzip -tq "$ARTIFACT_CACHE/testplex-map-assets.zip" >/dev/null; then
-  echo "The map asset bundle failed ZIP integrity validation; the running service has not been stopped." >&2
-  exit 2
+
+MAP_FILES=()
+if [[ "$MAP_SOURCE_MODE" == "bundle" ]]; then
+  echo "Validating the cached map asset bundle in place before touching the running server."
+  if ! unzip -tq "$ARTIFACT_CACHE/testplex-map-assets.zip" >/dev/null; then
+    echo "The map asset bundle failed ZIP integrity validation; the running service has not been stopped." >&2
+    exit 2
+  fi
+
+  while IFS= read -r map_entry; do
+    [[ "$map_entry" =~ ^maps/[^/]+(/[^/]+)*[.]zip$ ]] || {
+      echo "Unexpected entry in Mineplex map bundle: $map_entry" >&2
+      exit 2
+    }
+    map_rel="${map_entry#maps/}"
+    case "/$map_rel/" in
+      *"/../"*|*"/./"*|*"//"*)
+        echo "Refusing unsafe path in Mineplex map bundle: $map_entry" >&2
+        exit 2
+        ;;
+    esac
+  done < <(unzip -Z1 "$ARTIFACT_CACHE/testplex-map-assets.zip")
+
+  MAP_STAGE="$STAGE/map-assets"
+  echo "Extracting validated map ZIPs onto the server root filesystem: $MAP_STAGE"
+  mkdir -p "$MAP_STAGE"
+  unzip -q "$ARTIFACT_CACHE/testplex-map-assets.zip" -d "$MAP_STAGE"
+  mapfile -d '' -t MAP_FILES < <(find "$MAP_STAGE/maps" -type f -name '*.zip' -print0 | sort -z)
+  [[ "${#MAP_FILES[@]}" -gt 0 ]] || { echo "Map asset bundle contains no map ZIPs." >&2; exit 2; }
+  for map_file in "${MAP_FILES[@]}"; do
+    unzip -tq "$map_file" >/dev/null || { echo "Invalid map archive: $map_file" >&2; exit 2; }
+  done
+  echo "Validated one Arcade.jar and ${#MAP_FILES[@]} Mineplex map archives; only Arcade.jar will be installed."
+else
+  echo "Map source is unchanged and installed ZIPs were manifest-verified; leaving the shared map tree untouched."
 fi
 
 BUNDLE_NAMES=("Arcade.jar")
@@ -160,33 +211,8 @@ for name in "${BUNDLE_NAMES[@]}" "${LEGACY_SERVER_MODULE_JARS[@]}"; do
   fi
 done
 
-while IFS= read -r map_entry; do
-  [[ "$map_entry" =~ ^maps/[^/]+(/[^/]+)*[.]zip$ ]] || {
-    echo "Unexpected entry in Mineplex map bundle: $map_entry" >&2
-    exit 2
-  }
-  map_rel="${map_entry#maps/}"
-  case "/$map_rel/" in
-    *"/../"*|*"/./"*|*"//"*)
-      echo "Refusing unsafe path in Mineplex map bundle: $map_entry" >&2
-      exit 2
-      ;;
-  esac
-done < <(unzip -Z1 "$ARTIFACT_CACHE/testplex-map-assets.zip")
-
-MAP_STAGE="$STAGE/map-assets"
-echo "Extracting validated map ZIPs onto the server root filesystem: $MAP_STAGE"
-mkdir -p "$MAP_STAGE"
-unzip -q "$ARTIFACT_CACHE/testplex-map-assets.zip" -d "$MAP_STAGE"
-mapfile -d '' -t MAP_FILES < <(find "$MAP_STAGE/maps" -type f -name '*.zip' -print0 | sort -z)
-[[ "${#MAP_FILES[@]}" -gt 0 ]] || { echo "Map asset bundle contains no map ZIPs." >&2; exit 2; }
-for map_file in "${MAP_FILES[@]}"; do
-  unzip -tq "$map_file" >/dev/null || { echo "Invalid map archive: $map_file" >&2; exit 2; }
-done
-
 JAR_PATHS=("$STAGE/Arcade.jar")
 JAR_NAMES=("Arcade.jar")
-echo "Validated one Arcade.jar and ${#MAP_FILES[@]} Mineplex map archives; only Arcade.jar will be installed."
 if [[ -f "$PLUGINS/Arcade.jar" ]]; then
   OWNER_GROUP="$(stat -c '%U:%G' "$PLUGINS/Arcade.jar")"
 else
@@ -292,42 +318,47 @@ if [[ -d "$ROOT/world" ]] && ! grep -Fxq "TESTPLEX_SANDBOX_LOBBY_V3" "$ROOT/worl
   WORLD_BACKUP_CREATED=1
 fi
 
-install -d -o monstermaze -g monstermaze -m 0755 "$MAP_DEST"
-for source_map in "${MAP_FILES[@]}"; do
-  rel="${source_map#"$MAP_STAGE/maps/"}"
-  [[ "$rel" != "$source_map" && "$rel" != *"/../"* && "$rel" != ../* ]] || {
-    echo "Refusing unsafe extracted map path: $source_map" >&2
-    exit 2
-  }
-  dest="$MAP_DEST/$rel"
-  if [[ -f "$dest" ]] && cmp -s "$source_map" "$dest"; then
-    continue
-  fi
-  if [[ -f "$dest" ]]; then
-    backup_map="$BACKUP_DIR/maps/$rel"
-    install -d -m 0750 "$(dirname "$backup_map")"
-    cp -p "$dest" "$backup_map"
-  else
-    printf '%s\n' "$dest" >> "$MAP_ADDED_LIST"
-  fi
-  install -D -o monstermaze -g monstermaze -m 0644 "$source_map" "$dest"
-done
+if [[ "$MAP_SOURCE_MODE" == "bundle" ]]; then
+  install -d -o monstermaze -g monstermaze -m 0755 "$MAP_DEST"
+  for source_map in "${MAP_FILES[@]}"; do
+    rel="${source_map#"$MAP_STAGE/maps/"}"
+    [[ "$rel" != "$source_map" && "$rel" != *"/../"* && "$rel" != ../* ]] || {
+      echo "Refusing unsafe extracted map path: $source_map" >&2
+      exit 2
+    }
+    dest="$MAP_DEST/$rel"
+    if [[ -f "$dest" ]] && cmp -s "$source_map" "$dest"; then
+      continue
+    fi
+    if [[ -f "$dest" ]]; then
+      backup_map="$BACKUP_DIR/maps/$rel"
+      install -d -m 0750 "$(dirname "$backup_map")"
+      cp -p "$dest" "$backup_map"
+    else
+      printf '%s\n' "$dest" >> "$MAP_ADDED_LIST"
+    fi
+    install -D -o monstermaze -g monstermaze -m 0644 "$source_map" "$dest"
+  done
 
-source_count="${#MAP_FILES[@]}"
-installed_count=0
-while IFS= read -r -d '' installed_map; do
-  rel="${installed_map#"$MAP_STAGE/maps/"}"
-  cmp -s "$installed_map" "$MAP_DEST/$rel" || {
-    echo "Installed map did not match the source bundle: $rel" >&2
+  source_count="${#MAP_FILES[@]}"
+  installed_count=0
+  while IFS= read -r -d '' installed_map; do
+    rel="${installed_map#"$MAP_STAGE/maps/"}"
+    cmp -s "$installed_map" "$MAP_DEST/$rel" || {
+      echo "Installed map did not match the source bundle: $rel" >&2
+      exit 2
+    }
+    installed_count=$((installed_count + 1))
+  done < <(find "$MAP_STAGE/maps" -type f -name '*.zip' -print0)
+  [[ "$installed_count" -eq "$source_count" ]] || {
+    echo "Map verification count mismatch: source=$source_count installed=$installed_count" >&2
     exit 2
   }
-  installed_count=$((installed_count + 1))
-done < <(find "$MAP_STAGE/maps" -type f -name '*.zip' -print0)
-[[ "$installed_count" -eq "$source_count" ]] || {
-  echo "Map verification count mismatch: source=$source_count installed=$installed_count" >&2
-  exit 2
-}
-echo "Installed/verified $installed_count Mineplex map ZIPs under $MAP_DEST."
+  echo "Installed/verified $installed_count Mineplex map ZIPs under $MAP_DEST."
+else
+  installed_count="$(find "$MAP_DEST" -type f -iname '*.zip' -print | wc -l)"
+  echo "Reusing the $installed_count already-installed map ZIPs under $MAP_DEST; no map files were overwritten."
+fi
 
 for name in "${MANAGED_NAMES[@]}"; do
   if [[ "$name" != "Arcade.jar" ]]; then
