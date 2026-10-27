@@ -1,7 +1,9 @@
 package nautilus.game.arcade.game.games.monstermaze;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -19,6 +21,7 @@ import mineplex.minecraft.game.core.condition.Condition.ConditionType;
 import nautilus.game.arcade.ArcadeManager;
 import nautilus.game.arcade.GameType;
 import nautilus.game.arcade.events.GameStateChangeEvent;
+import nautilus.game.arcade.game.GameTeam;
 import nautilus.game.arcade.game.SoloGame;
 import nautilus.game.arcade.game.games.monstermaze.MMMazes.MazePreset;
 import nautilus.game.arcade.game.games.monstermaze.MazeBlockData.MazeBlock;
@@ -48,6 +51,7 @@ import nautilus.game.arcade.kit.Kit;
 import nautilus.game.arcade.managers.chat.ChatStatData;
 
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Effect;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -183,6 +187,30 @@ public class MonsterMaze extends SoloGame
 			setJumpsLeft(player, 3);
 	}
 
+	@Override
+	public void generateTeams()
+	{
+		super.generateTeams();
+		if (GetTeamList().isEmpty())
+		{
+			List<Location> centres = WorldData == null ? null : WorldData.GetDataLocs("ORANGE");
+			Location fallback = centres != null && !centres.isEmpty()
+					? centres.get(0).clone()
+					: (WorldData != null && WorldData.World != null ? WorldData.World.getSpawnLocation() : null);
+			if (fallback != null)
+			{
+				ArrayList<Location> spawns = new ArrayList<Location>();
+				spawns.add(fallback);
+				AddTeam(new GameTeam(this, "Players", ChatColor.YELLOW, spawns));
+				Bukkit.getLogger().warning("[MonsterMaze] Map has no TEAM_SPAWNS metadata; created a fallback team.");
+			}
+			else
+			{
+				Bukkit.getLogger().severe("[MonsterMaze] Cannot create a fallback team because the map world is unavailable.");
+			}
+		}
+	}
+
 	@EventHandler
 	public void GameStateChange(GameStateChangeEvent event)
 	{
@@ -195,17 +223,48 @@ public class MonsterMaze extends SoloGame
 			for (Team team : GetScoreboard().getScoreboard().getTeams())
 				team.setCanSeeFriendlyInvisibles(true);
 		}
-		else if(event.GetState() == GameState.Recruit)
+		else if (event.GetState() == GameState.Recruit)
 		{
+			List<Location> centres = WorldData == null ? null : WorldData.GetDataLocs("ORANGE");
+			if (centres == null || centres.isEmpty())
+			{
+				Bukkit.getLogger().severe("[MonsterMaze] The selected map has no DATA_NAME:ORANGE centre. Aborting safely.");
+				SetState(GameState.Dead);
+				return;
+			}
+
 			_monsterType = loadEntityType();
-			_center = WorldData.GetDataLocs("ORANGE").get(0);
+			_center = centres.get(0).clone();
 			int requestedPattern = Manager.getPlugin().getConfig().getInt("monstermaze.pattern", 0);
 			_preset = requestedPattern >= 1 && requestedPattern <= 3
 					? MMMazes.getPatternMapPreset(_center, getMazeBlockData(), requestedPattern)
 					: MMMazes.getRandomMapPreset(_center, getMazeBlockData());
+
+			if (_preset == null || _preset.getSpawns() == null || _preset.getSpawns().isEmpty())
+			{
+				Bukkit.getLogger().severe("[MonsterMaze] The selected maze preset has no player spawn tiles. Aborting safely.");
+				SetState(GameState.Dead);
+				return;
+			}
+
 			_preset.build();
 			_maze = new Maze(this, _preset);
-			
+
+			// WorldConfig's team spawn is a map anchor, not a player spawn.
+			// Use the actual marked maze spawn tiles to prevent falling below the arena.
+			if (GetTeamList().isEmpty())
+			{
+				ArrayList<Location> fallbackSpawns = new ArrayList<Location>();
+				fallbackSpawns.add(_preset.getSpawns().get(0).clone());
+				AddTeam(new GameTeam(this, "Players", ChatColor.YELLOW, fallbackSpawns));
+			}
+			GameTeam playerTeam = GetTeamList().get(0);
+			playerTeam.SetColor(ChatColor.YELLOW);
+			playerTeam.SetName("Players");
+			playerTeam.GetSpawns().clear();
+			for (Location spawn : _preset.getSpawns())
+				playerTeam.GetSpawns().add(spawn.clone());
+
 			_maze.fillSpawn(isActualModernMode() ? 225 : 150);
 		}
 	}

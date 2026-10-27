@@ -649,6 +649,14 @@ public class GameManager implements Listener
 		}
 	}
 
+	private boolean keepSinglePlayerSandboxGameRunning(Game game)
+	{
+		return game != null
+				&& Manager.isTestplexSandbox()
+				&& game.GetState() == GameState.Live
+				&& game.GetPlayers(true).size() == 1;
+	}
+
 	@EventHandler(priority = EventPriority.MONITOR)
 	public void EndUpdate(UpdateEvent event)
 	{
@@ -656,7 +664,7 @@ public class GameManager implements Listener
 			return;
 
 		Game game = Manager.GetGame();
-		if (game == null) return;
+		if (game == null || keepSinglePlayerSandboxGameRunning(game)) return;
 
 		game.EndCheck();
 	}
@@ -664,7 +672,10 @@ public class GameManager implements Listener
 	@EventHandler(priority = EventPriority.MONITOR)
 	public void EndStateChange(PlayerStateChangeEvent event)
 	{
-		event.GetGame().EndCheck();
+		Game game = event.GetGame();
+		if (game == null || keepSinglePlayerSandboxGameRunning(game)) return;
+
+		game.EndCheck();
 	}
 
 	@EventHandler
