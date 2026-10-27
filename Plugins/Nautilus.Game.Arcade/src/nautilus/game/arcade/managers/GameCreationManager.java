@@ -302,7 +302,7 @@ public class GameCreationManager implements Listener
 		}
 
 		_missingMapWarnings.remove(gameType);
-		if (_waitingForMapsType == gameType)
+		if (_waitingForMapsType != null)
 		{
 			_waitingForMapsType = null;
 			_nextMapRetryAtMillis = 0L;
