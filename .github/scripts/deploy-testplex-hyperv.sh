@@ -377,7 +377,7 @@ if [[ "$MAP_SOURCE_MODE" == "bundle" ]]; then
   echo "Installed/verified $installed_count Mineplex map ZIPs under $MAP_DEST."
 else
   installed_count="$(find "$MAP_DEST" -type f -iname '*.zip' -print | wc -l)"
-  echo "Reusing the $installed_count already-installed map ZIPs under $MAP_DEST; map directory permissions will still be normalised."
+  echo "Reusing the $installed_count already-installed map ZIPs under $MAP_DEST; no map files were overwritten, and permissions will still be normalised."
 fi
 
 # This deployment runs with umask 077. Ensure the map root and its parent

@@ -121,9 +121,11 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           import importlib.util
+          import io
           import os
           from pathlib import Path
           from tempfile import TemporaryDirectory
+          from zipfile import ZipFile
 
           script = Path(".github/scripts/create-testplex-map-bundle.py")
           spec = importlib.util.spec_from_file_location("testplex_map_bundle", script)
@@ -150,6 +152,46 @@ jobs:
               if first.read_bytes() != second.read_bytes():
                   raise SystemExit("Map bundle changed when only source file mtimes changed.")
           print("Map bundle packaging is reproducible across checkout mtimes.")
+
+          # MonsterMazeStandalone supplies these seven maps. Testplex needs the original
+          # per-map center, entity skin and B1/B2/B3 palette in Mineplex WorldConfig.dat.
+          required_maps = {
+              "Eye of Ender.zip": ("MAP_NAME:Eye of Ender", "DATA_NAME:ORANGE", "DATA_LOCS:0,64,0", "CUSTOM_NAME:E=ENDERMAN", "CUSTOM_NAME:B1=121,0", "CUSTOM_NAME:B2=121,0", "CUSTOM_NAME:B3=121,0"),
+              "Volcano.zip": ("MAP_NAME:Volcano", "DATA_NAME:ORANGE", "DATA_LOCS:-3,114,3", "CUSTOM_NAME:E=PIG_ZOMBIE", "CUSTOM_NAME:B1=112,0", "CUSTOM_NAME:B2=87,0", "CUSTOM_NAME:B3=112,0"),
+              "Colombia.zip": ("MAP_NAME:Colombia", "DATA_NAME:ORANGE", "DATA_LOCS:-7,61,5", "CUSTOM_NAME:E=OCELOT", "CUSTOM_NAME:B1=2,0", "CUSTOM_NAME:B2=1,2", "CUSTOM_NAME:B3=5,0"),
+              "Sandy Coast.zip": ("MAP_NAME:Sandy Coast", "DATA_NAME:ORANGE", "DATA_LOCS:23,13,15", "CUSTOM_NAME:E=VILLAGER", "CUSTOM_NAME:B1=155,0", "CUSTOM_NAME:B2=155,2", "CUSTOM_NAME:B3=155,0"),
+              "Siberian.zip": ("MAP_NAME:Siberian", "DATA_NAME:ORANGE", "DATA_LOCS:0,7,0", "CUSTOM_NAME:E=SNOWMAN", "CUSTOM_NAME:B1=80,0", "CUSTOM_NAME:B2=80,0", "CUSTOM_NAME:B3=80,0"),
+              "Swampland.zip": ("MAP_NAME:Swampland", "DATA_NAME:ORANGE", "DATA_LOCS:0,7,0", "CUSTOM_NAME:E=ZOMBIE", "CUSTOM_NAME:B1=2,0", "CUSTOM_NAME:B2=3,0", "CUSTOM_NAME:B3=3,0"),
+              "Tesoro Hundido.zip": ("MAP_NAME:Tesoro Hundido", "DATA_NAME:ORANGE", "DATA_LOCS:0,27,0", "CUSTOM_NAME:E=SQUID", "CUSTOM_NAME:B1=82,0", "CUSTOM_NAME:B2=159,9", "CUSTOM_NAME:B3=35,7"),
+          }
+          source_map_dir = Path("update/maps/Monster Maze")
+          for filename, required_values in required_maps.items():
+              source_archive = source_map_dir / filename
+              if not source_archive.is_file():
+                  raise SystemExit(f"Monster Maze source map is missing: {source_archive}")
+              with ZipFile(source_archive) as archive:
+                  names = set(archive.namelist())
+                  if "WorldConfig.dat" not in names:
+                      raise SystemExit(f"{filename} is missing root WorldConfig.dat")
+                  if "session.lock" in names or any(name.startswith("playerdata/") for name in names):
+                      raise SystemExit(f"{filename} contains transient session/player data")
+                  config = archive.read("WorldConfig.dat").decode("utf-8")
+                  missing = [value for value in required_values if value not in config]
+                  if missing:
+                      raise SystemExit(f"{filename} has incomplete map metadata: {missing}")
+
+          bundle_path = Path("Plugins/out/testplex-map-assets.zip")
+          with ZipFile(bundle_path) as bundle:
+              bundle_names = set(bundle.namelist())
+              for filename in required_maps:
+                  member = f"maps/Monster Maze/{filename}"
+                  if member not in bundle_names:
+                      raise SystemExit(f"Packaged map bundle is missing {member}")
+                  with ZipFile(io.BytesIO(bundle.read(member))) as archive:
+                      config = archive.read("WorldConfig.dat").decode("utf-8")
+                      if "DATA_NAME:ORANGE" not in config:
+                          raise SystemExit(f"Packaged map {member} has no maze centre metadata")
+          print("All seven Monster Maze maps include WorldConfig.dat and are present in the deployable bundle.")
           PY
 
       - name: Smoke-check native gameplay and cosmetic hooks
