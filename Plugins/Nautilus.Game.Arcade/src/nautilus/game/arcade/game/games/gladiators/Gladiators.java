@@ -320,8 +320,6 @@ public class Gladiators extends SoloGame
 		GetTeamList().get(0).setTutorial(new TutorialGladiators(Manager));
 	}
 
-	@Override
-
 	/** Cosmetic combat messages; kill outcome and damage logic are unchanged. */
 	@EventHandler(priority = EventPriority.HIGH)
 	public void arcadeCombatMessage(PlayerDeathEvent event)
@@ -342,6 +340,7 @@ public class Gladiators extends SoloGame
 		}
 	}
 
+	@Override
 	public void ParseData()
 	{
 		parseArenas();

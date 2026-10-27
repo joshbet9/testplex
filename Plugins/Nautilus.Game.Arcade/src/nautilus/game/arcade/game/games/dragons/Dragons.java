@@ -119,8 +119,6 @@ public class Dragons extends SoloGame
 		}
 	}
 
-	@EventHandler
-
 	/** Visual-only particles from the player's equipped Arcade Pyro cosmetic. */
 	@EventHandler
 	public void updatePyroCosmetic(UpdateEvent event)
@@ -144,6 +142,7 @@ public class Dragons extends SoloGame
 		}
 	}
 
+	@EventHandler
 	public void dragonSpawn(UpdateEvent event)
 	{
 		if (event.getType() != UpdateType.SEC_05 || !IsLive())

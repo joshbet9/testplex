@@ -384,14 +384,17 @@ public class Evolution extends SoloGame
 		String appearance = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "evolution", "egg-appearance");
 		String legacyEffect = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "evolution");
 		Location effectLocation = player.getLocation().clone().add(0, 1, 0);
-		ParticleType effect = null;
-		if ("charged".equalsIgnoreCase(appearance)) effect = ParticleType.FIREWORKS_SPARK;
-		else if ("void".equalsIgnoreCase(appearance)) effect = ParticleType.PORTAL;
-		else if ("nature".equalsIgnoreCase(appearance)) effect = ParticleType.HAPPY_VILLAGER;
+		ParticleType effectType = null;
+		String effectParticle = null;
+		if ("charged".equalsIgnoreCase(appearance)) effectType = ParticleType.FIREWORKS_SPARK;
+		else if ("void".equalsIgnoreCase(appearance)) effectType = ParticleType.PORTAL;
+		else if ("nature".equalsIgnoreCase(appearance)) effectType = ParticleType.HAPPY_VILLAGER;
 		else if ("dragon-egg".equalsIgnoreCase(legacyEffect))
-			effect = ParticleType.BLOCK_DUST.getParticle(Material.DRAGON_EGG, (byte) 0);
-		if (effect != null)
-			UtilParticle.PlayParticle(effect, effectLocation, 0.35F, 0.55F, 0.35F, 0.08F, 20, ViewDist.NORMAL, UtilServer.getPlayers());
+			effectParticle = ParticleType.BLOCK_DUST.getParticle(Material.DRAGON_EGG, (byte) 0);
+		if (effectType != null)
+			UtilParticle.PlayParticle(effectType, effectLocation, 0.35F, 0.55F, 0.35F, 0.08F, 20, ViewDist.NORMAL, UtilServer.getPlayers());
+		else if (effectParticle != null)
+			UtilParticle.PlayParticle(effectParticle, effectLocation, 0.35F, 0.55F, 0.35F, 0.08F, 20, ViewDist.NORMAL, UtilServer.getPlayers());
 
 		//Make sure they're not invis when they're done evolving
 		while (Manager.GetCondition().IsCloaked(event.getPlayer()))
