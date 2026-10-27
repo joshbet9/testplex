@@ -175,7 +175,7 @@ public class SetCommand extends CommandBase<ArcadeManager>
 			Plugin.GetGame().setGame(matches.get(0), caller, true);
 		}
 
-		if (UtilServer.isTestServer())
+		if (UtilServer.isTestServer() || Plugin.isTestplexSandbox())
 		{
 			Plugin.GetGameList().clear();
 			Plugin.GetGameList().add(matches.get(0));
