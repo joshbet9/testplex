@@ -12,6 +12,10 @@ import org.bukkit.Sound;
 import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
+import mineplex.core.common.util.UtilParticle;
+import mineplex.core.common.util.UtilParticle.ParticleType;
+import mineplex.core.common.util.UtilParticle.ViewDist;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
@@ -57,6 +61,7 @@ public class Dragons extends SoloGame
 
 	private List<Location> _dragonSpawns;
 	private PerkSparkler _sparkler;
+	private int _pyroCosmeticTick;
 
 	public Dragons(ArcadeManager manager)
 	{
@@ -115,6 +120,30 @@ public class Dragons extends SoloGame
 	}
 
 	@EventHandler
+
+	/** Visual-only particles from the player's equipped Arcade Pyro cosmetic. */
+	@EventHandler
+	public void updatePyroCosmetic(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.TICK || !IsLive() || ++_pyroCosmeticTick % 4 != 0) return;
+		for (Player player : GetPlayers(true))
+		{
+			String choice = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "dragons", "pyro-particles");
+			if (choice == null || choice.isEmpty() || "classic".equalsIgnoreCase(choice)) continue;
+			ParticleType particle;
+			switch (choice.toLowerCase(java.util.Locale.ROOT))
+			{
+				case "ember": particle = ParticleType.FLAME; break;
+				case "frost": particle = ParticleType.SNOW_SHOVEL; break;
+				case "ender": particle = ParticleType.PORTAL; break;
+				case "spark": particle = ParticleType.FIREWORKS_SPARK; break;
+				case "aurora": particle = ParticleType.WITCH_MAGIC; break;
+				default: continue;
+			}
+			UtilParticle.PlayParticle(particle, player.getLocation().clone().add(0, 0.25, 0), 0.12F, 0.18F, 0.12F, 0.01F, 3, ViewDist.NORMAL);
+		}
+	}
+
 	public void dragonSpawn(UpdateEvent event)
 	{
 		if (event.getType() != UpdateType.SEC_05 || !IsLive())

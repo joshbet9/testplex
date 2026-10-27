@@ -19,6 +19,9 @@ import org.bukkit.Sound;
 import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.entity.EntityDamageEvent;
@@ -318,6 +321,27 @@ public class Gladiators extends SoloGame
 	}
 
 	@Override
+
+	/** Cosmetic combat messages; kill outcome and damage logic are unchanged. */
+	@EventHandler(priority = EventPriority.HIGH)
+	public void arcadeCombatMessage(PlayerDeathEvent event)
+	{
+		if (!IsLive()) return;
+		Player victim = event.getEntity();
+		Player killer = victim.getKiller();
+		if (killer == null || !IsAlive(killer)) return;
+		String style = ArcadeCosmeticsMenu.getEquippedChoice(killer.getUniqueId(), "gladiators", "combat-messages");
+		if (style == null || style.isEmpty() || "classic".equalsIgnoreCase(style)) return;
+		switch (style.toLowerCase(java.util.Locale.ROOT))
+		{
+			case "ironic": event.setDeathMessage(C.cGold + killer.getName() + " bonked " + victim.getName() + " out of the arena."); break;
+			case "champion": event.setDeathMessage(C.cGold + C.Bold + killer.getName() + C.Reset + " claims victory over " + victim.getName() + "."); break;
+			case "dramatic": event.setDeathMessage(C.cRed + victim.getName() + " fell before " + killer.getName() + "!"); break;
+			case "silent": event.setDeathMessage(null); break;
+			default: break;
+		}
+	}
+
 	public void ParseData()
 	{
 		parseArenas();

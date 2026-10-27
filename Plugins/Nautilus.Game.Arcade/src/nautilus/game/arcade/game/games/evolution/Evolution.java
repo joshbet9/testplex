@@ -381,12 +381,17 @@ public class Evolution extends SoloGame
 	public void endEvolve(final EvolutionPostEvolveEvent event)
 	{
 		Player player = event.getPlayer();
-		if ("dragon-egg".equals(ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "evolution")))
-		{
-			UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.DRAGON_EGG, (byte) 0),
-					player.getLocation().clone().add(0, 1, 0), 0.35F, 0.55F, 0.35F, 0.08F,
-					20, ViewDist.NORMAL, UtilServer.getPlayers());
-		}
+		String appearance = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "evolution", "egg-appearance");
+		String legacyEffect = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "evolution");
+		Location effectLocation = player.getLocation().clone().add(0, 1, 0);
+		ParticleType effect = null;
+		if ("charged".equalsIgnoreCase(appearance)) effect = ParticleType.FIREWORKS_SPARK;
+		else if ("void".equalsIgnoreCase(appearance)) effect = ParticleType.PORTAL;
+		else if ("nature".equalsIgnoreCase(appearance)) effect = ParticleType.HAPPY_VILLAGER;
+		else if ("dragon-egg".equalsIgnoreCase(legacyEffect))
+			effect = ParticleType.BLOCK_DUST.getParticle(Material.DRAGON_EGG, (byte) 0);
+		if (effect != null)
+			UtilParticle.PlayParticle(effect, effectLocation, 0.35F, 0.55F, 0.35F, 0.08F, 20, ViewDist.NORMAL, UtilServer.getPlayers());
 
 		//Make sure they're not invis when they're done evolving
 		while (Manager.GetCondition().IsCloaked(event.getPlayer()))
