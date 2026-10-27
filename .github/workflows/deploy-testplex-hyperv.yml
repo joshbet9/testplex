@@ -138,35 +138,12 @@ jobs:
           ARTIFACT_DIR="$RUNNER_TEMP/testplex-upload-source"
           test -s "$ARTIFACT_DIR/Arcade.jar" || { echo "Artifact is missing Arcade.jar." >&2; exit 1; }
           test -s "$ARTIFACT_DIR/testplex-map-assets.zip" || { echo "Artifact is missing testplex-map-assets.zip." >&2; exit 1; }
+          unzip -tq "$ARTIFACT_DIR/Arcade.jar" >/dev/null
           unzip -tq "$ARTIFACT_DIR/testplex-map-assets.zip" >/dev/null
-
-          BUNDLE="$RUNNER_TEMP/testplex-plugin-set-$BUILD_SHA.zip"
-          python3 - "$ARTIFACT_DIR" "$BUNDLE" <<'PY'
-          from pathlib import Path
-          import sys
-          from zipfile import ZIP_STORED, ZipFile
-
-          source = Path(sys.argv[1])
-          destination = Path(sys.argv[2])
-          names = ("Arcade.jar", "testplex-map-assets.zip")
-          missing = [name for name in names if not (source / name).is_file() or (source / name).stat().st_size == 0]
-          if missing:
-              raise SystemExit("Missing/empty artifact entries: " + ", ".join(missing))
-          with ZipFile(destination, "w", compression=ZIP_STORED, allowZip64=True) as archive:
-              for name in names:
-                  archive.write(source / name, arcname=name)
-          with ZipFile(destination) as archive:
-              if sorted(archive.namelist()) != sorted(names):
-                  raise SystemExit("Packaged artifact contains unexpected entries.")
-              bad = archive.testzip()
-              if bad:
-                  raise SystemExit("Corrupt packaged entry: " + bad)
-          print(f"Packaged {destination.stat().st_size:,} bytes for resumable SSH transfer.")
-          PY
 
           port="${HYPERV_SSH_PORT:-22}"
           remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
-          upload_path="/tmp/testplex-plugin-set-$BUILD_SHA.zip.upload"
+          upload_dir="/tmp/testplex-artifact-cache"
           deploy_script="/tmp/testplex-deploy-script-$BUILD_SHA.sh"
           ssh_opts=(-p "$port" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
@@ -177,27 +154,36 @@ jobs:
           ssh "${ssh_opts[@]}" "$remote" \
             "set -eu; test -f '$TESTPLEX_SERVER_DIR/.testplex-sandbox'; test -d '$TESTPLEX_SERVER_DIR/plugins'; printf 'Remote host: '; hostname; printf 'Test service state: '; timeout 8 systemctl is-active '$TESTPLEX_SYSTEMD_SERVICE' || true; echo 'Memory:'; free -h; echo 'Disk:'; df -h '$TESTPLEX_SERVER_DIR'"
 
-          echo "Uploading the full plugin/map bundle to the test VM."
+          echo "Preparing a persistent, checksum-verified artifact cache on the test VM."
+          ssh "${ssh_opts[@]}" "$remote" "install -d -m 0700 '$upload_dir'"
+
+          echo "Syncing the Arcade JAR and map bundle as separate files."
           if ssh "${ssh_opts[@]}" "$remote" "command -v rsync >/dev/null 2>&1"; then
-            rsync --archive --partial --append-verify --timeout=180 --info=progress2 \
+            rsync --archive --checksum --partial --timeout=180 --info=progress2 \
               -e "ssh -p $port -i $HOME/.ssh/testplex_hyperv -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30" \
-              "$BUNDLE" "$remote:$upload_path"
+              "$ARTIFACT_DIR/Arcade.jar" "$ARTIFACT_DIR/testplex-map-assets.zip" "$remote:$upload_dir/"
           else
             echo "rsync is unavailable on the VM; falling back to SCP (not resumable)."
             scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
               -o BatchMode=yes -o StrictHostKeyChecking=yes \
               -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
               -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30 \
-              "$BUNDLE" "$remote:$upload_path"
+              "$ARTIFACT_DIR/Arcade.jar" "$ARTIFACT_DIR/testplex-map-assets.zip" "$remote:$upload_dir/"
           fi
 
-          local_sha="$(sha256sum "$BUNDLE" | cut -d ' ' -f1)"
-          remote_sha="$(ssh "${ssh_opts[@]}" "$remote" "sha256sum '$upload_path' | cut -d ' ' -f1")"
-          [[ "$local_sha" == "$remote_sha" ]] || {
-            echo "Uploaded bundle checksum mismatch; refusing deployment." >&2
+          local_arcade_sha="$(sha256sum "$ARTIFACT_DIR/Arcade.jar" | cut -d ' ' -f1)"
+          local_maps_sha="$(sha256sum "$ARTIFACT_DIR/testplex-map-assets.zip" | cut -d ' ' -f1)"
+          remote_arcade_sha="$(ssh "${ssh_opts[@]}" "$remote" "sha256sum '$upload_dir/Arcade.jar' | cut -d ' ' -f1")"
+          remote_maps_sha="$(ssh "${ssh_opts[@]}" "$remote" "sha256sum '$upload_dir/testplex-map-assets.zip' | cut -d ' ' -f1")"
+          [[ "$local_arcade_sha" == "$remote_arcade_sha" ]] || {
+            echo "Arcade.jar checksum mismatch; refusing deployment." >&2
             exit 1
           }
-          echo "Bundle upload verified by SHA-256."
+          [[ "$local_maps_sha" == "$remote_maps_sha" ]] || {
+            echo "Map asset bundle checksum mismatch; refusing deployment." >&2
+            exit 1
+          }
+          echo "Both remote artifacts verified by SHA-256."
 
           scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
