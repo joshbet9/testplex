@@ -1253,7 +1253,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 stand.setArms(false);
                 stand.setMarker(true);
                 stand.setCanPickupItems(false);
-                stand.setHelmet(baconBrawlAccessoryItem(choices[column]));
+                stand.setHelmet(getBaconBrawlAccessory(choices[column]));
                 baconBrawlShowcaseAccessories.add(stand);
             }
         }
@@ -1261,12 +1261,12 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         plugin.getLogger().info("Created Bacon Brawl pregame cosmetic showcase (4 pig styles and 4 pink sheep styles).");
     }
 
-    private ItemStack baconBrawlAccessoryItem(String choice) {
+    public static ItemStack getBaconBrawlAccessory(String choice) {
         if ("crown".equalsIgnoreCase(choice)) return new ItemStack(Material.GOLD_HELMET);
         if ("top_hat".equalsIgnoreCase(choice)) return new ItemStack(Material.WOOL, 1, (short) 15);
         if ("chef".equalsIgnoreCase(choice)) return new ItemStack(Material.WOOL, 1, (short) 0);
         if ("diamond".equalsIgnoreCase(choice)) return new ItemStack(Material.DIAMOND_HELMET);
-        return new ItemStack(Material.AIR);
+        return null;
     }
 
     private void clearBaconBrawlShowcase() {
