@@ -117,7 +117,7 @@ Assert-Contains "Maverick targets the next Safe Pad" $mazeFile "getMobKnockTarge
 Assert-Contains "Variant map catalogs fall back to non-empty original maps" $mapManagerFile "if (maps != null && !maps.isEmpty())"
 Assert-Contains "Map root supports explicit system-property override" $arcadeManagerFile "mineplex.maps.dir"
 Assert-Contains "Map root supports explicit environment override" $arcadeManagerFile "MINEPLEX_MAPS_DIR"
-Assert-Contains "Map root detects a nested maps bundle" $arcadeManagerFile "File nestedMaps = new File(candidate, \"maps\")"
+Assert-Contains "Map root detects a nested maps bundle" $arcadeManagerFile "containsMapArchives(nestedMaps)"
 Assert-Contains "Failed map root lookups are retried later" $arcadeManagerFile "_mapRootResolutionAttempted = false;"
 Assert-Contains "Random maze selection returns the selected non-repeat map" $layoutFile "return selected;"
 Assert-Contains "Fixed pattern selection is available" $layoutFile "getPatternMapPreset"
