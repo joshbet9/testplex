@@ -160,7 +160,7 @@ public class BaconBrawl extends SoloGame
 		{
 			UUID id = player.getUniqueId();
 			String choice = ArcadeCosmeticsMenu.getEquippedChoice(id, "baconbrawl");
-			ItemStack accessory = getCosmeticAccessory(choice);
+			ItemStack accessory = ArcadeCosmeticsMenu.getBaconBrawlAccessory(choice);
 			if (accessory == null)
 				continue;
 
@@ -211,28 +211,6 @@ public class BaconBrawl extends SoloGame
 
 		if (event.GetState() == GameState.End || event.GetState() == GameState.Dead)
 			removeAllCosmeticAccessories();
-	}
-
-	private ItemStack getCosmeticAccessory(String choice)
-	{
-		if (choice == null)
-			return null;
-
-		switch (choice.toLowerCase())
-		{
-			case "crown":
-				return new ItemStack(Material.GOLD_HELMET);
-			case "top_hat":
-				// A black wool block is a visibly distinct top-hat silhouette in the
-				// vanilla 1.8 model set and needs no client resource pack.
-				return new ItemStack(Material.WOOL, 1, (short) 15);
-			case "chef":
-				return new ItemStack(Material.WOOL, 1, (short) 0);
-			case "diamond":
-				return new ItemStack(Material.DIAMOND_HELMET);
-			default:
-				return null;
-		}
 	}
 
 	private void removeCosmeticAccessory(UUID id)
