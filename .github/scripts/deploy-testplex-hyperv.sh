@@ -50,32 +50,22 @@ EXPECTED_MARKER="TESTPLEX ISOLATED TEST SERVER - NOT PRODUCTION"
 
 PLUGINS="$ROOT/plugins"
 LOG="$ROOT/logs/latest.log"
-INCOMING="/tmp/testplex-plugin-set-$SHA.zip"
+ARTIFACT_CACHE="/tmp/testplex-artifact-cache"
 STAGE=""
 cleanup_preflight() {
-  rm -f "$INCOMING"
   if [[ -n "$STAGE" ]]; then rm -rf "$STAGE"; fi
 }
 trap cleanup_preflight EXIT
 
 [[ -d "$PLUGINS" ]] || { echo "Missing plugins directory: $PLUGINS" >&2; exit 2; }
-UPLOAD="${INCOMING}.upload"
-if [[ -s "$UPLOAD" ]]; then
-  echo "Using the plugin/map artifact uploaded over the authenticated SSH route."
-  mv "$UPLOAD" "$INCOMING"
-else
-  IFS= read -r DOWNLOAD_URL || {
-    echo "Missing uploaded artifact and one-time GitHub download URL on standard input." >&2
-    exit 2
-  }
-  case "$DOWNLOAD_URL" in
-    https://*.blob.core.windows.net/*|https://*.actions.githubusercontent.com/*|https://*.githubusercontent.com/*|https://github.com/*) ;;
-    *)
-      echo "Refusing artifact URL outside GitHub's download hosts." >&2
-      exit 2
-      ;;
-  esac
-fi
+[[ -s "$ARTIFACT_CACHE/Arcade.jar" ]] || {
+  echo "Missing/empty cached artifact: $ARTIFACT_CACHE/Arcade.jar" >&2
+  exit 2
+}
+[[ -s "$ARTIFACT_CACHE/testplex-map-assets.zip" ]] || {
+  echo "Missing/empty cached artifact: $ARTIFACT_CACHE/testplex-map-assets.zip" >&2
+  exit 2
+}
 timeout 8 systemctl cat "$SERVICE" >/dev/null
 SERVICE_STATE="$(timeout 8 systemctl is-active "$SERVICE" 2>/dev/null || true)"
 case "$SERVICE_STATE" in
@@ -115,44 +105,32 @@ echo "Pre-deployment memory and disk:"
 free -h
 df -h "$ROOT"
 
-if [[ ! -s "$INCOMING" ]]; then
-  echo "Downloading selected GitHub artifact directly to the test VM."
-  curl --fail --location --silent --show-error \
-    --retry 3 --retry-delay 2 --connect-timeout 15 --max-time 1800 \
-    --output "$INCOMING" "$DOWNLOAD_URL"
-fi
-[[ -s "$INCOMING" ]] || { echo "GitHub artifact download is empty." >&2; exit 2; }
-unzip -tq "$INCOMING" >/dev/null
-BUNDLE_LIST="$(unzip -Z1 "$INCOMING")"
-[[ "$(grep -Fxc "Arcade.jar" <<< "$BUNDLE_LIST" || true)" == "1" ]] || {
-  echo "Build bundle must contain exactly one Arcade.jar." >&2
+[[ -s "$ARTIFACT_CACHE/Arcade.jar" ]] || {
+  echo "Missing/empty Arcade.jar in the remote artifact cache." >&2
   exit 2
 }
-[[ "$(grep -Fxc "testplex-map-assets.zip" <<< "$BUNDLE_LIST" || true)" == "1" ]] || {
-  echo "Build bundle must contain exactly one testplex-map-assets.zip from the same source revision." >&2
+[[ -s "$ARTIFACT_CACHE/testplex-map-assets.zip" ]] || {
+  echo "Missing/empty map asset bundle in the remote artifact cache." >&2
   exit 2
 }
-BUNDLE_NAMES=()
-declare -A BUNDLE_SEEN=()
-JAR_ENTRY_RE='^[A-Za-z0-9._+() -]+[.]jar$'
-while IFS= read -r entry; do
-  if [[ "$entry" == "testplex-map-assets.zip" ]]; then
-    continue
-  fi
-  [[ "$entry" =~ $JAR_ENTRY_RE ]] || {
-    echo "Unexpected entry in plugin bundle: $entry" >&2
-    exit 2
-  }
-  if [[ -n "${BUNDLE_SEEN[$entry]:-}" ]]; then
-    echo "Duplicate entry in plugin bundle: $entry" >&2
-    exit 2
-  fi
-  BUNDLE_SEEN["$entry"]=1
-  BUNDLE_NAMES+=("$entry")
-done <<< "$BUNDLE_LIST"
+STAGE="$(mktemp -d "/tmp/testplex-stage-$SHA.XXXXXX")"
+cp -- "$ARTIFACT_CACHE/Arcade.jar" "$STAGE/Arcade.jar"
+cp -- "$ARTIFACT_CACHE/testplex-map-assets.zip" "$STAGE/testplex-map-assets.zip"
 
-# This is a single Arcade test instance, not a combined Hub/Clans/NanoGames server.
-# Also clean up sibling modules potentially left by earlier full-set deployment attempts.
+echo "Validating Arcade.jar integrity before touching the running server."
+if ! unzip -tq "$STAGE/Arcade.jar" >/dev/null; then
+  echo "Arcade.jar failed ZIP/JAR integrity validation; the running service has not been stopped." >&2
+  exit 2
+fi
+echo "Validating the map asset bundle before touching the running server."
+if ! unzip -tq "$STAGE/testplex-map-assets.zip" >/dev/null; then
+  echo "The map asset bundle failed ZIP integrity validation; the running service has not been stopped." >&2
+  exit 2
+fi
+
+BUNDLE_NAMES=("Arcade.jar")
+MANAGED_NAMES=()
+declare -A MANAGED_SEEN=()
 LEGACY_SERVER_MODULE_JARS=(
   "BungeeRotator.jar"
   "Clans.jar"
@@ -173,8 +151,6 @@ LEGACY_SERVER_MODULE_JARS=(
   "UHC WorldGen.jar"
   "mavericks-review-hub.jar"
 )
-MANAGED_NAMES=()
-declare -A MANAGED_SEEN=()
 for name in "${BUNDLE_NAMES[@]}" "${LEGACY_SERVER_MODULE_JARS[@]}"; do
   if [[ -z "${MANAGED_SEEN[$name]:-}" ]]; then
     MANAGED_SEEN["$name"]=1
@@ -182,12 +158,6 @@ for name in "${BUNDLE_NAMES[@]}" "${LEGACY_SERVER_MODULE_JARS[@]}"; do
   fi
 done
 
-STAGE="$(mktemp -d "/tmp/testplex-stage-$SHA.XXXXXX")"
-unzip -p "$INCOMING" "Arcade.jar" > "$STAGE/Arcade.jar"
-[[ -s "$STAGE/Arcade.jar" ]] || { echo "Extracted Arcade.jar is empty." >&2; exit 2; }
-unzip -p "$INCOMING" "testplex-map-assets.zip" > "$STAGE/testplex-map-assets.zip"
-[[ -s "$STAGE/testplex-map-assets.zip" ]] || { echo "Extracted Mineplex map asset bundle is empty." >&2; exit 2; }
-unzip -tq "$STAGE/testplex-map-assets.zip" >/dev/null
 while IFS= read -r map_entry; do
   [[ "$map_entry" =~ ^maps/[^/]+(/[^/]+)*[.]zip$ ]] || {
     echo "Unexpected entry in Mineplex map bundle: $map_entry" >&2
@@ -201,6 +171,7 @@ while IFS= read -r map_entry; do
       ;;
   esac
 done < <(unzip -Z1 "$STAGE/testplex-map-assets.zip")
+
 MAP_STAGE="$STAGE/map-assets"
 mkdir -p "$MAP_STAGE"
 unzip -q "$STAGE/testplex-map-assets.zip" -d "$MAP_STAGE"
@@ -209,10 +180,10 @@ mapfile -d '' -t MAP_FILES < <(find "$MAP_STAGE/maps" -type f -name '*.zip' -pri
 for map_file in "${MAP_FILES[@]}"; do
   unzip -tq "$map_file" >/dev/null || { echo "Invalid map archive: $map_file" >&2; exit 2; }
 done
+
 JAR_PATHS=("$STAGE/Arcade.jar")
 JAR_NAMES=("Arcade.jar")
-echo "Validated ${#BUNDLE_NAMES[@]} artifact JARs and ${#MAP_FILES[@]} Mineplex map archives; this test server will install Arcade.jar only."
-
+echo "Validated one Arcade.jar and ${#MAP_FILES[@]} Mineplex map archives; only Arcade.jar will be installed."
 if [[ -f "$PLUGINS/Arcade.jar" ]]; then
   OWNER_GROUP="$(stat -c '%U:%G' "$PLUGINS/Arcade.jar")"
 else
@@ -259,7 +230,6 @@ rollback() {
         echo "ERROR: $SERVICE state is unknown; refusing to overwrite plugin files because Java may still be using them." >&2
       fi
       timeout 10 systemctl status "$SERVICE" --no-pager --full || true
-      rm -f "$INCOMING"
       rm -rf "$STAGE"
       exit "$status"
     fi
@@ -294,7 +264,6 @@ rollback() {
     sleep 3
     timeout 10 journalctl -u "$SERVICE" -n 60 --no-pager || true
   fi
-  rm -f "$INCOMING"
   rm -rf "$STAGE"
   exit "$status"
 }
@@ -314,7 +283,7 @@ else
   fi
 fi
 
-if [[ -d "$ROOT/world" ]] && ! grep -Fxq "TESTPLEX_SANDBOX_LOBBY_V2" "$ROOT/world/TEST_LOBBY_PLANE.dat" 2>/dev/null; then
+if [[ -d "$ROOT/world" ]] && ! grep -Fxq "TESTPLEX_SANDBOX_LOBBY_V3" "$ROOT/world/TEST_LOBBY_PLANE.dat" 2>/dev/null; then
   echo "Backing up the current world before preparing the flat lobby."
   tar -czf "$WORLD_BACKUP" -C "$ROOT" world
   WORLD_BACKUP_CREATED=1
@@ -410,7 +379,7 @@ for attempt in $(seq 1 180); do
     arcade_log_ready=1
     echo "Observed the fresh Arcade enable log; waiting for lobby provisioning to finish."
   fi
-  if [[ -f "$ROOT/world/TEST_LOBBY_PLANE.dat" ]] && grep -Fxq "TESTPLEX_SANDBOX_LOBBY_V2" "$ROOT/world/TEST_LOBBY_PLANE.dat"; then
+  if [[ -f "$ROOT/world/TEST_LOBBY_PLANE.dat" ]] && grep -Fxq "TESTPLEX_SANDBOX_LOBBY_V3" "$ROOT/world/TEST_LOBBY_PLANE.dat"; then
     lobby_marker_ready=1
   fi
   if [[ "$arcade_log_ready" -eq 1 && "$lobby_marker_ready" -eq 1 ]]; then
@@ -423,7 +392,7 @@ if [[ "$ready" -ne 1 ]]; then
   if [[ "$arcade_log_ready" -ne 1 ]]; then
     echo "Arcade did not produce a fresh startup log marker within 180 seconds; diagnostics follow before rollback." >&2
   else
-    echo "Arcade startup was logged, but the versioned TESTPLEX_SANDBOX_LOBBY_V2 plane marker did not appear within 180 seconds; diagnostics follow before rollback." >&2
+    echo "Arcade startup was logged, but the versioned TESTPLEX_SANDBOX_LOBBY_V3 plane marker did not appear within 180 seconds; diagnostics follow before rollback." >&2
   fi
   dump_diagnostics
   exit 1
@@ -435,6 +404,5 @@ echo "Arcade.jar SHA-256:"
 sha256sum "$PLUGINS/Arcade.jar"
 echo "Rollback backup: $BACKUP_DIR"
 
-rm -f "$INCOMING"
 rm -rf "$STAGE"
 trap - EXIT
