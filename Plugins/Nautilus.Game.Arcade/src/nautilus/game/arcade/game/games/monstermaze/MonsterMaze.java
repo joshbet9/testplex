@@ -19,6 +19,10 @@ import mineplex.core.common.util.UtilTime;
 import mineplex.core.itemstack.ItemStackFactory;
 import mineplex.core.recharge.Recharge;
 import mineplex.core.updater.UpdateType;
+import net.minecraft.server.v1_8_R3.MobEffect;
+import net.minecraft.server.v1_8_R3.MobEffectList;
+import net.minecraft.server.v1_8_R3.PacketPlayOutEntityEffect;
+import net.minecraft.server.v1_8_R3.PacketPlayOutRemoveEntityEffect;
 import mineplex.core.updater.event.UpdateEvent;
 import mineplex.minecraft.game.core.condition.Condition.ConditionType;
 import nautilus.game.arcade.ArcadeManager;
@@ -64,6 +68,7 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.EnderCrystal;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent;
@@ -74,8 +79,6 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
 
@@ -92,7 +95,6 @@ public class MonsterMaze extends SoloGame
 	private final Map<UUID, GameScoreboard> _viewerScoreboards = new HashMap<UUID, GameScoreboard>();
 	private final Map<UUID, org.bukkit.scoreboard.Scoreboard> _previousScoreboards = new HashMap<UUID, org.bukkit.scoreboard.Scoreboard>();
 	private final Map<UUID, Integer> _visibilityModeData = new HashMap<UUID, Integer>();
-	private final Set<UUID> _visibilityInvisibilityTargets = new HashSet<UUID>();
 	private static final int VISIBILITY_SLOT = 7;
 	private static final int SAFE_PAD_COMPASS_SLOT = 1;
 	private static final String VISIBILITY_ITEM_NAME = "Player Visibility:";
@@ -731,11 +733,14 @@ public class MonsterMaze extends SoloGame
 			else
 				board.setSpectating(target);
 		}
-		for (Team team : board.getScoreboard().getTeams())
-			team.setCanSeeFriendlyInvisibles(true);
-
 		Team ghosts = ensureGhostTeam(board);
 		int modeData = getVisibilityModeData(viewer.getUniqueId());
+		for (Team team : board.getScoreboard().getTeams())
+			team.setCanSeeFriendlyInvisibles("mm_ghosts".equals(team.getName()));
+		if (modeData == 5)
+			addGhostEntry(ghosts, viewer);
+		else
+			ghosts.removeEntry(viewer.getName());
 		for (Player target : GetPlayers(false))
 		{
 			if (target.equals(viewer))
@@ -831,52 +836,68 @@ public class MonsterMaze extends SoloGame
 		refreshVisibilityViews();
 	}
 
-	/** Keep the per-viewer visible/hidden/ghost view matrix in sync with the global invisibility effect. */
+	/** Apply each view mode only to the observer's client; one player's setting must not alter everyone else's view. */
 	private void refreshVisibilityViews()
 	{
 		List<Player> players = GetPlayers(false);
-		Set<UUID> needInvisibility = new HashSet<UUID>();
 		for (Player observer : players)
 		{
-			if (getVisibilityModeData(observer.getUniqueId()) != 5)
+			if (!observer.isOnline())
 				continue;
-			for (Player target : players)
-				if (!observer.equals(target))
-					needInvisibility.add(target.getUniqueId());
-		}
-
-		for (Player target : players)
-		{
-			UUID targetId = target.getUniqueId();
-			if (needInvisibility.contains(targetId))
-			{
-				target.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 9999999, 1, true, false), true);
-				_visibilityInvisibilityTargets.add(targetId);
-			}
-			else if (_visibilityInvisibilityTargets.remove(targetId))
-			{
-				target.removePotionEffect(PotionEffectType.INVISIBILITY);
-			}
-		}
-
-		for (Player observer : players)
-		{
 			int modeData = getVisibilityModeData(observer.getUniqueId());
 			GameScoreboard board = getViewerScoreboard(observer);
 			Team ghosts = ensureGhostTeam(board);
+
+			if (modeData == 5)
+				addGhostEntry(ghosts, observer);
+			else
+				ghosts.removeEntry(observer.getName());
+
 			for (Player target : players)
 			{
-				if (observer.equals(target))
+				if (observer.equals(target) || !target.isOnline())
 					continue;
+
 				if (modeData == 8)
 					observer.hidePlayer(target);
 				else
 					observer.showPlayer(target);
+
 				if (modeData == 5)
 					addGhostEntry(ghosts, target);
 				else
 					ghosts.removeEntry(target.getName());
+
+				sendClientInvisibility(observer, target, modeData == 5);
 			}
+		}
+	}
+
+	/**
+	 * Invisibility packets are sent to one client only. That keeps VISIBLE players solid,
+	 * HIDDEN players absent, and TRANSPARENT players see-through even when another player
+	 * chooses a different mode.
+	 */
+	private void sendClientInvisibility(Player observer, Player target, boolean transparent)
+	{
+		try
+		{
+			if (transparent)
+			{
+				MobEffect invisible = new MobEffect(MobEffectList.INVISIBILITY.id, 9999999, 1, true, false);
+				((CraftPlayer) observer).getHandle().playerConnection.sendPacket(
+						new PacketPlayOutEntityEffect(target.getEntityId(), invisible));
+			}
+			else
+			{
+				((CraftPlayer) observer).getHandle().playerConnection.sendPacket(
+						new PacketPlayOutRemoveEntityEffect(target.getEntityId(), MobEffectList.INVISIBILITY));
+			}
+		}
+		catch (Exception ex)
+		{
+			Bukkit.getLogger().warning("[MonsterMaze] Could not update per-viewer ghost appearance for "
+					+ observer.getName() + " -> " + target.getName() + ": " + ex.getMessage());
 		}
 	}
 
@@ -913,14 +934,6 @@ public class MonsterMaze extends SoloGame
 					if (!viewer.equals(target))
 						viewer.showPlayer(target);
 		}
-
-		for (UUID id : new ArrayList<UUID>(_visibilityInvisibilityTargets))
-		{
-			Player player = Bukkit.getPlayer(id);
-			if (player != null && player.isOnline())
-				player.removePotionEffect(PotionEffectType.INVISIBILITY);
-		}
-		_visibilityInvisibilityTargets.clear();
 
 		for (Map.Entry<UUID, org.bukkit.scoreboard.Scoreboard> entry : _previousScoreboards.entrySet())
 		{
