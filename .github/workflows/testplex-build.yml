@@ -635,7 +635,7 @@ jobs:
               "$MAP_MANIFEST" "$remote:$map_manifest_remote"
 
             map_match="$(ssh "${ssh_opts[@]}" "$remote" \
-              "set -eu; if [[ -d /home/monstermaze/update/maps ]]; then installed_count=\$(find /home/monstermaze/update/maps -type f -iname '*.zip' -print | wc -l); manifest_count=\$(wc -l < '$map_manifest_remote'); if [[ \"\$installed_count\" -eq \"\$manifest_count\" ]] && (cd /home/monstermaze/update && sha256sum --check --status '$map_manifest_remote'); then printf installed; else printf bundle; fi; else printf bundle; fi")"
+              "set -eu; if [[ -d /home/monstermaze/update/maps ]] && (cd /home/monstermaze/update && sha256sum --check --status '$map_manifest_remote'); then printf installed; else printf bundle; fi")"
             if [[ "$map_match" == "installed" ]]; then
               MAPS_MODE="installed"
               manifest_count="$(wc -l < "$MAP_MANIFEST")"
