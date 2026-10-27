@@ -116,6 +116,7 @@ public class Maze implements Listener
 	private final List<Location> _firstStageParticlePath = new ArrayList<Location>();
 	private final Set<Integer> _celebratedPadStages = new HashSet<Integer>();
 	private int _firstStageParticleTick;
+	private int _padSpawnCount;
 			
 	@SuppressWarnings("deprecation")
 	public Maze(MonsterMaze host, MazePreset maze)
@@ -126,6 +127,9 @@ public class Maze implements Listener
 		_phaseTimer = _phaseTimerStart;
 		_safePadBeaconEnhancementsEnabled = _host.Manager.getPlugin().getConfig()
 				.getBoolean("monstermaze.safe-pad-enhancements.enabled", false);
+
+		// Stale containment can outlive the old preset's location list.
+		clearStaleContainmentGlass();
 		
 		for (Location loc : getPreset().getMaze())
 		{
@@ -153,7 +157,7 @@ public class Maze implements Listener
 
 		// Entity tracking is process-local; clear any mobs leaked by a previous instance
 		// before this run constructs its own mob list and first objective.
-		clearStaleMazeSnowmen();
+		clearStaleMazeEntities();
 		spawnSafePad();
 		_safePad = _nextSafePad;
 		_nextSafePad = null;
@@ -227,11 +231,19 @@ public class Maze implements Listener
 	/** Retarget immediately when the active objective changes, not only on the next updater tick. */
 	private void updateCompassTargets()
 	{
-		if (_safePad == null)
+		SafePad active = _safePad != null ? _safePad : _nextSafePad;
+		if (active == null)
 			return;
-		Location target = _safePad.getLocation().clone().add(0.5D, 0.0D, 0.5D);
+
 		for (Player player : _host.GetPlayers(true))
-			player.setCompassTarget(target);
+		{
+			// When this viewer is safely on the active pad, redirect to the preview pad.
+			// Other players still need the compass to point to the pad they must reach.
+			SafePad target = active;
+			if (_safePad != null && _nextSafePad != null && _safePad.isOn(player))
+				target = _nextSafePad;
+			player.setCompassTarget(target.getLocation().clone().add(0.5D, 0.0D, 0.5D));
+		}
 	}
 	
 	@EventHandler
@@ -956,6 +968,9 @@ public class Maze implements Listener
 		}
 		
 		Bukkit.getPluginManager().callEvent(new SafepadBuildEvent());
+		// Fireworks mark each pad as soon as it appears, rather than on player arrival.
+		playPadSpawnSignal(_nextSafePad);
+		updateCompassTargets();
 	}
 	
 	@SuppressWarnings("deprecation")
@@ -1294,8 +1309,6 @@ public class Maze implements Listener
 
 			if (_playersOnPad.size() == 1) // first player
 			{
-				if (_curSafe <= 2)
-					playFirstTwoStagePadFireworks();
 				_host.Announce(F.main("Game", F.name(p.getName()) + " made it to the Safe Pad first!"));
 
 				UtilTextMiddle.display("", C.cYellow + C.Bold + "You got to the Safe Pad first!", 5, 40, 5, p);
@@ -1341,9 +1354,31 @@ public class Maze implements Listener
 	
 	public void removePlayerContainmentUnit()
 	{
-		for(Location loc : _playerContainmentGlass)
-		{
+		for (Location loc : _playerContainmentGlass)
 			loc.getBlock().setType(Material.AIR);
+		clearStaleContainmentGlass();
+	}
+
+	/** Remove stale centre containment layers even when their old preset list is gone. */
+	private void clearStaleContainmentGlass()
+	{
+		if (_preset == null || _preset.getCenter() == null || _preset.getCenter().getWorld() == null)
+			return;
+		Location centre = _preset.getCenter();
+		int cx = centre.getBlockX();
+		int cy = centre.getBlockY();
+		int cz = centre.getBlockZ();
+		for (int x = -50; x <= 50; x++)
+		{
+			for (int z = -50; z <= 50; z++)
+			{
+				for (int y = cy; y <= cy + 1; y++)
+				{
+					Block block = centre.getWorld().getBlockAt(cx + x, y, cz + z);
+					if (block.getType() == Material.STAINED_GLASS)
+						block.setType(Material.AIR);
+				}
+			}
 		}
 	}
 	
@@ -1471,16 +1506,20 @@ public class Maze implements Listener
 		}
 	}
 
-	private void playFirstTwoStagePadFireworks()
+	private void playPadSpawnSignal(SafePad pad)
 	{
-		if (_safePad == null || _curSafe < 1 || _curSafe > 2 || !_celebratedPadStages.add(_curSafe))
+		if (pad == null || pad.getLocation() == null || pad.getLocation().getWorld() == null)
 			return;
-		Location location = _safePad.getLocation().clone().add(0.5D, 1.0D, 0.5D);
-		if (location.getWorld() == null)
-			return;
+
+		_padSpawnCount++;
+		Location base = pad.getLocation().clone();
+		Location location = base.clone().add(0.5D, 1.0D, 0.5D);
+
+		// Mark every newly spawned objective, including the initial and preview pads.
 		Firework firework = location.getWorld().spawn(location, Firework.class);
 		FireworkMeta meta = firework.getFireworkMeta();
-		Color colour = _curSafe == 1 ? Color.LIME : Color.AQUA;
+		Color colour = _padSpawnCount % 3 == 1 ? Color.LIME
+				: _padSpawnCount % 3 == 2 ? Color.AQUA : Color.ORANGE;
 		FireworkEffect effect = FireworkEffect.builder()
 				.with(FireworkEffect.Type.BALL_LARGE)
 				.withColor(colour)
@@ -1491,19 +1530,21 @@ public class Maze implements Listener
 		meta.addEffect(effect);
 		meta.setPower(0);
 		firework.setFireworkMeta(meta);
+
+		for (int dx = -2; dx <= 2; dx += 4)
+			for (int dz = -2; dz <= 2; dz += 4)
+				base.getWorld().playEffect(base.clone().add(dx, 1.0D, dz), Effect.FIREWORKS_SPARK, 0);
 	}
 
 	/** Clear stale hidden Snowman bodies within the current generated maze footprint. */
-	private void clearStaleMazeSnowmen()
+	private void clearStaleMazeEntities()
 	{
-		if (_preset == null || _preset.getCenter() == null)
+		if (_preset == null || _preset.getCenter() == null || _preset.getCenter().getWorld() == null)
 			return;
 		Location centre = _preset.getCenter();
-		if (centre.getWorld() == null)
-			return;
 		for (Entity entity : new ArrayList<Entity>(centre.getWorld().getEntities()))
 		{
-			if (!(entity instanceof Snowman))
+			if (entity instanceof Player)
 				continue;
 			Location location = entity.getLocation();
 			if (Math.abs(location.getX() - centre.getX()) <= 52.0D
@@ -1527,7 +1568,7 @@ public class Maze implements Listener
 				entity.remove();
 		}
 		_ents.clear();
-		clearStaleMazeSnowmen();
+		clearStaleMazeEntities();
 		_frozenUntil.clear();
 		_pendingSpawnLocations.clear();
 		_playersOnPad.clear();
