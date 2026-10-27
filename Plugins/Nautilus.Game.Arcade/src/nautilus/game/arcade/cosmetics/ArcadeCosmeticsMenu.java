@@ -928,7 +928,6 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 return;
             }
         }
-    }
 
         if (titleParts.length == 5 && "Setting".equals(titleParts[1])) {
             GameDefinition game = games.get(titleParts[2].toLowerCase(Locale.ROOT));
