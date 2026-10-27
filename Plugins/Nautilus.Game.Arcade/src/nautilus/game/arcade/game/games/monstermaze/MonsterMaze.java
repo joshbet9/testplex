@@ -66,6 +66,7 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.entity.EnderCrystal;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
@@ -77,6 +78,8 @@ import org.bukkit.event.entity.EntityRegainHealthEvent.RegainReason;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scoreboard.Team;
@@ -98,7 +101,8 @@ public class MonsterMaze extends SoloGame
 	private final Map<UUID, ItemStack> _previousVisibilityItems = new HashMap<UUID, ItemStack>();
 	private final Map<UUID, Integer> _visibilityModeData = new HashMap<UUID, Integer>();
 	private static final int VISIBILITY_SLOT = 7;
-	private static final int SAFE_PAD_COMPASS_SLOT = 1;
+	private static final int SAFE_PAD_COMPASS_SLOT = 4;
+	private static final int LEGACY_DUPLICATE_COMPASS_SLOT = 1;
 	private static final String VISIBILITY_ITEM_NAME = "Player Visibility:";
 	private static final String SAFE_PAD_COMPASS_NAME = ChatColor.GREEN + "Safe Pad Locator";
 	
@@ -178,7 +182,7 @@ public class MonsterMaze extends SoloGame
 		);
 
 		new CompassModule()
-				.setGiveCompass(true)
+				.setGiveCompass(false)
 				.setGiveCompassToSpecs(true)
 				.setGiveCompassToAlive(false)
 				.register(this);
@@ -334,6 +338,8 @@ public class MonsterMaze extends SoloGame
 			}
 
 			_monsterType = loadEntityType();
+			// Clear entities saved in the Mineplex map archive before each generated round.
+			clearStaleArenaEntities(WorldData.World);
 			_preset.build();
 			_maze = new Maze(this, _preset);
 
@@ -365,11 +371,73 @@ public class MonsterMaze extends SoloGame
 				player.setVelocity(new Vector(0, 0, 0));
 			}
 
+			// Ensure both gameplay controls exist before the Recruit countdown/first scoreboard tick.
+			for (Player player : GetPlayers(false))
+				ensureGameplayItems(player);
 			refreshAllPlayerVisibility();
 			_maze.fillSpawn(isActualModernMode() ? 225 : 150);
 		}
 	}
 	
+
+	/** Eliminate a player who falls under the maze; ordinary fall damage is disabled for this game. */
+	@EventHandler
+	public void onMonsterMazePlayerMove(PlayerMoveEvent event)
+	{
+		if (!IsLive() || _center == null || event.getTo() == null)
+			return;
+		Player player = event.getPlayer();
+		if (!IsAlive(player) || event.getTo().getY() >= _center.getY() - 3.0D)
+			return;
+		Manager.GetDamage().NewDamageEvent(player, null, null,
+				EntityDamageEvent.DamageCause.CUSTOM, 500, false, false, false,
+				"Game", "Fell off Monster Maze");
+	}
+
+	/** Clear all non-player entities saved in the active arena world before each round. */
+	private void clearStaleArenaEntities(org.bukkit.World world)
+	{
+		if (world == null)
+			return;
+		int removed = 0;
+		for (Entity entity : new ArrayList<Entity>(world.getEntities()))
+		{
+			if (entity instanceof Player)
+				continue;
+			entity.remove();
+			removed++;
+		}
+		if (removed > 0)
+			Bukkit.getLogger().info("[MonsterMaze] Cleared " + removed + " stale entities from arena world " + world.getName());
+	}
+
+	/** Also sweep lazy-loaded map chunks so archived entities cannot reappear mid-round. */
+	@EventHandler
+	public void onMonsterMazeChunkLoad(ChunkLoadEvent event)
+	{
+		if (WorldData == null || WorldData.World == null || event.getWorld() != WorldData.World)
+			return;
+		Location centre = getCentralStartSpawn();
+		if (centre == null)
+			return;
+		int minX = centre.getBlockX() - 52, maxX = centre.getBlockX() + 52;
+		int minZ = centre.getBlockZ() - 52, maxZ = centre.getBlockZ() + 52;
+		int chunkMinX = event.getChunk().getX() << 4, chunkMaxX = chunkMinX + 15;
+		int chunkMinZ = event.getChunk().getZ() << 4, chunkMaxZ = chunkMinZ + 15;
+		if (chunkMaxX < minX || chunkMinX > maxX || chunkMaxZ < minZ || chunkMinZ > maxZ)
+			return;
+		for (Entity entity : event.getChunk().getEntities())
+		{
+			if (entity instanceof Player)
+				continue;
+			Location location = entity.getLocation();
+			if (Math.abs(location.getX() - centre.getX()) <= 52.0D
+					&& Math.abs(location.getZ() - centre.getZ()) <= 52.0D
+					&& Math.abs(location.getY() - centre.getY()) <= 24.0D)
+				entity.remove();
+		}
+	}
+
 	private EntityType loadEntityType()
 	{
 		EntityType en = EntityType.SNOWMAN;
@@ -687,18 +755,22 @@ public class MonsterMaze extends SoloGame
 			board.write(C.cAqua + C.Bold + "Distance");
 			if (_maze.getSafePad() != null)
 			{
-				Location pad = _maze.getSafePad().getLocation();
-				double dx = viewer.getLocation().getX() - (pad.getX() + 0.5D);
-				double dz = viewer.getLocation().getZ() - (pad.getZ() + 0.5D);
-				int distance = (int) Math.round(Math.sqrt(dx * dx + dz * dz));
-				board.write(C.cWhite + distance + " blocks");
-				boolean safe = _maze.getSafePad().isOn(viewer);
-				board.write((safe ? C.cGreen : C.cRed) + (safe ? "SAFE" : "UNSAFE"));
+				if (_maze.getSafePad().isOn(viewer))
+				{
+					board.write(C.cGreen + C.Bold + "SAFE");
+				}
+				else
+				{
+					Location pad = _maze.getSafePad().getLocation();
+					double dx = viewer.getLocation().getX() - (pad.getX() + 0.5D);
+					double dz = viewer.getLocation().getZ() - (pad.getZ() + 0.5D);
+					int distance = (int) Math.round(Math.sqrt(dx * dx + dz * dz));
+					board.write(C.cWhite + distance + " blocks");
+				}
 			}
 			else
 			{
 				board.write(C.cWhite + "Unknown");
-				board.write(C.cRed + "UNSAFE");
 			}
 
 			board.writeNewLine();
@@ -757,6 +829,11 @@ public class MonsterMaze extends SoloGame
 	private void ensureGameplayItems(Player player)
 	{
 		UUID id = player.getUniqueId();
+		// Remove the duplicate locator created by the earlier native-port build.
+		ItemStack legacyCompass = player.getInventory().getItem(LEGACY_DUPLICATE_COMPASS_SLOT);
+		if (isSafePadCompassItem(legacyCompass))
+			player.getInventory().setItem(LEGACY_DUPLICATE_COMPASS_SLOT, null);
+
 		ItemStack compass = player.getInventory().getItem(SAFE_PAD_COMPASS_SLOT);
 		if (!isSafePadCompassItem(compass))
 		{
@@ -785,7 +862,8 @@ public class MonsterMaze extends SoloGame
 		if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta())
 			return false;
 		ItemMeta meta = item.getItemMeta();
-		return meta != null && SAFE_PAD_COMPASS_NAME.equals(meta.getDisplayName());
+		return meta != null && meta.hasDisplayName()
+				&& meta.getDisplayName().toLowerCase(java.util.Locale.ROOT).contains("safe pad locator");
 	}
 
 	private ItemStack createVisibilityItem(int modeData)
