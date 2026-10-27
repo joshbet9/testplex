@@ -51,6 +51,10 @@ public class MMMazes
 		private boolean _built = false;
 		
 		private ArrayList<Location> _maze = new ArrayList<Location>();
+		// Pattern cells marked 0 must become void; otherwise the supplied map's
+		// original floor survives underneath the generated layout and forms a
+		// second, overlapping maze.
+		private ArrayList<Location> _air = new ArrayList<Location>();
 		private ArrayList<Location> _validSafePadSpawns;
 		private ArrayList<Location> _spawns = new ArrayList<Location>();
 		
@@ -88,7 +92,11 @@ public class MMMazes
 				for (int x = 0; x < 99; x++)
 				{
 					int i = maze[y][x];
-					if(i == 1)
+					if (i == 0)
+					{
+						_air.add(cur.clone());
+					}
+					else if(i == 1)
 					{
 						_maze.add(cur);
 					}
@@ -151,21 +159,42 @@ public class MMMazes
 				}
 			}
 
-			ArrayList<Location> locsToPickFrom = new ArrayList<>(_validSafePadSpawns);
+			ArrayList<Location> locsToPickFrom = new ArrayList<Location>(_validSafePadSpawns);
 
 			int numberOfSafeZones = 8;
 			for (int i = 0; i < numberOfSafeZones; i++)
 			{
-				Location toAdd = null;
-				if (locsToPickFrom == null)
+				// Avoid an empty candidate list and null dereference on constrained layouts.
+				if (locsToPickFrom.isEmpty())
 				{
-					toAdd = UtilAlg.Random(locsToPickFrom);
+					locsToPickFrom.addAll(_validSafePadSpawns);
+					for (Iterator<Location> candidates = locsToPickFrom.iterator(); candidates.hasNext();)
+					{
+						Location candidate = candidates.next();
+						for (Location existing : _safeZones)
+						{
+							if (UtilMath.offset2d(candidate, existing) < 7)
+							{
+								candidates.remove();
+								break;
+							}
+						}
+					}
 				}
-				else
+
+				Location toAdd = null;
+				if (!locsToPickFrom.isEmpty())
 				{
 					ArrayList<Location> toBeAwayFrom = new ArrayList<Location>(_safeZones);
 					toBeAwayFrom.add(_center);
 					toAdd = UtilAlg.getLocationAwayFromOtherLocations(locsToPickFrom, toBeAwayFrom);
+					if (toAdd == null)
+						toAdd = locsToPickFrom.get(0);
+				}
+				if (toAdd == null)
+				{
+					System.out.println("Monster Maze: insufficient valid locations to create all eight Safe Pads.");
+					break;
 				}
 
 				_safeZones.add(toAdd);
@@ -208,6 +237,19 @@ public class MMMazes
 		@SuppressWarnings("deprecation")
 		public void build()
 		{
+			// Clear the original map's platform columns where this selected pattern
+			// expects void. The active gameplay maze is procedural; leaving the old
+			// floor beneath these cells creates a second, overlapping maze.
+			for (Location loc : _air)
+			{
+				for (int depth = 1; depth <= 3; depth++)
+				{
+					Block block = loc.clone().subtract(0, depth, 0).getBlock();
+					if (block.getType() != Material.AIR)
+						block.setType(Material.AIR, false);
+				}
+			}
+
 			for (Location loc : _maze)
 			{	
 				buildMazeBlockAt(loc);

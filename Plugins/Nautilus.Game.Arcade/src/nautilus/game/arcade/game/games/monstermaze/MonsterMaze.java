@@ -191,11 +191,16 @@ public class MonsterMaze extends SoloGame
 	public void generateTeams()
 	{
 		super.generateTeams();
+
+		// Select the procedural maze before Reborn recruits players. Team spawns are
+		// consumed during the normal game-start path, so assigning these in Recruit
+		// leaves players at the map's decorative anchor instead of on the start tiles.
+		selectMazePreset();
+
 		if (GetTeamList().isEmpty())
 		{
-			List<Location> centres = WorldData == null ? null : WorldData.GetDataLocs("ORANGE");
-			Location fallback = centres != null && !centres.isEmpty()
-					? centres.get(0).clone()
+			Location fallback = _preset != null && !_preset.getSpawns().isEmpty()
+					? _preset.getSpawns().get(0).clone()
 					: (WorldData != null && WorldData.World != null ? WorldData.World.getSpawnLocation() : null);
 			if (fallback != null)
 			{
@@ -209,6 +214,54 @@ public class MonsterMaze extends SoloGame
 				Bukkit.getLogger().severe("[MonsterMaze] Cannot create a fallback team because the map world is unavailable.");
 			}
 		}
+
+		if (_preset != null && _preset.getSpawns() != null && !_preset.getSpawns().isEmpty()
+				&& !GetTeamList().isEmpty())
+		{
+			GameTeam playerTeam = GetTeamList().get(0);
+			playerTeam.SetColor(ChatColor.YELLOW);
+			playerTeam.SetName("Players");
+			playerTeam.GetSpawns().clear();
+			for (Location spawn : _preset.getSpawns())
+				playerTeam.GetSpawns().add(spawn.clone());
+		}
+	}
+
+	/**
+	 * Pick the map's gameplay maze once per game instance. Both team placement and
+	 * Recruit/maze construction use this exact preset so their coordinates cannot
+	 * disagree, and random mode cannot silently re-roll after players are placed.
+	 */
+	private boolean selectMazePreset()
+	{
+		if (_preset != null)
+			return _preset.getSpawns() != null && !_preset.getSpawns().isEmpty();
+
+		if (WorldData == null || WorldData.World == null)
+		{
+			Bukkit.getLogger().severe("[MonsterMaze] Cannot select a maze because the map world is unavailable.");
+			return false;
+		}
+
+		List<Location> centres = WorldData.GetDataLocs("ORANGE");
+		if (centres == null || centres.isEmpty())
+		{
+			Bukkit.getLogger().severe("[MonsterMaze] The selected map has no DATA_NAME:ORANGE centre.");
+			return false;
+		}
+
+		_center = centres.get(0).clone();
+		int requestedPattern = Manager.getPlugin().getConfig().getInt("monstermaze.pattern", 0);
+		_preset = requestedPattern >= 1 && requestedPattern <= 3
+				? MMMazes.getPatternMapPreset(_center, getMazeBlockData(), requestedPattern)
+				: MMMazes.getRandomMapPreset(_center, getMazeBlockData());
+
+		if (_preset == null || _preset.getSpawns() == null || _preset.getSpawns().isEmpty())
+		{
+			Bukkit.getLogger().severe("[MonsterMaze] The selected maze preset has no player spawn tiles.");
+			return false;
+		}
+		return true;
 	}
 
 	@EventHandler
@@ -225,28 +278,16 @@ public class MonsterMaze extends SoloGame
 		}
 		else if (event.GetState() == GameState.Recruit)
 		{
-			List<Location> centres = WorldData == null ? null : WorldData.GetDataLocs("ORANGE");
-			if (centres == null || centres.isEmpty())
+			// Reuse the preset selected before Recruit, so the team spawn locations
+			// and the geometry we build here are guaranteed to describe the same maze.
+			if (!selectMazePreset())
 			{
-				Bukkit.getLogger().severe("[MonsterMaze] The selected map has no DATA_NAME:ORANGE centre. Aborting safely.");
+				Bukkit.getLogger().severe("[MonsterMaze] Could not prepare a valid gameplay maze. Aborting safely.");
 				SetState(GameState.Dead);
 				return;
 			}
 
 			_monsterType = loadEntityType();
-			_center = centres.get(0).clone();
-			int requestedPattern = Manager.getPlugin().getConfig().getInt("monstermaze.pattern", 0);
-			_preset = requestedPattern >= 1 && requestedPattern <= 3
-					? MMMazes.getPatternMapPreset(_center, getMazeBlockData(), requestedPattern)
-					: MMMazes.getRandomMapPreset(_center, getMazeBlockData());
-
-			if (_preset == null || _preset.getSpawns() == null || _preset.getSpawns().isEmpty())
-			{
-				Bukkit.getLogger().severe("[MonsterMaze] The selected maze preset has no player spawn tiles. Aborting safely.");
-				SetState(GameState.Dead);
-				return;
-			}
-
 			_preset.build();
 			_maze = new Maze(this, _preset);
 
