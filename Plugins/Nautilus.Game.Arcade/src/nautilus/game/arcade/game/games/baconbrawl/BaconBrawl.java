@@ -1,19 +1,12 @@
 package nautilus.game.arcade.game.games.baconbrawl;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
-import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
@@ -27,7 +20,6 @@ import mineplex.core.updater.event.UpdateEvent;
 import mineplex.minecraft.game.core.damage.CustomDamageEvent;
 
 import nautilus.game.arcade.ArcadeManager;
-import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import nautilus.game.arcade.GameType;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.game.SoloGame;
@@ -131,100 +123,6 @@ public class BaconBrawl extends SoloGame
 				player.playSound(player.getLocation(), Sound.ENDERDRAGON_WINGS, 1, 0.5F);
 			}
 		}
-	}
-
-	/**
-	 * Render each equipped Bacon Brawl accessory above its owner's pig or sheep
-	 * disguise. The invisible, marker armor stand has no gameplay collision; only
-	 * its helmet slot is visible to every client. No choice means the stock look.
-	 */
-	@EventHandler
-	public void cosmeticAccessories(UpdateEvent event)
-	{
-		if (event.getType() != UpdateType.TICK)
-			return;
-
-		if (!IsLive())
-		{
-			removeAllCosmeticAccessories();
-			return;
-		}
-
-		// 10 updates/second is smooth enough for a head accessory and keeps entity
-		// teleport traffic low on the 1.8 server.
-		if (++_cosmeticAccessoryTick % 2 != 0)
-			return;
-
-		Set<UUID> active = new HashSet<>();
-		for (Player player : GetPlayers(true))
-		{
-			UUID id = player.getUniqueId();
-			String choice = ArcadeCosmeticsMenu.getEquippedChoice(id, "baconbrawl");
-			ItemStack accessory = ArcadeCosmeticsMenu.getBaconBrawlAccessory(choice);
-			if (accessory == null)
-				continue;
-
-			active.add(id);
-			ArmorStand stand = _cosmeticAccessories.get(id);
-			if (stand == null || stand.isDead() || !stand.isValid())
-			{
-				removeCosmeticAccessory(id);
-				Location spawn = player.getLocation().clone().subtract(0, 0.18, 0);
-				stand = spawn.getWorld().spawn(spawn, ArmorStand.class);
-				stand.setVisible(false);
-				stand.setSmall(true);
-				stand.setGravity(false);
-				stand.setBasePlate(false);
-				stand.setArms(false);
-				stand.setMarker(true);
-				stand.setCanPickupItems(false);
-				_cosmeticAccessories.put(id, stand);
-				_cosmeticAccessoryChoices.remove(id);
-			}
-
-			if (!choice.equals(_cosmeticAccessoryChoices.get(id)))
-			{
-				stand.setHelmet(accessory);
-				_cosmeticAccessoryChoices.put(id, choice);
-			}
-
-			Location target = player.getLocation().clone().subtract(0, 0.18, 0);
-			if (!stand.getWorld().equals(target.getWorld()) || stand.getLocation().distanceSquared(target) > 0.0001
-					|| Math.abs(stand.getLocation().getYaw() - target.getYaw()) > 1.0F)
-			{
-				stand.teleport(target);
-			}
-		}
-
-		for (UUID id : new HashSet<>(_cosmeticAccessories.keySet()))
-		{
-			if (!active.contains(id))
-				removeCosmeticAccessory(id);
-		}
-	}
-
-	@EventHandler
-	public void cleanupCosmeticAccessories(GameStateChangeEvent event)
-	{
-		if (event.GetGame() != this)
-			return;
-
-		if (event.GetState() == GameState.End || event.GetState() == GameState.Dead)
-			removeAllCosmeticAccessories();
-	}
-
-	private void removeCosmeticAccessory(UUID id)
-	{
-		ArmorStand stand = _cosmeticAccessories.remove(id);
-		_cosmeticAccessoryChoices.remove(id);
-		if (stand != null && !stand.isDead())
-			stand.remove();
-	}
-
-	private void removeAllCosmeticAccessories()
-	{
-		for (UUID id : new HashSet<>(_cosmeticAccessories.keySet()))
-			removeCosmeticAccessory(id);
 	}
 
 	@EventHandler

@@ -1298,14 +1298,6 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         }
     }
 
-    public static ItemStack getBaconBrawlAccessory(String choice) {
-        if ("crown".equalsIgnoreCase(choice)) return new ItemStack(Material.GOLD_HELMET);
-        if ("top_hat".equalsIgnoreCase(choice)) return new ItemStack(Material.WOOL, 1, (short) 15);
-        if ("chef".equalsIgnoreCase(choice)) return new ItemStack(Material.WOOL, 1, (short) 0);
-        if ("diamond".equalsIgnoreCase(choice)) return new ItemStack(Material.DIAMOND_HELMET);
-        return null;
-    }
-
     private void clearBaconBrawlShowcase() {
         for (ArmorStand stand : new ArrayList<ArmorStand>(baconBrawlShowcaseAccessories)) {
             if (stand != null && !stand.isDead()) stand.remove();
