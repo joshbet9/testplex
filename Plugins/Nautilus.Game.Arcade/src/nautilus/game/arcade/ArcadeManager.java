@@ -1447,7 +1447,7 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 			{
 				System.err.println("Arcade map loader: no installed map root containing category/*.zip was found. "
 						+ "Working directory: " + new File(".").getAbsolutePath()
-						+ ". Game selection will remain unavailable until the map path is corrected.");
+						+ ". Game selection remains available, but game start will wait until map discovery succeeds.");
 				return maps;
 			}
 
