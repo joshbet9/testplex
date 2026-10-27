@@ -183,7 +183,6 @@ public class WinEffectDeathTag extends WinEffectGadget
         target.setGravity(true);
         target.setVelocity(away.normalize().multiply(1.25).setY(0.88));
         target.getWorld().playSound(target.getLocation(), Sound.VILLAGER_HIT, 1.2F, 0.75F);
-        target.getWorld().playSound(target.getLocation(), Sound.WOOD_BREAK, 0.8F, 1.1F);
         _next++;
         _nextImpact = System.currentTimeMillis() + 700L;
     }
