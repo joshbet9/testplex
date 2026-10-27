@@ -27,6 +27,27 @@ function Assert-Contains {
     }
 }
 
+function Assert-NotContains {
+    param(
+        [Parameter(Mandatory=$true)][string]$Name,
+        [Parameter(Mandatory=$true)][string]$File,
+        [Parameter(Mandatory=$true)][string]$Unexpected
+    )
+
+    if (-not (Test-Path -LiteralPath $File)) {
+        throw "${Name}: source file not found: $File"
+    }
+
+    $content = Get-Content -LiteralPath $File -Raw
+    if ($content.Contains($Unexpected)) {
+        $script:failures.Add($Name)
+        Write-Host "[FAIL] $Name" -ForegroundColor Red
+    }
+    else {
+        Write-Host "[PASS] $Name" -ForegroundColor Green
+    }
+}
+
 $failures = [System.Collections.Generic.List[string]]::new()
 $mazeDir = Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\game\games\monstermaze"
 $coreDir = Join-Path $repoRoot "Plugins\Mineplex.Core\src\mineplex\core\game"
@@ -38,6 +59,9 @@ $mazeFile = Join-Path $mazeDir "Maze.java"
 $mazeCoreFile = Join-Path $mazeDir "MonsterMaze.java"
 $mapManagerFile = Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\managers\GameCreationManager.java"
 $arcadeManagerFile = Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\ArcadeManager.java"
+$setGameFile = Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\gui\privateServer\page\SetGamePage.java"
+$cosmeticsFile = Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\cosmetics\ArcadeCosmeticsMenu.java"
+$deployScriptFile = Join-Path $repoRoot ".github\scripts\deploy-testplex-hyperv.sh"
 $layoutFile = Join-Path $mazeDir "MMMazes.java"
 $safePadFile = Join-Path $mazeDir "SafePad.java"
 $pbFile = Join-Path $mazeDir "MonsterMazePersonalBestManager.java"
@@ -117,8 +141,29 @@ Assert-Contains "Maverick targets the next Safe Pad" $mazeFile "getMobKnockTarge
 Assert-Contains "Variant map catalogs fall back to non-empty original maps" $mapManagerFile "if (maps != null && !maps.isEmpty())"
 Assert-Contains "Map root supports explicit system-property override" $arcadeManagerFile "mineplex.maps.dir"
 Assert-Contains "Map root supports explicit environment override" $arcadeManagerFile "MINEPLEX_MAPS_DIR"
+Assert-Contains "Map root targets the deployed shared map directory" $arcadeManagerFile "/home/monstermaze/update/maps"
 Assert-Contains "Map root detects a nested maps bundle" $arcadeManagerFile "containsMapArchives(nestedMaps)"
 Assert-Contains "Failed map root lookups are retried later" $arcadeManagerFile "_mapRootResolutionAttempted = false;"
+Assert-Contains "Micro Battle category aliases resolve" $arcadeManagerFile "trimTrailingS(actual).equals(trimTrailingS(wanted))"
+Assert-Contains "Spleef typo in the legacy map bundle resolves" $arcadeManagerFile '"speef".equals(actual)'
+Assert-Contains "Deployment fixes restrictive map directory modes" $deployScriptFile 'find "$MAP_DEST" -type d -exec chmod 0755 {} +'
+Assert-Contains "Deployment keeps map ZIPs readable" $deployScriptFile 'find "$MAP_DEST" -type f -iname ''*.zip'' -exec chmod 0644 {} +'
+Assert-Contains "Set Game selection continues without detected maps" $setGameFile "boolean mapsAvailable = hasMapArchive(type);"
+Assert-Contains "Set Game warns when no maps are detected instead of rejecting selection" $setGameFile "It will not start until a map is available."
+Assert-NotContains "Set Game no longer blocks selection when the map check is empty" $setGameFile "The game has not been selected."
+Assert-Contains "Game startup is blocked before WorldData initialisation when no ZIPs exist" $mapManagerFile "if (!usesGeneratedMap(gameType) && (_maps == null || _maps.isEmpty()))"
+Assert-Contains "Generated UHC worlds do not need map ZIPs" $mapManagerFile "return type == GameType.UHC || type == GameType.UHCSolo"
+Assert-Contains "Monster Maze cosmetics use one grouped mob-set line" $cosmeticsFile 'compositeFeature("mob-line", "Mob Sets & Custom Colours"'
+Assert-Contains "Monster Maze includes the source mob-set catalogue" $cosmeticsFile '"creeper", "skeleton", "spider", "zombie", "slime", "zombie_pigman"'
+Assert-Contains "Snake cosmetics are grouped into one line" $cosmeticsFile 'compositeFeature("snake-style", "Snake Skin & Ability Effects"'
+Assert-Contains "Paintball cosmetics are grouped into one line" $cosmeticsFile 'compositeFeature("paintball-style", "Weapon Skins & Impact Effects"'
+Assert-Contains "Evolution cosmetics are grouped into one line" $cosmeticsFile 'compositeFeature("evolution-style", "Evolution Appearance & Effects"'
+Assert-Contains "Micro Battles cosmetics are grouped into one line" $cosmeticsFile 'compositeFeature("battle-style", "Glass Colour & Border Effects"'
+Assert-Contains "Dragon Escape keeps a separate trail line and grouped finish line" $cosmeticsFile 'compositeFeature("finish-presentation", "Finish Presentation"'
+Assert-Contains "Win effects have a dedicated catalogue" $cosmeticsFile "private void openWinEffects(Player player)"
+Assert-NotContains "Per-game pages no longer show a separate win-effect placeholder" $cosmeticsFile "Win Effect Plan"
+Assert-Contains "Custom Pack unlock can be provided by the entitlement adapter" $cosmeticsFile "setMonsterMazeCustomPackUnlocked(UUID playerId, boolean unlocked)"
+Assert-Contains "Per-mob-set beacon and Safe Pad colours persist independently" $cosmeticsFile "mob-set-colours."
 Assert-Contains "Random maze selection returns the selected non-repeat map" $layoutFile "return selected;"
 Assert-Contains "Fixed pattern selection is available" $layoutFile "getPatternMapPreset"
 Assert-Contains "Pattern selection is configurable" $mazeCoreFile "getPatternMapPreset(_center, getMazeBlockData(), requestedPattern)"
