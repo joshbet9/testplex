@@ -491,7 +491,9 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         meta.setDisplayName(ChatColor.YELLOW + feature.displayName);
         List<String> lore = new ArrayList<String>();
         lore.add(ChatColor.GRAY + feature.description);
-        if (feature.toggleOptions) {
+        if (feature.isComposite()) {
+            lore.add(ChatColor.GRAY + feature.settings.size() + " configurable settings");
+        } else if (feature.toggleOptions) {
             int enabled = 0;
             for (String option : feature.options) {
                 if (isToggleEnabled(player.getUniqueId(), game, feature, option)) enabled++;
