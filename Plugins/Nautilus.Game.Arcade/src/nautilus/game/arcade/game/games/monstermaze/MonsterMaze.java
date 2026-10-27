@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 import mineplex.core.common.util.C;
@@ -49,6 +50,7 @@ import nautilus.game.arcade.game.games.monstermaze.trackers.SurvivePast10thSafep
 import nautilus.game.arcade.game.modules.compass.CompassModule;
 import nautilus.game.arcade.kit.Kit;
 import nautilus.game.arcade.managers.chat.ChatStatData;
+import nautilus.game.arcade.scoreboard.GameScoreboard;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -61,12 +63,17 @@ import org.bukkit.entity.EnderCrystal;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent.RegainReason;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.scoreboard.Team;
+import org.bukkit.util.Vector;
 
 public class MonsterMaze extends SoloGame
 {
@@ -76,6 +83,15 @@ public class MonsterMaze extends SoloGame
 	private MazePreset _preset;
 	
 	private Location _center;
+
+	// Each player needs their own sidebar because distance and Safe Pad status are viewer-specific.
+	private final Map<UUID, GameScoreboard> _viewerScoreboards = new HashMap<UUID, GameScoreboard>();
+	private final Map<UUID, org.bukkit.scoreboard.Scoreboard> _previousScoreboards = new HashMap<UUID, org.bukkit.scoreboard.Scoreboard>();
+	private final Map<UUID, Boolean> _visibilityHidden = new HashMap<UUID, Boolean>();
+	private static final int VISIBILITY_SLOT = 7;
+	private static final int SAFE_PAD_COMPASS_SLOT = 1;
+	private static final String VISIBILITY_ITEM_NAME = ChatColor.AQUA + "Player Visibility";
+	private static final String SAFE_PAD_COMPASS_NAME = ChatColor.GREEN + "Safe Pad Locator";
 	
 	private HashMap<Player, Long> _launched = new HashMap<Player, Long>();
 	// Retain the bump window even after the velocity/grounded tracker clears.
@@ -199,9 +215,9 @@ public class MonsterMaze extends SoloGame
 
 		if (GetTeamList().isEmpty())
 		{
-			Location fallback = _preset != null && !_preset.getSpawns().isEmpty()
-					? _preset.getSpawns().get(0).clone()
-					: (WorldData != null && WorldData.World != null ? WorldData.World.getSpawnLocation() : null);
+			Location fallback = getCentralStartSpawn();
+			if (fallback == null)
+				fallback = WorldData != null && WorldData.World != null ? WorldData.World.getSpawnLocation() : null;
 			if (fallback != null)
 			{
 				ArrayList<Location> spawns = new ArrayList<Location>();
@@ -215,15 +231,14 @@ public class MonsterMaze extends SoloGame
 			}
 		}
 
-		if (_preset != null && _preset.getSpawns() != null && !_preset.getSpawns().isEmpty()
-				&& !GetTeamList().isEmpty())
+		Location centralSpawn = getCentralStartSpawn();
+		if (centralSpawn != null && !GetTeamList().isEmpty())
 		{
 			GameTeam playerTeam = GetTeamList().get(0);
 			playerTeam.SetColor(ChatColor.YELLOW);
 			playerTeam.SetName("Players");
 			playerTeam.GetSpawns().clear();
-			for (Location spawn : _preset.getSpawns())
-				playerTeam.GetSpawns().add(spawn.clone());
+			playerTeam.GetSpawns().add(centralSpawn.clone());
 		}
 	}
 
@@ -235,7 +250,11 @@ public class MonsterMaze extends SoloGame
 	private boolean selectMazePreset()
 	{
 		if (_preset != null)
-			return _preset.getSpawns() != null && !_preset.getSpawns().isEmpty();
+		{
+			if (_center == null && _preset.getCenter() != null)
+				_center = _preset.getCenter().clone();
+			return _preset.getSpawns() != null && !_preset.getSpawns().isEmpty() && getCentralStartSpawn() != null;
+		}
 
 		if (WorldData == null || WorldData.World == null)
 		{
@@ -261,7 +280,20 @@ public class MonsterMaze extends SoloGame
 			Bukkit.getLogger().severe("[MonsterMaze] The selected maze preset has no player spawn tiles.");
 			return false;
 		}
-		return true;
+		return getCentralStartSpawn() != null;
+	}
+
+	/** The central orange marker is the gameplay start; preset spawn markers are elsewhere in the maze. */
+	private Location getCentralStartSpawn()
+	{
+		Location center = _preset != null ? _preset.getCenter() : _center;
+		if (center == null || center.getWorld() == null)
+			return null;
+		Location spawn = center.clone();
+		spawn.setX(center.getBlockX() + 0.5D);
+		spawn.setY(center.getBlockY());
+		spawn.setZ(center.getBlockZ() + 0.5D);
+		return spawn;
 	}
 
 	@EventHandler
@@ -275,6 +307,11 @@ public class MonsterMaze extends SoloGame
 
 			for (Team team : GetScoreboard().getScoreboard().getTeams())
 				team.setCanSeeFriendlyInvisibles(true);
+			refreshAllPlayerVisibility();
+		}
+		else if (event.GetState() == GameState.Dead)
+		{
+			clearPersonalScoreboardsAndVisibility();
 		}
 		else if (event.GetState() == GameState.Recruit)
 		{
@@ -291,21 +328,35 @@ public class MonsterMaze extends SoloGame
 			_preset.build();
 			_maze = new Maze(this, _preset);
 
-			// WorldConfig's team spawn is a map anchor, not a player spawn.
-			// Use the actual marked maze spawn tiles to prevent falling below the arena.
+			// Use the actual central start tile, not the maze-generation spawn markers.
+			Location centralSpawn = getCentralStartSpawn();
+			if (centralSpawn == null)
+			{
+				Bukkit.getLogger().severe("[MonsterMaze] Central maze start is unavailable; aborting this round.");
+				SetState(GameState.Dead);
+				return;
+			}
 			if (GetTeamList().isEmpty())
 			{
 				ArrayList<Location> fallbackSpawns = new ArrayList<Location>();
-				fallbackSpawns.add(_preset.getSpawns().get(0).clone());
+				fallbackSpawns.add(centralSpawn.clone());
 				AddTeam(new GameTeam(this, "Players", ChatColor.YELLOW, fallbackSpawns));
 			}
 			GameTeam playerTeam = GetTeamList().get(0);
 			playerTeam.SetColor(ChatColor.YELLOW);
 			playerTeam.SetName("Players");
 			playerTeam.GetSpawns().clear();
-			for (Location spawn : _preset.getSpawns())
-				playerTeam.GetSpawns().add(spawn.clone());
+			playerTeam.GetSpawns().add(centralSpawn.clone());
 
+			// Reborn may have teleported players before the generated maze was built. Re-seat
+			// everyone at the centre after the floor and safe-zone walls are ready.
+			for (Player player : GetPlayers(false))
+			{
+				player.teleport(centralSpawn);
+				player.setVelocity(new Vector(0, 0, 0));
+			}
+
+			refreshAllPlayerVisibility();
 			_maze.fillSpawn(isActualModernMode() ? 225 : 150);
 		}
 	}
@@ -593,53 +644,207 @@ public class MonsterMaze extends SoloGame
 	@EventHandler
 	public void ScoreboardUpdate(UpdateEvent event)
 	{
-		if (event.getType() != UpdateType.FAST)
+		if (event.getType() != UpdateType.FAST || _maze == null || GetTeamList().isEmpty())
 			return;
 
-		if (GetTeamList().isEmpty())
-			return;
-
-		Scoreboard.reset();
-
-		Scoreboard.writeNewLine();
-
-		Scoreboard.write(C.cYellow + C.Bold + "Players");
-
-		if (GetPlayers(true).size() > 5)
-		{	
-			Scoreboard.write(C.cWhite + GetPlayers(true).size() + " Alive");
-		}
-		else
+		for (Player viewer : GetPlayers(false))
 		{
-			for (Player p : GetPlayers(true))
+			ensureGameplayItems(viewer);
+			GameScoreboard board = getViewerScoreboard(viewer);
+			if (viewer.getScoreboard() != board.getScoreboard())
+				viewer.setScoreboard(board.getScoreboard());
+			syncViewerScoreboardTeams(board);
+
+			board.reset();
+			board.write(C.cYellow + C.Bold + "Players");
+			List<Player> alive = GetPlayers(true);
+			if (alive.size() <= 3)
 			{
-				Scoreboard.write(C.cWhite + p.getName());
+				for (Player alivePlayer : alive)
+					board.write(C.cWhite + alivePlayer.getName());
 			}
-		}
-		
-		Scoreboard.writeNewLine();
-		
-		Scoreboard.write(C.cGreen + C.Bold + "Safe Pad");
-		
-		if (_maze.getSafePad() != null)
-		{
-			Scoreboard.write(C.cWhite + _maze.getPhaseTimer() + " Seconds");
-		}
-		else
-		{
-			Scoreboard.write("None");
-		}
-		
-		Scoreboard.writeNewLine();
-		
-		Scoreboard.write(C.cGold + C.Bold + "Stage");
-		
-		Scoreboard.write(C.cWhite + getMaze().getCurrentSafePadCount());
+			else
+			{
+				board.write(C.cWhite + alive.size() + " Alive");
+			}
 
-		Scoreboard.writeNewLine();
-		Scoreboard.write(C.cAqua + C.Bold + "Maze Pattern");
-		Scoreboard.write(C.cWhite + getMaze().getPreset().getPatternId());
-		
-		Scoreboard.draw();
+			board.writeNewLine();
+			board.write(C.cGreen + C.Bold + "Safe Pad");
+			if (_maze.getSafePad() != null)
+				board.write(C.cWhite + _maze.getPhaseTimer() + " Seconds");
+			else
+				board.write(C.cWhite + "None");
+
+			board.write(C.cAqua + C.Bold + "Distance");
+			if (_maze.getSafePad() != null)
+			{
+				Location pad = _maze.getSafePad().getLocation();
+				double dx = viewer.getLocation().getX() - (pad.getX() + 0.5D);
+				double dz = viewer.getLocation().getZ() - (pad.getZ() + 0.5D);
+				int distance = (int) Math.round(Math.sqrt(dx * dx + dz * dz));
+				board.write(C.cWhite + distance + " blocks");
+				boolean safe = _maze.getSafePad().isOn(viewer);
+				board.write((safe ? C.cGreen : C.cRed) + (safe ? "SAFE" : "UNSAFE"));
+			}
+			else
+			{
+				board.write(C.cWhite + "Unknown");
+				board.write(C.cRed + "UNSAFE");
+			}
+
+			board.writeNewLine();
+			board.write(C.cGold + C.Bold + "Stage");
+			board.write(C.cWhite + _maze.getCurrentSafePadCount());
+			board.write(C.cAqua + C.Bold + "Maze Pattern");
+			board.write(C.cWhite + _maze.getPreset().getPatternId());
+			board.draw();
+
+			refreshPlayerVisibility(viewer);
+		}
+	}
+
+	private GameScoreboard getViewerScoreboard(Player player)
+	{
+		UUID id = player.getUniqueId();
+		GameScoreboard board = _viewerScoreboards.get(id);
+		if (board == null)
+		{
+			_previousScoreboards.put(id, player.getScoreboard());
+			board = new GameScoreboard(this, player);
+			_viewerScoreboards.put(id, board);
+			player.setScoreboard(board.getScoreboard());
+		}
+		return board;
+	}
+
+	private void syncViewerScoreboardTeams(GameScoreboard board)
+	{
+		for (Player target : GetPlayers(false))
+		{
+			GameTeam targetTeam = GetTeam(target);
+			if (targetTeam != null)
+				board.setPlayerTeam(target, targetTeam);
+			else
+				board.setSpectating(target);
+		}
+		for (Team team : board.getScoreboard().getTeams())
+			team.setCanSeeFriendlyInvisibles(true);
+	}
+
+	private void ensureGameplayItems(Player player)
+	{
+		ItemStack compass = player.getInventory().getItem(SAFE_PAD_COMPASS_SLOT);
+		if (compass == null || isSafePadCompassItem(compass))
+		{
+			ItemStack locator = new ItemStack(Material.COMPASS, 1);
+			ItemMeta meta = locator.getItemMeta();
+			meta.setDisplayName(SAFE_PAD_COMPASS_NAME);
+			meta.setLore(java.util.Collections.singletonList(ChatColor.GRAY + "Points to the active Safe Pad"));
+			locator.setItemMeta(meta);
+			player.getInventory().setItem(SAFE_PAD_COMPASS_SLOT, locator);
+		}
+
+		boolean hidden = Boolean.TRUE.equals(_visibilityHidden.get(player.getUniqueId()));
+		ItemStack visibility = player.getInventory().getItem(VISIBILITY_SLOT);
+		if (visibility == null || isVisibilityItem(visibility))
+			player.getInventory().setItem(VISIBILITY_SLOT, createVisibilityItem(hidden));
+	}
+
+	private boolean isSafePadCompassItem(ItemStack item)
+	{
+		if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta())
+			return false;
+		ItemMeta meta = item.getItemMeta();
+		return meta != null && SAFE_PAD_COMPASS_NAME.equals(meta.getDisplayName());
+	}
+
+	private ItemStack createVisibilityItem(boolean hidden)
+	{
+		ItemStack item = new ItemStack(Material.INK_SACK, 1, (short) (hidden ? 8 : 10));
+		ItemMeta meta = item.getItemMeta();
+		meta.setDisplayName(VISIBILITY_ITEM_NAME + ChatColor.WHITE + ": " + (hidden ? ChatColor.GRAY + "Hidden" : ChatColor.GREEN + "Visible"));
+		meta.setLore(java.util.Collections.singletonList(ChatColor.GRAY + "Right-click to toggle player visibility"));
+		item.setItemMeta(meta);
+		return item;
+	}
+
+	private boolean isVisibilityItem(ItemStack item)
+	{
+		if (item == null || item.getType() != Material.INK_SACK || !item.hasItemMeta())
+			return false;
+		ItemMeta meta = item.getItemMeta();
+		return meta != null && meta.hasDisplayName() && meta.getDisplayName().startsWith(VISIBILITY_ITEM_NAME);
+	}
+
+	@EventHandler
+	public void onVisibilityToggle(PlayerInteractEvent event)
+	{
+		if (event.getAction() == Action.PHYSICAL || !isVisibilityItem(event.getItem()))
+			return;
+		if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK)
+			return;
+		Player player = event.getPlayer();
+		if (!GetPlayers(false).contains(player))
+			return;
+
+		event.setCancelled(true);
+		UUID id = player.getUniqueId();
+		boolean hidden = !Boolean.TRUE.equals(_visibilityHidden.get(id));
+		_visibilityHidden.put(id, hidden);
+		player.getInventory().setItem(VISIBILITY_SLOT, createVisibilityItem(hidden));
+		refreshAllPlayerVisibility();
+		player.playSound(player.getLocation(), Sound.CLICK, 0.8F, hidden ? 0.8F : 1.2F);
+	}
+
+	private void refreshAllPlayerVisibility()
+	{
+		for (Player viewer : GetPlayers(false))
+		{
+			ensureGameplayItems(viewer);
+			refreshPlayerVisibility(viewer);
+		}
+	}
+
+	private void refreshPlayerVisibility(Player viewer)
+	{
+		if (viewer == null || !viewer.isOnline())
+			return;
+		boolean hidden = Boolean.TRUE.equals(_visibilityHidden.get(viewer.getUniqueId()));
+		for (Player target : GetPlayers(false))
+		{
+			if (viewer.equals(target))
+				continue;
+			if (hidden)
+				viewer.hidePlayer(target);
+			else
+				viewer.showPlayer(target);
+		}
+	}
+
+	private void clearPersonalScoreboardsAndVisibility()
+	{
+		for (Map.Entry<UUID, org.bukkit.scoreboard.Scoreboard> entry : _previousScoreboards.entrySet())
+		{
+			Player player = Bukkit.getPlayer(entry.getKey());
+			if (player != null && player.isOnline() && entry.getValue() != null)
+				player.setScoreboard(entry.getValue());
+		}
+		for (Player viewer : GetPlayers(false))
+		{
+			for (Player target : GetPlayers(false))
+			{
+				if (!viewer.equals(target))
+					viewer.showPlayer(target);
+			}
+			ItemStack item = viewer.getInventory().getItem(VISIBILITY_SLOT);
+			if (isVisibilityItem(item))
+				viewer.getInventory().setItem(VISIBILITY_SLOT, null);
+			ItemStack compass = viewer.getInventory().getItem(SAFE_PAD_COMPASS_SLOT);
+			if (isSafePadCompassItem(compass))
+				viewer.getInventory().setItem(SAFE_PAD_COMPASS_SLOT, null);
+		}
+		_viewerScoreboards.clear();
+		_previousScoreboards.clear();
+		_visibilityHidden.clear();
 	}
 }
