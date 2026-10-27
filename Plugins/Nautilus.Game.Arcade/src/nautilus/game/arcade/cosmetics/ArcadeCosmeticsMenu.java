@@ -421,7 +421,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     }
 
     public static int getMonsterMazeSafePadColourData(UUID playerId, String mobSet) {
-        return instance == null || playerId == null || mobSet == null ? colourData("green")
+        return instance == null || playerId == null || mobSet == null ? colourData("lime")
                 : colourData(instance.data.getString("players." + playerId + ".arcade.monstermaze.mob-set-colours."
                         + mobSet.toLowerCase(Locale.ROOT) + ".safe-pad", "lime"));
     }
