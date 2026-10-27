@@ -452,6 +452,16 @@ if [[ "$ready" -ne 1 ]]; then
   exit 1
 fi
 
+# Record the source revision that the installed shared maps now represent.
+# This marker is updated only after Arcade and the sandbox lobby are confirmed
+# healthy, so later code-only deployments can skip scanning and uploading maps.
+MAP_SOURCE_MARKER="$MAP_DEST/.testplex-map-source-commit"
+MAP_SOURCE_MARKER_TMP="$MAP_SOURCE_MARKER.tmp-$SHA"
+printf '%s\n' "$SHA" > "$MAP_SOURCE_MARKER_TMP"
+chown monstermaze:monstermaze "$MAP_SOURCE_MARKER_TMP"
+chmod 0644 "$MAP_SOURCE_MARKER_TMP"
+mv -f "$MAP_SOURCE_MARKER_TMP" "$MAP_SOURCE_MARKER"
+
 echo "Hyper-V Reborn Arcade test deployment succeeded for build $SHA."
 echo "Installed JAR count: ${#JAR_PATHS[@]} (Arcade only)"
 echo "Arcade.jar SHA-256:"

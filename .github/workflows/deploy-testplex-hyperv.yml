@@ -165,40 +165,28 @@ jobs:
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
             "$GITHUB_WORKSPACE/.github/scripts/deploy-testplex-hyperv.sh" "$remote:$deploy_script"
 
-          # A small manifest is enough to decide whether the 400 MB map bundle is
-          # needed. If each installed map ZIP matches the build source, reuse it.
+          # The last successful deployment records which source revision the
+          # installed map ZIPs represent. Compare source paths to that revision:
+          # code-only changes skip the expensive map checksum/transfer path.
           MAPS_MODE="bundle"
-          if git cat-file -e "$BUILD_SHA^{commit}" 2>/dev/null && git diff --quiet "$BUILD_SHA" HEAD -- update/maps/; then
-            MAP_MANIFEST="$RUNNER_TEMP/testplex-map-manifest.sha256"
-            (
-              cd update
-              find maps -type f -name '*.zip' -print0 | sort -z | xargs -0 sha256sum
-            ) > "$MAP_MANIFEST"
-            test -s "$MAP_MANIFEST" || { echo "Map source manifest is empty." >&2; exit 1; }
-            map_manifest_remote="$upload_dir/testplex-map-manifest-$BUILD_SHA.sha256"
-            scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
-              -o BatchMode=yes -o StrictHostKeyChecking=yes \
-              -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-              "$MAP_MANIFEST" "$remote:$map_manifest_remote"
-
-            if ssh "${ssh_opts[@]}" "$remote" "sudo -n bash '$deploy_script' --check-maps '$map_manifest_remote'"; then
+          MAP_BASELINE_FALLBACK="628140fd7865acf3eff2b46618aed79cb1f37b32"
+          map_baseline="$(ssh "${ssh_opts[@]}" "$remote" "cat /home/monstermaze/update/maps/.testplex-map-source-commit 2>/dev/null || true")"
+          if [[ ! "$map_baseline" =~ ^[0-9a-f]{40}$ ]] || ! git cat-file -e "$map_baseline^{commit}" 2>/dev/null; then
+            map_baseline="$MAP_BASELINE_FALLBACK"
+            echo "Map source marker missing/unavailable; bootstrapping from last verified map install $map_baseline."
+          fi
+          if git cat-file -e "$BUILD_SHA^{commit}" 2>/dev/null && git cat-file -e "$map_baseline^{commit}" 2>/dev/null; then
+            if git diff --quiet "$map_baseline" "$BUILD_SHA" -- update/maps/; then
               MAPS_MODE="installed"
-              manifest_count="$(wc -l < "$MAP_MANIFEST")"
-              echo "Root-verified all $manifest_count required installed map ZIPs; skipping the bundle transfer."
+              echo "No map-source changes since deployed revision $map_baseline; skipping ZIP scans and bundle transfer."
             else
-              map_check_rc=$?
-              if [[ "$map_check_rc" -eq 3 ]]; then
-                echo "One or more required map ZIPs differ; a verified map bundle update is required."
-              else
-                echo "Could not run the root map-manifest check (exit $map_check_rc); refusing to guess the map state." >&2
-                exit "$map_check_rc"
-              fi
+              echo "Map-source files changed since deployed revision $map_baseline; transferring the new bundle."
             fi
           else
-            echo "The selected build source tree is unavailable or its map tree differs from checkout; using the build's map bundle."
+            echo "Cannot compare map-source revisions safely; using the verified bundle."
           fi
 
-          echo "Uploading Arcade.jar separately so deployment doesn't depend on a long idle connection."
+          echo "Uploading Arcade.jar separately so deployment doesn't depend on a long idle connection."          echo "Uploading Arcade.jar separately so deployment doesn't depend on a long idle connection."
           if ssh "${ssh_opts[@]}" "$remote" "command -v rsync >/dev/null 2>&1"; then
             rsync --archive --checksum --partial --timeout=180 --info=progress2 \
               -e "ssh -p $port -i $HOME/.ssh/testplex_hyperv -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30" \
