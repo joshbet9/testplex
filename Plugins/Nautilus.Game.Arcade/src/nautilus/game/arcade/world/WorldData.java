@@ -29,6 +29,7 @@ import mineplex.core.world.MineplexWorld;
 
 import nautilus.game.arcade.GameType;
 import nautilus.game.arcade.game.Game;
+import nautilus.game.arcade.managers.GameCreationManager;
 import nautilus.game.arcade.game.games.uhc.UHC;
 
 /**
@@ -177,6 +178,13 @@ public class WorldData
 		TimingManager.stop("UnzipWorld creating folders");
 
 		TimingManager.start("UnzipWorld UnzipToDirectory");
+		if (GameCreationManager.usesGeneratedMonsterMazeMap(Game))
+		{
+			writeGeneratedMonsterMazeWorldConfig(new File(folder, "WorldConfig.dat"));
+			TimingManager.stop("UnzipWorld UnzipToDirectory");
+			return;
+		}
+
 		File mapArchive = Host.getArcadeManager().getInstalledMapArchive(Game, GetFile());
 		if (mapArchive == null || !mapArchive.isFile())
 		{
@@ -186,6 +194,28 @@ public class WorldData
 		}
 		ZipUtil.UnzipToDirectory(mapArchive.getAbsolutePath(), folder);
 		TimingManager.stop("UnzipWorld UnzipToDirectory");
+	}
+
+	/** Writes the Mineplex datapoints needed by the native, procedurally-built Monster Maze. */
+	private void writeGeneratedMonsterMazeWorldConfig(File target)
+	{
+		try (BufferedWriter writer = new BufferedWriter(new FileWriter(target)))
+		{
+			writer.write("MAP_NAME:Monster Maze Generated Test Arena\\n");
+			writer.write("MAP_AUTHOR:Testplex Sandbox\\n");
+			writer.write("MIN_X:-50\\nMAX_X:50\\nMIN_Y:0\\nMAX_Y:256\\nMIN_Z:-50\\nMAX_Z:50\\n");
+			writer.write("TEAM_NAME:RED\\n");
+			writer.write("TEAM_SPAWNS:0,100,0:5,100,0:-5,100,0:0,100,5:0,100,-5\\n");
+			writer.write("DATA_NAME:ORANGE\\nDATA_LOCS:0,100,0\\n");
+			writer.write("CUSTOM_NAME:B1=155,0\\nCUSTOM_LOCS:0,100,0\\n");
+			writer.write("CUSTOM_NAME:B2=155,2\\nCUSTOM_LOCS:0,100,0\\n");
+			writer.write("CUSTOM_NAME:B3=44,15\\nCUSTOM_LOCS:0,100,0\\n");
+			writer.write("CUSTOM_NAME:E=SNOWMAN\\nCUSTOM_LOCS:0,100,0\\n");
+		}
+		catch (Exception ex)
+		{
+			throw new IllegalStateException("Could not create generated Monster Maze test map metadata", ex);
+		}
 	}
 
 	public void Uninitialize()

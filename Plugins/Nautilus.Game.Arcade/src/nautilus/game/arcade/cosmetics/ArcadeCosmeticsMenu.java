@@ -11,6 +11,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
+import mineplex.core.achievement.AchievementCategory;
+
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -199,8 +201,36 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
 
     private void registerGame(String key, String displayName, Material icon, short durability,
                               String winEffect, FeatureDefinition... features) {
+        AchievementCategory statsCategory = statsCategoryFor(key);
+        if (statsCategory != null) {
+            icon = statsCategory.getIcon();
+            durability = (short) statsCategory.getIconData();
+        }
         games.put(key, new GameDefinition(key, displayName, icon, durability, winEffect,
                 Arrays.asList(features)));
+    }
+
+    /** Use the exact icons and durability data shown by /stats for Arcade games. */
+    private AchievementCategory statsCategoryFor(String key) {
+        switch (key) {
+            case "baconbrawl": return AchievementCategory.BACON_BRAWL;
+            case "bomblobbers": return AchievementCategory.BOMB_LOBBERS;
+            case "deathtag": return AchievementCategory.DEATH_TAG;
+            case "dragonescape": return AchievementCategory.DRAGON_ESCAPE;
+            case "dragons": return AchievementCategory.DRAGONS;
+            case "evolution": return AchievementCategory.EVOLUTION;
+            case "gladiators": return AchievementCategory.GLADIATORS;
+            case "microbattles": return AchievementCategory.MICRO_BATTLE;
+            case "monstermaze": return AchievementCategory.MONSTER_MAZE;
+            case "oneinthequiver": return AchievementCategory.ONE_IN_THE_QUIVER;
+            case "paintball": return AchievementCategory.SUPER_PAINTBALL;
+            case "runner": return AchievementCategory.RUNNER;
+            case "sheepquest": return AchievementCategory.SHEEP_QUEST;
+            case "snake": return AchievementCategory.SNAKE;
+            case "spleef": return AchievementCategory.SPLEEF;
+            case "turfwars": return AchievementCategory.TURF_WARS;
+            default: return null;
+        }
     }
 
     private FeatureDefinition feature(String key, String displayName, Material icon, String description,
@@ -290,6 +320,9 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         for (GameDefinition game : games.values()) {
             put(inventory, GAME_SLOTS[index++], gameIcon(player, game));
         }
+        put(inventory, WIN_EFFECT_SLOT, namedWithLore(Material.FIREWORK, ChatColor.LIGHT_PURPLE + "Win Effects",
+                Arrays.asList(ChatColor.GRAY + "Review the planned win-effect concept for every Arcade game.",
+                        ChatColor.YELLOW + "Click to open the Win Effects section.")));
         put(inventory, 49, named(Material.BARRIER, ChatColor.RED + "Close", "Close the Arcade Cosmetics menu."));
         player.openInventory(inventory);
     }
@@ -300,7 +333,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         meta.setDisplayName(ChatColor.YELLOW + game.displayName);
         List<String> lore = new ArrayList<String>();
         lore.add(ChatColor.GRAY.toString() + game.features.size() + (game.features.size() == 1 ? " cosmetic category" : " cosmetic categories"));
-        lore.add(ChatColor.GRAY + "Includes a planned win-effect placeholder");
+        lore.add(ChatColor.GRAY + "Win-effect concept tracked in the Win Effects section");
         lore.add(ChatColor.GREEN + "Click to open");
         meta.setLore(lore);
         item.setItemMeta(meta);
@@ -315,8 +348,31 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             FeatureDefinition feature = game.features.get(i);
             put(inventory, slots[i], featureIcon(player, game, feature));
         }
-        put(inventory, WIN_EFFECT_SLOT, winEffectItem(player, game));
+        put(inventory, WIN_EFFECT_SLOT, namedWithLore(Material.FIREWORK, ChatColor.LIGHT_PURPLE + "Win Effect Plan",
+                Arrays.asList(ChatColor.GRAY + "This game's planned win-effect concept is listed separately.",
+                        ChatColor.YELLOW + "Click to view it in the Win Effects section.")));
         put(inventory, 45, named(Material.ARROW, ChatColor.YELLOW + "Back to Games", "Return to the full game list."));
+        put(inventory, 49, named(Material.BARRIER, ChatColor.RED + "Close", "Close the Arcade Cosmetics menu."));
+        player.openInventory(inventory);
+    }
+
+    private void openWinEffects(Player player) {
+        openWinEffects(player, null);
+    }
+
+    private void openWinEffects(Player player, GameDefinition selectedGame) {
+        String title = TITLE_PREFIX + "Win Effects" + (selectedGame == null ? "" : " | " + selectedGame.key);
+        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.BLACK + title);
+        if (selectedGame == null) {
+            int index = 0;
+            for (GameDefinition game : games.values()) {
+                put(inventory, GAME_SLOTS[index++], winEffectItem(player, game));
+            }
+            put(inventory, 45, named(Material.ARROW, ChatColor.YELLOW + "Back to Games", "Return to the Arcade Cosmetics game list."));
+        } else {
+            put(inventory, 22, winEffectItem(player, selectedGame));
+            put(inventory, 45, named(Material.ARROW, ChatColor.YELLOW + "Back to Game", "Return to " + selectedGame.displayName + " cosmetics."));
+        }
         put(inventory, 49, named(Material.BARRIER, ChatColor.RED + "Close", "Close the Arcade Cosmetics menu."));
         player.openInventory(inventory);
     }
@@ -445,6 +501,10 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 player.closeInventory();
                 return;
             }
+            if ("Win Effects".equalsIgnoreCase(itemName)) {
+                openWinEffects(player);
+                return;
+            }
             GameDefinition game = gameFromDisplayName(itemName);
             if (game != null) openGame(player, game);
             return;
@@ -462,9 +522,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 player.closeInventory();
                 return;
             }
-            if (itemName.startsWith("Planned Win Effect")) {
-                toggleWinEffectPlaceholder(player, game);
-                openGame(player, game);
+            if ("Win Effect Plan".equalsIgnoreCase(itemName)) {
+                openWinEffects(player, game);
                 return;
             }
             for (String line : meta.getLore() == null ? Collections.<String>emptyList() : meta.getLore()) {
@@ -473,6 +532,46 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 FeatureDefinition feature = game.getFeature(plain.substring("Feature: ".length()));
                 if (feature != null) openFeature(player, game, feature);
                 return;
+            }
+            return;
+        }
+
+        if (titleParts.length == 2 && "Win Effects".equals(titleParts[1])) {
+            if ("Back to Games".equalsIgnoreCase(itemName)) {
+                openMain(player);
+                return;
+            }
+            if ("Close".equalsIgnoreCase(itemName)) {
+                player.closeInventory();
+                return;
+            }
+            GameDefinition effectGame = gameFromWinEffectMeta(meta);
+            if (effectGame != null) {
+                toggleWinEffectPlaceholder(player, effectGame);
+                openWinEffects(player);
+            }
+            return;
+        }
+
+        if (titleParts.length == 3 && "Win Effects".equals(titleParts[1])) {
+            GameDefinition selectedGame = games.get(titleParts[2].toLowerCase(Locale.ROOT));
+            if (selectedGame == null) return;
+            if ("Back to Game".equalsIgnoreCase(itemName)) {
+                openGame(player, selectedGame);
+                return;
+            }
+            if ("Back to Games".equalsIgnoreCase(itemName)) {
+                openMain(player);
+                return;
+            }
+            if ("Close".equalsIgnoreCase(itemName)) {
+                player.closeInventory();
+                return;
+            }
+            GameDefinition effectGame = gameFromWinEffectMeta(meta);
+            if (effectGame != null && effectGame.key.equals(selectedGame.key)) {
+                toggleWinEffectPlaceholder(player, effectGame);
+                openWinEffects(player, selectedGame);
             }
             return;
         }
@@ -614,6 +713,17 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             if (colours[i].equalsIgnoreCase(choice)) return i;
         }
         return -1;
+    }
+
+    private GameDefinition gameFromWinEffectMeta(ItemMeta meta) {
+        if (meta == null || meta.getLore() == null) return null;
+        for (String line : meta.getLore()) {
+            String plain = ChatColor.stripColor(line);
+            if (plain != null && plain.startsWith("WinEffect: ")) {
+                return games.get(plain.substring("WinEffect: ".length()).toLowerCase(Locale.ROOT));
+            }
+        }
+        return null;
     }
 
     private GameDefinition gameFromDisplayName(String label) {

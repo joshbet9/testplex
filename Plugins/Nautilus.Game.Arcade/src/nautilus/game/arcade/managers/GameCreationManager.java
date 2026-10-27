@@ -4,6 +4,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -41,6 +42,18 @@ public class GameCreationManager implements Listener
 {
 
 	private static final int MAX_ATTEMPTS = 50;
+	private static final String GENERATED_MONSTER_MAZE_MAP = "GeneratedTestArena";
+
+	/**
+	 * Monster Maze builds its maze from native layouts and datapoints, so its test arena
+	 * is generated at load time and must not depend on an installed ZIP archive.
+	 */
+	public static boolean usesGeneratedMonsterMazeMap(GameType gameType)
+	{
+		return gameType == GameType.MonsterMaze
+				|| gameType == GameType.MonsterMazeSpeed
+				|| gameType == GameType.MonsterMazeModern;
+	}
 
 	final ArcadeManager Manager;
 	private final VotingManager _votingManager;
@@ -288,7 +301,7 @@ public class GameCreationManager implements Listener
 		ModePref = null;
 
 		// No map voting, load the maps now
-		boolean loadMapsNow = !Manager.GetServerConfig().MapVoting || MapPref != null;
+		boolean loadMapsNow = usesGeneratedMonsterMazeMap(gameType) || !Manager.GetServerConfig().MapVoting || MapPref != null;
 
 		try
 		{
@@ -347,7 +360,7 @@ public class GameCreationManager implements Listener
 	{
 		Game game = Manager.GetGame();
 
-		if (game == null || game.GetState() != GameState.PreLoad || MapPref != null || !Manager.GetServerConfig().MapVoting || Manager.GetServerConfig().GameVoting)
+		if (game == null || game.GetState() != GameState.PreLoad || usesGeneratedMonsterMazeMap(game.GetType()) || MapPref != null || !Manager.GetServerConfig().MapVoting || Manager.GetServerConfig().GameVoting)
 		{
 			return;
 		}
@@ -373,6 +386,15 @@ public class GameCreationManager implements Listener
 	private void loadMaps(GameType gameType)
 	{
 		_maps = new HashMap<>();
+
+		if (usesGeneratedMonsterMazeMap(gameType))
+		{
+			_maps.put(gameType, Collections.singletonList(GENERATED_MONSTER_MAZE_MAP));
+			MapPref = null;
+			MapSource = null;
+			System.out.println("Using generated Monster Maze test arena for " + gameType.getName() + ".");
+			return;
+		}
 
 		// Map
 		for (GameType type : Game.getWorldHostNames(gameType))
