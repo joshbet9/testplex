@@ -5,10 +5,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.bukkit.entity.Player;
@@ -52,6 +54,9 @@ public class GameCreationManager implements Listener
 	private String _lastMode = null;
 	private final List<GameType> _lastGames = new ArrayList<>();
 	private Map<GameType, List<String>> _maps;
+	private final Set<GameType> _missingMapWarnings = new HashSet<GameType>();
+	private GameType _waitingForMapsType;
+	private long _nextMapRetryAtMillis;
 
 	public String MapPref = null;
 	public GameType MapSource = null;
@@ -246,9 +251,7 @@ public class GameCreationManager implements Listener
 
 		Class<? extends Game> gameClass = gameType.getGameClass();
 
-		_nextGame = null;
-
-		//Reset Changes
+		// Reset config/modules only after map preflight succeeds.
 		Manager.GetCreature().SetDisableCustomDrops(false);
 		Manager.GetDamage().resetConfiguration();
 		Manager.GetExplosion().resetConfiguration();
@@ -256,11 +259,6 @@ public class GameCreationManager implements Listener
 		Manager.getCosmeticManager().getGadgetManager().setShowWeaponNames(false);
 		Manager.GetDamage().GetCombatManager().setUseWeaponName(AttackReason.CustomWeaponName);
 		ItemStackFactory.Instance.SetUseCustomNames(false);
-
-		//Champions
-		Manager.toggleChampionsModules(gameType);
-
-		_lastGames.add(0, gameType);
 
 		// GameModes
 		if (gameType.hasGameModes())
@@ -285,18 +283,54 @@ public class GameCreationManager implements Listener
 			}
 		}
 
+		// If this game uses an automatically generated world, an installed map
+		// archive is not required. All other games must have at least one valid
+		// source ZIP before we construct a Game or initialise its WorldData.
+		boolean loadMapsNow = !Manager.GetServerConfig().MapVoting || MapPref != null;
+		long now = System.currentTimeMillis();
+		if (_waitingForMapsType != null && now < _nextMapRetryAtMillis
+				&& (_nextGame == null || _nextGame == _waitingForMapsType))
+		{
+			return;
+		}
+
+		loadMaps(gameType);
+		if (!usesGeneratedMap(gameType) && (_maps == null || _maps.isEmpty()))
+		{
+			if (_missingMapWarnings.add(gameType))
+			{
+				System.err.println("GameCreationManager: refusing to start " + gameType.getName()
+						+ " because no map ZIPs were discovered. The selection remains queued; "
+						+ "the shared map directory/folder name must be corrected first.");
+			}
+			_waitingForMapsType = gameType;
+			_nextMapRetryAtMillis = now + 5000L;
+			return;
+		}
+
+		_missingMapWarnings.remove(gameType);
+		if (_waitingForMapsType == gameType)
+		{
+			_waitingForMapsType = null;
+			_nextMapRetryAtMillis = 0L;
+		}
+
+		_nextGame = null;
 		ModePref = null;
 
-		// No map voting, load the maps now
-		boolean loadMapsNow = !Manager.GetServerConfig().MapVoting || MapPref != null;
+		// Reset changes only after confirming that the world can be loaded.
+		Manager.GetCreature().SetDisableCustomDrops(false);
+		Manager.GetDamage().resetConfiguration();
+		Manager.GetExplosion().resetConfiguration();
+		Manager.getCosmeticManager().setHideParticles(false);
+		Manager.getCosmeticManager().getGadgetManager().setShowWeaponNames(false);
+		Manager.GetDamage().GetCombatManager().setUseWeaponName(AttackReason.CustomWeaponName);
+		ItemStackFactory.Instance.SetUseCustomNames(false);
+		Manager.toggleChampionsModules(gameType);
+		_lastGames.add(0, gameType);
 
 		try
 		{
-			if (loadMapsNow)
-			{
-				loadMaps(gameType);
-			}
-
 			// Create Game instance
 			Game game = gameClass.getConstructor(ArcadeManager.class).newInstance(Manager);
 
@@ -341,6 +375,12 @@ public class GameCreationManager implements Listener
 		{
 			Manager.GetGame().SetState(GameState.Loading);
 		}
+	}
+
+	private boolean usesGeneratedMap(GameType type)
+	{
+		return type == GameType.UHC || type == GameType.UHCSolo
+				|| type == GameType.UHCSoloSpeed || type == GameType.UHCTeamsSpeed;
 	}
 
 	private void checkMapVoting()
