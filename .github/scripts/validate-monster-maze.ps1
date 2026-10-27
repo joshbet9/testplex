@@ -203,18 +203,25 @@ Assert-Contains "Maze layout void cells are cleared to prevent a second floor" $
 Assert-Contains "Monster Maze team start uses the centre marker" $mazeCoreFile "playerTeam.GetSpawns().add(centralSpawn.clone());"
 Assert-Contains "Players are reseated at the central start after maze construction" $mazeCoreFile "player.teleport(centralSpawn);"
 Assert-Contains "Visibility toggle is implemented as an interact control" $mazeCoreFile "onVisibilityToggle(PlayerInteractEvent event)"
+Assert-Contains "Only one Safe Pad compass is installed in the kit compass slot" $mazeCoreFile "SAFE_PAD_COMPASS_SLOT = 4"
+Assert-Contains "Legacy duplicate Safe Pad compass is removed" $mazeCoreFile "LEGACY_DUPLICATE_COMPASS_SLOT"
+Assert-Contains "Falling below the maze eliminates players instead of leaving them in the void" $mazeCoreFile "onMonsterMazePlayerMove(PlayerMoveEvent event)"
+Assert-Contains "Arena world is swept before each run" $mazeCoreFile "clearStaleArenaEntities(WorldData.World)"
+Assert-Contains "Lazy-loaded maze chunks are swept for stale entities" $mazeCoreFile "onMonsterMazeChunkLoad(ChunkLoadEvent event)"
 Assert-Contains "Visibility dye cycles visible hidden and transparent modes" $mazeCoreFile "int next = current == 10 ? 8 : current == 8 ? 5 : 10;"
 Assert-Contains "Transparent mode uses a per-viewer invisibility packet" $mazeCoreFile "PacketPlayOutEntityEffect(target.getEntityId(), invisible)"
 Assert-Contains "Leaving transparent mode removes the client-only effect" $mazeCoreFile "PacketPlayOutRemoveEntityEffect(target.getEntityId(), new MobEffect(MobEffectList.INVISIBILITY.id, 1, 0))"
 Assert-Contains "Transparent mode has a per-viewer ghost team" $mazeCoreFile 'registerNewTeam("mm_ghosts")'
 Assert-Contains "Personal scoreboards include active Safe Pad distance" $mazeCoreFile 'board.write(C.cAqua + C.Bold + "Distance");'
-Assert-Contains "Personal scoreboards show whether the player is safe" $mazeCoreFile '(safe ? "SAFE" : "UNSAFE")'
+Assert-Contains "SAFE replaces distance while the player stands on the active pad" $mazeCoreFile 'board.write(C.cGreen + C.Bold + "SAFE");'
 Assert-Contains "Personal scoreboards and visibility are restored at round end" $mazeCoreFile "clearPersonalScoreboardsAndVisibility();"
 Assert-Contains "Compass is refreshed immediately when the active Safe Pad changes" $mazeFile "updateCompassTargets();"
 Assert-Contains "First-stage path is generated through walkable maze cells" $mazeFile "Build a genuine walkable breadcrumb"
 Assert-Contains "First-stage path particle effect is emitted" $mazeFile "point.getWorld().playEffect(point, Effect.HAPPY_VILLAGER, 0)"
-Assert-Contains "The first two Safe Pads get fireworks" $mazeFile "playFirstTwoStagePadFireworks()"
-Assert-Contains "Stale backing Snowmen are swept at startup and cleanup" $mazeFile "clearStaleMazeSnowmen()"
+Assert-Contains "Every newly spawned Safe Pad is marked with fireworks" $mazeFile "playPadSpawnSignal(_nextSafePad)"
+Assert-Contains "Fireworks are not triggered by player arrival" $mazeFile "Mark every newly spawned objective"
+Assert-Contains "Stale centre containment glass is cleared" $mazeFile "clearStaleContainmentGlass()"
+Assert-Contains "All stale entities in the maze footprint are swept" $mazeFile "private void clearStaleMazeEntities()"
 Assert-Contains "Bomb Lobbers has direct-hit ding hook" (Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\game\games\lobbers\BombLobbers.java") "directHitDing"
 Assert-Contains "Demo effects are registered" (Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\Arcade.java") "new WinEffectArcadeDemo.MonsterMaze(gadgetManager)"
 Assert-Contains "Bacon Brawl effect is clearly labelled a demo" (Join-Path $repoRoot "Plugins\Nautilus.Game.Arcade\src\nautilus\game\arcade\wineffect\WinEffectBaconBrawl.java") "Mighty Lava Arena Demo"
