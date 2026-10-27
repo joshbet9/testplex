@@ -116,7 +116,7 @@ jobs:
         run: |
           set -euo pipefail
           bash -n .github/scripts/deploy-testplex-hyperv.sh
-          grep -Fq "JAR_ENTRY_RE='^[A-Za-z0-9._+() -]+[.]jar$'" .github/scripts/deploy-testplex-hyperv.sh
+          grep -Fq 'ARTIFACT_CACHE="/tmp/testplex-artifact-cache"' .github/scripts/deploy-testplex-hyperv.sh
           bash <<'BASH'
           set -euo pipefail
           JAR_ENTRY_RE='^[A-Za-z0-9._+() -]+[.]jar$'
@@ -298,13 +298,13 @@ jobs:
                   "versioned backups": ".testplex-backups",
                   "stops only the configured test service": 'systemctl stop "$SERVICE"',
                   "rollback remains reachable on failure": "rollback() {",
-                  "requires exactly one Arcade JAR": 'grep -Fxc "Arcade.jar"',
+                  "requires exactly one Arcade JAR": 'JAR_PATHS=("$STAGE/Arcade.jar")',
                   "rejects the existing standalone service namespace": "monstermaze-18.service",
               },
               "Deploy workflow": {
                   "test branch guard": "github.ref == 'refs/heads/feat/testbed-bootstrap'",
                   "manual opt-in": "inputs.deploy_to_test_server",
-                  "auto-deploy opt-in": "vars.TESTPLEX_AUTO_DEPLOY == 'true'",
+                  "push deploys automatically": "github.event_name == 'push' && needs.build.result == 'success'",
                   "reuses the established Hyper-V Tailscale route": "tailscale/github-action@v4",
                   "can deploy an existing successful build": "inputs.source_run_id",
               },
