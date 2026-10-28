@@ -62,6 +62,7 @@ import org.bukkit.Color;
 import org.bukkit.Effect;
 import org.bukkit.FireworkEffect;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
@@ -1066,7 +1067,7 @@ public class Maze implements Listener
 			World padWorld = _safePad != null
 					? _safePad.getLocation().getWorld()
 					: _nextSafePad.getLocation().getWorld();
-			SafePad.refreshBeaconBeamForViewer(viewer, _host.Manager.GetPlugin(), padWorld);
+			SafePad.refreshBeaconBeamForViewer(viewer, _host.Manager.getPlugin(), padWorld);
 		}
 	}
 
