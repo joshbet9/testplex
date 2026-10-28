@@ -367,6 +367,7 @@ public final class ArcadePortRules {
 
     public static final double SHEEP_QUEST_PLAYER_HIT_DAMAGE = 4.0D;
     public static final int SHEEP_QUEST_INITIAL_SHEEP = 4;
+    public static final long SHEEP_QUEST_ROUND_MILLIS = 300_000L;
     public static final int SHEEP_QUEST_MAX_CARRY = 3;
     public static final long SHEEP_QUEST_SPAWN_INTERVAL_MILLIS = 20_000L;
 
