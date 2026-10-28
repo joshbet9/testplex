@@ -259,6 +259,8 @@ jobs:
               "Evolution": (base / "game/games/evolution/Evolution.java").read_text(encoding="utf-8"),
               "Micro Battles": (base / "game/games/micro/Micro.java").read_text(encoding="utf-8"),
               "Cosmetic selector": (base / "cosmetics/ArcadeCosmeticsMenu.java").read_text(encoding="utf-8"),
+              "Arcade Test Harness": (base / "cosmetics/ArcadeTestHarness.java").read_text(encoding="utf-8"),
+              "Win Effect Gadget": Path("Plugins/Mineplex.Core/src/mineplex/core/gadget/types/WinEffectGadget.java").read_text(encoding="utf-8"),
               "Deployment script": Path(".github/scripts/deploy-testplex-hyperv.sh").read_text(encoding="utf-8"),
               "Deploy workflow": Path(".github/workflows/testplex-build.yml").read_text(encoding="utf-8"),
               "Deployment guide": Path("docs/testbed-deployment.md").read_text(encoding="utf-8"),
@@ -436,6 +438,22 @@ jobs:
               "Plugin Metadata": {
                   "separate prototype command": "arcadecosmetics:",
                   "prototype command alias": "arcadecosmeticsmenu",
+                  "sandbox test bench command": "arcadetest:",
+              },
+              "Arcade Test Harness": {
+                  "requires isolated sandbox and operator": "arcadeManager != null && arcadeManager.isTestplexSandbox() && sender.isOp()",
+                  "keeps win effects out of live rounds": "if (!isLobbySafe())",
+                  "only registers native Arcade effects": 'gadget.getName().startsWith("Arcade ")',
+                  "uses a separate test world": 'private static final String WORLD_NAME = "arcadetest";',
+                  "caps temporary bots per owner": "MAX_BOTS_PER_OWNER = 8",
+                  "returns from tested effect with isolated cleanup": "effect.runFinishForTest()",
+                  "removes bots when owner leaves": "clearBots(owner);",
+              },
+              "Win Effect Gadget": {
+                  "isolated test setup": "public void setupForTest(Player player, Location loc)",
+                  "test cleanup avoids global visibility changes": "public void runFinishForTest()",
+                  "damage cancellation is limited to effect participants": "(_allPlayers == null || _allPlayers.contains(event.getEntity()))",
+                  "duration starts at playback": "_start = System.currentTimeMillis();",
               },
               "Deployment script": {
                   "test-only marker required": ".testplex-sandbox",
