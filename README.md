@@ -57,3 +57,7 @@ The experimental branch also registers `MonsterMazeSpeed` and `MonsterMazeModern
 
 
 When GitHub Actions minutes are unavailable, run the local Java 8 build and source checks with `powershell -ExecutionPolicy Bypass -File .github/scripts/validate-monster-maze.ps1`. Use `-SkipBuild` only for a quick source-contract check; it does not replace compiling `Arcade.jar`.
+
+## Modern Arcade testbed (Paper 26.3)
+
+The independent Java 25/Paper 26.3 project lives in [modern-platform](modern-platform/README.md) and has its own build workflow at [Testplex Modern Paper 26.3](.github/workflows/testplex-modern-build.yml). It is intentionally isolated from the Java 8/1.8.8 Reborn build and does not deploy to the existing 1.8 service. Monster Maze and Snake are the first mechanics ports; cosmetic selections and win-scene options are stored independently per game while their actual renderers are added and tested with each game.
