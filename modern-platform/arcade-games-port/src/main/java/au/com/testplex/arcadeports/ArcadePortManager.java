@@ -3707,8 +3707,11 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             WorldBorder border = session.world.getWorldBorder();
-            double half = border.getSize() / 2.0D;
-            if (Math.abs(location.getX()) > half || Math.abs(location.getZ()) > half) eliminate(session, player, null, "caught by the closing border");
+            Location center = border.getCenter();
+            if (ArcadePortRules.isOutsideWorldBorder(location.getX(), location.getZ(),
+                    center.getX(), center.getZ(), border.getSize())) {
+                eliminate(session, player, null, "caught by the closing border");
+            }
         }
     }
 
