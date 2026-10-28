@@ -310,15 +310,11 @@ public final class SourceMapCatalog {
             Location last = start;
             if (start != null) result.add(start.clone());
             if (markers == null || markers.isEmpty()) return result;
-            double threshold = Double.isFinite(duplicateDistance) ? Math.max(0.0D, duplicateDistance) : 0.0D;
-            double thresholdSquared = threshold * threshold;
             for (Location marker : markers) {
                 if (marker == null) continue;
                 if (last != null) {
-                    double dx = marker.getX() - last.getX();
-                    double dy = marker.getY() - last.getY();
-                    double dz = marker.getZ() - last.getZ();
-                    if (dx * dx + dy * dy + dz * dz < thresholdSquared) continue;
+                    double distance = marker.distance(last);
+                    if (ArcadePortRules.isDuplicateDragonEscapeWaypoint(distance, duplicateDistance)) continue;
                 }
                 result.add(marker.clone());
                 last = marker;
