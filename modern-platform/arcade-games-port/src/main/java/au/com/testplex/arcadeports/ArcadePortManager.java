@@ -4164,14 +4164,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isSpleefProtectedBlock(Material material) {
-        return material == null || material.isAir() || material == Material.BEDROCK || material == Material.LAVA;
+        return !isSpleefFloorBlock(material);
     }
 
     private boolean isSpleefFloorBlock(Material material) {
-        return material == Material.SNOW_BLOCK || material == Material.WHITE_WOOL
-                || material == Material.LIME_WOOL || material == Material.GREEN_WOOL
-                || material == Material.YELLOW_WOOL || material == Material.ORANGE_WOOL
-                || material == Material.RED_WOOL;
+        return ArcadePortRules.isSpleefFloorMaterial(material);
     }
 
     private void restoreSpleefHunger(Session session, Player player, long now) {
