@@ -224,14 +224,18 @@ public class MonsterMaze extends SoloGame
 			setJumpsLeft(player, 3);
 	}
 
-	/** Re-send this player's current Safe Pad surface and beacon tint after cosmetic settings change. */
+	/** Re-send only this player's current Safe Pad surface and beacon tint after a colour change. */
 	public void refreshSafePadCosmeticsForViewer(Player viewer)
 	{
 		if (_maze != null)
-		{
-			_maze.refreshMobSetSettingsForPlayer(viewer);
 			_maze.refreshPlayerSafePadCosmetics(viewer);
-		}
+	}
+
+	/** Reconcile enabled mob-set choices after a mob-set toggle in the cosmetics menu. */
+	public void refreshMobSetSettingsForViewer(Player viewer)
+	{
+		if (_maze != null)
+			_maze.refreshMobSetSettingsForPlayer(viewer);
 	}
 
 	@Override
