@@ -5473,7 +5473,7 @@ public final class ArcadePortManager implements Listener {
                 session.world.spawnParticle(Particle.EXPLOSION, blast, 1, 0.0D, 0.0D, 0.0D, 0.0D);
                 session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
                 for (Player target : alivePlayers(session)) {
-                    if (session.type == ArcadePortGame.BOMB_LOBBERS && owner != null
+                    if (session.type == ArcadePortGame.BOMB_LOBBERS
                             && session.teams.getOrDefault(ownerId, -1)
                             .equals(session.teams.getOrDefault(target.getUniqueId(), -2))) continue;
                     double distanceSquared = target.getLocation().distanceSquared(blast);
