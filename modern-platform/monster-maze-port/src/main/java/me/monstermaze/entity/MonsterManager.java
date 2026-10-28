@@ -116,6 +116,7 @@ public class MonsterManager {
 
     public void clear() {
         for (LivingEntity ent : new ArrayList<LivingEntity>(ents.keySet())) {
+            MonsterEntityController.forget(ent);
             if (ent != null && ent.isValid()) ent.remove();
         }
         ents.clear();
@@ -189,6 +190,7 @@ public class MonsterManager {
             if (ent != null && ent.isValid() && pad.isOn(ent)) {
                 launched.remove(ent);
                 frozen.remove(ent);
+                MonsterEntityController.forget(ent);
                 ent.remove();
                 it.remove();
             }
@@ -207,6 +209,9 @@ public class MonsterManager {
             MazeMobWaypoint wp = data.getValue();
 
             if (ent == null || !ent.isValid() || ent.isDead()) {
+                MonsterEntityController.forget(ent);
+                launched.remove(ent);
+                frozen.remove(ent);
                 it.remove();
                 continue;
             }
@@ -230,8 +235,9 @@ public class MonsterManager {
                 if (west != null) nextBlock.add(west);
 
                 if (nextBlock.isEmpty()) {
-                    it.remove();
+                    MonsterEntityController.forget(ent);
                     ent.remove();
+                    it.remove();
                     continue;
                 }
 
@@ -242,8 +248,9 @@ public class MonsterManager {
                     else if (wp.Direction == CardinalDirection.EAST) nextBlock.remove(west);
                 }
                 if (nextBlock.isEmpty()) {
-                    it.remove();
+                    MonsterEntityController.forget(ent);
                     ent.remove();
+                    it.remove();
                     continue;
                 }
 
@@ -425,6 +432,7 @@ public class MonsterManager {
             LivingEntity ent = e.getKey();
             long started = e.getValue();
             if (ent == null || !ent.isValid()) {
+                MonsterEntityController.forget(ent);
                 it.remove();
                 frozen.remove(ent);
                 ents.remove(ent);
@@ -436,6 +444,7 @@ public class MonsterManager {
                 it.remove();
                 frozen.remove(ent);
                 ents.remove(ent);
+                MonsterEntityController.forget(ent);
                 ent.remove();
             }
         }
