@@ -545,6 +545,15 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.teamWithBestTimeoutStanding(2, 2, 4, 4));
     }
 
+    @Test void gladiatorsRoundsMoveFromOuterGreenArenasTowardRedFinals() {
+        assertEquals("GREEN", ArcadePortRules.gladiatorsArenaMarkerGroup(0));
+        assertEquals("YELLOW", ArcadePortRules.gladiatorsArenaMarkerGroup(1));
+        assertEquals("ORANGE", ArcadePortRules.gladiatorsArenaMarkerGroup(2));
+        assertEquals("RED", ArcadePortRules.gladiatorsArenaMarkerGroup(3));
+        assertEquals("GREEN", ArcadePortRules.gladiatorsArenaMarkerGroup(-1));
+        assertEquals("RED", ArcadePortRules.gladiatorsArenaMarkerGroup(4));
+    }
+
     @Test void turfWarsTimeoutUsesTerritoryBeforeKills() {
         assertEquals(0, ArcadePortRules.turfWarsTimeoutLeader(0, 0, 99));
         assertEquals(0, ArcadePortRules.turfWarsTimeoutLeader(8, 0, 99));
