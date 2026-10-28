@@ -134,7 +134,7 @@ public final class MonsterMazePersonalBestManager
         if (game == null)
             return null;
         CustomDataManager manager = game.Manager == null ? null : game.Manager.getCustomDataManager();
-        return manager != null ? manager : Managers.get(CustomDataManager.class);
+        return manager != null ? manager : Managers.require(CustomDataManager.class);
     }
 
     /**
