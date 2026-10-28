@@ -392,6 +392,16 @@ public final class ArcadePortRules {
         return Math.max(0L, currentMillis - 5_000L);
     }
 
+    /** Test a player against a world border whose centre may not be at world origin. */
+    public static boolean isOutsideWorldBorder(double playerX, double playerZ,
+            double centerX, double centerZ, double borderSize) {
+        if (!Double.isFinite(playerX) || !Double.isFinite(playerZ)
+                || !Double.isFinite(centerX) || !Double.isFinite(centerZ)
+                || !Double.isFinite(borderSize) || borderSize <= 0.0D) return true;
+        double halfSize = borderSize / 2.0D;
+        return Math.abs(playerX - centerX) > halfSize || Math.abs(playerZ - centerZ) > halfSize;
+    }
+
     public static boolean shouldPunishMicroIslandExit(long elapsedMillis, double ownDistanceSquared,
             double nearestOtherDistanceSquared) {
         return elapsedMillis >= 0L && elapsedMillis < MICRO_BATTLES_CHEAT_WINDOW_MILLIS
