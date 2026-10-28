@@ -313,7 +313,10 @@ public final class SourceMapCatalog {
             for (Location marker : markers) {
                 if (marker == null) continue;
                 if (last != null) {
-                    double distance = marker.distance(last);
+                    double dx = marker.getX() - last.getX();
+                    double dy = marker.getY() - last.getY();
+                    double dz = marker.getZ() - last.getZ();
+                    double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
                     if (ArcadePortRules.isDuplicateDragonEscapeWaypoint(distance, duplicateDistance)) continue;
                 }
                 result.add(marker.clone());
