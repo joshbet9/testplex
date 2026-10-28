@@ -23,7 +23,7 @@ public final class ArcadeCatalog {
                         single("sauce-splash", "Sauce Splash", "A red-orange splash bursts outward.")),
                      line("bacon-trail", "Bacon Blast Trail", "A short-lived ability-specific trail.", "PORKCHOP",
                         single("grease-skid", "Grease Skid", "A skid mark appears along the dash."),
-                        single("smokehouse", "Smokehouse", "A curl of smoke follows the player.")),
+                        single("smokehouse", "Smokehouse", "A curl of smoke follows the player."))),
                 win("lava-arena", "Mighty Lava Arena", "A compact lava-arena podium scene."),
                 win("bacon-crown", "Bacon Crown", "A floating bacon crown and victory fanfare."),
                 win("crispy-finale", "Crispy Finale", "A sizzling floor burst and smoke columns")));
@@ -57,7 +57,7 @@ public final class ArcadeCatalog {
                      line("finish-celebration", "Finish Celebration", "A separate finish-line moment.", "FIREWORK_ROCKET",
                         single("skylands-gate", "Skylands Gate", "A luminous gate opens behind the finisher."),
                         single("dragon-roar", "Dragon Roar", "A dragon silhouette sweeps over the finish."),
-                        single("cloud-surf", "Cloud Surf", "Cloud rings cascade down the finish platform.")),
+                        single("cloud-surf", "Cloud Surf", "Cloud rings cascade down the finish platform."))),
                 win("skylands-gate", "Skylands Gate", "A large floating gate frames the winner."),
                 win("dragon-perch", "Dragon Perch", "The winner stands on a stylised dragon perch."),
                 win("cloud-throne", "Cloud Throne", "A cloud-built throne rises under the winner")));
@@ -101,7 +101,7 @@ public final class ArcadeCatalog {
                      line("border-language", "Border Language", "A visual cue for a closing map border.", "END_ROD",
                         single("sweeping-tape", "Sweeping Tape", "A moving ribbon tracks the safe edge."),
                         single("warning-pips", "Warning Pips", "Warning ticks appear on the closing side."),
-                        single("shatter-line", "Shatter Line", "The border emits a glass-shatter silhouette.")),
+                        single("shatter-line", "Shatter Line", "The border emits a glass-shatter silhouette."))),
                 win("last-tile", "Last Tile", "Only the winner's final tile stays lit."),
                 win("micro-monument", "Micro Monument", "A tiny monument assembles around the winner."),
                 win("falling-stars", "Falling Stars", "A narrow star shower descends onto the platform")));
@@ -142,7 +142,7 @@ public final class ArcadeCatalog {
                      line("paint-impact", "Paint Impact Signature", "A unique splat silhouette for impacts.", "SLIME_BALL",
                         single("colourburst", "Colourburst", "A radial paint bloom."),
                         single("paint-drip", "Paint Drip", "Paint droplets slide down the hit point."),
-                        single("stencil-stamp", "Stencil Stamp", "A team-coloured stencil flashes briefly.")),
+                        single("stencil-stamp", "Stencil Stamp", "A team-coloured stencil flashes briefly."))),
                 win("paint-wall", "Paint Wall", "A team-coloured mural paints in behind the winner."),
                 win("marker-medal", "Marker Medal", "A medal assembles from paint-marker parts."),
                 win("splatter-crown", "Splatter Crown", "A crown of layered paint splashes")));
