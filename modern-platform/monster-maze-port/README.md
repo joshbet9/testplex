@@ -3,7 +3,7 @@
 This dedicated gameplay module adapts the **1.21/MonsterMazeStandalone** implementation from [joshbet9/MonsterMaze](https://github.com/joshbet9/MonsterMaze) to the independent Testplex Paper 26.3 platform. It uses the modern Bukkit/Paper implementation instead of copying the 1.8 `v1_8_R3` NMS entity classes.
 
 ## Gameplay port in this first pass
-- Original, legacy Speed, Modern and Classic modes; three authored maze patterns; timed stages and Safe Pad progression. Speed keeps the 1.8 QOL kit rules with the original 60s-minus-2s stage timer and 150/15 monster cadence; only Modern uses the accelerated timer and 225/30 monster cadence.
+- Original, legacy Speed, Modern and Classic modes; three authored maze patterns; timed stages and Safe Pad progression. Speed keeps the 1.8 QOL kit rules and a modern Speed II replacement for the 1.8 ground-level speeding dash, while retaining the original 60s-minus-2s stage timer and 150/15 monster cadence. Only Modern uses the accelerated timer and 225/30 monster cadence; Classic opts out of the speed boost.
 - Jumper, Slowball, Body Builder, Repulsor, and mode-gated Maverick kit behavior from the 1.21 source.
 - Monster routing, bumps, launch/freeze interactions, stage progression, spectator/elimination paths and cleanup.
 - Dedicated arena/lobby handling, maze generation and admin control.
