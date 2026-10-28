@@ -111,6 +111,8 @@ public abstract class WinEffectGadget extends Gadget
 
 	public void runPlay()
 	{
+		// Start the duration when the effect actually begins playing, not when its room was prepared.
+		_start = System.currentTimeMillis();
 		_finish = _start + _length;
 		play();
 	}
