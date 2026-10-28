@@ -37,6 +37,13 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.isOutsideWorldBorder(Double.NaN, 0.0D, 0.0D, 0.0D, 100.0D));
     }
 
+    @Test void microBattlesVerticalMapScanUsesExclusiveMaximum() {
+        assertFalse(ArcadePortRules.isMicroCrumbleScanComplete(95, 96));
+        assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(96, 96));
+        assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(97, 96));
+        assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(0, 0));
+    }
+
     @Test void microBattlesOpeningRestrictionOnlyPunishesLeavingForAnotherIsland() {
         assertTrue(ArcadePortRules.shouldPunishMicroIslandExit(3_999L, 100.0D, 25.0D));
         assertFalse(ArcadePortRules.shouldPunishMicroIslandExit(4_000L, 100.0D, 25.0D));
