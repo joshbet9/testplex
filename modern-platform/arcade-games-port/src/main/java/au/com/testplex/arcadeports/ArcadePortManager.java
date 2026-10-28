@@ -518,6 +518,7 @@ public final class ArcadePortManager implements Listener {
         if (active != session) return;
         // An empty live set is a real end condition even during a one-player test.
         if (session.alive.isEmpty()) {
+            if (!ArcadePortRules.shouldFinishWhenNobodyIsAlive(session.alive.size(), session.respawning.size())) return;
             finish(session, null, true);
             return;
         }
