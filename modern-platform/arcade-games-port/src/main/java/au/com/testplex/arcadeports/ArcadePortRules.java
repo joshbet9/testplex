@@ -185,11 +185,15 @@ public final class ArcadePortRules {
         };
     }
 
-    /** Legacy 1.8 armour points absorb 4% of incoming damage per point, up to 20 points. */
+    /**
+     * Legacy Minecraft armour reduction with zero toughness:
+     * effective armour = min(20, max(armour / 5, armour - damage / 2)).
+     */
     public static double bombLobbersDamageAfterArmor(double rawDamage, double armorPoints) {
         if (!Double.isFinite(rawDamage) || rawDamage <= 0.0D) return 0.0D;
         double armor = Double.isFinite(armorPoints) ? Math.max(0.0D, Math.min(20.0D, armorPoints)) : 0.0D;
-        return rawDamage * (1.0D - armor / 25.0D);
+        double effectiveArmor = Math.min(20.0D, Math.max(armor / 5.0D, armor - rawDamage / 2.0D));
+        return rawDamage * (1.0D - effectiveArmor / 25.0D);
     }
 
     public static double bombLobbersPitchVelocity(int level) {
