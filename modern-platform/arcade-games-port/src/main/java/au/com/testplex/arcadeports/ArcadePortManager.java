@@ -1127,19 +1127,21 @@ public final class ArcadePortManager implements Listener {
                 int killerLevel = ArcadePortRules.nextEvolutionLevel(
                         session.evolutionLevels.getOrDefault(killer.getUniqueId(), 0), true);
                 session.evolutionLevels.put(killer.getUniqueId(), killerLevel);
-                giveEvolutionKit(session, killer);
-                if (killerLevel >= 5) {
+                if (ArcadePortRules.isEvolutionWinnerLevel(killerLevel)) {
+                    session.evolutionLevels.put(killer.getUniqueId(), killerLevel);
                     finish(session, killer, true);
                     return;
                 }
+                session.evolutionLevels.put(killer.getUniqueId(), killerLevel);
+                giveEvolutionKit(session, killer);
             }
-            int victimLevel = ArcadePortRules.nextEvolutionLevel(
-                    session.evolutionLevels.getOrDefault(player.getUniqueId(), 0), false);
-            session.evolutionLevels.put(player.getUniqueId(), victimLevel);
+            int victimLevel = session.evolutionLevels.getOrDefault(player.getUniqueId(), 0);
+            session.respawning.add(player.getUniqueId());
             player.setGameMode(GameMode.SPECTATOR);
-            player.sendMessage(ChatColor.RED + "You were knocked back to evolution stage " + (victimLevel + 1) + ": " + reason + ".");
+            player.sendMessage(ChatColor.RED + "Defeated, but your evolution is retained at stage " + (victimLevel + 1) + ".");
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (active != session || !player.isOnline()) return;
+                if (active != session || !player.isOnline()
+                        || !session.respawning.remove(player.getUniqueId())) return;
                 Location spawn = spawnFor(session, player);
                 player.teleport(spawn);
                 player.setGameMode(GameMode.SURVIVAL);
