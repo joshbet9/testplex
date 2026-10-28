@@ -172,7 +172,7 @@ public final class ArcadePortManager implements Listener {
                 ? now + ArcadePortRules.TURF_WARS_BUILD_PHASE_MILLIS : 0L;
         session.turfFrontlineX = -1;
         lastDragonHazard = now + 8_000L;
-        lastSheepSpawn = now + 20_000L;
+        lastSheepSpawn = now + 5_000L;
         world.setTime(6000L);
         world.setStorm(false);
         world.setThundering(false);
@@ -232,7 +232,9 @@ public final class ArcadePortManager implements Listener {
                 runner.sendMessage(ChatColor.YELLOW + "Solo test: avoid the chaser; one hit ends the run.");
             }
         }
-        if (type == ArcadePortGame.SHEEP_QUEST) spawnSheep(session);
+        if (type == ArcadePortGame.SHEEP_QUEST) {
+            for (int i = 0; i < 8; i++) spawnSheep(session);
+        }
         if (type == ArcadePortGame.DRAGONS) spawnTestDragons(session);
         if (type == ArcadePortGame.GLADIATORS && participants.size() > 1) {
             startGladiatorsRound(session, alivePlayers(session), true);
@@ -725,7 +727,7 @@ public final class ArcadePortManager implements Listener {
             updateSheepQuest(session);
             if (now >= lastSheepSpawn && session.sheep.size() < 12) {
                 spawnSheep(session);
-                lastSheepSpawn = now + 20_000L;
+                lastSheepSpawn = now + 5_000L;
             }
         }
 
@@ -1024,9 +1026,9 @@ public final class ArcadePortManager implements Listener {
     private Player sheepQuestLeader(Session session) {
         int red = sheepQuestTeamCount(session, 0);
         int blue = sheepQuestTeamCount(session, 1);
-        if (red == blue) return topScorerOrLastAlive(session);
+        if (red == blue) return null;
         int winningTeam = ArcadePortRules.sheepQuestLeadingTeam(red, blue);
-        if (winningTeam < 0) return topScorerOrLastAlive(session);
+        if (winningTeam < 0) return null;
         return alivePlayers(session).stream()
                 .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
                 .max(java.util.Comparator.comparingInt(player -> session.scores.getOrDefault(player.getUniqueId(), 0)))
