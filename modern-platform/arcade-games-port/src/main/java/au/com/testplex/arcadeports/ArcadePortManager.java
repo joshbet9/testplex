@@ -3537,8 +3537,9 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         session.evolutionCharge.remove(id);
         player.setExp(0.0F);
+        // Slowness is charge feedback. Jump Boost belongs to the Slime evolution form,
+        // so cancelling a charge must not remove that form's gameplay perk.
         player.removePotionEffect(PotionEffectType.SLOWNESS);
-        player.removePotionEffect(PotionEffectType.JUMP_BOOST);
     }
 
     private void beginEvolution(Session session, Player player) {
