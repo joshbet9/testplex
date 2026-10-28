@@ -378,7 +378,7 @@ jobs:
               "Monster Maze Body Builder": {
                   "Body Rush is right-click, not Q-drop": "onBodyRushInteract(PlayerInteractEvent event)",
                   "Body Rush handles mob crosshair": "onBodyRushEntityInteract(PlayerInteractEntityEvent event)",
-                  "two charges are tracked as apples": 'C.cRed + "Activations: " + hand.getAmount()',
+                  "two charges are tracked as apples": 'C.cGold + C.Bold + "Activations: " + C.cRed + C.Bold + hand.getAmount()',
                   "Body Rush countdown actionbar": "new PacketPlayOutChat(packetText, (byte) 2)",
                   "Body Rush activation and impact particles": "Effect.MOBSPAWNER_FLAMES",
                   "Body Rush hit feedback": "_bodyRushFeedbackUntil.put(player.getUniqueId(), now + 750L)",
