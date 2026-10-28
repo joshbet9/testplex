@@ -701,6 +701,15 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldEnterSheepQuestOvertime(2, 5));
     }
 
+    @Test void fourTeamSheepQuestOvertimeStartsOnlyWithoutAUniqueLeader() {
+        assertTrue(ArcadePortRules.shouldEnterSheepQuestOvertime(new int[]{0, 0, 0, 0}));
+        assertTrue(ArcadePortRules.shouldEnterSheepQuestOvertime(new int[]{3, 3, 1, 0}));
+        assertTrue(ArcadePortRules.shouldEnterSheepQuestOvertime(new int[]{2, 2, 2, 2}));
+        assertFalse(ArcadePortRules.shouldEnterSheepQuestOvertime(new int[]{4, 3, 2, 1}));
+        assertFalse(ArcadePortRules.shouldEnterSheepQuestOvertime(new int[]{1, 2, 7, 3}));
+        assertTrue(ArcadePortRules.shouldEnterSheepQuestOvertime((int[]) null));
+    }
+
     @Test void sheepQuestSupportsFourTeamsAndDetectsTies() {
         assertEquals(0, ArcadePortRules.sheepQuestLeadingTeam(new int[]{5, 3, 2, 1}));
         assertEquals(1, ArcadePortRules.sheepQuestLeadingTeam(new int[]{1, 4, 2, 3}));
