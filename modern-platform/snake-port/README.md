@@ -5,7 +5,7 @@ This is a standalone, Paper-native first-pass port of the Arcade Snake mechanics
 ## Current mechanics
 - Sheep-headed player snakes with a following sheep tail; length grows over time and from green slime food.
 - Speed, Reverse and Invulnerable kits with short timed abilities.
-- Physical, steering magma-cube item-box hazards, with an animated hotbar roll.
+- Physical, steering magma-cube item-box hazards (10-second first spawn, then 15-second intervals, four-cube cap, source-style 0.12 steering every four ticks and preserved hop/gravity); touching a box during an active roulette no longer consumes it, with an animated hotbar roll.
 - Four per-player steering effects (Turn Lag, Drift, Overshoot and Weak Sharp Turning) whose durations escalate on repeat hits: 1, 3, 5, 10, 15, 20, then 30 seconds.
 - Tail/self-tail collision, idle/wall/quit elimination, spectator transitions and player inventory/location restoration.
 - Solo mode for long-running mechanics tests; multiplayer starts when multiple players queue.
