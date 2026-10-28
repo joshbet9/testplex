@@ -44,6 +44,11 @@ public final class SnakeRules {
         return speedBoost ? speed * 1.5D : speed;
     }
 
+    /** Match Reborn's per-round player index palette, wrapping safely when more than 16 players queue. */
+    public static int colorIndexForParticipant(int participantIndex, int paletteSize) {
+        return paletteSize <= 0 ? 0 : Math.floorMod(participantIndex, paletteSize);
+    }
+
     /** Source food collection uses a strict 2-block 3D radius. */
     public static boolean isFoodCollected(double distanceSquared) {
         return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
