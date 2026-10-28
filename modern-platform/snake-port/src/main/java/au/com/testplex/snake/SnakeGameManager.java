@@ -174,7 +174,7 @@ public final class SnakeGameManager implements Listener {
         startingPlayerCount = players.size();
         long now = System.currentTimeMillis();
         startedAt = now;
-        nextFoodAt = now + 500L;
+        nextFoodAt = now + 1_000L;
         nextGrowAt = now + 1_000L;
         nextHazardAt = now + FIRST_HAZARD_DELAY_MS;
         foods.clear();
