@@ -89,4 +89,12 @@ class ArcadePortGameTest {
         assertEquals(1.8D, ArcadePortRules.nextBaconKnockback(1.5D), 0.00001D);
     }
 
+    @Test void runnerFloorBlocksFallAfterSixHundredMilliseconds() {
+        assertEquals(600L, ArcadePortRules.RUNNER_BLOCK_DECAY_MILLIS);
+        assertEquals(1_200L, ArcadePortRules.RUNNER_BLOCK_LIFETIME_MILLIS);
+        assertFalse(ArcadePortRules.shouldDropRunnerBlock(599L));
+        assertTrue(ArcadePortRules.shouldDropRunnerBlock(600L));
+        assertTrue(ArcadePortRules.shouldDropRunnerBlock(1_200L));
+    }
+
 }
