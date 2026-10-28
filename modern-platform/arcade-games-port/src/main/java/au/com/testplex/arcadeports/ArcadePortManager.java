@@ -2793,21 +2793,27 @@ public final class ArcadePortManager implements Listener {
                 dragon.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
             }
 
-            // Match Reborn's radius-10 destruction over the full source-map volume.
-            int radius = (int) Math.ceil(ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS);
-            double radiusSquared = ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS
-                    * ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS;
-            for (int dx = -radius; dx <= radius; dx++) {
-                for (int dy = -radius; dy <= radius; dy++) {
-                    for (int dz = -radius; dz <= radius; dz++) {
-                        if (dx * dx + dy * dy + dz * dz > radiusSquared) continue;
-                        Block block = location.getBlock().getRelative(dx, dy, dz);
-                        if (block.isLiquid() || block.getRelative(BlockFace.UP).isLiquid()) continue;
-                        if (session.dragonEscapeMapName.contains("Hell") && block.getY() < 30) continue;
-                        if (session.dragonEscapeMapName.contains("Pirate") && block.getY() < 6) continue;
-                        if (!block.getType().isAir()) block.setType(Material.AIR, false);
+            // Reborn destroys a radius-10 sphere as the dragon moves. Do not scan the same area
+            // every tick: update the sphere after the dragon has moved at least half a block.
+            Location lastDestruction = session.dragonEscapeLastDestructionLocation;
+            double movedSquared = lastDestruction == null ? 0.0D : location.distanceSquared(lastDestruction);
+            if (ArcadePortRules.shouldProcessDragonEscapeDestruction(movedSquared, lastDestruction != null)) {
+                int radius = (int) Math.ceil(ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS);
+                double radiusSquared = ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS
+                        * ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS;
+                for (int dx = -radius; dx <= radius; dx++) {
+                    for (int dy = -radius; dy <= radius; dy++) {
+                        for (int dz = -radius; dz <= radius; dz++) {
+                            if (dx * dx + dy * dy + dz * dz > radiusSquared) continue;
+                            Block block = location.getBlock().getRelative(dx, dy, dz);
+                            if (block.isLiquid() || block.getRelative(BlockFace.UP).isLiquid()) continue;
+                            if (session.dragonEscapeMapName.contains("Hell") && block.getY() < 30) continue;
+                            if (session.dragonEscapeMapName.contains("Pirate") && block.getY() < 6) continue;
+                            if (!block.getType().isAir()) block.setType(Material.AIR, false);
+                        }
                     }
                 }
+                session.dragonEscapeLastDestructionLocation = location.clone();
             }
 
             int lastIndex = session.dragonEscapeWaypoints.size() - 1;
@@ -5522,6 +5528,7 @@ public final class ArcadePortManager implements Listener {
         long dragonNextSpawnAt;
         final Map<UUID, Long> dragonLeapReadyAt = new HashMap<>();
         EnderDragon dragonEscapeDragon;
+        Location dragonEscapeLastDestructionLocation;
         final List<Location> dragonEscapeWaypoints = new ArrayList<>();
         final Map<UUID, String> dragonEscapeKits = new HashMap<>();
         final Map<UUID, Integer> dragonEscapeLeapUsesRemaining = new HashMap<>();
