@@ -108,6 +108,16 @@ class ArcadePortGameTest {
         assertEquals("maps/dragon-escape.zip", SourceMapCatalog.resourceFor(ArcadePortGame.DRAGON_ESCAPE));
     }
 
+    @Test void oneInTheQuiverArchiveIsNotAccidentallyTheDeathTagMap() throws Exception {
+        try (var quiver = getClass().getClassLoader().getResourceAsStream("maps/one-in-the-quiver.zip");
+             var deathTag = getClass().getClassLoader().getResourceAsStream("maps/death-tag.zip")) {
+            assertNotNull(quiver, "One in the Quiver needs its own source map archive");
+            assertNotNull(deathTag, "Death Tag source map archive should be present");
+            assertFalse(java.util.Arrays.equals(quiver.readAllBytes(), deathTag.readAllBytes()),
+                    "One in the Quiver must not silently reuse the Death Tag village archive");
+        }
+    }
+
     @Test void originalMapCatalogEmbedsThirteenSourceWorldsAndLeavesEvolutionExplicitlyUnmapped() {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BACON_BRAWL));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BOMB_LOBBERS));
