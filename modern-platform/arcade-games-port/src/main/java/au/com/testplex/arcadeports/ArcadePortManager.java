@@ -1547,25 +1547,38 @@ public final class ArcadePortManager implements Listener {
     private void tryQuiverRebound(Session session, Projectile projectile, Player shooter, Player struckPlayer) {
         Integer bounces = session.quiverArrowBounces.remove(projectile.getUniqueId());
         if (!"enchanter".equals(session.quiverKits.getOrDefault(shooter.getUniqueId(), "leaper"))
-                || bounces == null || bounces <= 0 || active != session) return;
+                || bounces == null || !ArcadePortRules.shouldQuiverArrowBounce(bounces)
+                || active != session || !struckPlayer.isOnline()) return;
+        Location origin = struckPlayer.getEyeLocation().clone();
         Player nearest = null;
         double nearestDistance = ArcadePortRules.QUIVER_REBOUND_MAX_DISTANCE_SQUARED;
-        Location origin = struckPlayer.getEyeLocation().clone();
         for (Player candidate : alivePlayers(session)) {
             if (candidate.equals(shooter) || candidate.equals(struckPlayer)) continue;
             double distance = candidate.getLocation().distanceSquared(origin);
-            if (distance <= nearestDistance) {
+            if (ArcadePortRules.isQuiverReboundTargetInRange(distance) && distance < nearestDistance) {
                 nearestDistance = distance;
                 nearest = candidate;
             }
         }
-        if (nearest == null) return;
-        Vector trajectory = nearest.getEyeLocation().toVector().subtract(origin.toVector());
-        if (trajectory.lengthSquared() < 0.001D) return;
+
+        Vector trajectory;
+        if (nearest != null) {
+            trajectory = nearest.getEyeLocation().toVector().subtract(origin.toVector());
+        } else {
+            // The source Enchanter chain arrow still bounces when no nearby enemy is available.
+            double angle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
+            double vertical = ThreadLocalRandom.current().nextDouble(-0.12D, 0.22D);
+            trajectory = new Vector(Math.cos(angle), vertical, Math.sin(angle));
+        }
+        if (trajectory.lengthSquared() < 0.001D) {
+            double angle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
+            trajectory = new Vector(Math.cos(angle), 0.05D, Math.sin(angle));
+        }
         Arrow rebound = session.world.spawnArrow(origin, trajectory.normalize(), 1.2F, 0.0F);
         rebound.setShooter(shooter);
         session.entities.add(rebound);
-        session.quiverArrowBounces.put(rebound.getUniqueId(), 0);
+        session.quiverArrowBounces.put(rebound.getUniqueId(),
+                ArcadePortRules.quiverArrowBouncesAfterBounce(bounces));
     }
 
     private Location microCrumbleSpectatorLocation(Session session, SourceMapCatalog.MapData mapData) {
@@ -4641,7 +4654,7 @@ public final class ArcadePortManager implements Listener {
                 || !(event.getEntity() instanceof Player player)
                 || !"enchanter".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))
                 || !(event.getProjectile() instanceof Arrow arrow)) return;
-        session.quiverArrowBounces.put(arrow.getUniqueId(), 1);
+        session.quiverArrowBounces.put(arrow.getUniqueId(), ArcadePortRules.QUIVER_MAX_ARROW_BOUNCES);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
