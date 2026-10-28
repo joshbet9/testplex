@@ -360,6 +360,21 @@ class ArcadePortGameTest {
         assertEquals(12_000L, ArcadePortRules.sourceWorldTime(null, "Unknown"));
     }
 
+    @Test void dragonEscapeKitsExposeSourceKitChoicesAndLeapCharges() {
+        assertEquals("jumper", ArcadePortRules.normalizeDragonEscapeKit("Jumper"));
+        assertEquals("disruptor", ArcadePortRules.normalizeDragonEscapeKit("DISRUPTOR"));
+        assertEquals("warper", ArcadePortRules.normalizeDragonEscapeKit("Warper"));
+        assertEquals("digger", ArcadePortRules.normalizeDragonEscapeKit("Digger"));
+        assertNull(ArcadePortRules.normalizeDragonEscapeKit("speedster"));
+        assertEquals(4, ArcadePortRules.dragonEscapeLeapUses("jumper"));
+        assertEquals(3, ArcadePortRules.dragonEscapeLeapUses("disruptor"));
+        assertEquals(2, ArcadePortRules.dragonEscapeLeapUses("warper"));
+        assertEquals(0, ArcadePortRules.dragonEscapeLeapUses("digger"));
+        assertEquals(6, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
+        assertEquals(2, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_MAX_TNT);
+        assertEquals(10_000L, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
+    }
+
     @Test void dragonEscapeRouteOnlyDeduplicatesCoincidentWaypoints() {
         assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.0D));
         assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.5D));
