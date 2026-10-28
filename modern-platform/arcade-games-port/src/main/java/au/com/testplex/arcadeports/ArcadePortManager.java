@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Color;
 import org.bukkit.DyeColor;
 import org.bukkit.GameMode;
 import org.bukkit.GameRule;
@@ -46,6 +47,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
@@ -183,6 +185,7 @@ public final class ArcadePortManager implements Listener {
             session.players.put(player.getUniqueId(), player);
             session.alive.add(player.getUniqueId());
             session.scores.put(player.getUniqueId(), 0);
+            if (type == ArcadePortGame.PAINTBALL) session.paintPiecesRemaining.put(player.getUniqueId(), 4);
             if (type == ArcadePortGame.EVOLUTION) session.evolutionLevels.put(player.getUniqueId(), 0);
             int teamId = type == ArcadePortGame.MICRO_BATTLES ? i % 4 : i % 2;
             session.teams.put(player.getUniqueId(), teamId);
@@ -435,8 +438,9 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
                 break;
             case PAINTBALL:
-                player.getInventory().addItem(namedItem(Material.SNOWBALL, "Paintball", "Tag opponents with a direct hit.", 32));
+                player.getInventory().addItem(namedItem(Material.SNOWBALL, "Paintball", "Paint opponents' armour with direct hits.", 32));
                 player.getInventory().addItem(new ItemStack(Material.STONE_SWORD));
+                setPaintballArmor(session, player);
                 break;
             case RUNNER:
                 player.getInventory().addItem(namedItem(Material.FEATHER, "Runner Dash", "A short forward burst.", 3));
@@ -459,6 +463,59 @@ public final class ArcadePortManager implements Listener {
                 break;
         }
         player.updateInventory();
+    }
+
+    private void setPaintballArmor(Session session, Player player) {
+        Color teamColor = session.teams.getOrDefault(player.getUniqueId(), 0) == 0 ? Color.AQUA : Color.RED;
+        ItemStack[] armor = new ItemStack[] {
+                new ItemStack(Material.LEATHER_BOOTS),
+                new ItemStack(Material.LEATHER_LEGGINGS),
+                new ItemStack(Material.LEATHER_CHESTPLATE),
+                new ItemStack(Material.LEATHER_HELMET)
+        };
+        for (ItemStack piece : armor) {
+            if (piece.getItemMeta() instanceof LeatherArmorMeta meta) {
+                meta.setColor(teamColor);
+                piece.setItemMeta(meta);
+            }
+        }
+        player.getInventory().setArmorContents(armor);
+    }
+
+    private int applyPaintballHit(Session session, Player attacker, Player target) {
+        UUID targetId = target.getUniqueId();
+        int before = session.paintPiecesRemaining.getOrDefault(targetId, 4);
+        int after = ArcadePortRules.paintballPiecesAfterHit(before, 1);
+        if (after < before) {
+            ItemStack[] armor = target.getInventory().getArmorContents();
+            List<Integer> available = new ArrayList<>();
+            for (int i = 0; i < armor.length; i++) {
+                ItemStack piece = armor[i];
+                if (piece == null || !(piece.getItemMeta() instanceof LeatherArmorMeta meta)) continue;
+                if (!Color.PURPLE.equals(meta.getColor())) available.add(i);
+            }
+            if (!available.isEmpty()) {
+                int index = available.get(ThreadLocalRandom.current().nextInt(available.size()));
+                ItemStack piece = armor[index];
+                LeatherArmorMeta meta = (LeatherArmorMeta) piece.getItemMeta();
+                meta.setColor(Color.PURPLE);
+                piece.setItemMeta(meta);
+                target.getInventory().setArmorContents(armor);
+            }
+            session.paintPiecesRemaining.put(targetId, after);
+        }
+        target.getWorld().playSound(target.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7F, 1.8F);
+        target.getWorld().spawnParticle(Particle.SPLASH, target.getLocation().add(0.0D, 1.0D, 0.0D),
+                12, 0.35D, 0.4D, 0.35D, 0.03D);
+        attacker.playSound(attacker.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 1.4F);
+        attacker.sendMessage(ChatColor.YELLOW + "Paint hit! " + after + " armour pieces remaining.");
+        if (ArcadePortRules.isPaintballPlayerOut(after)) {
+            session.scores.merge(attacker.getUniqueId(), 1, Integer::sum);
+            announce(session, ChatColor.RED + target.getName() + ChatColor.GRAY + " was painted out by "
+                    + ChatColor.GREEN + attacker.getName() + ChatColor.GRAY + "!");
+            eliminate(session, target, attacker, "was completely painted");
+        }
+        return after;
     }
 
     private ItemStack namedItem(Material type, String title, String lore) {
@@ -789,7 +846,8 @@ public final class ArcadePortManager implements Listener {
             finish(session, null, true);
             return;
         }
-        if (session.type == ArcadePortGame.MICRO_BATTLES && session.participantsAtStart > 1) {
+        if ((session.type == ArcadePortGame.MICRO_BATTLES || session.type == ArcadePortGame.PAINTBALL)
+                && session.participantsAtStart > 1) {
             Set<Integer> remainingTeams = new HashSet<>();
             for (UUID id : session.alive) remainingTeams.add(session.teams.getOrDefault(id, -1));
             if (remainingTeams.size() <= 1) {
@@ -894,6 +952,7 @@ public final class ArcadePortManager implements Listener {
         if ((session.type == ArcadePortGame.PAINTBALL || session.type == ArcadePortGame.TURF_WARS
                 || session.type == ArcadePortGame.MICRO_BATTLES)
                 && session.teams.getOrDefault(attacker.getUniqueId(), -1).equals(session.teams.getOrDefault(target.getUniqueId(), -2))) return;
+        if (session.type == ArcadePortGame.PAINTBALL && "melee".equals(source)) return;
         if (session.type == ArcadePortGame.TURF_WARS && !session.turfCombat) return;
         if (session.type == ArcadePortGame.SPLEEF) return; // Player combat is disabled; projectiles target the floor.
 
@@ -921,11 +980,7 @@ public final class ArcadePortManager implements Listener {
                 checkRoundEnd(session);
                 break;
             case PAINTBALL:
-                session.scores.merge(attacker.getUniqueId(), 1, Integer::sum);
-                Vector push = target.getLocation().toVector().subtract(attacker.getLocation().toVector()).normalize().multiply(0.8D);
-                target.setVelocity(push.setY(0.25D));
-                target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0, 1, 0), 14, 0.4D, 0.5D, 0.4D, 0.12D);
-                checkWinnerForScore(session, attacker);
+                applyPaintballHit(session, attacker, target);
                 break;
             case TURF_WARS: {
                 UUID targetId = target.getUniqueId();
@@ -1613,6 +1668,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, PlayerSnapshot> snapshots = new HashMap<>();
         final Set<UUID> alive = new HashSet<>();
         final Map<UUID, Integer> scores = new HashMap<>();
+        final Map<UUID, Integer> paintPiecesRemaining = new HashMap<>();
         final Map<UUID, Integer> evolutionLevels = new HashMap<>();
         final Map<UUID, Integer> teams = new HashMap<>();
         final Set<UUID> tagged = new HashSet<>();
