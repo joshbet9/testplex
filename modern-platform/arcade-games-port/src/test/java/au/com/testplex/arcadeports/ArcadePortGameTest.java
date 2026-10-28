@@ -81,11 +81,12 @@ class ArcadePortGameTest {
         assertEquals(1, ArcadePortRules.requiredDeathTagChasers(-1L));
     }
 
-    @Test void baconBrawlEscalatesKnockbackWithShorterIntervals() {
+    @Test void baconBrawlEscalatesKnockbackWithShorterFiniteIntervals() {
         assertEquals(50_000L, ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS);
         assertEquals(45_000L, ArcadePortRules.nextBaconKnockbackInterval(50_000L));
-        assertEquals(5_000L, ArcadePortRules.nextBaconKnockbackInterval(5_000L));
-        assertEquals(5_000L, ArcadePortRules.nextBaconKnockbackInterval(1_000L));
+        assertEquals(5_000L, ArcadePortRules.nextBaconKnockbackInterval(10_000L));
+        assertEquals(0L, ArcadePortRules.nextBaconKnockbackInterval(5_000L));
+        assertEquals(0L, ArcadePortRules.nextBaconKnockbackInterval(0L));
         assertEquals(1.8D, ArcadePortRules.nextBaconKnockback(1.5D), 0.00001D);
     }
 
