@@ -545,6 +545,17 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.teamWithBestTimeoutStanding(2, 2, 4, 4));
     }
 
+    @Test void gladiatorsStartingTierScalesWithLobbySize() {
+        assertEquals(3, ArcadePortRules.gladiatorsStartingTierForPlayers(1));
+        assertEquals(3, ArcadePortRules.gladiatorsStartingTierForPlayers(2));
+        assertEquals(2, ArcadePortRules.gladiatorsStartingTierForPlayers(3));
+        assertEquals(2, ArcadePortRules.gladiatorsStartingTierForPlayers(4));
+        assertEquals(1, ArcadePortRules.gladiatorsStartingTierForPlayers(5));
+        assertEquals(1, ArcadePortRules.gladiatorsStartingTierForPlayers(8));
+        assertEquals(0, ArcadePortRules.gladiatorsStartingTierForPlayers(9));
+        assertEquals(0, ArcadePortRules.gladiatorsStartingTierForPlayers(16));
+    }
+
     @Test void gladiatorsRoundsMoveFromOuterGreenArenasTowardRedFinals() {
         assertEquals("GREEN", ArcadePortRules.gladiatorsArenaMarkerGroup(0));
         assertEquals("YELLOW", ArcadePortRules.gladiatorsArenaMarkerGroup(1));
