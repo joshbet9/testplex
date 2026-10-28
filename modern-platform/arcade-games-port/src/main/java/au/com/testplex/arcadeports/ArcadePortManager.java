@@ -22,6 +22,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.Sheep;
 import org.bukkit.entity.Snowball;
+import org.bukkit.entity.TNTPrimed;
 import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -153,6 +154,9 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         session.startedAt = now;
         session.endsAt = now + ROUND_MS;
+        session.lastBaconHungerAt = now;
+        session.lastBaconEscalationAt = now;
+        session.baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
         session.microBarrierActive = type == ArcadePortGame.MICRO_BATTLES;
         session.turfCombat = false;
         session.turfPhaseEndsAt = type == ArcadePortGame.TURF_WARS
@@ -397,7 +401,7 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().addItem(new ItemStack(Material.COOKED_PORKCHOP, 8));
                 break;
             case BOMB_LOBBERS:
-                player.getInventory().addItem(namedItem(Material.SNOWBALL, "Bomb Lobber", "Direct hits deliver a knockback burst.", 32));
+                player.getInventory().addItem(namedItem(Material.TNT, "Bomb Lobber", "Throw TNT to blast enemy players away.", 5));
                 break;
             case DEATH_TAG:
                 player.getInventory().addItem(namedItem(Material.STONE_SWORD, "Tag", "Hit runners to tag them."));
@@ -481,6 +485,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
             updateDeathTagChasers(session, now);
         }
+        if (session.type == ArcadePortGame.BACON_BRAWL) updateBaconBrawl(session, now);
         if (session.type == ArcadePortGame.DRAGONS && now >= lastDragonHazard) {
             launchDragonHazard(session);
             lastDragonHazard = now + 4_500L;
@@ -514,6 +519,31 @@ public final class ArcadePortManager implements Listener {
         }
         updateTitles(session);
         checkRoundEnd(session);
+    }
+
+    private void updateBaconBrawl(Session session, long now) {
+        if (now - session.lastBaconHungerAt >= 2_000L) {
+            session.lastBaconHungerAt = now;
+            for (Player player : new ArrayList<>(alivePlayers(session))) {
+                if (player.getFoodLevel() > 0) {
+                    player.setFoodLevel(Math.max(0, player.getFoodLevel() - 1));
+                } else if (player.getHealth() <= 2.0D) {
+                    eliminate(session, player, null, "starved");
+                    if (active != session) return;
+                } else {
+                    player.setHealth(player.getHealth() - 2.0D);
+                }
+            }
+        }
+        if (active != session || now - session.lastBaconEscalationAt < session.baconEscalationIntervalMillis) return;
+        session.lastBaconEscalationAt = now;
+        session.baconKnockback = ArcadePortRules.nextBaconKnockback(session.baconKnockback);
+        session.baconEscalationIntervalMillis = ArcadePortRules.nextBaconKnockbackInterval(
+                session.baconEscalationIntervalMillis);
+        announce(session, ChatColor.GREEN + "The ground trembles! Knockback has increased.");
+        for (Player player : alivePlayers(session)) {
+            player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_FLAP, 1.0F, 0.7F);
+        }
     }
 
     private void updateTurfWarsPhase(Session session, long now) {
@@ -680,17 +710,15 @@ public final class ArcadePortManager implements Listener {
 
         switch (session.type) {
             case BACON_BRAWL:
-            case BOMB_LOBBERS:
                 Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
                 if (direction.lengthSquared() < 1.0E-5D) direction = attacker.getLocation().getDirection();
-                target.setVelocity(direction.normalize().multiply(session.type == ArcadePortGame.BACON_BRAWL ? 1.65D : 1.2D).setY(0.7D));
+                target.setVelocity(direction.normalize().multiply(session.baconKnockback).setY(0.7D));
                 target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0, 1, 0), 10, 0.35D, 0.4D, 0.35D, 0.04D);
-                if (session.type == ArcadePortGame.BOMB_LOBBERS) {
-                    target.getWorld().playSound(target.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.0F, 1.2F);
-                    attacker.playSound(attacker.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.0F, 1.4F);
-                    attacker.sendMessage(ChatColor.YELLOW + "Direct hit!");
-                }
+                attacker.setFoodLevel(Math.min(20, attacker.getFoodLevel() + 2));
                 session.scores.merge(attacker.getUniqueId(), 1, Integer::sum);
+                break;
+            case BOMB_LOBBERS:
+                // Bomb Lobbers uses thrown TNT; melee attacks do not deal hits.
                 break;
             case DEATH_TAG:
                 if (session.tagged.contains(attacker.getUniqueId())) {
@@ -860,6 +888,7 @@ public final class ArcadePortManager implements Listener {
             announce(session, winner == null ? ChatColor.YELLOW + "Round ended." : ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won " + session.type.displayName() + "!");
         }
         for (Entity entity : new ArrayList<>(session.entities)) if (entity != null && entity.isValid()) entity.remove();
+        session.bombOwners.clear();
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             Player player = entry.getValue();
             PlayerSnapshot snapshot = session.snapshots.get(entry.getKey());
@@ -1051,7 +1080,19 @@ public final class ArcadePortManager implements Listener {
         if (!session.alive.contains(player.getUniqueId())) return;
         ItemStack heldItem = event.getItem();
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
-        if (session.type == ArcadePortGame.DRAGONS && item == Material.BLAZE_POWDER) {
+        if (session.type == ArcadePortGame.BOMB_LOBBERS && item == Material.TNT) {
+            event.setCancelled(true);
+            consumeHeld(player);
+            Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(0.8D));
+            TNTPrimed bomb = session.world.spawn(spawn, TNTPrimed.class);
+            bomb.setFuseTicks(55);
+            Vector velocity = player.getLocation().getDirection().multiply(1.45D);
+            velocity.setY(velocity.getY() + 0.28D);
+            bomb.setVelocity(velocity);
+            session.entities.add(bomb);
+            session.bombOwners.put(bomb.getUniqueId(), player.getUniqueId());
+            player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.9F, 1.0F);
+        } else if (session.type == ArcadePortGame.DRAGONS && item == Material.BLAZE_POWDER) {
             event.setCancelled(true);
             consumeHeld(player);
             Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.2D));
@@ -1185,10 +1226,41 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onExplode(EntityExplodeEvent event) {
         Session session = active;
-        if (session != null && event.getEntity().getWorld() == session.world) {
-            event.blockList().clear();
-            event.setCancelled(true);
+        if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (event.getEntity() instanceof TNTPrimed bomb) {
+            UUID ownerId = session.bombOwners.remove(bomb.getUniqueId());
+            if (ownerId != null && session.type == ArcadePortGame.BOMB_LOBBERS) {
+                Location blast = bomb.getLocation().clone();
+                Player owner = session.players.get(ownerId);
+                event.blockList().clear();
+                event.setCancelled(true);
+                session.entities.remove(bomb);
+                bomb.remove();
+                session.world.spawnParticle(Particle.EXPLOSION, blast, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+                session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
+                for (Player target : alivePlayers(session)) {
+                    if (owner != null && session.teams.getOrDefault(ownerId, -1)
+                            .equals(session.teams.getOrDefault(target.getUniqueId(), -2))) continue;
+                    double distanceSquared = target.getLocation().distanceSquared(blast);
+                    if (distanceSquared > 64.0D) continue;
+                    double distance = Math.sqrt(distanceSquared);
+                    Vector away = target.getLocation().toVector().subtract(blast.toVector());
+                    if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 1.0D, 0.0D);
+                    double force = 1.9D * (1.0D - distance / 8.0D);
+                    target.setVelocity(away.normalize().multiply(force).setY(Math.max(0.25D, 0.65D - distance * 0.045D)));
+                    target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0.0D, 1.0D, 0.0D),
+                            12, 0.35D, 0.45D, 0.35D, 0.05D);
+                    target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.2F);
+                    if (owner != null && owner.isOnline() && distance <= 3.0D) {
+                        owner.playSound(owner.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.0F, 1.45F);
+                        owner.sendMessage(ChatColor.YELLOW + "Direct hit!");
+                    }
+                }
+                return;
+            }
         }
+        event.blockList().clear();
+        event.setCancelled(true);
     }
 
     @EventHandler
@@ -1226,8 +1298,13 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> respawning = new HashSet<>();
         final Set<Sheep> sheep = new HashSet<>();
         final Set<Entity> entities = new HashSet<>();
+        final Map<UUID, UUID> bombOwners = new HashMap<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
         final int participantsAtStart;
+        double baconKnockback = 1.5D;
+        long lastBaconHungerAt;
+        long lastBaconEscalationAt;
+        long baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
         long startedAt;
         boolean microBarrierActive;
         boolean turfCombat;
