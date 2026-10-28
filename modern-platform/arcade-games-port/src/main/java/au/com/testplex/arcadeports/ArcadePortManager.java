@@ -3904,6 +3904,11 @@ public final class ArcadePortManager implements Listener {
             team = ArcadePortRules.teamWithBestTimeoutStanding(
                     teamZeroAlive, teamOneAlive, timeoutTeamKills(session, 0), timeoutTeamKills(session, 1));
         }
+        if (session.type == ArcadePortGame.TURF_WARS) {
+            // Turf Wars is a team-line objective: if both line and aggregate kills are tied,
+            // end as a draw instead of substituting an individual high scorer.
+            return team < 0 ? null : bestTimeoutPlayerOnTeam(session, team);
+        }
         return team < 0 ? topScorerOrLastAlive(session) : bestTimeoutPlayerOnTeam(session, team);
     }
 
