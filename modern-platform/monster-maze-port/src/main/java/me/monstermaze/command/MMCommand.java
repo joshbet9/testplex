@@ -37,7 +37,7 @@ public class MMCommand implements CommandExecutor {
             if (center != null && center.getWorld() != null
                     // The modern Game Panel is the entry point; redirect from any lobby/world
                     // into Monster Maze's own arena before replaying the requested start command.
-                    && player.getWorld() != center.getWorld() && !gm.isRunning()) {
+                    && player.getWorld() != center.getWorld() && gm.getState() == GameState.IDLE) {
                 player.closeInventory();
                 gm.sendToLobby(player);
                 final StringBuilder forwarded = new StringBuilder("mm");
@@ -82,7 +82,7 @@ public class MMCommand implements CommandExecutor {
     }
 
     private boolean start(CommandSender sender,String[] args,GameManager gm){
-        if(gm.getState()!=GameState.IDLE&&gm.getState()!=GameState.ENDING){sender.sendMessage(ChatColor.RED+"Game already running ("+gm.getState()+").");return true;}
+        if(gm.getState()!=GameState.IDLE){sender.sendMessage(ChatColor.RED+"Game is running or cleanup is still in progress ("+gm.getState()+").");return true;}
         if(args.length>=2&&(args[1].equalsIgnoreCase("challenge")||args[1].equalsIgnoreCase("mmr"))){
             if(!(sender instanceof Player)){sender.sendMessage(ChatColor.RED+"Players only.");return true;}
             final Player p=(Player)sender;
