@@ -2090,9 +2090,15 @@ public final class ArcadePortManager implements Listener {
                     return;
                 }
                 if (!session.sheepQuestOvertime) {
-                    session.sheepQuestOvertime = true;
-                    session.endsAt = Long.MAX_VALUE;
-                    announce(session, ChatColor.GOLD + "Sheep Quest is tied! First team to take the lead will win.");
+                    if (ArcadePortRules.shouldEnterSheepQuestOvertime(sheepQuestTeamCounts(session))) {
+                        session.sheepQuestOvertime = true;
+                        session.endsAt = Long.MAX_VALUE;
+                        announce(session, ChatColor.GOLD + "Sheep Quest is tied! First team to take the lead will win.");
+                    } else {
+                        // A unique leading team without an online participant cannot claim the win.
+                        finish(session, null, true);
+                        return;
+                    }
                 }
             } else {
                 finish(session, timeoutWinner(session), true);
@@ -3141,9 +3147,16 @@ public final class ArcadePortManager implements Listener {
         return count;
     }
 
-    private Player sheepQuestLeader(Session session) {
+    private int[] sheepQuestTeamCounts(Session session) {
         int[] counts = new int[4];
-        for (int team = 0; team < counts.length; team++) counts[team] = sheepQuestTeamCount(session, team);
+        for (int team = 0; team < counts.length; team++) {
+            counts[team] = sheepQuestTeamCount(session, team);
+        }
+        return counts;
+    }
+
+    private Player sheepQuestLeader(Session session) {
+        int[] counts = sheepQuestTeamCounts(session);
         int winningTeam = ArcadePortRules.sheepQuestLeadingTeam(counts);
         if (winningTeam < 0) return null;
         return session.players.values().stream()
