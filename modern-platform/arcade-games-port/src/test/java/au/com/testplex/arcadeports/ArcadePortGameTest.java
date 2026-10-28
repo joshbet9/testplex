@@ -526,4 +526,22 @@ class ArcadePortGameTest {
         assertEquals(20, ArcadePortRules.microBattlesMinimumFoodLevel(25));
     }
 
+
+    @Test void timedTeamGamesPreferSurvivorsThenAggregateKills() {
+        assertEquals(0, ArcadePortRules.teamWithBestTimeoutStanding(3, 2, 1, 99));
+        assertEquals(1, ArcadePortRules.teamWithBestTimeoutStanding(1, 2, 99, 0));
+        assertEquals(0, ArcadePortRules.teamWithBestTimeoutStanding(2, 2, 7, 6));
+        assertEquals(1, ArcadePortRules.teamWithBestTimeoutStanding(2, 2, 3, 4));
+        assertEquals(-1, ArcadePortRules.teamWithBestTimeoutStanding(2, 2, 4, 4));
+    }
+
+    @Test void turfWarsTimeoutUsesTerritoryBeforeKills() {
+        assertEquals(0, ArcadePortRules.turfWarsTimeoutLeader(0, 0, 99));
+        assertEquals(0, ArcadePortRules.turfWarsTimeoutLeader(8, 0, 99));
+        assertEquals(1, ArcadePortRules.turfWarsTimeoutLeader(-2, 99, 0));
+        assertEquals(1, ArcadePortRules.turfWarsTimeoutLeader(-8, 99, 0));
+        assertEquals(0, ArcadePortRules.turfWarsTimeoutLeader(-1, 5, 4));
+        assertEquals(1, ArcadePortRules.turfWarsTimeoutLeader(-1, 4, 5));
+        assertEquals(-1, ArcadePortRules.turfWarsTimeoutLeader(-1, 5, 5));
+    }
 }
