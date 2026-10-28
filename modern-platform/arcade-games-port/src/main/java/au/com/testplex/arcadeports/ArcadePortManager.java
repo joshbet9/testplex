@@ -155,7 +155,7 @@ public final class ArcadePortManager implements Listener {
         active = session;
         long now = System.currentTimeMillis();
         session.startedAt = now;
-        session.endsAt = now + ROUND_MS;
+        session.endsAt = now + (type == ArcadePortGame.SHEEP_QUEST ? 300_000L : ROUND_MS);
         session.lastBaconHungerAt = now;
         session.lastBaconEscalationAt = now;
         session.baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
@@ -166,7 +166,7 @@ public final class ArcadePortManager implements Listener {
                 ? now + ArcadePortRules.TURF_WARS_BUILD_PHASE_MILLIS : 0L;
         session.turfFrontlineX = -1;
         lastDragonHazard = now + 8_000L;
-        lastSheepSpawn = now;
+        lastSheepSpawn = now + 20_000L;
         world.setTime(6000L);
         world.setStorm(false);
         world.setThundering(false);
@@ -225,9 +225,7 @@ public final class ArcadePortManager implements Listener {
                 runner.sendMessage(ChatColor.YELLOW + "Solo test: avoid the chaser; one hit ends the run.");
             }
         }
-        if (type == ArcadePortGame.SHEEP_QUEST) {
-            for (int i = 0; i < 8; i++) spawnSheep(session);
-        }
+        if (type == ArcadePortGame.SHEEP_QUEST) spawnSheep(session);
         if (type == ArcadePortGame.MICRO_BATTLES) announce(session, ChatColor.AQUA + "Micro Battles: gather blocks; glass barriers drop after 10 seconds.");
         else announce(session, ChatColor.GOLD + type.displayName() + " started! This is a first-pass mechanics test.");
         if (type == ArcadePortGame.TURF_WARS) {
@@ -312,6 +310,7 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
+        if (type == ArcadePortGame.SHEEP_QUEST) buildSheepPens(world);
     }
 
     private List<Location> spawnLocations(ArcadePortGame type, int count) {
@@ -445,7 +444,7 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().addItem(new ItemStack(Material.ARROW, 12));
                 break;
             case SHEEP_QUEST:
-                player.getInventory().addItem(namedItem(Material.LEAD, "Shepherd", "Right-click sheep to capture them."));
+                player.getInventory().addItem(namedItem(Material.SADDLE, "Shepherd", "Hold to pick up sheep; carry them to your team's pen."));
                 break;
             case SPLEEF:
                 player.getInventory().addItem(new ItemStack(Material.IRON_SHOVEL));
@@ -485,7 +484,8 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         session.ticks++;
         if (now >= session.endsAt) {
-            Player winner = topScorerOrLastAlive(session);
+            Player winner = session.type == ArcadePortGame.SHEEP_QUEST
+                    ? sheepQuestLeader(session) : topScorerOrLastAlive(session);
             finish(session, winner, true);
             return;
         }
@@ -505,9 +505,12 @@ public final class ArcadePortManager implements Listener {
             launchDragonEscapeHazard(session);
             session.nextDragonEscapeHazardAt = now + ArcadePortRules.DRAGON_ESCAPE_HAZARD_INTERVAL_MILLIS;
         }
-        if (session.type == ArcadePortGame.SHEEP_QUEST && now >= lastSheepSpawn && session.sheep.size() < 12) {
-            spawnSheep(session);
-            lastSheepSpawn = now + 2_000L;
+        if (session.type == ArcadePortGame.SHEEP_QUEST) {
+            updateSheepQuest(session);
+            if (now >= lastSheepSpawn && session.sheep.size() < 12) {
+                spawnSheep(session);
+                lastSheepSpawn = now + 20_000L;
+            }
         }
 
         if (session.type == ArcadePortGame.PAINTBALL && session.ticks % 40 == 0) {
@@ -625,19 +628,137 @@ public final class ArcadePortManager implements Listener {
         session.entities.add(fireball);
     }
 
+    private Location sheepQuestPenCenter(Session session, int team) {
+        return new Location(session.world, team == 0 ? -15.0D : 15.0D, 64.0D, 0.0D);
+    }
+
+    private boolean isInsideSheepPen(Location location, int team) {
+        if (location == null || team < 0 || team > 1) return false;
+        Location center = sheepQuestPenCenter(active, team);
+        return location.getWorld() == center.getWorld()
+                && Math.abs(location.getX() - center.getX()) <= 2.5D
+                && Math.abs(location.getZ() - center.getZ()) <= 3.5D;
+    }
+
+    private void buildSheepPens(World world) {
+        for (int team = 0; team < 2; team++) {
+            int centerX = team == 0 ? -15 : 15;
+            Material wool = team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL;
+            for (int dx = -2; dx <= 2; dx++) {
+                for (int dz = -3; dz <= 3; dz++) {
+                    world.getBlockAt(centerX + dx, 63, dz).setType(wool, false);
+                    boolean wall = Math.abs(dx) == 2 || Math.abs(dz) == 3;
+                    boolean gate = dz == 0 && (team == 0 ? dx == 2 : dx == -2);
+                    if (wall && !gate) {
+                        for (int y = 64; y <= 65; y++) {
+                            world.getBlockAt(centerX + dx, y, dz).setType(wool, false);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void updateSheepQuest(Session session) {
+        java.util.Iterator<Map.Entry<Sheep, UUID>> iterator = session.sheepCarriers.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Sheep, UUID> entry = iterator.next();
+            Sheep sheep = entry.getKey();
+            UUID carrierId = entry.getValue();
+            Player carrier = session.players.get(carrierId);
+            if (sheep == null || !sheep.isValid() || sheep.isDead()) {
+                iterator.remove();
+                session.sheep.remove(sheep);
+                session.sheepOwners.remove(sheep);
+                continue;
+            }
+            if (carrier == null || !carrier.isOnline() || !session.alive.contains(carrierId)) {
+                iterator.remove();
+                sheep.setAI(true);
+                int owner = session.sheepOwners.getOrDefault(sheep, -1);
+                if (owner >= 0) {
+                    Location pen = sheepQuestPenCenter(session, owner);
+                    sheep.teleport(pen.clone().add(0.5D, 0.0D, 0.5D));
+                    sheep.setAI(false);
+                }
+                continue;
+            }
+
+            Vector facing = carrier.getLocation().getDirection().setY(0.0D);
+            if (facing.lengthSquared() < 0.001D) facing = new Vector(0.0D, 0.0D, 1.0D);
+            Location following = carrier.getLocation().clone().subtract(facing.normalize().multiply(1.35D));
+            following.setY(64.0D);
+            following.setYaw(carrier.getLocation().getYaw());
+            following.setPitch(0.0F);
+            sheep.teleport(following);
+
+            int team = session.teams.getOrDefault(carrierId, -1);
+            if (team < 0 || team > 1) continue;
+            if (horizontalDistanceSquared(carrier.getLocation(), sheepQuestPenCenter(session, team)) > 20.25D) continue;
+
+            int previousOwner = session.sheepOwners.getOrDefault(sheep, -1);
+            if (previousOwner == team && isInsideSheepPen(sheep.getLocation(), team)) continue;
+            session.sheepOwners.put(sheep, team);
+            sheep.setColor(team == 0 ? DyeColor.RED : DyeColor.BLUE);
+            sheep.setAI(false);
+            Location pen = sheepQuestPenCenter(session, team);
+            sheep.teleport(pen.clone().add(ThreadLocalRandom.current().nextDouble(-1.0D, 1.0D),
+                    0.0D, ThreadLocalRandom.current().nextDouble(-2.0D, 2.0D)));
+            iterator.remove();
+            session.scores.merge(carrierId, 1, Integer::sum);
+            carrier.playSound(carrier.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.5F);
+            carrier.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, carrier.getLocation().add(0, 1, 0),
+                    12, 0.35D, 0.4D, 0.35D, 0.04D);
+            announce(session, (previousOwner < 0 ? ChatColor.GREEN + "Sheep captured by " :
+                    ChatColor.YELLOW + "Sheep stolen by ") + carrier.getName() + " for "
+                    + (team == 0 ? ChatColor.RED + "Red" : ChatColor.BLUE + "Blue") + ChatColor.WHITE + "!");
+        }
+
+        for (Sheep sheep : session.sheep) {
+            if (!sheep.isValid() || session.sheepCarriers.containsKey(sheep)) continue;
+            int owner = session.sheepOwners.getOrDefault(sheep, -1);
+            if (owner >= 0 && !isInsideSheepPen(sheep.getLocation(), owner)) {
+                Location pen = sheepQuestPenCenter(session, owner);
+                sheep.teleport(pen.clone().add(0.5D, 0.0D, 0.5D));
+                sheep.setAI(false);
+            }
+        }
+    }
+
+    private int sheepQuestTeamCount(Session session, int team) {
+        int count = 0;
+        for (Sheep sheep : session.sheep) {
+            if (session.sheepOwners.getOrDefault(sheep, -1) == team && isInsideSheepPen(sheep.getLocation(), team)) count++;
+        }
+        return count;
+    }
+
+    private Player sheepQuestLeader(Session session) {
+        int red = sheepQuestTeamCount(session, 0);
+        int blue = sheepQuestTeamCount(session, 1);
+        if (red == blue) return topScorerOrLastAlive(session);
+        int winningTeam = red > blue ? 0 : 1;
+        return alivePlayers(session).stream()
+                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
+                .max(java.util.Comparator.comparingInt(player -> session.scores.getOrDefault(player.getUniqueId(), 0)))
+                .orElse(null);
+    }
+
     private void spawnSheep(Session session) {
         for (int attempt = 0; attempt < 18; attempt++) {
-            int x = ThreadLocalRandom.current().nextInt(-HALF_SIZE + 3, HALF_SIZE - 2);
-            int z = ThreadLocalRandom.current().nextInt(-HALF_SIZE + 3, HALF_SIZE - 2);
+            int x = ThreadLocalRandom.current().nextInt(-10, 11);
+            int z = ThreadLocalRandom.current().nextInt(-HALF_SIZE + 4, HALF_SIZE - 3);
             Location loc = new Location(session.world, x + 0.5D, 64.0D, z + 0.5D);
             if (session.world.getBlockAt(x, 63, z).getType().isAir()) continue;
             Sheep sheep = session.world.spawn(loc, Sheep.class);
-            sheep.setColor(DyeColor.values()[ThreadLocalRandom.current().nextInt(DyeColor.values().length)]);
-            sheep.setCustomName(ChatColor.WHITE + "Capture Sheep");
+            sheep.setColor(DyeColor.WHITE);
+            sheep.setCustomName(ChatColor.WHITE + "Sheep");
             sheep.setCustomNameVisible(true);
-            sheep.setAI(false);
+            sheep.setAI(true);
+            sheep.setInvulnerable(true);
             sheep.setRemoveWhenFarAway(false);
             session.sheep.add(sheep);
+            session.sheepOwners.put(sheep, -1);
             session.entities.add(sheep);
             return;
         }
@@ -761,7 +882,6 @@ public final class ArcadePortManager implements Listener {
                 && ArcadePortRules.isQuiverWinnerScoreReached(session.scores.getOrDefault(player.getUniqueId(), 0))) {
             finish(session, player, true);
         }
-        if (session.type == ArcadePortGame.SHEEP_QUEST && session.scores.getOrDefault(player.getUniqueId(), 0) >= 10) finish(session, player, true);
     }
 
     private void handlePlayerHit(Session session, Player attacker, Player target, String source) {
@@ -963,6 +1083,8 @@ public final class ArcadePortManager implements Listener {
             else pendingRestore.put(entry.getKey(), snapshot);
         }
         session.sheep.clear();
+        session.sheepOwners.clear();
+        session.sheepCarriers.clear();
         session.entities.clear();
         session.respawning.clear();
         session.alive.clear();
@@ -1135,6 +1257,11 @@ public final class ArcadePortManager implements Listener {
     public void onDamage(EntityDamageEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.SHEEP_QUEST && event.getEntity() instanceof Sheep sheep
+                && session.sheep.contains(sheep)) {
+            event.setCancelled(true);
+            return;
+        }
         if (event.getEntity() instanceof Player target && session.players.containsKey(target.getUniqueId())) {
             event.setCancelled(true);
             if (event instanceof EntityDamageByEntityEvent byEntity) {
@@ -1298,19 +1425,30 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInteractSheep(PlayerInteractEntityEvent event) {
         Session session = active;
-        if (session == null || session.type != ArcadePortGame.SHEEP_QUEST || !(event.getRightClicked() instanceof Sheep sheep)
-                || !session.sheep.contains(sheep) || !session.alive.contains(event.getPlayer().getUniqueId())) return;
-        event.setCancelled(true);
-        session.sheep.remove(sheep);
-        session.entities.remove(sheep);
-        sheep.remove();
+        if (session == null || session.type != ArcadePortGame.SHEEP_QUEST
+                || !(event.getRightClicked() instanceof Sheep sheep) || !session.sheep.contains(sheep)
+                || !session.alive.contains(event.getPlayer().getUniqueId())) return;
         Player player = event.getPlayer();
-        session.scores.merge(player.getUniqueId(), 1, Integer::sum);
-        player.playSound(player.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.3F);
-        player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation().add(0, 1, 0), 12, 0.3D, 0.3D, 0.3D, 0.04D);
-        player.sendMessage(ChatColor.GREEN + "Sheep captured! Score: " + session.scores.get(player.getUniqueId()));
-        checkWinnerForScore(session, player);
-        Bukkit.getScheduler().runTaskLater(plugin, () -> { if (active == session && session.sheep.size() < 10) spawnSheep(session); }, 40L);
+        ItemStack held = player.getInventory().getItemInMainHand();
+        if (held == null || held.getType() != Material.SADDLE) return;
+        event.setCancelled(true);
+        UUID playerId = player.getUniqueId();
+        int team = session.teams.getOrDefault(playerId, -1);
+        int owner = session.sheepOwners.getOrDefault(sheep, -1);
+        if (team < 0 || team > 1) return;
+        if (owner == team && isInsideSheepPen(sheep.getLocation(), team)) {
+            player.sendMessage(ChatColor.YELLOW + "That sheep is already safe in your pen.");
+            return;
+        }
+        if (session.sheepCarriers.containsValue(playerId)) {
+            player.sendMessage(ChatColor.YELLOW + "Return the sheep you are carrying first.");
+            return;
+        }
+        session.sheepCarriers.put(sheep, playerId);
+        sheep.setAI(false);
+        sheep.setColor(team == 0 ? DyeColor.RED : DyeColor.BLUE);
+        player.playSound(player.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 2.0F);
+        player.sendMessage(ChatColor.GREEN + "Sheep picked up. Carry it to your team's pen!");
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -1476,6 +1614,8 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> tagged = new HashSet<>();
         final Set<UUID> respawning = new HashSet<>();
         final Set<Sheep> sheep = new HashSet<>();
+        final Map<Sheep, Integer> sheepOwners = new HashMap<>();
+        final Map<Sheep, UUID> sheepCarriers = new HashMap<>();
         final Set<Entity> entities = new HashSet<>();
         final Map<UUID, UUID> bombOwners = new HashMap<>();
         final Map<Block, Long> runnerBlocks = new HashMap<>();
