@@ -883,12 +883,11 @@ public class Maze implements Listener
 		if (player == null)
 			return null;
 		String choice = getMobThemeChoiceForPlayer(player);
-		String selected = _viewerMobSetIds.get(player.getUniqueId());
-		// Map Default still needs a concrete palette key: use the current map's monster
-		// without changing the displayed per-round choice from Map Default.
-		if (selected == null && "map_default".equals(choice))
-			selected = mobSetForEntityType(_host.getMonsterType());
-		return selected;
+		// The source repo's Map Default palette is lime for both the Safe Pad and
+		// its beacon glass. It is a distinct palette key, not the mob model's colour.
+		if ("map_default".equals(choice))
+			return "map_default";
+		return _viewerMobSetIds.get(player.getUniqueId());
 	}
 
 	/** Cycle the selector and immediately refresh this viewer's mob models and objective colours. */
@@ -1010,20 +1009,6 @@ public class Maze implements Listener
 		if (available.isEmpty())
 			return null;
 		return available.get(Math.floorMod(playerId.hashCode(), available.size()));
-	}
-
-	private String mobSetForEntityType(EntityType type)
-	{
-		if (type == null)
-			return "creeper";
-		for (String mobSet : MOB_THEME_CYCLE)
-		{
-			if ("map_default".equals(mobSet) || "random".equals(mobSet))
-				continue;
-			if (type == entityTypeForMobSet(mobSet))
-				return mobSet;
-		}
-		return "creeper";
 	}
 
 	private void refreshMobDisguisesForViewer(Player viewer)
