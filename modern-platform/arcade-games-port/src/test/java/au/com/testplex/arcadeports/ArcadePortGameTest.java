@@ -166,4 +166,11 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldApplyDragonContactHit(11_500L, 11_500L));
     }
 
+    @Test void dragonEscapeHasARealFinishLine() {
+        assertEquals(77.0D, ArcadePortRules.DRAGON_ESCAPE_FINISH_Z);
+        assertFalse(ArcadePortRules.isDragonEscapeFinishReached(76.99D));
+        assertTrue(ArcadePortRules.isDragonEscapeFinishReached(77.0D));
+        assertTrue(ArcadePortRules.isDragonEscapeFinishReached(80.0D));
+    }
+
 }
