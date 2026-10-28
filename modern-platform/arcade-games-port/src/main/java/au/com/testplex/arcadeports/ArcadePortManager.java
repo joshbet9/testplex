@@ -2278,7 +2278,7 @@ public final class ArcadePortManager implements Listener {
         switch (kit) {
             case "mama-pig": {
                 Snowball bacon = player.launchProjectile(Snowball.class);
-                bacon.setItem(new ItemStack(Material.PORKCHOP));
+                bacon.setItem(new ItemStack(Material.PORKCHOP, 16));
                 Vector velocity = player.getEyeLocation().getDirection().normalize().multiply(1.0D);
                 velocity.setY(velocity.getY() + 0.2D);
                 bacon.setVelocity(velocity);
