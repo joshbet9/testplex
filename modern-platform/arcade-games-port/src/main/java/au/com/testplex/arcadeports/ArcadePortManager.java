@@ -945,6 +945,23 @@ public final class ArcadePortManager implements Listener {
         return new Location(world, Math.cos(angle) * 13.0D, 64.0D, Math.sin(angle) * 13.0D, (float)(angle * 180.0D / Math.PI + 90.0F), 0.0F);
     }
 
+    private Location microTeamCenter(Session session, int team) {
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (mapData != null) {
+            List<Location> markers = mapData.teamSpawnLocationsForTeam(team, 4);
+            if (!markers.isEmpty()) {
+                double x = 0.0D, y = 0.0D, z = 0.0D;
+                for (Location marker : markers) {
+                    x += marker.getX();
+                    y += marker.getY();
+                    z += marker.getZ();
+                }
+                return new Location(session.world, x / markers.size(), y / markers.size(), z / markers.size());
+            }
+        }
+        return islandSpawn(team * 2);
+    }
+
     private Location microTeamSpawn(int team, int slot, int slots) {
         Location center = islandSpawn(team * 2);
         if (slots > 1) {
@@ -3677,13 +3694,14 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.MICRO_BATTLES && session.alive.contains(player.getUniqueId())) {
             int team = session.teams.getOrDefault(player.getUniqueId(), -1);
             if (team >= 0 && team < 4) {
-                Location ownIsland = islandSpawn(team * 2);
+                Location ownIsland = microTeamCenter(session, team);
                 Location to = event.getTo();
                 double ownDistance = horizontalDistanceSquared(to, ownIsland);
                 double nearestOther = Double.POSITIVE_INFINITY;
                 for (int other = 0; other < 4; other++) {
                     if (other == team) continue;
-                    nearestOther = Math.min(nearestOther, horizontalDistanceSquared(to, islandSpawn(other * 2)));
+                    nearestOther = Math.min(nearestOther,
+                            horizontalDistanceSquared(to, microTeamCenter(session, other)));
                 }
                 if (ArcadePortRules.shouldPunishMicroIslandExit(System.currentTimeMillis() - session.startedAt,
                         ownDistance, nearestOther)) {
