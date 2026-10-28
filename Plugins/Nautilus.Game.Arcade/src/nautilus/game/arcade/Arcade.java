@@ -79,6 +79,7 @@ import mineplex.minecraft.game.core.damage.DamageManager;
 
 import nautilus.game.arcade.game.GameServerConfig;
 import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
+import nautilus.game.arcade.cosmetics.ArcadeTestHarness;
 import nautilus.game.arcade.wineffect.WinEffectBaconBrawl;
 import nautilus.game.arcade.wineffect.WinEffectBombLobbers;
 import nautilus.game.arcade.wineffect.WinEffectDeathTag;
@@ -90,6 +91,8 @@ public class Arcade extends JavaPlugin
 {
 
 	private ArcadeManager _gameManager;
+
+	private ArcadeTestHarness _testHarness;
 
 	private ServerConfiguration _serverConfiguration;
 
@@ -220,6 +223,9 @@ public class Arcade extends JavaPlugin
 		// Persistent per-player selector for game cosmetic prototypes.
 		new ArcadeCosmeticsMenu(this);
 
+		// Operator-only test bench: isolated win-effect playback and temporary target dummies.
+		_testHarness = new ArcadeTestHarness(this, _gameManager, gadgetManager);
+
 		//new BroadcastManager(this, _gameManager);
 
 		new MemoryFix(this);
@@ -246,6 +252,12 @@ public class Arcade extends JavaPlugin
 	@Override
 	public void onDisable()
 	{
+		if (_testHarness != null)
+		{
+			_testHarness.shutdown();
+			_testHarness = null;
+		}
+
 		for (Player player : UtilServer.getPlayers())
 			player.kickPlayer("Server Shutdown");
 
