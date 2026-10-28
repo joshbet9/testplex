@@ -402,8 +402,11 @@ class ArcadePortGameTest {
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("chris-p-bacon"));
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("unknown"));
         assertEquals(4_000L, ArcadePortRules.BACON_SLOW_UPDATE_INTERVAL_MILLIS);
+        assertEquals(120_000L, ArcadePortRules.BACON_BRAWL_ROUND_MILLIS);
+        assertEquals(20L, ArcadePortRules.BACON_BRAWL_RESPAWN_DELAY_TICKS);
         assertEquals(4_000L, ArcadePortRules.BACON_HUNGER_INTERVAL_MILLIS);
-        assertEquals(1, ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL);
+        assertEquals(2, ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL,
+                "the selected balance change doubles Bacon Brawl hunger drain");
         assertEquals(5.0F, ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE, 0.00001F);
         assertEquals(4.0D, ArcadePortRules.BACON_STARVATION_DAMAGE, 0.00001D);
         assertEquals(6.0D, ArcadePortRules.BACON_STANDARD_HIT_DAMAGE, 0.00001D);
@@ -417,6 +420,15 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isBaconBrawlBackstab(1.0D, 0.0D, 1.0D, 0.0D));
         assertFalse(ArcadePortRules.isBaconBrawlBackstab(0.0D, 0.0D, 1.0D, 0.0D));
         assertFalse(ArcadePortRules.isBaconBrawlBackstab(Double.NaN, 1.0D, 0.0D, -1.0D));
+    }
+
+    @Test void baconBrawlAwardsTheUniqueHighestKillCountAtTimeout() {
+        assertEquals(1, ArcadePortRules.baconBrawlUniqueLeaderIndex(java.util.List.of(2, 5, 3)));
+        assertEquals(0, ArcadePortRules.baconBrawlUniqueLeaderIndex(java.util.List.of(7, 2, 1)));
+        assertEquals(-1, ArcadePortRules.baconBrawlUniqueLeaderIndex(java.util.List.of(4, 4, 1)));
+        assertEquals(-1, ArcadePortRules.baconBrawlUniqueLeaderIndex(java.util.List.of(0, 0)));
+        assertEquals(-1, ArcadePortRules.baconBrawlUniqueLeaderIndex(java.util.List.of()));
+        assertEquals(-1, ArcadePortRules.baconBrawlUniqueLeaderIndex(null));
     }
 
     @Test void baconBrawlEscalatesKnockbackWithShorterFiniteIntervals() {
