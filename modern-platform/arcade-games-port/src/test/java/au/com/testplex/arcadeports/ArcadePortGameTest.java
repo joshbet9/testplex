@@ -388,6 +388,14 @@ class ArcadePortGameTest {
         assertEquals(10_000L, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
     }
 
+    @Test void dragonEscapeDestructionThrottleChecksNewAreaAfterMovement() {
+        assertTrue(ArcadePortRules.shouldProcessDragonEscapeDestruction(0.0D, false));
+        assertFalse(ArcadePortRules.shouldProcessDragonEscapeDestruction(0.0D, true));
+        assertFalse(ArcadePortRules.shouldProcessDragonEscapeDestruction(0.24D, true));
+        assertTrue(ArcadePortRules.shouldProcessDragonEscapeDestruction(0.25D, true));
+        assertTrue(ArcadePortRules.shouldProcessDragonEscapeDestruction(Double.NaN, true));
+    }
+
     @Test void dragonEscapeFallbackCrumblesOnlyItsGeneratedCourse() {
         assertTrue(ArcadePortRules.shouldCrumbleDragonEscapeFallbackTrack(false, 0));
         assertTrue(ArcadePortRules.shouldCrumbleDragonEscapeFallbackTrack(false, 82));
