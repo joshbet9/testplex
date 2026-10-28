@@ -406,8 +406,8 @@ public class MonsterMaze extends SoloGame
 			return;
 
 		// Once a player has reached the current Safe Pad, stepping off its edge sends
-		// them back to the centre start. Preserve the horizontal direction they walked
-		// off in so they immediately face the direction of travel on arrival.
+		// them back to the centre of that same Safe Pad, never to the map's start point.
+		// Preserve the horizontal direction they walked off in on arrival.
 		if (_maze != null && _maze.getSafePad() != null && _maze.hasReachedCurrentSafePad(player)
 				&& !_safePadReturnTeleports.contains(player.getUniqueId())
 				&& event.getFrom() != null && event.getTo() != null
@@ -415,16 +415,16 @@ public class MonsterMaze extends SoloGame
 		{
 			double dx = event.getTo().getX() - event.getFrom().getX();
 			double dz = event.getTo().getZ() - event.getFrom().getZ();
-			Location centre = getCentralStartSpawn();
-			if (centre != null)
+			Location padReturn = _maze.getSafePad().getLocation().clone().add(0.5D, 1.0D, 0.5D);
+			if (padReturn != null)
 			{
 				if (Math.abs(dx) + Math.abs(dz) > 0.0001D)
-					centre.setYaw((float) Math.toDegrees(Math.atan2(-dx, dz)));
-				centre.setPitch(0.0F);
+					padReturn.setYaw((float) Math.toDegrees(Math.atan2(-dx, dz)));
+				padReturn.setPitch(0.0F);
 				_safePadReturnTeleports.add(player.getUniqueId());
 				try
 				{
-					player.teleport(centre);
+					player.teleport(padReturn);
 					player.setVelocity(new Vector(0, 0, 0));
 				}
 				finally
