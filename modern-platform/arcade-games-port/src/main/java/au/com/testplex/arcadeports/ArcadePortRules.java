@@ -48,6 +48,14 @@ public final class ArcadePortRules {
         return -1;
     }
 
+    public static int paintballPiecesAfterHit(int remainingPieces, int paintAmount) {
+        return Math.max(0, Math.max(0, remainingPieces) - Math.max(0, paintAmount));
+    }
+
+    public static boolean isPaintballPlayerOut(int remainingPieces) {
+        return remainingPieces <= 0;
+    }
+
     public static long nextBaconKnockbackInterval(long currentMillis) {
         return Math.max(BACON_MIN_KNOCKBACK_INTERVAL_MILLIS, currentMillis - 5_000L);
     }
