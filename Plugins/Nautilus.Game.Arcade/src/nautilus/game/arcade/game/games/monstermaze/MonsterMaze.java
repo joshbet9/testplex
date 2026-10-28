@@ -392,7 +392,31 @@ public class MonsterMaze extends SoloGame
 		if (!IsLive() || _center == null || event.getTo() == null)
 			return;
 		Player player = event.getPlayer();
-		if (!IsAlive(player) || event.getTo().getY() >= _center.getY() - 3.0D)
+		if (!IsAlive(player))
+			return;
+
+		// Once a player has reached the current Safe Pad, stepping off its edge sends
+		// them back to the centre start. Preserve the horizontal direction they walked
+		// off in so they immediately face the direction of travel on arrival.
+		if (_maze != null && _maze.getSafePad() != null && _maze.hasReachedCurrentSafePad(player)
+				&& event.getFrom() != null && event.getTo() != null
+				&& _maze.getSafePad().isOn(event.getFrom()) && !_maze.getSafePad().isOn(event.getTo()))
+		{
+			double dx = event.getTo().getX() - event.getFrom().getX();
+			double dz = event.getTo().getZ() - event.getFrom().getZ();
+			Location centre = getCentralStartSpawn();
+			if (centre != null)
+			{
+				if (Math.abs(dx) + Math.abs(dz) > 0.0001D)
+					centre.setYaw((float) Math.toDegrees(Math.atan2(-dx, dz)));
+				centre.setPitch(0.0F);
+				player.teleport(centre);
+				player.setVelocity(new Vector(0, 0, 0));
+				return;
+			}
+		}
+
+		if (_center == null || event.getTo().getY() >= _center.getY() - 3.0D)
 			return;
 		Manager.GetDamage().NewDamageEvent(player, null, null,
 				EntityDamageEvent.DamageCause.CUSTOM, 500, false, false, false,
@@ -529,8 +553,8 @@ public class MonsterMaze extends SoloGame
 		
 		for (Player p : GetPlayers(true))
 		{
-			if (isModernVariant() && _maze != null && _maze.isOnPad(p, true))
-				continue; // Speed/QOL variant: jumps on any Safe Pad are free.
+			if (_maze != null && _maze.isOnPad(p, true))
+				continue; // Jumping on any Safe Pad is free in all three native variants.
 
 			if (!UtilInv.contains(p, "Jumps Remaining", Material.FEATHER, (byte) 0, 1) || p.getLocation().getY()-_center.getY() <= 0 || !Recharge.Instance.usable(p, "MM Player Jump") || isLaunched(p))
 				continue;
@@ -739,50 +763,42 @@ public class MonsterMaze extends SoloGame
 
 			board.reset();
 			board.write(C.cYellow + C.Bold + "Players");
-			List<Player> alive = GetPlayers(true);
-			if (alive.size() <= 3)
+			List<Player> alive = new ArrayList<Player>(GetPlayers(true));
+			// Keep the viewer's own line at the top; every entry carries its own pad distance
+			// and SAFE marker instead of adding a separate Distance section.
+			if (alive.remove(viewer))
+				alive.add(0, viewer);
+			SafePad activePad = _maze.getSafePad();
+			int shown = Math.min(9, alive.size());
+			for (int i = 0; i < shown; i++)
 			{
-				for (Player alivePlayer : alive)
-					board.write(C.cWhite + alivePlayer.getName());
-			}
-			else
-			{
-				board.write(C.cWhite + alive.size() + " Alive");
-			}
-
-			board.writeNewLine();
-			board.write(C.cGreen + C.Bold + "Safe Pad");
-			if (_maze.getSafePad() != null)
-				board.write(C.cWhite + _maze.getPhaseTimer() + " Seconds");
-			else
-				board.write(C.cWhite + "None");
-
-			board.write(C.cAqua + C.Bold + "Distance");
-			if (_maze.getSafePad() != null)
-			{
-				if (_maze.getSafePad().isOn(viewer))
+				Player target = alive.get(i);
+				String distanceText = "Unknown";
+				if (activePad != null && target.getWorld() == activePad.getLocation().getWorld())
 				{
-					board.write(C.cGreen + C.Bold + "SAFE");
-				}
-				else
-				{
-					Location pad = _maze.getSafePad().getLocation();
-					double dx = viewer.getLocation().getX() - (pad.getX() + 0.5D);
-					double dz = viewer.getLocation().getZ() - (pad.getZ() + 0.5D);
+					Location pad = activePad.getLocation();
+					double dx = target.getLocation().getX() - (pad.getX() + 0.5D);
+					double dz = target.getLocation().getZ() - (pad.getZ() + 0.5D);
 					int distance = (int) Math.round(Math.sqrt(dx * dx + dz * dz));
-					board.write(C.cWhite + distance + " blocks");
+					distanceText = distance + " blocks";
+					if (activePad.isOn(target))
+						distanceText += " " + C.cGreen + C.Bold + "SAFE";
 				}
+				board.write(C.cWhite + target.getName() + C.cGray + " " + distanceText);
 			}
-			else
-			{
-				board.write(C.cWhite + "Unknown");
-			}
+		if (alive.size() > shown)
+			board.write(C.cGray + "+ " + (alive.size() - shown) + " more");
 
-			board.writeNewLine();
-			board.write(C.cGold + C.Bold + "Stage");
-			board.write(C.cWhite + _maze.getCurrentSafePadCount());
-			board.write(C.cAqua + C.Bold + "Maze Pattern");
-			board.write(C.cWhite + _maze.getPreset().getPatternId());
+			board.write(C.cGreen + C.Bold + "Safe Pad: " + C.cWhite
+					+ (activePad == null ? "None" : _maze.getPhaseTimer() + "s"));
+			board.write(C.cGold + C.Bold + "Stage: " + C.cWhite + _maze.getCurrentSafePadCount());
+			int pattern = _maze.getPreset() == null ? 0 : _maze.getPreset().getPatternId();
+			board.write(C.cAqua + C.Bold + "Maze Pattern: " + C.cWhite + pattern);
+			int patternPb = MonsterMazePersonalBestManager.getKitBest(this, viewer, pattern);
+			board.write(C.cAqua + C.Bold + "Pattern PB: " + C.cWhite
+					+ (patternPb > 0 ? "Stage " + patternPb : "Not set"));
+			if (_maze != null)
+				_maze.refreshPlayerSafePadCosmetics(viewer);
 			board.draw();
 
 		}
