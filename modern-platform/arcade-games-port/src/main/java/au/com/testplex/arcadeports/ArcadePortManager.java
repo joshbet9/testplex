@@ -1186,7 +1186,7 @@ public final class ArcadePortManager implements Listener {
             int cy = island.getBlockY();
             int cz = island.getBlockZ();
             for (int offset = -4; offset <= 4; offset++) {
-                for (int y = cy; y <= cy + 1; y++) {
+                for (int y = cy; y <= ArcadePortRules.microBattlesBarrierTopY(cy); y++) {
                     Block[] ring = {
                             session.world.getBlockAt(cx + offset, y, cz - 4),
                             session.world.getBlockAt(cx + offset, y, cz + 4),
