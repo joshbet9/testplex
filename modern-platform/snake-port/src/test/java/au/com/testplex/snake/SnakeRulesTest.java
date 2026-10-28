@@ -29,6 +29,16 @@ class SnakeRulesTest {
         assertEquals(0, SnakeRules.colorIndexForParticipant(8, 0));
     }
 
+    @Test void foodSpawnsUseTheSourceRadialDistributionAndSearchBudget() {
+        assertEquals(36, SnakeRules.FOOD_SPAWN_ATTEMPTS);
+        assertEquals(46.0D, SnakeRules.FOOD_SPAWN_RADIUS, 0.000001D);
+        assertEquals(0.0D, SnakeRules.foodSpawnDistance(0.0D), 0.000001D);
+        assertEquals(23.0D, SnakeRules.foodSpawnDistance(0.25D), 0.000001D);
+        assertEquals(46.0D, SnakeRules.foodSpawnDistance(1.0D), 0.000001D);
+        assertEquals(46.0D, SnakeRules.foodSpawnDistance(4.0D), 0.000001D);
+        assertEquals(0.0D, SnakeRules.foodSpawnDistance(Double.NaN), 0.000001D);
+    }
+
     @Test void foodAndTailCollisionsUseSourceThreeDimensionalRadii() {
         assertTrue(SnakeRules.isFoodCollected(3.999D));
         assertFalse(SnakeRules.isFoodCollected(4.0D));
