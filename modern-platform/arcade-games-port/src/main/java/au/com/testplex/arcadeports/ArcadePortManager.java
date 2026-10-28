@@ -2580,14 +2580,11 @@ public final class ArcadePortManager implements Listener {
             List<Location> sourceRoute = mapData.dataLocations("BLACK");
             if (!starts.isEmpty() && !sourceRoute.isEmpty()) {
                 spawn = starts.get(0).clone();
-                Location lastSourceMarker = spawn.clone();
                 // DATA_LOCS is an ordered list in WorldConfig.dat. Preserve authored course order:
                 // a nearest-neighbour sort can jump across nearby switchbacks and bends.
-                for (Location marker : sourceRoute) {
-                    double markerDistance = marker.distance(lastSourceMarker);
-                    if (ArcadePortRules.isDuplicateDragonEscapeWaypoint(markerDistance)) continue;
-                    session.dragonEscapeWaypoints.add(marker.clone().subtract(0.0D, 1.0D, 0.0D));
-                    lastSourceMarker = marker;
+                for (Location marker : SourceMapCatalog.MapData.orderedRouteMarkers(
+                        spawn, sourceRoute, ArcadePortRules.DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE)) {
+                    session.dragonEscapeWaypoints.add(marker.subtract(0.0D, 1.0D, 0.0D));
                 }
             }
         }
