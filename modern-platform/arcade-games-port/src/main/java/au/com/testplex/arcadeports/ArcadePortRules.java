@@ -285,6 +285,17 @@ public final class ArcadePortRules {
         return tied ? -1 : bestTeam;
     }
 
+    /** Match the team-index order used by SourceMapCatalog: red, blue, green, yellow. */
+    public static String sheepQuestTeamPenMarker(int team) {
+        return switch (team) {
+            case 0 -> "RED";
+            case 1 -> "BLUE";
+            case 2 -> "GREEN";
+            case 3 -> "YELLOW";
+            default -> "UNASSIGNED";
+        };
+    }
+
     /** WorldConfig pen markers describe the floor; the sheep's feet block is one block above it. */
     public static boolean sheepQuestInsidePenMarker(int sheepBlockX, int sheepFeetY, int sheepBlockZ,
             int markerX, int markerFloorY, int markerZ) {
