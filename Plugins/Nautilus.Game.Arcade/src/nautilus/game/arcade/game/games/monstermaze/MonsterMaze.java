@@ -813,9 +813,8 @@ public class MonsterMaze extends SoloGame
 			board.write(C.cGold + C.Bold + "Stage: " + C.cWhite + _maze.getCurrentSafePadCount());
 			int pattern = _maze.getPreset() == null ? 0 : _maze.getPreset().getPatternId();
 			board.write(C.cAqua + C.Bold + "Maze Pattern: " + C.cWhite + pattern);
-			int patternPb = MonsterMazePersonalBestManager.getKitBest(this, viewer, pattern);
-			board.write(C.cAqua + C.Bold + "Pattern PB: " + C.cWhite
-					+ (patternPb > 0 ? "Stage " + patternPb : "Not set"));
+			String patternPb = MonsterMazePersonalBestManager.getBestForPattern(this, viewer, pattern);
+			board.write(C.cAqua + C.Bold + "Pattern PB: " + C.cWhite + patternPb);
 			board.draw();
 
 		}
