@@ -106,13 +106,16 @@ public class SafePad implements Listener {
     public boolean isActive() { return active; }
 
     public boolean isOn(Entity entity) {
-        Location loc = entity.getLocation();
-        int by = surfaceY;
+        return entity != null && isWithinFootprint(center, surfaceY, entity.getLocation());
+    }
 
+    static boolean isWithinFootprint(Location center, int surfaceY, Location location) {
+        if (center == null || location == null || center.getWorld() == null
+                || location.getWorld() != center.getWorld()) return false;
         // Off-centre pad fix: use the same symmetric 5x5 box as the visible pad in every mode.
-        double dx = loc.getX() - center.getX(), dz = loc.getZ() - center.getZ();
+        double dx = location.getX() - center.getX(), dz = location.getZ() - center.getZ();
         return dx > -2.5 && dx < 2.5 && dz > -2.5 && dz < 2.5
-                && loc.getY() > by && loc.getY() < by + 5;
+                && location.getY() > surfaceY && location.getY() < surfaceY + 5;
     }
 
     public boolean decay() {
