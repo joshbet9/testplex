@@ -390,6 +390,11 @@ public final class ArcadePortRules {
     }
 
  
+    /** Legacy Dragon Escape runs its Hell course at night; other courses keep the normal day start. */
+    public static long dragonEscapeWorldTime(String mapName) {
+        return mapName != null && mapName.contains("Hell") ? 16_000L : 6_000L;
+    }
+
     /** The source game finishes near its final map waypoint, not anywhere on a Z plane. */
     public static boolean isDragonEscapeFinishReached(double x, double y, double z) {
         double dx = x - DRAGON_ESCAPE_FINISH_X;
