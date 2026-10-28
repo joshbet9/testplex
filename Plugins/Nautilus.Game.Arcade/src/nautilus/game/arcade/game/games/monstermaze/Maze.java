@@ -520,6 +520,8 @@ public class Maze implements Listener
 				}
 
 				Bukkit.getPluginManager().callEvent(new MonsterBumpPlayerEvent(player));
+				// One contact window must count as a single hit even if several mobs overlap the player.
+				break;
 			}
 		}
 	}
