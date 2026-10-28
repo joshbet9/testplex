@@ -132,6 +132,17 @@ class ArcadePortGameTest {
         }
     }
 
+    @Test void sourceMapSpawnsAreInterleavedAcrossConfiguredTeams() {
+        assertEquals(java.util.List.of(0, 1, 2, 0, 1, 0),
+                SourceMapCatalog.MapData.roundRobinGroupOrder(java.util.List.of(3, 2, 1)));
+        assertEquals(java.util.List.of(0, 1, 2, 3, 0, 1, 2, 3),
+                SourceMapCatalog.MapData.roundRobinGroupOrder(java.util.List.of(2, 2, 2, 2)));
+        assertEquals(java.util.List.of(),
+                SourceMapCatalog.MapData.roundRobinGroupOrder(java.util.List.of(0, -1, 0)));
+        assertEquals(java.util.List.of(),
+                SourceMapCatalog.MapData.roundRobinGroupOrder(null));
+    }
+
     @Test void originalMapCatalogEmbedsThirteenSourceWorldsAndLeavesEvolutionExplicitlyUnmapped() {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BACON_BRAWL));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BOMB_LOBBERS));
