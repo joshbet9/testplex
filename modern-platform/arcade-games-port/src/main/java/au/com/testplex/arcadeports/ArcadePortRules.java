@@ -427,6 +427,12 @@ public final class ArcadePortRules {
         return targetEliminated;
     }
 
+    /** Reborn's Ground Pound scales horizontal knockback from 0 at range to 0.8 at point-blank. */
+    public static double quiverGroundPoundHorizontalMultiplier(double distance) {
+        if (!Double.isFinite(distance)) return 0.0D;
+        return Math.max(0.0D, Math.min(1.0D, (8.0D - distance) / 8.0D));
+    }
+
     public static double quiverMeleeDamage(String kit) {
         String value = normalizeQuiverKit(kit);
         if (value == null) value = "leaper";
