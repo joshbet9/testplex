@@ -6,6 +6,8 @@ package au.com.testplex.arcadeports;
  * needing a live Paper server.
  */
 public final class ArcadePortRules {
+    public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
+    public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
     private static final int MICRO_BATTLES_BORDER_START_TICK = 600; // 30 seconds
     private static final int MICRO_BATTLES_BORDER_INTERVAL_TICKS = 400; // 20 seconds
     private static final double MICRO_BATTLES_BORDER_STEP = 6.0D;
@@ -29,5 +31,18 @@ public final class ArcadePortRules {
 
     public static boolean isQuiverWinnerScoreReached(int kills) {
         return kills >= 20;
+    }
+
+    public static int advanceTurfFrontline(int currentFrontline, int teamId) {
+        if (teamId == 0) return currentFrontline + 1;
+        if (teamId == 1) return currentFrontline - 1;
+        return currentFrontline;
+    }
+
+    public static boolean isTurfWarsWinningLine(int frontline, int teamId, int halfSize) {
+        if (halfSize < 1) return false;
+        if (teamId == 0) return frontline >= halfSize - 1;
+        if (teamId == 1) return frontline <= -halfSize;
+        return false;
     }
 }
