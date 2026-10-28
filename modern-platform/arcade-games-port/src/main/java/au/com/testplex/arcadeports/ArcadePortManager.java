@@ -1500,30 +1500,11 @@ public final class ArcadePortManager implements Listener {
                 applyPaintballHit(session, attacker, target);
                 break;
             case TURF_WARS: {
-                UUID targetId = target.getUniqueId();
-                eliminate(session, target, attacker, "was hit in Turf Wars");
-                if (active != session) break;
-                advanceTurfWars(session, attacker);
-                if (active != session) break;
-                session.respawning.add(targetId);
-                Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                    if (active != session || !target.isOnline()
-                            || !session.players.containsKey(targetId) || !session.respawning.remove(targetId)) return;
-                    int playerIndex = new ArrayList<>(session.players.keySet()).indexOf(targetId);
-                    int slots = Math.max(1, (session.players.size() + 1) / 2);
-                    Location spawn = turfWarsSpawn(session.world, session.teams.getOrDefault(targetId, 0),
-                            Math.max(0, playerIndex / 2), slots);
-                    target.teleport(spawn);
-                    target.setGameMode(GameMode.SURVIVAL);
-                    target.setHealth(target.getMaxHealth());
-                    target.setFoodLevel(20);
-                    target.setSaturation(20.0F);
-                    target.setFireTicks(0);
-                    session.alive.add(targetId);
-                    session.lastLocations.put(targetId, spawn.clone());
-                    giveKit(session, target);
-                    target.sendMessage(ChatColor.GREEN + "Respawned. Every kill moves the turf line.");
-                }, 80L);
+                ItemStack heldWeapon = attacker.getInventory().getItemInMainHand();
+                boolean ironSword = "melee".equals(source) && heldWeapon != null
+                        && heldWeapon.getType() == Material.IRON_SWORD;
+                double damage = ArcadePortRules.turfWarsHitDamage(!"melee".equals(source), ironSword);
+                applyTurfWarsHit(session, attacker, target, damage);
                 break;
             }
             case EVOLUTION:
@@ -1548,6 +1529,43 @@ public final class ArcadePortManager implements Listener {
                 eliminate(session, target, attacker, source);
                 break;
         }
+    }
+
+    private void applyTurfWarsHit(Session session, Player attacker, Player target, double damage) {
+        if (active != session || !session.alive.contains(target.getUniqueId())
+                || !session.alive.contains(attacker.getUniqueId())) return;
+        if (target.getHealth() > damage) {
+            target.setHealth(target.getHealth() - damage);
+            target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
+            target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0.0D, 1.0D, 0.0D),
+                    5, 0.25D, 0.35D, 0.25D, 0.05D);
+            return;
+        }
+
+        UUID targetId = target.getUniqueId();
+        eliminate(session, target, attacker, "was defeated in Turf Wars");
+        if (active != session) return;
+        advanceTurfWars(session, attacker);
+        if (active != session) return;
+        session.respawning.add(targetId);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (active != session || !target.isOnline()
+                    || !session.players.containsKey(targetId) || !session.respawning.remove(targetId)) return;
+            int playerIndex = new ArrayList<>(session.players.keySet()).indexOf(targetId);
+            int slots = Math.max(1, (session.players.size() + 1) / 2);
+            Location spawn = turfWarsSpawn(session.world, session.teams.getOrDefault(targetId, 0),
+                    Math.max(0, playerIndex / 2), slots);
+            target.teleport(spawn);
+            target.setGameMode(GameMode.SURVIVAL);
+            target.setHealth(target.getMaxHealth());
+            target.setFoodLevel(20);
+            target.setSaturation(20.0F);
+            target.setFireTicks(0);
+            session.alive.add(targetId);
+            session.lastLocations.put(targetId, spawn.clone());
+            giveKit(session, target);
+            target.sendMessage(ChatColor.GREEN + "Respawned. Every kill moves the turf line.");
+        }, 80L);
     }
 
     private void advanceTurfWars(Session session, Player attacker) {
