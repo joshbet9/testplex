@@ -55,20 +55,18 @@ This is the manual runtime checklist for the isolated Mineplex Reborn test serve
 
 ## Snake gameplay mechanics
 
-Keep a round running long enough to test the full hazard ramp. Timings are measured from the start of the Live state.
+The timings below are measured from the start of the Live state. Normal green slime food should continue spawning and be edible throughout.
 
 | Approximate live time | Expected behaviour |
 | --- | --- |
-| 25 seconds | First per-player steering roulette announcement. |
-| 45 seconds | First Magma Cube hazard enters the arena. |
-| 50 seconds | Next steering roulette roll. |
-| 75 seconds | Second hazard; the roulette also rolls at 75 seconds. |
-| 105 seconds | Third hazard. |
-| 135 seconds | Fourth hazard; total active hazards are capped at four. |
+| About 10 seconds | First physical Magma Cube item-box hazard spawns on a clear floor tile. |
+| About 25 seconds | Second cube spawn, if the first spawn succeeded. |
+| About 40 seconds | Third cube spawn, subject to the four-active-cube cap. |
+| About 55 seconds | Fourth cube spawn; at most four hazards can be active. |
 
-For every roulette type, check that steering changes the actual travel direction without rotating the client's camera: Turn Lag catches up gradually, Drift carries momentum across ticks, Overshoot exaggerates the turn, and Weak Sharp Turning follows rapid turns sluggishly. Check that a fresh roll can change the effect but doesn't immediately repeat the prior one for the same player.
+Touch a cube and verify the player's hotbar shows a short item roulette, then the selected negative steering effect begins without rotating the camera. Each player's successive cube hits should apply effects for 1, 3, 5, 10, 15, 20, then at most 30 seconds. The effect types should be distinct: Turn Lag catches up gradually, Drift carries momentum and limits travel-direction changes to 8 degrees per tick, Overshoot adds 35% of the latest yaw change, and Weak Sharp Turning catches up at up to 4 degrees per tick during sharp turns. Turn Lag is capped at 6 degrees per tick. The original item in the roulette hotbar slot must be restored after the roll.
 
-For hazards, check that each cube spawns away from the player's current position, moves toward living players, eliminates on contact, respects the existing Snake invulnerability window, and disappears at game end. Note unexpected spawn positions, collisions through walls, stuck cubes, or any TPS impact.
+Check that each cube moves toward living players, is consumed when its item roll triggers, and does not kill the player. If a player touches another cube during an active hotbar roll, it should remain available and trigger a second roll immediately after the current one. Failed spawn positions should retry soon rather than producing chat-only announcements. Note stuck cubes, collisions through walls, broken item restoration or any TPS impact.
 
 ## Monster Maze safe-pad bounds and optional persistence
 
