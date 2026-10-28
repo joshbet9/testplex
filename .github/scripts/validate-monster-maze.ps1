@@ -259,8 +259,8 @@ Assert-Contains "Mob Theme changes refresh Safe Pad and beacon colours" $mazeFil
 Assert-Contains "Beacon is below the walkable clear-glass surface" $safePadFile "loc.clone().add(0, -1, 0), Material.BEACON"
 Assert-Contains "Beacon base is shifted down two blocks" $safePadFile "loc.clone().add(x, -2, z), Material.IRON_BLOCK"
 Assert-Contains "Beacon colour glass is rendered at floor level" $safePadFile "viewer.sendBlockChange(surface, Material.STAINED_GLASS, colour)"
-Assert-Contains "Beacon refresh forces the next 1.8 beam-segment scan" $safePadFile "new PacketPlayOutUpdateTime(refreshTime, world.getTime())"
-Assert-Contains "Beacon refresh restores the real client world age" $safePadFile "new PacketPlayOutUpdateTime(world.getFullTime(), world.getTime())"
+Assert-Contains "Beacon refresh forces the next 1.8 beam-segment scan" $safePadFile 'new PacketPlayOutUpdateTime(refreshTime, world.getTime(), Boolean.parseBoolean(world.getGameRuleValue("doDaylightCycle")))'
+Assert-Contains "Beacon refresh restores the real client world age" $safePadFile 'new PacketPlayOutUpdateTime(world.getFullTime(), world.getTime(), Boolean.parseBoolean(world.getGameRuleValue("doDaylightCycle")))'
 Assert-Contains "Beacon glass uses the per-mob-set beacon colour setting" $safePadFile "getMonsterMazeBeaconColourData(viewer.getUniqueId(), mobSet)"
 Assert-Contains "Safe Pad clay uses the per-mob-set Safe Pad colour setting" $safePadFile "getMonsterMazeSafePadColourData(viewer.getUniqueId(), mobSet)"
 Assert-Contains "Changing one colour selection refreshes both live overlays" $cosmeticsFile "refreshLiveMonsterMazeColours(player)"
