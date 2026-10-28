@@ -112,12 +112,15 @@ class ArcadePortGameTest {
         assertEquals(3, ArcadePortRules.spleefProjectileClearRadius(true, 100.0D));
     }
 
-    @Test void evolutionStagesIncreaseOnWinsAndDropOnLosses() {
+    @Test void evolutionStagesAdvanceOnKillsAndAreRetainedOnDeath() {
         assertEquals(1, ArcadePortRules.nextEvolutionLevel(0, true));
-        assertEquals(5, ArcadePortRules.nextEvolutionLevel(5, true));
-        assertEquals(1, ArcadePortRules.nextEvolutionLevel(2, false));
+        assertEquals(6, ArcadePortRules.nextEvolutionLevel(5, true));
+        assertEquals(6, ArcadePortRules.nextEvolutionLevel(6, true));
+        assertEquals(2, ArcadePortRules.nextEvolutionLevel(2, false));
         assertEquals(0, ArcadePortRules.nextEvolutionLevel(0, false));
         assertEquals(0, ArcadePortRules.nextEvolutionLevel(-1, false));
+        assertFalse(ArcadePortRules.isEvolutionWinnerLevel(5));
+        assertTrue(ArcadePortRules.isEvolutionWinnerLevel(6));
     }
 
     @Test void sheepQuestLeaderRequiresMorePenSheep() {
