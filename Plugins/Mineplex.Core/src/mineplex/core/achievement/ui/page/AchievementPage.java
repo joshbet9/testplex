@@ -203,9 +203,32 @@ public class AchievementPage extends ShopPageBase<AchievementManager, Achievemen
 			addItem(overflow ? 49 : 40, new ShopItem(hasAllAchievements ? Material.EMERALD_BLOCK : Material.REDSTONE_BLOCK, (byte) 0, itemName, masterAchievementLore.toArray(new String[0]), 1, false, true));
 		}
 
+		if (_category == AchievementCategory.MONSTER_MAZE
+				&& getPlayer().getName().equalsIgnoreCase(_targetName))
+			addMonsterMazePBButton();
 		addBackButton();
 		addStats();
 		addDivisionDisplay();
+	}
+
+	private void addMonsterMazePBButton()
+	{
+		List<String> lore = new ArrayList<String>();
+		lore.add(" ");
+		lore.add(ChatColor.GRAY + "View personal bests by mode,");
+		lore.add(ChatColor.GRAY + "maze pattern and kit.");
+		lore.add(ChatColor.YELLOW + "Click to open PB menu.");
+		addButton(47, new ShopItem(Material.BOOK_AND_QUILL, C.cAqua + "Monster Maze Personal Bests",
+				lore.toArray(new String[0]), 1, false, false), new IButton()
+		{
+			@Override
+			public void onClick(Player player, ClickType clickType)
+			{
+				getShop().openPageForPlayer(getPlayer(), new MonsterMazePBPage(getPlugin(), _statsManager,
+						getShop(), getClientManager(), getDonationManager(), player, _targetName, _targetStats));
+				player.playSound(player.getLocation(), Sound.CLICK, 1, 1);
+			}
+		});
 	}
 
 	private void addBackButton()
