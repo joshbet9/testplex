@@ -192,7 +192,7 @@ public final class ArcadePortManager implements Listener {
             session.scores.put(player.getUniqueId(), 0);
             if (type == ArcadePortGame.PAINTBALL) session.paintPiecesRemaining.put(player.getUniqueId(), 4);
             if (type == ArcadePortGame.EVOLUTION) session.evolutionLevels.put(player.getUniqueId(), 0);
-            int teamId = type == ArcadePortGame.MICRO_BATTLES ? i % 4 : i % 2;
+            int teamId = (type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST) ? i % 4 : i % 2;
             session.teams.put(player.getUniqueId(), teamId);
             Location spawn = spawns.get(i % spawns.size()).clone();
             if (type == ArcadePortGame.MICRO_BATTLES) {
@@ -977,30 +977,77 @@ public final class ArcadePortManager implements Listener {
         session.entities.add(fireball);
     }
 
+    private int sheepPenCenterX(int team) {
+        return team <= 1 ? -14 : 14;
+    }
+
+    private int sheepPenCenterZ(int team) {
+        return (team == 0 || team == 2) ? -14 : 14;
+    }
+
     private Location sheepQuestPenCenter(Session session, int team) {
-        return new Location(session.world, team == 0 ? -15.0D : 15.0D, 64.0D, 0.0D);
+        return new Location(session.world, sheepPenCenterX(team) + 0.5D, 64.0D,
+                sheepPenCenterZ(team) + 0.5D);
+    }
+
+    private DyeColor sheepTeamDyeColor(int team) {
+        return switch (team) {
+            case 0 -> DyeColor.RED;
+            case 1 -> DyeColor.LIGHT_BLUE;
+            case 2 -> DyeColor.YELLOW;
+            default -> DyeColor.LIME;
+        };
+    }
+
+    private ChatColor sheepTeamChatColor(int team) {
+        return switch (team) {
+            case 0 -> ChatColor.RED;
+            case 1 -> ChatColor.AQUA;
+            case 2 -> ChatColor.YELLOW;
+            default -> ChatColor.GREEN;
+        };
+    }
+
+    private Material sheepTeamWool(int team) {
+        return switch (team) {
+            case 0 -> Material.RED_WOOL;
+            case 1 -> Material.LIGHT_BLUE_WOOL;
+            case 2 -> Material.YELLOW_WOOL;
+            default -> Material.LIME_WOOL;
+        };
+    }
+
+    private String sheepTeamName(int team) {
+        return switch (team) {
+            case 0 -> "Red";
+            case 1 -> "Aqua";
+            case 2 -> "Yellow";
+            default -> "Green";
+        };
     }
 
     private boolean isInsideSheepPen(Session session, Location location, int team) {
-        if (session == null || location == null || team < 0 || team > 1) return false;
+        if (session == null || location == null || team < 0 || team > 3) return false;
         Location center = sheepQuestPenCenter(session, team);
         return location.getWorld() == center.getWorld()
                 && Math.abs(location.getX() - center.getX()) <= 2.5D
-                && Math.abs(location.getZ() - center.getZ()) <= 3.5D;
+                && Math.abs(location.getZ() - center.getZ()) <= 2.5D;
     }
 
     private void buildSheepPens(World world) {
-        for (int team = 0; team < 2; team++) {
-            int centerX = team == 0 ? -15 : 15;
-            Material wool = team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL;
+        for (int team = 0; team < 4; team++) {
+            int centerX = sheepPenCenterX(team);
+            int centerZ = sheepPenCenterZ(team);
+            Material wool = sheepTeamWool(team);
+            int gateX = (team == 0 || team == 1) ? 2 : -2;
             for (int dx = -2; dx <= 2; dx++) {
-                for (int dz = -3; dz <= 3; dz++) {
-                    world.getBlockAt(centerX + dx, 63, dz).setType(wool, false);
-                    boolean wall = Math.abs(dx) == 2 || Math.abs(dz) == 3;
-                    boolean gate = dz == 0 && (team == 0 ? dx == 2 : dx == -2);
+                for (int dz = -2; dz <= 2; dz++) {
+                    world.getBlockAt(centerX + dx, 63, centerZ + dz).setType(wool, false);
+                    boolean wall = Math.abs(dx) == 2 || Math.abs(dz) == 2;
+                    boolean gate = dx == gateX && dz == 0;
                     if (wall && !gate) {
                         for (int y = 64; y <= 65; y++) {
-                            world.getBlockAt(centerX + dx, y, dz).setType(wool, false);
+                            world.getBlockAt(centerX + dx, y, centerZ + dz).setType(wool, false);
                         }
                     }
                 }
@@ -1026,7 +1073,7 @@ public final class ArcadePortManager implements Listener {
             if (sheep == null || !sheep.isValid()) continue;
             int owner = session.sheepOwners.getOrDefault(sheep, -1);
             if (owner >= 0) {
-                sheep.setColor(owner == 0 ? DyeColor.RED : DyeColor.BLUE);
+                sheep.setColor(sheepTeamDyeColor(owner));
                 Location pen = sheepQuestPenCenter(session, owner);
                 sheep.teleport(pen.clone().add(0.5D, 0.0D, 0.5D));
                 sheep.setAI(false);
@@ -1078,12 +1125,12 @@ public final class ArcadePortManager implements Listener {
             sheep.teleport(following);
 
             int team = session.teams.getOrDefault(carrierId, -1);
-            if (team < 0 || team > 1) continue;
+            if (team < 0 || team > 3) continue;
             if (horizontalDistanceSquared(carrier.getLocation(), sheepQuestPenCenter(session, team)) > 20.25D) continue;
 
             int previousOwner = session.sheepOwners.getOrDefault(sheep, -1);
             session.sheepOwners.put(sheep, team);
-            sheep.setColor(team == 0 ? DyeColor.RED : DyeColor.BLUE);
+            sheep.setColor(sheepTeamDyeColor(team));
             sheep.setAI(false);
             Location pen = sheepQuestPenCenter(session, team);
             sheep.teleport(pen.clone().add(ThreadLocalRandom.current().nextDouble(-1.0D, 1.0D),
@@ -1096,7 +1143,7 @@ public final class ArcadePortManager implements Listener {
                         12, 0.35D, 0.4D, 0.35D, 0.04D);
                 announce(session, (previousOwner < 0 ? ChatColor.GREEN + "Sheep captured by " :
                         ChatColor.YELLOW + "Sheep stolen by ") + carrier.getName() + " for "
-                        + (team == 0 ? ChatColor.RED + "Red" : ChatColor.BLUE + "Blue") + ChatColor.WHITE + "!");
+                        + sheepTeamChatColor(team) + sheepTeamName(team) + ChatColor.WHITE + "!");
             } else {
                 carrier.sendMessage(ChatColor.GREEN + "Sheep returned to your team's pen.");
             }
@@ -1116,16 +1163,16 @@ public final class ArcadePortManager implements Listener {
     private int sheepQuestTeamCount(Session session, int team) {
         int count = 0;
         for (Sheep sheep : session.sheep) {
-            if (session.sheepOwners.getOrDefault(sheep, -1) == team && isInsideSheepPen(session, sheep.getLocation(), team)) count++;
+            if (session.sheepOwners.getOrDefault(sheep, -1) == team
+                    && isInsideSheepPen(session, sheep.getLocation(), team)) count++;
         }
         return count;
     }
 
     private Player sheepQuestLeader(Session session) {
-        int red = sheepQuestTeamCount(session, 0);
-        int blue = sheepQuestTeamCount(session, 1);
-        if (red == blue) return null;
-        int winningTeam = ArcadePortRules.sheepQuestLeadingTeam(red, blue);
+        int[] counts = new int[4];
+        for (int team = 0; team < counts.length; team++) counts[team] = sheepQuestTeamCount(session, team);
+        int winningTeam = ArcadePortRules.sheepQuestLeadingTeam(counts);
         if (winningTeam < 0) return null;
         return session.players.values().stream()
                 .filter(player -> player != null && player.isOnline()
@@ -1194,7 +1241,9 @@ public final class ArcadePortManager implements Listener {
             case ONE_IN_THE_QUIVER -> "kills " + scoreFor(session, id) + "/20";
             case PAINTBALL -> "armour " + session.paintPiecesRemaining.getOrDefault(id, 4) + "/4";
             case RUNNER -> "unstable tiles " + session.runnerBlocks.size();
-            case SHEEP_QUEST -> "pen sheep R" + sheepQuestTeamCount(session, 0) + " B" + sheepQuestTeamCount(session, 1);
+            case SHEEP_QUEST -> "pens R" + sheepQuestTeamCount(session, 0)
+                    + " A" + sheepQuestTeamCount(session, 1) + " Y" + sheepQuestTeamCount(session, 2)
+                    + " G" + sheepQuestTeamCount(session, 3);
             case SPLEEF -> "snowballs " + inventoryCount(player, Material.SNOWBALL);
             case TURF_WARS -> (session.turfCombat ? "COMBAT" : "BUILD") + " | turf " + session.turfFrontlineX;
         };
