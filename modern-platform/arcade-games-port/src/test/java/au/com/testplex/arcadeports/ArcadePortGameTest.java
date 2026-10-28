@@ -64,7 +64,8 @@ class ArcadePortGameTest {
         assertEquals(20L, ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS);
     }
 
-    @Test void turfWarsAlternatesBuildAndCombatPhases() {
+    @Test void turfWarsUsesFortySecondOpeningBuildThenTwentySecondBuildAndNinetySecondCombat() {
+        assertEquals(40_000L, ArcadePortRules.TURF_WARS_INITIAL_BUILD_PHASE_MILLIS);
         assertEquals(20_000L, ArcadePortRules.TURF_WARS_BUILD_PHASE_MILLIS);
         assertEquals(90_000L, ArcadePortRules.TURF_WARS_COMBAT_PHASE_MILLIS);
     }
