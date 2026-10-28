@@ -473,8 +473,14 @@ public final class ArcadePortManager implements Listener {
                 || session.type == ArcadePortGame.SHEEP_QUEST || session.type == ArcadePortGame.EVOLUTION) return;
         if (session.type == ArcadePortGame.DEATH_TAG) {
             long untagged = session.players.keySet().stream().filter(id -> session.alive.contains(id) && !session.tagged.contains(id)).count();
-            if (untagged <= 1) {
-                Player winner = session.players.keySet().stream().filter(id -> session.alive.contains(id) && !session.tagged.contains(id)).map(session.players::get).filter(p -> p != null && p.isOnline()).findFirst().orElse(null);
+            // A round starts with one tagged chaser, so "one runner left" is not a win
+            // condition. Finish only once the last runner is tagged.
+            if (untagged == 0) {
+                Player winner = session.players.keySet().stream()
+                        .filter(id -> session.alive.contains(id) && session.tagged.contains(id))
+                        .map(session.players::get).filter(p -> p != null && p.isOnline())
+                        .max(java.util.Comparator.comparingInt(p -> session.scores.getOrDefault(p.getUniqueId(), 0)))
+                        .orElse(null);
                 finish(session, winner, true);
             }
             return;
