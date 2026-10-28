@@ -194,6 +194,21 @@ public final class ArcadePortRules {
         };
     }
 
+    /** Apply the source's green/lime -> yellow -> red -> broken material sequence. */
+    public static Material nextSpleefSlowDamageMaterial(Material material) {
+        if (material == null) return null;
+        String name = material.name();
+        String family = name.endsWith("_WOOL") ? "_WOOL"
+                : name.endsWith("_TERRACOTTA") ? "_TERRACOTTA" : "";
+        if (family.isEmpty()) return null;
+        String colour = name.substring(0, name.length() - family.length());
+        return switch (colour) {
+            case "LIME", "GREEN" -> family.equals("_WOOL") ? Material.YELLOW_WOOL : Material.YELLOW_TERRACOTTA;
+            case "YELLOW" -> family.equals("_WOOL") ? Material.RED_WOOL : Material.RED_TERRACOTTA;
+            default -> null;
+        };
+    }
+
     public static int nextSpleefSlowDamageData(int legacyData) {
         return switch (legacyData) {
             case 5, 13 -> 4;
