@@ -1,11 +1,5 @@
 package me.monstermaze.util;
 
-import com.comphenix.protocol.PacketType;
-import com.comphenix.protocol.ProtocolLibrary;
-import com.comphenix.protocol.ProtocolManager;
-import com.comphenix.protocol.wrappers.WrappedDataValue;
-import com.comphenix.protocol.wrappers.WrappedDataWatcher;
-import com.comphenix.protocol.events.PacketContainer;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -25,7 +19,27 @@ import java.util.concurrent.ConcurrentHashMap;
 public class GameScoreboard {
     private final Map<UUID, Scoreboard> boards = new ConcurrentHashMap<UUID, Scoreboard>();
     private final Map<UUID, Integer> layoutPlayerCounts = new ConcurrentHashMap<UUID, Integer>();
-    private final ProtocolManager protocolManager = ProtocolLibrary.getProtocolManager();
+    private final Object optionalVisibilityAdapter;
+    private final java.lang.reflect.Method sendInvisibleMetadataMethod;
+
+    public GameScoreboard() {
+        Object adapter = null;
+        java.lang.reflect.Method sender = null;
+        // Keep the core game loadable when the optional ProtocolLib dependency is not installed.
+        if (Bukkit.getPluginManager().isPluginEnabled("ProtocolLib")) {
+            try {
+                Class<?> adapterType = Class.forName("me.monstermaze.util.ProtocolLibVisibility");
+                adapter = adapterType.getDeclaredConstructor().newInstance();
+                sender = adapterType.getMethod("sendInvisibleMetadata",
+                        Player.class, Player.class, boolean.class);
+            } catch (Throwable ignored) {
+                adapter = null;
+                sender = null;
+            }
+        }
+        optionalVisibilityAdapter = adapter;
+        sendInvisibleMetadataMethod = sender;
+    }
 
     private Scoreboard boardFor(Player p) {
         Scoreboard board=boards.get(p.getUniqueId());
@@ -158,17 +172,9 @@ public class GameScoreboard {
     }
 
     private void sendInvisibleMetadata(Player observer, Player target, boolean invisible) {
+        if (optionalVisibilityAdapter == null || sendInvisibleMetadataMethod == null) return;
         try {
-            WrappedDataWatcher source = WrappedDataWatcher.getEntityWatcher(target);
-            Byte current = source.getByte(0);
-            byte flags = current == null ? 0 : current.byteValue();
-            flags = invisible ? (byte) (flags | 0x20) : (byte) (flags & ~0x20);
-            PacketContainer packet = protocolManager.createPacket(PacketType.Play.Server.ENTITY_METADATA);
-            packet.getIntegers().write(0, target.getEntityId());
-            List<WrappedDataValue> values = new ArrayList<WrappedDataValue>();
-            values.add(new WrappedDataValue(0, WrappedDataWatcher.Registry.get(Byte.class), flags));
-            packet.getDataValueCollectionModifier().write(0, values);
-            protocolManager.sendServerPacket(observer, packet);
+            sendInvisibleMetadataMethod.invoke(optionalVisibilityAdapter, observer, target, invisible);
         } catch (Throwable ignored) { }
     }
 
