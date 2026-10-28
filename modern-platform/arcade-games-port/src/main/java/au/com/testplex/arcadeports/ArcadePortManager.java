@@ -50,6 +50,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.projectiles.ProjectileSource;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
@@ -708,6 +710,7 @@ public final class ArcadePortManager implements Listener {
             updateDeathTagChasers(session, now);
         }
         if (session.type == ArcadePortGame.BACON_BRAWL) updateBaconBrawl(session, now);
+        if (session.type == ArcadePortGame.EVOLUTION) updateEvolutionWebs(session, now);
         if (session.type == ArcadePortGame.RUNNER) processRunnerBlocks(session, now);
         if (session.type == ArcadePortGame.DRAGONS && now >= lastDragonHazard) {
             launchDragonHazard(session);
@@ -1170,11 +1173,57 @@ public final class ArcadePortManager implements Listener {
 
     private void giveEvolutionKit(Session session, Player player) {
         player.getInventory().clear();
+        for (PotionEffect effect : player.getActivePotionEffects()) player.removePotionEffect(effect.getType());
         int level = Math.max(0, Math.min(5, session.evolutionLevels.getOrDefault(player.getUniqueId(), 0)));
-        Material weapon = level >= 4 ? Material.DIAMOND_SWORD : level >= 2 ? Material.IRON_SWORD
-                : level == 1 ? Material.STONE_SWORD : Material.WOODEN_SWORD;
-        player.getInventory().addItem(new ItemStack(weapon));
-        player.sendMessage(ChatColor.GREEN + "Evolution stage restored: " + (level + 1) + ".");
+        switch (level) {
+            case 0:
+                player.getInventory().addItem(new ItemStack(Material.IRON_SWORD), new ItemStack(Material.SHIELD));
+                player.getInventory().setChestplate(new ItemStack(Material.IRON_CHESTPLATE));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 1_200, 0, false, false, true));
+                break;
+            case 1:
+                player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
+                        namedItem(Material.FIRE_CHARGE, "Blaze Fireball", "Right-click to launch a fireball.", 3));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 1_200, 0, false, false, true));
+                break;
+            case 2:
+                player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
+                        namedItem(Material.COBWEB, "Spider Web", "Right-click to place a temporary web.", 4));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 1_200, 0, false, false, true));
+                break;
+            case 3:
+                player.getInventory().addItem(new ItemStack(Material.IRON_SWORD),
+                        namedItem(Material.TNT, "Creeper Charge", "Right-click to throw an explosive charge.", 3));
+                break;
+            case 4:
+                player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
+                        namedItem(Material.SLIME_BALL, "Slime Bounce", "Right-click to leap forward.", 3));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 1_200, 1, false, false, true));
+                break;
+            default:
+                player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD),
+                        namedItem(Material.FEATHER, "Chicken Dash", "Right-click to dash.", 3));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 1_200, 1, false, false, true));
+                break;
+        }
+        player.sendMessage(ChatColor.GREEN + "Evolution stage restored: " + (level + 1) + "/6.");
+        player.updateInventory();
+    }
+
+    private void updateEvolutionWebs(Session session, long now) {
+        java.util.Iterator<Map.Entry<Block, Long>> iterator = session.evolutionWebs.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Block, Long> entry = iterator.next();
+            Block block = entry.getKey();
+            if (block == null || block.getType() != Material.COBWEB) {
+                iterator.remove();
+                continue;
+            }
+            if (now >= entry.getValue()) {
+                block.setType(Material.AIR, false);
+                iterator.remove();
+            }
+        }
     }
 
     private Location spawnFor(Session session, Player player) {
@@ -1381,6 +1430,8 @@ public final class ArcadePortManager implements Listener {
         for (Entity entity : new ArrayList<>(session.entities)) if (entity != null && entity.isValid()) entity.remove();
         session.bombOwners.clear();
         session.dragonContactCooldowns.clear();
+        for (Block block : session.evolutionWebs.keySet()) if (block.getType() == Material.COBWEB) block.setType(Material.AIR, false);
+        session.evolutionWebs.clear();
         session.runnerBlocks.clear();
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             Player player = entry.getValue();
@@ -1704,7 +1755,8 @@ public final class ArcadePortManager implements Listener {
         if (!session.alive.contains(player.getUniqueId())) return;
         ItemStack heldItem = event.getItem();
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
-        if (session.type == ArcadePortGame.BOMB_LOBBERS && item == Material.TNT) {
+        if ((session.type == ArcadePortGame.BOMB_LOBBERS || (session.type == ArcadePortGame.EVOLUTION
+                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 3)) && item == Material.TNT) {
             event.setCancelled(true);
             consumeHeld(player);
             Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(0.8D));
@@ -1716,7 +1768,41 @@ public final class ArcadePortManager implements Listener {
             session.entities.add(bomb);
             session.bombOwners.put(bomb.getUniqueId(), player.getUniqueId());
             player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.9F, 1.0F);
-        } else if (session.type == ArcadePortGame.DRAGONS && item == Material.BLAZE_POWDER) {
+        } else if (session.type == ArcadePortGame.EVOLUTION
+                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 1 && item == Material.FIRE_CHARGE) {
+            event.setCancelled(true);
+            consumeHeld(player);
+            Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.0D));
+            Fireball fireball = session.world.spawn(spawn, Fireball.class);
+            fireball.setShooter(player);
+            fireball.setYield(0.0F);
+            fireball.setIsIncendiary(false);
+            fireball.setVelocity(player.getLocation().getDirection().multiply(0.75D));
+            session.entities.add(fireball);
+        } else if (session.type == ArcadePortGame.EVOLUTION
+                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 2 && item == Material.COBWEB) {
+            event.setCancelled(true);
+            Location placement = player.getLocation().clone().add(player.getLocation().getDirection().normalize().multiply(1.5D));
+            placement.setY(64.0D);
+            Block web = placement.getBlock();
+            if (web.getType().isAir()) {
+                web.setType(Material.COBWEB, false);
+                session.evolutionWebs.put(web, System.currentTimeMillis() + 3_000L);
+                consumeHeld(player);
+                player.sendMessage(ChatColor.WHITE + "Spider web placed!");
+            } else {
+                player.sendMessage(ChatColor.YELLOW + "There is no space to place a web.");
+            }
+        } else if (session.type == ArcadePortGame.EVOLUTION
+                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 4 && item == Material.SLIME_BALL) {
+            event.setCancelled(true);
+            consumeHeld(player);
+            player.setVelocity(player.getLocation().getDirection().multiply(1.15D).setY(0.85D));
+            player.getWorld().spawnParticle(Particle.ITEM_SLIME, player.getLocation(), 12, 0.35D, 0.25D, 0.35D, 0.08D);
+            player.playSound(player.getLocation(), Sound.ENTITY_SLIME_JUMP, 1.0F, 1.25F);
+        } else if ((session.type == ArcadePortGame.RUNNER || session.type == ArcadePortGame.DRAGON_ESCAPE
+                || (session.type == ArcadePortGame.EVOLUTION
+                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 5)) && item == Material.FEATHER) {
             event.setCancelled(true);
             consumeHeld(player);
             Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.2D));
@@ -1864,7 +1950,9 @@ public final class ArcadePortManager implements Listener {
         if (session == null || event.getEntity().getWorld() != session.world) return;
         if (event.getEntity() instanceof TNTPrimed bomb) {
             UUID ownerId = session.bombOwners.remove(bomb.getUniqueId());
-            if (ownerId != null && session.type == ArcadePortGame.BOMB_LOBBERS) {
+            if (ownerId != null && (session.type == ArcadePortGame.BOMB_LOBBERS
+                    || (session.type == ArcadePortGame.EVOLUTION
+                    && session.evolutionLevels.getOrDefault(ownerId, 0) == 3))) {
                 Location blast = bomb.getLocation().clone();
                 Player owner = session.players.get(ownerId);
                 event.blockList().clear();
@@ -1874,7 +1962,8 @@ public final class ArcadePortManager implements Listener {
                 session.world.spawnParticle(Particle.EXPLOSION, blast, 1, 0.0D, 0.0D, 0.0D, 0.0D);
                 session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
                 for (Player target : alivePlayers(session)) {
-                    if (owner != null && session.teams.getOrDefault(ownerId, -1)
+                    if (session.type == ArcadePortGame.BOMB_LOBBERS && owner != null
+                            && session.teams.getOrDefault(ownerId, -1)
                             .equals(session.teams.getOrDefault(target.getUniqueId(), -2))) continue;
                     double distanceSquared = target.getLocation().distanceSquared(blast);
                     if (distanceSquared > 64.0D) continue;
@@ -1934,6 +2023,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> scores = new HashMap<>();
         final Map<UUID, Integer> paintPiecesRemaining = new HashMap<>();
         final Map<UUID, Integer> evolutionLevels = new HashMap<>();
+        final Map<Block, Long> evolutionWebs = new HashMap<>();
         final Map<UUID, Integer> gladiatorPairs = new HashMap<>();
         final Set<Integer> gladiatorResolvedPairs = new HashSet<>();
         int gladiatorRound = -1;
