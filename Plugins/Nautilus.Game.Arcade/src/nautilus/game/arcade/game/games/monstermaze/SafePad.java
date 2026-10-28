@@ -269,7 +269,7 @@ public class SafePad implements Listener
 		long nextBoundary = ((fullTime / 80L) + 1L) * 80L;
 		long refreshTime = nextBoundary - 1L;
 		((CraftPlayer) viewer).getHandle().playerConnection.sendPacket(
-				new PacketPlayOutUpdateTime(refreshTime, world.getTime()));
+				new PacketPlayOutUpdateTime(refreshTime, world.getTime(), Boolean.parseBoolean(world.getGameRuleValue("doDaylightCycle"))));
 
 		Bukkit.getScheduler().runTaskLater(plugin, new Runnable()
 		{
@@ -279,7 +279,7 @@ public class SafePad implements Listener
 				if (viewer.isOnline() && viewer.getWorld() == world)
 				{
 					((CraftPlayer) viewer).getHandle().playerConnection.sendPacket(
-							new PacketPlayOutUpdateTime(world.getFullTime(), world.getTime()));
+							new PacketPlayOutUpdateTime(world.getFullTime(), world.getTime(), Boolean.parseBoolean(world.getGameRuleValue("doDaylightCycle"))));
 				}
 			}
 		}, 2L);
