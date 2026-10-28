@@ -607,7 +607,7 @@ public final class ArcadePortRules {
     /** Initial line sits immediately to the left of the X-axis midpoint (red territory). */
     public static int turfWarsInitialFrontline(int minX, int maxXExclusive) {
         if (maxXExclusive <= minX) return -1;
-        return (int) Math.floor((minX + (double) maxXExclusive) / 2.0D) - 1;
+        return (int) Math.ceil((minX + (double) maxXExclusive) / 2.0D) - 1;
     }
 
     /** Source-map bounds are exclusive at the maximum coordinate. */
