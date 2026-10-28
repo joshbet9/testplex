@@ -29,6 +29,12 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldRemoveMicroBarrier(12_000L));
     }
 
+    @Test void microBattlesBarrierHeightTracksSourceIslandY() {
+        assertEquals(65, ArcadePortRules.microBattlesBarrierTopY(64));
+        assertEquals(73, ArcadePortRules.microBattlesBarrierTopY(72));
+        assertEquals(41, ArcadePortRules.microBattlesBarrierTopY(40));
+    }
+
     @Test void microBattlesBorderChecksRespectItsConfiguredCentre() {
         assertFalse(ArcadePortRules.isOutsideWorldBorder(110.0D, -40.0D, 100.0D, -40.0D, 40.0D));
         assertFalse(ArcadePortRules.isOutsideWorldBorder(120.0D, -60.0D, 100.0D, -40.0D, 40.0D));
