@@ -67,4 +67,10 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isTurfWarsWinningLine(20, 2, 20));
     }
 
+    @Test void respawningPlayersPreventPrematureRoundEnd() {
+        assertFalse(ArcadePortRules.shouldFinishWhenNobodyIsAlive(0, 1));
+        assertFalse(ArcadePortRules.shouldFinishWhenNobodyIsAlive(1, 0));
+        assertTrue(ArcadePortRules.shouldFinishWhenNobodyIsAlive(0, 0));
+    }
+
 }
