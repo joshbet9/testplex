@@ -98,6 +98,22 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldDropRunnerBlock(1_200L));
     }
 
+    @Test void runnerOnlyDestabilisesExposedSolidNonLiquidBlocksOnce() {
+        assertTrue(ArcadePortRules.shouldMarkRunnerBlock(true, false, false, true, false));
+        assertFalse(ArcadePortRules.shouldMarkRunnerBlock(false, false, false, true, false));
+        assertFalse(ArcadePortRules.shouldMarkRunnerBlock(true, true, false, true, false));
+        assertFalse(ArcadePortRules.shouldMarkRunnerBlock(true, false, true, true, false));
+        assertFalse(ArcadePortRules.shouldMarkRunnerBlock(true, false, false, false, false));
+        assertFalse(ArcadePortRules.shouldMarkRunnerBlock(true, false, false, true, true));
+    }
+
+    @Test void runnerFallingBlocksCannotHitPlayersStandingAboveThem() {
+        assertTrue(ArcadePortRules.shouldRunnerFallingBlockHit(64.0D, 64.0D));
+        assertTrue(ArcadePortRules.shouldRunnerFallingBlockHit(64.5D, 64.0D));
+        assertFalse(ArcadePortRules.shouldRunnerFallingBlockHit(64.5001D, 64.0D));
+        assertFalse(ArcadePortRules.shouldRunnerFallingBlockHit(70.0D, 64.0D));
+    }
+
     @Test void dragonEscapeLaunchesChaseHazardsOnSchedule() {
         assertEquals(6_000L, ArcadePortRules.DRAGON_ESCAPE_HAZARD_INTERVAL_MILLIS);
         assertFalse(ArcadePortRules.shouldLaunchDragonEscapeHazard(5_999L, 6_000L));
