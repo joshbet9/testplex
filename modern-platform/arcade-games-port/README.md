@@ -5,9 +5,9 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 ## Games covered in this first pass
 
 - Bacon Brawl — the three retained kits (Pig/Mama Pig/Sheep Pig), source-style hunger drain/starvation/hunger-on-hit, knockback escalation, Body Slam, Bacon Blast and Sheep Pig cloak/backstab.
-- Bomb Lobbers — snowball throws, direct-hit ding and knockback.
+- Bomb Lobbers — timed TNT throws, block/fuse detonation, direct-hit damage with the original note-pling feedback and light direct-hit knockback; team timeouts now use surviving players and team kill totals rather than an arbitrary individual score.
 - Death Tag — source-style Normal/Alpha chasers, death-triggered conversion, runner speed threshold, Basher/Archer/Traitor/Null runner loadouts, Archer arrow refresh, and flat Iron Skin damage reduction (historical map/light parity and disguise visuals remain).
-- Dragon Escape — generated parkour course, a visible Douglas chase dragon, radius-based course destruction, catch-up elimination and finish proximity (map-data/waypoint parity still needs original assets).
+- Dragon Escape — embedded Reborn terrain, RED dragon start marker, ordered BLACK route waypoints and GREEN speed marker are used when available; Douglas chases along the authored route, destroys blocks in its radius, catches trailing players and checks the finish waypoint. Map-specific movement/water handling and live-course acceptance still need validation.
 - Dragons — timed fireball hazards and a Pyro fireball ability.
 - Evolution — source-form health/damage progression across Iron Golem, Blaze, Spider, Creeper, Slime and Chicken; kills unlock hold-sneak grounded evolution charge, faster with consecutive life kills; 2.2-second form change plus 7-second total animation; stage persists through death with a four-second respawn. Map-platform illusions and the full 1.8 perk/disguise stack remain to port.
 - Gladiators — four source-style loadout tiers, paired tournament rounds, a five-second combat countdown and 60-second poison limited to unresolved 1v1 duels. Arena placement now reads the original map's GREEN/YELLOW/ORANGE/RED centre markers and nearest BLACK player spawns; per-arena doors/trails and full kit polish still remain.
