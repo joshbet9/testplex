@@ -4019,7 +4019,9 @@ public final class ArcadePortManager implements Listener {
     private void checkPlayerArena(Session session, Player player) {
         if (!session.alive.contains(player.getUniqueId())) return;
         Location location = player.getLocation();
-        if (location.getY() < 58.0D) {
+        double voidThresholdY = session.type == ArcadePortGame.DRAGON_ESCAPE
+                ? ArcadePortRules.dragonEscapeVoidThresholdY(session.dragonEscapeMapName) : 58.0D;
+        if (location.getY() < voidThresholdY) {
             eliminate(session, player, null, "fell from the arena");
             return;
         }
