@@ -43,6 +43,11 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isWorldDragonHazard(ArcadePortGame.BOMB_LOBBERS, true, false));
     }
 
+    @Test void quiverOnlyRegrantsArrowAfterElimination() {
+        assertFalse(ArcadePortRules.quiverRegrantsArrowAfterHit(false));
+        assertTrue(ArcadePortRules.quiverRegrantsArrowAfterHit(true));
+    }
+
     @Test void oneInTheQuiverNeedsTwentyKillsToWin() {
         assertFalse(ArcadePortRules.isQuiverWinnerScoreReached(0));
         assertFalse(ArcadePortRules.isQuiverWinnerScoreReached(19));
