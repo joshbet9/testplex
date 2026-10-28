@@ -5,6 +5,9 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 
+import net.md_5.bungee.api.ChatMessageType;
+import net.md_5.bungee.api.chat.TextComponent;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -70,27 +73,43 @@ public class KitSlowballModern extends KitSlowball
         player.sendMessage(C.cAqua + C.Bold + "Cryo Blitz! " + C.cGray
                 + frozen + " monster(s) frozen for 3 seconds.");
         player.playSound(player.getLocation(), org.bukkit.Sound.SUCCESSFUL_HIT, 1.0f, 1.5f);
+        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(
+                C.cAqua + C.Bold + "CRYO BLITZ " + C.cWhite + frozen + " frozen - 3.0s"));
         org.bukkit.Bukkit.getPluginManager().callEvent(new AbilityUseEvent(player));
     }
 
     @EventHandler
     public void onUpdate(UpdateEvent event)
     {
-        if (event.getType() != UpdateType.SEC || !Manager.GetGame().IsLive())
+        if (event.getType() != UpdateType.TICK || !Manager.GetGame().IsLive())
             return;
 
         long now = System.currentTimeMillis();
-        Iterator<Map.Entry<UUID, Long>> iterator = _nextUse.entrySet().iterator();
-        while (iterator.hasNext())
+        for (Player player : Bukkit.getOnlinePlayers())
         {
-            Map.Entry<UUID, Long> entry = iterator.next();
-            if (entry.getValue().longValue() > now)
+            if (!player.isOnline() || !HasKit(player))
                 continue;
-
-            Player player = org.bukkit.Bukkit.getPlayer(entry.getKey());
-            if (player != null && player.isOnline() && HasKit(player))
+            Long next = _nextUse.get(player.getUniqueId());
+            if (next == null)
+            {
+                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(
+                        C.cAqua + C.Bold + "CRYO BLITZ READY"));
+                continue;
+            }
+            long remaining = next.longValue() - now;
+            if (remaining <= 0)
+            {
+                _nextUse.remove(player.getUniqueId());
                 player.sendMessage(C.cAqua + "Cryo Blitz is ready.");
-            iterator.remove();
+                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(
+                        C.cAqua + C.Bold + "CRYO BLITZ READY"));
+            }
+            else
+            {
+                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(
+                        C.cAqua + C.Bold + "CRYO BLITZ " + C.cWhite
+                                + String.format(java.util.Locale.US, "%.1fs", remaining / 1000.0D)));
+            }
         }
     }
 
