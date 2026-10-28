@@ -151,7 +151,9 @@ public final class ArcadePortManager implements Listener {
         Session session = new Session(type, world, participants);
         active = session;
         long now = System.currentTimeMillis();
+        session.startedAt = now;
         session.endsAt = now + ROUND_MS;
+        session.microBarrierActive = type == ArcadePortGame.MICRO_BATTLES;
         session.turfCombat = false;
         session.turfPhaseEndsAt = type == ArcadePortGame.TURF_WARS
                 ? now + ArcadePortRules.TURF_WARS_BUILD_PHASE_MILLIS : 0L;
@@ -174,10 +176,11 @@ public final class ArcadePortManager implements Listener {
             session.players.put(player.getUniqueId(), player);
             session.alive.add(player.getUniqueId());
             session.scores.put(player.getUniqueId(), 0);
-            session.teams.put(player.getUniqueId(), i % 2);
+            int teamId = type == ArcadePortGame.MICRO_BATTLES ? i % 4 : i % 2;
+            session.teams.put(player.getUniqueId(), teamId);
             Location spawn = spawns.get(i % spawns.size()).clone();
             if (type == ArcadePortGame.MICRO_BATTLES) {
-                spawn = islandSpawn(i);
+                spawn = microTeamSpawn(teamId, i / 4, (participants.size() + 3) / 4);
             } else if (type == ArcadePortGame.TURF_WARS) {
                 spawn = turfWarsSpawn(world, session.teams.get(player.getUniqueId()), i / 2,
                         (participants.size() + 1) / 2);
@@ -217,7 +220,7 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.SHEEP_QUEST) {
             for (int i = 0; i < 8; i++) spawnSheep(session);
         }
-        if (type == ArcadePortGame.MICRO_BATTLES) announce(session, ChatColor.AQUA + "Micro Battles: survive as the border closes.");
+        if (type == ArcadePortGame.MICRO_BATTLES) announce(session, ChatColor.AQUA + "Micro Battles: gather blocks; glass barriers drop after 10 seconds.");
         else announce(session, ChatColor.GOLD + type.displayName() + " started! This is a first-pass mechanics test.");
         if (type == ArcadePortGame.TURF_WARS) {
             announce(session, ChatColor.GREEN + "Build phase: place your team's wool on your own turf for 20 seconds.");
@@ -266,8 +269,9 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (type == ArcadePortGame.MICRO_BATTLES) {
-            for (int i = 0; i < 8; i++) {
-                Location island = islandSpawn(i);
+            // Four team islands, each ringed by a two-block glass barrier for the opening countdown.
+            for (int team = 0; team < 4; team++) {
+                Location island = islandSpawn(team * 2);
                 int cx = island.getBlockX();
                 int cz = island.getBlockZ();
                 for (int x = cx - 3; x <= cx + 3; x++) {
@@ -275,8 +279,14 @@ public final class ArcadePortManager implements Listener {
                         world.getBlockAt(x, 63, z).setType(type.floor(), false);
                     }
                 }
-                // Keep the utility block off the exact player spawn block.
-                world.getBlockAt(cx + 2, 64, cz).setType(Material.CRAFTING_TABLE, false);
+                for (int offset = -4; offset <= 4; offset++) {
+                    for (int y = 64; y <= 65; y++) {
+                        world.getBlockAt(cx + offset, y, cz - 4).setType(Material.GLASS, false);
+                        world.getBlockAt(cx + offset, y, cz + 4).setType(Material.GLASS, false);
+                        world.getBlockAt(cx - 4, y, cz + offset).setType(Material.GLASS, false);
+                        world.getBlockAt(cx + 4, y, cz + offset).setType(Material.GLASS, false);
+                    }
+                }
             }
             return;
         }
@@ -314,7 +324,38 @@ public final class ArcadePortManager implements Listener {
     private Location islandSpawn(int index) {
         World world = worlds.get(ArcadePortGame.MICRO_BATTLES.id());
         double angle = 2.0D * Math.PI * Math.floorMod(index, 8) / 8.0D;
-        return new Location(world, Math.cos(angle) * 13.0D, 64.0D, Math.sin(angle) * 13.0D, (float)(angle * 180.0D / Math.PI + 90.0D), 0.0F);
+        return new Location(world, Math.cos(angle) * 13.0D, 64.0D, Math.sin(angle) * 13.0D, (float)(angle * 180.0D / Math.PI + 90.0F), 0.0F);
+    }
+
+    private Location microTeamSpawn(int team, int slot, int slots) {
+        Location center = islandSpawn(team * 2);
+        if (slots > 1) {
+            double angle = 2.0D * Math.PI * slot / slots;
+            center.add(Math.cos(angle) * 1.4D, 0.0D, Math.sin(angle) * 1.4D);
+        }
+        return center;
+    }
+
+    private void updateMicroBarrier(Session session, long now) {
+        if (!session.microBarrierActive || !ArcadePortRules.shouldRemoveMicroBarrier(now - session.startedAt)) return;
+        for (int team = 0; team < 4; team++) {
+            Location island = islandSpawn(team * 2);
+            int cx = island.getBlockX();
+            int cz = island.getBlockZ();
+            for (int offset = -4; offset <= 4; offset++) {
+                for (int y = 64; y <= 65; y++) {
+                    Block[] ring = {
+                            session.world.getBlockAt(cx + offset, y, cz - 4),
+                            session.world.getBlockAt(cx + offset, y, cz + 4),
+                            session.world.getBlockAt(cx - 4, y, cz + offset),
+                            session.world.getBlockAt(cx + 4, y, cz + offset)
+                    };
+                    for (Block block : ring) if (block.getType() == Material.GLASS) block.setType(Material.AIR, false);
+                }
+            }
+        }
+        session.microBarrierActive = false;
+        announce(session, ChatColor.AQUA + "Glass barriers are down! Fight for your team.");
     }
 
     private Location turfWarsSpawn(World world, int team, int slot, int slots) {
@@ -361,6 +402,7 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().addItem(new ItemStack(Material.STONE_SWORD));
                 player.getInventory().addItem(new ItemStack(Material.BOW));
                 player.getInventory().addItem(new ItemStack(Material.ARROW, 16));
+                player.getInventory().addItem(new ItemStack(Material.COBBLESTONE, 32));
                 break;
             case ONE_IN_THE_QUIVER:
                 player.getInventory().addItem(new ItemStack(Material.BOW));
@@ -417,6 +459,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
+        if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
         if (session.type == ArcadePortGame.DRAGONS && now >= lastDragonHazard) {
             launchDragonHazard(session);
             lastDragonHazard = now + 4_500L;
@@ -425,10 +468,7 @@ public final class ArcadePortManager implements Listener {
             spawnSheep(session);
             lastSheepSpawn = now + 2_000L;
         }
-        if (session.type == ArcadePortGame.MICRO_BATTLES && ArcadePortRules.shouldShrinkMicroBattlesBorder(session.ticks)) {
-            WorldBorder border = session.world.getWorldBorder();
-            border.setSize(ArcadePortRules.nextMicroBattlesBorderSize(border.getSize()), 8L);
-        }
+
         if (session.type == ArcadePortGame.PAINTBALL && session.ticks % 40 == 0) {
             for (UUID id : session.alive) {
                 Player player = session.players.get(id);
@@ -522,6 +562,19 @@ public final class ArcadePortManager implements Listener {
             finish(session, null, true);
             return;
         }
+        if (session.type == ArcadePortGame.MICRO_BATTLES && session.participantsAtStart > 1) {
+            Set<Integer> remainingTeams = new HashSet<>();
+            for (UUID id : session.alive) remainingTeams.add(session.teams.getOrDefault(id, -1));
+            if (remainingTeams.size() <= 1) {
+                int winnerTeam = remainingTeams.stream().findFirst().orElse(-1);
+                Player winner = alivePlayers(session).stream()
+                        .filter(p -> session.teams.getOrDefault(p.getUniqueId(), -2) == winnerTeam)
+                        .max(java.util.Comparator.comparingInt(p -> session.scores.getOrDefault(p.getUniqueId(), 0)))
+                        .orElse(null);
+                finish(session, winner, true);
+            }
+            return;
+        }
         if (session.participantsAtStart <= 1) return;
         if (session.type == ArcadePortGame.PAINTBALL || session.type == ArcadePortGame.TURF_WARS
                 || session.type == ArcadePortGame.SHEEP_QUEST || session.type == ArcadePortGame.EVOLUTION
@@ -599,7 +652,8 @@ public final class ArcadePortManager implements Listener {
     private void handlePlayerHit(Session session, Player attacker, Player target, String source) {
         if (active != session || attacker.equals(target) || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
-        if ((session.type == ArcadePortGame.PAINTBALL || session.type == ArcadePortGame.TURF_WARS)
+        if ((session.type == ArcadePortGame.PAINTBALL || session.type == ArcadePortGame.TURF_WARS
+                || session.type == ArcadePortGame.MICRO_BATTLES)
                 && session.teams.getOrDefault(attacker.getUniqueId(), -1).equals(session.teams.getOrDefault(target.getUniqueId(), -2))) return;
         if (session.type == ArcadePortGame.TURF_WARS && !session.turfCombat) return;
 
@@ -830,6 +884,12 @@ public final class ArcadePortManager implements Listener {
         pendingRestore.clear();
     }
 
+    private double horizontalDistanceSquared(Location left, Location right) {
+        double dx = left.getX() - right.getX();
+        double dz = left.getZ() - right.getZ();
+        return dx * dx + dz * dz;
+    }
+
     private boolean isInsideSession(Session session, Location location) {
         return location != null && location.getWorld() == session.world;
     }
@@ -854,6 +914,24 @@ public final class ArcadePortManager implements Listener {
         if (session == null || !isInsideSession(session, event.getTo())) return;
         Player player = event.getPlayer();
         if (!session.players.containsKey(player.getUniqueId())) return;
+        if (session.type == ArcadePortGame.MICRO_BATTLES && session.alive.contains(player.getUniqueId())) {
+            int team = session.teams.getOrDefault(player.getUniqueId(), -1);
+            if (team >= 0 && team < 4) {
+                Location ownIsland = islandSpawn(team * 2);
+                Location to = event.getTo();
+                double ownDistance = horizontalDistanceSquared(to, ownIsland);
+                double nearestOther = Double.POSITIVE_INFINITY;
+                for (int other = 0; other < 4; other++) {
+                    if (other == team) continue;
+                    nearestOther = Math.min(nearestOther, horizontalDistanceSquared(to, islandSpawn(other * 2)));
+                }
+                if (ArcadePortRules.shouldPunishMicroIslandExit(System.currentTimeMillis() - session.startedAt,
+                        ownDistance, nearestOther)) {
+                    eliminate(session, player, null, "left the starting island before the opening restriction ended");
+                    return;
+                }
+            }
+        }
         checkPlayerArena(session, player);
         if (active != session || !session.alive.contains(player.getUniqueId())) return;
         Location previous = session.lastLocations.get(player.getUniqueId());
@@ -1005,6 +1083,13 @@ public final class ArcadePortManager implements Listener {
             event.setExpToDrop(0);
             return;
         }
+        if (session.type == ArcadePortGame.MICRO_BATTLES && session.alive.contains(event.getPlayer().getUniqueId())
+                && event.getBlock().getType() == Material.COBBLESTONE && event.getBlock().getY() >= 64
+                && event.getBlock().getY() <= 72) {
+            event.setDropItems(false);
+            event.setExpToDrop(0);
+            return;
+        }
         if (session.type == ArcadePortGame.TURF_WARS && session.alive.contains(event.getPlayer().getUniqueId())) {
             int team = session.teams.getOrDefault(event.getPlayer().getUniqueId(), -1);
             Material ownWool = team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL;
@@ -1021,6 +1106,16 @@ public final class ArcadePortManager implements Listener {
     public void onBlockPlace(BlockPlaceEvent event) {
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            Player player = event.getPlayer();
+            boolean allowed = session.alive.contains(player.getUniqueId())
+                    && event.getBlockPlaced().getType() == Material.COBBLESTONE
+                    && event.getBlockPlaced().getY() >= 64 && event.getBlockPlaced().getY() <= 72
+                    && Math.abs(event.getBlockPlaced().getX()) <= HALF_SIZE
+                    && Math.abs(event.getBlockPlaced().getZ()) <= HALF_SIZE;
+            if (!allowed) event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.TURF_WARS) {
             Player player = event.getPlayer();
             int team = session.teams.getOrDefault(player.getUniqueId(), -1);
@@ -1112,6 +1207,8 @@ public final class ArcadePortManager implements Listener {
         final Set<Entity> entities = new HashSet<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
         final int participantsAtStart;
+        long startedAt;
+        boolean microBarrierActive;
         boolean turfCombat;
         long turfPhaseEndsAt;
         int turfFrontlineX = -1;
