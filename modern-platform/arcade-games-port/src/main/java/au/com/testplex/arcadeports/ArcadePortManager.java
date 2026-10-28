@@ -514,7 +514,10 @@ public final class ArcadePortManager implements Listener {
         lastSheepSpawn = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
         if (type == ArcadePortGame.DRAGON_ESCAPE) spawnDragonEscapeDragon(session);
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(type.id());
-        world.setTime(ArcadePortRules.sourceWorldTime(type, sourceMap == null ? "" : sourceMap.mapName()));
+        String sourceMapName = sourceMap == null ? "" : sourceMap.mapName();
+        world.setTime(type == ArcadePortGame.DRAGON_ESCAPE
+                ? ArcadePortRules.dragonEscapeWorldTime(sourceMapName)
+                : ArcadePortRules.sourceWorldTime(type, sourceMapName));
         world.setStorm(false);
         world.setThundering(false);
         WorldBorder border = world.getWorldBorder();
@@ -4378,11 +4381,19 @@ public final class ArcadePortManager implements Listener {
 
     private Material spleefNextColour(Material material) {
         String name = material.name();
-        String family = name.endsWith("_WOOL") ? "_WOOL" : "_TERRACOTTA";
+        boolean wool = name.endsWith("_WOOL");
+        String family = wool ? "_WOOL" : "_TERRACOTTA";
         String colour = name.endsWith(family) ? name.substring(0, name.length() - family.length()) : "";
-        return switch (colour) {
-            case "LIME", "GREEN" -> family.equals("_WOOL") ? Material.YELLOW_WOOL : Material.YELLOW_TERRACOTTA;
-            case "YELLOW", "ORANGE" -> family.equals("_WOOL") ? Material.RED_WOOL : Material.RED_TERRACOTTA;
+        int legacyData = switch (colour) {
+            case "LIME" -> 5;
+            case "GREEN" -> 13;
+            case "YELLOW" -> 4;
+            default -> -1;
+        };
+        int nextData = ArcadePortRules.nextSpleefSlowDamageData(legacyData);
+        return switch (nextData) {
+            case 4 -> wool ? Material.YELLOW_WOOL : Material.YELLOW_TERRACOTTA;
+            case 14 -> wool ? Material.RED_WOOL : Material.RED_TERRACOTTA;
             default -> null;
         };
     }
