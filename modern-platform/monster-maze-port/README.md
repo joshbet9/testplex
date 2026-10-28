@@ -3,7 +3,7 @@
 This dedicated gameplay module adapts the **1.21/MonsterMazeStandalone** implementation from [joshbet9/MonsterMaze](https://github.com/joshbet9/MonsterMaze) to the independent Testplex Paper 26.3 platform. It uses the modern Bukkit/Paper implementation instead of copying the 1.8 `v1_8_R3` NMS entity classes.
 
 ## Gameplay port in this first pass
-- Original, Modern and Classic modes, three authored maze patterns, timed stages and Safe Pad progression.
+- Original, legacy Speed, Modern and Classic modes; three authored maze patterns; timed stages and Safe Pad progression. Speed keeps the 1.8 QOL kit rules with the original 60s-minus-2s stage timer and 150/15 monster cadence; only Modern uses the accelerated timer and 225/30 monster cadence.
 - Jumper, Slowball, Body Builder, Repulsor, and mode-gated Maverick kit behavior from the 1.21 source.
 - Monster routing, bumps, launch/freeze interactions, stage progression, spectator/elimination paths and cleanup.
 - Dedicated arena/lobby handling, maze generation and admin control.
@@ -19,5 +19,5 @@ The JAR does not embed Minecraft world folders. The explicit modern Hyper-V depl
 
 **Status:** mechanics port in progress. Compiling against Paper 26.3 catches source API incompatibilities, but runtime and in-game behavior still need test-server verification before marking it ready.
 
-Reference source commit: `231fb1830ca53a3cdd7451391ac3d384a03ec5bb`.
+Reference source commit: `e4f42100f21a0f4a7b00e493220f12f6a6a1dcce` (`feat/personal-mob-themes`), with the 1.8 Speed mode rules retained.
 See [compatibility notes](docs/COMPATIBILITY-NOTES.md) and [porting roadmap](../docs/PORTING-ROADMAP.md).
