@@ -18,6 +18,7 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Fireball;
+import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.Sheep;
@@ -30,6 +31,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
@@ -437,6 +439,8 @@ public final class ArcadePortManager implements Listener {
                 break;
             case RUNNER:
                 player.getInventory().addItem(namedItem(Material.FEATHER, "Runner Dash", "A short forward burst.", 3));
+                player.getInventory().addItem(new ItemStack(Material.BOW));
+                player.getInventory().addItem(new ItemStack(Material.ARROW, 12));
                 break;
             case SHEEP_QUEST:
                 player.getInventory().addItem(namedItem(Material.LEAD, "Shepherd", "Right-click sheep to capture them."));
@@ -486,6 +490,7 @@ public final class ArcadePortManager implements Listener {
             updateDeathTagChasers(session, now);
         }
         if (session.type == ArcadePortGame.BACON_BRAWL) updateBaconBrawl(session, now);
+        if (session.type == ArcadePortGame.RUNNER) processRunnerBlocks(session, now);
         if (session.type == ArcadePortGame.DRAGONS && now >= lastDragonHazard) {
             launchDragonHazard(session);
             lastDragonHazard = now + 4_500L;
@@ -889,6 +894,7 @@ public final class ArcadePortManager implements Listener {
         }
         for (Entity entity : new ArrayList<>(session.entities)) if (entity != null && entity.isValid()) entity.remove();
         session.bombOwners.clear();
+        session.runnerBlocks.clear();
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             Player player = entry.getValue();
             PlayerSnapshot snapshot = session.snapshots.get(entry.getKey());
@@ -989,12 +995,69 @@ public final class ArcadePortManager implements Listener {
         if (previous == null || current == null || (previous.getBlockX() == current.getBlockX() && previous.getBlockZ() == current.getBlockZ())) return;
         if (session.type == ArcadePortGame.RUNNER) {
             int x = previous.getBlockX(), z = previous.getBlockZ();
-            if (Math.abs(x) < HALF_SIZE && Math.abs(z) < HALF_SIZE) session.world.getBlockAt(x, 63, z).setType(Material.AIR, false);
+            if (Math.abs(x) < HALF_SIZE && Math.abs(z) < HALF_SIZE) {
+                markRunnerBlock(session, session.world.getBlockAt(x, 63, z), System.currentTimeMillis());
+            }
         } else if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             int crumbleZ = current.getBlockZ() - 5;
             if (crumbleZ > -24 && crumbleZ < 78) for (int x = -3; x <= 3; x++) session.world.getBlockAt(x, 63, crumbleZ).setType(Material.AIR, false);
         }
         session.lastLocations.put(player.getUniqueId(), current.clone());
+    }
+
+    private void markRunnerBlock(Session session, Block block, long now) {
+        if (active != session || block == null || block.getY() != 63 || !block.getType().isSolid()
+                || block.getType() == Material.BEDROCK || session.runnerBlocks.containsKey(block)) return;
+        block.setType(Material.RED_TERRACOTTA, false);
+        session.runnerBlocks.put(block, now);
+    }
+
+    private void processRunnerBlocks(Session session, long now) {
+        java.util.Iterator<Map.Entry<Block, Long>> iterator = session.runnerBlocks.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Block, Long> entry = iterator.next();
+            Block block = entry.getKey();
+            if (block == null || block.getType() != Material.RED_TERRACOTTA) {
+                iterator.remove();
+                continue;
+            }
+            if (!ArcadePortRules.shouldDropRunnerBlock(now - entry.getValue())) continue;
+            Location fallingLocation = block.getLocation().add(0.5D, 1.0D, 0.5D);
+            block.setType(Material.AIR, false);
+            iterator.remove();
+            FallingBlock falling = session.world.spawnFallingBlock(fallingLocation, Material.RED_TERRACOTTA.createBlockData());
+            falling.setDropItem(false);
+            falling.setHurtEntities(true);
+            session.entities.add(falling);
+        }
+    }
+
+    private void handleRunnerFallingBlockHit(Session session, FallingBlock falling, Player target) {
+        if (active != session || !session.alive.contains(target.getUniqueId())
+                || !session.entities.remove(falling)) return;
+        Location impact = falling.getLocation().clone();
+        falling.remove();
+        Vector recoil = target.getLocation().toVector().subtract(impact.toVector());
+        if (recoil.lengthSquared() < 0.001D) recoil = new Vector(0.0D, 1.0D, 0.0D);
+        target.setVelocity(recoil.normalize().multiply(0.7D).setY(0.45D));
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.8F);
+        target.sendMessage(ChatColor.RED + "A falling block hit you!");
+        if (target.getHealth() <= 6.0D) {
+            eliminate(session, target, null, "was struck by a falling block");
+        } else {
+            target.setHealth(target.getHealth() - 6.0D);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onRunnerFallingBlockLand(EntityChangeBlockEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.RUNNER
+                || !(event.getEntity() instanceof FallingBlock falling)
+                || !session.entities.contains(falling)) return;
+        event.setCancelled(true);
+        session.entities.remove(falling);
+        falling.remove();
     }
 
     private void handleDragonHazardHit(Session session, Fireball fireball, Player target) {
@@ -1016,7 +1079,10 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             if (event instanceof EntityDamageByEntityEvent byEntity) {
                 Entity damager = byEntity.getDamager();
-                if (damager instanceof Player attacker) {
+                if (session.type == ArcadePortGame.RUNNER && damager instanceof FallingBlock falling
+                        && session.entities.contains(falling)) {
+                    handleRunnerFallingBlockHit(session, falling, target);
+                } else if (damager instanceof Player attacker) {
                     handlePlayerHit(session, attacker, target, "melee");
                 } else if (session.type == ArcadePortGame.DEATH_TAG && damager instanceof Zombie zombie
                         && session.entities.contains(zombie)) {
@@ -1040,6 +1106,22 @@ public final class ArcadePortManager implements Listener {
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+
+        if (session.type == ArcadePortGame.RUNNER && event.getEntity() instanceof Arrow arrow
+                && arrow.getShooter() instanceof Player shooter && session.alive.contains(shooter.getUniqueId())) {
+            Block hit = event.getHitBlock();
+            if (hit != null) {
+                for (int dx = -2; dx <= 2; dx++) {
+                    for (int dz = -2; dz <= 2; dz++) {
+                        if (dx * dx + dz * dz > 6) continue;
+                        markRunnerBlock(session, session.world.getBlockAt(hit.getX() + dx, 63, hit.getZ() + dz),
+                                System.currentTimeMillis());
+                    }
+                }
+                arrow.remove();
+            }
+            return;
+        }
 
         // Handle Dragons fireballs here rather than relying on damage-event ordering.
         // World hazards knock players back; player-fired fireballs follow normal combat rules.
@@ -1299,6 +1381,7 @@ public final class ArcadePortManager implements Listener {
         final Set<Sheep> sheep = new HashSet<>();
         final Set<Entity> entities = new HashSet<>();
         final Map<UUID, UUID> bombOwners = new HashMap<>();
+        final Map<Block, Long> runnerBlocks = new HashMap<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
         final int participantsAtStart;
         double baconKnockback = 1.5D;
