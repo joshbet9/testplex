@@ -1829,10 +1829,10 @@ public final class ArcadePortManager implements Listener {
                     if ("basher".equals(kit) && !"projectile hit".equals(source)) {
                         target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 2, false, false, true));
                     } else if ("traitor".equals(kit) && !"projectile hit".equals(source)) {
-                        Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+                        Vector knockbackDirection = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
                         double multiplier = ArcadePortRules.deathTagKnockbackMultiplier(
                                 session.alphaChasers.contains(target.getUniqueId()));
-                        if (direction.lengthSquared() > 0.001D) target.setVelocity(direction.normalize().multiply(0.8D * multiplier).setY(0.1D));
+                        if (knockbackDirection.lengthSquared() > 0.001D) target.setVelocity(knockbackDirection.normalize().multiply(0.8D * multiplier).setY(0.1D));
                     }
                 }
                 break;
