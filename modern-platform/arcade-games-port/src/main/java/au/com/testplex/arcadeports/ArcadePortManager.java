@@ -3869,6 +3869,27 @@ public final class ArcadePortManager implements Listener {
      * modes, a personal high score must not announce a losing team as winner.
      */
     private Player timeoutWinner(Session session) {
+        if (session.type == ArcadePortGame.DEATH_TAG) {
+            List<Player> runners = alivePlayers(session).stream()
+                    .filter(player -> !session.tagged.contains(player.getUniqueId()))
+                    .toList();
+            if (ArcadePortRules.shouldDeathTagRunnerWinTimeout(runners.size())) {
+                return runners.stream()
+                        .max(java.util.Comparator.comparingInt(player ->
+                                session.scores.getOrDefault(player.getUniqueId(), 0)))
+                        .orElse(null);
+            }
+            List<Player> chasers = alivePlayers(session).stream()
+                    .filter(player -> session.tagged.contains(player.getUniqueId()))
+                    .toList();
+            if (!chasers.isEmpty()) {
+                return chasers.stream()
+                        .max(java.util.Comparator.comparingInt(player ->
+                                session.scores.getOrDefault(player.getUniqueId(), 0)))
+                        .orElse(null);
+            }
+            return null;
+        }
         int team = -1;
         if (session.type == ArcadePortGame.TURF_WARS) {
             team = ArcadePortRules.turfWarsTimeoutLeader(session.turfFrontlineX,
