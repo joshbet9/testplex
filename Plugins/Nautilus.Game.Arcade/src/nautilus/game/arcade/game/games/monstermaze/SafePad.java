@@ -9,10 +9,13 @@ import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import net.minecraft.server.v1_8_R3.BlockPosition;
 import net.minecraft.server.v1_8_R3.Packet;
 import net.minecraft.server.v1_8_R3.PacketPlayOutBlockBreakAnimation;
+import net.minecraft.server.v1_8_R3.PacketPlayOutUpdateTime;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Bukkit;
+import org.bukkit.World;
+import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -21,6 +24,7 @@ import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.plugin.Plugin;
 
 public class SafePad implements Listener
 {
@@ -244,6 +248,41 @@ public class SafePad implements Listener
 		if (viewer == null || !viewer.isOnline() || Host == null || _loc == null || _loc.getWorld() == null)
 			return;
 		applyViewerCosmeticColours(viewer);
+	}
+
+	/**
+	 * Vanilla 1.8 caches beacon beam colour segments and only rebuilds them when client
+	 * world age crosses an 80-tick boundary. A fake per-viewer glass change is otherwise
+	 * visible in the block but the beam can retain its old tint for several seconds.
+	 *
+	 * Nudge only this viewer's client total-world-age to the tick immediately before the
+	 * next boundary, preserving the real day/night clock. The next client tick crosses the
+	 * boundary and recalculates the beam; restore the genuine world age two server ticks
+	 * later. This uses packets only and never changes the server's world time or blocks.
+	 */
+	public static void refreshBeaconBeamForViewer(final Player viewer, Plugin plugin, final World world)
+	{
+		if (viewer == null || !viewer.isOnline() || plugin == null || world == null || viewer.getWorld() != world)
+			return;
+
+		long fullTime = world.getFullTime();
+		long nextBoundary = ((fullTime / 80L) + 1L) * 80L;
+		long refreshTime = nextBoundary - 1L;
+		((CraftPlayer) viewer).getHandle().playerConnection.sendPacket(
+				new PacketPlayOutUpdateTime(refreshTime, world.getTime()));
+
+		Bukkit.getScheduler().runTaskLater(plugin, new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				if (viewer.isOnline() && viewer.getWorld() == world)
+				{
+					((CraftPlayer) viewer).getHandle().playerConnection.sendPacket(
+							new PacketPlayOutUpdateTime(world.getFullTime(), world.getTime()));
+				}
+			}
+		}, 2L);
 	}
 
 	@SuppressWarnings("deprecation")
