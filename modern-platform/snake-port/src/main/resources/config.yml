@@ -1,0 +1,4 @@
+# Test arena defaults. Per-player kit choices are stored under kits.<uuid>.
+# This plugin is self-contained and does not contact any backend.
+test-mode: true
+kits: {}

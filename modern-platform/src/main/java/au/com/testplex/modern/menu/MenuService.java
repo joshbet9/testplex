@@ -86,14 +86,23 @@ public final class MenuService implements Listener {
         inventory.setItem(11, makeItem(icon(game.getIcon()), ChatColor.AQUA + game.getName(), List.of(
                 ChatColor.GRAY + game.getDescription(),
                 ChatColor.YELLOW + "Port status: " + game.getPortStatus().getDisplay())));
+        String enginePlugin = null;
+        String startCommand = null;
         if ("monster-maze".equals(game.getId())) {
-            boolean engineInstalled = Bukkit.getPluginManager().isPluginEnabled("MonsterMazeModern");
+            enginePlugin = "MonsterMazeModern";
+            startCommand = "mm start";
+        } else if ("snake".equals(game.getId())) {
+            enginePlugin = "SnakeModern";
+            startCommand = "snake start";
+        }
+        if (enginePlugin != null) {
+            boolean engineInstalled = Bukkit.getPluginManager().isPluginEnabled(enginePlugin);
             ItemStack start = makeItem(engineInstalled ? Material.LIME_CONCRETE : Material.BARRIER,
-                    (engineInstalled ? ChatColor.GREEN : ChatColor.RED) + "Start / Test Monster Maze",
+                    (engineInstalled ? ChatColor.GREEN : ChatColor.RED) + "Start / Test " + game.getName(),
                     List.of(ChatColor.GRAY + (engineInstalled
                             ? "Launch a mechanics test run."
-                            : "Install MonsterMazeModern.jar alongside this plugin."),
-                            ChatColor.YELLOW + (engineInstalled ? "Click to run /mm start." : "Engine module not detected.")));
+                            : "Install " + enginePlugin + ".jar alongside this plugin."),
+                            ChatColor.YELLOW + (engineInstalled ? "Click to run /" + startCommand + "." : "Engine module not detected.")));
             mark(start, "launch-game", game, null, null);
             inventory.setItem(4, start);
         }
@@ -180,13 +189,23 @@ public final class MenuService implements Listener {
         String optionId = meta.getPersistentDataContainer().get(optionKey, PersistentDataType.STRING);
         GameDefinition game = catalog.getGame(gameId);
 
-        if ("launch-game".equals(action) && game != null && "monster-maze".equals(game.getId())) {
-            if (!Bukkit.getPluginManager().isPluginEnabled("MonsterMazeModern")) {
-                player.sendMessage(ChatColor.RED + "MonsterMazeModern.jar is not installed on this server yet.");
+        if ("launch-game".equals(action) && game != null) {
+            String enginePlugin = null;
+            String startCommand = null;
+            if ("monster-maze".equals(game.getId())) {
+                enginePlugin = "MonsterMazeModern";
+                startCommand = "mm start";
+            } else if ("snake".equals(game.getId())) {
+                enginePlugin = "SnakeModern";
+                startCommand = "snake start";
+            }
+            if (enginePlugin == null) return;
+            if (!Bukkit.getPluginManager().isPluginEnabled(enginePlugin)) {
+                player.sendMessage(ChatColor.RED + enginePlugin + ".jar is not installed on this server yet.");
                 return;
             }
             player.closeInventory();
-            player.performCommand("mm start");
+            player.performCommand(startCommand);
         } else if ("game".equals(action) && game != null) {
             openGameDetails(player, game);
         } else if ("cosmetics-game".equals(action) && game != null) {

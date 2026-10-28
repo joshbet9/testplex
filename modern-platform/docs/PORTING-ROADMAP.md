@@ -12,16 +12,18 @@
 ## Current implementation
 
 - `TestplexModernArcade.jar`: Game Panel, cosmetic catalogue and per-player preferences.
-- `MonsterMazeModern.jar`: initial import of `joshbet9/MonsterMaze`'s `1.21/MonsterMazeStandalone`, adapted as a separate Java 25 / Paper 26.3 plugin. Default test mode blocks production backend writes and heartbeats.
-- Monster Maze remains `MECHANICS_IN_PROGRESS` until Paper 26.3 compile, runtime and in-game acceptance are complete. New cosmetics are not the focus of this stage.
+- `MonsterMazeModern.jar`: mechanics-first import of the 1.21 standalone implementation, with production backend writes/heartbeats blocked by default.
+- `SnakeModern.jar`: independent mechanics-first port with its own test arena, snake tails, slime food, kits, magma-cube item boxes and steering roulette.
+- Both game modules compile against Paper 26.3 and have automated contract/rule tests. Neither is marked ready for in-game testing until the live server acceptance checklist is completed.
+- Neither module's new cosmetic line/win-scene renderers are considered complete.
 
 ## Per-game acceptance
 
-For each game, confirm lobby/entry; round start/reset/end; spectators and elimination; win detection; arena/map cleanup; reconnect/shutdown; game-specific items/abilities; persistent cosmetic selections; each cosmetic rendered at the intended trigger; each win effect rendered once to the intended viewers; and a repeatable bot or multi-client test path.
+For each game: confirm lobby/entry; round start/reset/end; spectators and elimination; win detection; arena/map cleanup; reconnect/shutdown; game-specific items/abilities; persistent cosmetic selections; each cosmetic rendered at the intended trigger; each win effect rendered once to intended viewers; and repeatable bot/multi-client testing.
 
 ## Order
 
-1. **Monster Maze** — close Paper 26.3 compatibility gaps in the copied 1.21 implementation; test modes, maze patterns, Safe Pads, beacon visibility, compass, mobs, kits, round cleanup and two-player flow.
-2. **Snake** — port gameplay on the same platform conventions; validate food, green slime behaviour, physical magma-cube item boxes, hotbar item roll and escalating effect durations.
-3. After Monster Maze and Snake mechanics are sound, go line-by-line through their cosmetics and win effects, wiring and testing each one individually.
-4. Port the remaining 14 games one at a time. They can start as rough mechanical/compatibility ports; fix version differences first, then add new mechanics, distinct cosmetic lines and unique win scenes game by game.
+1. **Monster Maze** — validate Original/Modern/Classic, maze patterns, Safe Pads, beacon visibility, compass, mobs, kits, round cleanup and two-player flow.
+2. **Snake** — validate steering/movement, tail spacing/collisions, slime growth, kit timers, item-box contacts/roulette, wall hits, disconnects and cleanup.
+3. After both games' mechanics are accepted, walk line-by-line through their cosmetic lines and win effects and test each.
+4. Port the remaining 14 games sequentially. Initial ports may be rough; resolve API/version compatibility and round lifecycle first, then add new mechanics, distinct cosmetics and win scenes for each game.

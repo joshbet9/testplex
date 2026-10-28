@@ -34,6 +34,7 @@ jobs:
           cache-dependency-path: |
             modern-platform/pom.xml
             modern-platform/monster-maze-port/pom.xml
+            modern-platform/snake-port/pom.xml
 
       - name: Build and run catalogue tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/pom.xml clean verify
@@ -41,14 +42,19 @@ jobs:
       - name: Build Monster Maze 26.3 port and run contract tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/monster-maze-port/pom.xml clean verify
 
+      - name: Build Snake 26.3 port and run mechanics-rule tests
+        run: mvn --batch-mode --no-transfer-progress -f modern-platform/snake-port/pom.xml clean verify
+
       - name: Verify modern plugin metadata and packaged classes
         shell: bash
         run: |
           set -euo pipefail
           jar_file="modern-platform/target/TestplexModernArcade.jar"
           maze_jar="modern-platform/monster-maze-port/target/MonsterMazeModern.jar"
+          snake_jar="modern-platform/snake-port/target/SnakeModern.jar"
           test -s "$jar_file"
           test -s "$maze_jar"
+          test -s "$snake_jar"
           jar tf "$jar_file" | grep -Fxq "plugin.yml"
           jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/TestplexModernArcade.class"
           jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/model/ArcadeCatalog.class"
@@ -58,7 +64,12 @@ jobs:
           jar tf "$maze_jar" | grep -Fxq "me/monstermaze/maze/MazeGenerator.class"
           unzip -p "$maze_jar" plugin.yml | grep -Fxq "name: MonsterMazeModern"
           unzip -p "$maze_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
-          echo "Both modern Paper 26.3 plugin artifacts verified."
+          jar tf "$snake_jar" | grep -Fxq "plugin.yml"
+          jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeModernPlugin.class"
+          jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeRules.class"
+          unzip -p "$snake_jar" plugin.yml | grep -Fxq "name: SnakeModern"
+          unzip -p "$snake_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
+          echo "All three modern Paper 26.3 plugin artifacts verified."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
@@ -67,6 +78,7 @@ jobs:
           path: |
             modern-platform/target/TestplexModernArcade.jar
             modern-platform/monster-maze-port/target/MonsterMazeModern.jar
+            modern-platform/snake-port/target/SnakeModern.jar
           if-no-files-found: error
           retention-days: 14
 
@@ -80,8 +92,8 @@ jobs:
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
             echo "- Catalogue: 16 Arcade games"
-            echo "- Built artifacts: TestplexModernArcade.jar and MonsterMazeModern.jar"
+            echo "- Built artifacts: TestplexModernArcade.jar, MonsterMazeModern.jar and SnakeModern.jar"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
-            echo "- Initial mechanics targets: Monster Maze first, Snake next"
+            echo "- Gameplay ports: Monster Maze and Snake first passes; in-game validation still required"
             echo "- Server deploy: intentionally not performed by this workflow"
           } >> "$GITHUB_STEP_SUMMARY"

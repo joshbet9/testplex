@@ -1,0 +1,16 @@
+name: SnakeModern
+version: 0.1.0-SNAPSHOT
+main: au.com.testplex.snake.SnakeModernPlugin
+api-version: '26.3'
+author: Testplex
+description: Standalone Snake mechanics port for the isolated Paper 26.3 Arcade test platform
+softdepend:
+  - TestplexModernArcade
+commands:
+  snake:
+    description: Join and test Snake
+    usage: /snake <join|start|kit|status|leave|stop>
+permissions:
+  testplex.snake.admin:
+    description: Allows resetting the modern Snake test game
+    default: op
