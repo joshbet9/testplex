@@ -340,7 +340,14 @@ public final class ArcadePortManager implements Listener {
                 session.evolutionLevels.put(player.getUniqueId(), 0);
                 session.evolutionLifeKills.put(player.getUniqueId(), 0);
             }
-            int teamId = (type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST) ? i % 4 : i % 2;
+            int teamCount = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST ? 4 : 2;
+            boolean teamMode = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST
+                    || type == ArcadePortGame.BOMB_LOBBERS || type == ArcadePortGame.PAINTBALL
+                    || type == ArcadePortGame.TURF_WARS;
+            SourceMapCatalog.MapData selectedMap = sourceMapData.get(type.id());
+            int teamId = teamMode && selectedMap != null
+                    ? selectedMap.teamIndexForSpawn(i, teamCount)
+                    : teamMode ? i % teamCount : i % 2;
             session.teams.put(player.getUniqueId(), teamId);
             if (type == ArcadePortGame.BACON_BRAWL) {
                 session.baconKits.put(player.getUniqueId(), baconKitPreferences.getOrDefault(player.getUniqueId(), "pig"));
@@ -352,9 +359,9 @@ public final class ArcadePortManager implements Listener {
                 session.bombDoubleJumpAvailable.add(player.getUniqueId());
             }
             Location spawn = spawns.get(i % spawns.size()).clone();
-            if (type == ArcadePortGame.MICRO_BATTLES) {
+            if (type == ArcadePortGame.MICRO_BATTLES && !sourceMapWorlds.contains(type.id())) {
                 spawn = microTeamSpawn(teamId, i / 4, (participants.size() + 3) / 4);
-            } else if (type == ArcadePortGame.TURF_WARS) {
+            } else if (type == ArcadePortGame.TURF_WARS && !sourceMapWorlds.contains(type.id())) {
                 spawn = turfWarsSpawn(world, session.teams.get(player.getUniqueId()), i / 2,
                         (participants.size() + 1) / 2);
             }
@@ -421,18 +428,17 @@ public final class ArcadePortManager implements Listener {
             WorldCreator creator = new WorldCreator(sourceWorldName)
                     .environment(World.Environment.NORMAL).generateStructures(false);
             world = creator.createWorld();
-            if (world != null) {
-                SourceMapCatalog.MapData mapData = SourceMapCatalog.read(world);
-                if (mapData != null) {
-                    sourceMapWorlds.add(type.id());
-                    sourceMapData.put(type.id(), mapData);
-                    plugin.getLogger().info("Loaded original " + type.displayName() + " map: "
-                            + mapData.mapName() + " (" + mapData.spawnLocations().size() + " configured spawn locations).");
-                } else {
-                    sourceMapWorlds.add(type.id());
-                    plugin.getLogger().warning("Loaded original terrain without parsed WorldConfig metadata for "
-                            + type.displayName() + "; using fallback spawn locations.");
-                }
+        }
+        if (world != null && SourceMapCatalog.hasMap(type) && !sourceMapWorlds.contains(type.id())) {
+            SourceMapCatalog.MapData mapData = SourceMapCatalog.read(world);
+            sourceMapWorlds.add(type.id());
+            if (mapData != null) {
+                sourceMapData.put(type.id(), mapData);
+                plugin.getLogger().info("Loaded original " + type.displayName() + " map: "
+                        + mapData.mapName() + " (" + mapData.spawnLocations().size() + " configured spawn locations).");
+            } else {
+                plugin.getLogger().warning("Loaded original terrain without parsed WorldConfig metadata for "
+                        + type.displayName() + "; using fallback spawn locations.");
             }
         }
         if (world == null) {

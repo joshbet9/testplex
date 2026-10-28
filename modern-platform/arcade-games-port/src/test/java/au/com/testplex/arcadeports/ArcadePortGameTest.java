@@ -95,6 +95,24 @@ class ArcadePortGameTest {
         assertEquals(1, ArcadePortRules.requiredDeathTagChasers(-1L));
     }
 
+    @Test void originalMapCatalogEmbedsThirteenSourceWorldsAndLeavesEvolutionExplicitlyUnmapped() {
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BACON_BRAWL));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BOMB_LOBBERS));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DEATH_TAG));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGON_ESCAPE));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGONS));
+        assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.EVOLUTION));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.GLADIATORS));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MICRO_BATTLES));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.ONE_IN_THE_QUIVER));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.PAINTBALL));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.RUNNER));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SHEEP_QUEST));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SPLEEF));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.TURF_WARS));
+        assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.EVOLUTION));
+    }
+
     @Test void spleefSourceKitSelectionHungerAndPerkTimingAreExplicit() {
         assertEquals("snowballer", ArcadePortRules.normalizeSpleefKit("Snowballer"));
         assertEquals("brawler", ArcadePortRules.normalizeSpleefKit("brawler"));
@@ -143,7 +161,7 @@ class ArcadePortGameTest {
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("chris-p-bacon"));
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("unknown"));
         assertEquals(1_000L, ArcadePortRules.BACON_HUNGER_INTERVAL_MILLIS);
-        assertEquals(2, ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL);
+        assertEquals(1, ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL);
         assertEquals(4.0D, ArcadePortRules.BACON_STARVATION_DAMAGE, 0.00001D);
         assertEquals(6.0D, ArcadePortRules.BACON_STANDARD_HIT_DAMAGE, 0.00001D);
         assertEquals(2.0D, ArcadePortRules.BACON_BODY_SLAM_RECOIL_DAMAGE, 0.00001D);

@@ -155,6 +155,35 @@ public final class SourceMapCatalog {
             for (List<Location> team : teamSpawns.values()) result.addAll(team);
             return result;
         }
+
+        /** Resolve a source spawn to its source team, preserving WorldConfig group ordering. */
+        public int teamIndexForSpawn(int spawnIndex, int teamCount) {
+            int teams = Math.max(1, teamCount);
+            List<Map.Entry<String, List<Location>>> groups = new ArrayList<>();
+            int total = 0;
+            for (Map.Entry<String, List<Location>> entry : teamSpawns.entrySet()) {
+                if (entry.getValue().isEmpty()) continue;
+                groups.add(entry);
+                total += entry.getValue().size();
+            }
+            if (groups.size() <= 1 || total == 0) return Math.floorMod(spawnIndex, teams);
+            int position = Math.floorMod(spawnIndex, total);
+            for (int i = 0; i < groups.size(); i++) {
+                Map.Entry<String, List<Location>> group = groups.get(i);
+                if (position < group.getValue().size()) {
+                    String label = group.getKey().toLowerCase(java.util.Locale.ROOT);
+                    if (label.contains("red")) return 0;
+                    if (label.contains("blue")) return Math.floorMod(1, teams);
+                    if (label.contains("green")) return Math.floorMod(2, teams);
+                    if (label.contains("yellow")) return Math.floorMod(3, teams);
+                    if (label.contains("purple")) return Math.floorMod(4, teams);
+                    return Math.floorMod(i, teams);
+                }
+                position -= group.getValue().size();
+            }
+            return Math.floorMod(spawnIndex, teams);
+        }
+
         public Map<String, List<Location>> teamSpawns() { return Map.copyOf(teamSpawns); }
     }
 }

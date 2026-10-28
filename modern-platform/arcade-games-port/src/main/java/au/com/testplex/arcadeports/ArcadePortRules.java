@@ -17,7 +17,7 @@ public final class ArcadePortRules {
     public static final long BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS = 50_000L;
     public static final long BACON_MIN_KNOCKBACK_INTERVAL_MILLIS = 5_000L;
     public static final long BACON_HUNGER_INTERVAL_MILLIS = 1_000L;
-    public static final int BACON_HUNGER_DRAIN_PER_INTERVAL = 2;
+    public static final int BACON_HUNGER_DRAIN_PER_INTERVAL = 1;
     public static final double BACON_STARVATION_DAMAGE = 4.0D;
     public static final double BACON_STANDARD_HIT_DAMAGE = 6.0D;
     public static final double BACON_BODY_SLAM_RECOIL_DAMAGE = 2.0D;

@@ -4,7 +4,7 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 
 ## Games covered in this first pass
 
-- Bacon Brawl — knockback and ring-out elimination.
+- Bacon Brawl — the three retained kits (Pig/Mama Pig/Sheep Pig), source-style hunger drain/starvation/hunger-on-hit, knockback escalation, Body Slam, Bacon Blast and Sheep Pig cloak/backstab.
 - Bomb Lobbers — snowball throws, direct-hit ding and knockback.
 - Death Tag — source-style Normal/Alpha chasers, death-triggered conversion, runner speed threshold, Basher/Archer/Traitor/Null runner loadouts, Archer arrow refresh, and flat Iron Skin damage reduction (historical map/light parity and disguise visuals remain).
 - Dragon Escape — generated parkour course, a visible Douglas chase dragon, radius-based course destruction, catch-up elimination and finish proximity (map-data/waypoint parity still needs original assets).
