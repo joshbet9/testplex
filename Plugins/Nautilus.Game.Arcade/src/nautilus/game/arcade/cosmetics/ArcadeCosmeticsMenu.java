@@ -838,6 +838,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         put(inventory, 26, named(Material.STAINED_CLAY, ChatColor.GREEN + "Safe Pad Colour", "Choose the Safe Pad surface colour for " + pretty(mobSet) + "."));
         String base = "players." + player.getUniqueId() + ".arcade.monstermaze.mob-set-colours." + mobSet;
         String defaultColour = defaultMonsterMazeMobSetColour(mobSet);
+        // Keep both colours independently configurable. The live refresh repaints both
+        // overlays in the same update, each from its own saved value.
         String beaconSelected = data.getString(base + ".beacon", defaultColour);
         String padSelected = data.getString(base + ".safe-pad", defaultColour);
         for (int i = 0; i < COLOUR_OPTIONS.length; i++) {
@@ -1087,8 +1089,10 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                         + mobSet + "." + parts[0];
                 data.set(path, parts[2]);
                 save();
+                // Refresh both overlays together, while preserving their independent saved colours.
                 refreshLiveMonsterMazeColours(player);
-                player.sendMessage(ChatColor.GREEN + pretty(mobSet) + " " + parts[0] + " colour set to " + pretty(parts[2]) + ".");
+                player.sendMessage(ChatColor.GREEN + pretty(mobSet) + " " + parts[0]
+                        + " colour set to " + pretty(parts[2]) + ".");
                 openMobSetColours(player, mobSet);
                 return;
             }

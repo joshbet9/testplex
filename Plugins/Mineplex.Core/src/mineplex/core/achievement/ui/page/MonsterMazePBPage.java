@@ -214,7 +214,7 @@ public class MonsterMazePBPage extends ShopPageBase<AchievementManager, Achievem
     {
         if (!_targetName.equalsIgnoreCase(getPlayer().getName()))
             return 0;
-        CustomDataManager customData = Managers.get(CustomDataManager.class);
+        CustomDataManager customData = Managers.require(CustomDataManager.class);
         if (customData == null)
             return 0;
         String key = display.getCustomDataKeyName() + "pb.pattern" + pattern + "." + slug(kit);
