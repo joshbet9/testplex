@@ -4703,6 +4703,8 @@ public final class ArcadePortManager implements Listener {
                         target.getLocation().add(0.0D, 1.0D, 0.0D), 1,
                         0.1D, 0.1D, 0.1D, 0.0D);
                 target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0F, 0.9F);
+                // Reborn plays the classic note-pl ing at the struck player on the direct hit.
+                target.playSound(target.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.2F, 1.65F);
                 owner.playSound(owner.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.0F, 1.45F);
                 owner.sendMessage(ChatColor.YELLOW + "Direct hit!");
                 if (target.getHealth() <= 10.0D) eliminate(session, target, owner, "was directly hit by TNT");
