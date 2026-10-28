@@ -89,6 +89,14 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isTurfWarsWinningLine(20, 2, 20));
     }
 
+    @Test void paintballEndsAtTenEliminationPoints() {
+        assertFalse(ArcadePortRules.isPaintballWinnerScoreReached(0));
+        assertFalse(ArcadePortRules.isPaintballWinnerScoreReached(9));
+        assertTrue(ArcadePortRules.isPaintballWinnerScoreReached(10));
+        assertTrue(ArcadePortRules.isPaintballWinnerScoreReached(11));
+        assertEquals(10, ArcadePortRules.PAINTBALL_WINNER_SCORE);
+    }
+
     @Test void paintballKitHitsPaintTheCorrectNumberOfArmourPieces() {
         assertEquals(3, ArcadePortRules.paintballPaintAmount("rifle", false, 0.0D));
         assertEquals(3, ArcadePortRules.paintballPaintAmount("rifle", true, 0.999D));
