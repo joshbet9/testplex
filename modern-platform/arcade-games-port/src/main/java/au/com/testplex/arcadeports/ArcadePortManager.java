@@ -21,6 +21,7 @@ import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EnderPearl;
 import org.bukkit.entity.EnderDragon;
+import org.bukkit.entity.Egg;
 import org.bukkit.entity.Fireball;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
@@ -1770,7 +1771,8 @@ public final class ArcadePortManager implements Listener {
                 break;
             default:
                 player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD),
-                        namedItem(Material.FEATHER, "Chicken Dash", "Right-click to dash.", 3));
+                        namedItem(Material.FEATHER, "Egg Launch", "Right-click to throw an egg; three eggs are carried.", 1),
+                        new ItemStack(Material.EGG, 3));
                 player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 1_200, 1, false, false, true));
                 break;
         }
@@ -2670,23 +2672,33 @@ public final class ArcadePortManager implements Listener {
             player.setVelocity(player.getLocation().getDirection().multiply(1.15D).setY(0.85D));
             player.getWorld().spawnParticle(Particle.ITEM_SLIME, player.getLocation(), 12, 0.35D, 0.25D, 0.35D, 0.08D);
             player.playSound(player.getLocation(), Sound.ENTITY_SLIME_JUMP, 1.0F, 1.25F);
-        } else if ((session.type == ArcadePortGame.RUNNER || session.type == ArcadePortGame.DRAGON_ESCAPE
-                || (session.type == ArcadePortGame.EVOLUTION
-                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 5)) && item == Material.FEATHER) {
+        } else if (session.type == ArcadePortGame.EVOLUTION
+                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 5 && item == Material.FEATHER) {
             event.setCancelled(true);
-            consumeHeld(player);
-            Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.2D));
-            Fireball fireball = session.world.spawn(spawn, Fireball.class);
-            fireball.setShooter(player);
-            fireball.setYield(0.0F);
-            fireball.setIsIncendiary(false);
-            fireball.setVelocity(player.getLocation().getDirection().multiply(0.8D));
-            session.entities.add(fireball);
+            if (inventoryCount(player, Material.EGG) <= 0) {
+                player.sendMessage(ChatColor.YELLOW + "You need an egg to use Egg Launch.");
+                return;
+            }
+            consumeOne(player, Material.EGG);
+            Egg egg = player.launchProjectile(Egg.class);
+            egg.setVelocity(player.getEyeLocation().getDirection().multiply(1.35D));
+            session.entities.add(egg);
+            player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.9F, 1.0F);
         } else if ((session.type == ArcadePortGame.RUNNER || session.type == ArcadePortGame.DRAGON_ESCAPE) && item == Material.FEATHER) {
             event.setCancelled(true);
             consumeHeld(player);
             player.setVelocity(player.getLocation().getDirection().multiply(1.0D).setY(0.45D));
             player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 12, 0.3D, 0.3D, 0.3D, 0.05D);
+        }
+    }
+
+    private void consumeOne(Player player, Material material) {
+        for (int slot = 0; slot < player.getInventory().getSize(); slot++) {
+            ItemStack item = player.getInventory().getItem(slot);
+            if (item == null || item.getType() != material || item.getAmount() <= 0) continue;
+            if (item.getAmount() == 1) player.getInventory().setItem(slot, null);
+            else item.setAmount(item.getAmount() - 1);
+            return;
         }
     }
 
