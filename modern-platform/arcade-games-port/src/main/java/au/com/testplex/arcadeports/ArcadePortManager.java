@@ -104,6 +104,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> quiverKitPreferences = new HashMap<>();
     private final Map<UUID, String> runnerKitPreferences = new HashMap<>();
     private final Map<UUID, String> dragonsKitPreferences = new HashMap<>();
+    private final Map<UUID, String> dragonEscapeKitPreferences = new HashMap<>();
     private Session active;
     private BukkitTask pendingStart;
     private ArcadePortGame pendingType;
@@ -127,6 +128,7 @@ public final class ArcadePortManager implements Listener {
                 case MICRO_BATTLES -> { selectMicroBattlesKit(player, value); return; }
                 case ONE_IN_THE_QUIVER -> { selectQuiverKit(player, value); return; }
                 case DRAGONS -> { selectDragonsKit(player, value); return; }
+                case DRAGON_ESCAPE -> { selectDragonEscapeKit(player, value); return; }
                 case PAINTBALL -> { selectPaintballKit(player, value); return; }
                 case DEATH_TAG -> { selectDeathTagRunnerKit(player, value); return; }
                 case RUNNER -> { selectRunnerKit(player, value); return; }
@@ -143,6 +145,7 @@ public final class ArcadePortManager implements Listener {
         else if (Set.of("rifle", "sniper", "shotgun", "machine-gun", "machinegun").contains(value)) selectPaintballKit(player, value);
         else if (ArcadePortRules.normalizeQuiverKit(value) != null) selectQuiverKit(player, value);
         else if (ArcadePortRules.normalizeDragonsKit(value) != null) selectDragonsKit(player, value);
+        else if (ArcadePortRules.normalizeDragonEscapeKit(value) != null) selectDragonEscapeKit(player, value);
         else if (value.startsWith("runnerkit-")) selectRunnerKit(player, value);
         else selectDeathTagRunnerKit(player, value);
     }
@@ -273,6 +276,31 @@ public final class ArcadePortManager implements Listener {
             giveKit(session, player);
             player.sendMessage(ChatColor.GREEN + "Dragons kit changed to " + kit + ".");
         } else player.sendMessage(ChatColor.GREEN + "Dragons kit set to " + kit + " for your next test.");
+    }
+
+    public void selectDragonEscapeKit(Player player, String requestedKit) {
+        if (player == null) return;
+        String kit = ArcadePortRules.normalizeDragonEscapeKit(requestedKit);
+        if (kit == null) {
+            player.sendMessage(ChatColor.YELLOW + "Dragon Escape kits: jumper, disruptor, warper, digger.");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        dragonEscapeKitPreferences.put(id, kit);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.DRAGON_ESCAPE
+                && session.players.containsKey(id) && session.alive.contains(id)) {
+            session.dragonEscapeKits.put(id, kit);
+            session.dragonEscapeLeapUsesRemaining.put(id, ArcadePortRules.dragonEscapeLeapUses(kit));
+            session.dragonEscapeDiggerUsesRemaining.put(id, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
+            session.dragonEscapeNextTntAt.put(id,
+                    System.currentTimeMillis() + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
+            session.dragonEscapeWarperUsed.remove(id);
+            giveKit(session, player);
+            player.sendMessage(ChatColor.GREEN + "Dragon Escape kit changed to " + kit + ".");
+        } else {
+            player.sendMessage(ChatColor.GREEN + "Dragon Escape kit set to " + kit + " for your next test.");
+        }
     }
 
     public void selectRunnerKit(Player player, String requestedKit) {
@@ -524,6 +552,15 @@ public final class ArcadePortManager implements Listener {
             if (type == ArcadePortGame.EVOLUTION) {
                 session.evolutionLevels.put(player.getUniqueId(), 0);
                 session.evolutionLifeKills.put(player.getUniqueId(), 0);
+            }
+            if (type == ArcadePortGame.DRAGON_ESCAPE) {
+                UUID playerId = player.getUniqueId();
+                String kit = dragonEscapeKitPreferences.getOrDefault(playerId, "jumper");
+                session.dragonEscapeKits.put(playerId, kit);
+                session.dragonEscapeLeapUsesRemaining.put(playerId, ArcadePortRules.dragonEscapeLeapUses(kit));
+                session.dragonEscapeDiggerUsesRemaining.put(playerId, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
+                session.dragonEscapeNextTntAt.put(playerId,
+                        now + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
             }
             int teamCount = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST ? 4 : 2;
             boolean teamMode = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST
@@ -1189,9 +1226,27 @@ public final class ArcadePortManager implements Listener {
             case DEATH_TAG:
                 giveDeathTagKit(session, player, false, false);
                 break;
-            case DRAGON_ESCAPE:
-                player.getInventory().addItem(namedItem(Material.FEATHER, "Dragon Dash", "Right-click to dash forward.", 3));
+            case DRAGON_ESCAPE: {
+                UUID id = player.getUniqueId();
+                String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
+                int leaps = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, ArcadePortRules.dragonEscapeLeapUses(kit));
+                if (!"digger".equals(kit)) {
+                    player.getInventory().addItem(namedItem(Material.IRON_AXE, "Leap",
+                            "Right-click to leap forward (" + leaps + " uses remaining).", 1));
+                }
+                if ("disruptor".equals(kit)) {
+                    player.getInventory().addItem(namedItem(Material.TNT, "Mini Explosive",
+                            "Right-click to throw a trip mine. Recharges every 10 seconds.", 1));
+                } else if ("warper".equals(kit)) {
+                    player.getInventory().addItem(namedItem(Material.ENDER_PEARL, "Warp",
+                            "Right-click to teleport to the nearest player ahead. One use."));
+                } else if ("digger".equals(kit)) {
+                    int digs = session.dragonEscapeDiggerUsesRemaining.getOrDefault(id, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
+                    player.getInventory().addItem(namedItem(Material.DIAMOND_PICKAXE, "Digger Pickaxe",
+                            "Left-click course blocks to recover and place as shortcuts (" + digs + " digs left)."));
+                }
                 break;
+            }
             case DRAGONS: {
                 String kit = session.dragonKits.getOrDefault(player.getUniqueId(), "coward");
                 player.getInventory().setArmorContents(null);
@@ -2030,7 +2085,11 @@ public final class ArcadePortManager implements Listener {
             processRunnerBlocks(session, now);
             updateRunnerKits(session, now);
         }
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE) updateDragonEscapeChase(session);
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+            updateDragonEscapeResources(session, now);
+            updateDragonEscapeMines(session);
+            updateDragonEscapeChase(session);
+        }
         if (session.type == ArcadePortGame.SHEEP_QUEST) {
             updateSheepQuest(session);
             if (now >= lastSheepSpawn && session.sheep.size() < 12) {
@@ -5215,6 +5274,12 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> dragonLeapReadyAt = new HashMap<>();
         EnderDragon dragonEscapeDragon;
         final List<Location> dragonEscapeWaypoints = new ArrayList<>();
+        final Map<UUID, String> dragonEscapeKits = new HashMap<>();
+        final Map<UUID, Integer> dragonEscapeLeapUsesRemaining = new HashMap<>();
+        final Map<UUID, Integer> dragonEscapeDiggerUsesRemaining = new HashMap<>();
+        final Map<UUID, Long> dragonEscapeNextTntAt = new HashMap<>();
+        final Set<UUID> dragonEscapeWarperUsed = new HashSet<>();
+        final Map<UUID, UUID> dragonEscapeMineOwners = new HashMap<>();
         String dragonEscapeMapName = "";
         double dragonEscapeSpeedMultiplier = 1.0D;
         final Map<Block, Long> runnerBlocks = new HashMap<>();
