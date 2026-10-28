@@ -502,4 +502,27 @@ public final class ArcadePortRules {
         if (teamId == 1) return frontline <= -halfSize;
         return false;
     }
+
+    /**
+     * Select a team winner for a timed elimination-game test. Remaining players
+     * are the primary standing; aggregate kills break ties. A perfect tie has
+     * no objective winner and may fall back to the game's normal score rule.
+     */
+    public static int teamWithBestTimeoutStanding(int teamZeroAlive, int teamOneAlive,
+            int teamZeroKills, int teamOneKills) {
+        if (teamZeroAlive != teamOneAlive) return teamZeroAlive > teamOneAlive ? 0 : 1;
+        if (teamZeroKills != teamOneKills) return teamZeroKills > teamOneKills ? 0 : 1;
+        return -1;
+    }
+
+    /**
+     * Turf Wars is won by the captured frontline, not by an individual kill
+     * count. Only when the line is unchanged do team kills provide a tiebreak.
+     */
+    public static int turfWarsTimeoutLeader(int frontline, int redKills, int blueKills) {
+        if (frontline > -1) return 0;
+        if (frontline < -1) return 1;
+        if (redKills != blueKills) return redKills > blueKills ? 0 : 1;
+        return -1;
+    }
 }
