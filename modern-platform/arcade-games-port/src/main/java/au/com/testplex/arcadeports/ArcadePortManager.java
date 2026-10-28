@@ -2641,7 +2641,13 @@ public final class ArcadePortManager implements Listener {
 
     private int dragonEscapePlayerProgress(Session session, Player player) {
         if (!session.dragonEscapeWaypoints.isEmpty()) {
-            return getDragonEscapeWaypointIndex(session, player.getLocation());
+            UUID id = player.getUniqueId();
+            int candidate = getDragonEscapeWaypointIndex(session, player.getLocation());
+            int progress = ArcadePortRules.monotonicDragonEscapeProgress(
+                    session.dragonEscapePlayerProgress.getOrDefault(id, 0),
+                    candidate, session.dragonEscapeWaypoints.size());
+            session.dragonEscapePlayerProgress.put(id, progress);
+            return progress;
         }
         return player.getLocation().getBlockZ();
     }
@@ -2774,12 +2780,15 @@ public final class ArcadePortManager implements Listener {
         if (active != session || dragon == null || !dragon.isValid() || dragon.isDead()) return;
         Location location = dragon.getLocation();
         if (!session.dragonEscapeWaypoints.isEmpty()) {
-            int dragonIndex = getDragonEscapeWaypointIndex(session, location);
+            int dragonIndex = ArcadePortRules.monotonicDragonEscapeProgress(
+                    session.dragonEscapeDragonProgress,
+                    getDragonEscapeWaypointIndex(session, location), session.dragonEscapeWaypoints.size());
+            session.dragonEscapeDragonProgress = dragonIndex;
             Location target = session.dragonEscapeWaypoints.get(
                     Math.min(session.dragonEscapeWaypoints.size() - 1, dragonIndex + 1));
             Vector desired = target.toVector().subtract(location.toVector());
             if (desired.lengthSquared() > 1.0E-4D) {
-                dragon.setVelocity(desired.normalize().multiply(0.2D * session.dragonEscapeSpeedMultiplier));
+                dragon.setVelocity(desired.normalize().multiply(0.2D));
             } else {
                 dragon.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
             }
@@ -2803,7 +2812,7 @@ public final class ArcadePortManager implements Listener {
 
             int lastIndex = session.dragonEscapeWaypoints.size() - 1;
             for (Player player : new ArrayList<>(alivePlayers(session))) {
-                int playerIndex = getDragonEscapeWaypointIndex(session, player.getLocation());
+                int playerIndex = dragonEscapePlayerProgress(session, player);
                 Location playerNext = session.dragonEscapeWaypoints.get(Math.min(lastIndex, playerIndex + 1));
                 Location dragonNext = session.dragonEscapeWaypoints.get(Math.min(lastIndex, dragonIndex + 1));
                 double playerScore = playerIndex * 10_000.0D - player.getLocation().distance(playerNext);
@@ -3170,7 +3179,7 @@ public final class ArcadePortManager implements Listener {
 
     private String dragonEscapeStatusText(Session session, Player player) {
         if (!session.dragonEscapeWaypoints.isEmpty()) {
-            int waypoint = getDragonEscapeWaypointIndex(session, player.getLocation());
+            int waypoint = dragonEscapePlayerProgress(session, player);
             return "route " + Math.min(waypoint + 1, session.dragonEscapeWaypoints.size())
                     + "/" + session.dragonEscapeWaypoints.size();
         }
@@ -5522,7 +5531,8 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> dragonEscapeWarperUsed = new HashSet<>();
         final Map<UUID, UUID> dragonEscapeMineOwners = new HashMap<>();
         String dragonEscapeMapName = "";
-        double dragonEscapeSpeedMultiplier = 1.0D;
+        int dragonEscapeDragonProgress;
+        final Map<UUID, Integer> dragonEscapePlayerProgress = new HashMap<>();
         final Map<Block, Long> runnerBlocks = new HashMap<>();
         final Map<Block, Material> runnerBlockMaterials = new HashMap<>();
         final Map<UUID, String> runnerKits = new HashMap<>();
