@@ -311,6 +311,16 @@ public final class SnakeGameManager implements Listener {
                 eliminate(state, null, "disconnected");
                 continue;
             }
+            if (state.segments.isEmpty()) {
+                eliminate(state, null, "missing snake head");
+                continue;
+            }
+            Sheep head = state.segments.get(0);
+            if (SnakeRules.shouldResitPlayer(head.isValid(),
+                    state.player.getVehicle() == head)) {
+                state.player.leaveVehicle();
+                head.addPassenger(state.player);
+            }
             expireEffects(state, now);
             if (state.reverseUntil > now) continue;
             moveSnake(state, now);
