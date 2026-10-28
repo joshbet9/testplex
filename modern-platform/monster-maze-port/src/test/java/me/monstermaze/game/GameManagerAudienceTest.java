@@ -19,6 +19,21 @@ class GameManagerAudienceTest {
         assertFalse(GameManager.isInArenaWorld(arena, null));
     }
 
+    @Test
+    void leavingAnotherWorldEliminatesOnlyActiveRoundParticipants() {
+        World arena = testWorld();
+        World anotherGame = testWorld();
+
+        assertTrue(GameManager.shouldEliminateForWorldChange(GameState.STARTING, true, arena, anotherGame));
+        assertTrue(GameManager.shouldEliminateForWorldChange(GameState.LIVE, true, arena, anotherGame));
+        assertFalse(GameManager.shouldEliminateForWorldChange(GameState.IDLE, true, arena, anotherGame));
+        assertFalse(GameManager.shouldEliminateForWorldChange(GameState.ENDING, true, arena, anotherGame));
+        assertFalse(GameManager.shouldEliminateForWorldChange(GameState.LIVE, false, arena, anotherGame));
+        assertFalse(GameManager.shouldEliminateForWorldChange(GameState.LIVE, true, null, anotherGame));
+        assertFalse(GameManager.shouldEliminateForWorldChange(GameState.LIVE, true, arena, null));
+        assertFalse(GameManager.shouldEliminateForWorldChange(GameState.LIVE, true, arena, arena));
+    }
+
     private static World testWorld() {
         return (World) Proxy.newProxyInstance(World.class.getClassLoader(), new Class<?>[]{World.class},
                 (proxy, method, args) -> {
