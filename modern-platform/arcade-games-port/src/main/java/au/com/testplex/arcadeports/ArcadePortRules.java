@@ -366,6 +366,10 @@ public final class ArcadePortRules {
 
     /** Four-team Sheep Quest overtime starts whenever there is no unique leading team. */
     public static boolean shouldEnterSheepQuestOvertime(int[] teamSheepCounts) {
+        if (teamSheepCounts == null) return true;
+        if (teamSheepCounts.length == 2) {
+            return shouldEnterSheepQuestOvertime(teamSheepCounts[0], teamSheepCounts[1]);
+        }
         return sheepQuestLeadingTeam(teamSheepCounts) < 0;
     }
     public static final double SHEEP_QUEST_PLAYER_HIT_DAMAGE = 4.0D;
@@ -555,8 +559,12 @@ public final class ArcadePortRules {
     }
 
     public static boolean isDuplicateDragonEscapeWaypoint(double distance) {
-        return Double.isFinite(distance) && distance >= 0.0D
-                && distance < DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE;
+        return isDuplicateDragonEscapeWaypoint(distance, DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE);
+    }
+
+    public static boolean isDuplicateDragonEscapeWaypoint(double distance, double threshold) {
+        return Double.isFinite(distance) && Double.isFinite(threshold)
+                && distance >= 0.0D && threshold >= 0.0D && distance < threshold;
     }
 
     public static boolean shouldDragonEscapePlayerBeCaught(double dragonProgress, double playerProgress) {
