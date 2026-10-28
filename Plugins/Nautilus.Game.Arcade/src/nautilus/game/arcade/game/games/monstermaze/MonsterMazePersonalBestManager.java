@@ -120,6 +120,18 @@ public final class MonsterMazePersonalBestManager
         });
     }
 
+    /** Read the current kit's PB for a specific pattern without starting a write. */
+    public static int getKitBest(MonsterMaze game, Player player, int pattern)
+    {
+        if (game == null || player == null || pattern < 1 || pattern > 3
+                || game.Manager.getCustomDataManager() == null || game.GetKit(player) == null)
+            return 0;
+        String prefix = game.GetType().getDisplay().getCustomDataKeyName();
+        String kit = game.GetKit(player).GetName();
+        return game.Manager.getCustomDataManager().getData(player,
+                prefix + "pb.pattern" + pattern + "." + slug(kit));
+    }
+
     /** Show the selected kit's local/native PB for each original maze pattern. */
     public static void show(final MonsterMaze game, final Player player)
     {
