@@ -20,9 +20,10 @@ The build uses Paper's official Maven repository and a version range for the cur
 - All 16 Arcade games are catalogued with distinct concepts for their cosmetic lines and win scenes.
 - `monster-maze-port/` builds `MonsterMazeModern.jar`, based on the 1.21 implementation in the separate MonsterMaze repository.
 - `snake-port/` builds `SnakeModern.jar`, a Paper-native mechanics-first port with an isolated arena.
-- Both have Start / Test actions in Game Details when their plugins are installed.
+- `arcade-games-port/` builds `ArcadeMechanicsModern.jar`, first-pass game loops and dedicated test arenas for the other 14 games.
+- Game Details now routes to the correct module's Start / Test command when the associated module is installed.
 
-**Important:** both game modules are initial passes. CI confirms compilation and unit-level checks only; runtime/gameplay, maps and lifecycle still require validation in-game. The new cosmetic options and win scenes are not claimed complete.
+**Important:** the 14 prototype loops are intentionally rough starting points, not a claim of original Mineplex parity. All 16 games remain in progress until their gameplay has been tested in-game. CI confirms compile/unit-level checks only; no modern server deployment has happened. New cosmetic renderers and distinct win scenes remain deferred.
 
 ## Isolation from 1.8
 
@@ -32,6 +33,6 @@ Modern server provisioning and deployment should be a separate, explicit step wi
 
 ## Next porting order
 
-1. Run the Monster Maze and Snake modules on Paper 26.3 and close runtime/gameplay issues using the original 1.8 and adapted 1.21 sources as references.
-2. Only after both mechanics are accepted, connect and test their new cosmetic lines and separate win effects.
-3. Port the remaining 14 Arcade games individually, fixing compatibility/lifecycle first and then iterating on new features, cosmetics and win scenes.
+1. Run Monster Maze and Snake on Paper 26.3 and fix runtime/gameplay discrepancies against the original 1.8 and adapted 1.21 source.
+2. Compare each of the other 14 rough game loops to the existing Reborn source and resolve mechanics/API/lifecycle issues game by game.
+3. Once the mechanics pass, wire and test each game's distinct cosmetic line(s) and separate win scene.

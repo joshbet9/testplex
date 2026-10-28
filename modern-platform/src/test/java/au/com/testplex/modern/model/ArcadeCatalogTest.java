@@ -35,16 +35,17 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void onlyMonsterMazeAndSnakeAreMarkedAsInitialMechanicsPorts() {
+    void everyGameHasAnInitialMechanicsPortButNoneIsDeclaredReadyBeforeLiveValidation() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
-                catalog.getGame("monster-maze").getPortStatus());
-        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
-                catalog.getGame("snake").getPortStatus());
+        for (GameDefinition game : catalog.getGames()) {
+            assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus(),
+                    game.getId() + " must remain in progress until its modern gameplay is validated");
+            assertFalse(game.isReadyForTest());
+        }
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS)
                 .count();
-        assertEquals(2, inProgress);
+        assertEquals(16, inProgress);
     }
 
     @Test

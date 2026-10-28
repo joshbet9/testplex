@@ -1,0 +1,39 @@
+package au.com.testplex.arcadeports;
+
+import org.bukkit.Material;
+import java.util.Locale;
+
+public enum ArcadePortGame {
+    BACON_BRAWL("bacon-brawl", "Bacon Brawl", Material.IRON_BLOCK),
+    BOMB_LOBBERS("bomb-lobbers", "Bomb Lobbers", Material.SMOOTH_STONE),
+    DEATH_TAG("death-tag", "Death Tag", Material.MOSS_BLOCK),
+    DRAGON_ESCAPE("dragon-escape", "Dragon Escape", Material.STONE_BRICKS),
+    DRAGONS("dragons", "Dragons", Material.STONE_BRICKS),
+    EVOLUTION("evolution", "Evolution", Material.GRASS_BLOCK),
+    GLADIATORS("gladiators", "Gladiators", Material.RED_SANDSTONE),
+    MICRO_BATTLES("micro-battles", "Micro Battles", Material.LIGHT_BLUE_STAINED_GLASS),
+    ONE_IN_THE_QUIVER("one-in-the-quiver", "One in the Quiver", Material.STONE_BRICKS),
+    PAINTBALL("paintball", "Paintball", Material.LIME_TERRACOTTA),
+    RUNNER("runner", "Runner", Material.WHITE_CONCRETE),
+    SHEEP_QUEST("sheep-quest", "Sheep Quest", Material.GRASS_BLOCK),
+    SPLEEF("spleef", "Spleef", Material.SNOW_BLOCK),
+    TURF_WARS("turf-wars", "Turf Wars", Material.GREEN_WOOL);
+
+    private final String id;
+    private final String displayName;
+    private final Material floor;
+    ArcadePortGame(String id, String displayName, Material floor) {
+        this.id = id;
+        this.displayName = displayName;
+        this.floor = floor;
+    }
+    public String id() { return id; }
+    public String displayName() { return displayName; }
+    public Material floor() { return floor; }
+    public static ArcadePortGame fromId(String id) {
+        if (id == null) return null;
+        String value = id.toLowerCase(Locale.ROOT).replace('_', '-').replace(' ', '-');
+        for (ArcadePortGame game : values()) if (game.id.equals(value) || game.name().toLowerCase(Locale.ROOT).replace('_','-').equals(value)) return game;
+        return null;
+    }
+}

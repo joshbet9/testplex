@@ -1,0 +1,16 @@
+name: ArcadeMechanicsModern
+version: 0.1.0-SNAPSHOT
+main: au.com.testplex.arcadeports.ArcadeMechanicsModernPlugin
+api-version: '26.3'
+author: Testplex
+description: Mechanics-first prototypes for the other 14 Arcade games on Paper 26.3
+softdepend:
+  - TestplexModernArcade
+commands:
+  arcadeport:
+    description: Start and test a modern Arcade mechanics prototype
+    usage: /arcadeport <play|join|start|status|stop>
+permissions:
+  testplex.arcadeports.admin:
+    description: Allows stopping and resetting an Arcade prototype
+    default: op

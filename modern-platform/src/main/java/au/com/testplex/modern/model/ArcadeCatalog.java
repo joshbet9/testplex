@@ -16,7 +16,7 @@ public final class ArcadeCatalog {
 
     public ArcadeCatalog() {
         register(game("bacon-brawl", "Bacon Brawl", "PORKCHOP", "Torpedo into rivals and launch them from the arena.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("signature-impact", "Signature Impact", "Body-Slam/Torpedo presentation.", "FIREWORK_ROCKET",
                         single("pork-comet", "Pork Comet", "A bacon comet slams into the impact point."),
                         single("crispy-ring", "Crispy Ring", "A sizzling ring expands from the impact point."),
@@ -29,7 +29,7 @@ public final class ArcadeCatalog {
                 win("crispy-finale", "Crispy Finale", "A sizzling floor burst and smoke columns")));
 
         register(game("bomb-lobbers", "Bomb Lobbers", "TNT", "Land direct TNT hits while surviving the Turtles arena.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("tnt-impact", "TNT Impact Signature", "Direct-hit presentation, not blast damage.", "TNT",
                         single("turtle-shell", "Turtle Shell", "A spinning shell-shaped ring."),
                         single("starburst-tnt", "Starburst TNT", "A radial star-shaped detonation."),
@@ -39,7 +39,7 @@ public final class ArcadeCatalog {
                 win("perfect-throw", "Perfect Throw", "A target reticle locks in before a clean TNT burst")));
 
         register(game("death-tag", "Death Tag", "SKELETON_SKULL", "Outrun the undead through the village-tree course.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("runner-trail", "Runner Trail Identity", "A recognisable trail silhouette, not just a particle recolour.", "SOUL_LANTERN",
                         single("bark-footprints", "Bark Footprints", "Leaf and bark footprints fade behind the runner."),
                         single("soul-ribbons", "Soul Ribbons", "Two curved soul ribbons trail behind."),
@@ -49,7 +49,7 @@ public final class ArcadeCatalog {
                 win("untouched-run", "Untouched Run", "A route map draws itself around the winner")));
 
         register(game("dragon-escape", "Dragon Escape", "DRAGON_HEAD", "Race the dragon through a collapsing parkour route.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("leader-marker", "Course Leader Marker", "A course-specific marker for the current leader.", "BEACON",
                         single("dragon-eye", "Dragon Eye", "An iris-like marker pulses above the leader."),
                         single("sky-compass", "Sky Compass", "A rotating compass motif follows the leader."),
@@ -63,7 +63,7 @@ public final class ArcadeCatalog {
                 win("cloud-throne", "Cloud Throne", "A cloud-built throne rises under the winner")));
 
         register(game("dragons", "Dragons", "BLAZE_POWDER", "Use Pyro platforms to survive dragon attacks.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("pyro-signature", "Pyro Signature", "Unique shape language for the Pyro ability.", "BLAZE_POWDER",
                         single("ember-wing", "Ember Wing", "A fan of flame-shaped particles."),
                         single("phoenix-arc", "Phoenix Arc", "A phoenix outline arcs through the air."),
@@ -73,7 +73,7 @@ public final class ArcadeCatalog {
                 win("last-platform", "Last Platform", "The remaining platform is spotlighted as the arena fades")));
 
         register(game("evolution", "Evolution", "DRAGON_EGG", "Fly upward as a chicken and evolve at the summit.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("metamorphosis", "Metamorphosis", "A layered evolution sequence, not an egg recolour.", "DRAGON_EGG",
                         single("shell-fragments", "Shell Fragments", "Egg-shell fragments burst outward."),
                         single("nature-bloom", "Nature Bloom", "Leaves and pollen unfold from the player."),
@@ -83,7 +83,7 @@ public final class ArcadeCatalog {
                 win("gene-helix", "Gene Helix", "A double helix spirals into the sky")));
 
         register(game("gladiators", "Gladiators", "IRON_SWORD", "Fight for the last position in the duel arena.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("duel-intro", "Duel Entrance", "A distinct combat entrance before the first hit.", "IRON_SWORD",
                         single("arena-challenger", "Arena Challenger", "An arena bell and crossed-sword flash."),
                         single("red-sand", "Red Sand", "A compact sand burst under the fighter."),
@@ -93,7 +93,7 @@ public final class ArcadeCatalog {
                 win("arena-banners", "Arena Banners", "Banners unfurl around the final combatant")));
 
         register(game("micro-battles", "Micro Battles", "LIGHT_BLUE_STAINED_GLASS", "Fight on tiny platforms as the border closes.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("platform-identity", "Platform Identity", "A starting platform material/pattern per player.", "GLASS",
                         single("cracked-ice", "Cracked Ice", "Frosted tiles with an icy edge."),
                         single("prism-grid", "Prism Grid", "A two-tone geometric grid."),
@@ -124,7 +124,7 @@ public final class ArcadeCatalog {
                 win("safe-pad-coronation", "Safe Pad Coronation", "The Safe Pad raises into a compact victory dais")));
 
         register(game("one-in-the-quiver", "One in the Quiver", "ARROW", "Land the decisive bow shot with one arrow at a time.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("arrow-flight", "Arrow Flight Signature", "A distinct arrow-flight trail and hit confirm.", "SPECTRAL_ARROW",
                         single("bullseye-dash", "Bullseye Dash", "A short target line follows the arrow."),
                         single("fletching-sparks", "Fletching Sparks", "Feather-shaped sparks mark the trajectory."),
@@ -134,7 +134,7 @@ public final class ArcadeCatalog {
                 win("archer-halo", "Archer Halo", "An archer's halo draws around the winner")));
 
         register(game("paintball", "Paintball", "SNOWBALL", "Control lanes with paintball weapons and team colours.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("weapon-personality", "Weapon Personality", "Per-weapon identity; projectile mechanics remain unchanged.", "CROSSBOW",
                         single("chrome-marker", "Chrome Marker", "A reflective chrome finish."),
                         single("splatter-cannon", "Splatter Cannon", "A chunky paint cannon silhouette."),
@@ -148,7 +148,7 @@ public final class ArcadeCatalog {
                 win("splatter-crown", "Splatter Crown", "A crown of layered paint splashes")));
 
         register(game("runner", "Runner", "LEATHER_BOOTS", "Survive by running the course without falling into gaps.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("route-mark", "Route Mark", "A recognisable path drawn along the winner's route.", "GLOW_INK_SAC",
                         single("red-walk", "Red Walk", "A clean red W-shaped route."),
                         single("chalk-dashes", "Chalk Dashes", "A chalk-like dashed route."),
@@ -158,7 +158,7 @@ public final class ArcadeCatalog {
                 win("runner-statue", "Runner Statue", "A running silhouette assembles into a statue")));
 
         register(game("sheep-quest", "Sheep Quest", "WHITE_WOOL", "Capture sheep and return them to your team's pen.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("capture-signature", "Capture Signature", "Distinct feedback when a sheep is secured.", "LEAD",
                         single("sheep-bell", "Sheep Bell", "A distinct bell and wool puff."),
                         single("wool-confetti", "Wool Confetti", "Colour-coded wool flecks burst outward."),
@@ -183,7 +183,7 @@ public final class ArcadeCatalog {
                 win("fruit-fountain", "Fruit Fountain", "Food items spiral into a colourful fountain")));
 
         register(game("spleef", "Spleef", "IRON_SHOVEL", "Break the floor beneath opponents and stay above the void.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("break-signature", "Block Break Signature", "A game-specific shape for each block break.", "IRON_SHOVEL",
                         single("snowburst", "Snowburst", "A short snow burst at the broken tile."),
                         single("ice-shards", "Ice Shards", "Crystalline fragments spread outward."),
@@ -193,7 +193,7 @@ public final class ArcadeCatalog {
                 win("shovel-salute", "Shovel Salute", "A ceremonial row of shovels rises from the floor")));
 
         register(game("turf-wars", "Turf Wars", "BOW", "Win ranged combat and control the central turf.",
-                GameDefinition.PortStatus.PLANNED,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("arrow-mark", "Arrow Mark", "A block-impact mark that follows the player's team palette.", "TARGET",
                         single("team-sigil", "Team Sigil", "A team sigil appears at the impact point."),
                         single("turf-crack", "Turf Crack", "A short crack traces from the hit."),
