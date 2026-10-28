@@ -1536,8 +1536,8 @@ public final class ArcadePortManager implements Listener {
         Color teamColor = switch (session.teams.getOrDefault(player.getUniqueId(), 0)) {
             case 0 -> Color.RED;
             case 1 -> Color.AQUA;
-            case 2 -> Color.YELLOW;
-            default -> Color.LIME;
+            case 2 -> Color.LIME;
+            default -> Color.YELLOW;
         };
         ItemStack[] armor = new ItemStack[] {
                 new ItemStack(Material.LEATHER_BOOTS),
@@ -2561,8 +2561,7 @@ public final class ArcadePortManager implements Listener {
         return switch (team) {
             case 0 -> "RED";
             case 1 -> "BLUE";
-            case 2 -> "YELLOW";
-            default -> "GREEN";
+            default -> ArcadePortRules.sheepQuestTeamPenMarker(team);
         };
     }
 
@@ -2590,8 +2589,8 @@ public final class ArcadePortManager implements Listener {
         return switch (team) {
             case 0 -> DyeColor.RED;
             case 1 -> DyeColor.LIGHT_BLUE;
-            case 2 -> DyeColor.YELLOW;
-            default -> DyeColor.LIME;
+            case 2 -> DyeColor.LIME;
+            default -> DyeColor.YELLOW;
         };
     }
 
@@ -2599,8 +2598,8 @@ public final class ArcadePortManager implements Listener {
         return switch (team) {
             case 0 -> ChatColor.RED;
             case 1 -> ChatColor.AQUA;
-            case 2 -> ChatColor.YELLOW;
-            default -> ChatColor.GREEN;
+            case 2 -> ChatColor.GREEN;
+            default -> ChatColor.YELLOW;
         };
     }
 
@@ -2608,8 +2607,8 @@ public final class ArcadePortManager implements Listener {
         return switch (team) {
             case 0 -> Material.RED_WOOL;
             case 1 -> Material.LIGHT_BLUE_WOOL;
-            case 2 -> Material.YELLOW_WOOL;
-            default -> Material.LIME_WOOL;
+            case 2 -> Material.LIME_WOOL;
+            default -> Material.YELLOW_WOOL;
         };
     }
 
@@ -2617,8 +2616,8 @@ public final class ArcadePortManager implements Listener {
         return switch (team) {
             case 0 -> "Red";
             case 1 -> "Aqua";
-            case 2 -> "Yellow";
-            default -> "Green";
+            case 2 -> "Green";
+            default -> "Yellow";
         };
     }
 
@@ -2858,8 +2857,8 @@ public final class ArcadePortManager implements Listener {
             case PAINTBALL -> "armour " + session.paintPiecesRemaining.getOrDefault(id, 4) + "/4";
             case RUNNER -> "unstable tiles " + session.runnerBlocks.size();
             case SHEEP_QUEST -> "pens R" + sheepQuestTeamCount(session, 0)
-                    + " A" + sheepQuestTeamCount(session, 1) + " Y" + sheepQuestTeamCount(session, 2)
-                    + " G" + sheepQuestTeamCount(session, 3);
+                    + " A" + sheepQuestTeamCount(session, 1) + " G" + sheepQuestTeamCount(session, 2)
+                    + " Y" + sheepQuestTeamCount(session, 3);
             case SPLEEF -> "snowballs " + inventoryCount(player, Material.SNOWBALL);
             case TURF_WARS -> (session.turfCombat ? "COMBAT" : "BUILD") + " | turf " + session.turfFrontlineX;
         };
