@@ -95,6 +95,27 @@ class ArcadePortGameTest {
         assertEquals(1, ArcadePortRules.requiredDeathTagChasers(-1L));
     }
 
+    @Test void bombLobbersKitsPitchLevelsCraftmanAndBombPrimingMatchSourceTiming() {
+        assertEquals("jumper", ArcadePortRules.normalizeBombLobbersKit("Jumper"));
+        assertEquals("armorer", ArcadePortRules.normalizeBombLobbersKit("armourer"));
+        assertEquals("pitcher", ArcadePortRules.normalizeBombLobbersKit("Pitcher"));
+        assertEquals("waller", ArcadePortRules.normalizeBombLobbersKit("Waller"));
+        assertNull(ArcadePortRules.normalizeBombLobbersKit("unknown"));
+        assertEquals(1.75D, ArcadePortRules.bombLobbersPitchVelocity(1), 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.bombLobbersPitchVelocity(2), 0.00001D);
+        assertEquals(2.25D, ArcadePortRules.bombLobbersPitchVelocity(3), 0.00001D);
+        assertEquals(8_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(0L));
+        assertEquals(8_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(20_000L));
+        assertEquals(7_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(20_001L));
+        assertEquals(6_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(40_001L));
+        assertEquals(5_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(60_001L));
+        assertEquals(4_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(620_001L));
+        assertFalse(ArcadePortRules.shouldPrimeBombLobbersBomb(2_999L, true));
+        assertTrue(ArcadePortRules.shouldPrimeBombLobbersBomb(3_000L, true));
+        assertFalse(ArcadePortRules.shouldPrimeBombLobbersBomb(7_999L, false));
+        assertTrue(ArcadePortRules.shouldPrimeBombLobbersBomb(8_000L, false));
+    }
+
     @Test void baconBrawlOnlyExposesTheThreeRetainedSourceKitsAndDoubleHungerRules() {
         assertEquals("pig", ArcadePortRules.normalizeBaconBrawlKit("Pig"));
         assertEquals("mama-pig", ArcadePortRules.normalizeBaconBrawlKit("mama"));

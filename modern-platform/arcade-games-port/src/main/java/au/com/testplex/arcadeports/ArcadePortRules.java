@@ -25,6 +25,10 @@ public final class ArcadePortRules {
     public static final long BACON_BLAST_COOLDOWN_MILLIS = 3_000L;
     public static final long BACON_CLOAK_COOLDOWN_MILLIS = 10_000L;
     public static final long BACON_CLOAK_DURATION_MILLIS = 5_000L;
+    public static final long BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS = 3_000L;
+    public static final long BOMB_LOBBERS_MAX_FLIGHT_MILLIS = 8_000L;
+    public static final int BOMB_LOBBERS_FUSE_TICKS = 60;
+    public static final int BOMB_LOBBERS_MAX_CARRIED = 3;
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
     public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
     public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
@@ -38,6 +42,39 @@ public final class ArcadePortRules {
     }
 
     /** Only the kits retained from the selected source ruleset are exposed. */
+    public static String normalizeBombLobbersKit(String requested) {
+        if (requested == null) return null;
+        String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        return switch (value) {
+            case "jumper" -> "jumper";
+            case "armorer", "armourer" -> "armorer";
+            case "pitcher" -> "pitcher";
+            case "waller" -> "waller";
+            default -> null;
+        };
+    }
+
+    public static double bombLobbersPitchVelocity(int level) {
+        return switch (Math.max(1, Math.min(3, level))) {
+            case 1 -> 1.75D;
+            case 3 -> 2.25D;
+            default -> 2.0D;
+        };
+    }
+
+    public static long bombLobbersCraftmanIntervalMillis(long liveMillis) {
+        if (liveMillis <= 20_000L) return 8_000L;
+        if (liveMillis <= 40_000L) return 7_000L;
+        if (liveMillis <= 60_000L) return 6_000L;
+        if (liveMillis <= 620_000L) return 5_000L;
+        return 4_000L;
+    }
+
+    public static boolean shouldPrimeBombLobbersBomb(long ageMillis, boolean touchingSolidBlock) {
+        return ageMillis >= BOMB_LOBBERS_MAX_FLIGHT_MILLIS
+                || (ageMillis >= BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS && touchingSolidBlock);
+    }
+
     public static String normalizeBaconBrawlKit(String requested) {
         if (requested == null) return null;
         String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
