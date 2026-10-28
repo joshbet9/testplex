@@ -13,11 +13,41 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class MonsterMazePortContractTest {
-    @Test void preservesTheThreeSourceGameModes() {
+    @Test void preservesOriginalSpeedModernAndClassicModeChoices() {
+        assertEquals(4, MazeMode.values().length);
         assertEquals(MazeMode.ORIGINAL, MazeMode.byName("Original"));
+        assertEquals(MazeMode.SPEED, MazeMode.byName("Speed"));
+        assertEquals(MazeMode.SPEED, MazeMode.byName("SPEED"));
         assertEquals(MazeMode.MODERN, MazeMode.byName("Modern"));
         assertEquals(MazeMode.CLASSIC, MazeMode.byName("Classic"));
+        assertNull(MazeMode.byName("unsupported"));
     }
+
+    @Test void speedRestoresLegacyQolRulesAndOriginalStageMonsterCadence() {
+        assertTrue(MazeMode.SPEED.qolEnabled());
+        assertFalse(MazeMode.ORIGINAL.qolEnabled());
+        assertEquals(5, KitType.available(MazeMode.SPEED).size());
+        assertTrue(KitType.available(MazeMode.SPEED).contains(KitType.MAVERICK));
+        assertEquals(60, MazeMode.SPEED.stageTimerSeconds(1));
+        assertEquals(58, MazeMode.SPEED.stageTimerSeconds(2));
+        assertEquals(15, MazeMode.SPEED.stageTimerSeconds(100));
+        assertEquals(150, MazeMode.SPEED.initialMonsterCount());
+        assertEquals(15, MazeMode.SPEED.additionalMonstersPerSafePad());
+    }
+
+    @Test void onlyModernUsesTheAcceleratedTimerAndHigherMonsterCounts() {
+        assertEquals(35, MazeMode.MODERN.stageTimerSeconds(1));
+        assertEquals(33, MazeMode.MODERN.stageTimerSeconds(2));
+        assertEquals(15, MazeMode.MODERN.stageTimerSeconds(10));
+        assertEquals(15, MazeMode.MODERN.stageTimerSeconds(100));
+        assertEquals(225, MazeMode.MODERN.initialMonsterCount());
+        assertEquals(30, MazeMode.MODERN.additionalMonstersPerSafePad());
+
+        assertEquals(60, MazeMode.CLASSIC.stageTimerSeconds(1));
+        assertEquals(150, MazeMode.CLASSIC.initialMonsterCount());
+        assertEquals(15, MazeMode.CLASSIC.additionalMonstersPerSafePad());
+    }
+
     @Test void preservesKitAvailabilityRules() {
         assertEquals(4, KitType.available(MazeMode.ORIGINAL).size());
         assertFalse(KitType.available(MazeMode.ORIGINAL).contains(KitType.MAVERICK));
