@@ -465,8 +465,9 @@ public final class ArcadePortManager implements Listener {
             session.deathTagNextLightAt = now + 1_000L;
         }
         session.turfCombat = false;
+        // Reborn doubles the opening build window; later build windows are 20 seconds.
         session.turfPhaseEndsAt = type == ArcadePortGame.TURF_WARS
-                ? now + ArcadePortRules.TURF_WARS_BUILD_PHASE_MILLIS : 0L;
+                ? now + ArcadePortRules.TURF_WARS_INITIAL_BUILD_PHASE_MILLIS : 0L;
         session.turfFrontlineX = -1;
         lastDragonHazard = now + 8_000L;
         lastSheepSpawn = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
