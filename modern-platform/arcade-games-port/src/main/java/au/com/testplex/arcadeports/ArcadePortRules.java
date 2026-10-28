@@ -7,8 +7,11 @@ package au.com.testplex.arcadeports;
  */
 public final class ArcadePortRules {
     public static final int EVOLUTION_WIN_LEVEL = 6;
-    public static final double DRAGON_ESCAPE_FINISH_Z = 77.0D;
-    public static final long DRAGON_ESCAPE_HAZARD_INTERVAL_MILLIS = 6_000L;
+    public static final double DRAGON_ESCAPE_FINISH_X = 0.5D;
+    public static final double DRAGON_ESCAPE_FINISH_Y = 64.0D;
+    public static final double DRAGON_ESCAPE_FINISH_Z = 77.5D;
+    public static final double DRAGON_ESCAPE_CHASE_SPEED = 0.2D;
+    public static final double DRAGON_ESCAPE_BLOCK_RADIUS = 10.0D;
     public static final long RUNNER_BLOCK_DECAY_MILLIS = 600L;
     public static final long RUNNER_BLOCK_LIFETIME_MILLIS = 1_200L;
     public static final long BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS = 50_000L;
@@ -153,12 +156,18 @@ public final class ArcadePortRules {
         return nowMillis >= nextAllowedMillis;
     }
 
-    public static boolean shouldLaunchDragonEscapeHazard(long nowMillis, long nextLaunchMillis) {
-        return nowMillis >= nextLaunchMillis;
+ 
+    /** The source game finishes near its final map waypoint, not anywhere on a Z plane. */
+    public static boolean isDragonEscapeFinishReached(double x, double y, double z) {
+        double dx = x - DRAGON_ESCAPE_FINISH_X;
+        double dy = y - DRAGON_ESCAPE_FINISH_Y;
+        double dz = z - DRAGON_ESCAPE_FINISH_Z;
+        return dx * dx + dy * dy + dz * dz < 9.0D;
     }
 
-    public static boolean isDragonEscapeFinishReached(double z) {
-        return z >= DRAGON_ESCAPE_FINISH_Z;
+    /** Reborn kills runners once Douglas's route progress has overtaken theirs. */
+    public static boolean shouldDragonEscapePlayerBeCaught(double dragonProgress, double playerProgress) {
+        return dragonProgress > playerProgress;
     }
 
     public static boolean isQuiverWinnerScoreReached(int kills) {

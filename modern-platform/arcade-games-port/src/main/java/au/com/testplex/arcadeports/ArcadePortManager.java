@@ -174,6 +174,7 @@ public final class ArcadePortManager implements Listener {
         session.turfFrontlineX = -1;
         lastDragonHazard = now + 8_000L;
         lastSheepSpawn = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
+        if (type == ArcadePortGame.DRAGON_ESCAPE) spawnDragonEscapeDragon(session);
         world.setTime(6000L);
         world.setStorm(false);
         world.setThundering(false);
@@ -831,11 +832,7 @@ public final class ArcadePortManager implements Listener {
             launchDragonHazard(session);
             lastDragonHazard = now + 4_500L;
         }
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE
-                && ArcadePortRules.shouldLaunchDragonEscapeHazard(now, session.nextDragonEscapeHazardAt)) {
-            launchDragonEscapeHazard(session);
-            session.nextDragonEscapeHazardAt = now + ArcadePortRules.DRAGON_ESCAPE_HAZARD_INTERVAL_MILLIS;
-        }
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE) updateDragonEscapeChase(session);
         if (session.type == ArcadePortGame.SHEEP_QUEST) {
             updateSheepQuest(session);
             if (now >= lastSheepSpawn && session.sheep.size() < 12) {
@@ -867,13 +864,7 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE && session.ticks % 4 == 0) {
-            // The old course crumbles behind the pack to keep forward motion part of the test.
-            int farthest = session.players.values().stream().filter(Player::isOnline).mapToInt(p -> p.getLocation().getBlockZ()).max().orElse(-22);
-            int crumbleZ = farthest - 7;
-            if (crumbleZ > -24 && crumbleZ < 78) for (int x = -3; x <= 3; x++) session.world.getBlockAt(x, 63, crumbleZ).setType(Material.AIR, false);
-        }
-        updateTitles(session);
+         updateTitles(session);
         checkRoundEnd(session);
     }
 
@@ -985,39 +976,56 @@ public final class ArcadePortManager implements Listener {
         shooter.sendMessage(ChatColor.LIGHT_PURPLE + "Dragon repelled!");
     }
 
-    private void launchDragonEscapeHazard(Session session) {
-        List<Player> alive = alivePlayers(session);
-        if (alive.isEmpty()) return;
-        Player target = alive.stream()
-                .max(java.util.Comparator.comparingDouble(player -> player.getLocation().getZ()))
-                .orElse(null);
-        if (target == null) return;
-
-        Location targetLocation = target.getLocation().clone();
-        double spawnX = Math.max(-2.5D, Math.min(2.5D,
-                targetLocation.getX() + ThreadLocalRandom.current().nextDouble(-1.5D, 1.5D)));
-        Location spawn = new Location(session.world, spawnX, targetLocation.getY() + 2.0D,
-                Math.max(-23.0D, targetLocation.getZ() - 9.0D));
-        Fireball fireball = session.world.spawn(spawn, Fireball.class);
-        fireball.setIsIncendiary(false);
-        fireball.setYield(0.0F);
-        Vector direction = targetLocation.toVector().subtract(spawn.toVector());
-        if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.0D, 1.0D);
-        fireball.setVelocity(direction.normalize().multiply(0.65D));
-        session.entities.add(fireball);
+    private void spawnDragonEscapeDragon(Session session) {
+        Location spawn = new Location(session.world, 0.5D, 66.5D, -35.0D);
+        EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
+        dragon.setAI(false);
+        dragon.setGravity(false);
+        dragon.setInvulnerable(true);
+        dragon.setRemoveWhenFarAway(false);
+        dragon.setCustomName(ChatColor.YELLOW + "Douglas the Dragon");
+        dragon.setCustomNameVisible(true);
+        dragon.setVelocity(new Vector(0.0D, 0.0D, ArcadePortRules.DRAGON_ESCAPE_CHASE_SPEED));
+        session.dragonEscapeDragon = dragon;
+        session.entities.add(dragon);
     }
 
-    private void handleDragonEscapeHazardHit(Session session, Fireball fireball, Player target) {
-        if (active != session || !session.alive.contains(target.getUniqueId())) return;
-        Vector recoil = fireball.getLocation().toVector().subtract(target.getLocation().toVector());
-        if (recoil.lengthSquared() < 0.001D) recoil = new Vector(0.0D, 0.0D, -1.0D);
-        target.setVelocity(recoil.normalize().multiply(0.9D).setY(0.42D));
-        target.playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.9F, 0.8F);
-        target.sendMessage(ChatColor.RED + "The dragon's fireball struck you!");
-        if (target.getHealth() <= 4.0D) {
-            eliminate(session, target, null, "was caught by the dragon's fireball");
+    /** Paper-native approximation of Reborn's DragonEscapeData.Move + radius-10 block explosion. */
+    private void updateDragonEscapeChase(Session session) {
+        EnderDragon dragon = session.dragonEscapeDragon;
+        if (active != session || dragon == null || !dragon.isValid() || dragon.isDead()) return;
+        Location location = dragon.getLocation();
+        if (location.getZ() < 80.0D) {
+            Vector desired = new Vector((0.5D - location.getX()) * 0.025D,
+                    (65.5D - location.getY()) * 0.02D, 1.0D).normalize()
+                    .multiply(ArcadePortRules.DRAGON_ESCAPE_CHASE_SPEED);
+            dragon.setVelocity(desired);
         } else {
-            target.setHealth(target.getHealth() - 4.0D);
+            dragon.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+        }
+
+        // Reborn destroys blocks in a radius of 10 around Douglas. The generated test course
+        // is a straight, 7-block-wide lane, so only course floor blocks are affected here.
+        int minZ = Math.max(-24, (int) Math.floor(location.getZ() - ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS));
+        int maxZ = Math.min(80, (int) Math.floor(location.getZ() + ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS));
+        double radius = ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS;
+        for (int x = -3; x <= 3; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                Block block = session.world.getBlockAt(x, 63, z);
+                if (block.getType().isAir()) continue;
+                double dx = x + 0.5D - location.getX();
+                double dy = 63.5D - location.getY();
+                double dz = z + 0.5D - location.getZ();
+                if (dx * dx + dy * dy + dz * dz <= radius * radius) block.setType(Material.AIR, false);
+            }
+        }
+
+        double dragonProgress = location.getZ();
+        for (Player player : new ArrayList<>(alivePlayers(session))) {
+            if (ArcadePortRules.shouldDragonEscapePlayerBeCaught(dragonProgress, player.getLocation().getZ())) {
+                eliminate(session, player, null, "was caught by Douglas the Dragon");
+                if (active != session) return;
+            }
         }
     }
 
@@ -1842,7 +1850,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE
-                && ArcadePortRules.isDragonEscapeFinishReached(event.getTo().getZ())) {
+                && ArcadePortRules.isDragonEscapeFinishReached(event.getTo().getX(), event.getTo().getY(), event.getTo().getZ())) {
             finish(session, player, true);
             return;
         }
@@ -2083,17 +2091,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE && event.getEntity() instanceof Fireball fireball
-                && session.entities.contains(fireball)) {
-            if (event.getHitEntity() instanceof Player target && session.alive.contains(target.getUniqueId())) {
-                handleDragonEscapeHazardHit(session, fireball, target);
-            }
-            session.entities.remove(fireball);
-            fireball.remove();
-            return;
-        }
-
-        // Handle Dragons fireballs here rather than relying on damage-event ordering.
+         // Handle Dragons fireballs here rather than relying on damage-event ordering.
         // World hazards knock players back; player-fired fireballs follow normal combat rules.
         if (session.type == ArcadePortGame.DRAGONS && event.getEntity() instanceof Fireball fireball
                 && session.entities.contains(fireball)) {
@@ -2485,6 +2483,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, UUID> bombOwners = new HashMap<>();
         final Map<UUID, Location> bombLastLocations = new HashMap<>();
         final Map<UUID, Long> dragonContactCooldowns = new HashMap<>();
+        EnderDragon dragonEscapeDragon;
         final Map<Block, Long> runnerBlocks = new HashMap<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
         final int participantsAtStart;
@@ -2493,8 +2492,7 @@ public final class ArcadePortManager implements Listener {
         long lastBaconEscalationAt;
         long baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
         long startedAt;
-        long nextDragonEscapeHazardAt;
-        boolean microBarrierActive;
+         boolean microBarrierActive;
         boolean turfCombat;
         boolean sheepQuestOvertime;
         long turfPhaseEndsAt;

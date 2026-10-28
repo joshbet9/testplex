@@ -114,11 +114,16 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRunnerFallingBlockHit(70.0D, 64.0D));
     }
 
-    @Test void dragonEscapeLaunchesChaseHazardsOnSchedule() {
-        assertEquals(6_000L, ArcadePortRules.DRAGON_ESCAPE_HAZARD_INTERVAL_MILLIS);
-        assertFalse(ArcadePortRules.shouldLaunchDragonEscapeHazard(5_999L, 6_000L));
-        assertTrue(ArcadePortRules.shouldLaunchDragonEscapeHazard(6_000L, 6_000L));
-        assertTrue(ArcadePortRules.shouldLaunchDragonEscapeHazard(12_000L, 6_000L));
+    @Test void dragonEscapeUsesARealChaseProgressAndCourseFinishProximity() {
+        assertEquals(0.2D, ArcadePortRules.DRAGON_ESCAPE_CHASE_SPEED, 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS, 0.00001D);
+        assertTrue(ArcadePortRules.shouldDragonEscapePlayerBeCaught(25.01D, 25.0D));
+        assertFalse(ArcadePortRules.shouldDragonEscapePlayerBeCaught(24.99D, 25.0D));
+        assertFalse(ArcadePortRules.isDragonEscapeFinishReached(10.0D, 64.0D, 77.5D));
+        assertFalse(ArcadePortRules.isDragonEscapeFinishReached(0.5D, 70.0D, 77.5D));
+        assertFalse(ArcadePortRules.isDragonEscapeFinishReached(0.5D, 64.0D, 74.4D));
+        assertTrue(ArcadePortRules.isDragonEscapeFinishReached(0.5D, 64.0D, 75.0D));
+        assertTrue(ArcadePortRules.isDragonEscapeFinishReached(0.5D, 64.0D, 77.5D));
     }
 
     @Test void spleefProjectileRadiusScalesWithArrowSpeed() {
