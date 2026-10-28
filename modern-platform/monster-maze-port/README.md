@@ -15,7 +15,7 @@ Use `/gamepanel`, choose Monster Maze, then select **Start / Test Monster Maze**
 ## Test isolation and maps
 Default config uses `test-mode: true` and `record-runs: false`. Test mode suppresses backend API writes and status heartbeats even if production environment variables exist. Leave test mode enabled on the test platform.
 
-Historical map worlds are not copied as part of this source port. The source falls back to `mm_void` when no active map world is present; complete map parity requires importing/installing the proper world assets into the modern server.
+The JAR does not embed Minecraft world folders. The explicit modern Hyper-V deployment now checks out and installs the seven physical source worlds used by `maps.yml` (`mm_void`, `mm_volcano`, `mm_colombia`, `mm_sandycoast`, `mm_siberian`, `mm_swampland`, and `mm_tesorohundido`) from `joshbet9/MonsterMaze/solo/1.21/maps`. It verifies each world has `level.dat` and region data, records the source commit, backs up existing map folders, and restores those backups if startup fails. Manual installations must provision the same folders before selecting these maps; missing folders are rejected by `MapManager`, and startup may otherwise fall back to `mm_void`.
 
 **Status:** mechanics port in progress. Compiling against Paper 26.3 catches source API incompatibilities, but runtime and in-game behavior still need test-server verification before marking it ready.
 
