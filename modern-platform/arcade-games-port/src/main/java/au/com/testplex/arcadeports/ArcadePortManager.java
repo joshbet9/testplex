@@ -2129,20 +2129,13 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void spawnTestDragons(Session session) {
-        int count = Math.min(5, Math.max(2, (session.participantsAtStart + 2) / 3));
-        for (int i = 0; i < count; i++) {
-            double angle = Math.PI * 2.0D * i / count;
-            Location spawn = new Location(session.world, Math.cos(angle) * 14.0D,
-                    68.0D + (i % 2) * 2.0D, Math.sin(angle) * 14.0D);
-            EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
-            dragon.setCustomName(ChatColor.DARK_PURPLE + "Arcade Dragon");
-            dragon.setCustomNameVisible(false);
-            dragon.setAI(false);
-            dragon.setGravity(false);
-            dragon.setSilent(false);
-            session.entities.add(dragon);
-        }
-        announce(session, ChatColor.DARK_PURPLE + "The dragons are hunting! Repel them with your Pyro fireballs.");
+        // Reborn starts its spawn loop during live play and adds at most one
+        // dragon every 500 ms until five are active. Do not flood the arena at
+        // round start; updateTestDragons() handles the source cadence and RED
+        // map spawn markers for every dragon.
+        session.dragonNextSpawnAt = System.currentTimeMillis() + ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS;
+        announce(session, ChatColor.DARK_PURPLE
+                + "The dragons are hunting! Repel them with your Pyro fireballs.");
     }
 
     private void updateTestDragons(Session session, long now) {
