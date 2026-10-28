@@ -780,6 +780,13 @@ class ArcadePortGameTest {
         assertEquals(4.0D, ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE, 0.00001D);
     }
 
+    @Test void turfWarsTerritoryUsesTheSourceSpawnFloorHeight() {
+        assertEquals(63, ArcadePortRules.turfWarsFloorYFromSpawn(64.0D));
+        assertEquals(69, ArcadePortRules.turfWarsFloorYFromSpawn(70.9D));
+        assertEquals(40, ArcadePortRules.turfWarsFloorYFromSpawn(41.0D));
+        assertEquals(63, ArcadePortRules.turfWarsFloorYFromSpawn(Double.NaN));
+    }
+
     @Test void turfWarsBuildPlacementStaysInsideSourceBoundsAndTerritory() {
         assertTrue(ArcadePortRules.isTurfWarsBuildWithinBounds(100, -10, 100, 140, -20, 20));
         assertTrue(ArcadePortRules.isTurfWarsBuildWithinBounds(139, 19, 100, 140, -20, 20));
