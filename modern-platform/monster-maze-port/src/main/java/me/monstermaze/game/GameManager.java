@@ -1000,7 +1000,9 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
     /** Only players registered when this round started receive its messages and titles. */
     private List<Player> getRoundAudiencePlayers() {
-        if (roundParticipants.isEmpty()) return getArenaWorldPlayers();
+        if (roundParticipants.isEmpty()) {
+            return state == GameState.IDLE ? getArenaWorldPlayers() : Collections.<Player>emptyList();
+        }
         List<Player> players = new ArrayList<Player>();
         boolean liveAudience = state == GameState.STARTING || state == GameState.LIVE;
         World arenaWorld = center == null ? null : center.getWorld();
