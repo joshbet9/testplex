@@ -5225,8 +5225,9 @@ public final class ArcadePortManager implements Listener {
             for (Player target : alivePlayers(session)) {
                 UUID targetId = target.getUniqueId();
                 if (targetId.equals(ownerId)) continue;
-                if (session.teams.getOrDefault(ownerId, -1)
-                        .equals(session.teams.getOrDefault(targetId, -2))) continue;
+                if (!ArcadePortRules.areBombLobbersEnemies(
+                        session.teams.getOrDefault(ownerId, -1),
+                        session.teams.getOrDefault(targetId, -1))) continue;
                 double distanceSquared = distanceSquaredToSegment(target.getLocation(), previous, current);
                 if (!ArcadePortRules.isBombDirectHit(distanceSquared)) continue;
 
@@ -5474,8 +5475,9 @@ public final class ArcadePortManager implements Listener {
                 session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
                 for (Player target : alivePlayers(session)) {
                     if (session.type == ArcadePortGame.BOMB_LOBBERS
-                            && session.teams.getOrDefault(ownerId, -1)
-                            .equals(session.teams.getOrDefault(target.getUniqueId(), -2))) continue;
+                            && !ArcadePortRules.areBombLobbersEnemies(
+                                    session.teams.getOrDefault(ownerId, -1),
+                                    session.teams.getOrDefault(target.getUniqueId(), -1))) continue;
                     double distanceSquared = target.getLocation().distanceSquared(blast);
                     if (distanceSquared > 64.0D) continue;
                     double distance = Math.sqrt(distanceSquared);
