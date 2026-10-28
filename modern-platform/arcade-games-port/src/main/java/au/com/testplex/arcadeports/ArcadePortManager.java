@@ -455,6 +455,7 @@ public final class ArcadePortManager implements Listener {
         session.endsAt = now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 600_000L : ROUND_MS);
         session.lastBaconHungerAt = now;
+        session.lastBaconSlowUpdateAt = now;
         session.lastWorldWaterDamageAt = now;
         session.lastBaconEscalationAt = now;
         session.lastSpleefHungerAt = now;
@@ -2197,19 +2198,24 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateBaconBrawl(Session session, long now) {
+        // Source UpdateType.SLOW runs every 4 seconds. Keep ability contact/expiry checks
+        // on every tick, but gate hunger and knockback escalation on that slower cadence.
+        updateBaconBrawlAbilities(session, now);
+        if (active != session
+                || now - session.lastBaconSlowUpdateAt < ArcadePortRules.BACON_SLOW_UPDATE_INTERVAL_MILLIS) return;
+        session.lastBaconSlowUpdateAt = now;
         if (now - session.lastBaconHungerAt >= ArcadePortRules.BACON_HUNGER_INTERVAL_MILLIS) {
             session.lastBaconHungerAt = now;
             for (Player player : new ArrayList<>(alivePlayers(session))) {
                 if (player.getFoodLevel() > 0) {
                     player.setFoodLevel(Math.max(0, player.getFoodLevel() - ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL));
+                    player.setSaturation(5.0F);
                 } else if (player.getHealth() <= ArcadePortRules.BACON_STARVATION_DAMAGE) {
                     eliminate(session, player, null, "starved");
                     if (active != session) return;
                 } else player.setHealth(player.getHealth() - ArcadePortRules.BACON_STARVATION_DAMAGE);
             }
         }
-        if (active != session) return;
-        updateBaconBrawlAbilities(session, now);
         if (active != session || session.baconEscalationIntervalMillis <= 0L
                 || now - session.lastBaconEscalationAt < session.baconEscalationIntervalMillis) return;
         session.lastBaconEscalationAt = now;
@@ -2320,6 +2326,7 @@ public final class ArcadePortManager implements Listener {
         target.setVelocity(direction.normalize().multiply(hitKnockback).setY(0.7D));
         target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0, 1, 0), 10, 0.35D, 0.4D, 0.35D, 0.04D);
         attacker.setFoodLevel(Math.min(20, attacker.getFoodLevel() + 2));
+        attacker.setSaturation(5.0F);
         attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.8F, 1.1F);
         double damage = ArcadePortRules.BACON_STANDARD_HIT_DAMAGE;
         if (target.getHealth() <= damage) {
@@ -5703,6 +5710,7 @@ public final class ArcadePortManager implements Listener {
         final int participantsAtStart;
         double baconKnockback = 1.5D;
         long lastBaconHungerAt;
+        long lastBaconSlowUpdateAt;
         long lastWorldWaterDamageAt;
         long lastBaconEscalationAt;
         long baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
