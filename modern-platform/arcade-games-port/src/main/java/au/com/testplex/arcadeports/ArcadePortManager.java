@@ -1180,18 +1180,22 @@ public final class ArcadePortManager implements Listener {
             }
             session.microBarrierBlocks.clear();
         } else for (int team = 0; team < 4; team++) {
-            Location island = islandSpawn(team * 2);
+            SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+            Location island = mapData == null ? islandSpawn(team * 2) : microTeamCenter(session, team);
             int cx = island.getBlockX();
+            int cy = island.getBlockY();
             int cz = island.getBlockZ();
             for (int offset = -4; offset <= 4; offset++) {
-                for (int y = 64; y <= 65; y++) {
+                for (int y = cy; y <= cy + 1; y++) {
                     Block[] ring = {
                             session.world.getBlockAt(cx + offset, y, cz - 4),
                             session.world.getBlockAt(cx + offset, y, cz + 4),
                             session.world.getBlockAt(cx - 4, y, cz + offset),
                             session.world.getBlockAt(cx + 4, y, cz + offset)
                     };
-                    for (Block block : ring) if (block.getType() == Material.GLASS) block.setType(Material.AIR, false);
+                    for (Block block : ring) {
+                        if (block.getType() == Material.GLASS) block.setType(Material.AIR, false);
+                    }
                 }
             }
         }
