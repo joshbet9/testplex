@@ -4077,9 +4077,11 @@ public final class ArcadePortManager implements Listener {
         Location previous = session.lastLocations.get(player.getUniqueId());
         Location current = event.getTo();
         if (previous == null || current == null || (previous.getBlockX() == current.getBlockX() && previous.getBlockZ() == current.getBlockZ())) return;
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && ArcadePortRules.shouldCrumbleDragonEscapeFallbackTrack(
+                        !session.dragonEscapeWaypoints.isEmpty(), current.getBlockZ())) {
             int crumbleZ = current.getBlockZ() - 5;
-            if (crumbleZ > -24 && crumbleZ < 78) for (int x = -3; x <= 3; x++) session.world.getBlockAt(x, 63, crumbleZ).setType(Material.AIR, false);
+            for (int x = -3; x <= 3; x++) session.world.getBlockAt(x, 63, crumbleZ).setType(Material.AIR, false);
         }
         session.lastLocations.put(player.getUniqueId(), current.clone());
     }
