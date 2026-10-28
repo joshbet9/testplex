@@ -6,11 +6,15 @@ import me.monstermaze.event.FirstToSafepadEvent;
 import me.monstermaze.event.SafepadBuildEvent;
 import me.monstermaze.kit.KitManager;
 import me.monstermaze.maze.MazeGenerator;
+import me.monstermaze.maze.MazePathfinder;
 import me.monstermaze.stats.StatTracker;
 import me.monstermaze.stats.LeaderboardBoard;
 import me.monstermaze.util.GameScoreboard;
 import me.monstermaze.util.TextUtil;
 import org.bukkit.Bukkit;
+import org.bukkit.Color;
+import org.bukkit.Particle;
+import org.bukkit.FireworkEffect;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -18,21 +22,29 @@ import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Firework;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.inventory.meta.FireworkMeta;
+import org.bukkit.util.Vector;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -43,6 +55,7 @@ public class GameManager implements Listener {
 
     private final MonsterMazePlugin plugin;
     private final MazeGenerator mazeGenerator;
+    private final MazePathfinder safePadNavigation = new MazePathfinder();
     private final MonsterManager monsterManager;
     private final KitManager kitManager;
     private final StatTracker stats;
@@ -59,6 +72,8 @@ public class GameManager implements Listener {
     private final Set<UUID> alive = new HashSet<UUID>();
     private final Set<UUID> spectators = new HashSet<UUID>();
     private final List<Player> playersOnPad = new ArrayList<Player>();
+    /** Players who have landed on this stage's Safe Pad; jumping does not clear this lock-in. */
+    private final Set<UUID> padLockIns = new HashSet<UUID>();
 
     private SafePad safePad;          // active pad
     private SafePad nextSafePad;      // preview pad (spawns at t=2)
@@ -79,7 +94,7 @@ public class GameManager implements Listener {
     private int liveTick;
     private float lastExpPct = -1;
     private int lastLevel = -1;
-    private Location lastCompassTarget;
+    private final Map<UUID, Location> lastCompassTargets = new HashMap<UUID, Location>();
 
     public GameManager(MonsterMazePlugin plugin) {
         this.plugin = plugin;
@@ -217,6 +232,9 @@ public void startGame(Location preferCenter, int requestedPattern) {
         alive.clear();
         spectators.clear();
         playersOnPad.clear();
+        padLockIns.clear();
+        lastCompassTargets.clear();
+        safePadNavigation.clear();
         curSafe = 1;
         phaseTimer = 60;
         phaseTimerStart = 60;
@@ -242,8 +260,6 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
                 for (Player p : Bukkit.getOnlinePlayers()) {
                     if (p.getGameMode() == GameMode.SPECTATOR) continue;
-                    // The selector sandbox is a separate world and is never a game participant.
-                    if (center != null && p.getWorld() != center.getWorld()) continue;
                     alive.add(p.getUniqueId());
                     preparePlayer(p);
                     p.teleport(center.clone().add(0.5, 1, 0.5));
@@ -268,12 +284,15 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 spawnSafePad();
                 safePad = nextSafePad;
                 nextSafePad = null;
+                rebuildSafePadNavigation();
+                launchPadFirework(safePad);
 
                 // Point every alive player's compass at the active safe pad / beacon from spawn.
                 updateCompasses();
 
                 // --- FIX: INITIALIZE & APPLY SCOREBOARD UPFRONT (Issue #5) ---
                 scoreboard.create();
+                List<GameScoreboard.PlayerDistance> distanceStandings = updateDistanceStandings(getAlivePlayers());
                 int pattern = getPatternIndex();
                 for (Player p : getAlivePlayers()) {
                     String pbText = null;
@@ -286,7 +305,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                         }
                     }
                     scoreboard.update(p, getAlivePlayers().size(), curSafe, phaseTimer, safePad != null,
-                            getMode().color + getMode().id, pbText);
+                            getMode().color + getMode().id, pbText, distanceStandings);
                 }
                 scoreboard.apply(getAlivePlayers());
                 // -------------------------------------------------------------
@@ -313,7 +332,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                         if (state != GameState.STARTING) { cancel(); return; }
                         if (t <= 0) { beginLive(); cancel(); return; }
                         broadcast(ChatColor.YELLOW + "Starting in " + ChatColor.WHITE + t + "...");
-                        titleArenaPlayers("", ChatColor.YELLOW + "" + t, 0, 15, 5);
+                        TextUtil.titleAll("", ChatColor.YELLOW + "" + t, 0, 15, 5);
                         t--;
                     }
                 }.runTaskTimer(plugin, 10L, 20L);
@@ -330,7 +349,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         leaderboardBoard.clear();
         for (Player p : getAlivePlayers()) p.closeInventory();
 
-        titleArenaPlayers("", ChatColor.YELLOW + "" + ChatColor.BOLD + "Get to the Safe Pad!", 5, 40, 5);
+        TextUtil.titleAll("", ChatColor.YELLOW + "" + ChatColor.BOLD + "Get to the Safe Pad!", 5, 40, 5);
         broadcast(ChatColor.GREEN + "" + ChatColor.BOLD + "GO!");
 
         secondTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
@@ -358,6 +377,8 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 // PERF: the scoreboard/KB/pad info only changes on stage/phase transitions
                 // (and the PB lookup is per player), so update it 2x/s instead of 20x/s.
                 if ((liveTick % 10) == 1) {
+                    List<GameScoreboard.PlayerDistance> distanceStandings = updateDistanceStandings(aliveNow);
+                    if (curSafe == 1) emitStageOneGuidance(aliveNow);
                     int pattern = getPatternIndex();
                     int aliveCount = aliveNow.size();
                     for (Player p : aliveNow) {
@@ -371,7 +392,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                             }
                         }
                         scoreboard.update(p, aliveCount, curSafe, phaseTimer, safePad != null,
-                                getMode().color + getMode().id, pbText);
+                                getMode().color + getMode().id, pbText, distanceStandings);
                     }
                     scoreboard.apply(aliveNow);
                 }
@@ -387,20 +408,15 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
         monsterManager.stop();
         kitManager.clearSelectors();
+        safePadNavigation.clear();
+        padLockIns.clear();
+        lastCompassTargets.clear();
+        playersOnPad.clear();
         destroyAllPads();
         mazeGenerator.returnToLobby();
-        List<Player> roundPlayers = new ArrayList<Player>();
-        if (center != null && center.getWorld() != null) {
-            for (Player online : Bukkit.getOnlinePlayers()) {
-                if (online.getWorld() == center.getWorld()) roundPlayers.add(online);
-            }
-        } else {
-            // Preserve the prior shutdown cleanup fallback if the arena center was never configured.
-            roundPlayers.addAll(Bukkit.getOnlinePlayers());
-        }
-        scoreboard.clear(roundPlayers);
+        scoreboard.clear(new ArrayList<Player>(Bukkit.getOnlinePlayers()));
 
-        for (Player p : roundPlayers) {
+        for (Player p : Bukkit.getOnlinePlayers()) {
             p.setExp(0); p.setLevel(0);
             p.getInventory().clear();
             p.getInventory().setArmorContents(null);
@@ -425,7 +441,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         if (center != null) {
             kitManager.spawnSelectors(mazeGenerator.getLobbyCenter());
             refreshLeaderboardBoard();
-            for (Player p : roundPlayers) {
+            for (Player p : Bukkit.getOnlinePlayers()) {
                 kitManager.openSelector(p);
             }
         }
@@ -513,27 +529,27 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
         if (phaseTimer == 20 || phaseTimer == 15 || phaseTimer == 10
                 || phaseTimer == 5 || phaseTimer == 4) {
-            titleArenaPlayers("", ChatColor.GREEN + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
+            TextUtil.titleAll("", ChatColor.GREEN + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
         }
         if (phaseTimer == 3) {
-            titleArenaPlayers("", ChatColor.YELLOW + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
+            TextUtil.titleAll("", ChatColor.YELLOW + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
         }
         if (phaseTimer == 2) {
-            titleArenaPlayers("", ChatColor.GOLD + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
+            TextUtil.titleAll("", ChatColor.GOLD + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
             spawnSafePad(); // next pad appears
         }
         if (phaseTimer == 1) {
-            titleArenaPlayers("", ChatColor.RED + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
+            TextUtil.titleAll("", ChatColor.RED + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
         }
 
         if (phaseTimer == 0) {
             for (Player p : getAlivePlayers()) {
-                // Survival requires being ON the pad right now. (See note: the older
-                // playersOnPad "ever touched" check wrongly let players who stepped on the
-                // pad then walked off it survive the round end.)
-                boolean onPad = safePad != null && safePad.isOn(p);
+                boolean onPad = safePad != null && safePad.isOn(p) && p.isOnGround();
+                if (onPad) padLockIns.add(p.getUniqueId());
+                boolean secured = padLockIns.contains(p.getUniqueId());
 
-                if (onPad) {
+                if (secured) {
+                    if (!onPad) teleportToSafePadCenter(p);
                     TextUtil.title(p, "", ChatColor.YELLOW + "" + ChatColor.BOLD + "Get to the Next Safe Pad!", 5, 40, 5);
                 } else {
                     TextUtil.title(p, "", ChatColor.RED + "" + ChatColor.BOLD + "You weren't on the Safe Pad!", 5, 40, 5);
@@ -545,6 +561,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             monsterManager.spawnMore(getMode() == MazeMode.MODERN ? 30 : 15);
             stopSafePad();
             playersOnPad.clear();
+            padLockIns.clear();
             firstClaimedThisPhase = false;
 
             phaseTimerStart = stageTimer(curSafe + 1);
@@ -557,6 +574,8 @@ public void startGame(Location preferCenter, int requestedPattern) {
             curSafe++;
             safePad = nextSafePad;
             nextSafePad = null;
+            rebuildSafePadNavigation();
+            if (curSafe <= 2) launchPadFirework(safePad);
 
             checkWin();
         }
@@ -567,15 +586,24 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
         boolean allOn = true;
         for (Player p : getAlivePlayers()) {
-            if (!safePad.isOn(p)) {
+            UUID id = p.getUniqueId();
+            boolean onPad = safePad.isOn(p);
+            boolean grounded = p.isOnGround();
+
+            if (onPad && grounded) padLockIns.add(id);
+            if (!onPad || !grounded) {
                 allOn = false;
-                if (playersOnPad.contains(p)) {
+                if (!onPad && padLockIns.contains(id) && grounded) {
+                    teleportToSafePadCenter(p);
+                    continue;
+                }
+                if (!onPad && grounded && playersOnPad.contains(p) && !padLockIns.contains(id)) {
                     TextUtil.title(p, "", ChatColor.RED + "" + ChatColor.BOLD + "Get back to the Safe Pad!", 0, 5, 0);
                 }
                 continue;
             }
 
-            // Always check Pilot when standing on the safe pad
+            // Reaching the pad requires landing. Jumping after that does not clear padLockIns.
             stats.checkPilotLand(p, true);
 
             if (!playersOnPad.contains(p)) {
@@ -710,6 +738,8 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
     private void eliminate(Player player, String message) {
         if (!alive.remove(player.getUniqueId())) return;
+        lastCompassTargets.remove(player.getUniqueId());
+        padLockIns.remove(player.getUniqueId());
         recordPB(player);
         spectators.add(player.getUniqueId());
         broadcast(message);
@@ -785,19 +815,28 @@ public void startGame(Location preferCenter, int requestedPattern) {
     public boolean tryBumpCooldown(Player player) { return true; }
 
     private void updateCompasses() {
-        SafePad target = safePad != null ? safePad : nextSafePad;
-        if (target == null) return;
-        Location loc = target.getLocation();
-        // PERF: the pad moves once per stage; only resend the compass packet on change.
-        if (lastCompassTarget != null
-                && lastCompassTarget.getWorld() == loc.getWorld()
-                && lastCompassTarget.getBlockX() == loc.getBlockX()
-                && lastCompassTarget.getBlockY() == loc.getBlockY()
-                && lastCompassTarget.getBlockZ() == loc.getBlockZ()) {
-            return;
+        for (Player player : getAlivePlayers()) {
+            // Players who have locked in on this stage's pad are already safe.
+            // Once the preview pad appears, point those players at it immediately.
+            SafePad target = padLockIns.contains(player.getUniqueId()) && nextSafePad != null
+                    ? nextSafePad
+                    : (safePad != null ? safePad : nextSafePad);
+            if (target == null) continue;
+
+            Location loc = target.getLocation();
+            UUID playerId = player.getUniqueId();
+            Location last = lastCompassTargets.get(playerId);
+            // Each player's target can differ depending on their Safe Pad lock-in.
+            if (last != null
+                    && last.getWorld() == loc.getWorld()
+                    && last.getBlockX() == loc.getBlockX()
+                    && last.getBlockY() == loc.getBlockY()
+                    && last.getBlockZ() == loc.getBlockZ()) {
+                continue;
+            }
+            player.setCompassTarget(loc);
+            lastCompassTargets.put(playerId, loc.clone());
         }
-        lastCompassTarget = loc;
-        for (Player p : getAlivePlayers()) p.setCompassTarget(loc);
     }
 
     private void updateExpBars(List<Player> aliveNow) {
@@ -820,28 +859,84 @@ public void startGame(Location preferCenter, int requestedPattern) {
         }
     }
 
-    private void titleArenaPlayers(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
-        if (center == null || center.getWorld() == null) {
-            TextUtil.titleAll(title, subtitle, fadeIn, stay, fadeOut);
+    /** Rebuild the exact shortest-path distance field once for each new active Safe Pad. */
+    private void rebuildSafePadNavigation() {
+        if (safePad == null) {
+            safePadNavigation.clear();
             return;
         }
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (player.getWorld() == center.getWorld()) {
-                TextUtil.title(player, title, subtitle, fadeIn, stay, fadeOut);
+        safePadNavigation.rebuild(mazeGenerator.getPathPoints(), safePad.getLocation());
+    }
+
+    private void teleportToSafePadCenter(Player player) {
+        if(player==null||safePad==null||!player.isOnline())return;
+        Location facing=player.getLocation(),destination=safePad.getLocation().clone();
+        destination.setYaw(facing.getYaw());destination.setPitch(facing.getPitch());
+        player.setFallDistance(0.0f);player.setVelocity(new Vector(0,0,0));player.teleport(destination);
+    }
+
+    /** The first two active pads get a brief, non-damaging celebration firework. */
+    /** First two active Safe Pads get three brighter, harmless fireworks. */
+    private void launchPadFirework(SafePad pad) {
+        if(pad==null||curSafe>2)return;
+        final Location center=pad.getLocation().clone().add(0,1,0);final boolean firstPad=curSafe==1;
+        for(int i=0;i<3;i++){
+            final int shot=i;
+            Bukkit.getScheduler().runTaskLater(plugin,new Runnable(){@Override public void run(){
+                Location at=center.clone().add((shot-1)*0.45,0,shot==1?0.35:-0.35);
+                try{
+                    Firework firework=at.getWorld().spawn(at,Firework.class);FireworkMeta meta=firework.getFireworkMeta();meta.setPower(1);
+                    FireworkEffect.Type type=shot==0?FireworkEffect.Type.BALL_LARGE:shot==1?FireworkEffect.Type.STAR:FireworkEffect.Type.BURST;
+                    Color primary=firstPad?(shot==0?Color.LIME:shot==1?Color.YELLOW:Color.AQUA):(shot==0?Color.PURPLE:shot==1?Color.FUCHSIA:Color.AQUA);
+                    meta.addEffect(FireworkEffect.builder().with(type).withColor(primary,Color.WHITE).withFade(firstPad?Color.YELLOW:Color.LIME).trail(true).flicker(true).build());
+                    meta.addEffect(FireworkEffect.builder().with(FireworkEffect.Type.BALL).withColor(firstPad?Color.AQUA:Color.YELLOW).trail(true).build());
+                    firework.setFireworkMeta(meta);
+                }catch(Throwable ignored){
+                        for(int n=0;n<8;n++)at.getWorld().spawnParticle(Particle.HAPPY_VILLAGER,at.clone().add((n%3)*0.2,n*0.15,(n%2)*0.2),1,0,0,0,0);
+                }
+            }},i*3L);
+        }
+    }
+
+    /** Route particles follow only real maze cells and appear during Stage 1 only. */
+    private void emitStageOneGuidance(List<Player> aliveNow) {
+        if (safePad == null || !safePadNavigation.isReady()) return;
+        for (Player player : aliveNow) {
+            if (playersOnPad.contains(player) || safePad.isOn(player)) continue;
+            List<Location> markers = safePadNavigation.trailTowardTarget(player.getLocation(), 120, 4);
+            for (Location marker : markers) {
+                marker.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, marker, 1, 0.05, 0.08, 0.05, 0.0);
             }
         }
     }
 
-    private void broadcast(String msg) {
-        if (center == null || center.getWorld() == null) {
-            Bukkit.broadcastMessage(msg);
-            return;
+    private List<GameScoreboard.PlayerDistance> updateDistanceStandings(List<Player> aliveNow) {
+        final List<GameScoreboard.PlayerDistance> lines=new ArrayList<GameScoreboard.PlayerDistance>();
+        if(safePad==null||!safePadNavigation.isReady()||aliveNow==null||aliveNow.isEmpty())return lines;
+        final List<DistanceEntry> ranking=new ArrayList<DistanceEntry>();
+        for(Player player:aliveNow)ranking.add(new DistanceEntry(player,safePadNavigation.distanceInBlocks(player.getLocation())));
+        Collections.sort(ranking,new Comparator<DistanceEntry>(){@Override public int compare(DistanceEntry left,DistanceEntry right){
+            int distance=Double.compare(left.distance,right.distance);return distance!=0?distance:left.player.getName().compareToIgnoreCase(right.player.getName());
+        }});
+        for(DistanceEntry entry:ranking) {
+            String displayDistance = padLockIns.contains(entry.player.getUniqueId())
+                    ? "SAFE" : formatDistance(entry.distance);
+            lines.add(new GameScoreboard.PlayerDistance(entry.player.getName(), displayDistance));
         }
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (player.getWorld() == center.getWorld()) player.sendMessage(msg);
-        }
-        Bukkit.getConsoleSender().sendMessage(msg);
+        return lines;
     }
+
+    private String formatDistance(double distance) {
+        return Double.isInfinite(distance) || Double.isNaN(distance) ? "?" : String.valueOf(Math.round(distance));
+    }
+
+    private static final class DistanceEntry {
+        final Player player;
+        final double distance;
+        DistanceEntry(Player player, double distance) { this.player = player; this.distance = distance; }
+    }
+
+    private void broadcast(String msg) { Bukkit.broadcastMessage(msg); }
 
     // -------------------- Events --------------------
 
@@ -849,6 +944,8 @@ public void startGame(Location preferCenter, int requestedPattern) {
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         UUID id = player.getUniqueId();
+        padLockIns.remove(id);
+        lastCompassTargets.remove(id);
         
         for (Player online : Bukkit.getOnlinePlayers()) {
             online.showPlayer(player);
@@ -888,6 +985,11 @@ public void startGame(Location preferCenter, int requestedPattern) {
     @SuppressWarnings("deprecation")
     public void onDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player)) return;
+        if (event instanceof EntityDamageByEntityEvent
+                && ((EntityDamageByEntityEvent) event).getDamager() instanceof Firework) {
+            event.setCancelled(true);
+            return;
+        }
         if (state != GameState.LIVE && state != GameState.STARTING) return;
         Player p = (Player) event.getEntity();
         if (!alive.contains(p.getUniqueId())) { event.setCancelled(true); return; }
@@ -903,7 +1005,12 @@ public void startGame(Location preferCenter, int requestedPattern) {
         if (center == null) return;
 
         if (p.getLocation().getY() < center.getY() - 3) {
+            if (padLockIns.contains(p.getUniqueId()) && safePad != null) {
+                teleportToSafePadCenter(p);
+                return;
+            }
             eliminate(p, ChatColor.RED + p.getName() + " fell off the maze!");
+            return;
         }
         // Pilot check: only award when the player actually lands ON a safe pad after a bump.
         // (Previously passed "true" unconditionally, so any grounded landing after a mob hit —
