@@ -13,6 +13,14 @@ public final class SnakeRules {
     public static final int SPEED_REFERENCE_LENGTH = 180;
     public static final double SNAKE_TAIL_COLLISION_RADIUS = 1.2D;
     public static final double FOOD_PICKUP_RADIUS = 2.0D;
+    public static final int FOOD_SPAWN_ATTEMPTS = 36;
+    public static final double FOOD_SPAWN_RADIUS = 46.0D;
+
+    /** Reborn samples food uniformly by area within a disk around the arena spawn. */
+    public static double foodSpawnDistance(double randomUnit) {
+        if (!Double.isFinite(randomUnit)) return 0.0D;
+        return Math.sqrt(Math.max(0.0D, Math.min(1.0D, randomUnit))) * FOOD_SPAWN_RADIUS;
+    }
 
     public static final int MAX_HAZARDS = 4;
     public static final int HAZARD_SPAWN_ATTEMPTS = 48;
