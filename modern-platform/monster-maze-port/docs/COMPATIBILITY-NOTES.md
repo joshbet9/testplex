@@ -7,7 +7,7 @@ The old module includes server-version-locked `v1_8_R3` classes such as `AddonGh
 
 ### Legacy 1.8 Speed mode retained in the modern port
 - The 1.8 source exposes Original, Speed and Modern. Speed enables QOL kit rules while preserving the original stage timer (60 seconds, minus 2 per stage, floored at 15 seconds), 150 initial monsters, and 15 additional monsters per Safe Pad.
-- The 1.21 source exposes Original, Modern and Classic instead. The modern port keeps both historical Speed and current Classic so neither mode family is lost: only Modern uses the accelerated stage timer, 225 initial monsters, and 30 additional monsters per Safe Pad.
+- The 1.21 source exposes Original, Modern and Classic instead. The modern port keeps both historical Speed and current Classic so neither mode family is lost: only Modern uses the accelerated stage timer, 225 initial monsters, and 30 additional monsters per Safe Pad. Speed and Modern receive the closest Paper 26.3 equivalent available for the 1.8 ground-level speeding dash (Speed II on players whose jump is locked); Classic opts out.
 - Contract tests cover the mode names, kit availability, timer boundaries, and monster-count cadence.
 
 ### 1.21 implementation used as the baseline
