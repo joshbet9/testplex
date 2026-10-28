@@ -282,6 +282,9 @@ jobs:
                   "persistent drift": "_lastTravelDirection.put(player, blended.clone())",
                   "persistent sharp-turn state": "appliedYaw += clamp(remaining, -4.0f, 4.0f)",
                   "hazard cleanup": "removeMagmaCubes();",
+                  "Magma Cubes require a valid on-course spawn tile": "findMagmaCubeSpawn(target, center)",
+                  "failed hazard spawn retries shortly": "spawned ? MAGMA_HAZARD_INTERVAL_MS : 5000L",
+                  "hazard chat only follows a valid entity spawn": "A size " + '" + cube.getSize() + " hazard has spawned in the arena',
               },
               "Monster Maze SafePad": {
                   "world check": "entityLocation.getWorld() != _loc.getWorld()",
@@ -298,6 +301,9 @@ jobs:
                   "prevent vanilla beacon GUI": "public void onInteract(PlayerInteractEvent event)",
                   "unregister interaction listener after pad deactivation": "unregisterListener();",
                   "each newly built pad reapplies viewer palette": "applyViewerCosmeticColours();",
+                  "right-click re-applies pad tints after client updates": "refreshTintAfterPadInteraction(final PlayerInteractEvent event)",
+                  "repaint retries after delayed block updates": "new long[] {1L, 3L, 6L, 10L}",
+                  "right-click objective beacon is cancelled": "boolean objectiveBeacon =",
               },
               "Monster Maze": {
                   "persistence opt-in defaults off": 'getBoolean("monstermaze.safe-pad-enhancements.enabled", false)',
@@ -399,6 +405,10 @@ jobs:
                   "PB per kit": "getKitBest(_display, _pattern, kits[i])",
                   "native account data unavailable is handled safely": "Managers.get(CustomDataManager.class)",
                   "pattern click uses clicked player to open kit list": "getShop().openPageForPlayer(player, next)",
+                  "view pages use unique inventory titles": "pageTitle(view, display, pattern)",
+                  "info paper has a click handler": "How Monster Maze PBs work",
+                  "kit PB entries are actionable": "Click to show this PB.",
+                  "kit page paper returns to patterns": "Back to Pattern Selection",
               },
               "Monster Maze Stats Page": {
                   "links to the PB browser": "addMonsterMazePBButton()",
