@@ -56,6 +56,18 @@ public final class ArcadePortRules {
         return remainingPieces <= 0;
     }
 
+    public static int gladiatorsTierForRound(int round) {
+        return Math.max(0, Math.min(3, round));
+    }
+
+    public static int gladiatorsPairCount(int players) {
+        return Math.max(0, (Math.max(0, players) + 1) / 2);
+    }
+
+    public static boolean allGladiatorPairsResolved(int pairCount, int resolvedPairs) {
+        return pairCount > 0 && resolvedPairs >= pairCount;
+    }
+
     public static long nextBaconKnockbackInterval(long currentMillis) {
         return Math.max(BACON_MIN_KNOCKBACK_INTERVAL_MILLIS, currentMillis - 5_000L);
     }
