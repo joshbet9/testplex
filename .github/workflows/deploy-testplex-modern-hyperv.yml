@@ -124,7 +124,14 @@ jobs:
           run-id: ${{ inputs.source_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Verify and stage the four JARs
+      - name: Checkout Monster Maze source world assets
+        uses: actions/checkout@v4
+        with:
+          repository: joshbet9/MonsterMaze
+          ref: main
+          path: monstermaze-source
+
+      - name: Verify and stage the four JARs and Monster Maze worlds
         id: stage-jars
         shell: bash
         env:
@@ -142,9 +149,21 @@ jobs:
             unzip -tq "$source_jar" >/dev/null
             cp "$source_jar" "$stage_dir/$jar"
           done
-          (cd "$stage_dir" && sha256sum *.jar > SHA256SUMS)
+
+          # These physical worlds are required by MonsterMazeModern's maps.yml.
+          map_root="$GITHUB_WORKSPACE/monstermaze-source/solo/1.21/maps"
+          map_source_sha="$(git -C "$GITHUB_WORKSPACE/monstermaze-source" rev-parse HEAD)"
+          for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+            test -s "$map_root/$world/level.dat" || { echo "Missing source level.dat for $world" >&2; exit 1; }
+            test -d "$map_root/$world/region" || { echo "Missing source region folder for $world" >&2; exit 1; }
+          done
+          tar --exclude='*/session.lock' --exclude='*/uid.dat' -czf "$stage_dir/MonsterMazeMaps.tar.gz" \
+            -C "$map_root" mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido
+          printf '%s\n' "$map_source_sha" > "$stage_dir/MonsterMazeMapsSource.txt"
+          tar -tzf "$stage_dir/MonsterMazeMaps.tar.gz" >/dev/null
+          (cd "$stage_dir" && sha256sum *.jar MonsterMazeMaps.tar.gz MonsterMazeMapsSource.txt > SHA256SUMS)
           echo "stage_dir=$stage_dir" >> "$GITHUB_OUTPUT"
-          echo "Verified all four modern JARs from $SOURCE_SHA"
+          echo "Verified four modern JARs ($SOURCE_SHA) and seven Monster Maze source worlds ($map_source_sha)"
 
       - name: Validate isolated remote target and legacy downtime
         shell: bash
@@ -235,6 +254,8 @@ jobs:
             "$STAGE_DIR/MonsterMazeModern.jar" \
             "$STAGE_DIR/SnakeModern.jar" \
             "$STAGE_DIR/ArcadeMechanicsModern.jar" \
+            "$STAGE_DIR/MonsterMazeMaps.tar.gz" \
+            "$STAGE_DIR/MonsterMazeMapsSource.txt" \
             "$remote:$upload_dir/"
           scp -p -P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
@@ -277,6 +298,8 @@ jobs:
           for jar in TestplexModernArcade.jar MonsterMazeModern.jar SnakeModern.jar ArcadeMechanicsModern.jar; do
             sudo -n test -s "$UPLOAD_DIR/$jar"
           done
+          sudo -n test -s "$UPLOAD_DIR/MonsterMazeMaps.tar.gz"
+          sudo -n test -s "$UPLOAD_DIR/MonsterMazeMapsSource.txt"
           sudo -n test -s "$UPLOAD_DIR/SHA256SUMS"
 
           legacy_state="$(sudo -n systemctl is-active testplex-reborn.service 2>/dev/null || true)"
@@ -335,6 +358,15 @@ jobs:
           fi
           sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$SERVER_DIR/plugins" "$SERVER_DIR/backups"
 
+          # Stage and validate source worlds outside the live Bukkit world folders.
+          MAP_STAGE_DIR="$UPLOAD_DIR/mm-map-stage"
+          mkdir -p "$MAP_STAGE_DIR"
+          tar -xzf "$UPLOAD_DIR/MonsterMazeMaps.tar.gz" -C "$MAP_STAGE_DIR"
+          for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+            test -s "$MAP_STAGE_DIR/$world/level.dat"
+            test -d "$MAP_STAGE_DIR/$world/region"
+          done
+
           STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
           BACKUP_DIR="$SERVER_DIR/backups/$STAMP-$BUILD_SHA"
           sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$BACKUP_DIR"
@@ -353,7 +385,7 @@ jobs:
             HAD_OLD_PLUGINS=true
             sudo -n cp -a "$SERVER_DIR/plugins" "$BACKUP_DIR/plugins"
           fi
-          for file in server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build; do
+          for file in server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps; do
             if sudo -n test -f "$SERVER_DIR/$file"; then
               sudo -n cp -a "$SERVER_DIR/$file" "$BACKUP_DIR/$file"
             fi
@@ -430,9 +462,21 @@ jobs:
               sudo -n rm -rf "$SERVER_DIR/plugins"
               sudo -n cp -a "$BACKUP_DIR/plugins" "$SERVER_DIR/plugins"
             fi
-            for file in server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build; do
+            for file in server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps; do
               if sudo -n test -f "$BACKUP_DIR/$file"; then sudo -n cp -a "$BACKUP_DIR/$file" "$SERVER_DIR/$file"; fi
             done
+            if ! sudo -n test -f "$BACKUP_DIR/.testplex-mm-source-maps"; then
+              sudo -n rm -f "$SERVER_DIR/.testplex-mm-source-maps"
+            fi
+            if sudo -n test -f "$BACKUP_DIR/mm-source-worlds.list"; then
+              for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+                sudo -n rm -rf "$SERVER_DIR/$world"
+                if sudo -n test -d "$BACKUP_DIR/mm-source-worlds/$world"; then
+                  sudo -n cp -a "$BACKUP_DIR/mm-source-worlds/$world" "$SERVER_DIR/$world"
+                  sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR/$world"
+                fi
+              done
+            fi
             if [[ "$HAD_OLD_UNIT" == "true" ]]; then
               sudo -n cp -a "$BACKUP_DIR/testplex-modern.service" /etc/systemd/system/testplex-modern.service
               sudo -n systemctl daemon-reload
@@ -443,6 +487,36 @@ jobs:
             fi
             sudo -n tail -n 100 "$SERVER_DIR/logs/latest.log" 2>/dev/null || true
           }
+
+          # Install fresh source maps only after a recoverable snapshot is ready.
+          # Stop Paper before touching its physical world folders.
+          install_source_worlds() (
+            set -euo pipefail
+            if sudo -n systemctl is-active --quiet testplex-modern.service; then
+              sudo -n systemctl stop testplex-modern.service
+            fi
+            sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$BACKUP_DIR/mm-source-worlds"
+            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+              if sudo -n test -e "$SERVER_DIR/$world"; then
+                sudo -n cp -a "$SERVER_DIR/$world" "$BACKUP_DIR/mm-source-worlds/$world"
+              fi
+            done
+            printf '%s\n' mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido \
+              | sudo -n tee "$BACKUP_DIR/mm-source-worlds.list" >/dev/null
+            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+              sudo -n rm -rf "$SERVER_DIR/$world"
+              sudo -n cp -a "$MAP_STAGE_DIR/$world" "$SERVER_DIR/$world"
+              sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR/$world"
+            done
+            sudo -n install -o monstermaze -g monstermaze -m 0644 \
+              "$UPLOAD_DIR/MonsterMazeMapsSource.txt" "$SERVER_DIR/.testplex-mm-source-maps"
+          )
+          if ! install_source_worlds; then
+            echo "Failed to install Monster Maze source worlds; rolling back the modern-only deployment." >&2
+            rollback
+            exit 1
+          fi
+          echo "Installed Monster Maze map source commit $(cat "$UPLOAD_DIR/MonsterMazeMapsSource.txt")."
 
           if ! sudo -n systemctl restart testplex-modern.service; then
             rollback
