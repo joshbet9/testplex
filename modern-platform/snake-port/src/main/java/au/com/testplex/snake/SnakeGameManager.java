@@ -486,18 +486,16 @@ public final class SnakeGameManager implements Listener {
         List<SnakeState> alive = snakes.values().stream().filter(s -> s.alive && s.player.isOnline()).toList();
         if (alive.isEmpty() || arena == null) return false;
         SnakeState target = alive.get(ThreadLocalRandom.current().nextInt(alive.size()));
-        double angle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
-        double distance = ThreadLocalRandom.current().nextDouble(16.0D, 35.0D);
-        double x = target.player.getLocation().getX() + Math.cos(angle) * distance;
-        double z = target.player.getLocation().getZ() + Math.sin(angle) * distance;
-        int bx = (int) Math.round(Math.max(-ARENA_RADIUS + 3, Math.min(ARENA_RADIUS - 3, x)));
-        int bz = (int) Math.round(Math.max(-ARENA_RADIUS + 3, Math.min(ARENA_RADIUS - 3, z)));
-        if (!arena.getBlockAt(bx, 63, bz).getType().isSolid()) return false;
+        Location spawn = findHazardSpawn(target.player);
+        if (spawn == null) {
+            plugin.getLogger().warning("[Snake] No clear floor tile found for a magma-cube item box; retrying soon.");
+            return false;
+        }
 
-        MagmaCube cube = arena.spawn(new Location(arena, bx + .5D, 64.0D, bz + .5D), MagmaCube.class);
+        MagmaCube cube = arena.spawn(spawn, MagmaCube.class);
         cube.setSize(Math.min(4, hazards.size() + 1));
-        cube.setCustomName(ChatColor.GOLD + "Snake Item Box");
-        cube.setCustomNameVisible(true);
+        cube.setCustomName(ChatColor.RED + "Snake Hazard");
+        cube.setCustomNameVisible(false);
         // Keep the source magma cube's native hop/gravity; only its target-seeking
         // steering is scripted by moveAndProcessHazards().
         cube.setAI(true);
@@ -505,9 +503,59 @@ public final class SnakeGameManager implements Listener {
         cube.setSilent(false);
         cube.setRemoveWhenFarAway(false);
         hazards.add(cube);
-        announce(ChatColor.RED + "" + ChatColor.BOLD + "ITEM BOX! " + ChatColor.GRAY
-                + "A size " + cube.getSize() + " magma-cube hazard has appeared (" + hazards.size() + "/" + MAX_HAZARDS + ").");
+        announce(ChatColor.RED + "" + ChatColor.BOLD + "MAGMA CUBE! " + ChatColor.GRAY
+                + "A size " + cube.getSize() + " hazard has spawned in the arena ("
+                + hazards.size() + "/" + MAX_HAZARDS + ").");
+        for (SnakeState state : alive) {
+            state.player.playSound(state.player.getLocation(), Sound.ENTITY_MAGMA_CUBE_JUMP, 0.8F, 0.8F);
+        }
         return true;
+    }
+
+    /**
+     * Mirror the legacy 48-point golden-angle search and five-block clearance test.
+     * Item boxes spawn around a live target, but are clamped away from the arena wall
+     * and never placed into an overhead obstruction or embedded floor.
+     */
+    private Location findHazardSpawn(Player target) {
+        if (target == null || !target.isOnline() || target.getWorld() != arena) return null;
+        Location center = arena.getSpawnLocation();
+        Location playerLocation = target.getLocation();
+        double startAngle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
+        int baseY = playerLocation.getBlockY();
+        for (int attempt = 0; attempt < SnakeRules.HAZARD_SPAWN_ATTEMPTS; attempt++) {
+            double angle = startAngle + attempt * 2.399963229728653D;
+            double distance = SnakeRules.hazardSpawnDistance(attempt);
+            double x = playerLocation.getX() + Math.cos(angle) * distance;
+            double z = playerLocation.getZ() + Math.sin(angle) * distance;
+            x = Math.max(center.getX() - ARENA_RADIUS + 6.0D,
+                    Math.min(center.getX() + ARENA_RADIUS - 6.0D, x));
+            z = Math.max(center.getZ() - ARENA_RADIUS + 6.0D,
+                    Math.min(center.getZ() + ARENA_RADIUS - 6.0D, z));
+            int blockX = (int) Math.floor(x);
+            int blockZ = (int) Math.floor(z);
+            if (!arena.isChunkLoaded(blockX >> 4, blockZ >> 4)) {
+                arena.getChunkAt(blockX >> 4, blockZ >> 4).load();
+            }
+            int minY = Math.max(1, baseY - 7);
+            int maxY = Math.min(arena.getMaxHeight() - 5, baseY + 3);
+            for (int y = maxY; y >= minY; y--) {
+                Block ground = arena.getBlockAt(blockX, y - 1, blockZ);
+                if (!ground.getType().isSolid()) continue;
+                boolean clear = true;
+                for (int offset = 0; offset <= 4; offset++) {
+                    Block space = arena.getBlockAt(blockX, y + offset, blockZ);
+                    if (!space.getType().isAir()) {
+                        clear = false;
+                        break;
+                    }
+                }
+                if (!clear) continue;
+                return new Location(arena, blockX + 0.5D, y, blockZ + 0.5D,
+                        (float) ThreadLocalRandom.current().nextDouble(0.0D, 360.0D), 0.0F);
+            }
+        }
+        return null;
     }
 
     private void moveAndProcessHazards() {
