@@ -318,7 +318,7 @@ jobs:
                   "body rush intercepts contacts": "bodyRushKit.consumeMonsterHit(player)",
                   "Maverick pad-directed knockback": "getMobKnockTarget()",
                   "resets toggle to Map Default on every game": 'applyMobThemeChoice(player, "map_default", false)',
-                  "Map Default resolves source mob palette": "mobSetForEntityType(_host.getMonsterType())",
+                  "Map Default uses the source lime pad/beacon palette": 'if ("map_default".equals(choice))\n\t\t\treturn "map_default";',
                   "theme selector honours enabled mob sets": "ArcadeCosmeticsMenu.isMonsterMazeMobSetEnabled(playerId, mobSet)",
                   "live mob-set changes reconcile active theme": "public void refreshMobSetSettingsForPlayer(Player player)",
                   "pad spawn fireworks are limited to two signals": "if (_padSpawnCount >= 2)",
