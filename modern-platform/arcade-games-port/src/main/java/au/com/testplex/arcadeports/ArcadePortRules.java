@@ -496,6 +496,16 @@ public final class ArcadePortRules {
         return currentFrontline;
     }
 
+    /** Original Gladiators opens with green outer arenas, then moves inward by tier. */
+    public static String gladiatorsArenaMarkerGroup(int round) {
+        return switch (Math.max(0, Math.min(3, round))) {
+            case 1 -> "YELLOW";
+            case 2 -> "ORANGE";
+            case 3 -> "RED";
+            default -> "GREEN";
+        };
+    }
+
     public static boolean isTurfWarsWinningLine(int frontline, int teamId, int halfSize) {
         if (halfSize < 1) return false;
         if (teamId == 0) return frontline >= halfSize - 1;
