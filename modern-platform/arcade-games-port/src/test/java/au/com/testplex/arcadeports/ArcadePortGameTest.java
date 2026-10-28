@@ -112,4 +112,12 @@ class ArcadePortGameTest {
         assertEquals(3, ArcadePortRules.spleefProjectileClearRadius(true, 100.0D));
     }
 
+    @Test void evolutionStagesIncreaseOnWinsAndDropOnLosses() {
+        assertEquals(1, ArcadePortRules.nextEvolutionLevel(0, true));
+        assertEquals(5, ArcadePortRules.nextEvolutionLevel(5, true));
+        assertEquals(1, ArcadePortRules.nextEvolutionLevel(2, false));
+        assertEquals(0, ArcadePortRules.nextEvolutionLevel(0, false));
+        assertEquals(0, ArcadePortRules.nextEvolutionLevel(-1, false));
+    }
+
 }
