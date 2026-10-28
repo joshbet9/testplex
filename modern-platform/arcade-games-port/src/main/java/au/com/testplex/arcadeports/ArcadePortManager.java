@@ -164,6 +164,7 @@ public final class ArcadePortManager implements Listener {
                 : type == ArcadePortGame.GLADIATORS ? 600_000L : ROUND_MS);
         session.lastBaconHungerAt = now;
         session.lastBaconEscalationAt = now;
+        session.baconKnockback = ArcadePortRules.initialBaconKnockback(participants.size());
         session.baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
         session.nextDragonEscapeHazardAt = now + ArcadePortRules.DRAGON_ESCAPE_HAZARD_INTERVAL_MILLIS;
         session.microBarrierActive = type == ArcadePortGame.MICRO_BATTLES;
