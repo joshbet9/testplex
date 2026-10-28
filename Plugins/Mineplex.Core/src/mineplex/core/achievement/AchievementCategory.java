@@ -234,9 +234,10 @@ public enum AchievementCategory
 			new StatDisplay[]{StatDisplay.WINS, StatDisplay.GAMES_PLAYED, StatDisplay.KILLS, StatDisplay.DEATHS, StatDisplay.GEMS_EARNED},
 			Material.MONSTER_EGG, 55 /* slime */, GameCategory.ARCADE, "Harvester Kit", false, GameDisplay.Evolution.getGameId()),
 
-	MONSTER_MAZE("Monster Maze", null,
+	MONSTER_MAZE("Monster Maze", new String[]{"Monster Maze", "Monster Maze Speed", "Monster Maze Modern"},
 			new StatDisplay[]{StatDisplay.WINS, StatDisplay.GAMES_PLAYED, StatDisplay.DEATHS, StatDisplay.GEMS_EARNED},
-			Material.ROTTEN_FLESH, 0, GameCategory.ARCADE, "SoonTM", false, GameDisplay.MonsterMaze.getGameId()),
+			Material.ROTTEN_FLESH, 0, GameCategory.ARCADE, null, false,
+			GameDisplay.MonsterMaze.getGameId(), GameDisplay.MonsterMazeSpeed.getGameId(), GameDisplay.MonsterMazeModern.getGameId()),
 
 	GLADIATORS("Gladiators", null,
 			new StatDisplay[]{StatDisplay.WINS, StatDisplay.GAMES_PLAYED, StatDisplay.KILLS, StatDisplay.DEATHS, StatDisplay.GEMS_EARNED},
