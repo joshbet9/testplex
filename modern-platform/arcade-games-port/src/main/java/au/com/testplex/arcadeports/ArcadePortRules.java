@@ -476,6 +476,11 @@ public final class ArcadePortRules {
         return alphaChaser ? 0.5D : 1.0D;
     }
 
+    /** Original Death Tag lights switch between gold blocks and white wool each second. */
+    public static Material deathTagNextLightMaterial(Material current) {
+        return current == Material.GOLD_BLOCK ? Material.WHITE_WOOL : Material.GOLD_BLOCK;
+    }
+
     /** Reborn's runner speed threshold is strictly greater than 25% chasers. */
     public static boolean deathTagRunnersReceiveSpeed(int chasers, int totalPlayers) {
         return totalPlayers > 0 && chasers >= 0 && (double) chasers / (double) totalPlayers > 0.25D;
