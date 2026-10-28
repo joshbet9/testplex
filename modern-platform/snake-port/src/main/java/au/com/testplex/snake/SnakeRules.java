@@ -1,8 +1,18 @@
 package au.com.testplex.snake;
 
+import org.bukkit.Location;
+import org.bukkit.util.Vector;
+
+import java.util.ArrayList;
+import java.util.List;
+
 /** Small deterministic rules shared by the Snake loop and its contract tests. */
 public final class SnakeRules {
     private static final int[] ROULETTE_SECONDS = {1, 3, 5, 10, 15, 20, 30};
+
+    public static final int SPEED_REFERENCE_LENGTH = 180;
+    public static final double SNAKE_TAIL_COLLISION_RADIUS = 1.2D;
+    public static final double FOOD_PICKUP_RADIUS = 2.0D;
 
     public static final int MAX_HAZARDS = 4;
     public static final long FIRST_HAZARD_DELAY_MILLIS = 10_000L;
@@ -23,10 +33,56 @@ public final class SnakeRules {
         return ROULETTE_SECONDS[Math.min(hitCount, ROULETTE_SECONDS.length) - 1];
     }
 
+    /**
+     * Map Reborn's speed curve (0.4 + min(0.7, length / 180)) onto modern
+     * block-per-tick movement. The source stops gaining speed at 126 segments;
+     * 180 is a reference length, not a maximum tail size.
+     */
     public static double movementSpeed(int tailLength, boolean speedBoost) {
-        double growth = Math.min(0.16D, Math.max(0, tailLength) / 1800.0D);
-        double speed = 0.18D + growth;
+        double sourceGrowth = Math.min(0.7D, Math.max(0, tailLength) / (double) SPEED_REFERENCE_LENGTH);
+        double speed = 0.18D + (sourceGrowth / 0.7D) * 0.16D;
         return speedBoost ? speed * 1.5D : speed;
+    }
+
+    /** Source food collection uses a strict 2-block 3D radius. */
+    public static boolean isFoodCollected(double distanceSquared) {
+        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
+                && distanceSquared < FOOD_PICKUP_RADIUS * FOOD_PICKUP_RADIUS;
+    }
+
+    /** Source tail collision tests a strict 1.2-block 3D radius. */
+    public static boolean isTailCollision(double distanceSquared) {
+        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
+                && distanceSquared < SNAKE_TAIL_COLLISION_RADIUS * SNAKE_TAIL_COLLISION_RADIUS;
+    }
+
+    /**
+     * Continue a growing tail along its existing final segment. For a one-segment
+     * snake, extend behind the player's facing direction as the source does.
+     */
+    public static Vector tailExtensionDirection(Vector previousSegment, Vector lastSegment, Vector playerFacing) {
+        if (previousSegment != null && lastSegment != null) {
+            Vector tailDirection = lastSegment.clone().subtract(previousSegment).setY(0.0D);
+            if (tailDirection.lengthSquared() > 1.0E-6D) return tailDirection.normalize();
+        }
+        Vector facing = playerFacing == null ? new Vector(0.0D, 0.0D, 1.0D)
+                : playerFacing.clone().setY(0.0D);
+        if (facing.lengthSquared() < 1.0E-6D) facing = new Vector(0.0D, 0.0D, 1.0D);
+        return facing.normalize().multiply(-1.0D);
+    }
+
+    /**
+     * Seed the head-first path deque from the segment positions after Reverser flips
+     * the segment list. Keeping the existing geometry prevents all segments collapsing
+     * onto the old head when normal path-following resumes.
+     */
+    public static List<Location> seedReversedBodyPath(List<Location> reversedSegments) {
+        List<Location> path = new ArrayList<>();
+        if (reversedSegments == null) return path;
+        for (Location location : reversedSegments) {
+            if (location != null) path.add(location.clone());
+        }
+        return path;
     }
 
     public static double clampTurnRadians(double requestedRadians) {
