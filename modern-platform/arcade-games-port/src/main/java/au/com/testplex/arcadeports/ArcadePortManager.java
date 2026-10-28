@@ -2864,8 +2864,17 @@ public final class ArcadePortManager implements Listener {
         List<Player> alive = alivePlayers(session);
         if (alive.isEmpty()) return;
         Player target = alive.get(ThreadLocalRandom.current().nextInt(alive.size()));
-        double edgeX = ThreadLocalRandom.current().nextBoolean() ? -18.0D : 18.0D;
-        Location spawn = new Location(session.world, edgeX, 68.0D, target.getLocation().getZ());
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        boolean fromLeft = ThreadLocalRandom.current().nextBoolean();
+        double edgeX;
+        double spawnY = Math.max(68.0D, target.getLocation().getY() + 4.0D);
+        if (mapData != null && mapData.hasBounds()) {
+            edgeX = fromLeft ? mapData.minX() + 1.5D : mapData.maxX() - 1.5D;
+            if (mapData.hasVerticalBounds()) spawnY = Math.min(spawnY, mapData.maxY() - 2.0D);
+        } else {
+            edgeX = fromLeft ? -18.0D : 18.0D;
+        }
+        Location spawn = new Location(session.world, edgeX, spawnY, target.getLocation().getZ());
         Fireball fireball = session.world.spawn(spawn, Fireball.class);
         // Leave the shooter unset: this is a world hazard, not a player-fired attack.
         fireball.setIsIncendiary(false);
