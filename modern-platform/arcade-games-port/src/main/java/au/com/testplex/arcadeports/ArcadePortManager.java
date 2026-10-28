@@ -4701,9 +4701,18 @@ public final class ArcadePortManager implements Listener {
         }
 
         if (session.type == ArcadePortGame.BACON_BRAWL
-                && event.getEntity() instanceof Snowball bacon && session.entities.remove(bacon)) {
-            bacon.getWorld().spawnParticle(Particle.CLOUD, bacon.getLocation(), 14, 0.25D, 0.25D, 0.25D, 0.04D);
-            bacon.getWorld().playSound(bacon.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.5F, 1.6F);
+                && event.getEntity() instanceof Snowball bacon && session.entities.contains(bacon)) {
+            Location impact = bacon.getLocation().clone();
+            if (event.getHitEntity() instanceof Player target
+                    && bacon.getShooter() instanceof Player attacker
+                    && session.alive.contains(attacker.getUniqueId())
+                    && session.alive.contains(target.getUniqueId())) {
+                handlePlayerHit(session, attacker, target, "bacon-blast");
+            }
+            impact.getWorld().spawnParticle(Particle.CLOUD, impact, 14,
+                    0.25D, 0.25D, 0.25D, 0.04D);
+            impact.getWorld().playSound(impact, Sound.ENTITY_GENERIC_EXPLODE, 0.5F, 1.6F);
+            session.entities.remove(bacon);
             bacon.remove();
             return;
         }
