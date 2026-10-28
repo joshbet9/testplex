@@ -29,6 +29,14 @@ public final class ArcadePortRules {
     public static final long BOMB_LOBBERS_MAX_FLIGHT_MILLIS = 8_000L;
     public static final int BOMB_LOBBERS_FUSE_TICKS = 60;
     public static final int BOMB_LOBBERS_MAX_CARRIED = 3;
+    public static final long SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS = 4_000L;
+    public static final int SPLEEF_HUNGER_DRAIN_PER_INTERVAL = 2;
+    public static final long SPLEEF_HUNGER_RESTORE_COOLDOWN_MILLIS = 50L;
+    public static final long SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS = 2_000L;
+    public static final int SPLEEF_ARCHER_MAX_ARROWS = 2;
+    public static final int SPLEEF_SNOWBALLER_MAX_SNOWBALLS = 16;
+    public static final long SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS = 6_000L;
+    public static final long SPLEEF_SMASHER_COOLDOWN_MILLIS = 250L;
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
     public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
     public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
@@ -42,6 +50,26 @@ public final class ArcadePortRules {
     }
 
     /** Only the kits retained from the selected source ruleset are exposed. */
+    public static String normalizeSpleefKit(String requested) {
+        if (requested == null) return null;
+        String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        return switch (value) {
+            case "snowballer" -> "snowballer";
+            case "brawler" -> "brawler";
+            case "archer" -> "archer";
+            default -> null;
+        };
+    }
+
+    /** Legacy Spleef wool/clay data transitions: green -> yellow -> red -> broken. */
+    public static int nextSpleefSlowDamageData(int legacyData) {
+        return switch (legacyData) {
+            case 5, 13 -> 4;
+            case 4 -> 14;
+            default -> -1;
+        };
+    }
+
     public static String normalizeBombLobbersKit(String requested) {
         if (requested == null) return null;
         String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');

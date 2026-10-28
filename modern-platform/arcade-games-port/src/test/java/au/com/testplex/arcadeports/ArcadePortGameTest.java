@@ -95,6 +95,25 @@ class ArcadePortGameTest {
         assertEquals(1, ArcadePortRules.requiredDeathTagChasers(-1L));
     }
 
+    @Test void spleefSourceKitSelectionHungerAndPerkTimingAreExplicit() {
+        assertEquals("snowballer", ArcadePortRules.normalizeSpleefKit("Snowballer"));
+        assertEquals("brawler", ArcadePortRules.normalizeSpleefKit("brawler"));
+        assertEquals("archer", ArcadePortRules.normalizeSpleefKit("Archer"));
+        assertNull(ArcadePortRules.normalizeSpleefKit("unknown"));
+        assertEquals(4_000L, ArcadePortRules.SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS);
+        assertEquals(2, ArcadePortRules.SPLEEF_HUNGER_DRAIN_PER_INTERVAL);
+        assertEquals(50L, ArcadePortRules.SPLEEF_HUNGER_RESTORE_COOLDOWN_MILLIS);
+        assertEquals(2_000L, ArcadePortRules.SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS);
+        assertEquals(2, ArcadePortRules.SPLEEF_ARCHER_MAX_ARROWS);
+        assertEquals(16, ArcadePortRules.SPLEEF_SNOWBALLER_MAX_SNOWBALLS);
+        assertEquals(6_000L, ArcadePortRules.SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS);
+        assertEquals(250L, ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS);
+        assertEquals(4, ArcadePortRules.nextSpleefSlowDamageData(5));
+        assertEquals(4, ArcadePortRules.nextSpleefSlowDamageData(13));
+        assertEquals(14, ArcadePortRules.nextSpleefSlowDamageData(4));
+        assertEquals(-1, ArcadePortRules.nextSpleefSlowDamageData(14));
+    }
+
     @Test void bombLobbersKitsPitchLevelsCraftmanAndBombPrimingMatchSourceTiming() {
         assertEquals("jumper", ArcadePortRules.normalizeBombLobbersKit("Jumper"));
         assertEquals("armorer", ArcadePortRules.normalizeBombLobbersKit("armourer"));

@@ -16,7 +16,7 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 - Paintball — selectable Rifle, Sniper, Shotgun and Machine Gun kits; projectile-specific paint counts, scope-charge damage, a heat gauge and team-coloured armour (kit perks and revive/Save Me flow remain to port).
 - Runner — disappearing floor tiles and dash item.
 - Sheep Quest — captureable sheep and score target.
-- Spleef — snow floor and shovel-only tile breaks.
+- Spleef — source kit selection (Snowballer, Brawler and Archer), snowballer replacement cap, Brawler Leap/Smasher, two-arrow Fletcher replenishment, source-timed hunger drain/restoration, and three-stage arrow floor damage. Original maps are still not imported.
 - Turf Wars — team assignment, bow combat and territory block marking.
 
 Each game gets its own separate test world, so arena generation/destruction does not use the live 1.8 Testplex world. These are simple generated test arenas, not the historical original maps.
@@ -26,7 +26,7 @@ Each game gets its own separate test world, so arena generation/destruction does
 - `/gamepanel` → choose a supported game → **Start / Test**. The coordinator calls `/arcadeport play <game-id>`.
 - `/arcadeport play <id>` — joins a quick-start window, giving others a few seconds to join.
 - `/arcadeport join <id>` then `/arcadeport start <id>` — queue a multi-player test.
-- `/arcadeport kit <rifle|sniper|shotgun|machine-gun|runner-basher|runner-archer|runner-traitor|runner-null>` — choose a kit before a test (Death Tag runner kit can also be changed while playing as a runner).
+- `/arcadeport kit <jumper|armorer|pitcher|waller|pig|mama-pig|sheep-pig|snowballer|brawler|archer|rifle|sniper|shotgun|machine-gun|runner-basher|runner-archer|runner-traitor|runner-null>` — choose a game kit before a test.
 - `/arcadeport status`, `/arcadeport stop` (operator only).
 
 Game IDs are: `bacon-brawl`, `bomb-lobbers`, `death-tag`, `dragon-escape`, `dragons`, `evolution`, `gladiators`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`.
