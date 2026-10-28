@@ -57,6 +57,10 @@ public final class ArcadePortRules {
         if (blueSheep > redSheep) return 1;
         return -1;
     }
+
+    public static boolean shouldEnterSheepQuestOvertime(int redSheep, int blueSheep) {
+        return redSheep == blueSheep;
+    }
     public static final int SHEEP_QUEST_INITIAL_SHEEP = 4;
     public static final int SHEEP_QUEST_MAX_CARRY = 3;
     public static final long SHEEP_QUEST_SPAWN_INTERVAL_MILLIS = 20_000L;
