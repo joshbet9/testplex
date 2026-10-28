@@ -97,4 +97,11 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldDropRunnerBlock(1_200L));
     }
 
+    @Test void dragonEscapeLaunchesChaseHazardsOnSchedule() {
+        assertEquals(6_000L, ArcadePortRules.DRAGON_ESCAPE_HAZARD_INTERVAL_MILLIS);
+        assertFalse(ArcadePortRules.shouldLaunchDragonEscapeHazard(5_999L, 6_000L));
+        assertTrue(ArcadePortRules.shouldLaunchDragonEscapeHazard(6_000L, 6_000L));
+        assertTrue(ArcadePortRules.shouldLaunchDragonEscapeHazard(12_000L, 6_000L));
+    }
+
 }
