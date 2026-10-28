@@ -29,6 +29,7 @@ public final class ArcadePortRules {
     public static final long BACON_SLOW_UPDATE_INTERVAL_MILLIS = 4_000L;
     public static final long BACON_HUNGER_INTERVAL_MILLIS = 4_000L;
     public static final int BACON_HUNGER_DRAIN_PER_INTERVAL = 1;
+    public static final float BACON_SATURATION_ON_FOOD_CHANGE = 5.0F;
     public static final double BACON_STARVATION_DAMAGE = 4.0D;
     public static final double BACON_STANDARD_HIT_DAMAGE = 6.0D;
     public static final double BACON_BODY_SLAM_RECOIL_DAMAGE = 2.0D;
