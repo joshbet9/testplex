@@ -73,6 +73,31 @@ public final class ArcadePortRules {
     private ArcadePortRules() {
     }
 
+    public static String normalizeDragonEscapeKit(String requested) {
+        if (requested == null) return null;
+        String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        return switch (value) {
+            case "jumper" -> "jumper";
+            case "disruptor" -> "disruptor";
+            case "warper" -> "warper";
+            case "digger" -> "digger";
+            default -> null;
+        };
+    }
+
+    public static int dragonEscapeLeapUses(String kit) {
+        return switch (normalizeDragonEscapeKit(kit) == null ? "" : normalizeDragonEscapeKit(kit)) {
+            case "jumper" -> 4;
+            case "disruptor" -> 3;
+            case "warper" -> 2;
+            default -> 0;
+        };
+    }
+
+    public static final int DRAGON_ESCAPE_DIGGER_MAX_USES = 6;
+    public static final int DRAGON_ESCAPE_DISRUPTOR_MAX_TNT = 2;
+    public static final long DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS = 10_000L;
+
     public static String normalizeDragonsKit(String requested) {
         if (requested == null) return null;
         String kit = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
