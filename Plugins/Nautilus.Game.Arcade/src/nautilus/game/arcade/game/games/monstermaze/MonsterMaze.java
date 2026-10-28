@@ -221,6 +221,13 @@ public class MonsterMaze extends SoloGame
 			setJumpsLeft(player, 3);
 	}
 
+	/** Re-send this player's current Safe Pad surface and beacon tint after cosmetic settings change. */
+	public void refreshSafePadCosmeticsForViewer(Player viewer)
+	{
+		if (_maze != null)
+			_maze.refreshPlayerSafePadCosmetics(viewer);
+	}
+
 	@Override
 	public void generateTeams()
 	{
@@ -964,6 +971,22 @@ public class MonsterMaze extends SoloGame
 		if (_maze == null || !GetPlayers(false).contains(player))
 			return;
 		event.setCancelled(true);
+		cycleMobTheme(player);
+	}
+
+	/** The server routes right-click-on-mob to this event instead of PlayerInteractEvent. */
+	@EventHandler
+	public void onMobThemeCycleEntity(PlayerInteractEntityEvent event)
+	{
+		Player player = event.getPlayer();
+		if (!isMobThemeItem(player.getItemInHand()) || _maze == null || !GetPlayers(false).contains(player))
+			return;
+		event.setCancelled(true);
+		cycleMobTheme(player);
+	}
+
+	private void cycleMobTheme(Player player)
+	{
 		String selected = _maze.cycleMobThemeForPlayer(player);
 		player.getInventory().setItem(MOB_THEME_SLOT, createMobThemeItem(player));
 		player.playSound(player.getLocation(), Sound.CLICK, 0.8F, 1.2F);
