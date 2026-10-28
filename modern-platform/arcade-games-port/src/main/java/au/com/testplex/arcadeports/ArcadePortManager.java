@@ -1075,7 +1075,7 @@ public final class ArcadePortManager implements Listener {
         return switch (session.type) {
             case BACON_BRAWL -> "knockback x" + String.format(java.util.Locale.ROOT, "%.1f", session.baconKnockback);
             case BOMB_LOBBERS -> "bombs " + inventoryCount(player, Material.TNT);
-            case DEATH_TAG -> "IT " + session.tagged.size() + " | runners "
+            case DEATH_TAG -> "IT " + session.tagged.stream().filter(session.alive::contains).count() + " | runners "
                     + Math.max(0, session.alive.size() - session.tagged.stream().filter(session.alive::contains).count());
             case DRAGON_ESCAPE -> "finish " + Math.max(0, player.getLocation().getBlockZ()) + "/" + (int) ArcadePortRules.DRAGON_ESCAPE_FINISH_Z;
             case DRAGONS -> "dragons " + session.entities.stream().filter(EnderDragon.class::isInstance).count();
@@ -1309,17 +1309,26 @@ public final class ArcadePortManager implements Listener {
             case BOMB_LOBBERS:
                 // Bomb Lobbers uses thrown TNT; melee attacks do not deal hits.
                 break;
-            case DEATH_TAG:
-                if (session.tagged.contains(attacker.getUniqueId())) {
-                    session.tagged.add(target.getUniqueId());
+            case DEATH_TAG: {
+                UUID attackerId = attacker.getUniqueId();
+                UUID targetId = target.getUniqueId();
+                boolean attackerTagged = session.tagged.contains(attackerId);
+                boolean targetTagged = session.tagged.contains(targetId);
+                if (ArcadePortRules.shouldSpreadDeathTag(attackerTagged)) {
+                    session.tagged.add(targetId);
                     target.sendMessage(ChatColor.RED + "Tagged! You are now IT.");
                     attacker.sendMessage(ChatColor.GREEN + "Tag confirmed.");
-                } else if (session.tagged.contains(target.getUniqueId())) {
-                    session.tagged.remove(attacker.getUniqueId());
-                    session.tagged.add(attacker.getUniqueId());
+                    target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 1.0F, 0.8F);
+                } else if (ArcadePortRules.shouldTransferDeathTag(attackerTagged, targetTagged)) {
+                    session.tagged.remove(targetId);
+                    session.tagged.add(attackerId);
+                    attacker.sendMessage(ChatColor.RED + "You are now IT! The tag has transferred.");
+                    target.sendMessage(ChatColor.GREEN + "You escaped the tag!");
+                    attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 1.0F, 1.2F);
                 }
                 checkRoundEnd(session);
                 break;
+            }
             case PAINTBALL:
                 applyPaintballHit(session, attacker, target);
                 break;
