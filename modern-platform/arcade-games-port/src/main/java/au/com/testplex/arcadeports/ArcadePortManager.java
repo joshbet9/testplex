@@ -3026,7 +3026,7 @@ public final class ArcadePortManager implements Listener {
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (active != session || !player.isOnline()
                         || !session.players.containsKey(playerId) || !session.respawning.remove(playerId)) return;
-                Location spawn = spawnFor(session, player);
+                Location spawn = teamSpawnFor(session, player, 4);
                 player.teleport(spawn);
                 player.setGameMode(GameMode.SURVIVAL);
                 player.setHealth(player.getMaxHealth());
@@ -3284,6 +3284,19 @@ public final class ArcadePortManager implements Listener {
                 iterator.remove();
             }
         }
+    }
+
+    /** Keep respawning team players on their own archived team spawns. */
+    private Location teamSpawnFor(Session session, Player player, int teamCount) {
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        int team = session.teams.getOrDefault(player.getUniqueId(), -1);
+        if (mapData != null && team >= 0 && team < teamCount) {
+            List<Location> teamSpawns = mapData.teamSpawnLocationsForTeam(team, teamCount);
+            if (!teamSpawns.isEmpty()) {
+                return teamSpawns.get(ThreadLocalRandom.current().nextInt(teamSpawns.size())).clone();
+            }
+        }
+        return spawnFor(session, player);
     }
 
     private Location spawnFor(Session session, Player player) {
