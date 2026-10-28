@@ -822,7 +822,11 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BACON_BRAWL) updateBaconBrawl(session, now);
         if (session.type == ArcadePortGame.BOMB_LOBBERS) updateBombLobbers(session);
         if (session.type == ArcadePortGame.EVOLUTION) updateEvolutionWebs(session, now);
-        if (session.type == ArcadePortGame.RUNNER) processRunnerBlocks(session, now);
+        if (session.type == ArcadePortGame.RUNNER) {
+            // Reborn marks the whole standing footprint on every game tick, not only on movement events.
+            markRunnerFootprints(session, now);
+            processRunnerBlocks(session, now);
+        }
         if (session.type == ArcadePortGame.DRAGONS && now >= lastDragonHazard) {
             launchDragonHazard(session);
             lastDragonHazard = now + 4_500L;
@@ -1847,21 +1851,42 @@ public final class ArcadePortManager implements Listener {
         Location previous = session.lastLocations.get(player.getUniqueId());
         Location current = event.getTo();
         if (previous == null || current == null || (previous.getBlockX() == current.getBlockX() && previous.getBlockZ() == current.getBlockZ())) return;
-        if (session.type == ArcadePortGame.RUNNER) {
-            int x = previous.getBlockX(), z = previous.getBlockZ();
-            if (Math.abs(x) < HALF_SIZE && Math.abs(z) < HALF_SIZE) {
-                markRunnerBlock(session, session.world.getBlockAt(x, 63, z), System.currentTimeMillis());
-            }
-        } else if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             int crumbleZ = current.getBlockZ() - 5;
             if (crumbleZ > -24 && crumbleZ < 78) for (int x = -3; x <= 3; x++) session.world.getBlockAt(x, 63, crumbleZ).setType(Material.AIR, false);
         }
         session.lastLocations.put(player.getUniqueId(), current.clone());
     }
 
+    private void markRunnerFootprints(Session session, long now) {
+        for (UUID id : new HashSet<>(session.alive)) {
+            Player player = session.players.get(id);
+            if (player == null || !player.isOnline() || player.getWorld() != session.world) continue;
+
+            org.bukkit.util.BoundingBox bounds = player.getBoundingBox();
+            int minX = (int) Math.floor(bounds.getMinX());
+            int maxX = (int) Math.floor(bounds.getMaxX() - 1.0E-6D);
+            int minZ = (int) Math.floor(bounds.getMinZ());
+            int maxZ = (int) Math.floor(bounds.getMaxZ() - 1.0E-6D);
+            // Matches Reborn's player-location minus half a block: while jumping, the sampled block is air.
+            int trailY = (int) Math.floor(player.getLocation().getY() - 0.5D);
+
+            for (int x = minX; x <= maxX; x++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    if (Math.abs(x) > HALF_SIZE || Math.abs(z) > HALF_SIZE) continue;
+                    markRunnerBlock(session, session.world.getBlockAt(x, trailY, z), now);
+                }
+            }
+        }
+    }
+
     private void markRunnerBlock(Session session, Block block, long now) {
-        if (active != session || block == null || block.getY() != 63 || !block.getType().isSolid()
-                || block.getType() == Material.BEDROCK || session.runnerBlocks.containsKey(block)) return;
+        if (active != session || block == null || block.getY() < 0 || block.getY() > 192
+                || Math.abs(block.getX()) > HALF_SIZE || Math.abs(block.getZ()) > HALF_SIZE) return;
+        boolean aboveIsAir = block.getRelative(org.bukkit.block.BlockFace.UP).getType().isAir();
+        if (!ArcadePortRules.shouldMarkRunnerBlock(block.getType().isSolid(),
+                block.getType() == Material.BEDROCK, block.isLiquid(), aboveIsAir,
+                session.runnerBlocks.containsKey(block))) return;
         block.setType(Material.RED_TERRACOTTA, false);
         session.runnerBlocks.put(block, now);
     }
@@ -1876,12 +1901,14 @@ public final class ArcadePortManager implements Listener {
                 continue;
             }
             if (!ArcadePortRules.shouldDropRunnerBlock(now - entry.getValue())) continue;
-            Location fallingLocation = block.getLocation().add(0.5D, 1.0D, 0.5D);
+            Location fallingLocation = block.getLocation().add(0.5D, 0.0D, 0.5D);
             block.setType(Material.AIR, false);
             iterator.remove();
             FallingBlock falling = session.world.spawnFallingBlock(fallingLocation, Material.RED_TERRACOTTA.createBlockData());
             falling.setDropItem(false);
             falling.setHurtEntities(true);
+            // Reborn's projectile helper applies a small upward launch before the block falls.
+            falling.setVelocity(new Vector(0.0D, 0.3D, 0.0D));
             session.entities.add(falling);
         }
     }
@@ -1918,6 +1945,7 @@ public final class ArcadePortManager implements Listener {
 
     private void handleRunnerFallingBlockHit(Session session, FallingBlock falling, Player target) {
         if (active != session || !session.alive.contains(target.getUniqueId())
+                || !ArcadePortRules.shouldRunnerFallingBlockHit(target.getLocation().getY(), falling.getLocation().getY())
                 || !session.entities.remove(falling)) return;
         Location impact = falling.getLocation().clone();
         falling.remove();
@@ -2039,11 +2067,15 @@ public final class ArcadePortManager implements Listener {
                 && arrow.getShooter() instanceof Player shooter && session.alive.contains(shooter.getUniqueId())) {
             Block hit = event.getHitBlock();
             if (hit != null) {
+                // Reborn uses a 2.5-block 3D radius, so wall/floor blocks are eligible if exposed above.
+                long now = System.currentTimeMillis();
                 for (int dx = -2; dx <= 2; dx++) {
-                    for (int dz = -2; dz <= 2; dz++) {
-                        if (dx * dx + dz * dz > 6) continue;
-                        markRunnerBlock(session, session.world.getBlockAt(hit.getX() + dx, 63, hit.getZ() + dz),
-                                System.currentTimeMillis());
+                    for (int dy = -2; dy <= 2; dy++) {
+                        for (int dz = -2; dz <= 2; dz++) {
+                            if (dx * dx + dy * dy + dz * dz > 6.25D) continue;
+                            markRunnerBlock(session, session.world.getBlockAt(
+                                    hit.getX() + dx, hit.getY() + dy, hit.getZ() + dz), now);
+                        }
                     }
                 }
                 arrow.remove();
