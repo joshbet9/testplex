@@ -60,6 +60,10 @@ class SnakeRulesTest {
         assertEquals(1.2D, SnakeRules.SNAKE_TAIL_COLLISION_RADIUS, 0.000001D);
     }
 
+    @Test void tailSegmentsUseTheSourceOneBlockSpacing() {
+        assertEquals(1.0D, SnakeRules.SEGMENT_SPACING, 0.000001D);
+    }
+
     @Test void aNewTailSegmentFollowsTheExistingTailDirection() {
         org.bukkit.util.Vector previous = new org.bukkit.util.Vector(0.0D, 64.0D, 0.0D);
         org.bukkit.util.Vector last = new org.bukkit.util.Vector(1.0D, 64.0D, 0.0D);
