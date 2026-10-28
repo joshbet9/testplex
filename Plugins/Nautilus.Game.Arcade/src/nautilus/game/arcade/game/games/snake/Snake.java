@@ -25,6 +25,9 @@ import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.entity.EntityTargetEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
 import mineplex.core.common.util.C;
@@ -81,33 +84,41 @@ public class Snake extends SoloGame
 
 	// Mario-Kart-style roulette: one temporary steering debuff per player, rerolled during long rounds.
 	private enum ControlDebuff {
-		TURN_LAG("Turn Lag", "Turns take time to catch up with your input."),
-		DRIFT("Drift", "Your snake keeps sliding in its previous direction."),
-		OVERSHOOT("Overshoot", "Sharp turns swing further than intended."),
-		WEAK_SHARP_TURN("Weak Sharp Turning", "Quick, sharp turns are less responsive.");
+		TURN_LAG("Turn Lag", "Turns trail behind your camera input.", Material.WATCH),
+		DRIFT("Drift", "Your snake keeps its momentum through turns.", Material.SLIME_BALL),
+		OVERSHOOT("Overshoot", "Sharp turns swing further than intended.", Material.FIREWORK),
+		WEAK_SHARP_TURN("Weak Sharp Turning", "Quick, sharp turns are less responsive.", Material.SHEARS);
 
 		final String display;
 		final String description;
-		ControlDebuff(String display, String description) {
+		final Material icon;
+		ControlDebuff(String display, String description, Material icon) {
 			this.display = display;
 			this.description = description;
+			this.icon = icon;
 		}
 	}
 	private final HashMap<Player, ControlDebuff> _controlDebuffs = new HashMap<Player, ControlDebuff>();
+	private final HashMap<Player, Long> _controlDebuffUntil = new HashMap<Player, Long>();
+	private final HashMap<Player, Integer> _rouletteHitCount = new HashMap<Player, Integer>();
+	private final HashSet<Player> _rouletteRollsInProgress = new HashSet<Player>();
+	private final HashMap<Player, ItemStack> _rouletteOriginalHotbarItems = new HashMap<Player, ItemStack>();
 	private int _abilityVisualTick;
 	private final HashMap<Player, Float> _lastRawYaw = new HashMap<Player, Float>();
 	private final HashMap<Player, Float> _laggedYaw = new HashMap<Player, Float>();
 	private final HashMap<Player, Vector> _lastTravelDirection = new HashMap<Player, Vector>();
 
-	// Hazards arrive progressively so early Snake play is still readable.
+	// Magma Cubes are physical item-box hazards; each contact starts a player-specific hotbar roll.
 	private final HashSet<MagmaCube> _magmaCubes = new HashSet<MagmaCube>();
 	private long _snakeLiveStartedAt;
 	private long _nextMagmaHazardAt;
-	private long _lastRouletteRound;
 	private int _hazardSteeringTick;
-	private static final long ROULETTE_INTERVAL_MS = 25000L;
-	private static final long FIRST_MAGMA_HAZARD_MS = 45000L;
-	private static final long MAGMA_HAZARD_INTERVAL_MS = 30000L;
+	private static final int ROULETTE_HOTBAR_SLOT = 8;
+	private static final int ROULETTE_ANIMATION_STEPS = 12;
+	private static final int[] ROULETTE_DEBUFF_SECONDS = new int[] {1, 3, 5, 10, 15, 20, 30};
+	private static final double MAX_DRIFT_TURN_RADIANS = Math.toRadians(8.0D);
+	private static final long FIRST_MAGMA_HAZARD_MS = 10000L;
+	private static final long MAGMA_HAZARD_INTERVAL_MS = 15000L;
 	private static final int MAX_MAGMA_HAZARDS = 4;
 
 	public Snake(ArcadeManager manager)
@@ -193,9 +204,12 @@ public class Snake extends SoloGame
 
 		_snakeLiveStartedAt = System.currentTimeMillis();
 		_nextMagmaHazardAt = _snakeLiveStartedAt + FIRST_MAGMA_HAZARD_MS;
-		_lastRouletteRound = 0L;
 		_hazardSteeringTick = 0;
+		restoreAllRouletteHotbarItems();
 		_controlDebuffs.clear();
+		_controlDebuffUntil.clear();
+		_rouletteHitCount.clear();
+		_rouletteRollsInProgress.clear();
 		_lastRawYaw.clear();
 		_laggedYaw.clear();
 		_lastTravelDirection.clear();
@@ -315,30 +329,6 @@ public class Snake extends SoloGame
 			return;
 
 		long now = System.currentTimeMillis();
-		long elapsed = now - _snakeLiveStartedAt;
-		long rouletteRound = elapsed / ROULETTE_INTERVAL_MS;
-		if (rouletteRound > _lastRouletteRound)
-		{
-			_lastRouletteRound = rouletteRound;
-			for (Player player : GetPlayers(true))
-			{
-				ControlDebuff previous = _controlDebuffs.get(player);
-				ControlDebuff[] all = ControlDebuff.values();
-				ControlDebuff next = all[(int) (Math.random() * all.length)];
-				if (previous != null && all.length > 1)
-				{
-					while (next == previous) next = all[(int) (Math.random() * all.length)];
-				}
-				_controlDebuffs.put(player, next);
-				_laggedYaw.put(player, Float.valueOf(player.getLocation().getYaw()));
-				_lastRawYaw.put(player, Float.valueOf(player.getLocation().getYaw()));
-				_lastTravelDirection.remove(player);
-				player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "SNAKE ROULETTE! "
-						+ ChatColor.LIGHT_PURPLE + next.display + ChatColor.GRAY + " — " + next.description);
-				player.playSound(player.getLocation(), Sound.NOTE_PLING, 1.0f, 1.35f);
-			}
-		}
-
 		if (now >= _nextMagmaHazardAt && _magmaCubes.size() < MAX_MAGMA_HAZARDS)
 		{
 			boolean spawned = spawnMagmaCubeHazard();
@@ -400,15 +390,19 @@ public class Snake extends SoloGame
 		if (debuff == ControlDebuff.DRIFT)
 		{
 			Vector previous = _lastTravelDirection.get(player);
-			Vector blended = previous == null
-					? current.clone()
-					: current.clone().multiply(0.62).add(previous.clone().multiply(0.38));
-			if (blended.lengthSquared() < 1.0e-6) blended = current.clone();
-			blended.normalize();
-			// Keep the blended heading as the next tick's momentum. Saving the raw
-			// camera direction here made Drift last for only one tick.
-			_lastTravelDirection.put(player, blended.clone());
-			return blended;
+			if (previous == null || previous.lengthSquared() < 1.0e-6)
+				previous = current.clone();
+			previous.normalize();
+			// Drift is inertia, not a tiny blend with camera heading. Limit the snake's
+			// heading change each tick while still allowing the player to steer.
+			double previousAngle = Math.atan2(previous.getZ(), previous.getX());
+			double requestedAngle = Math.atan2(current.getZ(), current.getX());
+			double delta = wrapRadians(requestedAngle - previousAngle);
+			delta = Math.max(-MAX_DRIFT_TURN_RADIANS, Math.min(MAX_DRIFT_TURN_RADIANS, delta));
+			double driftAngle = previousAngle + delta;
+			Vector drifting = new Vector(Math.cos(driftAngle), 0.0D, Math.sin(driftAngle)).normalize();
+			_lastTravelDirection.put(player, drifting.clone());
+			return drifting;
 		}
 		return current;
 	}
@@ -423,6 +417,13 @@ public class Snake extends SoloGame
 	private float clamp(float value, float min, float max)
 	{
 		return Math.max(min, Math.min(max, value));
+	}
+
+	private double wrapRadians(double angle)
+	{
+		while (angle <= -Math.PI) angle += Math.PI * 2.0D;
+		while (angle > Math.PI) angle -= Math.PI * 2.0D;
+		return angle;
 	}
 
 	/**
@@ -455,14 +456,20 @@ public class Snake extends SoloGame
 		}
 
 		MagmaCube cube;
+		boolean previousCreatureOverride = CreatureAllowOverride;
 		try
 		{
+			CreatureAllowOverride = true;
 			cube = spawn.getWorld().spawn(spawn, MagmaCube.class);
 		}
 		catch (RuntimeException ex)
 		{
 			Manager.getPlugin().getLogger().warning("[Snake] Magma Cube spawn failed: " + ex.getMessage());
 			return false;
+		}
+		finally
+		{
+			CreatureAllowOverride = previousCreatureOverride;
 		}
 		if (cube == null || !cube.isValid() || cube.isDead())
 		{
@@ -511,6 +518,10 @@ public class Snake extends SoloGame
 
 			int blockX = (int) Math.floor(x);
 			int blockZ = (int) Math.floor(z);
+			// Load the chunk before inspecting blocks; otherwise valid, unloaded floor
+			// tiles can look like failed spawn locations.
+			if (!world.isChunkLoaded(blockX >> 4, blockZ >> 4))
+				world.getChunkAt(blockX >> 4, blockZ >> 4).load();
 			int minY = Math.max(1, baseY - 7);
 			int maxY = Math.min(world.getMaxHeight() - 4, baseY + 3);
 			for (int y = maxY; y >= minY; y--)
@@ -564,9 +575,9 @@ public class Snake extends SoloGame
 					nearestDistance = distance;
 					nearest = player;
 				}
-				if (distance < 1.65 && !_invul.containsKey(player))
+				if (distance < 2.1D)
 				{
-					KillPlayer(player, null, "Magma Cube");
+					beginMagmaRoulette(player);
 					cube.remove();
 					iterator.remove();
 					nearest = null;
@@ -594,6 +605,122 @@ public class Snake extends SoloGame
 			if (cube != null && cube.isValid()) cube.remove();
 		}
 		_magmaCubes.clear();
+	}
+
+	/** Starts a Mario-Kart-style item roll when a player touches a Magma Cube. */
+	private void beginMagmaRoulette(final Player player)
+	{
+		if (player == null || !player.isOnline() || !IsAlive(player) || !_tail.containsKey(player)
+				|| _rouletteRollsInProgress.contains(player))
+			return;
+
+		final ControlDebuff[] outcomes = ControlDebuff.values();
+		final ControlDebuff result = outcomes[(int) (Math.random() * outcomes.length)];
+		Integer oldCount = _rouletteHitCount.get(player);
+		final int hitCount = (oldCount == null ? 0 : oldCount.intValue()) + 1;
+		_rouletteHitCount.put(player, Integer.valueOf(hitCount));
+		final int durationSeconds = ROULETTE_DEBUFF_SECONDS[Math.min(hitCount - 1, ROULETTE_DEBUFF_SECONDS.length - 1)];
+
+		ItemStack current = player.getInventory().getItem(ROULETTE_HOTBAR_SLOT);
+		_rouletteOriginalHotbarItems.put(player, current == null ? null : current.clone());
+		_rouletteRollsInProgress.add(player);
+		player.playSound(player.getLocation(), Sound.NOTE_PLING, 1.0F, 1.2F);
+
+		new BukkitRunnable()
+		{
+			private int step;
+
+			@Override
+			public void run()
+			{
+				if (!IsLive() || !player.isOnline() || !IsAlive(player)
+						|| !_rouletteRollsInProgress.contains(player))
+				{
+					restoreRouletteHotbarItem(player);
+					cancel();
+					return;
+				}
+
+				if (step < ROULETTE_ANIMATION_STEPS)
+				{
+					ControlDebuff preview = outcomes[(step + (int) (Math.random() * outcomes.length)) % outcomes.length];
+					player.getInventory().setItem(ROULETTE_HOTBAR_SLOT, rouletteItem(preview));
+					player.updateInventory();
+					step++;
+					return;
+				}
+
+				restoreRouletteHotbarItem(player);
+				_controlDebuffs.put(player, result);
+				_controlDebuffUntil.put(player, Long.valueOf(System.currentTimeMillis() + durationSeconds * 1000L));
+				float yaw = player.getLocation().getYaw();
+				_lastRawYaw.put(player, Float.valueOf(yaw));
+				_laggedYaw.put(player, Float.valueOf(yaw));
+				Vector initialDirection = player.getLocation().getDirection().setY(0);
+				if (initialDirection.lengthSquared() < 1.0e-6)
+					initialDirection = new Vector(0, 0, 1);
+				_lastTravelDirection.put(player, initialDirection.normalize());
+				player.sendMessage(ChatColor.RED + "" + ChatColor.BOLD + "ITEM ROULETTE! "
+						+ ChatColor.LIGHT_PURPLE + result.display + ChatColor.GRAY + " for "
+						+ ChatColor.YELLOW + durationSeconds + "s" + ChatColor.GRAY + " — " + result.description);
+				player.playSound(player.getLocation(), Sound.NOTE_PLING, 1.0F, 1.8F);
+				cancel();
+			}
+		}.runTaskTimer(Manager.GetPlugin(), 0L, 2L);
+	}
+
+	private ItemStack rouletteItem(ControlDebuff effect)
+	{
+		ItemStack item = new ItemStack(effect.icon, 1);
+		ItemMeta meta = item.getItemMeta();
+		if (meta != null)
+		{
+			meta.setDisplayName(ChatColor.LIGHT_PURPLE + effect.display);
+			item.setItemMeta(meta);
+		}
+		return item;
+	}
+
+	private void restoreRouletteHotbarItem(Player player)
+	{
+		if (player == null || !_rouletteOriginalHotbarItems.containsKey(player))
+			return;
+		ItemStack original = _rouletteOriginalHotbarItems.remove(player);
+		if (player.isOnline())
+		{
+			player.getInventory().setItem(ROULETTE_HOTBAR_SLOT, original == null ? null : original.clone());
+			player.updateInventory();
+		}
+		_rouletteRollsInProgress.remove(player);
+	}
+
+	private void restoreAllRouletteHotbarItems()
+	{
+		for (Player player : new ArrayList<Player>(_rouletteOriginalHotbarItems.keySet()))
+			restoreRouletteHotbarItem(player);
+	}
+
+	/** Expire each debuff independently; hits escalate through 1, 3, 5, 10 seconds and beyond. */
+	@EventHandler
+	public void ExpireRouletteDebuffs(UpdateEvent event)
+	{
+		if (event.getType() != UpdateType.TICK || _controlDebuffUntil.isEmpty())
+			return;
+		long now = System.currentTimeMillis();
+		Iterator<java.util.Map.Entry<Player, Long>> iterator = _controlDebuffUntil.entrySet().iterator();
+		while (iterator.hasNext())
+		{
+			java.util.Map.Entry<Player, Long> entry = iterator.next();
+			Player player = entry.getKey();
+			if (player == null || !player.isOnline() || now < entry.getValue().longValue())
+				continue;
+			iterator.remove();
+			_controlDebuffs.remove(player);
+			_laggedYaw.remove(player);
+			_lastRawYaw.put(player, Float.valueOf(player.getLocation().getYaw()));
+			_lastTravelDirection.remove(player);
+			player.sendMessage(ChatColor.GREEN + "Snake steering effect expired.");
+		}
 	}
 
 	@EventHandler
@@ -707,25 +834,70 @@ public class Snake extends SoloGame
 		if (event.getType() != UpdateType.SEC)
 			return;
 
-		Location loc = GetTeamList().get(0).GetSpawns().get(UtilMath.r(GetTeamList().get(0).GetSpawns().size()));
-
-		loc.setX(-48 + UtilMath.r(97));
-		loc.setZ(-48 + UtilMath.r(97));
-
-		if (!UtilBlock.airFoliage(loc.getBlock()))
+		if (GetTeamList().isEmpty() || GetTeamList().get(0).GetSpawns().isEmpty())
+			return;
+		Location origin = GetTeamList().get(0).GetSpawns().get(0).clone();
+		Location loc = findFoodSpawnLocation(origin);
+		if (loc == null)
 			return;
 
-		if (UtilMath.offset(loc, this.GetSpectatorLocation()) > 48)
+		// Preserve normal green slime food. Clone the start position rather than
+		// mutating the game's actual spawn coordinates when randomising X/Z.
+		Slime slime;
+		boolean previousCreatureOverride = CreatureAllowOverride;
+		try
+		{
+			CreatureAllowOverride = true;
+			slime = loc.getWorld().spawn(loc, Slime.class);
+		}
+		catch (RuntimeException ex)
+		{
+			Manager.getPlugin().getLogger().warning("[Snake] Green slime spawn failed: " + ex.getMessage());
 			return;
+		}
+		finally
+		{
+			CreatureAllowOverride = previousCreatureOverride;
+		}
+		if (slime == null || !slime.isValid() || slime.isDead())
+		{
+			if (slime != null && slime.isValid()) slime.remove();
+			return;
+		}
+		slime.setSize(2);
+		slime.setRemoveWhenFarAway(false);
+		UtilEnt.vegetate(slime);
+		_food.add(slime);
+	}
 
-		//Spawn
-		this.CreatureAllowOverride = true;
-		Slime pig = loc.getWorld().spawn(loc, Slime.class);
-		this.CreatureAllowOverride = false;
-		pig.setSize(2);
-		UtilEnt.vegetate(pig);
+	/** Find a real floor tile inside the Snake arena bounds for food slimes. */
+	private Location findFoodSpawnLocation(Location origin)
+	{
+		if (origin == null || origin.getWorld() == null)
+			return null;
+		org.bukkit.World world = origin.getWorld();
+		int baseY = origin.getBlockY();
+		for (int attempt = 0; attempt < 36; attempt++)
+		{
+			double angle = Math.random() * Math.PI * 2.0D;
+			double distance = Math.sqrt(Math.random()) * 46.0D;
+			int blockX = origin.getBlockX() + (int) Math.round(Math.cos(angle) * distance);
+			int blockZ = origin.getBlockZ() + (int) Math.round(Math.sin(angle) * distance);
+			if (!world.isChunkLoaded(blockX >> 4, blockZ >> 4))
+				world.getChunkAt(blockX >> 4, blockZ >> 4).load();
 
-		_food.add(pig);
+			int minY = Math.max(1, baseY - 8);
+			int maxY = Math.min(world.getMaxHeight() - 3, baseY + 4);
+			for (int y = maxY; y >= minY; y--)
+			{
+				org.bukkit.block.Block ground = world.getBlockAt(blockX, y - 1, blockZ);
+				org.bukkit.block.Block feet = world.getBlockAt(blockX, y, blockZ);
+				org.bukkit.block.Block head = world.getBlockAt(blockX, y + 1, blockZ);
+				if (ground.getType().isSolid() && feet.getType() == Material.AIR && head.getType() == Material.AIR)
+					return new Location(world, blockX + 0.5D, y, blockZ + 0.5D);
+			}
+		}
+		return null;
 	}
 
 	@EventHandler
@@ -1087,7 +1259,10 @@ public class Snake extends SoloGame
 	{
 		if (event.GetState() == GameState.Dead)
 		{
+			restoreAllRouletteHotbarItems();
 			_tail.clear();
+			for (Entity food : _food)
+				if (food != null && food.isValid()) food.remove();
 			_food.clear();
 			_color.clear();
 			_invul.clear();
@@ -1096,12 +1271,14 @@ public class Snake extends SoloGame
 			_move.clear();
 			_moveTime.clear();
 			_controlDebuffs.clear();
+			_controlDebuffUntil.clear();
+			_rouletteHitCount.clear();
+			_rouletteRollsInProgress.clear();
 			_lastRawYaw.clear();
 			_laggedYaw.clear();
 			_lastTravelDirection.clear();
 			_snakeLiveStartedAt = 0L;
 			_nextMagmaHazardAt = 0L;
-			_lastRouletteRound = 0L;
 			removeMagmaCubes();
 
 			HandlerList.unregisterAll(this);
