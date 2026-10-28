@@ -635,6 +635,15 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldFinishDeathTagRound(0, 2));
     }
 
+    @Test void bombLobbersTntOnlyDamagesAssignedEnemyTeams() {
+        assertFalse(ArcadePortRules.areBombLobbersEnemies(0, 0));
+        assertFalse(ArcadePortRules.areBombLobbersEnemies(1, 1));
+        assertTrue(ArcadePortRules.areBombLobbersEnemies(0, 1));
+        assertTrue(ArcadePortRules.areBombLobbersEnemies(1, 0));
+        assertFalse(ArcadePortRules.areBombLobbersEnemies(-1, 1));
+        assertFalse(ArcadePortRules.areBombLobbersEnemies(0, -1));
+    }
+
     @Test void bombLobbersDamageRespectsLegacyDamageDependentArmorReduction() {
         assertEquals(10.0D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 0.0D), 0.00001D);
         assertEquals(9.2D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 7.0D), 0.00001D);
