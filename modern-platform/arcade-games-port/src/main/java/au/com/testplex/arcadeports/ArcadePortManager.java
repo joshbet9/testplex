@@ -1847,7 +1847,7 @@ public final class ArcadePortManager implements Listener {
                     announce(session, ChatColor.GOLD + "Sheep Quest is tied! First team to take the lead will win.");
                 }
             } else {
-                finish(session, topScorerOrLastAlive(session), true);
+                finish(session, timeoutWinner(session), true);
                 return;
             }
         }
@@ -3381,6 +3381,64 @@ public final class ArcadePortManager implements Listener {
             if (p != null && p.isOnline()) players.add(p);
         }
         return players;
+    }
+
+    /**
+     * Resolve time-limit winners using each game's actual objective. In team
+     * modes, a personal high score must not announce a losing team as winner.
+     */
+    private Player timeoutWinner(Session session) {
+        int team = -1;
+        if (session.type == ArcadePortGame.TURF_WARS) {
+            team = ArcadePortRules.turfWarsTimeoutLeader(
+                    session.turfFrontlineX, timeoutTeamKills(session, 0), timeoutTeamKills(session, 1));
+        } else if (session.type == ArcadePortGame.MICRO_BATTLES
+                || session.type == ArcadePortGame.PAINTBALL
+                || session.type == ArcadePortGame.BOMB_LOBBERS) {
+            int teamZeroAlive = (int) session.alive.stream()
+                    .filter(id -> session.teams.getOrDefault(id, -1) == 0).count();
+            int teamOneAlive = (int) session.alive.stream()
+                    .filter(id -> session.teams.getOrDefault(id, -1) == 1).count();
+            team = ArcadePortRules.teamWithBestTimeoutStanding(
+                    teamZeroAlive, teamOneAlive, timeoutTeamKills(session, 0), timeoutTeamKills(session, 1));
+        }
+        return team < 0 ? topScorerOrLastAlive(session) : bestTimeoutPlayerOnTeam(session, team);
+    }
+
+    private int timeoutTeamKills(Session session, int team) {
+        int total = 0;
+        for (Map.Entry<UUID, Integer> entry : session.scores.entrySet()) {
+            if (session.teams.getOrDefault(entry.getKey(), -1) == team) total += entry.getValue();
+        }
+        return total;
+    }
+
+    private Player bestTimeoutPlayerOnTeam(Session session, int team) {
+        Player best = null;
+        int bestScore = Integer.MIN_VALUE;
+        // Prefer a living member of the winning team so the announced winner
+        // is still in the round; use a surviving participant only as fallback.
+        for (UUID id : session.alive) {
+            if (session.teams.getOrDefault(id, -1) != team) continue;
+            Player candidate = session.players.get(id);
+            if (candidate != null && candidate.isOnline()
+                    && session.scores.getOrDefault(id, 0) > bestScore) {
+                best = candidate;
+                bestScore = session.scores.getOrDefault(id, 0);
+            }
+        }
+        if (best != null) return best;
+        for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
+            UUID id = entry.getKey();
+            Player candidate = entry.getValue();
+            if (session.teams.getOrDefault(id, -1) != team || candidate == null || !candidate.isOnline()) continue;
+            int score = session.scores.getOrDefault(id, 0);
+            if (score > bestScore) {
+                best = candidate;
+                bestScore = score;
+            }
+        }
+        return best;
     }
 
     private Player topScorerOrLastAlive(Session session) {
