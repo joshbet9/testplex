@@ -14,6 +14,8 @@ public final class ArcadePortRules {
     public static final double DRAGON_ESCAPE_FINISH_Z = 77.5D;
     public static final double DRAGON_ESCAPE_CHASE_SPEED = 0.2D;
     public static final double DRAGON_ESCAPE_BLOCK_RADIUS = 10.0D;
+    /** Only discard effectively coincident markers; close BLACK markers are valid route steps. */
+    public static final double DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE = 0.75D;
     public static final long RUNNER_BLOCK_DECAY_MILLIS = 600L;
     public static final long RUNNER_BLOCK_LIFETIME_MILLIS = 1_200L;
     public static final long RUNNER_LEAP_COOLDOWN_MILLIS = 8_000L;
@@ -467,6 +469,11 @@ public final class ArcadePortRules {
     }
 
     /** Reborn kills runners once Douglas's route progress has overtaken theirs. */
+    public static boolean isDuplicateDragonEscapeWaypoint(double distance) {
+        return Double.isFinite(distance) && distance >= 0.0D
+                && distance < DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE;
+    }
+
     public static boolean shouldDragonEscapePlayerBeCaught(double dragonProgress, double playerProgress) {
         return dragonProgress > playerProgress;
     }
