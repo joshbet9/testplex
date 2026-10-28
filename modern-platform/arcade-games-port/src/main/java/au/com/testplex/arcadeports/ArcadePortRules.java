@@ -86,6 +86,11 @@ public final class ArcadePortRules {
         };
     }
 
+    /** A Disruptor mine starts its own recharge window when it is thrown. */
+    public static long dragonEscapeNextTntChargeAt(long thrownAtMillis) {
+        return thrownAtMillis + DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS;
+    }
+
     public static int dragonEscapeLeapUses(String kit) {
         return switch (normalizeDragonEscapeKit(kit) == null ? "" : normalizeDragonEscapeKit(kit)) {
             case "jumper" -> 4;
