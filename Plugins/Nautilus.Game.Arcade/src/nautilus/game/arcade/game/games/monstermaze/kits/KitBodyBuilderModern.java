@@ -7,8 +7,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import net.md_5.bungee.api.ChatMessageType;
-import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.chat.BaseComponent;
+import net.md_5.bungee.chat.ComponentSerializer;
+import net.minecraft.server.v1_8_R3.IChatBaseComponent;
+import net.minecraft.server.v1_8_R3.PacketPlayOutChat;
+import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -146,7 +149,9 @@ public class KitBodyBuilderModern extends KitBodyBuilder
 
     private void sendActionBar(Player player, String message)
     {
-        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(message));
+        BaseComponent[] components = TextComponent.fromLegacyText(message);
+        IChatBaseComponent packetText = IChatBaseComponent.ChatSerializer.a(ComponentSerializer.toString(components));
+        ((CraftPlayer) player).getHandle().playerConnection.sendPacket(new PacketPlayOutChat(packetText, (byte) 2));
     }
 
     public boolean isBodyRushActive(Player player)
