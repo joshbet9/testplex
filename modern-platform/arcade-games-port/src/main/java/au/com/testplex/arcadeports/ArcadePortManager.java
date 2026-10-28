@@ -1312,6 +1312,21 @@ public final class ArcadePortManager implements Listener {
         session.quiverArrowBounces.put(rebound.getUniqueId(), 0);
     }
 
+    private Location microCrumbleSpectatorLocation(Session session, SourceMapCatalog.MapData mapData) {
+        if (mapData != null) {
+            List<Location> markers = mapData.customLocations("SPECTATOR");
+            if (markers.isEmpty()) markers = mapData.dataLocations("SPECTATOR");
+            if (!markers.isEmpty()) return markers.get(0).clone();
+            if (mapData.hasBounds()) {
+                double y = mapData.hasVerticalBounds()
+                        ? Math.max(mapData.minY() + 8.0D, mapData.maxY() - 5.0D)
+                        : session.world.getSpawnLocation().getY() + 10.0D;
+                return new Location(session.world, mapData.centerX(), y, mapData.centerZ());
+            }
+        }
+        return session.world.getSpawnLocation().clone().add(0.0D, 10.0D, 0.0D);
+    }
+
     private void updateMicroCrumble(Session session, long now) {
         if (active != session || session.type != ArcadePortGame.MICRO_BATTLES) return;
 
@@ -1337,8 +1352,9 @@ public final class ArcadePortManager implements Listener {
         // prioritising blocks furthest from the map's spectator/centre location.
         if (now - session.startedAt < 1_000L || session.microCrumbleBlocks.isEmpty()) return;
         SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
-        double centerX = mapData == null ? 0.0D : mapData.centerX();
-        double centerZ = mapData == null ? 0.0D : mapData.centerZ();
+        Location spectatorCenter = microCrumbleSpectatorLocation(session, mapData);
+        double centerX = spectatorCenter.getX();
+        double centerZ = spectatorCenter.getZ();
         for (int i = 0; i < ArcadePortRules.MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK; i++) {
             Block best = null;
             double farthest = -1.0D;
@@ -1353,16 +1369,17 @@ public final class ArcadePortManager implements Listener {
             }
             if (best == null) break;
 
-            int minimumY = Math.max(0, session.microCrumbleMinY);
-            while (best.getY() > minimumY && !best.getRelative(0, -1, 0).getType().isAir()) {
-                best = best.getRelative(0, -1, 0);
+            while (best.getY() > session.world.getMinHeight()
+                    && !best.getRelative(BlockFace.DOWN).getType().isAir()) {
+                best = best.getRelative(BlockFace.DOWN);
             }
             session.microCrumbleBlocks.remove(best);
-            if (best.getType().isAir()) continue;
+            if (best.getWorld() != spectatorCenter.getWorld() || best.getType().isAir()) continue;
 
-            String materialName = best.getType().name();
-            if (materialName.endsWith("_DOOR")) best.getRelative(0, 1, 0).setType(Material.AIR, false);
-            if (ThreadLocalRandom.current().nextDouble() > 0.95D) {
+            Material material = best.getType();
+            if (material == Material.OAK_DOOR || material == Material.IRON_DOOR) {
+                best.getRelative(BlockFace.UP).setType(Material.AIR, false);
+            } else if (ThreadLocalRandom.current().nextDouble() > 0.95D) {
                 FallingBlock falling = session.world.spawnFallingBlock(
                         best.getLocation().add(0.5D, 0.5D, 0.5D), best.getBlockData());
                 falling.setDropItem(false);
