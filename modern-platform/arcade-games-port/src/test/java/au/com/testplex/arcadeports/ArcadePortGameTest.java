@@ -628,6 +628,13 @@ class ArcadePortGameTest {
         assertEquals(1.0D, ArcadePortRules.deathTagKnockbackMultiplier(false));
     }
 
+    @Test void deathTagOnlyChasersSpreadTheTagToRunners() {
+        assertTrue(ArcadePortRules.shouldSpreadDeathTag(true, false));
+        assertFalse(ArcadePortRules.shouldSpreadDeathTag(false, true));
+        assertFalse(ArcadePortRules.shouldSpreadDeathTag(false, false));
+        assertFalse(ArcadePortRules.shouldSpreadDeathTag(true, true));
+    }
+
     @Test void deathTagRunnersGainSpeedOnlyWhenChasersExceedOneQuarterOfPlayers() {
         assertFalse(ArcadePortRules.deathTagRunnersReceiveSpeed(1, 4));
         assertTrue(ArcadePortRules.deathTagRunnersReceiveSpeed(2, 6));
