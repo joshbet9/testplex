@@ -7,6 +7,7 @@ import java.util.Locale;
 import java.util.Set;
 
 import mineplex.core.customdata.CustomDataManager;
+import mineplex.core.game.GameDisplay;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -118,6 +119,38 @@ public final class MonsterMazePersonalBestManager
                 });
             }
         });
+    }
+
+    /**
+     * A player with no recorded PB in any native mode/pattern/kit has not yet made
+     * measurable progress on this Testplex Monster Maze installation; show tutorial cues.
+     */
+    public static boolean hasAnyPersonalBest(MonsterMaze game, Player player)
+    {
+        if (game == null || player == null)
+            return false;
+        CustomDataManager customData = game.Manager.getCustomDataManager();
+        if (customData == null)
+            return false;
+
+        GameDisplay[] displays = new GameDisplay[] {
+                GameDisplay.MonsterMaze, GameDisplay.MonsterMazeSpeed, GameDisplay.MonsterMazeModern};
+        String[] kits = new String[] {"Jumper", "Slowballer", "Body Builder", "Repulsor", "Maverick"};
+        for (GameDisplay display : displays)
+        {
+            String prefix = display.getCustomDataKeyName();
+            for (int pattern = 1; pattern <= 3; pattern++)
+            {
+                for (String kit : kits)
+                {
+                    int stage = customData.getData(player,
+                            prefix + "pb.pattern" + pattern + "." + slug(kit));
+                    if (stage > 0)
+                        return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
