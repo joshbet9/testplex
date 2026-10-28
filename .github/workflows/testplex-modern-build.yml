@@ -1,0 +1,71 @@
+name: Testplex Modern Paper 26.3
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "modern-platform/**"
+      - ".github/workflows/testplex-modern-build.yml"
+  pull_request:
+    paths:
+      - "modern-platform/**"
+      - ".github/workflows/testplex-modern-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-modern-arcade:
+    name: Build and test Paper 26.3 plugin
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: modern-platform/pom.xml
+
+      - name: Build and run catalogue tests
+        run: mvn --batch-mode --no-transfer-progress -f modern-platform/pom.xml clean verify
+
+      - name: Verify plugin metadata and packaged classes
+        shell: bash
+        run: |
+          set -euo pipefail
+          jar_file="modern-platform/target/TestplexModernArcade.jar"
+          test -s "$jar_file"
+          jar tf "$jar_file" | grep -Fxq "plugin.yml"
+          jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/TestplexModernArcade.class"
+          jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/model/ArcadeCatalog.class"
+          unzip -p "$jar_file" plugin.yml | grep -Fxq "api-version: '26.3'"
+          echo "Modern Paper 26.3 plugin artifact verified."
+
+      - name: Upload modern plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: testplex-modern-paper-26.3
+          path: modern-platform/target/TestplexModernArcade.jar
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write build summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Testplex Modern Paper 26.3"
+            echo
+            echo "- Runtime/API baseline: Java 25 / Paper 26.3"
+            echo "- Separate from legacy Java 8 build and deployment"
+            echo "- Catalogue: 16 Arcade games"
+            echo "- Initial mechanics targets: Monster Maze and Snake"
+            echo "- Server deploy: intentionally not performed by this workflow"
+          } >> "$GITHUB_STEP_SUMMARY"
