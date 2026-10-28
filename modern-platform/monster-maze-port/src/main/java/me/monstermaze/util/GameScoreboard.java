@@ -212,8 +212,10 @@ public class GameScoreboard {
     }
     public void clear(List<Player> players) {
         Scoreboard main = Bukkit.getScoreboardManager().getMainScoreboard();
+        if (players == null) return;
         for (Player p : players) {
-            p.setScoreboard(main);
+            if (p == null) continue;
+            if (p.isOnline()) p.setScoreboard(main);
             boards.remove(p.getUniqueId());
             layoutPlayerCounts.remove(p.getUniqueId());
         }
