@@ -57,6 +57,14 @@ public final class ArcadePortRules {
         if (blueSheep > redSheep) return 1;
         return -1;
     }
+    public static final int SHEEP_QUEST_INITIAL_SHEEP = 4;
+    public static final int SHEEP_QUEST_MAX_CARRY = 3;
+    public static final long SHEEP_QUEST_SPAWN_INTERVAL_MILLIS = 20_000L;
+
+    public static boolean canCarryAnotherSheep(int carriedCount) {
+        return carriedCount >= 0 && carriedCount < SHEEP_QUEST_MAX_CARRY;
+    }
+
 
     public static int paintballPiecesAfterHit(int remainingPieces, int paintAmount) {
         return Math.max(0, Math.max(0, remainingPieces) - Math.max(0, paintAmount));
