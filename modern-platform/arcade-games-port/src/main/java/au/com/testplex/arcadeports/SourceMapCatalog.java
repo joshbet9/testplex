@@ -93,6 +93,8 @@ public final class SourceMapCatalog {
         if (!Files.isRegularFile(config)) return null;
         MapData data = new MapData();
         String currentTeam = "Unassigned";
+        String currentDataName = "Unassigned";
+        String currentCustomName = "Unassigned";
         try {
             for (String line : Files.readAllLines(config, StandardCharsets.UTF_8)) {
                 int colon = line.indexOf(':');
@@ -109,21 +111,11 @@ public final class SourceMapCatalog {
                         currentTeam = value.isEmpty() ? "Unassigned" : value;
                         data.teamSpawns.computeIfAbsent(currentTeam, ignored -> new ArrayList<>());
                     }
-                    case "TEAM_SPAWNS" -> {
-                        List<Location> team = data.teamSpawns.computeIfAbsent(currentTeam, ignored -> new ArrayList<>());
-                        for (String token : value.split(":")) {
-                            String[] coords = token.trim().split(",");
-                            if (coords.length < 3) continue;
-                            try {
-                                double x = Double.parseDouble(coords[0].trim()) + 0.5D;
-                                double y = Double.parseDouble(coords[1].trim());
-                                double z = Double.parseDouble(coords[2].trim()) + 0.5D;
-                                team.add(new Location(world, x, y, z));
-                            } catch (NumberFormatException ignored) {
-                                // Skip malformed individual markers and keep the rest of this map.
-                            }
-                        }
-                    }
+                    case "TEAM_SPAWNS" -> data.addLocations(world, data.teamSpawns, currentTeam, value, true);
+                    case "DATA_NAME" -> currentDataName = value.isEmpty() ? "Unassigned" : value;
+                    case "DATA_LOCS" -> data.addLocations(world, data.dataLocations, currentDataName, value, false);
+                    case "CUSTOM_NAME" -> currentCustomName = value.isEmpty() ? "Unassigned" : value;
+                    case "CUSTOM_LOCS" -> data.addLocations(world, data.customLocations, currentCustomName, value, false);
                     default -> { }
                 }
             }
@@ -143,6 +135,27 @@ public final class SourceMapCatalog {
         private boolean hasMinX, hasMaxX, hasMinZ, hasMaxZ;
         private int minX = -40, maxX = 40, minZ = -40, maxZ = 40;
         private final Map<String, List<Location>> teamSpawns = new LinkedHashMap<>();
+        private final Map<String, List<Location>> dataLocations = new LinkedHashMap<>();
+        private final Map<String, List<Location>> customLocations = new LinkedHashMap<>();
+
+        private void addLocations(World world, Map<String, List<Location>> target, String name,
+                String encoded, boolean centerBlock) {
+            List<Location> locations = target.computeIfAbsent(name.toUpperCase(java.util.Locale.ROOT),
+                    ignored -> new ArrayList<>());
+            for (String token : encoded.split(":")) {
+                String[] coordinates = token.trim().split(",");
+                if (coordinates.length < 3) continue;
+                try {
+                    double x = Double.parseDouble(coordinates[0].trim());
+                    double y = Double.parseDouble(coordinates[1].trim());
+                    double z = Double.parseDouble(coordinates[2].trim());
+                    locations.add(new Location(world, x + (centerBlock ? 0.5D : 0.0D), y,
+                            z + (centerBlock ? 0.5D : 0.0D)));
+                } catch (NumberFormatException ignored) {
+                    // Ignore malformed marker coordinates only.
+                }
+            }
+        }
 
         public String mapName() { return mapName; }
         public boolean hasBounds() { return hasMinX && hasMaxX && hasMinZ && hasMaxZ; }
@@ -184,6 +197,15 @@ public final class SourceMapCatalog {
             return Math.floorMod(spawnIndex, teams);
         }
 
+        public List<Location> dataLocations(String name) {
+            return copyLocations(dataLocations.get(name == null ? "" : name.toUpperCase(java.util.Locale.ROOT)));
+        }
+        public List<Location> customLocations(String name) {
+            return copyLocations(customLocations.get(name == null ? "" : name.toUpperCase(java.util.Locale.ROOT)));
+        }
+        private List<Location> copyLocations(List<Location> values) {
+            return values == null ? new ArrayList<>() : new ArrayList<>(values);
+        }
         public Map<String, List<Location>> teamSpawns() { return Map.copyOf(teamSpawns); }
     }
 }

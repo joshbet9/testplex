@@ -95,6 +95,11 @@ class ArcadePortGameTest {
         assertEquals(1, ArcadePortRules.requiredDeathTagChasers(-1L));
     }
 
+    @Test void dragonEscapeMapMarkerQueriesAreNormalised() {
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGON_ESCAPE));
+        assertEquals("maps/dragon-escape.zip", SourceMapCatalog.resourceFor(ArcadePortGame.DRAGON_ESCAPE));
+    }
+
     @Test void originalMapCatalogEmbedsThirteenSourceWorldsAndLeavesEvolutionExplicitlyUnmapped() {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BACON_BRAWL));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BOMB_LOBBERS));
