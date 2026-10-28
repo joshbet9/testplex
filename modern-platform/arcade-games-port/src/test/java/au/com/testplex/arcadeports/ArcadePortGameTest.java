@@ -108,6 +108,13 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldFinishWhenNobodyIsAlive(0, 0));
     }
 
+    @Test void deathTagTimeoutPrefersAnySurvivingRunner() {
+        assertTrue(ArcadePortRules.shouldDeathTagRunnerWinTimeout(1));
+        assertTrue(ArcadePortRules.shouldDeathTagRunnerWinTimeout(4));
+        assertFalse(ArcadePortRules.shouldDeathTagRunnerWinTimeout(0));
+        assertFalse(ArcadePortRules.shouldDeathTagRunnerWinTimeout(-1));
+    }
+
     @Test void deathTagAddsAChaserEveryThirtySeconds() {
         assertEquals(1, ArcadePortRules.requiredDeathTagChasers(0L));
         assertEquals(1, ArcadePortRules.requiredDeathTagChasers(29_999L));
