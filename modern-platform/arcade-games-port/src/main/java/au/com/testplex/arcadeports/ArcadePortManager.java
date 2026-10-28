@@ -2910,6 +2910,16 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private String dragonEscapeStatusText(Session session, Player player) {
+        if (!session.dragonEscapeWaypoints.isEmpty()) {
+            int waypoint = getDragonEscapeWaypointIndex(session, player.getLocation());
+            return "route " + Math.min(waypoint + 1, session.dragonEscapeWaypoints.size())
+                    + "/" + session.dragonEscapeWaypoints.size();
+        }
+        return "finish " + Math.max(0, player.getLocation().getBlockZ()) + "/"
+                + (int) ArcadePortRules.DRAGON_ESCAPE_FINISH_Z;
+    }
+
     private String gameStatusText(Session session, Player player) {
         UUID id = player.getUniqueId();
         return switch (session.type) {
@@ -2917,7 +2927,7 @@ public final class ArcadePortManager implements Listener {
             case BOMB_LOBBERS -> "bombs " + inventoryCount(player, Material.TNT);
             case DEATH_TAG -> "IT " + session.tagged.stream().filter(session.alive::contains).count() + " | runners "
                     + Math.max(0, session.alive.size() - session.tagged.stream().filter(session.alive::contains).count());
-            case DRAGON_ESCAPE -> "finish " + Math.max(0, player.getLocation().getBlockZ()) + "/" + (int) ArcadePortRules.DRAGON_ESCAPE_FINISH_Z;
+            case DRAGON_ESCAPE -> dragonEscapeStatusText(session, player);
             case DRAGONS -> "dragons " + session.entities.stream().filter(EnderDragon.class::isInstance).count();
             case EVOLUTION -> "stage " + (session.evolutionLevels.getOrDefault(id, 0) + 1) + "/6";
             case GLADIATORS -> {
@@ -3774,8 +3784,11 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE
-                && ArcadePortRules.isDragonEscapeFinishReached(event.getTo().getX(), event.getTo().getY(), event.getTo().getZ())) {
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE && session.dragonEscapeWaypoints.isEmpty()
+                && ArcadePortRules.isDragonEscapeFinishReached(
+                        event.getTo().getX(), event.getTo().getY(), event.getTo().getZ())) {
+            // Fixed finish coordinates are only for the generated fallback course.
+            // Original Reborn maps finish at their last authored route waypoint.
             finish(session, player, true);
             return;
         }
