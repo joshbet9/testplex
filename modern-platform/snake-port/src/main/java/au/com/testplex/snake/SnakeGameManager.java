@@ -800,7 +800,9 @@ public final class SnakeGameManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onEntityTarget(EntityTargetEvent event) {
-        if (event.getEntity().getWorld() == arena && !(event.getEntity() instanceof MagmaCube)) event.setCancelled(true);
+        // Reborn cancels vanilla entity targeting throughout Snake. Item-box cubes
+        // are steered by moveAndProcessHazards(), not by hostile AI target selection.
+        if (event.getEntity().getWorld() == arena) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
