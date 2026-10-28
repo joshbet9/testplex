@@ -386,7 +386,8 @@ class ArcadePortGameTest {
         assertEquals("sheep-pig", ArcadePortRules.normalizeBaconBrawlKit("sheep"));
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("chris-p-bacon"));
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("unknown"));
-        assertEquals(1_000L, ArcadePortRules.BACON_HUNGER_INTERVAL_MILLIS);
+        assertEquals(4_000L, ArcadePortRules.BACON_SLOW_UPDATE_INTERVAL_MILLIS);
+        assertEquals(4_000L, ArcadePortRules.BACON_HUNGER_INTERVAL_MILLIS);
         assertEquals(1, ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL);
         assertEquals(4.0D, ArcadePortRules.BACON_STARVATION_DAMAGE, 0.00001D);
         assertEquals(6.0D, ArcadePortRules.BACON_STANDARD_HIT_DAMAGE, 0.00001D);
