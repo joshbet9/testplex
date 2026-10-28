@@ -998,6 +998,18 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 && arenaWorld != null && playerWorld != null && arenaWorld != playerWorld;
     }
 
+    static boolean shouldRedirectUnregisteredPlayer(GameState state, boolean registered,
+            World arenaWorld, World playerWorld) {
+        return !registered && (state == GameState.STARTING || state == GameState.LIVE)
+                && isInArenaWorld(arenaWorld, playerWorld);
+    }
+
+    static boolean shouldIncludeRoundAudience(boolean registered, boolean online,
+            boolean requireArenaWorld, World arenaWorld, World playerWorld) {
+        return registered && online
+                && (!requireArenaWorld || isInArenaWorld(arenaWorld, playerWorld));
+    }
+
     /** Only players registered when this round started receive its messages and titles. */
     private List<Player> getRoundAudiencePlayers() {
         if (roundParticipants.isEmpty()) {
@@ -1008,8 +1020,9 @@ public void startGame(Location preferCenter, int requestedPattern) {
         World arenaWorld = center == null ? null : center.getWorld();
         for (UUID id : new HashSet<UUID>(roundParticipants)) {
             Player player = Bukkit.getPlayer(id);
-            if (player == null || !player.isOnline()) continue;
-            if (liveAudience && !isInArenaWorld(arenaWorld, player.getWorld())) continue;
+            if (player == null) continue;
+            if (!shouldIncludeRoundAudience(true, player.isOnline(), liveAudience,
+                    arenaWorld, player.getWorld())) continue;
             players.add(player);
         }
         return players;
@@ -1042,9 +1055,17 @@ public void startGame(Location preferCenter, int requestedPattern) {
         if (state != GameState.STARTING && state != GameState.LIVE) return;
         Player player = event.getPlayer();
         UUID id = player.getUniqueId();
-        if (!roundParticipants.contains(id) || center == null
-                || isInArenaWorld(center.getWorld(), player.getWorld())) return;
-        if (shouldEliminateForWorldChange(state, alive.contains(id), center.getWorld(), player.getWorld())) {
+        if (center == null) return;
+        World arenaWorld = center.getWorld();
+        if (shouldRedirectUnregisteredPlayer(state, roundParticipants.contains(id),
+                arenaWorld, player.getWorld())) {
+            Location lobby = getLobbySpawn();
+            if (lobby != null) player.teleport(lobby);
+            return;
+        }
+        if (!roundParticipants.contains(id)
+                || isInArenaWorld(arenaWorld, player.getWorld())) return;
+        if (shouldEliminateForWorldChange(state, alive.contains(id), arenaWorld, player.getWorld())) {
             eliminate(player, ChatColor.RED + player.getName() + " left the Monster Maze arena.");
         } else if (state == GameState.STARTING) {
             roundParticipants.remove(id);
