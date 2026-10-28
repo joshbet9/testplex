@@ -160,4 +160,10 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.allGladiatorPairsResolved(0, 0));
     }
 
+    @Test void dragonContactHitsRespectPerPlayerCooldown() {
+        assertTrue(ArcadePortRules.shouldApplyDragonContactHit(10_000L, 0L));
+        assertFalse(ArcadePortRules.shouldApplyDragonContactHit(10_000L, 11_500L));
+        assertTrue(ArcadePortRules.shouldApplyDragonContactHit(11_500L, 11_500L));
+    }
+
 }
