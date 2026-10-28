@@ -26,4 +26,8 @@ public final class ArcadePortRules {
     public static boolean isWorldDragonHazard(ArcadePortGame game, boolean trackedEntity, boolean playerOwned) {
         return game == ArcadePortGame.DRAGONS && trackedEntity && !playerOwned;
     }
+
+    public static boolean isQuiverWinnerScoreReached(int kills) {
+        return kills >= 20;
+    }
 }
