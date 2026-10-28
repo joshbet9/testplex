@@ -201,6 +201,10 @@ public final class ArcadePortRules {
         return attackerTagged && !targetTagged;
     }
 
+    public static boolean deathTagHitIsLethal(double currentHealth, double hitDamage) {
+        return hitDamage > 0.0D && currentHealth <= hitDamage;
+    }
+
     public static double deathTagChaserDamage(boolean alphaChaser) {
         return alphaChaser ? 6.0D : 4.0D;
     }

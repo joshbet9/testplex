@@ -304,7 +304,8 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.DEATH_TAG) {
             for (Player player : participants) {
-                giveDeathTagKit(session, player, session.tagged.contains(player.getUniqueId()));
+                giveDeathTagKit(session, player, session.tagged.contains(player.getUniqueId()),
+                        session.alphaChasers.contains(player.getUniqueId()));
             }
         }
         if (type == ArcadePortGame.SHEEP_QUEST) {
@@ -1805,7 +1806,7 @@ public final class ArcadePortManager implements Listener {
                 if (attackerChaser) {
                     double damage = ArcadePortRules.deathTagChaserDamage(
                             session.alphaChasers.contains(attacker.getUniqueId()));
-                    if (target.getHealth() <= damage) {
+                    if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
                         makeDeathTagChaser(session, target, "was killed by a chaser");
                         checkRoundEnd(session);
                     } else {
@@ -1818,7 +1819,7 @@ public final class ArcadePortManager implements Listener {
                     double damage = ArcadePortRules.deathTagDamageAfterIronSkin(baseDamage,
                             session.alphaChasers.contains(target.getUniqueId()));
                     if (damage > 0.0D) {
-                        if (target.getHealth() <= damage) {
+                        if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
                             makeDeathTagChaser(session, target, "was defeated by a runner");
                         } else {
                             target.setHealth(target.getHealth() - damage);

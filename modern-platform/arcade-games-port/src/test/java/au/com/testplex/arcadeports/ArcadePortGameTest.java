@@ -213,6 +213,11 @@ class ArcadePortGameTest {
     }
 
     @Test void deathTagChasersConvertRunnersOnlyAfterLethalDamageAndHaveDistinctKits() {
+        assertFalse(ArcadePortRules.deathTagHitIsLethal(20.0D, 4.0D));
+        assertFalse(ArcadePortRules.deathTagHitIsLethal(4.01D, 4.0D));
+        assertTrue(ArcadePortRules.deathTagHitIsLethal(4.0D, 4.0D));
+        assertTrue(ArcadePortRules.deathTagHitIsLethal(1.0D, 6.0D));
+        assertFalse(ArcadePortRules.deathTagHitIsLethal(1.0D, 0.0D));
         assertEquals(4.0D, ArcadePortRules.deathTagChaserDamage(false));
         assertEquals(6.0D, ArcadePortRules.deathTagChaserDamage(true));
         assertEquals(6.0D, ArcadePortRules.deathTagRunnerDamage("basher", false));
