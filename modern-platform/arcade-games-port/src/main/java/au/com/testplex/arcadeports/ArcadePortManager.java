@@ -4392,22 +4392,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private Material spleefNextColour(Material material) {
-        String name = material.name();
-        boolean wool = name.endsWith("_WOOL");
-        String family = wool ? "_WOOL" : "_TERRACOTTA";
-        String colour = name.endsWith(family) ? name.substring(0, name.length() - family.length()) : "";
-        int legacyData = switch (colour) {
-            case "LIME" -> 5;
-            case "GREEN" -> 13;
-            case "YELLOW" -> 4;
-            default -> -1;
-        };
-        int nextData = ArcadePortRules.nextSpleefSlowDamageData(legacyData);
-        return switch (nextData) {
-            case 4 -> wool ? Material.YELLOW_WOOL : Material.YELLOW_TERRACOTTA;
-            case 14 -> wool ? Material.RED_WOOL : Material.RED_TERRACOTTA;
-            default -> null;
-        };
+        return ArcadePortRules.nextSpleefSlowDamageMaterial(material);
     }
 
     private void breakSpleefBlock(Session session, Block block) {
