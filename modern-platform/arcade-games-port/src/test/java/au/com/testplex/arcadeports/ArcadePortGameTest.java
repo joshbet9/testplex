@@ -79,6 +79,22 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.quiverRegrantsArrowAfterHit(true));
     }
 
+    @Test void quiverEnchanterChainsTwiceAndFallsBackWhenNoEnemyIsNearby() {
+        assertEquals(2, ArcadePortRules.QUIVER_MAX_ARROW_BOUNCES);
+        assertTrue(ArcadePortRules.shouldQuiverArrowBounce(2));
+        assertTrue(ArcadePortRules.shouldQuiverArrowBounce(1));
+        assertFalse(ArcadePortRules.shouldQuiverArrowBounce(0));
+        assertEquals(1, ArcadePortRules.quiverArrowBouncesAfterBounce(2));
+        assertEquals(0, ArcadePortRules.quiverArrowBouncesAfterBounce(1));
+        assertEquals(0, ArcadePortRules.quiverArrowBouncesAfterBounce(0));
+
+        assertTrue(ArcadePortRules.isQuiverReboundTargetInRange(0.0D));
+        assertTrue(ArcadePortRules.isQuiverReboundTargetInRange(64.0D));
+        assertFalse(ArcadePortRules.isQuiverReboundTargetInRange(64.01D));
+        assertFalse(ArcadePortRules.isQuiverReboundTargetInRange(Double.NaN));
+        assertEquals(64.0D, ArcadePortRules.QUIVER_REBOUND_MAX_DISTANCE_SQUARED, 0.00001D);
+    }
+
     @Test void quiverGroundPoundUsesSourceRadialImpulse() {
         assertEquals(1.0D, ArcadePortRules.quiverGroundPoundHorizontalMultiplier(0.0D), 0.00001D);
         assertEquals(0.5D, ArcadePortRules.quiverGroundPoundHorizontalMultiplier(4.0D), 0.00001D);
