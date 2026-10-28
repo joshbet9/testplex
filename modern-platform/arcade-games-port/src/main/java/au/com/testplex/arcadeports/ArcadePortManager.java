@@ -411,10 +411,10 @@ public final class ArcadePortManager implements Listener {
             finish(session, advancing.get(0), true);
             return;
         }
-        session.gladiatorRound = initial ? 0 : Math.min(3, session.gladiatorRound + 1);
+        session.gladiatorRound = initial ? 0 : ArcadePortRules.gladiatorsTierForRound(session.gladiatorRound + 1);
         session.gladiatorPairs.clear();
         session.gladiatorResolvedPairs.clear();
-        session.gladiatorPairCount = (advancing.size() + 1) / 2;
+        session.gladiatorPairCount = ArcadePortRules.gladiatorsPairCount(advancing.size());
         session.nextGladiatorRoundAt = 0L;
         session.gladiatorRoundStartedAt = System.currentTimeMillis();
         session.lastGladiatorPoisonAt = session.gladiatorRoundStartedAt + 60_000L;
@@ -1004,8 +1004,7 @@ public final class ArcadePortManager implements Listener {
                 finish(session, alivePlayers(session).stream().findFirst().orElse(null), true);
                 return;
             }
-            if (session.gladiatorPairCount > 0
-                    && session.gladiatorResolvedPairs.size() >= session.gladiatorPairCount
+            if (ArcadePortRules.allGladiatorPairsResolved(session.gladiatorPairCount, session.gladiatorResolvedPairs.size())
                     && session.nextGladiatorRoundAt == 0L) {
                 session.nextGladiatorRoundAt = System.currentTimeMillis() + 2_000L;
                 announce(session, ChatColor.GREEN + "All matches are complete. Advancing the winners...");
