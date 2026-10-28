@@ -25,6 +25,10 @@ public final class ArcadePortRules {
         return elapsedMillis >= MICRO_BATTLES_BARRIER_DURATION_MILLIS;
     }
 
+    public static double initialBaconKnockback(int playerCount) {
+        return playerCount == 2 ? 1.8D : 1.5D;
+    }
+
     public static double nextBaconKnockback(double current) {
         return current * 1.2D;
     }
