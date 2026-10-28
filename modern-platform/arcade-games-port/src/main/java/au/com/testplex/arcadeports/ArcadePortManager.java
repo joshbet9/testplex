@@ -4152,13 +4152,17 @@ public final class ArcadePortManager implements Listener {
         return Material.RED_TERRACOTTA;
     }
 
-    private boolean insideRunnerSourceBounds(Session session, int x, int z) {
+    private boolean insideSourceMapBounds(Session session, int x, int z) {
         SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
         if (mapData != null && mapData.hasBounds()) {
             return x >= mapData.minX() && x < mapData.maxX()
                     && z >= mapData.minZ() && z < mapData.maxZ();
         }
         return Math.abs(x) <= HALF_SIZE && Math.abs(z) <= HALF_SIZE;
+    }
+
+    private boolean insideRunnerSourceBounds(Session session, int x, int z) {
+        return insideSourceMapBounds(session, x, z);
     }
 
     private void markRunnerFootprints(Session session, long now) {
@@ -5336,18 +5340,44 @@ public final class ArcadePortManager implements Listener {
             Vector facing = player.getLocation().getDirection().normalize();
             int forwardX = (int) Math.round(facing.getX());
             int forwardZ = (int) Math.round(facing.getZ());
+            if (forwardX == 0 && forwardZ == 0) {
+                double yaw = Math.toRadians(player.getLocation().getYaw());
+                forwardX = (int) Math.round(-Math.sin(yaw));
+                forwardZ = (int) Math.round(Math.cos(yaw));
+            }
             int centerX = clicked.getX() + forwardX;
             int centerY = clicked.getY() + 1;
             int centerZ = clicked.getZ() + forwardZ;
             int sideX = forwardZ;
             int sideZ = -forwardX;
-            for (int width = -2; width <= 2; width++) {
+            List<Block> wallBlocks = new ArrayList<>(15);
+            SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+            boolean validFootprint = true;
+            for (int width = -2; width <= 2 && validFootprint; width++) {
                 for (int height = 0; height < 3; height++) {
-                    Block wall = session.world.getBlockAt(centerX + sideX * width,
-                            centerY + height, centerZ + sideZ * width);
-                    wall.setType(Material.STONE_BRICKS, false);
+                    int x = centerX + sideX * width;
+                    int y = centerY + height;
+                    int z = centerZ + sideZ * width;
+                    if (!insideSourceMapBounds(session, x, z) || y < 1
+                            || y >= session.world.getMaxHeight() - 1
+                            || (mapData != null && mapData.hasVerticalBounds()
+                                && (y < mapData.minY() || y >= mapData.maxY()))) {
+                        validFootprint = false;
+                        break;
+                    }
+                    Block wall = session.world.getBlockAt(x, y, z);
+                    if (!wall.getType().isAir()) {
+                        validFootprint = false;
+                        break;
+                    }
+                    wallBlocks.add(wall);
                 }
             }
+            if (!validFootprint || wallBlocks.size() != 15) {
+                player.sendMessage(ChatColor.YELLOW + "There is not enough clear space to build that wall.");
+                return true;
+            }
+            for (Block wall : wallBlocks) wall.setType(Material.STONE_BRICKS, false);
             consumeHeld(player);
             player.getWorld().playSound(clicked.getLocation(), Sound.BLOCK_STONE_PLACE, 0.8F, 0.9F);
             return true;
