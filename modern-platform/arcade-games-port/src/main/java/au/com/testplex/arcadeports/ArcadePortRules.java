@@ -6,6 +6,7 @@ package au.com.testplex.arcadeports;
  * needing a live Paper server.
  */
 public final class ArcadePortRules {
+    public static final int EVOLUTION_WIN_LEVEL = 6;
     public static final double DRAGON_ESCAPE_FINISH_Z = 77.0D;
     public static final long DRAGON_ESCAPE_HAZARD_INTERVAL_MILLIS = 6_000L;
     public static final long RUNNER_BLOCK_DECAY_MILLIS = 600L;
@@ -39,8 +40,12 @@ public final class ArcadePortRules {
     }
 
     public static int nextEvolutionLevel(int currentLevel, boolean wonDuel) {
-        int next = currentLevel + (wonDuel ? 1 : -1);
-        return Math.max(0, Math.min(5, next));
+        int safeLevel = Math.max(0, Math.min(EVOLUTION_WIN_LEVEL, currentLevel));
+        return wonDuel ? Math.min(EVOLUTION_WIN_LEVEL, safeLevel + 1) : safeLevel;
+    }
+
+    public static boolean isEvolutionWinnerLevel(int level) {
+        return level >= EVOLUTION_WIN_LEVEL;
     }
 
     public static int sheepQuestLeadingTeam(int redSheep, int blueSheep) {
