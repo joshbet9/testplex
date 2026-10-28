@@ -1161,7 +1161,7 @@ public final class ArcadePortManager implements Listener {
                         break;
                     case "waller":
                         player.getInventory().setItem(1, namedItem(Material.STONE_SHOVEL, "Wall Builder",
-                                "Right-click a block to build a temporary 5x3 stone-brick wall.", 3));
+                                "Right-click a block to build a 5x3 wall; enemy TNT can break it.", 3));
                         break;
                     default:
                         break;
@@ -3588,6 +3588,7 @@ public final class ArcadePortManager implements Listener {
         for (Entity entity : new ArrayList<>(session.entities)) if (entity != null && entity.isValid()) entity.remove();
         session.bombOwners.clear();
         session.bombLastLocations.clear();
+        session.bombWallerWallBlocks.clear();
         session.dragonContactCooldowns.clear();
         session.paintProjectileDamage.clear();
         session.paintballLastShotAt.clear();
@@ -4883,6 +4884,7 @@ public final class ArcadePortManager implements Listener {
                     Block wall = session.world.getBlockAt(centerX + sideX * width,
                             centerY + height, centerZ + sideZ * width);
                     wall.setType(Material.STONE_BRICKS, false);
+                    session.bombWallerWallBlocks.add(wall);
                 }
             }
             consumeHeld(player);
@@ -4958,8 +4960,18 @@ public final class ArcadePortManager implements Listener {
                     && session.evolutionLevels.getOrDefault(ownerId, 0) == 3))) {
                 Location blast = bomb.getLocation().clone();
                 Player owner = session.players.get(ownerId);
+                List<Block> blocksHit = new ArrayList<>(event.blockList());
                 event.blockList().clear();
                 event.setCancelled(true);
+                if (session.type == ArcadePortGame.BOMB_LOBBERS) {
+                    // Keep custom player damage below, but let the explosion carve the map.
+                    // Archived source maps are reloaded before the next round.
+                    for (Block block : blocksHit) {
+                        if (block == null || block.getWorld() != session.world || block.getType().isAir()) continue;
+                        block.setType(Material.AIR, false);
+                        session.bombWallerWallBlocks.remove(block);
+                    }
+                }
                 session.entities.remove(bomb);
                 session.bombLastLocations.remove(bomb.getUniqueId());
                 bomb.remove();
@@ -5070,6 +5082,7 @@ public final class ArcadePortManager implements Listener {
         final Map<Sheep, Integer> sheepOwners = new HashMap<>();
         final Map<Sheep, UUID> sheepCarriers = new LinkedHashMap<>();
         final Set<Entity> entities = new HashSet<>();
+        final Set<Block> bombWallerWallBlocks = new HashSet<>();
         final Map<UUID, UUID> bombOwners = new HashMap<>();
         final Map<UUID, Location> bombLastLocations = new HashMap<>();
         final Map<UUID, Long> bombCreatedAt = new HashMap<>();
