@@ -56,7 +56,7 @@ public final class MobThemeManager implements Listener {
         meta.setLore(Arrays.asList(ChatColor.GRAY+"Right-click to cycle mob themes",ChatColor.GRAY+"Uses vanilla mob heads or spawn eggs",ChatColor.GRAY+"Map Default uses the map's normal mob and colours."));
         item.setItemMeta(meta);p.getInventory().setItem(SLOT,item);p.updateInventory();
     }
-    private static Material selectorIcon(String theme){
+    static Material selectorIcon(String theme){
         if("random".equals(theme))return Material.NETHER_STAR;
         if("creeper".equals(theme))return Material.CREEPER_HEAD;
         if("skeleton".equals(theme))return Material.SKELETON_SKULL;
@@ -64,7 +64,7 @@ public final class MobThemeManager implements Listener {
         if("snowman".equals(theme))return Material.PUMPKIN;
         return spawnEggMaterial(theme);
     }
-    private static Material spawnEggMaterial(String theme){
+    static Material spawnEggMaterial(String theme){
         String id=theme==null?"creeper":theme.toLowerCase(Locale.ROOT);
         if("zombie_pigman".equals(id))id="zombified_piglin";
         if("snowman".equals(id))id="snow_golem";
@@ -213,13 +213,13 @@ public final class MobThemeManager implements Listener {
     private boolean visibleTo(Player p,PadVisual d){if(p==null||!p.isOnline()||d.center.getWorld()==null||!p.getWorld().equals(d.center.getWorld()))return false;Location l=p.getLocation();return Math.abs(l.getX()-d.center.getX())<=192&&Math.abs(l.getZ()-d.center.getZ())<=192;}
     private String palette(Player p){String s=selected(p);if("map_default".equals(s))return s;return "random".equals(s)?randomConcrete(p.getUniqueId(),null):s;}
     private String defaultTheme(){try{String s=plugin.getMapManager()==null?null:plugin.getMapManager().activeMob();return normalize(s==null?"creeper":s);}catch(Throwable ignored){return "creeper";}}
-    private static String normalize(String s) {
+    static String normalize(String s) {
         if(s==null||s.trim().isEmpty())return "creeper";s=s.trim().toLowerCase(Locale.ROOT).replace('-','_').replace(' ','_');
         if("pig_zombie".equals(s)||"zombified_piglin".equals(s))s="zombie_pigman";if("snow_golem".equals(s))s="snowman";
         if("mushroom_cow".equals(s))s="mooshroom";if("eyeofender".equals(s)||"eye_of_ender".equals(s))s="enderman";return THEMES.contains(s)?s:"creeper";
     }
-    private static String randomConcrete(UUID viewer,UUID entity){int h=viewer.hashCode();if(entity!=null)h=31*h+entity.hashCode();return THEMES.get(1+Math.floorMod(h,THEMES.size()-2));}
-    private static String color(String s) {
+    static String randomConcrete(UUID viewer,UUID entity){int h=viewer.hashCode();if(entity!=null)h=31*h+entity.hashCode();return THEMES.get(1+Math.floorMod(h,THEMES.size()-2));}
+    static String color(String s) {
         switch(normalize(s)){
             case "creeper":case "slime":return "LIME";case "skeleton":return "LIGHT_GRAY";case "spider":return "BLACK";
             case "silverfish":case "bat":case "wolf":return "GRAY";case "zombie":return "GREEN";
@@ -229,7 +229,7 @@ public final class MobThemeManager implements Listener {
             case "cow":case "horse":return "BROWN";case "squid":return "BLUE";case "ocelot":return "YELLOW";default:return "LIME";
         }
     }
-    private static String displayName(String s){if("map_default".equals(s))return "Map Default";if("random".equals(s))return "Random Mob";StringBuilder b=new StringBuilder();for(String part:normalize(s).split("_")){if(b.length()>0)b.append(' ');b.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));}return b.toString();}
+    static String displayName(String s){if("map_default".equals(s))return "Map Default";if("random".equals(s))return "Random Mob";StringBuilder b=new StringBuilder();for(String part:normalize(s).split("_")){if(b.length()>0)b.append(' ');b.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));}return b.toString();}
     private static boolean isSelector(ItemStack i){if(i==null||!i.hasItemMeta())return false;ItemMeta m=i.getItemMeta();return m!=null&&m.hasDisplayName()&&ChatColor.stripColor(m.getDisplayName()).startsWith("Mob Theme:");}
     private String key(Location l){return l.getWorld().getUID()+":"+l.getBlockX()+":"+l.getBlockY()+":"+l.getBlockZ();}
     private void load(){if(!file.exists())return;YamlConfiguration y=YamlConfiguration.loadConfiguration(file);for(String id:y.getKeys(false)){try{choices.put(UUID.fromString(id),normalize(y.getString(id)));}catch(IllegalArgumentException ignored){}}}
