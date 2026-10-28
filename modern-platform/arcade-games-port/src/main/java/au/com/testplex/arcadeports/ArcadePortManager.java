@@ -1867,7 +1867,8 @@ public final class ArcadePortManager implements Listener {
         target.getWorld().playSound(target.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7F, 1.8F);
         target.getWorld().spawnParticle(Particle.SPLASH, target.getLocation().add(0.0D, 1.0D, 0.0D),
                 12, 0.35D, 0.4D, 0.35D, 0.03D);
-        attacker.playSound(attacker.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 1.4F);
+        // Reborn's Paintball hit confirmation is the high-pitched classic orb pickup.
+        attacker.playSound(attacker.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 3.0F);
         attacker.sendMessage(ChatColor.YELLOW + "Paint hit! " + after + " armour pieces remaining.");
         if (ArcadePortRules.isPaintballPlayerOut(after)) {
             announce(session, ChatColor.RED + target.getName() + ChatColor.GRAY + " was painted out by "
