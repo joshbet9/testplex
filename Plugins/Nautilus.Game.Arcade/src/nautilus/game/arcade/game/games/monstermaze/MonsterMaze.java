@@ -228,7 +228,10 @@ public class MonsterMaze extends SoloGame
 	public void refreshSafePadCosmeticsForViewer(Player viewer)
 	{
 		if (_maze != null)
+		{
+			_maze.refreshMobSetSettingsForPlayer(viewer);
 			_maze.refreshPlayerSafePadCosmetics(viewer);
+		}
 	}
 
 	@Override
