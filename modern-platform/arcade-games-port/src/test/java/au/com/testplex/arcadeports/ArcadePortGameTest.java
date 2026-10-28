@@ -51,4 +51,20 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.isQuiverWinnerScoreReached(21));
     }
 
+    @Test void turfWarsAlternatesBuildAndCombatPhases() {
+        assertEquals(20_000L, ArcadePortRules.TURF_WARS_BUILD_PHASE_MILLIS);
+        assertEquals(90_000L, ArcadePortRules.TURF_WARS_COMBAT_PHASE_MILLIS);
+    }
+
+    @Test void turfWarsKillsMoveFrontlineAndWinAtTheTerritoryEdge() {
+        assertEquals(0, ArcadePortRules.advanceTurfFrontline(-1, 0));
+        assertEquals(-2, ArcadePortRules.advanceTurfFrontline(-1, 1));
+        assertEquals(-1, ArcadePortRules.advanceTurfFrontline(-1, 3));
+        assertFalse(ArcadePortRules.isTurfWarsWinningLine(18, 0, 20));
+        assertTrue(ArcadePortRules.isTurfWarsWinningLine(19, 0, 20));
+        assertFalse(ArcadePortRules.isTurfWarsWinningLine(-19, 1, 20));
+        assertTrue(ArcadePortRules.isTurfWarsWinningLine(-20, 1, 20));
+        assertFalse(ArcadePortRules.isTurfWarsWinningLine(20, 2, 20));
+    }
+
 }
