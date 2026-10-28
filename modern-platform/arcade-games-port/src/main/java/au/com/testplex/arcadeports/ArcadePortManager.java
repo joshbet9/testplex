@@ -836,7 +836,9 @@ public final class ArcadePortManager implements Listener {
             finish(session, advancing.get(0), true);
             return;
         }
-        session.gladiatorRound = initial ? 0 : ArcadePortRules.gladiatorsTierForRound(session.gladiatorRound + 1);
+        session.gladiatorRound = initial
+                ? ArcadePortRules.gladiatorsStartingTierForPlayers(advancing.size())
+                : ArcadePortRules.gladiatorsTierForRound(session.gladiatorRound + 1);
         session.gladiatorPairs.clear();
         session.gladiatorResolvedPairs.clear();
         session.gladiatorPairCount = ArcadePortRules.gladiatorsPairCount(advancing.size());
