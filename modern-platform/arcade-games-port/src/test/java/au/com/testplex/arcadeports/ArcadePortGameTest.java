@@ -127,4 +127,17 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.sheepQuestLeadingTeam(0, 0));
     }
 
+    @Test void paintballPlayerIsOutOnlyAfterAllFourArmourPiecesArePainted() {
+        int remaining = 4;
+        remaining = ArcadePortRules.paintballPiecesAfterHit(remaining, 1);
+        assertEquals(3, remaining);
+        assertFalse(ArcadePortRules.isPaintballPlayerOut(remaining));
+        assertEquals(2, ArcadePortRules.paintballPiecesAfterHit(remaining, 1));
+        assertEquals(1, ArcadePortRules.paintballPiecesAfterHit(2, 1));
+        assertEquals(0, ArcadePortRules.paintballPiecesAfterHit(1, 1));
+        assertTrue(ArcadePortRules.isPaintballPlayerOut(0));
+        assertEquals(0, ArcadePortRules.paintballPiecesAfterHit(0, 3));
+        assertEquals(4, ArcadePortRules.paintballPiecesAfterHit(4, 0));
+    }
+
 }
