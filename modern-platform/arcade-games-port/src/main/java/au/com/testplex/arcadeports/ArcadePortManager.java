@@ -507,6 +507,12 @@ public final class ArcadePortManager implements Listener {
             session.turfMinZ = turfSourceMap.minZ();
             session.turfMaxZExclusive = turfSourceMap.maxZ();
         }
+        if (turfSourceMap != null) {
+            List<Location> redTeamSpawns = turfSourceMap.teamSpawnLocationsForTeam(0, 2);
+            if (!redTeamSpawns.isEmpty()) {
+                session.turfFloorY = ArcadePortRules.turfWarsFloorYFromSpawn(redTeamSpawns.get(0).getY());
+            }
+        }
         session.turfInitialFrontlineX = ArcadePortRules.turfWarsInitialFrontline(
                 session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive);
         session.turfFrontlineX = session.turfInitialFrontlineX;
@@ -3812,8 +3818,8 @@ public final class ArcadePortManager implements Listener {
         session.turfFrontlineX = nextFrontline;
         Material turf = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
         for (int z = session.turfMinZ; z < session.turfMaxZExclusive; z++) {
-            session.world.getBlockAt(paintedX, 63, z).setType(turf, false);
-            for (int y = 64; y <= 68; y++) {
+            session.world.getBlockAt(paintedX, session.turfFloorY, z).setType(turf, false);
+            for (int y = session.turfFloorY + 1; y <= session.turfFloorY + 5; y++) {
                 Block structure = session.world.getBlockAt(paintedX, y, z);
                 if (structure.getType() == Material.RED_WOOL || structure.getType() == Material.BLUE_WOOL) {
                     structure.setType(Material.AIR, false);
@@ -5694,6 +5700,7 @@ public final class ArcadePortManager implements Listener {
         int turfInitialFrontlineX = -1;
         int turfFrontlineMinX = -HALF_SIZE;
         int turfFrontlineMaxXExclusive = HALF_SIZE;
+        int turfFloorY = 63;
         int turfMinZ = -HALF_SIZE;
         int turfMaxZExclusive = HALF_SIZE + 1;
         long endsAt;
