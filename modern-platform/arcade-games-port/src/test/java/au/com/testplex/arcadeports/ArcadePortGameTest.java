@@ -192,4 +192,12 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldFinishDeathTagRound(0, 2));
     }
 
+    @Test void bombLobbersDirectHitUsesSweptTntCollisionRadius() {
+        assertTrue(ArcadePortRules.isBombDirectHit(0.0D));
+        assertTrue(ArcadePortRules.isBombDirectHit(0.75D));
+        assertTrue(ArcadePortRules.isBombDirectHit(1.0D));
+        assertFalse(ArcadePortRules.isBombDirectHit(1.01D));
+        assertFalse(ArcadePortRules.isBombDirectHit(-0.01D));
+    }
+
 }
