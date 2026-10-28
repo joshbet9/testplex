@@ -34,6 +34,11 @@ public final class SnakeRules {
     public static final double HAZARD_STEERING_SPEED = 0.12D;
     public static final double HAZARD_CONTACT_RADIUS = 2.1D;
 
+    /** Source ReSit remounts the player on the live snake head every tick. */
+    public static boolean shouldResitPlayer(boolean hasHead, boolean ridingHead) {
+        return hasHead && !ridingHead;
+    }
+
     /** The source cancels normal damage but immediately eliminates a player hit by lava. */
     public static boolean shouldEliminateFromDamageCause(String causeName) {
         return causeName != null && "LAVA".equalsIgnoreCase(causeName);
