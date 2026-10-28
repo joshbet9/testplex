@@ -275,12 +275,23 @@ jobs:
 
           contracts = {
               "Snake": {
-                  "progressive hazard start": "FIRST_MAGMA_HAZARD_MS = 45000L",
-                  "repeating hazard interval": "MAGMA_HAZARD_INTERVAL_MS = 30000L",
+                  "progressive hazard start": "FIRST_MAGMA_HAZARD_MS = 10000L",
+                  "repeating hazard interval": "MAGMA_HAZARD_INTERVAL_MS = 15000L",
                   "four-hazard cap": "MAX_MAGMA_HAZARDS = 4",
-                  "roulette steering hook": "getDebuffedDirection(player).multiply(4)",
-                  "persistent drift": "_lastTravelDirection.put(player, blended.clone())",
+                  "steering uses the debuffed direction": "getDebuffedDirection(player).multiply(4)",
+                  "drift carries forward the limited travel direction": "_lastTravelDirection.put(player, drifting.clone())",
                   "persistent sharp-turn state": "appliedYaw += clamp(remaining, -4.0f, 4.0f)",
+                  "green slime food uses a floor-safe spawn": "findFoodSpawnLocation(origin)",
+                  "food spawn does not mutate the team start": "GetSpawns().get(0).clone()",
+                  "Magma Cubes bypass Reborn spawn filtering": "CreatureAllowOverride = true;",
+                  "cube contact starts the hotbar item roll": "beginMagmaRoulette(player)",
+                  "hotbar roll previews items": "setItem(ROULETTE_HOTBAR_SLOT, rouletteItem(preview))",
+                  "each player progresses through effect durations": "new int[] {1, 3, 5, 10, 15, 20, 30}",
+                  "steering effects expire individually": "public void ExpireRouletteDebuffs",
+                  "Drift has an observable turn-rate limit": "MAX_DRIFT_TURN_RADIANS",
+                  "Turn Lag is balanced": "clamp(delta, -6.0f, 6.0f)",
+                  "Overshoot is balanced": "delta * 0.35f",
+                  "repeat contact waits for the active roll": "leave the cube in",
                   "hazard cleanup": "removeMagmaCubes();",
                   "Magma Cubes require a valid on-course spawn tile": "findMagmaCubeSpawn(target, center)",
                   "failed hazard spawn retries shortly": "spawned ? MAGMA_HAZARD_INTERVAL_MS : 5000L",
@@ -375,6 +386,7 @@ jobs:
               "Monster Maze PB": {
                   "mode/pattern/kit separated PB key": "displayPrefix + \"pb.pattern\" + pattern + \".\" + slug(kitName)",
                   "persists through Mineplex custom data": "customData.setData(player, key, bestToSave)",
+                  "requires registered data manager when the Arcade reference is missing": "Managers.require(CustomDataManager.class)",
                   "new PB notification": "New Monster Maze personal best: Stage",
                   "native PB inspection": "public static void show(final MonsterMaze game, final Player player)",
                   "scoreboard PB is best kit for selected pattern": "public static String getBestForPattern",
@@ -403,7 +415,7 @@ jobs:
                   "three modes": "GameDisplay.MonsterMazeModern",
                   "three patterns per mode": "for (int pattern = 1; pattern <= 3; pattern++)",
                   "PB per kit": "getKitBest(_display, _pattern, kits[i])",
-                  "native account data unavailable is handled safely": "Managers.get(CustomDataManager.class)",
+                  "native account data unavailable is handled safely": "Managers.require(CustomDataManager.class)",
                   "pattern click uses clicked player to open kit list": "getShop().openPageForPlayer(player, next)",
                   "view pages use unique inventory titles": "pageTitle(view, display, pattern)",
                   "info paper has a click handler": "How Monster Maze PBs work",
@@ -490,6 +502,10 @@ jobs:
                   "Spleef cosmetic entry": 'registerGame("spleef", "Spleef"',
                   "Turf Wars cosmetic entry": 'registerGame("turfwars", "Turf Wars"',
                   "Monster Maze source palette defaults": 'case "witch": return "purple"',
+                  "beacon swatch reads its own saved colour": 'String beaconSelected = data.getString(base + ".beacon", defaultColour);',
+                  "pad swatch reads its own saved colour": 'String padSelected = data.getString(base + ".safe-pad", defaultColour);',
+                  "a click persists only that swatch": 'data.set(path, parts[2]);',
+                  "pad and beacon overlays refresh together": 'refreshLiveMonsterMazeColours(player);',
                   "Mob Set toggles refresh live gameplay": 'refreshLiveMonsterMazeColours(player);',
               },
               "Map Loader": {
@@ -564,7 +580,7 @@ jobs:
               },
               "In-game test plan": {
                   "manual runtime testing disclosed": "these scenarios still require an actual 1.8.x server",
-                  "Snake hazard schedule": "135 seconds",
+                  "Snake hazard schedule": "55 seconds",
                   "native Speed and Modern test matrix": "MonsterMazeSpeed",
                   "pattern selector documented": "monstermaze.pattern",
                   "PB validation documented": "personal best",
@@ -583,6 +599,11 @@ jobs:
                   if expected not in source:
                       missing.append(f"{game}: {label}")
 
+          if "ROULETTE_INTERVAL_MS" in sources["Snake"]:
+              missing.append("Snake: steering effects must be triggered by Magma Cube contact, not a global timer")
+          if "One contact window must count as a single hit" not in sources["Monster Maze"]:
+              missing.append("Monster Maze: overlapping mobs must not double the damage for one contact")
+          
           maze_source = sources["Monster Maze"]
           particle_path_method = maze_source.split("private void updateFirstStageParticlePath()", 1)[1].split("private void playPadSpawnSignal(", 1)[0]
           firework_method = maze_source.split("private void playPadSpawnSignal(", 1)[1].split("private void clearStaleMazeEntities()", 1)[0]
