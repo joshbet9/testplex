@@ -237,4 +237,11 @@ class ArcadePortGameTest {
         assertEquals(4.0D, ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE, 0.00001D);
     }
 
+    @Test void turfWarsUsesDifferentArrowAndMeleeDamage() {
+        assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage(true, false), 0.00001D);
+        assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage(true, true), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.turfWarsHitDamage(false, false), 0.00001D);
+        assertEquals(12.0D, ArcadePortRules.turfWarsHitDamage(false, true), 0.00001D);
+    }
+
 }
