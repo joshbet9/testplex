@@ -2684,7 +2684,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isDragonEscapeDiggerBlockAllowed(Material material) {
-        return material != null && material.isBlock() && !material.isAir() && !material.isLiquid()
+        return material != null && material.isBlock() && !material.isAir()
+                && material != Material.WATER && material != Material.LAVA && material != Material.BUBBLE_COLUMN
                 && material != Material.BEDROCK && material != Material.BARRIER
                 && material != Material.END_PORTAL && material != Material.END_PORTAL_FRAME
                 && material != Material.COMMAND_BLOCK && material != Material.CHAIN_COMMAND_BLOCK
