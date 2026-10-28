@@ -111,7 +111,17 @@ public class MonsterMazePlugin extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new DebugSoloModeListener(this), this);
         getCommand("mm").setExecutor(new MMCommand(this));
         getCommand("pause").setExecutor(new PauseCommand(this));
-        Bukkit.getScheduler().runTaskLater(this, new Runnable() { @Override public void run() { for (Player p : Bukkit.getOnlinePlayers()) gameManager.sendToLobby(p); } }, 20L);
+        // Keep the modern platform's unified Game Panel; never pull all server players into this lobby.
+        getCommand("games").setExecutor((sender, command, label, args) -> {
+            if (sender instanceof Player player
+                    && Bukkit.getPluginManager().isPluginEnabled("TestplexModernArcade")) {
+                player.performCommand("gamepanel");
+            } else {
+                sender.sendMessage(org.bukkit.ChatColor.YELLOW
+                        + "Use /mm start [1|2|3] to start a Monster Maze test.");
+            }
+            return true;
+        });
         statusHeartbeatReporter.start();
         getLogger().info("MonsterMazeStandalone enabled.");
         getLogger().info("Active map: " + mapManager.getActiveMap());
