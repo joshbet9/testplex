@@ -33,6 +33,10 @@ public final class ArcadePortRules {
         return kills >= 20;
     }
 
+    public static boolean shouldFinishWhenNobodyIsAlive(int alivePlayers, int respawningPlayers) {
+        return alivePlayers <= 0 && respawningPlayers <= 0;
+    }
+
     public static int advanceTurfFrontline(int currentFrontline, int teamId) {
         if (teamId == 0) return currentFrontline + 1;
         if (teamId == 1) return currentFrontline - 1;
