@@ -970,6 +970,12 @@ public void startGame(Location preferCenter, int requestedPattern) {
         return arenaWorld != null && playerWorld != null && arenaWorld == playerWorld;
     }
 
+    static boolean shouldEliminateForWorldChange(GameState state, boolean alive,
+            World arenaWorld, World playerWorld) {
+        return alive && (state == GameState.STARTING || state == GameState.LIVE)
+                && arenaWorld != null && playerWorld != null && arenaWorld != playerWorld;
+    }
+
     /** Round participants still need their temporary state restored if they leave the arena world. */
     private List<Player> getRoundPlayersForCleanup() {
         Map<UUID, Player> players = new HashMap<UUID, Player>();
@@ -999,10 +1005,9 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
     @EventHandler
     public void onWorldChange(PlayerChangedWorldEvent event) {
-        if (state != GameState.STARTING && state != GameState.LIVE) return;
         Player player = event.getPlayer();
-        if (!alive.contains(player.getUniqueId()) || center == null) return;
-        if (isInArenaWorld(center.getWorld(), player.getWorld())) return;
+        if (!shouldEliminateForWorldChange(state, alive.contains(player.getUniqueId()),
+                center == null ? null : center.getWorld(), player.getWorld())) return;
         eliminate(player, ChatColor.RED + player.getName() + " left the Monster Maze arena.");
     }
 
