@@ -389,6 +389,12 @@ public final class ArcadePortRules {
         return remainingPieces <= 0;
     }
 
+    public static final int PAINTBALL_WINNER_SCORE = 10;
+
+    public static boolean isPaintballWinnerScoreReached(int score) {
+        return score >= PAINTBALL_WINNER_SCORE;
+    }
+
     public static double paintballHealthAfterHit(int remainingPieces) {
         return Math.max(2.0D, Math.max(0, remainingPieces) * 5.0D + 1.0D);
     }
