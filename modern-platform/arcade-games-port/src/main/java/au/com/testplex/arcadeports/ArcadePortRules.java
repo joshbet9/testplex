@@ -158,6 +158,11 @@ public final class ArcadePortRules {
         return nextY >= maxYExclusive;
     }
 
+    /** The source Micro Battles glass barrier is two blocks high, starting at the island spawn Y. */
+    public static int microBattlesBarrierTopY(int islandSpawnY) {
+        return islandSpawnY + 1;
+    }
+
     public static boolean shouldRemoveMicroBarrier(long elapsedMillis) {
         return elapsedMillis >= MICRO_BATTLES_BARRIER_DURATION_MILLIS;
     }
