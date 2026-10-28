@@ -744,6 +744,17 @@ public final class ArcadePortRules {
         return initialPlayers > 2 ? runnersRemaining <= 1 : runnersRemaining <= 0;
     }
 
+    /** Clamp flying dragon targets inside the authored X/Z map bounds with a one-block safety margin. */
+    public static double clampDragonSkyTargetCoordinate(double coordinate, int minInclusive, int maxExclusive) {
+        if (!Double.isFinite(coordinate) || maxExclusive <= minInclusive) {
+            return (minInclusive + (double) maxExclusive) / 2.0D;
+        }
+        double low = minInclusive + 1.0D;
+        double high = maxExclusive - 1.001D;
+        if (high < low) return (minInclusive + (double) maxExclusive) / 2.0D;
+        return Math.max(low, Math.min(high, coordinate));
+    }
+
     public static double turfWarsHitDamage(boolean projectile, boolean ironSword) {
         if (projectile) return 9.0D;
         return ironSword ? 12.0D : 6.0D;
