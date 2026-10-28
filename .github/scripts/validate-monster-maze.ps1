@@ -140,6 +140,7 @@ Assert-Contains "Monster spawns are queued in bounded per-tick batches" $mazeFil
 Assert-Contains "Pending mob spawns are cleared on game end" $mazeFile "_pendingSpawnLocations.clear();"
 Assert-Contains "Modern uses the standalone timer curve" $mazeFile "35 - (_curSafe * 20 / 9)"
 Assert-Contains "Modern adds 30 mobs instead of stacking the 15-mob wave" $mazeFile "fillSpawn(30)"
+Assert-Contains "One contact pass breaks after one normal mob hit" $mazeFile "One contact window must count as a single hit even if several mobs overlap the player."
 Assert-Contains "Body Rush intercepts monster contact" $mazeFile "bodyRushKit.consumeMonsterHit(player)"
 Assert-Contains "Cryo Blitz freezes monsters" $mazeFile "public int freezeMonsters(Location origin"
 Assert-Contains "Maverick targets the next Safe Pad" $mazeFile "getMobKnockTarget()"
@@ -169,7 +170,8 @@ Assert-Contains "Dragon Escape keeps a separate trail line and grouped finish li
 Assert-Contains "Per-game pages keep win effects separate from game cosmetic lines" $cosmeticsFile "Win effects are managed separately in Cosmetics."
 Assert-NotContains "Per-game pages no longer show a separate win-effect placeholder" $cosmeticsFile "Win Effect Plan"
 Assert-Contains "Custom Pack unlock can be provided by the entitlement adapter" $cosmeticsFile "setMonsterMazeCustomPackUnlocked(UUID playerId, boolean unlocked)"
-Assert-Contains "Per-mob-set beacon and Safe Pad colours persist independently" $cosmeticsFile "mob-set-colours."
+Assert-Contains "Per-mob-set Safe Pad and beacon colours are stored together" $cosmeticsFile 'data.set(base + ".beacon", parts[2]);'
+Assert-Contains "Per-mob-set Safe Pad and beacon colours share one menu selection" $cosmeticsFile "String selectedColour = data.getString(base + ".safe-pad","
 Assert-Contains "Enabled Monster Maze mob sets are exposed to gameplay" $cosmeticsFile "getEnabledMonsterMazeMobSets(UUID playerId)"
 Assert-Contains "Custom mob-set selection is persisted separately from default map appearance" $cosmeticsFile "mob-sets-customized"
 Assert-Contains "Operators can grant the Custom Pack for test runs" $cosmeticsFile "arcadecosmetics unlock <online-player> monstermaze custom-pack"
@@ -193,6 +195,8 @@ Assert-Contains "Random maze selection returns the selected non-repeat map" $lay
 Assert-Contains "Fixed pattern selection is available" $layoutFile "getPatternMapPreset"
 Assert-Contains "Pattern selection is configurable" $mazeCoreFile "getPatternMapPreset(_center, getMazeBlockData(), requestedPattern)"
 Assert-Contains "Personal bests use Mineplex custom data" $pbFile "customData.setData(player, key, bestToSave)"
+Assert-Contains "PB recording falls back to the registered Mineplex custom-data manager" $pbFile "Managers.get(CustomDataManager.class)"
+Assert-Contains "PB writes are logged for test-server diagnosis" $pbFile "[MonsterMaze PB] Recorded "
 Assert-Contains "Personal best keys distinguish game mode, pattern and kit" $pbFile 'displayPrefix + "pb.pattern" + pattern + "." + slug(kitName)'
 Assert-Contains "Personal bests can be viewed with /game pb" $pbFile "public static void show("
 Assert-Contains "Custom data setter saves through Mineplex storage" $customDataFile "public void setData(Player player, String key, int value)"
