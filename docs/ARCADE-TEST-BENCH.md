@@ -25,7 +25,7 @@ Open **Game Bot Spawner** from `/arcadetest`, or use:
 
 Use a game key such as `baconbrawl`, `bomblobbers`, `deathtag`, `dragonescape`, `dragons`, `evolution`, `gladiators`, `microbattles`, `monstermaze`, `oneinthequiver`, `paintball`, `runner`, `sheepquest`, `snake`, `spleef`, or `turfwars`. The menu displays the supported games. Dummies spawn near the operator and carry a representative held item for that game. Append `moving` for slow circular motion.
 
-The spawner is bounded to eight dummies per operator and 32 across the server. Dummies are cleaned up when the owner runs `/arcadetest clear), disconnects, or the Arcade plugin shuts down.
+The spawner is bounded to eight dummies per operator and 32 across the server. Dummies are cleaned up when the owner runs `/arcadetest clear`, disconnects, or the Arcade plugin shuts down.
 
 ## Important limitation
 
