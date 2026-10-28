@@ -43,10 +43,51 @@ public final class ArcadePortRules {
     public static final long MICRO_BATTLES_BARRIER_DURATION_MILLIS = 10_000L;
     public static final int MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK = 3;
     public static final int MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS = 2;
+    public static final int DRAGONS_MAX_DRAGONS = 5;
+    public static final long DRAGONS_SPAWN_INTERVAL_MILLIS = 500L;
+    public static final long DRAGONS_CONTACT_COOLDOWN_MILLIS = 2_000L;
+    public static final long DRAGONS_SPARKLER_INTERVAL_MILLIS = 25_000L;
+    public static final int DRAGONS_MAX_SPARKLERS = 2;
+    public static final int DRAGONS_SPARKLER_LIFETIME_TICKS = 100;
+    public static final double DRAGONS_SPARKLER_RANGE_SQUARED = 48.0D * 48.0D;
+    public static final int DRAGONS_MARKSMAN_MAX_ARROWS = 4;
+    public static final long DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS = 4_000L;
+    public static final int DRAGONS_BARRAGE_MAX_ARROWS = 6;
+    public static final long DRAGONS_BARRAGE_INTERVAL_MILLIS = 200L;
+    public static final long DRAGONS_BARRAGE_INITIAL_CHARGE_MILLIS = 1_000L;
+    public static final long DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS = 8_000L;
     public static final long MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS = 20_000L;
     public static final int MICRO_BATTLES_FLETCHER_MAX_ARROWS = 3;
 
     private ArcadePortRules() {
+    }
+
+    public static String normalizeDragonsKit(String requested) {
+        if (requested == null) return null;
+        String kit = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (kit.startsWith("dragons-")) kit = kit.substring("dragons-".length());
+        return switch (kit) {
+            case "coward" -> "coward";
+            case "marksman", "markman" -> "marksman";
+            case "pyrotechnic", "pyro" -> "pyrotechnic";
+            default -> null;
+        };
+    }
+
+    public static boolean shouldSpawnTestDragon(int currentCount, long now, long nextSpawnAt) {
+        return currentCount < DRAGONS_MAX_DRAGONS && now >= nextSpawnAt;
+    }
+
+    public static boolean shouldReplenishDragonSparkler(long now, long nextSpawnAt, int currentCount) {
+        return now >= nextSpawnAt && currentCount < DRAGONS_MAX_SPARKLERS;
+    }
+
+    public static boolean shouldExpireDragonSparkler(int livedTicks, double y, boolean inLiquid) {
+        return livedTicks > DRAGONS_SPARKLER_LIFETIME_TICKS || y < 4.0D || inLiquid;
+    }
+
+    public static double dragonFallDamageAfterReduction(double damage) {
+        return Math.max(0.0D, damage - 1.0D);
     }
 
     public static String normalizeMicroBattlesKit(String requested) {

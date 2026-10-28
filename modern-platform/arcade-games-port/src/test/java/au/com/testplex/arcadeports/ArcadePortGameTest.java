@@ -144,6 +144,25 @@ class ArcadePortGameTest {
         assertEquals(1_200L, ArcadePortRules.QUIVER_NINJA_VANISH_MILLIS);
     }
 
+    @Test void dragonsSourceKitsSpawnLoopSparklerAndFallRulesAreExplicit() {
+        assertEquals("coward", ArcadePortRules.normalizeDragonsKit("Coward"));
+        assertEquals("marksman", ArcadePortRules.normalizeDragonsKit("Marksman"));
+        assertEquals("pyrotechnic", ArcadePortRules.normalizeDragonsKit("Pyro"));
+        assertNull(ArcadePortRules.normalizeDragonsKit("unknown"));
+        assertTrue(ArcadePortRules.shouldSpawnTestDragon(0, 1_000L, 1_000L));
+        assertFalse(ArcadePortRules.shouldSpawnTestDragon(5, 1_000L, 1_000L));
+        assertFalse(ArcadePortRules.shouldSpawnTestDragon(2, 999L, 1_000L));
+        assertTrue(ArcadePortRules.shouldReplenishDragonSparkler(25_000L, 25_000L, 1));
+        assertFalse(ArcadePortRules.shouldReplenishDragonSparkler(25_000L, 25_000L, 2));
+        assertTrue(ArcadePortRules.shouldExpireDragonSparkler(101, 64.0D, false));
+        assertTrue(ArcadePortRules.shouldExpireDragonSparkler(20, 3.9D, false));
+        assertTrue(ArcadePortRules.shouldExpireDragonSparkler(20, 64.0D, true));
+        assertEquals(3.0D, ArcadePortRules.dragonFallDamageAfterReduction(4.0D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.dragonFallDamageAfterReduction(0.5D), 0.00001D);
+        assertEquals(500L, ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS);
+        assertEquals(6, ArcadePortRules.DRAGONS_BARRAGE_MAX_ARROWS);
+    }
+
     @Test void microBattlesSourceKitsFletcherAndIronSkinAreExplicit() {
         assertEquals("archer", ArcadePortRules.normalizeMicroBattlesKit("Archer"));
         assertEquals("worker", ArcadePortRules.normalizeMicroBattlesKit("Worker"));
