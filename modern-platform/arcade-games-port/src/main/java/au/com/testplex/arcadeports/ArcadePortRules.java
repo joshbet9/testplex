@@ -42,6 +42,12 @@ public final class ArcadePortRules {
         return Math.max(0, Math.min(5, next));
     }
 
+    public static int sheepQuestLeadingTeam(int redSheep, int blueSheep) {
+        if (redSheep > blueSheep) return 0;
+        if (blueSheep > redSheep) return 1;
+        return -1;
+    }
+
     public static long nextBaconKnockbackInterval(long currentMillis) {
         return Math.max(BACON_MIN_KNOCKBACK_INTERVAL_MILLIS, currentMillis - 5_000L);
     }
