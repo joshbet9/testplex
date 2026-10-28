@@ -12,7 +12,7 @@ class SnakeRulesTest {
         assertEquals(30, SnakeRules.rouletteDurationSecondsForHit(99));
     }
 
-    @Test void sourceSpeedCurveSaturatesAt126SegmentsButDoesNotCapGrowth() {
+    @Test void sourceSpeedCurveSaturatesAt126Segments() {
         assertTrue(SnakeRules.movementSpeed(126, false) > SnakeRules.movementSpeed(1, false));
         assertEquals(SnakeRules.movementSpeed(126, false), SnakeRules.movementSpeed(180, false), 0.000001D);
         assertEquals(SnakeRules.movementSpeed(126, false), SnakeRules.movementSpeed(1000, false), 0.000001D);
@@ -43,8 +43,8 @@ class SnakeRulesTest {
 
         org.bukkit.util.Vector fallback = SnakeRules.tailExtensionDirection(null, null, facing);
         assertEquals(0.0D, fallback.getX(), 0.000001D);
-        assertEquals(0.0D, fallback.getZ(), 0.000001D);
-        assertEquals(-1.0D, fallback.getZ() == 0.0D ? fallback.getX() : fallback.getZ(), 0.000001D);
+        assertEquals(0.0D, fallback.getY(), 0.000001D);
+        assertEquals(-1.0D, fallback.getZ(), 0.000001D);
     }
 
     @Test void reverserSeedsPathInTheSameOrderAsTheFlippedSegments() {
