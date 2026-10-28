@@ -201,6 +201,9 @@ public final class MenuService implements Listener {
             } else if ("snake".equals(game.getId())) {
                 enginePlugin = "SnakeModern";
                 startCommand = "snake start";
+            } else {
+                enginePlugin = "ArcadeMechanicsModern";
+                startCommand = "arcadeport play " + game.getId();
             }
             if (enginePlugin == null) return;
             if (!Bukkit.getPluginManager().isPluginEnabled(enginePlugin)) {
