@@ -78,9 +78,25 @@ public final class SnakeRules {
      */
     public static List<Location> seedReversedBodyPath(List<Location> reversedSegments) {
         List<Location> path = new ArrayList<>();
-        if (reversedSegments == null) return path;
+        if (reversedSegments == null || reversedSegments.isEmpty()) return path;
+        Location previous = null;
         for (Location location : reversedSegments) {
-            if (location != null) path.add(location.clone());
+            if (location == null) continue;
+            if (previous == null) {
+                path.add(location.clone());
+                previous = location;
+                continue;
+            }
+            double dx = location.getX() - previous.getX();
+            double dy = location.getY() - previous.getY();
+            double dz = location.getZ() - previous.getZ();
+            double distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            int steps = Math.max(1, (int) Math.ceil(distance / 0.2D));
+            for (int step = 1; step <= steps; step++) {
+                double amount = step / (double) steps;
+                path.add(previous.clone().add(dx * amount, dy * amount, dz * amount));
+            }
+            previous = location;
         }
         return path;
     }
