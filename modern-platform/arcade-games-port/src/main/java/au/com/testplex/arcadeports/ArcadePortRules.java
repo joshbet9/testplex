@@ -1,5 +1,7 @@
 package au.com.testplex.arcadeports;
 
+import org.bukkit.Material;
+
 /**
  * Small deterministic rules used by the mechanics-first Arcade prototypes.
  * Keeping timing and hazard classification here makes them testable without
