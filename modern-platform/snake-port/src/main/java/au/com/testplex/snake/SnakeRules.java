@@ -33,6 +33,11 @@ public final class SnakeRules {
     public static final double HAZARD_STEERING_SPEED = 0.12D;
     public static final double HAZARD_CONTACT_RADIUS = 2.1D;
 
+    /** The source cancels normal damage but immediately eliminates a player hit by lava. */
+    public static boolean shouldEliminateFromDamageCause(String causeName) {
+        return causeName != null && "LAVA".equalsIgnoreCase(causeName);
+    }
+
     /** Match Reborn's golden-angle search distances for finding a clear magma-cube spawn. */
     public static double hazardSpawnDistance(int attempt) {
         return HAZARD_SPAWN_BASE_DISTANCE
