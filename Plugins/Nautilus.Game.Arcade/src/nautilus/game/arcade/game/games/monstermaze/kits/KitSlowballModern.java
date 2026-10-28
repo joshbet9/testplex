@@ -5,8 +5,11 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 
-import net.md_5.bungee.api.ChatMessageType;
-import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.chat.BaseComponent;
+import net.md_5.bungee.chat.ComponentSerializer;
+import net.minecraft.server.v1_8_R3.IChatBaseComponent;
+import net.minecraft.server.v1_8_R3.PacketPlayOutChat;
+import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -73,9 +76,15 @@ public class KitSlowballModern extends KitSlowball
         player.sendMessage(C.cAqua + C.Bold + "Cryo Blitz! " + C.cGray
                 + frozen + " monster(s) frozen for 3 seconds.");
         player.playSound(player.getLocation(), org.bukkit.Sound.SUCCESSFUL_HIT, 1.0f, 1.5f);
-        player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(
-                C.cAqua + C.Bold + "CRYO BLITZ " + C.cWhite + frozen + " frozen - 3.0s"));
+        sendActionBar(player, C.cAqua + C.Bold + "CRYO BLITZ " + C.cWhite + frozen + " frozen - 3.0s");
         org.bukkit.Bukkit.getPluginManager().callEvent(new AbilityUseEvent(player));
+    }
+
+    private void sendActionBar(Player player, String message)
+    {
+        BaseComponent[] components = TextComponent.fromLegacyText(message);
+        IChatBaseComponent packetText = IChatBaseComponent.ChatSerializer.a(ComponentSerializer.toString(components));
+        ((CraftPlayer) player).getHandle().playerConnection.sendPacket(new PacketPlayOutChat(packetText, (byte) 2));
     }
 
     @EventHandler
@@ -92,8 +101,7 @@ public class KitSlowballModern extends KitSlowball
             Long next = _nextUse.get(player.getUniqueId());
             if (next == null)
             {
-                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(
-                        C.cAqua + C.Bold + "CRYO BLITZ READY"));
+                sendActionBar(player, C.cAqua + C.Bold + "CRYO BLITZ READY");
                 continue;
             }
             long remaining = next.longValue() - now;
@@ -101,14 +109,12 @@ public class KitSlowballModern extends KitSlowball
             {
                 _nextUse.remove(player.getUniqueId());
                 player.sendMessage(C.cAqua + "Cryo Blitz is ready.");
-                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(
-                        C.cAqua + C.Bold + "CRYO BLITZ READY"));
+                sendActionBar(player, C.cAqua + C.Bold + "CRYO BLITZ READY");
             }
             else
             {
-                player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText(
-                        C.cAqua + C.Bold + "CRYO BLITZ " + C.cWhite
-                                + String.format(java.util.Locale.US, "%.1fs", remaining / 1000.0D)));
+                sendActionBar(player, C.cAqua + C.Bold + "CRYO BLITZ " + C.cWhite
+                        + String.format(java.util.Locale.US, "%.1fs", remaining / 1000.0D));
             }
         }
     }
