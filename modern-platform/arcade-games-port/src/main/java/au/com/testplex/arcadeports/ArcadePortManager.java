@@ -649,6 +649,9 @@ public final class ArcadePortManager implements Listener {
                 break;
             case SHEEP_QUEST:
                 player.getInventory().addItem(namedItem(Material.SADDLE, "Shepherd", "Hold to pick up sheep; carry them to your team's pen."));
+                player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
+                player.getInventory().addItem(new ItemStack(Material.BOW));
+                player.getInventory().addItem(new ItemStack(Material.ARROW, 8));
                 break;
             case SPLEEF:
                 player.getInventory().addItem(new ItemStack(Material.IRON_SHOVEL));
@@ -1466,7 +1469,7 @@ public final class ArcadePortManager implements Listener {
         if (active != session || attacker.equals(target) || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
         if ((session.type == ArcadePortGame.PAINTBALL || session.type == ArcadePortGame.TURF_WARS
-                || session.type == ArcadePortGame.MICRO_BATTLES)
+                || session.type == ArcadePortGame.MICRO_BATTLES || session.type == ArcadePortGame.SHEEP_QUEST)
                 && session.teams.getOrDefault(attacker.getUniqueId(), -1).equals(session.teams.getOrDefault(target.getUniqueId(), -2))) return;
         if (session.type == ArcadePortGame.PAINTBALL && "melee".equals(source)) return;
         if (session.type == ArcadePortGame.TURF_WARS && !session.turfCombat) return;
@@ -1528,8 +1531,15 @@ public final class ArcadePortManager implements Listener {
                 eliminate(session, target, attacker, "lost a duel");
                 break;
             case SHEEP_QUEST:
-                // A hit makes the carrier drop every sheep in their stack.
+                // Hits drop a carrier's stack and still deal damage, as in the original TeamGame.
                 dropSheepFromCarrier(session, target, "was hit");
+                double sheepQuestDamage = ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE;
+                if (target.getHealth() <= sheepQuestDamage) {
+                    eliminate(session, target, attacker, "was defeated while carrying sheep");
+                } else {
+                    target.setHealth(target.getHealth() - sheepQuestDamage);
+                    target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
+                }
                 break;
             case ONE_IN_THE_QUIVER:
                 scoreQuiverKill(session, attacker, target);
@@ -1644,7 +1654,13 @@ public final class ArcadePortManager implements Listener {
         active = null;
         if (session.tickTask != null) session.tickTask.cancel();
         if (announceWinner) {
-            announce(session, winner == null ? ChatColor.YELLOW + "Round ended." : ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won " + session.type.displayName() + "!");
+            if (session.type == ArcadePortGame.SHEEP_QUEST && winner != null) {
+                int winnerTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
+                announce(session, sheepTeamChatColor(winnerTeam) + sheepTeamName(winnerTeam)
+                        + ChatColor.GOLD + " team won Sheep Quest!");
+            } else {
+                announce(session, winner == null ? ChatColor.YELLOW + "Round ended." : ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won " + session.type.displayName() + "!");
+            }
         }
         for (Entity entity : new ArrayList<>(session.entities)) if (entity != null && entity.isValid()) entity.remove();
         session.bombOwners.clear();
