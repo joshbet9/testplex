@@ -2323,7 +2323,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (active != session || !"body-slam".equals(source) || !session.alive.contains(attacker.getUniqueId())) return;
         double recoil = ArcadePortRules.BACON_BODY_SLAM_RECOIL_DAMAGE;
-        if (attacker.getHealth() <= recoil) eliminate(session, attacker, target, "was hurt by their body slam");
+        if (attacker.getHealth() <= recoil) eliminate(session, attacker, null, "was hurt by their body slam");
         else {
             attacker.setHealth(attacker.getHealth() - recoil);
             Vector recoilDirection = attacker.getLocation().toVector().subtract(target.getLocation().toVector());
