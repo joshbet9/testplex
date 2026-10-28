@@ -66,7 +66,10 @@ class SnakeRulesTest {
         assertEquals(7.0D, path.get(5).getX(), 0.000001D);
         assertEquals(6.0D, path.get(10).getX(), 0.000001D);
         for (int i = 1; i < path.size(); i++) {
-            assertTrue(path.get(i - 1).distance(path.get(i)) <= 0.200001D);
+            double dx = path.get(i).getX() - path.get(i - 1).getX();
+            double dy = path.get(i).getY() - path.get(i - 1).getY();
+            double dz = path.get(i).getZ() - path.get(i - 1).getZ();
+            assertTrue(Math.sqrt(dx * dx + dy * dy + dz * dz) <= 0.200001D);
         }
         segments.get(0).setX(99.0D);
         assertEquals(8.0D, path.get(0).getX(), 0.000001D);
