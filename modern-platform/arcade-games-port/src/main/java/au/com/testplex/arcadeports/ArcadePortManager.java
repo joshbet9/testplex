@@ -469,7 +469,19 @@ public final class ArcadePortManager implements Listener {
         // Reborn doubles the opening build window; later build windows are 20 seconds.
         session.turfPhaseEndsAt = type == ArcadePortGame.TURF_WARS
                 ? now + ArcadePortRules.TURF_WARS_INITIAL_BUILD_PHASE_MILLIS : 0L;
-        session.turfFrontlineX = -1;
+        SourceMapCatalog.MapData turfSourceMap = type == ArcadePortGame.TURF_WARS
+                ? sourceMapData.get(type.id()) : null;
+        if (turfSourceMap != null && turfSourceMap.hasBounds()
+                && turfSourceMap.maxX() > turfSourceMap.minX()
+                && turfSourceMap.maxZ() > turfSourceMap.minZ()) {
+            session.turfFrontlineMinX = turfSourceMap.minX();
+            session.turfFrontlineMaxXExclusive = turfSourceMap.maxX();
+            session.turfMinZ = turfSourceMap.minZ();
+            session.turfMaxZExclusive = turfSourceMap.maxZ();
+        }
+        session.turfInitialFrontlineX = ArcadePortRules.turfWarsInitialFrontline(
+                session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive);
+        session.turfFrontlineX = session.turfInitialFrontlineX;
         lastDragonHazard = now + 8_000L;
         lastSheepSpawn = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
         if (type == ArcadePortGame.DRAGON_ESCAPE) spawnDragonEscapeDragon(session);
@@ -554,7 +566,7 @@ public final class ArcadePortManager implements Listener {
             if (type == ArcadePortGame.MICRO_BATTLES && !sourceMapWorlds.contains(type.id())) {
                 spawn = microTeamSpawn(teamId, i / 4, (participants.size() + 3) / 4);
             } else if (type == ArcadePortGame.TURF_WARS && !sourceMapWorlds.contains(type.id())) {
-                spawn = turfWarsSpawn(world, session.teams.get(player.getUniqueId()), i / 2,
+                spawn = turfWarsSpawn(session, session.teams.get(player.getUniqueId()), i / 2,
                         (participants.size() + 1) / 2);
             }
             player.closeInventory();
@@ -1109,6 +1121,15 @@ public final class ArcadePortManager implements Listener {
         }
         session.microBarrierActive = false;
         announce(session, ChatColor.AQUA + "Glass barriers are down! Fight for your team.");
+    }
+
+    private Location turfWarsSpawn(Session session, int team, int slot, int slots) {
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (mapData != null) {
+            List<Location> teamSpawns = mapData.teamSpawnLocationsForTeam(team, 2);
+            if (!teamSpawns.isEmpty()) return teamSpawns.get(Math.floorMod(slot, teamSpawns.size())).clone();
+        }
+        return turfWarsSpawn(session.world, team, slot, slots);
     }
 
     private Location turfWarsSpawn(World world, int team, int slot, int slots) {
@@ -3411,7 +3432,7 @@ public final class ArcadePortManager implements Listener {
                     || !session.players.containsKey(targetId) || !session.respawning.remove(targetId)) return;
             int playerIndex = new ArrayList<>(session.players.keySet()).indexOf(targetId);
             int slots = Math.max(1, (session.players.size() + 1) / 2);
-            Location spawn = turfWarsSpawn(session.world, session.teams.getOrDefault(targetId, 0),
+            Location spawn = turfWarsSpawn(session, session.teams.getOrDefault(targetId, 0),
                     Math.max(0, playerIndex / 2), slots);
             target.teleport(spawn);
             target.setGameMode(GameMode.SURVIVAL);
@@ -3434,7 +3455,7 @@ public final class ArcadePortManager implements Listener {
         int paintedX = team == 0 ? nextFrontline : oldFrontline;
         session.turfFrontlineX = nextFrontline;
         Material turf = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
-        for (int z = -HALF_SIZE; z <= HALF_SIZE; z++) {
+        for (int z = session.turfMinZ; z < session.turfMaxZExclusive; z++) {
             session.world.getBlockAt(paintedX, 63, z).setType(turf, false);
             for (int y = 64; y <= 68; y++) {
                 Block structure = session.world.getBlockAt(paintedX, y, z);
@@ -3443,7 +3464,8 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
-        if (ArcadePortRules.isTurfWarsWinningLine(nextFrontline, team, HALF_SIZE)) {
+        if (ArcadePortRules.isTurfWarsWinningLine(nextFrontline, team,
+                session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive)) {
             finish(session, attacker, true);
             return;
         }
@@ -3540,8 +3562,8 @@ public final class ArcadePortManager implements Listener {
     private Player timeoutWinner(Session session) {
         int team = -1;
         if (session.type == ArcadePortGame.TURF_WARS) {
-            team = ArcadePortRules.turfWarsTimeoutLeader(
-                    session.turfFrontlineX, timeoutTeamKills(session, 0), timeoutTeamKills(session, 1));
+            team = ArcadePortRules.turfWarsTimeoutLeader(session.turfFrontlineX,
+                    session.turfInitialFrontlineX, timeoutTeamKills(session, 0), timeoutTeamKills(session, 1));
         } else if (session.type == ArcadePortGame.MICRO_BATTLES
                 || session.type == ArcadePortGame.PAINTBALL
                 || session.type == ArcadePortGame.BOMB_LOBBERS) {
@@ -5192,6 +5214,11 @@ public final class ArcadePortManager implements Listener {
         boolean sheepQuestOvertime;
         long turfPhaseEndsAt;
         int turfFrontlineX = -1;
+        int turfInitialFrontlineX = -1;
+        int turfFrontlineMinX = -HALF_SIZE;
+        int turfFrontlineMaxXExclusive = HALF_SIZE;
+        int turfMinZ = -HALF_SIZE;
+        int turfMaxZExclusive = HALF_SIZE + 1;
         long endsAt;
         int ticks;
         BukkitTask tickTask;
