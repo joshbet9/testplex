@@ -2028,7 +2028,7 @@ public enum GameKit
 					GameDisplay.MonsterMazeSpeed,
 					"Body Builder",
 					"monstermazespeedbodybuilder",
-					new String[] { "Gain max health when first to a Safe Pad.", "Drop an apple to activate Body Rush." },
+					new String[] { "Gain max health when first to a Safe Pad.", "Right-click an apple to activate Body Rush." },
 					new KitEntityData<>(Skeleton.class, new ItemStack(Material.IRON_PLATE)),
 					2000
 			),
@@ -2082,7 +2082,7 @@ public enum GameKit
 					GameDisplay.MonsterMazeModern,
 					"Body Builder",
 					"monstermazemodernbodybuilder",
-					new String[] { "Gain max health when first to a Safe Pad.", "Drop an apple to activate Body Rush." },
+					new String[] { "Gain max health when first to a Safe Pad.", "Right-click an apple to activate Body Rush." },
 					new KitEntityData<>(Skeleton.class, new ItemStack(Material.IRON_PLATE)),
 					2000
 			),
