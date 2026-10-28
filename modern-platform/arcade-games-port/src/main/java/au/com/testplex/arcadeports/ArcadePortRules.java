@@ -24,11 +24,14 @@ public final class ArcadePortRules {
     public static final int RUNNER_MAX_FROSTBALLS = 16;
     public static final int RUNNER_FROSTBALL_SLOW_TICKS = 40;
     public static final int RUNNER_FROSTBALL_SLOW_AMPLIFIER = 2;
+    /** Original Bacon Brawl is decided by kills at the two-minute mark. */
+    public static final long BACON_BRAWL_ROUND_MILLIS = 120_000L;
+    public static final long BACON_BRAWL_RESPAWN_DELAY_TICKS = 20L;
     public static final long BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS = 50_000L;
     public static final long BACON_MIN_KNOCKBACK_INTERVAL_MILLIS = 5_000L;
     public static final long BACON_SLOW_UPDATE_INTERVAL_MILLIS = 4_000L;
     public static final long BACON_HUNGER_INTERVAL_MILLIS = 4_000L;
-    public static final int BACON_HUNGER_DRAIN_PER_INTERVAL = 1;
+    public static final int BACON_HUNGER_DRAIN_PER_INTERVAL = 2;
     public static final float BACON_SATURATION_ON_FOOD_CHANGE = 5.0F;
     public static final double BACON_STARVATION_DAMAGE = 4.0D;
     public static final double BACON_STANDARD_HIT_DAMAGE = 6.0D;
@@ -291,6 +294,29 @@ public final class ArcadePortRules {
             case "sheep", "sheep-pig" -> "sheep-pig";
             default -> null;
         };
+    }
+
+    /**
+     * Return the unique highest-kill player's index, or -1 for empty/tied scores.
+     * The original game is a kill race, so deaths and respawns do not remove a
+     * player's accumulated kills from the final comparison.
+     */
+    public static int baconBrawlUniqueLeaderIndex(java.util.List<Integer> kills) {
+        if (kills == null || kills.isEmpty()) return -1;
+        int bestScore = Integer.MIN_VALUE;
+        int bestIndex = -1;
+        boolean tied = false;
+        for (int i = 0; i < kills.size(); i++) {
+            int score = kills.get(i) == null ? 0 : kills.get(i);
+            if (score > bestScore) {
+                bestScore = score;
+                bestIndex = i;
+                tied = false;
+            } else if (score == bestScore) {
+                tied = true;
+            }
+        }
+        return tied ? -1 : bestIndex;
     }
 
     public static double initialBaconKnockback(int playerCount) {
