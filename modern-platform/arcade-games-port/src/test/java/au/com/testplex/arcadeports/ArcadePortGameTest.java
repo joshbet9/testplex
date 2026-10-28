@@ -551,6 +551,13 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.sheepQuestLeadingTeam(null));
     }
 
+    @Test void sheepQuestPenMarkersMatchTheFloorOneBlockBelowSheepFeet() {
+        assertTrue(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -4, 10, 63, -4));
+        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 63, -4, 10, 63, -4));
+        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(11, 64, -4, 10, 63, -4));
+        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -3, 10, 63, -4));
+    }
+
     @Test void sheepQuestPlayerHitsDropSheepAndDealDamage() {
         assertEquals(4.0D, ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE, 0.00001D);
     }
