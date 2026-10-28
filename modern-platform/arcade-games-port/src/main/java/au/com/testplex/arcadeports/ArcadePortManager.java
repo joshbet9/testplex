@@ -2541,9 +2541,15 @@ public final class ArcadePortManager implements Listener {
     private Location randomDragonSkyTarget(Session session) {
         Location center = session.dragonSpectatorLocation == null
                 ? session.world.getSpawnLocation() : session.dragonSpectatorLocation;
-        return center.clone().add(ThreadLocalRandom.current().nextDouble(-50.0D, 51.0D),
-                ThreadLocalRandom.current().nextDouble(20.0D, 41.0D),
-                ThreadLocalRandom.current().nextDouble(-50.0D, 51.0D));
+        double x = center.getX() + ThreadLocalRandom.current().nextDouble(-50.0D, 51.0D);
+        double z = center.getZ() + ThreadLocalRandom.current().nextDouble(-50.0D, 51.0D);
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (mapData != null && mapData.hasBounds()) {
+            x = ArcadePortRules.clampDragonSkyTargetCoordinate(x, mapData.minX(), mapData.maxX());
+            z = ArcadePortRules.clampDragonSkyTargetCoordinate(z, mapData.minZ(), mapData.maxZ());
+        }
+        return new Location(session.world, x,
+                center.getY() + ThreadLocalRandom.current().nextDouble(20.0D, 41.0D), z);
     }
 
     private void setDragonTargetSky(Session session, EnderDragon dragon) {
