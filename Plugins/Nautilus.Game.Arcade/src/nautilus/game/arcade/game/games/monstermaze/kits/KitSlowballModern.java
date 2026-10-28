@@ -35,6 +35,7 @@ public class KitSlowballModern extends KitSlowball
     private static final double RADIUS = 6.0D;
 
     private final Map<UUID, Long> _nextUse = new HashMap<UUID, Long>();
+    private final Map<UUID, Long> _frozenUntil = new HashMap<UUID, Long>();
 
     public KitSlowballModern(nautilus.game.arcade.ArcadeManager manager)
     {
@@ -74,6 +75,8 @@ public class KitSlowballModern extends KitSlowball
 
         int frozen = game.getMaze().freezeMonsters(player.getLocation(), RADIUS, FREEZE_MS);
         _nextUse.put(player.getUniqueId(), now + COOLDOWN_MS);
+        if (frozen > 0)
+            _frozenUntil.put(player.getUniqueId(), now + FREEZE_MS);
         player.sendMessage(C.cAqua + C.Bold + "Cryo Blitz! " + C.cGray
                 + frozen + " monster(s) frozen for 3 seconds.");
         player.playSound(player.getLocation(), org.bukkit.Sound.SUCCESSFUL_HIT, 1.0f, 1.5f);
@@ -99,6 +102,14 @@ public class KitSlowballModern extends KitSlowball
         {
             if (!player.isOnline() || !HasKit(player))
                 continue;
+            Long frozenUntil = _frozenUntil.get(player.getUniqueId());
+            if (frozenUntil != null && frozenUntil.longValue() > now)
+            {
+                sendActionBar(player, C.cAqua + C.Bold + "FROZEN " + C.cWhite
+                        + String.format(java.util.Locale.US, "%.1fs", (frozenUntil.longValue() - now) / 1000.0D));
+                continue;
+            }
+            _frozenUntil.remove(player.getUniqueId());
             Long next = _nextUse.get(player.getUniqueId());
             if (next == null)
             {
@@ -124,6 +135,9 @@ public class KitSlowballModern extends KitSlowball
     public void onGameEnd(GameStateChangeEvent event)
     {
         if (event.GetState() == GameState.End || event.GetState() == GameState.Dead)
+        {
             _nextUse.clear();
+            _frozenUntil.clear();
+        }
     }
 }
