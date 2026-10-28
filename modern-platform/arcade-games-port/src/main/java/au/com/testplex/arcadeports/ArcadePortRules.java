@@ -496,6 +496,18 @@ public final class ArcadePortRules {
         return currentFrontline;
     }
 
+    /**
+     * Reborn scales the starting Gladiators arenas to the lobby size: fewer players
+     * start farther inward (stronger tier); larger lobbies use outer tiers first.
+     * Tier index is GREEN=0, YELLOW=1, ORANGE=2, RED=3.
+     */
+    public static int gladiatorsStartingTierForPlayers(int players) {
+        if (players <= 2) return 3;
+        if (players <= 4) return 2;
+        if (players <= 8) return 1;
+        return 0;
+    }
+
     /** Original Gladiators opens with green outer arenas, then moves inward by tier. */
     public static String gladiatorsArenaMarkerGroup(int round) {
         return switch (Math.max(0, Math.min(3, round))) {
