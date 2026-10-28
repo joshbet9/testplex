@@ -14,6 +14,7 @@ import net.minecraft.server.v1_8_R3.IChatBaseComponent;
 import net.minecraft.server.v1_8_R3.PacketPlayOutChat;
 import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
 import org.bukkit.Bukkit;
+import org.bukkit.Effect;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.entity.LivingEntity;
@@ -71,10 +72,10 @@ public class KitBodyBuilderModern extends KitBodyBuilder
                 Material.APPLE, (byte) 0, 2, C.cRed + C.Bold + "Body Rush");
         ItemMeta meta = item.getItemMeta();
         meta.setLore(java.util.Arrays.asList(
-                C.cGray + "Right-click to activate.",
-                C.cGray + "10 seconds of monster-hit immunity.",
-                C.cGray + "Each monster hit removes 2 seconds.",
-                C.cRed + "Activations: 2"));
+                C.cYellow + C.Bold + "RIGHT-CLICK TO ACTIVATE",
+                C.cWhite + "10 seconds of " + C.cRed + C.Bold + "monster-hit immunity",
+                C.cGray + "Each hit removes " + C.cYellow + C.Bold + "2 seconds",
+                C.cGold + C.Bold + "Activations: " + C.cRed + C.Bold + "2"));
         item.setItemMeta(meta);
         player.getInventory().setItem(0, item);
     }
@@ -131,20 +132,22 @@ public class KitBodyBuilderModern extends KitBodyBuilder
             hand.setAmount(hand.getAmount() - 1);
             ItemMeta remainingMeta = hand.getItemMeta();
             remainingMeta.setLore(java.util.Arrays.asList(
-                    C.cGray + "Right-click to activate.",
-                    C.cGray + "10 seconds of monster-hit immunity.",
-                    C.cGray + "Each monster hit removes 2 seconds.",
-                    C.cRed + "Activations: " + hand.getAmount()));
+                    C.cYellow + C.Bold + "RIGHT-CLICK TO ACTIVATE",
+                    C.cWhite + "10 seconds of " + C.cRed + C.Bold + "monster-hit immunity",
+                    C.cGray + "Each hit removes " + C.cYellow + C.Bold + "2 seconds",
+                    C.cGold + C.Bold + "Activations: " + C.cRed + C.Bold + hand.getAmount()));
             hand.setItemMeta(remainingMeta);
             player.setItemInHand(hand);
         }
         player.updateInventory();
         _bodyRushUntil.put(player.getUniqueId(), now + BODY_RUSH_DURATION_MS);
         _bodyRushFeedbackUntil.remove(player.getUniqueId());
-        player.sendMessage(C.cRed + C.Bold + "Body Rush activated!" + C.cGray
-                + " Monster hits will be deflected for 10 seconds.");
+        player.sendMessage(C.cRed + C.Bold + "BODY RUSH ACTIVATED! " + C.cWhite
+                + "Monster hits are deflected for " + C.cGold + C.Bold + "10 seconds" + C.cWhite + ".");
         player.playSound(player.getLocation(), org.bukkit.Sound.SUCCESSFUL_HIT, 1.0f, 1.25f);
-        sendActionBar(player, C.cRed + C.Bold + "BODY RUSH 10.0s");
+        player.getWorld().playEffect(player.getLocation(), Effect.MOBSPAWNER_FLAMES, 0);
+        sendActionBar(player, C.cRed + C.Bold + "BODY RUSH! " + C.cGold + C.Bold + "10.0s"
+                + C.cGray + "  |  " + C.cYellow + C.Bold + "HIT -2.0s");
         Bukkit.getPluginManager().callEvent(new AbilityUseEvent(player));
     }
 
@@ -184,6 +187,8 @@ public class KitBodyBuilderModern extends KitBodyBuilder
 
         long remaining = until.longValue() - HIT_PENALTY_MS;
         _bodyRushFeedbackUntil.put(player.getUniqueId(), now + 750L);
+        player.playSound(player.getLocation(), org.bukkit.Sound.HURT_FLESH, 1.0f, 1.35f);
+        player.getWorld().playEffect(player.getLocation(), Effect.MOBSPAWNER_FLAMES, 0);
         if (remaining <= now)
             _bodyRushUntil.remove(player.getUniqueId());
         else
@@ -239,9 +244,10 @@ public class KitBodyBuilderModern extends KitBodyBuilder
             {
                 Long feedbackUntil = _bodyRushFeedbackUntil.get(playerId);
                 String feedback = feedbackUntil != null && feedbackUntil.longValue() > now
-                        ? " " + ChatColor.YELLOW + "-2.0s" : "";
-                sendActionBar(player, C.cRed + C.Bold + "BODY RUSH "
-                        + String.format(java.util.Locale.US, "%.1fs", (until - now) / 1000.0D) + feedback);
+                        ? " " + C.cYellow + C.Bold + "-2.0s" : "";
+                sendActionBar(player, C.cRed + C.Bold + "BODY RUSH! " + C.cGold + C.Bold
+                        + String.format(java.util.Locale.US, "%.1fs", (until - now) / 1000.0D)
+                        + C.cGray + " remaining" + feedback);
             }
         }
         Iterator<Map.Entry<UUID, Long>> feedbackIterator = _bodyRushFeedbackUntil.entrySet().iterator();

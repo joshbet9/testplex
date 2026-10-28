@@ -882,7 +882,11 @@ public class Maze implements Listener
 	{
 		if (player == null)
 			return null;
-		getMobThemeChoiceForPlayer(player);
+		String choice = getMobThemeChoiceForPlayer(player);
+		// The source repo's Map Default palette is lime for both the Safe Pad and
+		// its beacon glass. It is a distinct palette key, not the mob model's colour.
+		if ("map_default".equals(choice))
+			return "map_default";
 		return _viewerMobSetIds.get(player.getUniqueId());
 	}
 
@@ -892,12 +896,46 @@ public class Maze implements Listener
 		if (player == null)
 			return "map_default";
 		String current = getMobThemeChoiceForPlayer(player);
-		int index = MOB_THEME_CYCLE.indexOf(current);
-		String next = MOB_THEME_CYCLE.get((index < 0 ? 0 : index + 1) % MOB_THEME_CYCLE.size());
+		List<String> options = getMobThemeOptions(player.getUniqueId());
+		int index = options.indexOf(current);
+		String next = options.get((index < 0 ? 0 : index + 1) % options.size());
 		applyMobThemeChoice(player, next, true);
 		refreshMobDisguisesForViewer(player);
 		refreshSafePadCosmeticColours(player);
 		return next;
+	}
+
+	/** Reconcile an in-game theme after Mob Sets are enabled or disabled in Cosmetics. */
+	public void refreshMobSetSettingsForPlayer(Player player)
+	{
+		if (player == null || !player.isOnline())
+			return;
+		UUID playerId = player.getUniqueId();
+		String choice = getMobThemeChoiceForPlayer(player);
+		List<String> available = getAvailableMobSets(playerId);
+		boolean themeChanged = false;
+		if ("random".equals(choice))
+		{
+			String currentConcrete = _viewerMobSetIds.get(playerId);
+			if (available.isEmpty())
+			{
+				applyMobThemeChoice(player, "map_default", true);
+				themeChanged = true;
+			}
+			else if (currentConcrete == null || !available.contains(currentConcrete))
+			{
+				applyMobThemeChoice(player, "random", false);
+				themeChanged = true;
+			}
+		}
+		else if (!"map_default".equals(choice) && !available.contains(choice))
+		{
+			applyMobThemeChoice(player, "map_default", true);
+			themeChanged = true;
+		}
+		if (themeChanged)
+			refreshMobDisguisesForViewer(player);
+		refreshSafePadCosmeticColours(player);
 	}
 
 	private void applyMobThemeChoice(Player player, String choice, boolean persist)
@@ -906,25 +944,33 @@ public class Maze implements Listener
 		String selected = choice == null ? "map_default" : choice.toLowerCase(Locale.ROOT);
 		if (!MOB_THEME_CYCLE.contains(selected))
 			selected = "map_default";
-		String concrete = selected;
-		EntityType type;
-		if ("map_default".equals(selected))
-		{
-			concrete = null;
-			type = _host.getMonsterType();
-		}
-		else
+
+		String concrete = null;
+		EntityType type = _host.getMonsterType();
+		if (!"map_default".equals(selected))
 		{
 			if ("random".equals(selected))
 				concrete = randomConcreteMobSet(playerId);
-			type = entityTypeForMobSet(concrete);
-			if (type == null)
+			else
+				concrete = selected;
+
+			if (concrete == null || !getAvailableMobSets(playerId).contains(concrete))
 			{
 				selected = "map_default";
 				concrete = null;
-				type = _host.getMonsterType();
+			}
+			else
+			{
+				type = entityTypeForMobSet(concrete);
+				if (type == null)
+				{
+					selected = "map_default";
+					concrete = null;
+					type = _host.getMonsterType();
+				}
 			}
 		}
+
 		_viewerMobThemeChoices.put(playerId, selected);
 		_viewerMobSetIds.put(playerId, concrete);
 		_viewerMobTypes.put(playerId, type == null ? _host.getMonsterType() : type);
@@ -932,10 +978,37 @@ public class Maze implements Listener
 			ArcadeCosmeticsMenu.setMonsterMazeSelectedMobTheme(playerId, selected);
 	}
 
+	private List<String> getAvailableMobSets(UUID playerId)
+	{
+		List<String> available = new ArrayList<String>();
+		boolean customised = ArcadeCosmeticsMenu.hasCustomMonsterMazeMobSets(playerId);
+		for (String mobSet : MOB_THEME_CYCLE)
+		{
+			if ("map_default".equals(mobSet) || "random".equals(mobSet))
+				continue;
+			if (!customised || ArcadeCosmeticsMenu.isMonsterMazeMobSetEnabled(playerId, mobSet))
+				available.add(mobSet);
+		}
+		return available;
+	}
+
+	private List<String> getMobThemeOptions(UUID playerId)
+	{
+		List<String> options = new ArrayList<String>();
+		options.add("map_default");
+		List<String> available = getAvailableMobSets(playerId);
+		options.addAll(available);
+		if (!available.isEmpty())
+			options.add("random");
+		return options;
+	}
+
 	private String randomConcreteMobSet(UUID playerId)
 	{
-		int count = MOB_THEME_CYCLE.size() - 2; // Exclude Map Default and Random Mob.
-		return MOB_THEME_CYCLE.get(1 + Math.floorMod(playerId.hashCode(), count));
+		List<String> available = getAvailableMobSets(playerId);
+		if (available.isEmpty())
+			return null;
+		return available.get(Math.floorMod(playerId.hashCode(), available.size()));
 	}
 
 	private void refreshMobDisguisesForViewer(Player viewer)
@@ -1720,7 +1793,7 @@ public class Maze implements Listener
 			return;
 		_padSpawnCount++;
 
-		Location location = pad.getLocation().clone().add(0.5D, 3.0D, 0.5D);
+		Location location = pad.getLocation().clone().add(0.5D, 10.0D, 0.5D);
 		Color colour = _padSpawnCount == 1 ? Color.LIME : Color.AQUA;
 		for (Player viewer : _host.GetPlayers(false))
 		{

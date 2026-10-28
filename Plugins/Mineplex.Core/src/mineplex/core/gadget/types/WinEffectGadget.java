@@ -54,6 +54,7 @@ public abstract class WinEffectGadget extends Gadget
 	protected long _start, _finish, _length = TimeUnit.SECONDS.toMillis(12);
 	protected Location _baseLocation;
 	private int _gameTime = 12000;
+	private boolean _testMode;
 
 	/**
 	 * The file name of the schematic used for this win room. Schematics can be found in the "schematic" folder
@@ -119,6 +120,11 @@ public abstract class WinEffectGadget extends Gadget
 
 	public void runFinish()
 	{
+		if (_testMode)
+		{
+			runFinishForTest();
+			return;
+		}
 		try
 		{
 			finish();
@@ -137,6 +143,7 @@ public abstract class WinEffectGadget extends Gadget
 			_nonTeam = null;
 			_other = null;
 			_allPlayers = null;
+			_testMode = false;
 			// Loads gadgets back when players are teleported to the arcade hub, after the win effect
 			Manager.getUserGadgetPersistence().setEnabled(true);
 			for (Player player : UtilServer.getPlayers())
@@ -204,6 +211,7 @@ public abstract class WinEffectGadget extends Gadget
 
 	public void setup(Player player, List<Player> team, List<Player> nonTeam, Location loc)
 	{
+		_testMode = false;
 		_player = player;
 		_team = team;
 		_nonTeam = nonTeam;
@@ -242,6 +250,7 @@ public abstract class WinEffectGadget extends Gadget
 	 */
 	public void setupForTest(Player player, Location loc)
 	{
+		_testMode = true;
 		_player = player;
 		_team = new ArrayList<>();
 		_team.add(player);
@@ -281,7 +290,15 @@ public abstract class WinEffectGadget extends Gadget
 			_allPlayers = null;
 			_start = 0L;
 			_finish = 0L;
+			_testMode = false;
 		}
+	}
+
+	/** Install the native invisible win-room barrier shell for the isolated tester. */
+	public void prepareTestContainment(Location loc)
+	{
+		if (_testMode && loc != null && loc.getWorld() != null)
+			createBarriers(loc);
 	}
 
 	/**
@@ -305,16 +322,32 @@ public abstract class WinEffectGadget extends Gadget
 	public void teleport(Location loc)
 	{
 		createBarriers(loc);
+		final boolean testTeleport = _testMode;
+		final Player testTarget = _player;
 
 		BukkitRunnable bRunnable = new BukkitRunnable()
 		{
 			@Override
 			public void run()
 			{
-				VisibilityManager vm = Managers.require(VisibilityManager.class);
-				for (Player p : UtilServer.getPlayers())
+				VisibilityManager vm = testTeleport ? null : Managers.require(VisibilityManager.class);
+				List<Player> targets = new ArrayList<Player>();
+				if (testTeleport)
 				{
-					Bukkit.getOnlinePlayers().forEach(pl -> vm.hidePlayer(pl, p, "Inside Win Effect"));
+					if (testTarget != null && testTarget.isOnline())
+						targets.add(testTarget);
+				}
+				else
+				{
+					for (Player online : UtilServer.getPlayers())
+						targets.add(online);
+				}
+				for (Player p : targets)
+				{
+					if (p == null || !p.isOnline())
+						continue;
+					if (!testTeleport)
+						Bukkit.getOnlinePlayers().forEach(pl -> vm.hidePlayer(pl, p, "Inside Win Effect"));
 					p.eject();
 					p.teleport(loc);
 					p.setGameMode(GameMode.ADVENTURE);

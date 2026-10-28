@@ -224,9 +224,18 @@ public class AchievementPage extends ShopPageBase<AchievementManager, Achievemen
 			@Override
 			public void onClick(Player player, ClickType clickType)
 			{
-				getShop().openPageForPlayer(getPlayer(), new MonsterMazePBPage(getPlugin(), _statsManager,
-						getShop(), getClientManager(), getDonationManager(), player, _targetName, _targetStats));
-				player.playSound(player.getLocation(), Sound.CLICK, 1, 1);
+				try
+				{
+					MonsterMazePBPage page = new MonsterMazePBPage(getPlugin(), _statsManager,
+							getShop(), getClientManager(), getDonationManager(), player, _targetName, _targetStats);
+					getShop().openPageForPlayer(player, page);
+					player.playSound(player.getLocation(), Sound.CLICK, 1, 1);
+				}
+				catch (RuntimeException ex)
+				{
+					Bukkit.getLogger().warning("[MonsterMaze PB] Could not open PB browser: " + ex.getMessage());
+					player.sendMessage(ChatColor.RED + "Monster Maze PBs could not be opened. Check the server log.");
+				}
 			}
 		});
 	}
