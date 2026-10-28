@@ -32,6 +32,18 @@ class MonsterMazePortContractTest {
         }
     }
 
+    @Test void shipsSafeIsolatedTestDefaults() throws Exception {
+        try (InputStream input = getClass().getClassLoader().getResourceAsStream("config.yml")) {
+            assertNotNull(input, "config.yml must be packaged with MonsterMazeModern.jar");
+            YamlConfiguration config = YamlConfiguration.loadConfiguration(
+                    new InputStreamReader(input, StandardCharsets.UTF_8));
+            assertTrue(config.getBoolean("test-mode", false),
+                    "The modern test port must keep production backend writes disabled by default");
+            assertFalse(config.getBoolean("record-runs", true),
+                    "Test runs must not be recorded to the production backend by default");
+        }
+    }
+
     @Test void configuredMapsUseTheSevenSourceWorldFoldersProvisionedByDeployment() throws Exception {
         try (InputStream input = getClass().getClassLoader().getResourceAsStream("maps.yml")) {
             assertNotNull(input, "maps.yml must be packaged with MonsterMazeModern.jar");
