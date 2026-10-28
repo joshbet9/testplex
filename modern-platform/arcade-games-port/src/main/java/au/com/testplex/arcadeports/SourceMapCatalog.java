@@ -12,9 +12,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -44,6 +46,35 @@ public final class SourceMapCatalog {
 
     public static boolean hasMap(ArcadePortGame game) {
         return resourceFor(game) != null;
+    }
+
+    public static boolean isReservedSourceWorldName(String worldName) {
+        return worldName != null && worldName.startsWith("arcadeport_source_")
+                && worldName.indexOf('/') < 0 && worldName.indexOf('\\') < 0 && !worldName.contains("..");
+    }
+
+    /** Reset only a reserved archived-map world. */
+    public static boolean resetTestWorld(JavaPlugin plugin, String worldName) {
+        if (!isReservedSourceWorldName(worldName)) {
+            plugin.getLogger().severe("Refusing to reset non-source test world: " + worldName);
+            return false;
+        }
+        Path container = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        Path root = container.resolve(worldName).normalize();
+        if (!root.startsWith(container) || root.equals(container)) return false;
+        World loaded = Bukkit.getWorld(worldName);
+        if (loaded != null && !Bukkit.unloadWorld(loaded, false)) {
+            plugin.getLogger().warning("Could not unload source test world " + worldName + "; it is still in use.");
+            return false;
+        }
+        if (!Files.exists(root)) return true;
+        try (Stream<Path> paths = Files.walk(root)) {
+            for (Path item : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(item);
+            return true;
+        } catch (IOException ex) {
+            plugin.getLogger().warning("Could not reset source test world " + worldName + ": " + ex.getMessage());
+            return false;
+        }
     }
 
     /** Extract only into this module's dedicated arcadeport_source_* test world. */

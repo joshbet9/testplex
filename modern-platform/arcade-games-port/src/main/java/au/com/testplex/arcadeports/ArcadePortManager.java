@@ -276,7 +276,21 @@ public final class ArcadePortManager implements Listener {
             pendingStart = null;
             pendingType = null;
         }
-        World world = worlds.computeIfAbsent(type.id(), ignored -> createWorld(type));
+        World world;
+        if (SourceMapCatalog.hasMap(type)) {
+            String sourceWorldName = "arcadeport_source_" + type.id().replace('-', '_');
+            if (!SourceMapCatalog.resetTestWorld(plugin, sourceWorldName)) {
+                sender.sendMessage(ChatColor.RED + "Could not reset the archived source map; refusing to start on a modified arena.");
+                return;
+            }
+            worlds.remove(type.id());
+            sourceMapWorlds.remove(type.id());
+            sourceMapData.remove(type.id());
+            world = createWorld(type);
+            if (world != null) worlds.put(type.id(), world);
+        } else {
+            world = worlds.computeIfAbsent(type.id(), ignored -> createWorld(type));
+        }
         if (world == null) {
             sender.sendMessage(ChatColor.RED + "The test world could not be loaded. Check the server log.");
             return;
@@ -294,6 +308,14 @@ public final class ArcadePortManager implements Listener {
         session.baconKnockback = ArcadePortRules.initialBaconKnockback(participants.size());
         session.baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
         session.microBarrierActive = type == ArcadePortGame.MICRO_BATTLES;
+        SourceMapCatalog.MapData microSourceMap = sourceMapData.get(type.id());
+        if (type == ArcadePortGame.MICRO_BATTLES && microSourceMap != null) {
+            for (Location marker : microSourceMap.customLocations("20")) {
+                Block barrier = marker.getBlock();
+                session.microBarrierBlocks.add(barrier);
+                barrier.setType(Material.GLASS, false);
+            }
+        }
         session.turfCombat = false;
         session.turfPhaseEndsAt = type == ArcadePortGame.TURF_WARS
                 ? now + ArcadePortRules.TURF_WARS_BUILD_PHASE_MILLIS : 0L;
@@ -824,7 +846,12 @@ public final class ArcadePortManager implements Listener {
 
     private void updateMicroBarrier(Session session, long now) {
         if (!session.microBarrierActive || !ArcadePortRules.shouldRemoveMicroBarrier(now - session.startedAt)) return;
-        for (int team = 0; team < 4; team++) {
+        if (!session.microBarrierBlocks.isEmpty()) {
+            for (Block block : session.microBarrierBlocks) {
+                if (block.getType() == Material.GLASS) block.setType(Material.AIR, false);
+            }
+            session.microBarrierBlocks.clear();
+        } else for (int team = 0; team < 4; team++) {
             Location island = islandSpawn(team * 2);
             int cx = island.getBlockX();
             int cz = island.getBlockZ();
@@ -1688,7 +1715,31 @@ public final class ArcadePortManager implements Listener {
         return (team == 0 || team == 2) ? -14 : 14;
     }
 
+    private String sheepPenMarker(int team) {
+        return switch (team) {
+            case 0 -> "RED";
+            case 1 -> "BLUE";
+            case 2 -> "YELLOW";
+            default -> "GREEN";
+        };
+    }
+
+    private List<Location> sourceSheepPenBlocks(Session session, int team) {
+        SourceMapCatalog.MapData data = sourceMapData.get(session.type.id());
+        return data == null ? List.of() : data.dataLocations(sheepPenMarker(team));
+    }
+
     private Location sheepQuestPenCenter(Session session, int team) {
+        List<Location> pen = sourceSheepPenBlocks(session, team);
+        if (!pen.isEmpty()) {
+            double x = 0.0D, y = 0.0D, z = 0.0D;
+            for (Location block : pen) {
+                x += block.getBlockX() + 0.5D;
+                y += block.getBlockY() + 1.0D;
+                z += block.getBlockZ() + 0.5D;
+            }
+            return new Location(session.world, x / pen.size(), y / pen.size(), z / pen.size());
+        }
         return new Location(session.world, sheepPenCenterX(team) + 0.5D, 64.0D,
                 sheepPenCenterZ(team) + 0.5D);
     }
@@ -1730,10 +1781,16 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isInsideSheepPen(Session session, Location location, int team) {
-        if (session == null || location == null || team < 0 || team > 3) return false;
+        if (session == null || location == null || team < 0 || team > 3
+                || location.getWorld() != session.world) return false;
+        List<Location> pen = sourceSheepPenBlocks(session, team);
+        if (!pen.isEmpty()) {
+            Block sheepBlock = location.getBlock();
+            for (Location marker : pen) if (marker.getBlock().equals(sheepBlock)) return true;
+            return false;
+        }
         Location center = sheepQuestPenCenter(session, team);
-        return location.getWorld() == center.getWorld()
-                && Math.abs(location.getX() - center.getX()) <= 2.5D
+        return Math.abs(location.getX() - center.getX()) <= 2.5D
                 && Math.abs(location.getZ() - center.getZ()) <= 2.5D;
     }
 
@@ -1885,23 +1942,34 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void spawnSheep(Session session) {
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (mapData != null && !mapData.dataLocations("WHITE").isEmpty()) {
+            List<Location> sourceSpawns = mapData.dataLocations("WHITE");
+            Location sourceSpawn = sourceSpawns.get(ThreadLocalRandom.current().nextInt(sourceSpawns.size())).clone();
+            configureQuestSheep(session, session.world.spawn(sourceSpawn, Sheep.class));
+            return;
+        }
         for (int attempt = 0; attempt < 18; attempt++) {
             int x = ThreadLocalRandom.current().nextInt(-10, 11);
             int z = ThreadLocalRandom.current().nextInt(-HALF_SIZE + 4, HALF_SIZE - 3);
             Location loc = new Location(session.world, x + 0.5D, 64.0D, z + 0.5D);
             if (session.world.getBlockAt(x, 63, z).getType().isAir()) continue;
             Sheep sheep = session.world.spawn(loc, Sheep.class);
-            sheep.setColor(DyeColor.WHITE);
-            sheep.setCustomName(ChatColor.WHITE + "Sheep");
-            sheep.setCustomNameVisible(true);
-            sheep.setAI(true);
-            sheep.setInvulnerable(true);
-            sheep.setRemoveWhenFarAway(false);
-            session.sheep.add(sheep);
-            session.sheepOwners.put(sheep, -1);
-            session.entities.add(sheep);
+            configureQuestSheep(session, sheep);
             return;
         }
+    }
+
+    private void configureQuestSheep(Session session, Sheep sheep) {
+        sheep.setColor(DyeColor.WHITE);
+        sheep.setCustomName(ChatColor.WHITE + "Sheep");
+        sheep.setCustomNameVisible(true);
+        sheep.setAI(true);
+        sheep.setInvulnerable(true);
+        sheep.setRemoveWhenFarAway(false);
+        session.sheep.add(sheep);
+        session.sheepOwners.put(sheep, -1);
+        session.entities.add(sheep);
     }
 
     private void updateTitles(Session session) {
@@ -3770,6 +3838,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> spleefLastHungerGainAt = new HashMap<>();
         final Map<UUID, Long> spleefNextArrowAt = new HashMap<>();
         long lastSpleefHungerAt;
+        final Set<Block> microBarrierBlocks = new HashSet<>();
         final Map<UUID, Long> dragonContactCooldowns = new HashMap<>();
         EnderDragon dragonEscapeDragon;
         final List<Location> dragonEscapeWaypoints = new ArrayList<>();

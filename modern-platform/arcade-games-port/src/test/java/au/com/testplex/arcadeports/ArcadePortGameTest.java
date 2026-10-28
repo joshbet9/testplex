@@ -95,6 +95,14 @@ class ArcadePortGameTest {
         assertEquals(1, ArcadePortRules.requiredDeathTagChasers(-1L));
     }
 
+    @Test void sourceWorldResetOnlyAcceptsReservedWorldNames() {
+        assertTrue(SourceMapCatalog.isReservedSourceWorldName("arcadeport_source_bacon_brawl"));
+        assertTrue(SourceMapCatalog.isReservedSourceWorldName("arcadeport_source_micro_battles"));
+        assertFalse(SourceMapCatalog.isReservedSourceWorldName("world"));
+        assertFalse(SourceMapCatalog.isReservedSourceWorldName("../world"));
+        assertFalse(SourceMapCatalog.isReservedSourceWorldName("arcadeport_proto_evolution"));
+    }
+
     @Test void dragonEscapeMapMarkerQueriesAreNormalised() {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGON_ESCAPE));
         assertEquals("maps/dragon-escape.zip", SourceMapCatalog.resourceFor(ArcadePortGame.DRAGON_ESCAPE));
