@@ -158,6 +158,11 @@ public final class ArcadePortRules {
         return initialPlayers > 2 ? runnersRemaining <= 1 : runnersRemaining <= 0;
     }
 
+    public static double turfWarsHitDamage(boolean projectile, boolean ironSword) {
+        if (projectile) return 9.0D;
+        return ironSword ? 12.0D : 6.0D;
+    }
+
     public static int advanceTurfFrontline(int currentFrontline, int teamId) {
         if (teamId == 0) return currentFrontline + 1;
         if (teamId == 1) return currentFrontline - 1;
