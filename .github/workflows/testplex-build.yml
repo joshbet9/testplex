@@ -319,6 +319,8 @@ jobs:
                   "resets toggle to Map Default on every game": 'applyMobThemeChoice(player, "map_default", false)',
                   "pad spawn fireworks are limited to two signals": "if (_padSpawnCount >= 2)",
                   "fireworks spawn higher above the pad": "base.clone().add(0.5D, 3.0D, 0.5D)",
+                  "tutorial fireworks are viewer-targeted": "UtilFirework.packetPlayFirework(viewer, location",
+                  "new-player eligibility checks stored Monster Maze PBs": "MonsterMazePersonalBestManager.hasAnyPersonalBest(_host, player)",
                   "missed Safe Pad timeout is authoritative": "p.setHealth(0.0D)",
               },
               "Monster Maze Core": {
@@ -363,6 +365,8 @@ jobs:
                   "new PB notification": "New Monster Maze personal best: Stage",
                   "native PB inspection": "public static void show(final MonsterMaze game, final Player player)",
                   "scoreboard PB is best kit for selected pattern": "public static String getBestForPattern",
+                  "onboarding checks all native modes": "GameDisplay.MonsterMazeModern",
+                  "players without a PB get tutorial cues": "public static boolean hasAnyPersonalBest",
               },
               "Monster Maze Body Builder": {
                   "Body Rush is right-click, not Q-drop": "onBodyRushInteract(PlayerInteractEvent event)",
