@@ -360,6 +360,14 @@ class ArcadePortGameTest {
         assertEquals(12_000L, ArcadePortRules.sourceWorldTime(null, "Unknown"));
     }
 
+    @Test void dragonEscapeRouteOnlyDeduplicatesCoincidentWaypoints() {
+        assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.0D));
+        assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.5D));
+        assertFalse(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.75D));
+        assertFalse(ArcadePortRules.isDuplicateDragonEscapeWaypoint(2.0D));
+        assertFalse(ArcadePortRules.isDuplicateDragonEscapeWaypoint(Double.NaN));
+    }
+
     @Test void dragonEscapeUsesARealChaseProgressAndCourseFinishProximity() {
         assertEquals(0.2D, ArcadePortRules.DRAGON_ESCAPE_CHASE_SPEED, 0.00001D);
         assertEquals(10.0D, ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS, 0.00001D);
