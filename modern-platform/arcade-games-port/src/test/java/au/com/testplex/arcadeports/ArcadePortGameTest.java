@@ -476,6 +476,13 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.monotonicDragonEscapeProgress(0, 1, 0));
     }
 
+    @Test void dragonEscapeDisruptorRechargeStartsWhenTntIsThrown() {
+        assertEquals(10_000L, ArcadePortRules.dragonEscapeNextTntChargeAt(0L));
+        assertEquals(25_000L, ArcadePortRules.dragonEscapeNextTntChargeAt(15_000L));
+        assertEquals(ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS,
+                ArcadePortRules.dragonEscapeNextTntChargeAt(-1_000L) - (-1_000L));
+    }
+
     @Test void dragonEscapeRouteOnlyDeduplicatesCoincidentWaypoints() {
         assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.0D));
         assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.5D));
