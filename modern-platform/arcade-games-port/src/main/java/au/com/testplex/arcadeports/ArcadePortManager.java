@@ -159,6 +159,7 @@ public final class ArcadePortManager implements Listener {
         session.lastBaconHungerAt = now;
         session.lastBaconEscalationAt = now;
         session.baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
+        session.nextDragonEscapeHazardAt = now + ArcadePortRules.DRAGON_ESCAPE_HAZARD_INTERVAL_MILLIS;
         session.microBarrierActive = type == ArcadePortGame.MICRO_BATTLES;
         session.turfCombat = false;
         session.turfPhaseEndsAt = type == ArcadePortGame.TURF_WARS
@@ -495,6 +496,11 @@ public final class ArcadePortManager implements Listener {
             launchDragonHazard(session);
             lastDragonHazard = now + 4_500L;
         }
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && ArcadePortRules.shouldLaunchDragonEscapeHazard(now, session.nextDragonEscapeHazardAt)) {
+            launchDragonEscapeHazard(session);
+            session.nextDragonEscapeHazardAt = now + ArcadePortRules.DRAGON_ESCAPE_HAZARD_INTERVAL_MILLIS;
+        }
         if (session.type == ArcadePortGame.SHEEP_QUEST && now >= lastSheepSpawn && session.sheep.size() < 12) {
             spawnSheep(session);
             lastSheepSpawn = now + 2_000L;
@@ -561,6 +567,42 @@ public final class ArcadePortManager implements Listener {
             session.turfPhaseEndsAt = now + ArcadePortRules.TURF_WARS_BUILD_PHASE_MILLIS;
             for (Player player : alivePlayers(session)) giveTurfWarsWool(session, player);
             announce(session, ChatColor.GREEN + "Build phase! You have 20 seconds to reinforce your team's turf.");
+        }
+    }
+
+    private void launchDragonEscapeHazard(Session session) {
+        List<Player> alive = alivePlayers(session);
+        if (alive.isEmpty()) return;
+        Player target = alive.stream()
+                .max(java.util.Comparator.comparingDouble(player -> player.getLocation().getZ()))
+                .orElse(null);
+        if (target == null) return;
+
+        Location targetLocation = target.getLocation().clone();
+        double spawnX = Math.max(-2.5D, Math.min(2.5D,
+                targetLocation.getX() + ThreadLocalRandom.current().nextDouble(-1.5D, 1.5D)));
+        Location spawn = new Location(session.world, spawnX, targetLocation.getY() + 2.0D,
+                Math.max(-23.0D, targetLocation.getZ() - 9.0D));
+        Fireball fireball = session.world.spawn(spawn, Fireball.class);
+        fireball.setIsIncendiary(false);
+        fireball.setYield(0.0F);
+        Vector direction = targetLocation.toVector().subtract(spawn.toVector());
+        if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.0D, 1.0D);
+        fireball.setVelocity(direction.normalize().multiply(0.65D));
+        session.entities.add(fireball);
+    }
+
+    private void handleDragonEscapeHazardHit(Session session, Fireball fireball, Player target) {
+        if (active != session || !session.alive.contains(target.getUniqueId())) return;
+        Vector recoil = fireball.getLocation().toVector().subtract(target.getLocation().toVector());
+        if (recoil.lengthSquared() < 0.001D) recoil = new Vector(0.0D, 0.0D, -1.0D);
+        target.setVelocity(recoil.normalize().multiply(0.9D).setY(0.42D));
+        target.playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.9F, 0.8F);
+        target.sendMessage(ChatColor.RED + "The dragon's fireball struck you!");
+        if (target.getHealth() <= 4.0D) {
+            eliminate(session, target, null, "was caught by the dragon's fireball");
+        } else {
+            target.setHealth(target.getHealth() - 4.0D);
         }
     }
 
@@ -1123,6 +1165,16 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE && event.getEntity() instanceof Fireball fireball
+                && session.entities.contains(fireball)) {
+            if (event.getHitEntity() instanceof Player target && session.alive.contains(target.getUniqueId())) {
+                handleDragonEscapeHazardHit(session, fireball, target);
+            }
+            session.entities.remove(fireball);
+            fireball.remove();
+            return;
+        }
+
         // Handle Dragons fireballs here rather than relying on damage-event ordering.
         // World hazards knock players back; player-fired fireballs follow normal combat rules.
         if (session.type == ArcadePortGame.DRAGONS && event.getEntity() instanceof Fireball fireball
@@ -1389,6 +1441,7 @@ public final class ArcadePortManager implements Listener {
         long lastBaconEscalationAt;
         long baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
         long startedAt;
+        long nextDragonEscapeHazardAt;
         boolean microBarrierActive;
         boolean turfCombat;
         long turfPhaseEndsAt;
