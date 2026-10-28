@@ -427,6 +427,7 @@ public final class ArcadePortManager implements Listener {
         session.endsAt = now + (type == ArcadePortGame.SHEEP_QUEST ? 300_000L
                 : type == ArcadePortGame.GLADIATORS ? 600_000L : ROUND_MS);
         session.lastBaconHungerAt = now;
+        session.lastWorldWaterDamageAt = now;
         session.lastBaconEscalationAt = now;
         session.lastSpleefHungerAt = now;
         session.dragonNextSpawnAt = now;
