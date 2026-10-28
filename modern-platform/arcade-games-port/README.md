@@ -6,7 +6,7 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 
 - Bacon Brawl — knockback and ring-out elimination.
 - Bomb Lobbers — snowball throws, direct-hit ding and knockback.
-- Death Tag — tagged/chaser tracking and last-runners logic.
+- Death Tag — source-style Normal/Alpha chasers, death-triggered conversion, runner speed threshold, Basher/Archer/Traitor/Null runner loadouts, Archer arrow refresh, and flat Iron Skin damage reduction (historical map/light parity and disguise visuals remain).
 - Dragon Escape — generated parkour course, a visible Douglas chase dragon, radius-based course destruction, catch-up elimination and finish proximity (map-data/waypoint parity still needs original assets).
 - Dragons — timed fireball hazards and a Pyro fireball ability.
 - Evolution — combat-driven stage/weapon progression and respawn loop.

@@ -201,6 +201,32 @@ public final class ArcadePortRules {
         return attackerTagged && !targetTagged;
     }
 
+    public static double deathTagChaserDamage(boolean alphaChaser) {
+        return alphaChaser ? 6.0D : 4.0D;
+    }
+
+    public static double deathTagRunnerDamage(String runnerKit, boolean projectile) {
+        String kit = runnerKit == null ? "basher" : runnerKit.toLowerCase(java.util.Locale.ROOT);
+        if ("null".equals(kit)) return 0.0D;
+        if (projectile) return "archer".equals(kit) ? 4.0D : 0.0D;
+        return "basher".equals(kit) || "traitor".equals(kit) ? 6.0D : 0.0D;
+    }
+
+    /** Iron Skin in Reborn subtracts a flat 2 or 4 damage from attacks greater than 1. */
+    public static double deathTagDamageAfterIronSkin(double damage, boolean alphaChaser) {
+        if (damage <= 1.0D) return damage;
+        return Math.max(0.0D, damage - (alphaChaser ? 4.0D : 2.0D));
+    }
+
+    public static double deathTagKnockbackMultiplier(boolean alphaChaser) {
+        return alphaChaser ? 0.5D : 1.0D;
+    }
+
+    /** Reborn's runner speed threshold is strictly greater than 25% chasers. */
+    public static boolean deathTagRunnersReceiveSpeed(int chasers, int totalPlayers) {
+        return totalPlayers > 0 && chasers >= 0 && (double) chasers / (double) totalPlayers > 0.25D;
+    }
+
     public static boolean shouldFinishDeathTagRound(int runnersRemaining, int initialPlayers) {
         return initialPlayers > 2 ? runnersRemaining <= 1 : runnersRemaining <= 0;
     }

@@ -212,11 +212,27 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isDragonEscapeFinishReached(0.5D, 64.0D, 80.51D));
     }
 
-    @Test void deathTagChasersConvertRunnersWithoutTagTransfer() {
-        assertTrue(ArcadePortRules.shouldSpreadDeathTag(true, false));
-        assertFalse(ArcadePortRules.shouldSpreadDeathTag(true, true));
-        assertFalse(ArcadePortRules.shouldSpreadDeathTag(false, true));
-        assertFalse(ArcadePortRules.shouldSpreadDeathTag(false, false));
+    @Test void deathTagChasersConvertRunnersOnlyAfterLethalDamageAndHaveDistinctKits() {
+        assertEquals(4.0D, ArcadePortRules.deathTagChaserDamage(false));
+        assertEquals(6.0D, ArcadePortRules.deathTagChaserDamage(true));
+        assertEquals(6.0D, ArcadePortRules.deathTagRunnerDamage("basher", false));
+        assertEquals(6.0D, ArcadePortRules.deathTagRunnerDamage("traitor", false));
+        assertEquals(4.0D, ArcadePortRules.deathTagRunnerDamage("archer", true));
+        assertEquals(0.0D, ArcadePortRules.deathTagRunnerDamage("null", false));
+        assertEquals(0.0D, ArcadePortRules.deathTagRunnerDamage("basher", true));
+        assertEquals(4.0D, ArcadePortRules.deathTagDamageAfterIronSkin(6.0D, false));
+        assertEquals(2.0D, ArcadePortRules.deathTagDamageAfterIronSkin(6.0D, true));
+        assertEquals(0.0D, ArcadePortRules.deathTagDamageAfterIronSkin(4.0D, true));
+        assertEquals(1.0D, ArcadePortRules.deathTagDamageAfterIronSkin(1.0D, true));
+        assertEquals(0.5D, ArcadePortRules.deathTagKnockbackMultiplier(true));
+        assertEquals(1.0D, ArcadePortRules.deathTagKnockbackMultiplier(false));
+    }
+
+    @Test void deathTagRunnersGainSpeedOnlyWhenChasersExceedOneQuarterOfPlayers() {
+        assertFalse(ArcadePortRules.deathTagRunnersReceiveSpeed(1, 4));
+        assertTrue(ArcadePortRules.deathTagRunnersReceiveSpeed(2, 6));
+        assertFalse(ArcadePortRules.deathTagRunnersReceiveSpeed(0, 4));
+        assertFalse(ArcadePortRules.deathTagRunnersReceiveSpeed(0, 0));
     }
 
     @Test void deathTagEndsWhenOneRunnerRemainsExceptInSmallTestLobbies() {
