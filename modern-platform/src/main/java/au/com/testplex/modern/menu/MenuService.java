@@ -94,7 +94,7 @@ public final class MenuService implements Listener {
                 ChatColor.GRAY + "Distinct celebrations for " + game.getName() + "."));
         mark(wins, "win-effects", game, null, null);
         inventory.setItem(15, wins);
-        inventory.setItem(22, backItem("Back to Game Panel", "back-panel"));
+        inventory.setItem(22, backItem("Back to Game Panel", "back-panel", null));
         player.openInventory(inventory);
     }
 
@@ -114,7 +114,7 @@ public final class MenuService implements Listener {
                 ChatColor.GRAY + "Win effects are configured separately from cosmetic lines."));
         mark(wins, "win-effects", game, null, null);
         inventory.setItem(49, wins);
-        inventory.setItem(53, backItem("Back to Game", "back-game"));
+        inventory.setItem(53, backItem("Back to Game", "back-game", game));
         player.openInventory(inventory);
     }
 
@@ -132,7 +132,7 @@ public final class MenuService implements Listener {
             mark(item, "cosmetic-option", game, line, option.getId());
             inventory.setItem(slot++, item);
         }
-        inventory.setItem(22, backItem("Back to Cosmetic Lines", "back-lines"));
+        inventory.setItem(22, backItem("Back to Cosmetic Lines", "back-lines", game));
         player.openInventory(inventory);
     }
 
@@ -148,7 +148,7 @@ public final class MenuService implements Listener {
             mark(item, "win-option", game, null, option.getId());
             inventory.setItem(slot++, item);
         }
-        inventory.setItem(22, backItem("Back to Cosmetic Lines", "back-lines"));
+        inventory.setItem(22, backItem("Back to Cosmetic Lines", "back-lines", game));
         player.openInventory(inventory);
     }
 
@@ -206,9 +206,9 @@ public final class MenuService implements Listener {
         return game.getCosmeticLines().stream().filter(line -> line.getId().equals(id)).findFirst().orElse(null);
     }
 
-    private ItemStack backItem(String name, String action) {
+    private ItemStack backItem(String name, String action, GameDefinition game) {
         ItemStack item = makeItem(Material.ARROW, ChatColor.YELLOW + name, List.of());
-        mark(item, action, null, null, null);
+        mark(item, action, game, null, null);
         return item;
     }
 
