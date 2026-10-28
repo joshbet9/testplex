@@ -29,6 +29,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
@@ -151,6 +152,10 @@ public final class ArcadePortManager implements Listener {
         active = session;
         long now = System.currentTimeMillis();
         session.endsAt = now + ROUND_MS;
+        session.turfCombat = false;
+        session.turfPhaseEndsAt = type == ArcadePortGame.TURF_WARS
+                ? now + ArcadePortRules.TURF_WARS_BUILD_PHASE_MILLIS : 0L;
+        session.turfFrontlineX = -1;
         lastDragonHazard = now + 8_000L;
         lastSheepSpawn = now;
         world.setTime(6000L);
@@ -173,6 +178,9 @@ public final class ArcadePortManager implements Listener {
             Location spawn = spawns.get(i % spawns.size()).clone();
             if (type == ArcadePortGame.MICRO_BATTLES) {
                 spawn = islandSpawn(i);
+            } else if (type == ArcadePortGame.TURF_WARS) {
+                spawn = turfWarsSpawn(world, session.teams.get(player.getUniqueId()), i / 2,
+                        (participants.size() + 1) / 2);
             }
             player.closeInventory();
             player.leaveVehicle();
@@ -211,6 +219,9 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.MICRO_BATTLES) announce(session, ChatColor.AQUA + "Micro Battles: survive as the border closes.");
         else announce(session, ChatColor.GOLD + type.displayName() + " started! This is a first-pass mechanics test.");
+        if (type == ArcadePortGame.TURF_WARS) {
+            announce(session, ChatColor.GREEN + "Build phase: place your team's wool on your own turf for 20 seconds.");
+        }
         if (participants.size() == 1) announce(session, ChatColor.GRAY + "Solo test mode: the run will remain available for practice until the timer ends or you reset it.");
         session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
         sender.sendMessage(ChatColor.GREEN + "Started " + type.displayName() + " with " + participants.size() + (participants.size() == 1 ? " player." : " players."));
@@ -275,17 +286,11 @@ public final class ArcadePortManager implements Listener {
                 || type == ArcadePortGame.TURF_WARS;
         for (int x = -HALF_SIZE; x <= HALF_SIZE; x++) {
             for (int z = -HALF_SIZE; z <= HALF_SIZE; z++) {
-                world.getBlockAt(x, 63, z).setType(type.floor(), false);
+                Material floor = type == ArcadePortGame.TURF_WARS
+                        ? (x <= -1 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA) : type.floor();
+                world.getBlockAt(x, 63, z).setType(floor, false);
                 if (walls && (Math.abs(x) == HALF_SIZE || Math.abs(z) == HALF_SIZE)) {
                     for (int y = 64; y <= 66; y++) world.getBlockAt(x, y, z).setType(Material.BLACKSTONE, false);
-                }
-            }
-        }
-        if (type == ArcadePortGame.TURF_WARS) {
-            for (int z = -HALF_SIZE + 2; z < HALF_SIZE - 1; z++) {
-                for (int y = 64; y <= 68; y++) {
-                    world.getBlockAt(-1, y, z).setType(Material.GLASS, false);
-                    world.getBlockAt(0, y, z).setType(Material.GLASS, false);
                 }
             }
         }
@@ -310,6 +315,19 @@ public final class ArcadePortManager implements Listener {
         World world = worlds.get(ArcadePortGame.MICRO_BATTLES.id());
         double angle = 2.0D * Math.PI * Math.floorMod(index, 8) / 8.0D;
         return new Location(world, Math.cos(angle) * 13.0D, 64.0D, Math.sin(angle) * 13.0D, (float)(angle * 180.0D / Math.PI + 90.0D), 0.0F);
+    }
+
+    private Location turfWarsSpawn(World world, int team, int slot, int slots) {
+        double z = Math.max(-14.0D, Math.min(14.0D, (slot - (slots - 1) / 2.0D) * 4.0D));
+        boolean red = team == 0;
+        return new Location(world, red ? -15.0D : 15.0D, 64.0D, z, red ? -90.0F : 90.0F, 0.0F);
+    }
+
+    private void giveTurfWarsWool(Session session, Player player) {
+        int team = session.teams.getOrDefault(player.getUniqueId(), -1);
+        if (team < 0) return;
+        Material wool = team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL;
+        player.getInventory().addItem(new ItemStack(wool, 24));
     }
 
     private void giveKit(Session session, Player player) {
@@ -365,6 +383,7 @@ public final class ArcadePortManager implements Listener {
             case TURF_WARS:
                 player.getInventory().addItem(new ItemStack(Material.BOW));
                 player.getInventory().addItem(new ItemStack(Material.ARROW, 32));
+                giveTurfWarsWool(session, player);
                 break;
         }
         player.updateInventory();
@@ -397,6 +416,7 @@ public final class ArcadePortManager implements Listener {
             finish(session, winner, true);
             return;
         }
+        if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.DRAGONS && now >= lastDragonHazard) {
             launchDragonHazard(session);
             lastDragonHazard = now + 4_500L;
@@ -433,6 +453,19 @@ public final class ArcadePortManager implements Listener {
         }
         updateTitles(session);
         checkRoundEnd(session);
+    }
+
+    private void updateTurfWarsPhase(Session session, long now) {
+        if (now < session.turfPhaseEndsAt) return;
+        session.turfCombat = !session.turfCombat;
+        if (session.turfCombat) {
+            session.turfPhaseEndsAt = now + ArcadePortRules.TURF_WARS_COMBAT_PHASE_MILLIS;
+            announce(session, ChatColor.RED + "Combat phase! Kills advance your team's turf.");
+        } else {
+            session.turfPhaseEndsAt = now + ArcadePortRules.TURF_WARS_BUILD_PHASE_MILLIS;
+            for (Player player : alivePlayers(session)) giveTurfWarsWool(session, player);
+            announce(session, ChatColor.GREEN + "Build phase! You have 20 seconds to reinforce your team's turf.");
+        }
     }
 
     private void launchDragonHazard(Session session) {
@@ -558,7 +591,6 @@ public final class ArcadePortManager implements Listener {
                 && ArcadePortRules.isQuiverWinnerScoreReached(session.scores.getOrDefault(player.getUniqueId(), 0))) {
             finish(session, player, true);
         }
-        if (session.type == ArcadePortGame.TURF_WARS && session.scores.getOrDefault(player.getUniqueId(), 0) >= 15) finish(session, player, true);
         if (session.type == ArcadePortGame.SHEEP_QUEST && session.scores.getOrDefault(player.getUniqueId(), 0) >= 10) finish(session, player, true);
         if (session.type == ArcadePortGame.EVOLUTION && session.scores.getOrDefault(player.getUniqueId(), 0) >= 5) finish(session, player, true);
     }
@@ -568,6 +600,7 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(target.getUniqueId())) return;
         if ((session.type == ArcadePortGame.PAINTBALL || session.type == ArcadePortGame.TURF_WARS)
                 && session.teams.getOrDefault(attacker.getUniqueId(), -1).equals(session.teams.getOrDefault(target.getUniqueId(), -2))) return;
+        if (session.type == ArcadePortGame.TURF_WARS && !session.turfCombat) return;
 
         switch (session.type) {
             case BACON_BRAWL:
@@ -595,13 +628,39 @@ public final class ArcadePortManager implements Listener {
                 checkRoundEnd(session);
                 break;
             case PAINTBALL:
-            case TURF_WARS:
                 session.scores.merge(attacker.getUniqueId(), 1, Integer::sum);
                 Vector push = target.getLocation().toVector().subtract(attacker.getLocation().toVector()).normalize().multiply(0.8D);
                 target.setVelocity(push.setY(0.25D));
                 target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0, 1, 0), 14, 0.4D, 0.5D, 0.4D, 0.12D);
                 checkWinnerForScore(session, attacker);
                 break;
+            case TURF_WARS: {
+                UUID targetId = target.getUniqueId();
+                eliminate(session, target, attacker, "was hit in Turf Wars");
+                if (active != session) break;
+                advanceTurfWars(session, attacker);
+                if (active != session) break;
+                session.respawning.add(targetId);
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (active != session || !target.isOnline()
+                            || !session.players.containsKey(targetId) || !session.respawning.remove(targetId)) return;
+                    int playerIndex = new ArrayList<>(session.players.keySet()).indexOf(targetId);
+                    int slots = Math.max(1, (session.players.size() + 1) / 2);
+                    Location spawn = turfWarsSpawn(session.world, session.teams.getOrDefault(targetId, 0),
+                            Math.max(0, playerIndex / 2), slots);
+                    target.teleport(spawn);
+                    target.setGameMode(GameMode.SURVIVAL);
+                    target.setHealth(target.getMaxHealth());
+                    target.setFoodLevel(20);
+                    target.setSaturation(20.0F);
+                    target.setFireTicks(0);
+                    session.alive.add(targetId);
+                    session.lastLocations.put(targetId, spawn.clone());
+                    giveKit(session, target);
+                    target.sendMessage(ChatColor.GREEN + "Respawned. Every kill moves the turf line.");
+                }, 80L);
+                break;
+            }
             case EVOLUTION:
                 target.getWorld().playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 1.0F, 0.8F);
                 eliminate(session, target, attacker, "lost a duel");
@@ -619,6 +678,31 @@ public final class ArcadePortManager implements Listener {
                 }
                 break;
         }
+    }
+
+    private void advanceTurfWars(Session session, Player attacker) {
+        int team = session.teams.getOrDefault(attacker.getUniqueId(), -1);
+        if (team != 0 && team != 1) return;
+        int oldFrontline = session.turfFrontlineX;
+        int nextFrontline = ArcadePortRules.advanceTurfFrontline(oldFrontline, team);
+        int paintedX = team == 0 ? nextFrontline : oldFrontline;
+        session.turfFrontlineX = nextFrontline;
+        Material turf = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
+        for (int z = -HALF_SIZE; z <= HALF_SIZE; z++) {
+            session.world.getBlockAt(paintedX, 63, z).setType(turf, false);
+            for (int y = 64; y <= 68; y++) {
+                Block structure = session.world.getBlockAt(paintedX, y, z);
+                if (structure.getType() == Material.RED_WOOL || structure.getType() == Material.BLUE_WOOL) {
+                    structure.setType(Material.AIR, false);
+                }
+            }
+        }
+        if (ArcadePortRules.isTurfWarsWinningLine(nextFrontline, team, HALF_SIZE)) {
+            finish(session, attacker, true);
+            return;
+        }
+        announce(session, (team == 0 ? ChatColor.RED + "Red" : ChatColor.BLUE + "Blue")
+                + ChatColor.WHITE + " advanced the turf line to " + nextFrontline + ".");
     }
 
     private void scoreQuiverKill(Session session, Player attacker, Player target) {
@@ -817,6 +901,16 @@ public final class ArcadePortManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBowShoot(EntityShootBowEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.TURF_WARS || session.turfCombat
+                || !(event.getEntity() instanceof Player player) || event.getEntity().getWorld() != session.world
+                || !session.players.containsKey(player.getUniqueId())) return;
+        event.setCancelled(true);
+        player.sendMessage(ChatColor.YELLOW + "You cannot shoot during build time.");
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
@@ -841,14 +935,12 @@ public final class ArcadePortManager implements Listener {
         if (event.getHitEntity() instanceof Player target && event.getEntity() instanceof Projectile projectile) {
             ProjectileSource source = projectile.getShooter();
             if (source instanceof Player shooter) hitProjectile(session, projectile, shooter, target);
-        } else if (session.type == ArcadePortGame.TURF_WARS && event.getHitBlock() != null
+        } else if (session.type == ArcadePortGame.TURF_WARS && session.turfCombat && event.getHitBlock() != null
                 && event.getEntity() instanceof Projectile projectile && projectile.getShooter() instanceof Player shooter) {
             Block block = event.getHitBlock();
-            if (block.getY() == 63) {
-                int team = session.teams.getOrDefault(shooter.getUniqueId(), 0);
-                block.setType(team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL, false);
-                session.scores.merge(shooter.getUniqueId(), 1, Integer::sum);
-                checkWinnerForScore(session, shooter);
+            if (block.getType() == Material.RED_WOOL || block.getType() == Material.BLUE_WOOL) {
+                block.setType(Material.AIR, false);
+                shooter.playSound(shooter.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 0.7F, 1.5F);
             }
         }
     }
@@ -915,13 +1007,53 @@ public final class ArcadePortManager implements Listener {
             event.setExpToDrop(0);
             return;
         }
+        if (session.type == ArcadePortGame.TURF_WARS && session.alive.contains(event.getPlayer().getUniqueId())) {
+            int team = session.teams.getOrDefault(event.getPlayer().getUniqueId(), -1);
+            Material ownWool = team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL;
+            if ((team == 0 || team == 1) && event.getBlock().getType() == ownWool) {
+                event.setDropItems(false);
+                event.setExpToDrop(0);
+                return;
+            }
+        }
         event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent event) {
         Session session = active;
-        if (session != null && event.getBlock().getWorld() == session.world) event.setCancelled(true);
+        if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.TURF_WARS) {
+            Player player = event.getPlayer();
+            int team = session.teams.getOrDefault(player.getUniqueId(), -1);
+            Material ownWool = team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL;
+            Material ownTurf = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
+            if (session.turfCombat || !session.alive.contains(player.getUniqueId())
+                    || (team != 0 && team != 1) || event.getBlockPlaced().getType() != ownWool) {
+                event.setCancelled(true);
+                return;
+            }
+            int x = event.getBlockPlaced().getX();
+            if ((team == 0 && x > session.turfFrontlineX) || (team == 1 && x <= session.turfFrontlineX)) {
+                event.setCancelled(true);
+                player.sendMessage(ChatColor.YELLOW + "You can only build on your team's turf.");
+                return;
+            }
+            boolean aboveOwnTurf = false;
+            for (int i = 1; i <= 5; i++) {
+                Material below = event.getBlockPlaced().getRelative(0, -i, 0).getType();
+                if (below == ownTurf || below == ownWool) {
+                    aboveOwnTurf = true;
+                    break;
+                }
+            }
+            if (!aboveOwnTurf) {
+                event.setCancelled(true);
+                player.sendMessage(ChatColor.YELLOW + "Build no more than five blocks above your team's turf.");
+            }
+            return;
+        }
+        event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -982,6 +1114,9 @@ public final class ArcadePortManager implements Listener {
         final Set<Entity> entities = new HashSet<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
         final int participantsAtStart;
+        boolean turfCombat;
+        long turfPhaseEndsAt;
+        int turfFrontlineX = -1;
         long endsAt;
         int ticks;
         BukkitTask tickTask;
