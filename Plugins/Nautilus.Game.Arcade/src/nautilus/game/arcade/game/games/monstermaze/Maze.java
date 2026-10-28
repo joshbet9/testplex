@@ -128,7 +128,7 @@ public class Maze implements Listener
 	private final Set<Integer> _celebratedPadStages = new HashSet<Integer>();
 	private int _firstStageParticleTick;
 	private int _padSpawnCount;
-	private final Set<UUID> _padFireworkTutorialPlayers = new HashSet<UUID>();
+	private final Set<UUID> _newPlayerTutorialViewers = new HashSet<UUID>();
 			
 	@SuppressWarnings("deprecation")
 	public Maze(MonsterMaze host, MazePreset maze)
@@ -140,15 +140,15 @@ public class Maze implements Listener
 		_safePadBeaconEnhancementsEnabled = _host.Manager.getPlugin().getConfig()
 				.getBoolean("monstermaze.safe-pad-enhancements.enabled", false);
 
-		// A Mob Theme is a per-round toggle, not a persistent preference. Every new game
-		// begins with Map Default for each player; colour customisation remains per mob set.
-		// The first two pad fireworks are an onboarding cue only. Keep an independent viewer
-		// list so experienced players do not receive tutorial fireworks every new match.
+		// Mob Theme is a per-game toggle, not a persistent preference. Always begin at
+		// Map Default; Safe Pad and beacon colour customisation remains saved per mob set.
+		// Only first-time players receive the first-stage particle breadcrumb. The first
+		// two pad fireworks are shown to everyone in every game.
 		for (Player player : _host.GetPlayers(false))
 		{
 			applyMobThemeChoice(player, "map_default", false);
 			if (!MonsterMazePersonalBestManager.hasAnyPersonalBest(_host, player))
-				_padFireworkTutorialPlayers.add(player.getUniqueId());
+				_newPlayerTutorialViewers.add(player.getUniqueId());
 		}
 
 		// Stale containment can outlive the old preset's location list.
@@ -872,7 +872,7 @@ public class Maze implements Listener
 			return "map_default";
 		UUID playerId = player.getUniqueId();
 		if (!_viewerMobThemeChoices.containsKey(playerId))
-			applyMobThemeChoice(player, ArcadeCosmeticsMenu.getMonsterMazeSelectedMobTheme(playerId), false);
+			applyMobThemeChoice(player, "map_default", false);
 		String selected = _viewerMobThemeChoices.get(playerId);
 		return selected == null ? "map_default" : selected;
 	}
@@ -1684,14 +1684,28 @@ public class Maze implements Listener
 
 	private void updateFirstStageParticlePath()
 	{
-		if (_curSafe != 1 || _firstStageParticlePath.isEmpty())
+		// The breadcrumb leads new players to the first Safe Pad. It must not be broadcast
+		// to experienced players or shown after the first-pad stage has ended.
+		if (_curSafe != 1 || _firstStageParticlePath.isEmpty() || _newPlayerTutorialViewers.isEmpty())
 			return;
 		if (++_firstStageParticleTick % 10 != 0)
 			return;
+
+		List<Player> tutorialViewers = new ArrayList<Player>();
+		for (Player viewer : _host.GetPlayers(false))
+		{
+			if (viewer != null && viewer.isOnline()
+					&& _newPlayerTutorialViewers.contains(viewer.getUniqueId()))
+				tutorialViewers.add(viewer);
+		}
+		if (tutorialViewers.isEmpty())
+			return;
+		Player[] recipients = tutorialViewers.toArray(new Player[0]);
 		for (Location point : _firstStageParticlePath)
 		{
 			if (point.getWorld() != null)
-				point.getWorld().playEffect(point, Effect.HAPPY_VILLAGER, 0);
+				UtilParticle.PlayParticle(ParticleType.HAPPY_VILLAGER, point,
+						0F, 0F, 0F, 0F, 1, ViewDist.NORMAL, recipients);
 		}
 	}
 
@@ -1700,20 +1714,17 @@ public class Maze implements Listener
 		if (pad == null || pad.getLocation() == null || pad.getLocation().getWorld() == null)
 			return;
 
-		// Only the initial pad and its first preview pad are tutorial signals. PacketFirework
-		// is viewer-targeted, so existing players don't see onboarding cues for new players.
+		// Fireworks always signal the first two Safe Pads for every participant/game.
+		// The separate particle breadcrumb above remains restricted to new players.
 		if (_padSpawnCount >= 2)
 			return;
 		_padSpawnCount++;
-		if (_padFireworkTutorialPlayers.isEmpty())
-			return;
 
-		Location base = pad.getLocation().clone();
-		Location location = base.clone().add(0.5D, 3.0D, 0.5D);
+		Location location = pad.getLocation().clone().add(0.5D, 3.0D, 0.5D);
 		Color colour = _padSpawnCount == 1 ? Color.LIME : Color.AQUA;
 		for (Player viewer : _host.GetPlayers(false))
 		{
-			if (!_padFireworkTutorialPlayers.contains(viewer.getUniqueId()))
+			if (viewer == null || !viewer.isOnline())
 				continue;
 			UtilFirework.packetPlayFirework(viewer, location, FireworkEffect.Type.BALL_LARGE,
 					colour, true, true);
