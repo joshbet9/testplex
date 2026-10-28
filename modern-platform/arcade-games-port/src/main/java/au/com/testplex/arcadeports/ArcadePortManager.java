@@ -490,7 +490,8 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.participantsAtStart <= 1) return;
         if (session.type == ArcadePortGame.PAINTBALL || session.type == ArcadePortGame.TURF_WARS
-                || session.type == ArcadePortGame.SHEEP_QUEST || session.type == ArcadePortGame.EVOLUTION) return;
+                || session.type == ArcadePortGame.SHEEP_QUEST || session.type == ArcadePortGame.EVOLUTION
+                || session.type == ArcadePortGame.ONE_IN_THE_QUIVER) return;
         if (session.type == ArcadePortGame.DEATH_TAG) {
             long untagged = session.players.keySet().stream().filter(id -> session.alive.contains(id) && !session.tagged.contains(id)).count();
             // A round starts with one tagged chaser, so "one runner left" is not a win
@@ -553,6 +554,10 @@ public final class ArcadePortManager implements Listener {
 
     private void checkWinnerForScore(Session session, Player player) {
         if (session.type == ArcadePortGame.PAINTBALL && session.scores.getOrDefault(player.getUniqueId(), 0) >= 10) finish(session, player, true);
+        if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
+                && ArcadePortRules.isQuiverWinnerScoreReached(session.scores.getOrDefault(player.getUniqueId(), 0))) {
+            finish(session, player, true);
+        }
         if (session.type == ArcadePortGame.TURF_WARS && session.scores.getOrDefault(player.getUniqueId(), 0) >= 15) finish(session, player, true);
         if (session.type == ArcadePortGame.SHEEP_QUEST && session.scores.getOrDefault(player.getUniqueId(), 0) >= 10) finish(session, player, true);
         if (session.type == ArcadePortGame.EVOLUTION && session.scores.getOrDefault(player.getUniqueId(), 0) >= 5) finish(session, player, true);
@@ -604,6 +609,9 @@ public final class ArcadePortManager implements Listener {
             case SHEEP_QUEST:
                 // Sheep Quest scoring is handled by capturing sheep, not combat.
                 break;
+            case ONE_IN_THE_QUIVER:
+                scoreQuiverKill(session, attacker, target);
+                break;
             default:
                 eliminate(session, target, attacker, source);
                 if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER && attacker.isOnline()) {
@@ -613,6 +621,40 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void scoreQuiverKill(Session session, Player attacker, Player target) {
+        if (active != session || !session.alive.contains(attacker.getUniqueId())
+                || !session.alive.contains(target.getUniqueId())) return;
+
+        int kills = session.scores.merge(attacker.getUniqueId(), 1, Integer::sum);
+        attacker.sendMessage(ChatColor.GREEN + "Quiver kill! " + kills + "/20.");
+        checkWinnerForScore(session, attacker);
+        if (active != session) return;
+
+        UUID targetId = target.getUniqueId();
+        target.leaveVehicle();
+        target.setGameMode(GameMode.SPECTATOR);
+        session.alive.remove(targetId);
+        session.respawning.add(targetId);
+        target.sendMessage(ChatColor.RED + "Eliminated! Respawning shortly.");
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (active != session || !target.isOnline()
+                    || !session.players.containsKey(targetId) || !session.respawning.remove(targetId)) return;
+            Location spawn = spawnFor(session, target);
+            target.teleport(spawn);
+            target.setGameMode(GameMode.SURVIVAL);
+            target.setHealth(target.getMaxHealth());
+            target.setFoodLevel(20);
+            target.setSaturation(20.0F);
+            target.setFireTicks(0);
+            target.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+            session.alive.add(targetId);
+            session.lastLocations.put(targetId, spawn.clone());
+            giveKit(session, target);
+            target.sendMessage(ChatColor.GREEN + "Respawned. First to 20 kills wins.");
+        }, 40L);
+    }
+
     private void hitProjectile(Session session, Projectile projectile, Player shooter, Player target) {
         if (session.type == ArcadePortGame.BOMB_LOBBERS) {
             handlePlayerHit(session, shooter, target, "bomb hit");
@@ -620,7 +662,10 @@ public final class ArcadePortManager implements Listener {
             handlePlayerHit(session, shooter, target, "projectile hit");
         } else if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER || session.type == ArcadePortGame.MICRO_BATTLES) {
             handlePlayerHit(session, shooter, target, "arrow hit");
-            if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER && shooter.isOnline()) shooter.getInventory().setItem(1, new ItemStack(Material.ARROW, 1));
+            if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER && active == session
+                    && shooter.isOnline() && session.alive.contains(shooter.getUniqueId())) {
+                shooter.getInventory().setItem(1, new ItemStack(Material.ARROW, 1));
+            }
         } else {
             handlePlayerHit(session, shooter, target, "projectile hit");
         }
@@ -667,6 +712,7 @@ public final class ArcadePortManager implements Listener {
         }
         session.sheep.clear();
         session.entities.clear();
+        session.respawning.clear();
         session.alive.clear();
         session.players.clear();
         session.snapshots.clear();
@@ -910,6 +956,7 @@ public final class ArcadePortManager implements Listener {
         PlayerSnapshot snapshot = session.snapshots.get(id);
         if (snapshot != null) pendingRestore.put(id, snapshot);
         if (session.type == ArcadePortGame.DEATH_TAG) session.tagged.remove(id);
+        session.respawning.remove(id);
         session.players.remove(id);
         session.snapshots.remove(id);
         checkRoundEnd(session);
@@ -930,6 +977,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> scores = new HashMap<>();
         final Map<UUID, Integer> teams = new HashMap<>();
         final Set<UUID> tagged = new HashSet<>();
+        final Set<UUID> respawning = new HashSet<>();
         final Set<Sheep> sheep = new HashSet<>();
         final Set<Entity> entities = new HashSet<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
