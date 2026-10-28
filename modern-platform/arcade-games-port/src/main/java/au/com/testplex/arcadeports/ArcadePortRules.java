@@ -75,7 +75,7 @@ public final class ArcadePortRules {
     }
 
     public static long nextBaconKnockbackInterval(long currentMillis) {
-        return Math.max(BACON_MIN_KNOCKBACK_INTERVAL_MILLIS, currentMillis - 5_000L);
+        return Math.max(0L, currentMillis - 5_000L);
     }
 
     public static boolean shouldPunishMicroIslandExit(long elapsedMillis, double ownDistanceSquared,
