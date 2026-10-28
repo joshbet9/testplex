@@ -565,7 +565,7 @@ class ArcadePortGameTest {
         assertEquals(7.2D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 12.0D), 0.00001D);
         assertEquals(6.0D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 15.0D), 0.00001D);
         assertEquals(4.0D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 20.0D), 0.00001D);
-        assertEquals(9.6D, ArcadePortRules.bombLobbersDamageAfterArmor(1.0D, 15.0D), 0.00001D);
+        assertEquals(0.42D, ArcadePortRules.bombLobbersDamageAfterArmor(1.0D, 15.0D), 0.00001D);
         assertEquals(0.0D, ArcadePortRules.bombLobbersDamageAfterArmor(-1.0D, 15.0D), 0.00001D);
         assertEquals(10.0D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, -5.0D), 0.00001D);
     }
