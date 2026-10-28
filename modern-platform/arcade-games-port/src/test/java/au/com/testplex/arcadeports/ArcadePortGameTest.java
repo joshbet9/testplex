@@ -244,4 +244,12 @@ class ArcadePortGameTest {
         assertEquals(12.0D, ArcadePortRules.turfWarsHitDamage(false, true), 0.00001D);
     }
 
+    @Test void paintballHealthTracksRemainingArmourPieces() {
+        assertEquals(21.0D, ArcadePortRules.paintballHealthAfterHit(4), 0.00001D);
+        assertEquals(16.0D, ArcadePortRules.paintballHealthAfterHit(3), 0.00001D);
+        assertEquals(11.0D, ArcadePortRules.paintballHealthAfterHit(2), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.paintballHealthAfterHit(1), 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.paintballHealthAfterHit(0), 0.00001D);
+    }
+
 }
