@@ -12,6 +12,7 @@ import net.minecraft.server.v1_8_R3.IChatBaseComponent;
 import net.minecraft.server.v1_8_R3.PacketPlayOutChat;
 import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
 import org.bukkit.Bukkit;
+import org.bukkit.Effect;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -73,15 +74,46 @@ public class KitSlowballModern extends KitSlowball
             return;
         }
 
-        int frozen = game.getMaze().freezeMonsters(player.getLocation(), RADIUS, FREEZE_MS);
+        org.bukkit.Location origin = player.getLocation().clone();
+        int frozen = game.getMaze().freezeMonsters(origin, RADIUS, FREEZE_MS);
         _nextUse.put(player.getUniqueId(), now + COOLDOWN_MS);
         if (frozen > 0)
             _frozenUntil.put(player.getUniqueId(), now + FREEZE_MS);
-        player.sendMessage(C.cAqua + C.Bold + "Cryo Blitz! " + C.cGray
-                + frozen + " monster(s) frozen for 3 seconds.");
-        player.playSound(player.getLocation(), org.bukkit.Sound.SUCCESSFUL_HIT, 1.0f, 1.5f);
-        sendActionBar(player, C.cAqua + C.Bold + "CRYO BLITZ " + C.cWhite + frozen + " frozen - 3.0s");
+        player.sendMessage(C.cAqua + C.Bold + "CRYO BLITZ! " + C.cWhite
+                + frozen + C.cAqua + C.Bold + " monsters frozen " + C.cGray
+                + "for " + C.cYellow + C.Bold + "3 seconds" + C.cGray + ".");
+        player.playSound(origin, org.bukkit.Sound.DIG_SNOW, 1.0f, 0.6f);
+        player.playSound(origin, org.bukkit.Sound.SUCCESSFUL_HIT, 1.0f, 1.5f);
+        playCryoRadiusVisual(origin);
+        sendActionBar(player, C.cAqua + C.Bold + "CRYO BLITZ! " + C.cWhite + frozen
+                + C.cAqua + C.Bold + " FROZEN " + C.cYellow + C.Bold + "RADIUS " + C.cGold + "6"
+                + C.cGray + " | " + C.cWhite + "3.0s");
         org.bukkit.Bukkit.getPluginManager().callEvent(new AbilityUseEvent(player));
+    }
+
+    /**
+     * A visible snow-burst ring marks the exact Cryo Blitz radius for everyone nearby.
+     * Use legacy 1.8 effects rather than client/version-specific particle APIs.
+     */
+    private void playCryoRadiusVisual(org.bukkit.Location origin)
+    {
+        if (origin == null || origin.getWorld() == null)
+            return;
+        org.bukkit.World world = origin.getWorld();
+        for (int i = 0; i < 56; i++)
+        {
+            double angle = (Math.PI * 2.0D * i) / 56.0D;
+            org.bukkit.Location point = origin.clone().add(
+                    Math.cos(angle) * RADIUS, 0.15D, Math.sin(angle) * RADIUS);
+            world.playEffect(point, Effect.SNOWBALL_BREAK, 0);
+        }
+        for (int i = 0; i < 28; i++)
+        {
+            double angle = (Math.PI * 2.0D * i) / 28.0D;
+            org.bukkit.Location point = origin.clone().add(
+                    Math.cos(angle) * (RADIUS - 0.7D), 0.15D, Math.sin(angle) * (RADIUS - 0.7D));
+            world.playEffect(point, Effect.SNOWBALL_BREAK, 0);
+        }
     }
 
     private void sendActionBar(Player player, String message)
@@ -113,7 +145,7 @@ public class KitSlowballModern extends KitSlowball
             Long next = _nextUse.get(player.getUniqueId());
             if (next == null)
             {
-                sendActionBar(player, C.cAqua + C.Bold + "CRYO BLITZ READY");
+                sendActionBar(player, C.cGreen + C.Bold + "CRYO BLITZ READY!");
                 continue;
             }
             long remaining = next.longValue() - now;
