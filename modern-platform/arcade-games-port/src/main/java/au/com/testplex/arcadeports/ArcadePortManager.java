@@ -1555,7 +1555,8 @@ public final class ArcadePortManager implements Listener {
         for (Player candidate : alivePlayers(session)) {
             if (candidate.equals(shooter) || candidate.equals(struckPlayer)) continue;
             double distance = candidate.getLocation().distanceSquared(origin);
-            if (ArcadePortRules.isQuiverReboundTargetInRange(distance) && distance < nearestDistance) {
+            if (ArcadePortRules.isQuiverReboundTargetInRange(distance)
+                    && (nearest == null || distance < nearestDistance)) {
                 nearestDistance = distance;
                 nearest = candidate;
             }
