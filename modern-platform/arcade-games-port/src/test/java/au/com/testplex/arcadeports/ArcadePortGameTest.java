@@ -104,4 +104,12 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldLaunchDragonEscapeHazard(12_000L, 6_000L));
     }
 
+    @Test void spleefProjectileRadiusScalesWithArrowSpeed() {
+        assertEquals(1, ArcadePortRules.spleefProjectileClearRadius(false, 8.0D));
+        assertEquals(1, ArcadePortRules.spleefProjectileClearRadius(true, 0.0D));
+        assertEquals(2, ArcadePortRules.spleefProjectileClearRadius(true, 1.6D));
+        assertEquals(3, ArcadePortRules.spleefProjectileClearRadius(true, 4.0D));
+        assertEquals(3, ArcadePortRules.spleefProjectileClearRadius(true, 100.0D));
+    }
+
 }
