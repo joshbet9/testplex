@@ -448,6 +448,9 @@ public final class ArcadePortManager implements Listener {
                 break;
             case SPLEEF:
                 player.getInventory().addItem(new ItemStack(Material.IRON_SHOVEL));
+                player.getInventory().addItem(new ItemStack(Material.SNOWBALL, 16));
+                player.getInventory().addItem(new ItemStack(Material.BOW));
+                player.getInventory().addItem(new ItemStack(Material.ARROW, 12));
                 break;
             case TURF_WARS:
                 player.getInventory().addItem(new ItemStack(Material.BOW));
@@ -754,6 +757,7 @@ public final class ArcadePortManager implements Listener {
                 || session.type == ArcadePortGame.MICRO_BATTLES)
                 && session.teams.getOrDefault(attacker.getUniqueId(), -1).equals(session.teams.getOrDefault(target.getUniqueId(), -2))) return;
         if (session.type == ArcadePortGame.TURF_WARS && !session.turfCombat) return;
+        if (session.type == ArcadePortGame.SPLEEF) return; // Player combat is disabled; projectiles target the floor.
 
         switch (session.type) {
             case BACON_BRAWL:
@@ -1148,6 +1152,32 @@ public final class ArcadePortManager implements Listener {
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+
+        if (session.type == ArcadePortGame.SPLEEF
+                && (event.getEntity() instanceof Snowball || event.getEntity() instanceof Arrow)
+                && event.getEntity() instanceof Projectile projectile
+                && projectile.getShooter() instanceof Player shooter
+                && session.alive.contains(shooter.getUniqueId())) {
+            Block hit = event.getHitBlock();
+            if (hit != null) {
+                boolean arrow = projectile instanceof Arrow;
+                double speed = projectile.getVelocity().length();
+                int radius = ArcadePortRules.spleefProjectileClearRadius(arrow, speed);
+                for (int dx = -radius; dx <= radius; dx++) {
+                    for (int dz = -radius; dz <= radius; dz++) {
+                        if (dx * dx + dz * dz > radius * radius) continue;
+                        Block floor = session.world.getBlockAt(hit.getX() + dx, 63, hit.getZ() + dz);
+                        if (floor.getType() == Material.SNOW_BLOCK) {
+                            floor.setType(Material.AIR, false);
+                            session.world.spawnParticle(Particle.CLOUD, floor.getLocation().add(0.5D, 0.5D, 0.5D),
+                                    4, 0.2D, 0.2D, 0.2D, 0.02D);
+                        }
+                    }
+                }
+                projectile.remove();
+            }
+            return;
+        }
 
         if (session.type == ArcadePortGame.RUNNER && event.getEntity() instanceof Arrow arrow
                 && arrow.getShooter() instanceof Player shooter && session.alive.contains(shooter.getUniqueId())) {
