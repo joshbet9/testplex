@@ -82,6 +82,10 @@ public final class ArcadePortRules {
         return game == ArcadePortGame.DRAGONS && trackedEntity && !playerOwned;
     }
 
+    public static boolean shouldApplyDragonContactHit(long nowMillis, long nextAllowedMillis) {
+        return nowMillis >= nextAllowedMillis;
+    }
+
     public static boolean shouldLaunchDragonEscapeHazard(long nowMillis, long nextLaunchMillis) {
         return nowMillis >= nextLaunchMillis;
     }
