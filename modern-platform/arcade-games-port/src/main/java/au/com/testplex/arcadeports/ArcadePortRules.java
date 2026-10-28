@@ -285,13 +285,14 @@ public final class ArcadePortRules {
         return Math.hypot(backX - fromX, backZ - fromZ) < 0.8D;
     }
 
+    /** Canonical kit IDs mirror the official names; old test aliases remain accepted. */
     public static String normalizeBaconBrawlKit(String requested) {
         if (requested == null) return null;
         String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
         return switch (value) {
-            case "pig" -> "pig";
-            case "mama", "mama-pig" -> "mama-pig";
-            case "sheep", "sheep-pig" -> "sheep-pig";
+            case "el-muchacho-pigo", "muchacho", "body-slam", "pigo" -> "el-muchacho-pigo";
+            case "mama", "mama-pig", "mama-piggles" -> "mama-piggles";
+            case "pig", "sneaky-pig", "sheep", "sheep-pig" -> "pig";
             default -> null;
         };
     }
