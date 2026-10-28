@@ -2630,6 +2630,10 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private boolean isSpleefProtectedBlock(Material material) {
+        return material == null || material.isAir() || material == Material.BEDROCK || material == Material.LAVA;
+    }
+
     private boolean isSpleefFloorBlock(Material material) {
         return material == Material.SNOW_BLOCK || material == Material.WHITE_WOOL
                 || material == Material.LIME_WOOL || material == Material.GREEN_WOOL
@@ -2655,8 +2659,8 @@ public final class ArcadePortManager implements Listener {
 
     private void handleSpleefBlockHit(Session session, Player player, Block block, long now) {
         if (active != session || session.type != ArcadePortGame.SPLEEF || block == null
-                || block.getWorld() != session.world || block.getY() != 63
-                || !session.alive.contains(player.getUniqueId()) || !isSpleefFloorBlock(block.getType())) return;
+                || block.getWorld() != session.world || !session.alive.contains(player.getUniqueId())
+                || isSpleefProtectedBlock(block.getType())) return;
         restoreSpleefHunger(session, player, now);
         String kit = session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer");
         if ("brawler".equals(kit)) {
@@ -2665,10 +2669,14 @@ public final class ArcadePortManager implements Listener {
                 session.spleefSmasherReadyAt.put(player.getUniqueId(),
                         now + ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS);
                 for (int dx = -1; dx <= 1; dx++) {
-                    for (int dz = -1; dz <= 1; dz++) {
-                        fadeSpleefBlock(session, block.getRelative(dx, 0, dz), false);
+                    for (int dy = -1; dy <= 1; dy++) {
+                        for (int dz = -1; dz <= 1; dz++) {
+                            if (dx == 0 && dy == 0 && dz == 0) continue;
+                            fadeSpleefBlock(session, block.getRelative(dx, dy, dz), false);
+                        }
                     }
                 }
+                fadeSpleefBlock(session, block, false);
             } else fadeSpleefBlock(session, block, false);
         } else fadeSpleefBlock(session, block, false);
         giveSpleefSnowball(session, player);
@@ -2723,25 +2731,55 @@ public final class ArcadePortManager implements Listener {
 
     private void fadeSpleefBlock(Session session, Block block, boolean slowDamage) {
         if (active != session || session.type != ArcadePortGame.SPLEEF || block == null
-                || block.getWorld() != session.world || block.getY() != 63
-                || !isSpleefFloorBlock(block.getType())) return;
+                || block.getWorld() != session.world || isSpleefProtectedBlock(block.getType())) return;
+        Material material = block.getType();
         if (!slowDamage) {
-            block.setType(Material.AIR, false);
-            session.world.spawnParticle(Particle.CLOUD, block.getLocation().add(0.5D, 0.5D, 0.5D),
-                    4, 0.2D, 0.2D, 0.2D, 0.02D);
-            session.world.playSound(block.getLocation(), Sound.BLOCK_SNOW_BREAK, 0.5F, 1.15F);
+            breakSpleefBlock(session, block);
             return;
         }
-        Material damaged = switch (block.getType()) {
-            case SNOW_BLOCK, WHITE_WOOL, LIME_WOOL, GREEN_WOOL -> Material.YELLOW_WOOL;
-            case YELLOW_WOOL, ORANGE_WOOL -> Material.RED_WOOL;
-            default -> Material.AIR;
-        };
-        block.setType(damaged, false);
-        if (damaged == Material.AIR) {
-            session.world.spawnParticle(Particle.CLOUD, block.getLocation().add(0.5D, 0.5D, 0.5D),
-                    4, 0.2D, 0.2D, 0.2D, 0.02D);
+        Material damaged = null;
+        if (isSpleefWoolOrTerracotta(material)) {
+            damaged = spleefNextColour(material);
+        } else if (material == Material.STONE) {
+            damaged = Material.COBBLESTONE;
+        } else if (material == Material.STONE_BRICKS || material == Material.MOSSY_STONE_BRICKS) {
+            damaged = Material.CRACKED_STONE_BRICKS;
+        } else if (material == Material.GRASS_BLOCK) {
+            damaged = Material.DIRT;
+        } else if (material == Material.SPRUCE_PLANKS) {
+            damaged = Material.OAK_PLANKS;
+        } else if (material == Material.OAK_PLANKS) {
+            damaged = Material.BIRCH_PLANKS;
         }
+        if (damaged == null || damaged == material) {
+            breakSpleefBlock(session, block);
+        } else {
+            block.setType(damaged, false);
+        }
+    }
+
+    private boolean isSpleefWoolOrTerracotta(Material material) {
+        String name = material.name();
+        return name.endsWith("_WOOL") || name.endsWith("_TERRACOTTA") || material == Material.TERRACOTTA;
+    }
+
+    private Material spleefNextColour(Material material) {
+        String name = material.name();
+        String family = name.endsWith("_WOOL") ? "_WOOL" : "_TERRACOTTA";
+        String colour = name.endsWith(family) ? name.substring(0, name.length() - family.length()) : "";
+        return switch (colour) {
+            case "LIME", "GREEN" -> family.equals("_WOOL") ? Material.YELLOW_WOOL : Material.YELLOW_TERRACOTTA;
+            case "YELLOW", "ORANGE" -> family.equals("_WOOL") ? Material.RED_WOOL : Material.RED_TERRACOTTA;
+            default -> null;
+        };
+    }
+
+    private void breakSpleefBlock(Session session, Block block) {
+        if (isSpleefProtectedBlock(block.getType())) return;
+        block.setType(Material.AIR, false);
+        session.world.spawnParticle(Particle.CLOUD, block.getLocation().add(0.5D, 0.5D, 0.5D),
+                4, 0.2D, 0.2D, 0.2D, 0.02D);
+        session.world.playSound(block.getLocation(), Sound.BLOCK_STONE_BREAK, 0.5F, 1.15F);
     }
 
     private void handleRunnerFallingBlockHit(Session session, FallingBlock falling, Player target) {
@@ -2897,28 +2935,32 @@ public final class ArcadePortManager implements Listener {
                 && event.getEntity() instanceof Projectile projectile
                 && projectile.getShooter() instanceof Player shooter
                 && session.alive.contains(shooter.getUniqueId())) {
-            Block hit = event.getHitBlock();
-            if (hit != null) {
-                Block center = session.world.getBlockAt(hit.getX(), 63, hit.getZ());
-                restoreSpleefHunger(session, shooter, System.currentTimeMillis());
+            Block center = event.getHitBlock();
+            if (center == null) {
+                center = projectile.getLocation().add(projectile.getVelocity().clone().multiply(0.8D)).getBlock();
+            }
+            long now = System.currentTimeMillis();
+            if (center.getWorld() == session.world && !isSpleefProtectedBlock(center.getType())) {
+                restoreSpleefHunger(session, shooter, now);
                 if (projectile instanceof Arrow arrow) {
-                    double speed = arrow.getVelocity().length();
-                    int radius = ArcadePortRules.spleefProjectileClearRadius(true, speed);
+                    double radius = 0.5D + arrow.getVelocity().length() / 1.6D;
+                    int limit = (int) Math.ceil(radius);
                     fadeSpleefBlock(session, center, false);
-                    for (int dx = -radius; dx <= radius; dx++) {
-                        for (int dz = -radius; dz <= radius; dz++) {
-                            if ((dx == 0 && dz == 0) || dx * dx + dz * dz > radius * radius) continue;
-                            fadeSpleefBlock(session, session.world.getBlockAt(
-                                    hit.getX() + dx, 63, hit.getZ() + dz), true);
+                    for (int dx = -limit; dx <= limit; dx++) {
+                        for (int dy = -limit; dy <= limit; dy++) {
+                            for (int dz = -limit; dz <= limit; dz++) {
+                                if ((dx == 0 && dy == 0 && dz == 0)
+                                        || dx * dx + dy * dy + dz * dz > radius * radius) continue;
+                                fadeSpleefBlock(session, center.getRelative(dx, dy, dz), true);
+                            }
                         }
                     }
                 } else {
-                    // A snowball breaks exactly the tile it strikes; Snowballer earns a replacement.
                     fadeSpleefBlock(session, center, false);
                     giveSpleefSnowball(session, shooter);
                 }
-                projectile.remove();
             }
+            projectile.remove();
             return;
         }
 
@@ -3162,8 +3204,7 @@ public final class ArcadePortManager implements Listener {
             event.setExpToDrop(0);
             return;
         }
-        if (session.type == ArcadePortGame.SPLEEF && event.getBlock().getY() == 63
-                && isSpleefFloorBlock(event.getBlock().getType())
+        if (session.type == ArcadePortGame.SPLEEF && !isSpleefProtectedBlock(event.getBlock().getType())
                 && session.alive.contains(event.getPlayer().getUniqueId())) {
             event.setDropItems(false);
             event.setExpToDrop(0);
@@ -3195,8 +3236,7 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.SPLEEF
                 || event.getBlock().getWorld() != session.world
-                || event.getBlock().getY() != 63
-                || !isSpleefFloorBlock(event.getBlock().getType())
+                || isSpleefProtectedBlock(event.getBlock().getType())
                 || !session.alive.contains(event.getPlayer().getUniqueId())) return;
         event.setCancelled(true);
         handleSpleefBlockHit(session, event.getPlayer(), event.getBlock(), System.currentTimeMillis());
