@@ -201,6 +201,14 @@ class ArcadePortGameTest {
         }
     }
 
+    @Test void dragonsFlightTargetsStayInsideSourceMapBounds() {
+        assertEquals(101.0D, ArcadePortRules.clampDragonSkyTargetCoordinate(50.0D, 100, 140), 0.00001D);
+        assertEquals(138.999D, ArcadePortRules.clampDragonSkyTargetCoordinate(200.0D, 100, 140), 0.00001D);
+        assertEquals(120.0D, ArcadePortRules.clampDragonSkyTargetCoordinate(Double.NaN, 100, 140), 0.00001D);
+        assertEquals(100.5D, ArcadePortRules.clampDragonSkyTargetCoordinate(500.0D, 100, 101), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.clampDragonSkyTargetCoordinate(-500.0D, -20, 20), 0.00001D);
+    }
+
     @Test void sourceMapSpawnsAreInterleavedAcrossConfiguredTeams() {
         assertEquals(java.util.List.of(0, 1, 2, 0, 1, 0),
                 SourceMapCatalog.MapData.roundRobinGroupOrder(java.util.List.of(3, 2, 1)));
