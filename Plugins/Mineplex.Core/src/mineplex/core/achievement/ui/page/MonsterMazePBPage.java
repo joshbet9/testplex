@@ -181,7 +181,9 @@ public class MonsterMazePBPage extends ShopPageBase<AchievementManager, Achievem
     {
         if (!_targetName.equalsIgnoreCase(getPlayer().getName()))
             return 0;
-        CustomDataManager customData = Managers.require(CustomDataManager.class);
+        CustomDataManager customData = Managers.get(CustomDataManager.class);
+        if (customData == null)
+            return 0;
         String key = display.getCustomDataKeyName() + "pb.pattern" + pattern + "." + slug(kit);
         return Math.max(0, customData.getData(getPlayer(), key));
     }
@@ -201,16 +203,36 @@ public class MonsterMazePBPage extends ShopPageBase<AchievementManager, Achievem
 
     private void openPatterns(Player player, GameDisplay display)
     {
-        getShop().openPageForPlayer(getPlayer(), new MonsterMazePBPage(getPlugin(), _statsManager, getShop(),
-                getClientManager(), getDonationManager(), player, _targetName, _targetStats, View.PATTERNS, display, 0));
-        player.playSound(player.getLocation(), Sound.CLICK, 1, 1);
+        try
+        {
+            MonsterMazePBPage next = new MonsterMazePBPage(getPlugin(), _statsManager, getShop(),
+                    getClientManager(), getDonationManager(), player, _targetName, _targetStats,
+                    View.PATTERNS, display, 0);
+            getShop().openPageForPlayer(player, next);
+            player.playSound(player.getLocation(), Sound.CLICK, 1, 1);
+        }
+        catch (RuntimeException ex)
+        {
+            org.bukkit.Bukkit.getLogger().warning("[MonsterMaze PB] Could not open pattern list: " + ex.getMessage());
+            player.sendMessage(org.bukkit.ChatColor.RED + "Monster Maze PBs could not be opened. Check the server log.");
+        }
     }
 
     private void openKits(Player player, GameDisplay display, int pattern)
     {
-        getShop().openPageForPlayer(getPlayer(), new MonsterMazePBPage(getPlugin(), _statsManager, getShop(),
-                getClientManager(), getDonationManager(), player, _targetName, _targetStats, View.KITS, display, pattern));
-        player.playSound(player.getLocation(), Sound.CLICK, 1, 1);
+        try
+        {
+            MonsterMazePBPage next = new MonsterMazePBPage(getPlugin(), _statsManager, getShop(),
+                    getClientManager(), getDonationManager(), player, _targetName, _targetStats,
+                    View.KITS, display, pattern);
+            getShop().openPageForPlayer(player, next);
+            player.playSound(player.getLocation(), Sound.CLICK, 1, 1);
+        }
+        catch (RuntimeException ex)
+        {
+            org.bukkit.Bukkit.getLogger().warning("[MonsterMaze PB] Could not open kit PB list: " + ex.getMessage());
+            player.sendMessage(org.bukkit.ChatColor.RED + "Per-kit Monster Maze PBs could not be opened. Check the server log.");
+        }
     }
 
     private void addBackButton()
