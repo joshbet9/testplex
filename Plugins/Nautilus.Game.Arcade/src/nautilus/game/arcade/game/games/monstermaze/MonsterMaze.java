@@ -816,8 +816,6 @@ public class MonsterMaze extends SoloGame
 			int patternPb = MonsterMazePersonalBestManager.getKitBest(this, viewer, pattern);
 			board.write(C.cAqua + C.Bold + "Pattern PB: " + C.cWhite
 					+ (patternPb > 0 ? "Stage " + patternPb : "Not set"));
-			if (_maze != null)
-				_maze.refreshPlayerSafePadCosmetics(viewer);
 			board.draw();
 
 		}
