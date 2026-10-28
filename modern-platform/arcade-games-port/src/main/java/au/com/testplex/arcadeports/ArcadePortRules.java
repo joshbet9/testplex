@@ -267,6 +267,20 @@ public final class ArcadePortRules {
                 || (ageMillis >= BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS && touchingSolidBlock);
     }
 
+    /** Match Reborn's backstab cone: compare the target's backward look with the attacker direction. */
+    public static boolean isBaconBrawlBackstab(double targetLookX, double targetLookZ,
+            double attackerFromTargetX, double attackerFromTargetZ) {
+        double lookLength = Math.hypot(targetLookX, targetLookZ);
+        double attackerLength = Math.hypot(attackerFromTargetX, attackerFromTargetZ);
+        if (!Double.isFinite(lookLength) || !Double.isFinite(attackerLength)
+                || lookLength < 1.0E-6D || attackerLength < 1.0E-6D) return false;
+        double backX = -targetLookX / lookLength;
+        double backZ = -targetLookZ / lookLength;
+        double fromX = attackerFromTargetX / attackerLength;
+        double fromZ = attackerFromTargetZ / attackerLength;
+        return Math.hypot(backX - fromX, backZ - fromZ) < 0.8D;
+    }
+
     public static String normalizeBaconBrawlKit(String requested) {
         if (requested == null) return null;
         String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
