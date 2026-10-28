@@ -746,6 +746,12 @@ public final class ArcadePortRules {
         };
     }
 
+    /** Turf floor is the block below players' source spawn feet location. */
+    public static int turfWarsFloorYFromSpawn(double spawnY) {
+        if (!Double.isFinite(spawnY)) return 63;
+        return (int) Math.floor(spawnY) - 1;
+    }
+
     /** Initial line sits immediately to the left of the X-axis midpoint (red territory). */
     public static int turfWarsInitialFrontline(int minX, int maxXExclusive) {
         if (maxXExclusive <= minX) return -1;
