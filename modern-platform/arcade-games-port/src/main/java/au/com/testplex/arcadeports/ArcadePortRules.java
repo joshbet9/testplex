@@ -76,6 +76,7 @@ public final class ArcadePortRules {
     public static String normalizeDragonEscapeKit(String requested) {
         if (requested == null) return null;
         String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (value.startsWith("dragon-escape-")) value = value.substring("dragon-escape-".length());
         return switch (value) {
             case "jumper" -> "jumper";
             case "disruptor" -> "disruptor";
