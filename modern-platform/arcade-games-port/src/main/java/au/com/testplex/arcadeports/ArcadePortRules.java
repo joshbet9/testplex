@@ -58,6 +58,23 @@ public final class ArcadePortRules {
         return -1;
     }
 
+    public static int sheepQuestLeadingTeam(int[] sheepCounts) {
+        if (sheepCounts == null || sheepCounts.length == 0) return -1;
+        int bestTeam = -1;
+        int bestCount = Integer.MIN_VALUE;
+        boolean tied = false;
+        for (int team = 0; team < sheepCounts.length; team++) {
+            if (sheepCounts[team] > bestCount) {
+                bestCount = sheepCounts[team];
+                bestTeam = team;
+                tied = false;
+            } else if (sheepCounts[team] == bestCount) {
+                tied = true;
+            }
+        }
+        return tied ? -1 : bestTeam;
+    }
+
     public static boolean shouldEnterSheepQuestOvertime(int redSheep, int blueSheep) {
         return redSheep == blueSheep;
     }
