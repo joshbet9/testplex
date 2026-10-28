@@ -305,6 +305,16 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRunnerFallingBlockHit(70.0D, 64.0D));
     }
 
+    @Test void sourceWaterDamageMatchesTheOriginalArcadeGameSettings() {
+        assertEquals(5, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.BOMB_LOBBERS, "Mighty Lava Arena"));
+        assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGONS, "Dragons"));
+        assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.RUNNER, "Runner"));
+        assertEquals(4, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.SPLEEF, "Spleef"));
+        assertEquals(2, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Pirate"));
+        assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.DRAGON_ESCAPE, "Hell"));
+        assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.BACON_BRAWL, "Arena"));
+    }
+
     @Test void dragonEscapeHellMapStartsAtNight() {
         assertEquals(16_000L, ArcadePortRules.dragonEscapeWorldTime("Dragon Escape Hell"));
         assertEquals(6_000L, ArcadePortRules.dragonEscapeWorldTime("Dragon Escape Pirate"));
