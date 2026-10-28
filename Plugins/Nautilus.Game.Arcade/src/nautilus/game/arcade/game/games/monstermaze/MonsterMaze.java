@@ -79,6 +79,7 @@ import org.bukkit.event.entity.EntityRegainHealthEvent.RegainReason;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
@@ -102,6 +103,7 @@ public class MonsterMaze extends SoloGame
 	private final Map<UUID, ItemStack> _previousCompassItems = new HashMap<UUID, ItemStack>();
 	private final Map<UUID, ItemStack> _previousMobThemeItems = new HashMap<UUID, ItemStack>();
 	private final Map<UUID, ItemStack> _previousVisibilityItems = new HashMap<UUID, ItemStack>();
+	private final Set<UUID> _safePadReturnTeleports = new HashSet<UUID>();
 	private final Map<UUID, Integer> _visibilityModeData = new HashMap<UUID, Integer>();
 	private static final int VISIBILITY_SLOT = 7;
 	private static final int MOB_THEME_SLOT = 6;
@@ -407,6 +409,7 @@ public class MonsterMaze extends SoloGame
 		// them back to the centre start. Preserve the horizontal direction they walked
 		// off in so they immediately face the direction of travel on arrival.
 		if (_maze != null && _maze.getSafePad() != null && _maze.hasReachedCurrentSafePad(player)
+				&& !_safePadReturnTeleports.contains(player.getUniqueId())
 				&& event.getFrom() != null && event.getTo() != null
 				&& _maze.getSafePad().isOn(event.getFrom()) && !_maze.getSafePad().isOn(event.getTo()))
 		{
@@ -418,8 +421,16 @@ public class MonsterMaze extends SoloGame
 				if (Math.abs(dx) + Math.abs(dz) > 0.0001D)
 					centre.setYaw((float) Math.toDegrees(Math.atan2(-dx, dz)));
 				centre.setPitch(0.0F);
-				player.teleport(centre);
-				player.setVelocity(new Vector(0, 0, 0));
+				_safePadReturnTeleports.add(player.getUniqueId());
+				try
+				{
+					player.teleport(centre);
+					player.setVelocity(new Vector(0, 0, 0));
+				}
+				finally
+				{
+					_safePadReturnTeleports.remove(player.getUniqueId());
+				}
 				return;
 			}
 		}
@@ -1199,6 +1210,7 @@ public class MonsterMaze extends SoloGame
 				player.getInventory().setItem(SAFE_PAD_COMPASS_SLOT, entry.getValue() == null ? null : entry.getValue().clone());
 		}
 		_viewerScoreboards.clear();
+		_safePadReturnTeleports.clear();
 		_previousScoreboards.clear();
 		_previousCompassItems.clear();
 		_previousMobThemeItems.clear();
