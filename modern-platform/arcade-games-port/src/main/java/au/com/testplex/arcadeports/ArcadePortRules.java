@@ -157,6 +157,13 @@ public final class ArcadePortRules {
         };
     }
 
+    /** Legacy 1.8 armour points absorb 4% of incoming damage per point, up to 20 points. */
+    public static double bombLobbersDamageAfterArmor(double rawDamage, double armorPoints) {
+        if (!Double.isFinite(rawDamage) || rawDamage <= 0.0D) return 0.0D;
+        double armor = Double.isFinite(armorPoints) ? Math.max(0.0D, Math.min(20.0D, armorPoints)) : 0.0D;
+        return rawDamage * (1.0D - armor / 25.0D);
+    }
+
     public static double bombLobbersPitchVelocity(int level) {
         return switch (Math.max(1, Math.min(3, level))) {
             case 1 -> 1.75D;
