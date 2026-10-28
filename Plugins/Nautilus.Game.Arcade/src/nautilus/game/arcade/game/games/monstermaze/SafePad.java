@@ -253,13 +253,14 @@ public class SafePad implements Listener
 
 		String mobSet = _maze == null ? null : _maze.getMobSetForPlayer(viewer);
 		boolean customPack = mobSet != null && ArcadeCosmeticsMenu.isMonsterMazeCustomPackUnlocked(viewer.getUniqueId());
-		boolean warningTintActive = _breakColour != _surfaceColour;
-
+		// The server-side clay still changes through the green/yellow/orange/red warning
+		// sequence. Keep the per-viewer cosmetic tint stable over that backing block data;
+		// otherwise the selected colour appears to switch off halfway through a stage.
 		for (SafePadBlock block : _blocks)
 		{
 			if (block.getBlockMaterial() != Material.STAINED_CLAY)
 				continue;
-			byte data = customPack && !warningTintActive
+			byte data = customPack
 					? (byte) ArcadeCosmeticsMenu.getMonsterMazeSafePadColourData(viewer.getUniqueId(), mobSet)
 					: block.getBlockData();
 			viewer.sendBlockChange(block.getLocation(), Material.STAINED_CLAY, data);
@@ -464,10 +465,14 @@ public class SafePad implements Listener
 	
 	public boolean isOn(Entity e)
 	{
-		if (e == null || e.getWorld() != _loc.getWorld())
+		return e != null && isOn(e.getLocation());
+	}
+
+	public boolean isOn(Location entityLocation)
+	{
+		if (entityLocation == null || entityLocation.getWorld() != _loc.getWorld())
 			return false;
 
-		Location entityLocation = e.getLocation();
 		double dx = entityLocation.getX() - _loc.getX();
 		double dz = entityLocation.getZ() - _loc.getZ();
 		double dy = entityLocation.getY() - _loc.getY();

@@ -5,6 +5,13 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.UUID;
 
+import net.md_5.bungee.api.chat.BaseComponent;
+import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.chat.ComponentSerializer;
+import net.minecraft.server.v1_8_R3.IChatBaseComponent;
+import net.minecraft.server.v1_8_R3.PacketPlayOutChat;
+import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -28,6 +35,7 @@ public class KitSlowballModern extends KitSlowball
     private static final double RADIUS = 6.0D;
 
     private final Map<UUID, Long> _nextUse = new HashMap<UUID, Long>();
+    private final Map<UUID, Long> _frozenUntil = new HashMap<UUID, Long>();
 
     public KitSlowballModern(nautilus.game.arcade.ArcadeManager manager)
     {
@@ -67,30 +75,59 @@ public class KitSlowballModern extends KitSlowball
 
         int frozen = game.getMaze().freezeMonsters(player.getLocation(), RADIUS, FREEZE_MS);
         _nextUse.put(player.getUniqueId(), now + COOLDOWN_MS);
+        if (frozen > 0)
+            _frozenUntil.put(player.getUniqueId(), now + FREEZE_MS);
         player.sendMessage(C.cAqua + C.Bold + "Cryo Blitz! " + C.cGray
                 + frozen + " monster(s) frozen for 3 seconds.");
         player.playSound(player.getLocation(), org.bukkit.Sound.SUCCESSFUL_HIT, 1.0f, 1.5f);
+        sendActionBar(player, C.cAqua + C.Bold + "CRYO BLITZ " + C.cWhite + frozen + " frozen - 3.0s");
         org.bukkit.Bukkit.getPluginManager().callEvent(new AbilityUseEvent(player));
+    }
+
+    private void sendActionBar(Player player, String message)
+    {
+        BaseComponent[] components = TextComponent.fromLegacyText(message);
+        IChatBaseComponent packetText = IChatBaseComponent.ChatSerializer.a(ComponentSerializer.toString(components));
+        ((CraftPlayer) player).getHandle().playerConnection.sendPacket(new PacketPlayOutChat(packetText, (byte) 2));
     }
 
     @EventHandler
     public void onUpdate(UpdateEvent event)
     {
-        if (event.getType() != UpdateType.SEC || !Manager.GetGame().IsLive())
+        if (event.getType() != UpdateType.TICK || !Manager.GetGame().IsLive())
             return;
 
         long now = System.currentTimeMillis();
-        Iterator<Map.Entry<UUID, Long>> iterator = _nextUse.entrySet().iterator();
-        while (iterator.hasNext())
+        for (Player player : Bukkit.getOnlinePlayers())
         {
-            Map.Entry<UUID, Long> entry = iterator.next();
-            if (entry.getValue().longValue() > now)
+            if (!player.isOnline() || !HasKit(player))
                 continue;
-
-            Player player = org.bukkit.Bukkit.getPlayer(entry.getKey());
-            if (player != null && player.isOnline() && HasKit(player))
+            Long frozenUntil = _frozenUntil.get(player.getUniqueId());
+            if (frozenUntil != null && frozenUntil.longValue() > now)
+            {
+                sendActionBar(player, C.cAqua + C.Bold + "FROZEN " + C.cWhite
+                        + String.format(java.util.Locale.US, "%.1fs", (frozenUntil.longValue() - now) / 1000.0D));
+                continue;
+            }
+            _frozenUntil.remove(player.getUniqueId());
+            Long next = _nextUse.get(player.getUniqueId());
+            if (next == null)
+            {
+                sendActionBar(player, C.cAqua + C.Bold + "CRYO BLITZ READY");
+                continue;
+            }
+            long remaining = next.longValue() - now;
+            if (remaining <= 0)
+            {
+                _nextUse.remove(player.getUniqueId());
                 player.sendMessage(C.cAqua + "Cryo Blitz is ready.");
-            iterator.remove();
+                sendActionBar(player, C.cAqua + C.Bold + "CRYO BLITZ READY");
+            }
+            else
+            {
+                sendActionBar(player, C.cAqua + C.Bold + "CRYO BLITZ " + C.cWhite
+                        + String.format(java.util.Locale.US, "%.1fs", remaining / 1000.0D));
+            }
         }
     }
 
@@ -98,6 +135,9 @@ public class KitSlowballModern extends KitSlowball
     public void onGameEnd(GameStateChangeEvent event)
     {
         if (event.GetState() == GameState.End || event.GetState() == GameState.Dead)
+        {
             _nextUse.clear();
+            _frozenUntil.clear();
+        }
     }
 }

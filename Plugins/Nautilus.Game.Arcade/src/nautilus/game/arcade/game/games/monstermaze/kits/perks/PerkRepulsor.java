@@ -27,6 +27,7 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 
 public class PerkRepulsor extends Perk
 {
@@ -53,30 +54,40 @@ public class PerkRepulsor extends Perk
 			return;
 		
 		Player player = event.getPlayer();
-		
-		if (!Kit.HasKit(player)) 
+		if (!Kit.HasKit(player))
 			return;
-		
 		event.setCancelled(true);
-		
+		repulse(player);
+	}
+
+	/** Bukkit sends entity-interact instead of block/air interact when the crosshair is on a mob. */
+	@EventHandler
+	public void onRepulseEntity(PlayerInteractEntityEvent event)
+	{
+		Player player = event.getPlayer();
+		if (!Manager.GetGame().IsLive() || !Kit.HasKit(player)
+				|| !UtilInv.IsItem(player.getItemInHand(), Material.COAL, (byte) 0))
+			return;
+		event.setCancelled(true);
+		repulse(player);
+	}
+
+	private void repulse(Player player)
+	{
+		if (!UtilInv.IsItem(player.getItemInHand(), Material.COAL, (byte) 0))
+			return;
 		UtilInv.remove(player, Material.COAL, (byte)0, 1);
 		UtilInv.Update(player);
-		
 		UtilFirework.playFirework(player.getLocation(), Type.BALL_LARGE, Color.AQUA, false, false);
-		
 		for (Entity ent : UtilEnt.getInRadius(player.getLocation(), 6).keySet())
 		{
 			if (ent instanceof Player || !(ent instanceof LivingEntity))
 				continue;
-				
 			ent.playEffect(EntityEffect.HURT);
 			UtilAction.velocity(ent, UtilAlg.getTrajectory2d(player, ent), 1, true, 0, 0.8, 2, true);
-
 			_launched.put(ent, System.currentTimeMillis());
-			
 			Bukkit.getPluginManager().callEvent(new EntityLaunchEvent(ent));
 		}
-		
 		Bukkit.getPluginManager().callEvent(new AbilityUseEvent(player));
 	}
 	

@@ -138,6 +138,11 @@ public class Maze implements Listener
 		_safePadBeaconEnhancementsEnabled = _host.Manager.getPlugin().getConfig()
 				.getBoolean("monstermaze.safe-pad-enhancements.enabled", false);
 
+		// A Mob Theme is a per-round toggle, not a persistent preference. Every new game
+		// begins with Map Default for each player; colour customisation remains per mob set.
+		for (Player player : _host.GetPlayers(false))
+			applyMobThemeChoice(player, "map_default", false);
+
 		// Stale containment can outlive the old preset's location list.
 		clearStaleContainmentGlass();
 		
@@ -196,6 +201,18 @@ public class Maze implements Listener
 	public int getCurrentSafePadCount()
 	{
 		return _curSafe;
+	}
+
+	/** Whether this player has already reached the active pad during this stage. */
+	public boolean hasReachedCurrentSafePad(Player player)
+	{
+		return player != null && _playersOnPad.contains(player);
+	}
+
+	/** Reapply client-side pad/beacon tints when a player joins the game or their theme changes. */
+	public void refreshPlayerSafePadCosmetics(Player viewer)
+	{
+		refreshSafePadCosmeticColours(viewer);
 	}
 	
 	public boolean isOnPad(Player player, boolean checkNotActive )
@@ -1366,22 +1383,35 @@ public class Maze implements Listener
 
 		if(_phaseTimer == 0)
 		{
-			for (Player p : _host.GetPlayers(true))
+			for (Player p : new ArrayList<Player>(_host.GetPlayers(true)))
 			{
-				if(_safePad.isOn(p))
+				if (_safePad.isOn(p))
 				{
 					UtilTextMiddle.display("", C.cYellow + C.Bold + "Get to the Next Safe Pad!", 5, 40, 5, p);
-					// maybe send them a happy message? =)
-					//					UtilPlayer.message(p, F.main("Game", "Since you were on the Safe Pad, you didn't die!"));
+					continue;
 				}
-				else
+
+				// The timeout is authoritative. A mob collision or ability in this same tick must
+				// not let a player evade map damage by moving away before the damage event resolves.
+				try
 				{
-					_host.Manager.GetDamage().NewDamageEvent(p, null, null, 
+					_host.Manager.GetDamage().NewDamageEvent(p, null, null,
 							DamageCause.CUSTOM, 500, false, false, false,
 							"Game", "Map damage");
-					UtilTextMiddle.display("", C.cRed + C.Bold + "You weren't on the Safe Pad!", 5, 40, 5, p);
-					UtilPlayer.message(p, F.main("Game", "You weren't on the Safe Pad!"));
 				}
+				catch (Throwable failure)
+				{
+					Bukkit.getLogger().warning("[MonsterMaze] Map-damage event failed for " + p.getName()
+							+ ": " + failure.getClass().getSimpleName());
+				}
+				if (_host.IsAlive(p) && p.isOnline() && !p.isDead() && p.getHealth() > 0.0D)
+				{
+					// Custom damage is occasionally cancelled or reduced by unrelated handlers.
+					// Enforce elimination at the stage boundary even if the damage event partially applies.
+					try { p.setHealth(0.0D); } catch (IllegalArgumentException ignored) { }
+				}
+				UtilTextMiddle.display("", C.cRed + C.Bold + "You weren't on the Safe Pad!", 5, 40, 5, p);
+				UtilPlayer.message(p, F.main("Game", "You weren't on the Safe Pad!"));
 			}
 
 			// The source's Speed mode retains the original 15-mob wave; Modern adds
@@ -1662,9 +1692,13 @@ public class Maze implements Listener
 		if (pad == null || pad.getLocation() == null || pad.getLocation().getWorld() == null)
 			return;
 
+		// The launch signal is an onboarding cue only. Show it for the first two pads
+		// of a fresh run, not every subsequent stage, and launch it well above the maze.
+		if (_padSpawnCount >= 2)
+			return;
 		_padSpawnCount++;
 		Location base = pad.getLocation().clone();
-		Location location = base.clone().add(0.5D, 1.0D, 0.5D);
+		Location location = base.clone().add(0.5D, 3.0D, 0.5D);
 
 		// Mark every newly spawned objective, including the initial and preview pads.
 		Firework firework = location.getWorld().spawn(location, Firework.class);

@@ -53,6 +53,7 @@ import nautilus.game.arcade.Arcade;
 import nautilus.game.arcade.ArcadeManager;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.game.Game.GameState;
+import nautilus.game.arcade.game.games.monstermaze.MonsterMaze;
 
 /**
  * Testbed-only, persistent selector for per-game Arcade cosmetics and their
@@ -1056,6 +1057,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                         + mobSet + "." + parts[0];
                 data.set(path, parts[2]);
                 save();
+                refreshLiveMonsterMazeColours(player);
                 player.sendMessage(ChatColor.GREEN + pretty(mobSet) + " " + parts[0] + " colour set to " + pretty(parts[2]) + ".");
                 openMobSetColours(player, mobSet);
                 return;
@@ -1143,6 +1145,14 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             clearDeathTagShowcase();
             clearDragonEscapeShowcase();
         }
+    }
+
+    /** Immediately repaint the viewer's active client-only Mob Theme/colour overrides. */
+    private void refreshLiveMonsterMazeColours(Player player) {
+        if (player == null || !(plugin instanceof Arcade)) return;
+        ArcadeManager manager = ((Arcade) plugin).getArcadeManager();
+        if (manager == null || !(manager.GetGame() instanceof MonsterMaze)) return;
+        ((MonsterMaze) manager.GetGame()).refreshSafePadCosmeticsForViewer(player);
     }
 
     private World getLobbyWorld() {

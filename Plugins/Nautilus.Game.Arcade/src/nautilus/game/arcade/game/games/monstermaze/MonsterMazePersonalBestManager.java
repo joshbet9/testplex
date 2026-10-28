@@ -120,6 +120,47 @@ public final class MonsterMazePersonalBestManager
         });
     }
 
+    /**
+     * Best stored result for this pattern regardless of the kit used, matching the
+     * original Monster Maze scoreboard's stage-plus-kit PB display.
+     */
+    public static String getBestForPattern(MonsterMaze game, Player player, int pattern)
+    {
+        if (game == null || player == null || pattern < 1 || pattern > 3
+                || game.Manager.getCustomDataManager() == null)
+            return "Not set";
+
+        String prefix = game.GetType().getDisplay().getCustomDataKeyName();
+        String[] kits = game.isModernVariant()
+                ? new String[] {"Jumper", "Slowballer", "Body Builder", "Repulsor", "Maverick"}
+                : new String[] {"Jumper", "Slowballer", "Body Builder", "Repulsor"};
+        int bestStage = 0;
+        String bestKit = null;
+        for (String kit : kits)
+        {
+            String key = prefix + "pb.pattern" + pattern + "." + slug(kit);
+            int stage = game.Manager.getCustomDataManager().getData(player, key);
+            if (stage > bestStage)
+            {
+                bestStage = stage;
+                bestKit = kit;
+            }
+        }
+        return bestStage > 0 ? "Stage " + bestStage + " (" + bestKit + ")" : "Not set";
+    }
+
+    /** Read the current kit's PB for a specific pattern without starting a write. */
+    public static int getKitBest(MonsterMaze game, Player player, int pattern)
+    {
+        if (game == null || player == null || pattern < 1 || pattern > 3
+                || game.Manager.getCustomDataManager() == null || game.GetKit(player) == null)
+            return 0;
+        String prefix = game.GetType().getDisplay().getCustomDataKeyName();
+        String kit = game.GetKit(player).GetName();
+        return game.Manager.getCustomDataManager().getData(player,
+                prefix + "pb.pattern" + pattern + "." + slug(kit));
+    }
+
     /** Show the selected kit's local/native PB for each original maze pattern. */
     public static void show(final MonsterMaze game, final Player player)
     {
