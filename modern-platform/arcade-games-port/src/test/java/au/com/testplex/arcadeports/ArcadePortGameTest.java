@@ -712,6 +712,15 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.canCarryAnotherSheep(-1));
     }
 
+    @Test void sheepQuestSlowsMoreAsPlayersCarryAdditionalSheep() {
+        assertEquals(-1, ArcadePortRules.sheepQuestCarrySlownessAmplifier(0));
+        assertEquals(0, ArcadePortRules.sheepQuestCarrySlownessAmplifier(1));
+        assertEquals(1, ArcadePortRules.sheepQuestCarrySlownessAmplifier(2));
+        assertEquals(2, ArcadePortRules.sheepQuestCarrySlownessAmplifier(3));
+        assertEquals(2, ArcadePortRules.sheepQuestCarrySlownessAmplifier(4));
+        assertEquals(-1, ArcadePortRules.sheepQuestCarrySlownessAmplifier(-1));
+    }
+
     @Test void sheepQuestSupportsFourTeamsAndDetectsTies() {
         assertEquals(0, ArcadePortRules.sheepQuestLeadingTeam(new int[]{5, 3, 2, 1}));
         assertEquals(1, ArcadePortRules.sheepQuestLeadingTeam(new int[]{1, 4, 2, 3}));
