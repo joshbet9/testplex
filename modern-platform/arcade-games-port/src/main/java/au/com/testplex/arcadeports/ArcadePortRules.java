@@ -392,6 +392,21 @@ public final class ArcadePortRules {
 
  
     /** Legacy Dragon Escape runs its Hell course at night; other courses keep the normal day start. */
+    /**
+     * Preserve the original per-game world-water damage settings. Dragon Escape
+     * only enables this penalty on its Pirate course.
+     */
+    public static int sourceWorldWaterDamage(ArcadePortGame game, String mapName) {
+        if (game == null) return 0;
+        return switch (game) {
+            case BOMB_LOBBERS -> 5;
+            case DRAGONS, RUNNER, SPLEEF -> 4;
+            case DRAGON_ESCAPE -> mapName != null
+                    && mapName.toLowerCase(java.util.Locale.ROOT).contains("pirate") ? 2 : 0;
+            default -> 0;
+        };
+    }
+
     public static long dragonEscapeWorldTime(String mapName) {
         return mapName != null && mapName.contains("Hell") ? 16_000L : 6_000L;
     }
