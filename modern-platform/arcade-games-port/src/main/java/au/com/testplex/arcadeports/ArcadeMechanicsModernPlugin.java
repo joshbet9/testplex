@@ -56,7 +56,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     return true;
                 }
                 if (args.length < 2) {
-                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit <jumper|armorer|pitcher|waller|pig|mama-pig|sheep-pig|snowballer|brawler|archer|rifle|sniper|shotgun|machine-gun|runner-basher|runner-archer|runner-traitor|runner-null>");
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit <jumper|armorer|pitcher|waller|pig|mama-pig|sheep-pig|snowballer|brawler|archer|worker|fighter|rifle|sniper|shotgun|machine-gun|runner-basher|runner-archer|runner-traitor|runner-null>");
                     return true;
                 }
                 manager.selectKit(player, args[1]);
@@ -76,7 +76,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>" + ChatColor.GRAY + " — quick solo test; starts after a short join window");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join <game-id>" + ChatColor.GRAY + " — queue to join a multiplayer test");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a Bomb Lobbers, Bacon Brawl, Spleef, Paintball or Death Tag runner kit");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a Bomb Lobbers, Bacon Brawl, Micro Battles, Spleef, Paintball or Death Tag runner kit");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport status" + ChatColor.GRAY + " — active game and queue counts");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport stop" + ChatColor.GRAY + " — operator reset");
                 sender.sendMessage(ChatColor.DARK_GRAY + "IDs: bacon-brawl, bomb-lobbers, death-tag, dragon-escape, dragons, evolution, gladiators, micro-battles, one-in-the-quiver, paintball, runner, sheep-quest, spleef, turf-wars");

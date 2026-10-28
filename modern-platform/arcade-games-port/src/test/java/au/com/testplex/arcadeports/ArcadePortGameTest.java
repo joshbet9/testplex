@@ -126,6 +126,22 @@ class ArcadePortGameTest {
         assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.EVOLUTION));
     }
 
+    @Test void microBattlesSourceKitsFletcherAndIronSkinAreExplicit() {
+        assertEquals("archer", ArcadePortRules.normalizeMicroBattlesKit("Archer"));
+        assertEquals("worker", ArcadePortRules.normalizeMicroBattlesKit("Worker"));
+        assertEquals("fighter", ArcadePortRules.normalizeMicroBattlesKit("Fighter"));
+        assertNull(ArcadePortRules.normalizeMicroBattlesKit("unknown"));
+        assertEquals(20_000L, ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
+        assertEquals(3, ArcadePortRules.MICRO_BATTLES_FLETCHER_MAX_ARROWS);
+        assertTrue(ArcadePortRules.shouldReplenishMicroArrow(20_000L, 20_000L, 2, 3));
+        assertFalse(ArcadePortRules.shouldReplenishMicroArrow(19_999L, 20_000L, 2, 3));
+        assertFalse(ArcadePortRules.shouldReplenishMicroArrow(20_000L, 20_000L, 3, 3));
+        assertEquals(2.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(4.0D, true), 0.00001D);
+        assertEquals(3.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(6.0D, true), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(1.0D, true), 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(4.0D, false), 0.00001D);
+    }
+
     @Test void spleefSourceKitSelectionHungerAndPerkTimingAreExplicit() {
         assertEquals("snowballer", ArcadePortRules.normalizeSpleefKit("Snowballer"));
         assertEquals("brawler", ArcadePortRules.normalizeSpleefKit("brawler"));

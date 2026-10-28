@@ -95,6 +95,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> baconKitPreferences = new HashMap<>();
     private final Map<UUID, String> bombLobbersKitPreferences = new HashMap<>();
     private final Map<UUID, String> spleefKitPreferences = new HashMap<>();
+    private final Map<UUID, String> microKitPreferences = new HashMap<>();
     private Session active;
     private BukkitTask pendingStart;
     private ArcadePortGame pendingType;
@@ -112,6 +113,7 @@ public final class ArcadePortManager implements Listener {
         if (ArcadePortRules.normalizeBaconBrawlKit(value) != null) selectBaconBrawlKit(player, value);
         else if (ArcadePortRules.normalizeBombLobbersKit(value) != null) selectBombLobbersKit(player, value);
         else if (ArcadePortRules.normalizeSpleefKit(value) != null) selectSpleefKit(player, value);
+        else if (ArcadePortRules.normalizeMicroBattlesKit(value) != null) selectMicroBattlesKit(player, value);
         else if (Set.of("rifle", "sniper", "shotgun", "machine-gun", "machinegun").contains(value)) selectPaintballKit(player, value);
         else selectDeathTagRunnerKit(player, value);
     }
@@ -170,6 +172,28 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.GREEN + "Spleef kit changed to " + kit + ".");
         } else {
             player.sendMessage(ChatColor.GREEN + "Spleef kit set to " + kit + " for your next test.");
+        }
+    }
+
+    public void selectMicroBattlesKit(Player player, String requestedKit) {
+        if (player == null) return;
+        String kit = ArcadePortRules.normalizeMicroBattlesKit(requestedKit);
+        if (kit == null) {
+            player.sendMessage(ChatColor.YELLOW + "Micro Battles kits: archer, worker, fighter.");
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        microKitPreferences.put(playerId, kit);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.MICRO_BATTLES
+                && session.players.containsKey(playerId) && session.alive.contains(playerId)) {
+            session.microKits.put(playerId, kit);
+            session.microNextArrowAt.put(playerId,
+                    System.currentTimeMillis() + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
+            giveKit(session, player);
+            player.sendMessage(ChatColor.GREEN + "Micro Battles kit changed to " + kit + ".");
+        } else {
+            player.sendMessage(ChatColor.GREEN + "Micro Battles kit set to " + kit + " for your next test.");
         }
     }
 
@@ -380,6 +404,11 @@ public final class ArcadePortManager implements Listener {
                         bombLobbersKitPreferences.getOrDefault(player.getUniqueId(), "jumper"));
                 session.bombPitchLevels.put(player.getUniqueId(), 2);
                 session.bombDoubleJumpAvailable.add(player.getUniqueId());
+            }
+            if (type == ArcadePortGame.MICRO_BATTLES) {
+                session.microKits.put(player.getUniqueId(), microKitPreferences.getOrDefault(player.getUniqueId(), "archer"));
+                session.microNextArrowAt.put(player.getUniqueId(),
+                        now + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
             }
             Location spawn = spawns.get(i % spawns.size()).clone();
             if (type == ArcadePortGame.MICRO_BATTLES && !sourceMapWorlds.contains(type.id())) {
@@ -950,13 +979,32 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().addItem(new ItemStack(Material.BOW));
                 player.getInventory().addItem(new ItemStack(Material.ARROW, 3));
                 break;
-            case MICRO_BATTLES:
-                player.getInventory().addItem(new ItemStack(Material.STONE_SWORD));
-                player.getInventory().addItem(new ItemStack(Material.BOW));
-                player.getInventory().addItem(new ItemStack(Material.ARROW, 16));
-                player.getInventory().addItem(new ItemStack(Material.COBBLESTONE, 32));
+            case MICRO_BATTLES: {
+                String kit = session.microKits.getOrDefault(player.getUniqueId(), "archer");
+                switch (kit) {
+                    case "worker":
+                        player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
+                        player.getInventory().addItem(new ItemStack(Material.STONE_SHOVEL));
+                        player.getInventory().addItem(new ItemStack(Material.STONE_PICKAXE));
+                        player.getInventory().addItem(new ItemStack(Material.STONE_AXE));
+                        player.getInventory().addItem(new ItemStack(Material.APPLE, 4));
+                        break;
+                    case "fighter":
+                        player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
+                        player.getInventory().addItem(new ItemStack(Material.APPLE, 5));
+                        break;
+                    default:
+                        player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
+                        player.getInventory().addItem(new ItemStack(Material.BOW));
+                        player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
+                                "Automatically replenishes up to 3 arrows every 20 seconds.",
+                                ArcadePortRules.MICRO_BATTLES_FLETCHER_MAX_ARROWS));
+                        player.getInventory().addItem(new ItemStack(Material.APPLE, 3));
+                        break;
+                }
                 setMicroTeamArmor(session, player);
                 break;
+            }
             case ONE_IN_THE_QUIVER:
                 player.getInventory().addItem(new ItemStack(Material.BOW));
                 player.getInventory().addItem(namedItem(Material.ARROW, "Super Arrow", "One arrow per shot; earn another with each kill."));
@@ -1005,6 +1053,35 @@ public final class ArcadePortManager implements Listener {
         player.updateInventory();
     }
 
+    private int countNamedItems(Player player, Material material, String expectedName) {
+        int count = 0;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item == null || item.getType() != material || !item.hasItemMeta()
+                    || item.getItemMeta().getDisplayName() == null) continue;
+            String display = ChatColor.stripColor(item.getItemMeta().getDisplayName());
+            if (display != null && display.contains(expectedName)) count += item.getAmount();
+        }
+        return count;
+    }
+
+    private void updateMicroBattlesArrows(Session session, long now) {
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            if (!"archer".equals(session.microKits.getOrDefault(id, "archer"))) continue;
+            long next = session.microNextArrowAt.getOrDefault(id,
+                    now + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
+            int count = countNamedItems(player, Material.ARROW, "Fletched Arrow");
+            if (now < next) continue;
+            if (ArcadePortRules.shouldReplenishMicroArrow(now, next, count,
+                    ArcadePortRules.MICRO_BATTLES_FLETCHER_MAX_ARROWS)) {
+                player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
+                        "Automatically replenishes up to 3 arrows every 20 seconds.", 1));
+                player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8F, 1.0F);
+            }
+            session.microNextArrowAt.put(id, now + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
+        }
+    }
+
     private void setMicroTeamArmor(Session session, Player player) {
         Color teamColor = switch (session.teams.getOrDefault(player.getUniqueId(), 0)) {
             case 0 -> Color.RED;
@@ -1038,7 +1115,9 @@ public final class ArcadePortManager implements Listener {
         if (active != session || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
         boolean projectile = !"melee".equals(source);
-        double damage = ArcadePortRules.microBattlesHitDamage(projectile);
+        boolean fighter = "fighter".equals(session.microKits.getOrDefault(target.getUniqueId(), "archer"));
+        double damage = ArcadePortRules.microBattlesDamageAfterIronSkin(
+                ArcadePortRules.microBattlesHitDamage(projectile), fighter);
         if (projectile) {
             Vector push = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
             if (push.lengthSquared() < 0.0001D) push = attacker.getLocation().getDirection();
@@ -1282,7 +1361,10 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
         if (session.type == ArcadePortGame.GLADIATORS) updateGladiators(session, now);
-        if (session.type == ArcadePortGame.MICRO_BATTLES) enforceMicroBattlesHunger(session);
+        if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            enforceMicroBattlesHunger(session);
+            updateMicroBattlesArrows(session, now);
+        }
         if (session.type == ArcadePortGame.DRAGONS && session.ticks % 4 == 0) updateTestDragons(session, now);
         if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
             updateDeathTagChasers(session, now);
@@ -3104,6 +3186,18 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onMicroBowShoot(EntityShootBowEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.MICRO_BATTLES
+                || !(event.getEntity() instanceof Player player)
+                || !"archer".equals(session.microKits.getOrDefault(player.getUniqueId(), "archer"))
+                || !(event.getProjectile() instanceof Arrow arrow)) return;
+        // Archer's loadout only supplies fletched arrows, so each shot gets the source perk's
+        // remove-on-impact behaviour even when the last arrow has just left the inventory.
+        session.microFletchedArrows.add(arrow.getUniqueId());
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBowShoot(EntityShootBowEvent event) {
         Session session = active;
@@ -3118,6 +3212,13 @@ public final class ArcadePortManager implements Listener {
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+
+        if (session.type == ArcadePortGame.MICRO_BATTLES
+                && event.getEntity() instanceof Arrow microArrow
+                && session.microFletchedArrows.remove(microArrow.getUniqueId())) {
+            microArrow.remove();
+            return;
+        }
 
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && event.getEntity() instanceof Snowball bacon && session.entities.remove(bacon)) {
@@ -3837,6 +3938,9 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> spleefSmasherReadyAt = new HashMap<>();
         final Map<UUID, Long> spleefLastHungerGainAt = new HashMap<>();
         final Map<UUID, Long> spleefNextArrowAt = new HashMap<>();
+        final Map<UUID, String> microKits = new HashMap<>();
+        final Map<UUID, Long> microNextArrowAt = new HashMap<>();
+        final Set<UUID> microFletchedArrows = new HashSet<>();
         long lastSpleefHungerAt;
         final Set<Block> microBarrierBlocks = new HashSet<>();
         final Map<UUID, Long> dragonContactCooldowns = new HashMap<>();

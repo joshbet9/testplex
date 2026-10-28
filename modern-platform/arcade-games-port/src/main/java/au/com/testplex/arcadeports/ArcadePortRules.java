@@ -41,8 +41,31 @@ public final class ArcadePortRules {
     public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
     public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
     public static final long MICRO_BATTLES_BARRIER_DURATION_MILLIS = 10_000L;
+    public static final long MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS = 20_000L;
+    public static final int MICRO_BATTLES_FLETCHER_MAX_ARROWS = 3;
 
     private ArcadePortRules() {
+    }
+
+    public static String normalizeMicroBattlesKit(String requested) {
+        if (requested == null) return null;
+        String kit = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        return switch (kit) {
+            case "archer" -> "archer";
+            case "worker" -> "worker";
+            case "fighter" -> "fighter";
+            default -> null;
+        };
+    }
+
+    public static double microBattlesDamageAfterIronSkin(double damage, boolean fighter) {
+        if (!fighter || damage <= 1.0D) return damage;
+        return Math.max(0.0D, damage * 0.5D);
+    }
+
+    public static boolean shouldReplenishMicroArrow(long nowMillis, long nextArrowAt,
+            int namedArrows, int maximum) {
+        return nowMillis >= nextArrowAt && namedArrows < Math.max(0, maximum);
     }
 
     public static boolean shouldRemoveMicroBarrier(long elapsedMillis) {
