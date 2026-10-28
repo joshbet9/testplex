@@ -34,6 +34,24 @@ class GameManagerAudienceTest {
         assertFalse(GameManager.shouldEliminateForWorldChange(GameState.LIVE, true, arena, arena));
     }
 
+    @Test
+    void redirectsUnregisteredEntrantsAndKeepsRoundAudienceScoped() {
+        World arena = testWorld();
+        World anotherGame = testWorld();
+
+        assertTrue(GameManager.shouldRedirectUnregisteredPlayer(GameState.STARTING, false, arena, arena));
+        assertTrue(GameManager.shouldRedirectUnregisteredPlayer(GameState.LIVE, false, arena, arena));
+        assertFalse(GameManager.shouldRedirectUnregisteredPlayer(GameState.IDLE, false, arena, arena));
+        assertFalse(GameManager.shouldRedirectUnregisteredPlayer(GameState.LIVE, true, arena, arena));
+        assertFalse(GameManager.shouldRedirectUnregisteredPlayer(GameState.LIVE, false, arena, anotherGame));
+
+        assertTrue(GameManager.shouldIncludeRoundAudience(true, true, true, arena, arena));
+        assertFalse(GameManager.shouldIncludeRoundAudience(false, true, true, arena, arena));
+        assertFalse(GameManager.shouldIncludeRoundAudience(true, false, true, arena, arena));
+        assertFalse(GameManager.shouldIncludeRoundAudience(true, true, true, arena, anotherGame));
+        assertTrue(GameManager.shouldIncludeRoundAudience(true, true, false, arena, anotherGame));
+    }
+
     private static World testWorld() {
         return (World) Proxy.newProxyInstance(World.class.getClassLoader(), new Class<?>[]{World.class},
                 (proxy, method, args) -> {
