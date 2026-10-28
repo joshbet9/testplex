@@ -838,8 +838,19 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         put(inventory, 26, named(Material.STAINED_CLAY, ChatColor.GREEN + "Safe Pad Colour", "Choose the Safe Pad surface colour for " + pretty(mobSet) + "."));
         String base = "players." + player.getUniqueId() + ".arcade.monstermaze.mob-set-colours." + mobSet;
         String defaultColour = defaultMonsterMazeMobSetColour(mobSet);
-        String beaconSelected = data.getString(base + ".beacon", defaultColour);
-        String padSelected = data.getString(base + ".safe-pad", defaultColour);
+        // Safe Pad and beacon are one visual treatment. Prefer the Safe Pad value when
+        // migrating older profiles that stored the two colours independently.
+        String selectedColour = data.getString(base + ".safe-pad",
+                data.getString(base + ".beacon", defaultColour));
+        String beaconStored = data.getString(base + ".beacon", defaultColour);
+        String padStored = data.getString(base + ".safe-pad", defaultColour);
+        if (!selectedColour.equalsIgnoreCase(beaconStored) || !selectedColour.equalsIgnoreCase(padStored)) {
+            data.set(base + ".beacon", selectedColour);
+            data.set(base + ".safe-pad", selectedColour);
+            save();
+        }
+        String beaconSelected = selectedColour;
+        String padSelected = selectedColour;
         for (int i = 0; i < COLOUR_OPTIONS.length; i++) {
             String colour = COLOUR_OPTIONS[i];
             ItemStack beacon = new ItemStack(Material.STAINED_GLASS_PANE, 1, (short) i);
@@ -1083,12 +1094,14 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 if (plain == null || !plain.startsWith("MobColour: ")) continue;
                 String[] parts = plain.substring("MobColour: ".length()).split(":");
                 if (parts.length != 3 || !parts[1].equals(mobSet) || colourData(parts[2]) < 0) return;
-                String path = "players." + player.getUniqueId() + ".arcade.monstermaze.mob-set-colours."
-                        + mobSet + "." + parts[0];
-                data.set(path, parts[2]);
+                String base = "players." + player.getUniqueId() + ".arcade.monstermaze.mob-set-colours." + mobSet;
+                // Selecting either swatch updates both keys so every pad paints its
+                // clay surface and beacon glass from the exact same colour selection.
+                data.set(base + ".beacon", parts[2]);
+                data.set(base + ".safe-pad", parts[2]);
                 save();
                 refreshLiveMonsterMazeColours(player);
-                player.sendMessage(ChatColor.GREEN + pretty(mobSet) + " " + parts[0] + " colour set to " + pretty(parts[2]) + ".");
+                player.sendMessage(ChatColor.GREEN + pretty(mobSet) + " Safe Pad and beacon colours set to " + pretty(parts[2]) + ".");
                 openMobSetColours(player, mobSet);
                 return;
             }
