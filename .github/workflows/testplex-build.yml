@@ -318,8 +318,10 @@ jobs:
                   "Maverick pad-directed knockback": "getMobKnockTarget()",
                   "resets toggle to Map Default on every game": 'applyMobThemeChoice(player, "map_default", false)',
                   "pad spawn fireworks are limited to two signals": "if (_padSpawnCount >= 2)",
-                  "fireworks spawn higher above the pad": "base.clone().add(0.5D, 3.0D, 0.5D)",
-                  "tutorial fireworks are viewer-targeted": "UtilFirework.packetPlayFirework(viewer, location",
+                  "fireworks spawn higher above the pad": "pad.getLocation().clone().add(0.5D, 3.0D, 0.5D)",
+                  "fireworks use per-viewer packet effects": "UtilFirework.packetPlayFirework(viewer, location",
+                  "first-stage breadcrumb uses targeted particles": "UtilParticle.PlayParticle(ParticleType.HAPPY_VILLAGER",
+                  "breadcrumb has a new-player recipient filter": "_newPlayerTutorialViewers.contains(viewer.getUniqueId())",
                   "new-player eligibility checks stored Monster Maze PBs": "MonsterMazePersonalBestManager.hasAnyPersonalBest(_host, player)",
                   "missed Safe Pad timeout is authoritative": "p.setHealth(0.0D)",
               },
@@ -334,7 +336,8 @@ jobs:
                   "recent monster bump prevents jump-charge loss": "_recentMonsterBump.put(event.getPlayer(), now)",
                   "two-second bump grace window": "!UtilTime.elapsed(bumpedAt, 2000)",
                   "free Safe Pad jumps in every mode": "if (_maze != null && _maze.isOnPad(p, true))",
-                  "returns claimed players to centre on pad walk-off": "hasReachedCurrentSafePad(player)",
+                  "returns claimed players to the active Safe Pad on walk-off": "Location padReturn = _maze.getSafePad().getLocation().clone().add(0.5D, 1.0D, 0.5D)",
+                  "walk-off teleport target is the Safe Pad": "player.teleport(padReturn)",
                   "distance and SAFE are per-player entries": 'target.getName() + C.cGray + " " + distanceText',
                   "scoreboard shows the pattern PB": "getBestForPattern(this, viewer, pattern)",
                   "native stats are enabled": "CanAddStats = true;",
@@ -552,6 +555,20 @@ jobs:
                   if expected not in source:
                       missing.append(f"{game}: {label}")
 
+          maze_source = sources["Monster Maze"]
+          particle_path_method = maze_source.split("private void updateFirstStageParticlePath()", 1)[1].split("private void playPadSpawnSignal(", 1)[0]
+          firework_method = maze_source.split("private void playPadSpawnSignal(", 1)[1].split("private void clearStaleMazeEntities()", 1)[0]
+          if "_newPlayerTutorialViewers.contains(viewer.getUniqueId())" not in particle_path_method:
+              missing.append("Monster Maze: first-pad particle breadcrumb must be limited to new players")
+          if "UtilParticle.PlayParticle(ParticleType.HAPPY_VILLAGER" not in particle_path_method:
+              missing.append("Monster Maze: first-pad particle breadcrumb must use viewer-targeted particles")
+          if "if (_padSpawnCount >= 2)" not in firework_method or "for (Player viewer : _host.GetPlayers(false))" not in firework_method:
+              missing.append("Monster Maze: first two Safe Pad fireworks must be sent to every participant each game")
+          if "_newPlayerTutorialViewers" in firework_method or "_newPlayerTutorialViewers.isEmpty()" in firework_method:
+              missing.append("Monster Maze: all-player fireworks must not be gated by new-player eligibility")
+          theme_lookup = maze_source.split("public String getMobThemeChoiceForPlayer(Player player)", 1)[1].split("public String getMobSetForPlayer(Player player)", 1)[0]
+          if 'applyMobThemeChoice(player, "map_default", false)' not in theme_lookup:
+              missing.append("Monster Maze: theme lookup must default to Map Default when a player has no round choice")
           if 'getCommand("cosmetics")' in sources["Cosmetic selector"]:
               missing.append("Cosmetic selector: must not replace the normal /cosmetics command")
           if "getBaconBrawlAccessory" in sources["Bacon Brawl"] or "cosmeticAccessories(UpdateEvent event)" in sources["Bacon Brawl"]:
