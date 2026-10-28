@@ -120,4 +120,11 @@ class ArcadePortGameTest {
         assertEquals(0, ArcadePortRules.nextEvolutionLevel(-1, false));
     }
 
+    @Test void sheepQuestLeaderRequiresMorePenSheep() {
+        assertEquals(0, ArcadePortRules.sheepQuestLeadingTeam(3, 2));
+        assertEquals(1, ArcadePortRules.sheepQuestLeadingTeam(1, 4));
+        assertEquals(-1, ArcadePortRules.sheepQuestLeadingTeam(2, 2));
+        assertEquals(-1, ArcadePortRules.sheepQuestLeadingTeam(0, 0));
+    }
+
 }
