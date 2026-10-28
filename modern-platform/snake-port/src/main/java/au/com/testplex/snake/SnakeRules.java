@@ -11,6 +11,7 @@ public final class SnakeRules {
     private static final int[] ROULETTE_SECONDS = {1, 3, 5, 10, 15, 20, 30};
 
     public static final int SPEED_REFERENCE_LENGTH = 180;
+    public static final double SEGMENT_SPACING = 1.0D;
     public static final double SNAKE_TAIL_COLLISION_RADIUS = 1.2D;
     public static final double FOOD_PICKUP_RADIUS = 2.0D;
     public static final int FOOD_SPAWN_ATTEMPTS = 36;
