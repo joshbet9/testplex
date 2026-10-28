@@ -4,7 +4,6 @@ import me.monstermaze.command.MMCommand;
 import me.monstermaze.command.MMUtilityCommandListener;
 import me.monstermaze.command.PauseCommand;
 import me.monstermaze.command.DebugSoloModeListener;
-import me.monstermaze.entity.MonsterDisguiseListener;
 import me.monstermaze.entity.MonsterEntityListener;
 import me.monstermaze.game.BuildBypassListener;
 import me.monstermaze.game.GameManager;
@@ -49,7 +48,10 @@ public class MonsterMazePlugin extends JavaPlugin {
     private RunRecorder runRecorder;
     private SoloRunCompletionListener soloRunCompletionListener;
     private MonsterEntityListener monsterEntityListener;
-    private MonsterDisguiseListener monsterDisguiseListener;
+    // Optional ProtocolLib adapter is kept reflective so the plugin can load without ProtocolLib.
+    private Object monsterDisguiseListener;
+    private java.lang.reflect.Method refreshMonsterDisguisesMethod;
+    private java.lang.reflect.Method shutdownMonsterDisguisesMethod;
     private ChallengeManager challengeManager;
     private CompetitiveMatchTracker competitiveMatchTracker;
     private StatusHeartbeatReporter statusHeartbeatReporter;
@@ -91,9 +93,17 @@ public class MonsterMazePlugin extends JavaPlugin {
         this.gameManager = new GameManager(this);
         this.gameManager.getMonsterManager().setMobType(mapManager.activeMob());
         this.monsterEntityListener = new MonsterEntityListener(this, gameManager);
-        if (Bukkit.getPluginManager().getPlugin("ProtocolLib") != null) {
-            try { this.monsterDisguiseListener = new MonsterDisguiseListener(this); getLogger().info("ProtocolLib detected; Monster Maze ghost-mob disguises enabled."); }
-            catch (Throwable t) {
+        if (Bukkit.getPluginManager().isPluginEnabled("ProtocolLib")) {
+            try {
+                Class<?> adapterType = Class.forName("me.monstermaze.entity.MonsterDisguiseListener");
+                Object adapter = adapterType.getConstructor(MonsterMazePlugin.class).newInstance(this);
+                java.lang.reflect.Method refresh = adapterType.getMethod("refreshPlayer", Player.class);
+                java.lang.reflect.Method shutdown = adapterType.getMethod("shutdown");
+                this.monsterDisguiseListener = adapter;
+                this.refreshMonsterDisguisesMethod = refresh;
+                this.shutdownMonsterDisguisesMethod = shutdown;
+                getLogger().info("ProtocolLib detected; Monster Maze ghost-mob disguises enabled.");
+            } catch (Throwable t) {
                 getLogger().log(Level.WARNING,
                         "ProtocolLib is present but ghost-mob disguises could not be enabled; base mob rendering will remain active.", t);
             }
@@ -135,16 +145,23 @@ public class MonsterMazePlugin extends JavaPlugin {
         if (competitiveMatchTracker != null) competitiveMatchTracker.shutdown();
         if (soloRunCompletionListener != null) soloRunCompletionListener.shutdown();
         if (gameManager != null) gameManager.forceStop();
-        if (monsterDisguiseListener != null) monsterDisguiseListener.shutdown();
+        if (monsterDisguiseListener != null && shutdownMonsterDisguisesMethod != null) {
+            try { shutdownMonsterDisguisesMethod.invoke(monsterDisguiseListener); }
+            catch (Throwable t) { getLogger().log(Level.WARNING, "Could not shut down optional mob disguise adapter.", t); }
+        }
         if (mobThemeManager != null) mobThemeManager.shutdown();
     }
     public static MonsterMazePlugin getInstance() { return instance; }
     public GameManager getGameManager() { return gameManager; }
     public MobThemeManager getMobThemeManager() { return mobThemeManager; }
     public void refreshPlayerMobThemes(Player player) {
-        if (monsterDisguiseListener != null) monsterDisguiseListener.refreshPlayer(player);
+        if (monsterDisguiseListener == null || refreshMonsterDisguisesMethod == null || player == null) return;
+        try { refreshMonsterDisguisesMethod.invoke(monsterDisguiseListener, player); }
+        catch (Throwable ignored) { }
     }
-    public boolean hasPerPlayerMobDisguises() { return monsterDisguiseListener != null; }
+    public boolean hasPerPlayerMobDisguises() {
+        return monsterDisguiseListener != null && refreshMonsterDisguisesMethod != null;
+    }
     public MazeMode getMode() { return mode; }
     public MazeMode setMode(MazeMode newMode) { if (newMode == null) newMode = MazeMode.ORIGINAL; this.mode = newMode; getConfig().set("mode", newMode.id); saveConfig(); return newMode; }
     public VoidWorldManager getVoidWorlds() { return voidWorlds; }
