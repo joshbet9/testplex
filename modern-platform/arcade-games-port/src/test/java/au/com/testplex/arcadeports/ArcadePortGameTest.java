@@ -389,6 +389,7 @@ class ArcadePortGameTest {
         assertEquals(4_000L, ArcadePortRules.BACON_SLOW_UPDATE_INTERVAL_MILLIS);
         assertEquals(4_000L, ArcadePortRules.BACON_HUNGER_INTERVAL_MILLIS);
         assertEquals(1, ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL);
+        assertEquals(5.0F, ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE, 0.00001F);
         assertEquals(4.0D, ArcadePortRules.BACON_STARVATION_DAMAGE, 0.00001D);
         assertEquals(6.0D, ArcadePortRules.BACON_STANDARD_HIT_DAMAGE, 0.00001D);
         assertEquals(2.0D, ArcadePortRules.BACON_BODY_SLAM_RECOIL_DAMAGE, 0.00001D);
