@@ -6,6 +6,8 @@ package au.com.testplex.arcadeports;
  * needing a live Paper server.
  */
 public final class ArcadePortRules {
+    public static final long RUNNER_BLOCK_DECAY_MILLIS = 600L;
+    public static final long RUNNER_BLOCK_LIFETIME_MILLIS = 1_200L;
     public static final long BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS = 50_000L;
     public static final long BACON_MIN_KNOCKBACK_INTERVAL_MILLIS = 5_000L;
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
@@ -22,6 +24,10 @@ public final class ArcadePortRules {
 
     public static double nextBaconKnockback(double current) {
         return current * 1.2D;
+    }
+
+    public static boolean shouldDropRunnerBlock(long elapsedMillis) {
+        return elapsedMillis >= RUNNER_BLOCK_DECAY_MILLIS;
     }
 
     public static long nextBaconKnockbackInterval(long currentMillis) {
