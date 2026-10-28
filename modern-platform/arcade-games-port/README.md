@@ -16,10 +16,10 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 - Paintball — selectable Rifle, Sniper, Shotgun and Machine Gun kits; projectile-specific paint counts, scope-charge damage, a heat gauge and team-coloured armour (kit perks and revive/Save Me flow remain to port).
 - Runner — disappearing floor tiles and dash item.
 - Sheep Quest — captureable sheep and score target.
-- Spleef — source kit selection (Snowballer, Brawler and Archer), snowballer replacement cap, Brawler Leap/Smasher, two-arrow Fletcher replenishment, source-timed hunger drain/restoration, and three-stage arrow floor damage. Original maps are still not imported.
+- Spleef — source kit selection (Snowballer, Brawler and Archer), snowballer replacement cap, Brawler Leap/Smasher, two-arrow Fletcher replenishment, source-timed hunger drain/restoration, source material damage transitions and 3D arrow-radius clearing.
 - Turf Wars — team assignment, bow combat and territory block marking.
 
-Each game gets its own separate test world, so arena generation/destruction does not use the live 1.8 Testplex world. These are simple generated test arenas, not the historical original maps.
+Each game gets its own separate modern test world, so arena generation/destruction does not use the live 1.8 Testplex world. Original Reborn map archives are embedded for Bacon Brawl, Bomb Lobbers, Death Tag, Dragon Escape, Dragons, Gladiators, Micro Battles, One in the Quiver, Paintball, Runner, Sheep Quest, Spleef and Turf Wars; these load into separate source-world folders and read WorldConfig.dat spawn groups and map bounds. Evolution remains generated because an Evolution map archive is not present in the source map catalogue.
 
 ## Commands
 

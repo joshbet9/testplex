@@ -86,6 +86,8 @@ public final class ArcadePortManager implements Listener {
     private final ArcadeMechanicsModernPlugin plugin;
     private final Map<String, LinkedHashMap<UUID, Player>> queues = new HashMap<>();
     private final Map<String, World> worlds = new HashMap<>();
+    private final Set<String> sourceMapWorlds = new HashSet<>();
+    private final Map<String, SourceMapCatalog.MapData> sourceMapData = new HashMap<>();
     private final Map<UUID, PlayerSnapshot> pendingRestore = new HashMap<>();
     private final Map<UUID, String> paintballKitPreferences = new HashMap<>();
     private final Map<UUID, String> deathTagRunnerKitPreferences = new HashMap<>();
@@ -278,7 +280,7 @@ public final class ArcadePortManager implements Listener {
             sender.sendMessage(ChatColor.RED + "The test world could not be loaded. Check the server log.");
             return;
         }
-        buildArena(type, world);
+        if (!sourceMapWorlds.contains(type.id())) buildArena(type, world);
         Session session = new Session(type, world, participants);
         active = session;
         long now = System.currentTimeMillis();
@@ -302,9 +304,15 @@ public final class ArcadePortManager implements Listener {
         world.setStorm(false);
         world.setThundering(false);
         WorldBorder border = world.getWorldBorder();
-        border.setCenter(0.0D, 0.0D);
+        SourceMapCatalog.MapData sourceMap = sourceMapData.get(type.id());
+        if (sourceMap != null && sourceMap.hasBounds()) {
+            border.setCenter(sourceMap.centerX(), sourceMap.centerZ());
+            border.setSize(Math.max(40.0D, Math.max(sourceMap.width(), sourceMap.depth()) + 8.0D));
+        } else {
+            border.setCenter(0.0D, 0.0D);
+            border.setSize(type == ArcadePortGame.MICRO_BATTLES ? 42.0D : 80.0D);
+        }
         border.setDamageAmount(0.0D);
-        border.setSize(type == ArcadePortGame.MICRO_BATTLES ? 42.0D : 80.0D);
         List<Location> spawns = spawnLocations(type, participants.size());
         for (int i = 0; i < participants.size(); i++) {
             Player player = participants.get(i);
@@ -406,22 +414,45 @@ public final class ArcadePortManager implements Listener {
     }
 
     private World createWorld(ArcadePortGame type) {
-        String worldName = "arcadeport_" + type.id().replace('-', '_');
-        World world = Bukkit.getWorld(worldName);
-        if (world == null) {
-            WorldCreator creator = new WorldCreator(worldName);
-            creator.type(WorldType.FLAT).generateStructures(false);
+        String sourceWorldName = "arcadeport_source_" + type.id().replace('-', '_');
+        World world = Bukkit.getWorld(sourceWorldName);
+        if (world == null && SourceMapCatalog.hasMap(type)
+                && SourceMapCatalog.install(plugin, type, sourceWorldName)) {
+            WorldCreator creator = new WorldCreator(sourceWorldName)
+                    .environment(World.Environment.NORMAL).generateStructures(false);
             world = creator.createWorld();
+            if (world != null) {
+                SourceMapCatalog.MapData mapData = SourceMapCatalog.read(world);
+                if (mapData != null) {
+                    sourceMapWorlds.add(type.id());
+                    sourceMapData.put(type.id(), mapData);
+                    plugin.getLogger().info("Loaded original " + type.displayName() + " map: "
+                            + mapData.mapName() + " (" + mapData.spawnLocations().size() + " configured spawn locations).");
+                } else {
+                    sourceMapWorlds.add(type.id());
+                    plugin.getLogger().warning("Loaded original terrain without parsed WorldConfig metadata for "
+                            + type.displayName() + "; using fallback spawn locations.");
+                }
+            }
         }
         if (world == null) {
-            plugin.getLogger().severe("Could not create test world " + worldName);
+            String worldName = "arcadeport_proto_" + type.id().replace('-', '_');
+            world = Bukkit.getWorld(worldName);
+            if (world == null) {
+                WorldCreator creator = new WorldCreator(worldName);
+                creator.type(WorldType.FLAT).generateStructures(false);
+                world = creator.createWorld();
+            }
+        }
+        if (world == null) {
+            plugin.getLogger().severe("Could not create world for " + type.displayName());
             return null;
         }
         world.setGameRule(GameRule.DO_MOB_SPAWNING, false);
         world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
         world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
         world.setGameRule(GameRule.KEEP_INVENTORY, true);
-        world.setSpawnLocation(0, 64, 0);
+        if (!sourceMapWorlds.contains(type.id())) world.setSpawnLocation(0, 64, 0);
         return world;
     }
 
@@ -487,6 +518,13 @@ public final class ArcadePortManager implements Listener {
     }
 
     private List<Location> spawnLocations(ArcadePortGame type, int count) {
+        SourceMapCatalog.MapData sourceMap = sourceMapData.get(type.id());
+        if (sourceMap != null && !sourceMap.spawnLocations().isEmpty()) {
+            List<Location> configured = sourceMap.spawnLocations();
+            List<Location> chosen = new ArrayList<>();
+            for (int i = 0; i < Math.max(1, count); i++) chosen.add(configured.get(i % configured.size()).clone());
+            return chosen;
+        }
         List<Location> locations = new ArrayList<>();
         if (type == ArcadePortGame.DRAGON_ESCAPE) {
             for (int i = 0; i < Math.max(1, count); i++) locations.add(new Location(worlds.get(type.id()), (i % 5) - 2.0D, 64.0D, -22.0D + (i / 5) * 2, 0.0F, 0.0F));
