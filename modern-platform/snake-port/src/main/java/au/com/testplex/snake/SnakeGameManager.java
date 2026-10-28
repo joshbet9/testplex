@@ -32,6 +32,8 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
@@ -193,12 +195,17 @@ public final class SnakeGameManager implements Listener {
             player.leaveVehicle();
             player.teleport(spawn);
             player.setGameMode(GameMode.SURVIVAL);
+            // The legacy source disguises the player as a sheep. Without a tested 26.3
+            // packet-disguise plugin, hide the passenger model so the sheep head/tail show.
+            player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,
+                    Integer.MAX_VALUE, 0, false, false, false));
             player.getInventory().clear();
             player.setExp(0.0F);
             player.setLevel(0);
 
-            SnakeState state = new SnakeState(player, snapshot, kit, spawn);
-            Sheep head = spawnSegment(spawn, colorFor(i));
+            DyeColor snakeColor = colorFor(i);
+            SnakeState state = new SnakeState(player, snapshot, kit, spawn, snakeColor);
+            Sheep head = spawnSegment(spawn, snakeColor);
             state.segments.add(head);
             state.path.addFirst(spawn.clone());
             head.addPassenger(player);
@@ -665,6 +672,7 @@ public final class SnakeGameManager implements Listener {
         removeSegments(state);
         if (state.player.isOnline()) {
             state.player.leaveVehicle();
+            state.player.removePotionEffect(PotionEffectType.INVISIBILITY);
             state.player.setGameMode(GameMode.SPECTATOR);
             state.player.sendMessage(ChatColor.RED + "You were eliminated: " + reason + ".");
             if (killer != null) {
@@ -727,7 +735,7 @@ public final class SnakeGameManager implements Listener {
 
     private DyeColor colorFor(int index) {
         DyeColor[] values = DyeColor.values();
-        return values[Math.floorMod(index, values.length)];
+        return values[SnakeRules.colorIndexForParticipant(index, values.length)];
     }
 
     private boolean isKnownKit(String kit) {
@@ -900,11 +908,11 @@ public final class SnakeGameManager implements Listener {
         ItemStack rouletteOriginalItem;
         BukkitTask rouletteTask;
 
-        SnakeState(Player player, PlayerSnapshot snapshot, String kit, Location spawn) {
+        SnakeState(Player player, PlayerSnapshot snapshot, String kit, Location spawn, DyeColor color) {
             this.player = player;
             this.snapshot = snapshot;
             this.kit = kit;
-            this.color = DyeColor.values()[Math.floorMod(player.getEntityId(), DyeColor.values().length)];
+            this.color = color;
             this.lastRawYaw = spawn.getYaw();
             this.laggedYaw = spawn.getYaw();
             this.lastTravelDirection = spawn.getDirection().setY(0).normalize();
@@ -921,6 +929,7 @@ public final class SnakeGameManager implements Listener {
         final int level;
         final boolean allowFlight;
         final boolean flying;
+        final List<PotionEffect> potionEffects;
 
         PlayerSnapshot(Player player) {
             location = player.getLocation().clone();
@@ -933,6 +942,7 @@ public final class SnakeGameManager implements Listener {
             level = player.getLevel();
             allowFlight = player.getAllowFlight();
             flying = player.isFlying();
+            potionEffects = new ArrayList<>(player.getActivePotionEffects());
         }
 
         void restore(Player player) {
@@ -946,6 +956,10 @@ public final class SnakeGameManager implements Listener {
             player.setGameMode(gameMode);
             player.setExp(exp);
             player.setLevel(level);
+            for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) {
+                player.removePotionEffect(effect.getType());
+            }
+            for (PotionEffect effect : potionEffects) player.addPotionEffect(effect);
             player.setAllowFlight(allowFlight);
             if (allowFlight) player.setFlying(flying);
         }
