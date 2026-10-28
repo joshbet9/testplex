@@ -3298,7 +3298,19 @@ public final class ArcadePortManager implements Listener {
                     .filter(p -> !session.tagged.contains(p.getUniqueId()))
                     .toList();
             if (ArcadePortRules.shouldFinishDeathTagRound(runners.size(), session.participantsAtStart)) {
-                finish(session, runners.size() == 1 ? runners.get(0) : null, true);
+                Player winner;
+                if (runners.size() == 1) {
+                    winner = runners.get(0);
+                } else if (ArcadePortRules.deathTagChasersWinRound(runners.size())) {
+                    winner = alivePlayers(session).stream()
+                            .filter(player -> session.tagged.contains(player.getUniqueId()))
+                            .max(java.util.Comparator.comparingInt(player ->
+                                    session.scores.getOrDefault(player.getUniqueId(), 0)))
+                            .orElse(null);
+                } else {
+                    winner = null;
+                }
+                finish(session, winner, true);
             }
             return;
         }
