@@ -11,6 +11,7 @@ import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.MagmaCube;
@@ -195,6 +196,12 @@ public final class SnakeGameManager implements Listener {
             player.leaveVehicle();
             player.teleport(spawn);
             player.setGameMode(GameMode.SURVIVAL);
+            player.setHealth(player.getMaxHealth());
+            player.setFoodLevel(20);
+            player.setSaturation(5.0F);
+            player.setExhaustion(0.0F);
+            player.setFireTicks(0);
+            player.setWalkSpeed(0.2F);
             // The legacy source disguises the player as a sheep. Without a tested 26.3
             // packet-disguise plugin, hide the passenger model so the sheep head/tail show.
             player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,
@@ -997,6 +1004,13 @@ public final class SnakeGameManager implements Listener {
         final boolean allowFlight;
         final boolean flying;
         final List<PotionEffect> potionEffects;
+        final double health;
+        final double maxHealthBase;
+        final int food;
+        final float saturation;
+        final float exhaustion;
+        final int fireTicks;
+        final float walkSpeed;
 
         PlayerSnapshot(Player player) {
             location = player.getLocation().clone();
@@ -1010,6 +1024,14 @@ public final class SnakeGameManager implements Listener {
             allowFlight = player.getAllowFlight();
             flying = player.isFlying();
             potionEffects = new ArrayList<>(player.getActivePotionEffects());
+            health = player.getHealth();
+            var maxHealthAttribute = player.getAttribute(Attribute.MAX_HEALTH);
+            maxHealthBase = maxHealthAttribute == null ? player.getMaxHealth() : maxHealthAttribute.getBaseValue();
+            food = player.getFoodLevel();
+            saturation = player.getSaturation();
+            exhaustion = player.getExhaustion();
+            fireTicks = player.getFireTicks();
+            walkSpeed = player.getWalkSpeed();
         }
 
         void restore(Player player) {
@@ -1023,6 +1045,14 @@ public final class SnakeGameManager implements Listener {
             player.setGameMode(gameMode);
             player.setExp(exp);
             player.setLevel(level);
+            var maxHealthAttribute = player.getAttribute(Attribute.MAX_HEALTH);
+            if (maxHealthAttribute != null) maxHealthAttribute.setBaseValue(maxHealthBase);
+            player.setHealth(Math.max(1.0D, Math.min(health, player.getMaxHealth())));
+            player.setFoodLevel(food);
+            player.setSaturation(saturation);
+            player.setExhaustion(exhaustion);
+            player.setFireTicks(fireTicks);
+            player.setWalkSpeed(walkSpeed);
             for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) {
                 player.removePotionEffect(effect.getType());
             }
