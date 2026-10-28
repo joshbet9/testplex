@@ -71,7 +71,7 @@ public class MonsterManager {
     public void start(MazeGenerator maze) {
         clear();
         this.maze = maze;
-        int starter = game.getMode() == MazeMode.MODERN ? 225 : 150;
+        int starter = game.getMode().initialMonsterCount();
 
         final int[] spawned = {0};
         spawnTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
