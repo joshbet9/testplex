@@ -29,6 +29,14 @@ class SnakeRulesTest {
         assertEquals(0, SnakeRules.colorIndexForParticipant(8, 0));
     }
 
+    @Test void lavaIsFatalWhileOtherDamageCausesAreCancelled() {
+        assertTrue(SnakeRules.shouldEliminateFromDamageCause("LAVA"));
+        assertTrue(SnakeRules.shouldEliminateFromDamageCause("lava"));
+        assertFalse(SnakeRules.shouldEliminateFromDamageCause("FALL"));
+        assertFalse(SnakeRules.shouldEliminateFromDamageCause("FIRE"));
+        assertFalse(SnakeRules.shouldEliminateFromDamageCause(null));
+    }
+
     @Test void foodSpawnsUseTheSourceRadialDistributionAndSearchBudget() {
         assertEquals(36, SnakeRules.FOOD_SPAWN_ATTEMPTS);
         assertEquals(46.0D, SnakeRules.FOOD_SPAWN_RADIUS, 0.000001D);
