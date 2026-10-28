@@ -16,6 +16,15 @@ public final class ArcadePortRules {
     public static final long RUNNER_BLOCK_LIFETIME_MILLIS = 1_200L;
     public static final long BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS = 50_000L;
     public static final long BACON_MIN_KNOCKBACK_INTERVAL_MILLIS = 5_000L;
+    public static final long BACON_HUNGER_INTERVAL_MILLIS = 1_000L;
+    public static final int BACON_HUNGER_DRAIN_PER_INTERVAL = 2;
+    public static final double BACON_STARVATION_DAMAGE = 4.0D;
+    public static final double BACON_STANDARD_HIT_DAMAGE = 6.0D;
+    public static final double BACON_BODY_SLAM_RECOIL_DAMAGE = 2.0D;
+    public static final long BACON_BODY_SLAM_COOLDOWN_MILLIS = 8_000L;
+    public static final long BACON_BLAST_COOLDOWN_MILLIS = 3_000L;
+    public static final long BACON_CLOAK_COOLDOWN_MILLIS = 10_000L;
+    public static final long BACON_CLOAK_DURATION_MILLIS = 5_000L;
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
     public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
     public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
@@ -26,6 +35,18 @@ public final class ArcadePortRules {
 
     public static boolean shouldRemoveMicroBarrier(long elapsedMillis) {
         return elapsedMillis >= MICRO_BATTLES_BARRIER_DURATION_MILLIS;
+    }
+
+    /** Only the kits retained from the selected source ruleset are exposed. */
+    public static String normalizeBaconBrawlKit(String requested) {
+        if (requested == null) return null;
+        String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        return switch (value) {
+            case "pig" -> "pig";
+            case "mama", "mama-pig" -> "mama-pig";
+            case "sheep", "sheep-pig" -> "sheep-pig";
+            default -> null;
+        };
     }
 
     public static double initialBaconKnockback(int playerCount) {

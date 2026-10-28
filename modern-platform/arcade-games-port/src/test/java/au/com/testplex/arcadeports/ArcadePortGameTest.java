@@ -95,6 +95,20 @@ class ArcadePortGameTest {
         assertEquals(1, ArcadePortRules.requiredDeathTagChasers(-1L));
     }
 
+    @Test void baconBrawlOnlyExposesTheThreeRetainedSourceKitsAndDoubleHungerRules() {
+        assertEquals("pig", ArcadePortRules.normalizeBaconBrawlKit("Pig"));
+        assertEquals("mama-pig", ArcadePortRules.normalizeBaconBrawlKit("mama"));
+        assertEquals("mama-pig", ArcadePortRules.normalizeBaconBrawlKit("Mama Pig"));
+        assertEquals("sheep-pig", ArcadePortRules.normalizeBaconBrawlKit("sheep"));
+        assertNull(ArcadePortRules.normalizeBaconBrawlKit("chris-p-bacon"));
+        assertNull(ArcadePortRules.normalizeBaconBrawlKit("unknown"));
+        assertEquals(1_000L, ArcadePortRules.BACON_HUNGER_INTERVAL_MILLIS);
+        assertEquals(2, ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL);
+        assertEquals(4.0D, ArcadePortRules.BACON_STARVATION_DAMAGE, 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.BACON_STANDARD_HIT_DAMAGE, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.BACON_BODY_SLAM_RECOIL_DAMAGE, 0.00001D);
+    }
+
     @Test void baconBrawlEscalatesKnockbackWithShorterFiniteIntervals() {
         assertEquals(50_000L, ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS);
         assertEquals(45_000L, ArcadePortRules.nextBaconKnockbackInterval(50_000L));

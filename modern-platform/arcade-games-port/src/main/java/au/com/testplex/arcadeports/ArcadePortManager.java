@@ -88,6 +88,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, PlayerSnapshot> pendingRestore = new HashMap<>();
     private final Map<UUID, String> paintballKitPreferences = new HashMap<>();
     private final Map<UUID, String> deathTagRunnerKitPreferences = new HashMap<>();
+    private final Map<UUID, String> baconKitPreferences = new HashMap<>();
     private Session active;
     private BukkitTask pendingStart;
     private ArcadePortGame pendingType;
@@ -101,13 +102,29 @@ public final class ArcadePortManager implements Listener {
 
     public void selectKit(Player player, String requestedKit) {
         if (player == null || requestedKit == null) return;
-        String value = requestedKit.toLowerCase(java.util.Locale.ROOT)
-                .replace('_', '-').replace(' ', '-');
-        if (Set.of("rifle", "sniper", "shotgun", "machine-gun", "machinegun").contains(value)) {
-            selectPaintballKit(player, value);
-        } else {
-            selectDeathTagRunnerKit(player, value);
+        String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (ArcadePortRules.normalizeBaconBrawlKit(value) != null) selectBaconBrawlKit(player, value);
+        else if (Set.of("rifle", "sniper", "shotgun", "machine-gun", "machinegun").contains(value)) selectPaintballKit(player, value);
+        else selectDeathTagRunnerKit(player, value);
+    }
+
+    public void selectBaconBrawlKit(Player player, String requestedKit) {
+        if (player == null) return;
+        String kit = ArcadePortRules.normalizeBaconBrawlKit(requestedKit);
+        if (kit == null) {
+            player.sendMessage(ChatColor.YELLOW + "Bacon Brawl kits: pig, mama-pig, sheep-pig. Chris P. Bacon is intentionally omitted.");
+            return;
         }
+        baconKitPreferences.put(player.getUniqueId(), kit);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.BACON_BRAWL
+                && session.players.containsKey(player.getUniqueId()) && session.alive.contains(player.getUniqueId())) {
+            clearBaconCloak(session, player.getUniqueId());
+            session.baconSlams.remove(player.getUniqueId());
+            session.baconKits.put(player.getUniqueId(), kit);
+            giveKit(session, player);
+            player.sendMessage(ChatColor.GREEN + "Bacon Brawl kit changed to " + kit + ".");
+        } else player.sendMessage(ChatColor.GREEN + "Bacon Brawl kit set to " + kit + " for your next test.");
     }
 
     public void selectDeathTagRunnerKit(Player player, String requestedKit) {
@@ -268,6 +285,9 @@ public final class ArcadePortManager implements Listener {
             }
             int teamId = (type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST) ? i % 4 : i % 2;
             session.teams.put(player.getUniqueId(), teamId);
+            if (type == ArcadePortGame.BACON_BRAWL) {
+                session.baconKits.put(player.getUniqueId(), baconKitPreferences.getOrDefault(player.getUniqueId(), "pig"));
+            }
             Location spawn = spawns.get(i % spawns.size()).clone();
             if (type == ArcadePortGame.MICRO_BATTLES) {
                 spawn = microTeamSpawn(teamId, i / 4, (participants.size() + 3) / 4);
@@ -278,7 +298,7 @@ public final class ArcadePortManager implements Listener {
             player.closeInventory();
             player.leaveVehicle();
             player.teleport(spawn);
-            player.setGameMode(GameMode.SURVIVAL);
+            player.setGameMode(type == ArcadePortGame.BACON_BRAWL ? GameMode.ADVENTURE : GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
             player.setSaturation(20.0F);
@@ -740,10 +760,22 @@ public final class ArcadePortManager implements Listener {
     private void giveKit(Session session, Player player) {
         player.getInventory().clear();
         switch (session.type) {
-            case BACON_BRAWL:
-                player.getInventory().addItem(namedItem(Material.STICK, "Bacon Brawl", "Knock opponents from the platform."));
-                player.getInventory().addItem(new ItemStack(Material.COOKED_PORKCHOP, 8));
+            case BACON_BRAWL: {
+                String kit = session.baconKits.getOrDefault(player.getUniqueId(), "pig");
+                switch (kit) {
+                    case "mama-pig":
+                        player.getInventory().addItem(namedItem(Material.IRON_AXE, "Mama Pig - Bacon Blast", "Right-click to throw a bacon blast (3s cooldown)."));
+                        player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 60, 1, false, false, false));
+                        break;
+                    case "sheep-pig":
+                        player.getInventory().addItem(namedItem(Material.IRON_AXE, "Sheep Pig - Cloak", "Right-click to cloak for 5s (10s cooldown). Backstab for bonus knockback."));
+                        break;
+                    default:
+                        player.getInventory().addItem(namedItem(Material.IRON_AXE, "Pig - Body Slam", "Right-click to leap and body-slam nearby opponents (8s cooldown)."));
+                        break;
+                }
                 break;
+            }
             case BOMB_LOBBERS:
                 player.getInventory().addItem(namedItem(Material.TNT, "Bomb Lobber", "Throw TNT to blast enemy players away.", 5));
                 break;
@@ -1136,28 +1168,143 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateBaconBrawl(Session session, long now) {
-        if (now - session.lastBaconHungerAt >= 2_000L) {
+        if (now - session.lastBaconHungerAt >= ArcadePortRules.BACON_HUNGER_INTERVAL_MILLIS) {
             session.lastBaconHungerAt = now;
             for (Player player : new ArrayList<>(alivePlayers(session))) {
                 if (player.getFoodLevel() > 0) {
-                    player.setFoodLevel(Math.max(0, player.getFoodLevel() - 1));
-                } else if (player.getHealth() <= 2.0D) {
+                    player.setFoodLevel(Math.max(0, player.getFoodLevel() - ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL));
+                } else if (player.getHealth() <= ArcadePortRules.BACON_STARVATION_DAMAGE) {
                     eliminate(session, player, null, "starved");
                     if (active != session) return;
-                } else {
-                    player.setHealth(player.getHealth() - 2.0D);
-                }
+                } else player.setHealth(player.getHealth() - ArcadePortRules.BACON_STARVATION_DAMAGE);
             }
         }
+        if (active != session) return;
+        updateBaconBrawlAbilities(session, now);
         if (active != session || session.baconEscalationIntervalMillis <= 0L
                 || now - session.lastBaconEscalationAt < session.baconEscalationIntervalMillis) return;
         session.lastBaconEscalationAt = now;
         session.baconKnockback = ArcadePortRules.nextBaconKnockback(session.baconKnockback);
-        session.baconEscalationIntervalMillis = ArcadePortRules.nextBaconKnockbackInterval(
-                session.baconEscalationIntervalMillis);
-        announce(session, ChatColor.GREEN + "The ground trembles! Knockback has increased.");
-        for (Player player : alivePlayers(session)) {
+        session.baconEscalationIntervalMillis = ArcadePortRules.nextBaconKnockbackInterval(session.baconEscalationIntervalMillis);
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.sendMessage(ChatColor.GREEN + "The ground begins to tremble... All pigs now take more knockback!");
             player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_FLAP, 1.0F, 0.7F);
+        }
+    }
+
+    private void updateBaconBrawlAbilities(Session session, long now) {
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            PotionEffect speed = player.getPotionEffect(PotionEffectType.SPEED);
+            if ("mama-pig".equals(session.baconKits.getOrDefault(id, "pig"))
+                    && (session.ticks % 20 == 0 || speed == null || speed.getDuration() < 20)) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 1, false, false, false));
+            }
+            Long cloakedUntil = session.baconCloakedUntil.get(id);
+            if (cloakedUntil != null && now >= cloakedUntil) clearBaconCloak(session, id);
+        }
+        for (Map.Entry<UUID, Long> entry : new ArrayList<>(session.baconSlams.entrySet())) {
+            UUID slammerId = entry.getKey();
+            Player slammer = session.players.get(slammerId);
+            long expiresAt = entry.getValue();
+            if (slammer == null || !slammer.isOnline() || !session.alive.contains(slammerId)
+                    || now >= expiresAt || (expiresAt - now < 800L && slammer.isOnGround())) {
+                session.baconSlams.remove(slammerId);
+                continue;
+            }
+            for (Player target : alivePlayers(session)) {
+                if (!target.equals(slammer) && target.getLocation().distanceSquared(slammer.getLocation()) < 4.0D) {
+                    session.baconSlams.remove(slammerId);
+                    handlePlayerHit(session, slammer, target, "body-slam");
+                    break;
+                }
+            }
+            if (active != session) return;
+        }
+    }
+
+    private void useBaconBrawlAbility(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        String kit = session.baconKits.getOrDefault(id, "pig");
+        long cooldown = switch (kit) {
+            case "mama-pig" -> ArcadePortRules.BACON_BLAST_COOLDOWN_MILLIS;
+            case "sheep-pig" -> ArcadePortRules.BACON_CLOAK_COOLDOWN_MILLIS;
+            default -> ArcadePortRules.BACON_BODY_SLAM_COOLDOWN_MILLIS;
+        };
+        long nextReady = session.baconAbilityReadyAt.getOrDefault(id, 0L);
+        if (now < nextReady) {
+            player.sendMessage(ChatColor.YELLOW + "Ability ready in " + Math.max(1L, (nextReady - now + 999L) / 1000L) + "s.");
+            return;
+        }
+        session.baconAbilityReadyAt.put(id, now + cooldown);
+        switch (kit) {
+            case "mama-pig": {
+                Snowball bacon = player.launchProjectile(Snowball.class);
+                bacon.setItem(new ItemStack(Material.PORKCHOP));
+                Vector velocity = player.getEyeLocation().getDirection().normalize().multiply(1.0D);
+                velocity.setY(velocity.getY() + 0.2D);
+                bacon.setVelocity(velocity);
+                session.entities.add(bacon);
+                player.playSound(player.getLocation(), Sound.ENTITY_PIG_AMBIENT, 1.0F, 1.5F);
+                player.sendMessage(ChatColor.GREEN + "Bacon Blast!");
+                break;
+            }
+            case "sheep-pig":
+                clearBaconCloak(session, id);
+                session.baconCloakedUntil.put(id, now + ArcadePortRules.BACON_CLOAK_DURATION_MILLIS);
+                player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 100, 0, false, false, false));
+                player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation().add(0, 1, 0), 14, 0.35D, 0.5D, 0.35D, 0.03D);
+                player.sendMessage(ChatColor.GREEN + "Cloak activated for 5 seconds.");
+                break;
+            default:
+                Vector leap = player.getLocation().getDirection().normalize().multiply(1.2D);
+                leap.setY(0.2D);
+                player.setVelocity(leap);
+                session.baconSlams.put(id, now + 1_000L);
+                player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 12, 0.3D, 0.25D, 0.3D, 0.05D);
+                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1.0F, 0.8F);
+                player.sendMessage(ChatColor.GREEN + "Body Slam!");
+                break;
+        }
+    }
+
+    private void clearBaconCloak(Session session, UUID playerId) {
+        boolean wasCloaked = session.baconCloakedUntil.remove(playerId) != null;
+        Player player = session.players.get(playerId);
+        if (wasCloaked && player != null && player.isOnline()) player.removePotionEffect(PotionEffectType.INVISIBILITY);
+    }
+
+    private void handleBaconBrawlHit(Session session, Player attacker, Player target, String source) {
+        if (active != session || attacker.equals(target)
+                || !session.alive.contains(attacker.getUniqueId())
+                || !session.alive.contains(target.getUniqueId())) return;
+        clearBaconCloak(session, attacker.getUniqueId());
+        clearBaconCloak(session, target.getUniqueId());
+        String kit = session.baconKits.getOrDefault(attacker.getUniqueId(), "pig");
+        Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+        if (direction.lengthSquared() < 1.0E-5D) direction = attacker.getLocation().getDirection();
+        double hitKnockback = session.baconKnockback;
+        if ("body-slam".equals(source)) hitKnockback = Math.max(hitKnockback, 2.0D);
+        if ("sheep-pig".equals(kit) && "melee".equals(source)) hitKnockback *= 2.5D;
+        target.setVelocity(direction.normalize().multiply(hitKnockback).setY(0.7D));
+        target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0, 1, 0), 10, 0.35D, 0.4D, 0.35D, 0.04D);
+        attacker.setFoodLevel(Math.min(20, attacker.getFoodLevel() + 2));
+        attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.8F, 1.1F);
+        double damage = ArcadePortRules.BACON_STANDARD_HIT_DAMAGE;
+        if (target.getHealth() <= damage) {
+            session.scores.merge(attacker.getUniqueId(), 1, Integer::sum);
+            eliminate(session, target, attacker, "was knocked out by " + attacker.getName());
+        } else {
+            target.setHealth(target.getHealth() - damage);
+            target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
+        }
+        if (active != session || !"body-slam".equals(source) || !session.alive.contains(attacker.getUniqueId())) return;
+        double recoil = ArcadePortRules.BACON_BODY_SLAM_RECOIL_DAMAGE;
+        if (attacker.getHealth() <= recoil) eliminate(session, attacker, target, "was hurt by their body slam");
+        else {
+            attacker.setHealth(attacker.getHealth() - recoil);
+            Vector recoilDirection = attacker.getLocation().toVector().subtract(target.getLocation().toVector());
+            if (recoilDirection.lengthSquared() > 1.0E-5D) attacker.setVelocity(recoilDirection.normalize().multiply(0.6D).setY(0.15D));
         }
     }
 
@@ -1949,12 +2096,7 @@ public final class ArcadePortManager implements Listener {
 
         switch (session.type) {
             case BACON_BRAWL:
-                Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
-                if (direction.lengthSquared() < 1.0E-5D) direction = attacker.getLocation().getDirection();
-                target.setVelocity(direction.normalize().multiply(session.baconKnockback).setY(0.7D));
-                target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0, 1, 0), 10, 0.35D, 0.4D, 0.35D, 0.04D);
-                attacker.setFoodLevel(Math.min(20, attacker.getFoodLevel() + 2));
-                session.scores.merge(attacker.getUniqueId(), 1, Integer::sum);
+                handleBaconBrawlHit(session, attacker, target, source);
                 break;
             case BOMB_LOBBERS:
                 // Bomb Lobbers uses thrown TNT; melee attacks do not deal hits.
@@ -2475,6 +2617,36 @@ public final class ArcadePortManager implements Listener {
     public void onDamage(EntityDamageEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.BACON_BRAWL
+                && event.getEntity() instanceof Player baconTarget
+                && session.players.containsKey(baconTarget.getUniqueId())) {
+            if (event instanceof EntityDamageByEntityEvent byEntity) {
+                Entity damager = byEntity.getDamager();
+                if (damager instanceof Player attacker) {
+                    event.setCancelled(true);
+                    handlePlayerHit(session, attacker, baconTarget, "melee");
+                    return;
+                }
+                if (damager instanceof Snowball bacon && session.entities.contains(bacon)
+                        && bacon.getShooter() instanceof Player attacker) {
+                    event.setCancelled(true);
+                    handlePlayerHit(session, attacker, baconTarget, "bacon-blast");
+                    return;
+                }
+            }
+            if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FIRE_TICK) {
+                event.setCancelled(true);
+                return;
+            }
+            event.setCancelled(true);
+            double damage = event.getFinalDamage();
+            if (damage > 0.0D) {
+                if (baconTarget.getHealth() <= damage) eliminate(session, baconTarget, null,
+                        event.getCause().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' '));
+                else baconTarget.setHealth(baconTarget.getHealth() - damage);
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.SHEEP_QUEST && event.getEntity() instanceof Sheep sheep
                 && session.sheep.contains(sheep)) {
             event.setCancelled(true);
@@ -2516,6 +2688,14 @@ public final class ArcadePortManager implements Listener {
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+
+        if (session.type == ArcadePortGame.BACON_BRAWL
+                && event.getEntity() instanceof Snowball bacon && session.entities.remove(bacon)) {
+            bacon.getWorld().spawnParticle(Particle.CLOUD, bacon.getLocation(), 14, 0.25D, 0.25D, 0.25D, 0.04D);
+            bacon.getWorld().playSound(bacon.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.5F, 1.6F);
+            bacon.remove();
+            return;
+        }
 
         if (session.type == ArcadePortGame.SPLEEF
                 && (event.getEntity() instanceof Snowball || event.getEntity() instanceof Arrow)
@@ -2612,6 +2792,12 @@ public final class ArcadePortManager implements Listener {
         if (!session.alive.contains(player.getUniqueId())) return;
         ItemStack heldItem = event.getItem();
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
+        if (session.type == ArcadePortGame.BACON_BRAWL && item == Material.IRON_AXE
+                && event.getAction().isRightClick()) {
+            event.setCancelled(true);
+            useBaconBrawlAbility(session, player, System.currentTimeMillis());
+            return;
+        }
         if (session.type == ArcadePortGame.EVOLUTION
                 && (session.evolving.contains(player.getUniqueId())
                 || session.evolutionCharge.containsKey(player.getUniqueId()))) {
@@ -3012,6 +3198,10 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> alphaChasers = new HashSet<>();
         final Map<UUID, String> deathTagRunnerKits = new HashMap<>();
         final Map<UUID, Long> deathTagLastArrowAt = new HashMap<>();
+        final Map<UUID, String> baconKits = new HashMap<>();
+        final Map<UUID, Long> baconAbilityReadyAt = new HashMap<>();
+        final Map<UUID, Long> baconSlams = new HashMap<>();
+        final Map<UUID, Long> baconCloakedUntil = new HashMap<>();
         final Set<UUID> respawning = new HashSet<>();
         final Set<Sheep> sheep = new HashSet<>();
         final Map<Sheep, Integer> sheepOwners = new HashMap<>();
@@ -3050,6 +3240,7 @@ public final class ArcadePortManager implements Listener {
         final ItemStack[] armor;
         final ItemStack offhand;
         final GameMode mode;
+        final List<PotionEffect> potionEffects;
         final float exp;
         final int level;
         final boolean allowFlight;
@@ -3066,6 +3257,7 @@ public final class ArcadePortManager implements Listener {
             ItemStack off = p.getInventory().getItemInOffHand();
             offhand = off == null ? null : off.clone();
             mode = p.getGameMode();
+            potionEffects = new ArrayList<>(p.getActivePotionEffects());
             exp = p.getExp();
             level = p.getLevel();
             allowFlight = p.getAllowFlight();
@@ -3086,6 +3278,8 @@ public final class ArcadePortManager implements Listener {
             p.getInventory().setArmorContents(cloneItems(armor));
             p.getInventory().setItemInOffHand(offhand == null ? null : offhand.clone());
             p.setGameMode(mode);
+            for (PotionEffect effect : new ArrayList<>(p.getActivePotionEffects())) p.removePotionEffect(effect.getType());
+            for (PotionEffect effect : potionEffects) p.addPotionEffect(effect);
             p.setExp(exp);
             p.setLevel(level);
             p.setFoodLevel(food);
