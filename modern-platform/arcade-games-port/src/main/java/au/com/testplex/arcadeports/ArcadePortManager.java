@@ -663,7 +663,7 @@ public final class ArcadePortManager implements Listener {
                 break;
             case ONE_IN_THE_QUIVER:
                 player.getInventory().addItem(new ItemStack(Material.BOW));
-                player.getInventory().addItem(new ItemStack(Material.ARROW, 1));
+                player.getInventory().addItem(namedItem(Material.ARROW, "Super Arrow", "One arrow per shot; earn another with each kill."));
                 player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
                 break;
             case PAINTBALL:
@@ -1829,7 +1829,7 @@ public final class ArcadePortManager implements Listener {
         target.setGameMode(GameMode.SPECTATOR);
         session.alive.remove(targetId);
         session.respawning.add(targetId);
-        target.sendMessage(ChatColor.RED + "Eliminated! Respawning shortly.");
+        target.sendMessage(ChatColor.RED + "Eliminated! Respawning in one second.");
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (active != session || !target.isOnline()
@@ -1846,7 +1846,7 @@ public final class ArcadePortManager implements Listener {
             session.lastLocations.put(targetId, spawn.clone());
             giveKit(session, target);
             target.sendMessage(ChatColor.GREEN + "Respawned. First to 20 kills wins.");
-        }, 40L);
+        }, ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS);
     }
 
     private void hitProjectile(Session session, Projectile projectile, Player shooter, Player target) {
@@ -1862,7 +1862,7 @@ public final class ArcadePortManager implements Listener {
             handlePlayerHit(session, shooter, target, "arrow hit");
             if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER && active == session
                     && shooter.isOnline() && session.alive.contains(shooter.getUniqueId())) {
-                shooter.getInventory().setItem(1, new ItemStack(Material.ARROW, 1));
+                shooter.getInventory().setItem(1, namedItem(Material.ARROW, "Super Arrow", "One arrow per shot; earn another with each kill."));
             }
         } else {
             handlePlayerHit(session, shooter, target, "projectile hit");
@@ -2419,10 +2419,23 @@ public final class ArcadePortManager implements Listener {
         player.sendMessage(ChatColor.GREEN + "Sheep picked up. Carry it to your team's pen!");
     }
 
+    private boolean isQuiverBreakableGlass(Material material) {
+        String name = material.name();
+        return material == Material.GLASS || material == Material.GLASS_PANE
+                || name.endsWith("_STAINED_GLASS") || name.endsWith("_STAINED_GLASS_PANE");
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && isQuiverBreakableGlass(event.getBlock().getType())) {
+            event.setDropItems(false);
+            event.setExpToDrop(0);
+            return;
+        }
         if (session.type == ArcadePortGame.SPLEEF && event.getBlock().getY() == 63
                 && isSpleefFloorBlock(event.getBlock().getType())
                 && session.alive.contains(event.getPlayer().getUniqueId())) {

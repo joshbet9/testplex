@@ -183,6 +183,8 @@ public final class ArcadePortRules {
         return dragonProgress > playerProgress;
     }
 
+    public static final long QUIVER_RESPAWN_DELAY_TICKS = 20L;
+
     public static boolean isQuiverWinnerScoreReached(int kills) {
         return kills >= 20;
     }

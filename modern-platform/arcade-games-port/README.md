@@ -12,7 +12,7 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 - Evolution — combat-driven stage/weapon progression and respawn loop.
 - Gladiators — compact melee elimination arena.
 - Micro Battles — isolated islands and shrinking border.
-- One in the Quiver — one-arrow kill loop and arrow regrant on elimination.
+- One in the Quiver — first-to-20 one-arrow kill loop, named Super Arrow regrant, one-second respawn and breakable glass/glass panes (original kit abilities are still to port).
 - Paintball — selectable Rifle, Sniper, Shotgun and Machine Gun kits; projectile-specific paint counts, scope-charge damage, a heat gauge and team-coloured armour (kit perks and revive/Save Me flow remain to port).
 - Runner — disappearing floor tiles and dash item.
 - Sheep Quest — captureable sheep and score target.

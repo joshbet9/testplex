@@ -48,6 +48,7 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isQuiverWinnerScoreReached(19));
         assertTrue(ArcadePortRules.isQuiverWinnerScoreReached(20));
         assertTrue(ArcadePortRules.isQuiverWinnerScoreReached(21));
+        assertEquals(20L, ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS);
     }
 
     @Test void turfWarsAlternatesBuildAndCombatPhases() {
