@@ -1072,7 +1072,7 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         return switch (session.type) {
             case BACON_BRAWL -> "knockback x" + String.format(java.util.Locale.ROOT, "%.1f", session.baconKnockback);
-            case BOMB_LOBBERS -> "TNT " + player.getInventory().getItemInMainHand().getAmount();
+            case BOMB_LOBBERS -> "bombs " + inventoryCount(player, Material.TNT);
             case DEATH_TAG -> "IT " + session.tagged.size() + " | runners "
                     + Math.max(0, session.alive.size() - session.tagged.stream().filter(session.alive::contains).count());
             case DRAGON_ESCAPE -> "finish " + Math.max(0, player.getLocation().getBlockZ()) + "/" + (int) ArcadePortRules.DRAGON_ESCAPE_FINISH_Z;
@@ -1092,13 +1092,21 @@ public final class ArcadePortManager implements Listener {
             case PAINTBALL -> "armour " + session.paintPiecesRemaining.getOrDefault(id, 4) + "/4";
             case RUNNER -> "unstable tiles " + session.runnerBlocks.size();
             case SHEEP_QUEST -> "pen sheep R" + sheepQuestTeamCount(session, 0) + " B" + sheepQuestTeamCount(session, 1);
-            case SPLEEF -> "snowballs " + player.getInventory().contains(Material.SNOWBALL);
+            case SPLEEF -> "snowballs " + inventoryCount(player, Material.SNOWBALL);
             case TURF_WARS -> (session.turfCombat ? "COMBAT" : "BUILD") + " | turf " + session.turfFrontlineX;
         };
     }
 
     private int scoreFor(Session session, UUID id) {
         return session.scores.getOrDefault(id, 0);
+    }
+
+    private int inventoryCount(Player player, Material material) {
+        int amount = 0;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item != null && item.getType() == material) amount += item.getAmount();
+        }
+        return amount;
     }
 
     private void checkRoundEnd(Session session) {
