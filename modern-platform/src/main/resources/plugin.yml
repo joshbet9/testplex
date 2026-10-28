@@ -1,0 +1,22 @@
+name: TestplexModernArcade
+version: 0.1.0-SNAPSHOT
+main: au.com.testplex.modern.TestplexModernArcade
+api-version: '26.3'
+description: Independent modern Arcade port for Minecraft Java 26.3 / Paper.
+authors: [Testplex]
+commands:
+  gamepanel:
+    description: Open the modern Arcade Game Panel.
+    usage: /gamepanel
+    aliases: [arcadepanel]
+  arcadecosmetics:
+    description: Browse per-game modern Arcade cosmetic lines and win effects.
+    usage: /arcadecosmetics
+    aliases: [moderncosmetics]
+  arcadetest:
+    description: Inspect the modern Arcade port status.
+    usage: /arcadetest status
+permissions:
+  testplex.modern.admin:
+    description: Access modern Arcade test harness commands.
+    default: op
