@@ -22,6 +22,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.Sheep;
 import org.bukkit.entity.Snowball;
+import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -177,7 +178,7 @@ public final class ArcadePortManager implements Listener {
             player.leaveVehicle();
             player.teleport(spawn);
             player.setGameMode(GameMode.SURVIVAL);
-            player.setHealth(Math.max(1.0D, player.getHealth()));
+            player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
             player.setSaturation(20.0F);
             player.setFireTicks(0);
@@ -187,11 +188,23 @@ public final class ArcadePortManager implements Listener {
             giveKit(session, player);
             session.lastLocations.put(player.getUniqueId(), spawn.clone());
         }
-        if (type == ArcadePortGame.DEATH_TAG && participants.size() > 1) {
-            Player chaser = participants.get(ThreadLocalRandom.current().nextInt(participants.size()));
-            session.tagged.add(chaser.getUniqueId());
-            chaser.sendMessage(ChatColor.RED + "You are IT! Tag every runner.");
-            for (Player p : participants) if (p != chaser) p.sendMessage(ChatColor.GREEN + "Run! Avoid the tagged player.");
+        if (type == ArcadePortGame.DEATH_TAG) {
+            if (participants.size() > 1) {
+                Player chaser = participants.get(ThreadLocalRandom.current().nextInt(participants.size()));
+                session.tagged.add(chaser.getUniqueId());
+                chaser.sendMessage(ChatColor.RED + "You are IT! Tag every runner.");
+                for (Player p : participants) if (p != chaser) p.sendMessage(ChatColor.GREEN + "Run! Avoid the tagged player.");
+            } else {
+                // Solo mechanics test: use an isolated vanilla chaser so Death Tag is still interactive.
+                Player runner = participants.get(0);
+                Zombie chaser = session.world.spawn(new Location(session.world, -9.0D, 64.0D, 0.0D), Zombie.class);
+                chaser.setCustomName(ChatColor.RED + "Death Tag Test Chaser");
+                chaser.setCustomNameVisible(true);
+                chaser.setRemoveWhenFarAway(false);
+                chaser.setTarget(runner);
+                session.entities.add(chaser);
+                runner.sendMessage(ChatColor.YELLOW + "Solo test: avoid the chaser; one hit ends the run.");
+            }
         }
         if (type == ArcadePortGame.SHEEP_QUEST) {
             for (int i = 0; i < 8; i++) spawnSheep(session);
@@ -428,7 +441,7 @@ public final class ArcadePortManager implements Listener {
         double edgeX = ThreadLocalRandom.current().nextBoolean() ? -18.0D : 18.0D;
         Location spawn = new Location(session.world, edgeX, 68.0D, target.getLocation().getZ());
         Fireball fireball = session.world.spawn(spawn, Fireball.class);
-        fireball.setShooter(target);
+        // Leave the shooter unset: this is a world hazard, not a player-fired attack.
         fireball.setIsIncendiary(false);
         fireball.setYield(0.0F);
         Vector direction = target.getLocation().toVector().subtract(spawn.toVector()).normalize().multiply(0.65D);
@@ -468,7 +481,13 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void checkRoundEnd(Session session) {
-        if (active != session || session.participantsAtStart <= 1) return;
+        if (active != session) return;
+        // An empty live set is a real end condition even during a one-player test.
+        if (session.alive.isEmpty()) {
+            finish(session, null, true);
+            return;
+        }
+        if (session.participantsAtStart <= 1) return;
         if (session.type == ArcadePortGame.PAINTBALL || session.type == ArcadePortGame.TURF_WARS
                 || session.type == ArcadePortGame.SHEEP_QUEST || session.type == ArcadePortGame.EVOLUTION) return;
         if (session.type == ArcadePortGame.DEATH_TAG) {
@@ -727,8 +746,21 @@ public final class ArcadePortManager implements Listener {
         if (session == null || event.getEntity().getWorld() != session.world) return;
         if (event.getEntity() instanceof Player target && session.players.containsKey(target.getUniqueId())) {
             event.setCancelled(true);
-            if (event instanceof EntityDamageByEntityEvent byEntity && byEntity.getDamager() instanceof Player attacker) {
-                handlePlayerHit(session, attacker, target, "melee");
+            if (event instanceof EntityDamageByEntityEvent byEntity) {
+                Entity damager = byEntity.getDamager();
+                if (damager instanceof Player attacker) {
+                    handlePlayerHit(session, attacker, target, "melee");
+                } else if (session.type == ArcadePortGame.DRAGONS && damager instanceof Fireball fireball
+                        && fireball.getShooter() == null) {
+                    Vector recoil = target.getLocation().toVector().subtract(fireball.getLocation().toVector());
+                    if (recoil.lengthSquared() < 0.001D) recoil = new Vector(0, 1, 0);
+                    target.setVelocity(recoil.normalize().multiply(0.8D).setY(0.55D));
+                    target.getWorld().spawnParticle(Particle.FLAME, target.getLocation().add(0, 1, 0), 16, 0.35D, 0.4D, 0.35D, 0.05D);
+                    target.playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.7F, 1.4F);
+                } else if (session.type == ArcadePortGame.DEATH_TAG && damager instanceof Zombie zombie
+                        && session.entities.contains(zombie)) {
+                    eliminate(session, target, null, "was tagged by the chaser");
+                }
             }
         }
     }
@@ -759,7 +791,8 @@ public final class ArcadePortManager implements Listener {
         if (session == null) return;
         Player player = event.getPlayer();
         if (!session.alive.contains(player.getUniqueId())) return;
-        Material item = event.getMaterial();
+        ItemStack heldItem = event.getItem();
+        Material item = heldItem == null ? Material.AIR : heldItem.getType();
         if (session.type == ArcadePortGame.DRAGONS && item == Material.BLAZE_POWDER) {
             event.setCancelled(true);
             consumeHeld(player);
@@ -898,6 +931,10 @@ public final class ArcadePortManager implements Listener {
         final int level;
         final boolean allowFlight;
         final boolean flying;
+        final double health;
+        final int food;
+        final float saturation;
+        final float walkSpeed;
         PlayerSnapshot(Player p) {
             location = p.getLocation().clone();
             inventory = cloneItems(p.getInventory().getContents());
@@ -909,6 +946,10 @@ public final class ArcadePortManager implements Listener {
             level = p.getLevel();
             allowFlight = p.getAllowFlight();
             flying = p.isFlying();
+            health = p.getHealth();
+            food = p.getFoodLevel();
+            saturation = p.getSaturation();
+            walkSpeed = p.getWalkSpeed();
         }
         void restore(Player p) {
             if (p == null || !p.isOnline()) return;
@@ -921,7 +962,12 @@ public final class ArcadePortManager implements Listener {
             p.setGameMode(mode);
             p.setExp(exp);
             p.setLevel(level);
+            p.setFoodLevel(food);
+            p.setSaturation(saturation);
+            p.setWalkSpeed(walkSpeed);
             p.setAllowFlight(allowFlight);
+            double maxHealth = p.getMaxHealth();
+            p.setHealth(Math.max(1.0D, Math.min(health, maxHealth)));
             if (allowFlight) p.setFlying(flying);
         }
         private static ItemStack[] cloneItems(ItemStack[] items) {
