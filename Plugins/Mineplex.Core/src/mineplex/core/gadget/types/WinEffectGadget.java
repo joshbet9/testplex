@@ -339,7 +339,8 @@ public abstract class WinEffectGadget extends Gadget
 				}
 				else
 				{
-					targets.addAll(UtilServer.getPlayers());
+					for (Player online : UtilServer.getPlayers())
+						targets.add(online);
 				}
 				for (Player p : targets)
 				{
