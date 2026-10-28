@@ -706,6 +706,7 @@ public final class ArcadePortManager implements Listener {
                 target.getInventory().setArmorContents(armor);
             }
             session.paintPiecesRemaining.put(targetId, after);
+            target.setHealth(ArcadePortRules.paintballHealthAfterHit(after));
         }
         target.getWorld().playSound(target.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7F, 1.8F);
         target.getWorld().spawnParticle(Particle.SPLASH, target.getLocation().add(0.0D, 1.0D, 0.0D),
