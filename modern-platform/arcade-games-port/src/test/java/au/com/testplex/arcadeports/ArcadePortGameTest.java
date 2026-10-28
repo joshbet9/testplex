@@ -675,6 +675,21 @@ class ArcadePortGameTest {
         assertEquals(4.0D, ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE, 0.00001D);
     }
 
+    @Test void turfWarsBuildPlacementStaysInsideSourceBoundsAndTerritory() {
+        assertTrue(ArcadePortRules.isTurfWarsBuildWithinBounds(100, -10, 100, 140, -20, 20));
+        assertTrue(ArcadePortRules.isTurfWarsBuildWithinBounds(139, 19, 100, 140, -20, 20));
+        assertFalse(ArcadePortRules.isTurfWarsBuildWithinBounds(99, 0, 100, 140, -20, 20));
+        assertFalse(ArcadePortRules.isTurfWarsBuildWithinBounds(140, 0, 100, 140, -20, 20));
+        assertFalse(ArcadePortRules.isTurfWarsBuildWithinBounds(120, -21, 100, 140, -20, 20));
+        assertFalse(ArcadePortRules.isTurfWarsBuildWithinBounds(120, 20, 100, 140, -20, 20));
+
+        assertTrue(ArcadePortRules.canTurfWarsBuildOnTerritory(0, 119, 119));
+        assertFalse(ArcadePortRules.canTurfWarsBuildOnTerritory(0, 120, 119));
+        assertTrue(ArcadePortRules.canTurfWarsBuildOnTerritory(1, 120, 119));
+        assertFalse(ArcadePortRules.canTurfWarsBuildOnTerritory(1, 119, 119));
+        assertFalse(ArcadePortRules.canTurfWarsBuildOnTerritory(2, 120, 119));
+    }
+
     @Test void turfWarsFrontlineAndVictoryUseTheSourceMapBounds() {
         assertEquals(-1, ArcadePortRules.turfWarsInitialFrontline(-20, 20));
         assertEquals(119, ArcadePortRules.turfWarsInitialFrontline(100, 140));
