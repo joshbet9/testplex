@@ -95,6 +95,7 @@ public final class ArcadeTestHarness implements CommandExecutor, Listener
     private WinEffectGadget activeEffect;
     private Player activeTester;
     private PlayerSnapshot activeSnapshot;
+    private Location lastSafeWinTesterLocation;
     private boolean shuttingDown;
 
     public ArcadeTestHarness(Arcade plugin, ArcadeManager arcadeManager, GadgetManager gadgetManager)
@@ -421,6 +422,10 @@ public final class ArcadeTestHarness implements CommandExecutor, Listener
 
             Location view = base.clone().add(0.0, 3.0, 21.0);
             view.setDirection(base.toVector().subtract(view.toVector()));
+            // The real win-effect teleport path builds this invisible barrier shell. The
+            // lobby test bench does not call that path for every effect, so install it here.
+            selected.prepareTestContainment(view);
+            lastSafeWinTesterLocation = view.clone();
             player.closeInventory();
             player.setGameMode(GameMode.ADVENTURE);
             player.setVelocity(new Vector(0, 0, 0));
@@ -453,12 +458,41 @@ public final class ArcadeTestHarness implements CommandExecutor, Listener
                     cancel();
                     return;
                 }
+                keepWinTesterInsideBox();
                 if (!activeEffect.isRunning())
                 {
                     finishWinTest(true);
                 }
             }
         }.runTaskTimer(plugin, 10L, 10L);
+    }
+
+    /**
+     * Keep a tester inside the same barrier room used by real win effects, even if a
+     * particular effect temporarily removes blocks or moves its camera/player oddly.
+     */
+    private void keepWinTesterInsideBox()
+    {
+        Player player = activeTester;
+        if (player == null || !player.isOnline() || lastSafeWinTesterLocation == null)
+            return;
+
+        Location current = player.getLocation();
+        Location safe = lastSafeWinTesterLocation;
+        boolean inTestWorld = current.getWorld() != null
+                && WORLD_NAME.equals(current.getWorld().getName());
+        boolean insideArena = inTestWorld
+                && Math.abs(current.getX()) < ARENA_RADIUS - 2
+                && Math.abs(current.getZ()) < ARENA_RADIUS - 2;
+        if (!insideArena || current.getY() < 1.5D)
+        {
+            player.setVelocity(new Vector(0, 0, 0));
+            player.teleport(safe.clone());
+            player.setFallDistance(0.0F);
+            return;
+        }
+        if (current.getY() > 2.5D)
+            lastSafeWinTesterLocation = current.clone();
     }
 
     private World getOrCreateTestWorld()
@@ -515,6 +549,7 @@ public final class ArcadeTestHarness implements CommandExecutor, Listener
         activeEffect = null;
         activeTester = null;
         activeSnapshot = null;
+        lastSafeWinTesterLocation = null;
         if (winMonitorTask != null)
         {
             winMonitorTask.cancel();
