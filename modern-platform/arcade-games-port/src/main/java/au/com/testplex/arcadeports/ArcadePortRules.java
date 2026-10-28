@@ -285,6 +285,12 @@ public final class ArcadePortRules {
         return tied ? -1 : bestTeam;
     }
 
+    /** WorldConfig pen markers describe the floor; the sheep's feet block is one block above it. */
+    public static boolean sheepQuestInsidePenMarker(int sheepBlockX, int sheepFeetY, int sheepBlockZ,
+            int markerX, int markerFloorY, int markerZ) {
+        return sheepBlockX == markerX && sheepFeetY == markerFloorY + 1 && sheepBlockZ == markerZ;
+    }
+
     public static boolean shouldEnterSheepQuestOvertime(int redSheep, int blueSheep) {
         return redSheep == blueSheep;
     }
