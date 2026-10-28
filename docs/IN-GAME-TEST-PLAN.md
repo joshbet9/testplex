@@ -124,6 +124,13 @@ Run each game type from the normal Reborn game selector/admin game tooling, not 
 - Rejoin and verify the record remains stored by Mineplex account custom data. This feature uses Mineplex's custom-data manager; it does not use the standalone project's competitive backend.
 - If the test server lacks a functioning account/custom-data database, record that as a test-environment blocker rather than assuming PB persistence passed.
 
+### Safe Pad onboarding, return and per-round theme reset
+
+- In a new account with no Monster Maze PB in Original, Speed or Modern, confirm the first-stage particle breadcrumb leads toward Safe Pad 1. An account with a PB in any of those variants must not see the breadcrumb.
+- In the same match, confirm the first and second Safe Pad spawns each show an elevated firework to **all** players, including experienced players. Repeat in another match; the first two fireworks must appear again.
+- After reaching the active Safe Pad, walk off each edge. The return teleport must place the player on the centre of that same Safe Pad (not the map's central start), preserve the direction of travel, and not loop.
+- Right-click the Mob Theme toggle to select a non-default mob set, then start a fresh game. The toggle and disguise must start at **Map Default** in Original, Speed and Modern. The saved Safe Pad and beacon colour choices for each mob set should remain available.
+
 ### Global lifecycle and regression checks
 
 - Allow a player to use Cryo Blitz while monsters are moving. Affected monsters should stop movement and contact behaviour for 3s, then resume.
