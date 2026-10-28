@@ -244,25 +244,58 @@ public final class SourceMapCatalog {
         /** Resolve an interleaved source spawn to its source team. */
         public int teamIndexForSpawn(int spawnIndex, int teamCount) {
             int teams = Math.max(1, teamCount);
-            List<Map.Entry<String, List<Location>>> groups = new ArrayList<>();
+            List<Map.Entry<String, List<Location>>> groups = nonEmptyTeamGroups();
             List<Integer> sizes = new ArrayList<>();
             int total = 0;
-            for (Map.Entry<String, List<Location>> entry : teamSpawns.entrySet()) {
-                if (entry.getValue().isEmpty()) continue;
-                groups.add(entry);
-                sizes.add(entry.getValue().size());
-                total += entry.getValue().size();
+            for (Map.Entry<String, List<Location>> group : groups) {
+                sizes.add(group.getValue().size());
+                total += group.getValue().size();
             }
             if (groups.size() <= 1 || total == 0) return Math.floorMod(spawnIndex, teams);
             List<Integer> order = roundRobinGroupOrder(sizes);
             int groupIndex = order.get(Math.floorMod(spawnIndex, order.size()));
-            String label = groups.get(groupIndex).getKey().toLowerCase(java.util.Locale.ROOT);
-            if (label.contains("red")) return 0;
-            if (label.contains("blue")) return Math.floorMod(1, teams);
-            if (label.contains("green")) return Math.floorMod(2, teams);
+            return teamIndexForGroup(groups.get(groupIndex).getKey(), groupIndex, teams);
+        }
+
+        /** Get the source map spawn markers belonging to one indexed team. */
+        public List<Location> teamSpawnLocationsForTeam(int teamIndex, int teamCount) {
+            int teams = Math.max(1, teamCount);
+            int targetTeam = Math.floorMod(teamIndex, teams);
+            List<Map.Entry<String, List<Location>>> groups = nonEmptyTeamGroups();
+            List<Location> result = new ArrayList<>();
+            if (groups.size() == 1) {
+                List<Location> locations = groups.get(0).getValue();
+                for (int i = 0; i < locations.size(); i++) {
+                    if (Math.floorMod(i, teams) == targetTeam) result.add(locations.get(i).clone());
+                }
+                return result;
+            }
+            for (int i = 0; i < groups.size(); i++) {
+                if (teamIndexForGroup(groups.get(i).getKey(), i, teams) == targetTeam) {
+                    for (Location location : groups.get(i).getValue()) result.add(location.clone());
+                }
+            }
+            return result;
+        }
+
+        /** Resolve familiar source group names while preserving source order as a fallback. */
+        public static int teamIndexForGroup(String teamName, int groupIndex, int teamCount) {
+            int teams = Math.max(1, teamCount);
+            String label = teamName == null ? "" : teamName.toLowerCase(java.util.Locale.ROOT);
+            if (label.contains("red")) return Math.floorMod(0, teams);
+            if (label.contains("blue") || label.contains("aqua")) return Math.floorMod(1, teams);
+            if (label.contains("green") || label.contains("lime")) return Math.floorMod(2, teams);
             if (label.contains("yellow")) return Math.floorMod(3, teams);
             if (label.contains("purple")) return Math.floorMod(4, teams);
             return Math.floorMod(groupIndex, teams);
+        }
+
+        private List<Map.Entry<String, List<Location>>> nonEmptyTeamGroups() {
+            List<Map.Entry<String, List<Location>>> groups = new ArrayList<>();
+            for (Map.Entry<String, List<Location>> entry : teamSpawns.entrySet()) {
+                if (!entry.getValue().isEmpty()) groups.add(entry);
+            }
+            return groups;
         }
 
         public List<Location> dataLocations(String name) {
