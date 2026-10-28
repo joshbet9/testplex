@@ -18,6 +18,7 @@ import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.ArmorStand;
@@ -451,6 +452,17 @@ public final class ArcadePortManager implements Listener {
                 session.microBarrierBlocks.add(barrier);
                 barrier.setType(Material.GLASS, false);
             }
+        }
+        if (type == ArcadePortGame.DEATH_TAG) {
+            SourceMapCatalog.MapData deathTagMap = sourceMapData.get(type.id());
+            if (deathTagMap != null) {
+                for (Location marker : deathTagMap.customLocations("89")) {
+                    Block light = marker.getBlock();
+                    session.deathTagOriginalLightBlocks.putIfAbsent(light, light.getBlockData().clone());
+                    if (ThreadLocalRandom.current().nextBoolean()) light.setType(Material.GOLD_BLOCK, false);
+                }
+            }
+            session.deathTagNextLightAt = now + 1_000L;
         }
         session.turfCombat = false;
         session.turfPhaseEndsAt = type == ArcadePortGame.TURF_WARS
@@ -966,6 +978,15 @@ public final class ArcadePortManager implements Listener {
             }
         }
         player.updateInventory();
+    }
+
+    private void updateDeathTagLights(Session session, long now) {
+        if (session.deathTagOriginalLightBlocks.isEmpty() || now < session.deathTagNextLightAt) return;
+        session.deathTagNextLightAt = now + 1_000L;
+        for (Block block : session.deathTagOriginalLightBlocks.keySet()) {
+            if (block == null || block.getWorld() != session.world) continue;
+            block.setType(ArcadePortRules.deathTagNextLightMaterial(block.getType()), false);
+        }
     }
 
     private void updateDeathTagConditions(Session session, long now) {
@@ -1909,6 +1930,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
             updateDeathTagChasers(session, now);
         }
+        if (session.type == ArcadePortGame.DEATH_TAG) updateDeathTagLights(session, now);
         if (session.type == ArcadePortGame.BACON_BRAWL) updateBaconBrawl(session, now);
         if (session.type == ArcadePortGame.BOMB_LOBBERS) updateBombLobbers(session);
         if (session.type == ArcadePortGame.SPLEEF) updateSpleef(session, now);
@@ -3514,6 +3536,11 @@ public final class ArcadePortManager implements Listener {
                 announce(session, winner == null ? ChatColor.YELLOW + "Round ended." : ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won " + session.type.displayName() + "!");
             }
         }
+        for (Map.Entry<Block, BlockData> entry : session.deathTagOriginalLightBlocks.entrySet()) {
+            Block block = entry.getKey();
+            if (block != null && block.getWorld() == session.world) block.setBlockData(entry.getValue(), false);
+        }
+        session.deathTagOriginalLightBlocks.clear();
         for (Entity entity : new ArrayList<>(session.entities)) if (entity != null && entity.isValid()) entity.remove();
         session.bombOwners.clear();
         session.bombLastLocations.clear();
@@ -4987,6 +5014,8 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> alphaChasers = new HashSet<>();
         final Map<UUID, String> deathTagRunnerKits = new HashMap<>();
         final Map<UUID, Long> deathTagLastArrowAt = new HashMap<>();
+        final Map<Block, BlockData> deathTagOriginalLightBlocks = new LinkedHashMap<>();
+        long deathTagNextLightAt;
         final Map<UUID, String> baconKits = new HashMap<>();
         final Map<UUID, Long> baconAbilityReadyAt = new HashMap<>();
         final Map<UUID, Long> baconSlams = new HashMap<>();
