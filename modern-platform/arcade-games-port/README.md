@@ -17,7 +17,7 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 - Runner — source Leaper/Archer/Frosty kit identities, 8-second Leap, 6-second Quickshot, Frost Balls replenished every 500 ms up to 16 with Slow II for two seconds, source-map bounds, trail material tracking, 600 ms decay and 1.2-second falling-block lifetime, and radius-2.5 arrow trail marking.
 - Sheep Quest — captureable sheep and score target.
 - Spleef — source kit selection (Snowballer, Brawler and Archer), snowballer replacement cap, Brawler Leap/Smasher, two-arrow Fletcher replenishment, source-timed hunger drain/restoration, source material damage transitions and 3D arrow-radius clearing.
-- Turf Wars — team assignment, bow combat and territory block marking.
+- Turf Wars — team assignment, bow combat and territory block marking; source timing now uses the 40-second initial build, followed by 20-second build / 90-second combat cycles.
 
 Each game gets its own separate modern test world, so arena generation/destruction does not use the live 1.8 Testplex world. Original Reborn map archives are embedded for Bacon Brawl, Bomb Lobbers, Death Tag, Dragon Escape, Dragons, Gladiators, Micro Battles, One in the Quiver, Paintball, Runner, Sheep Quest, Spleef and Turf Wars; these load into separate source-world folders and read WorldConfig.dat spawn groups and map bounds. Evolution remains generated because an Evolution map archive is not present in the source map catalogue.
 
