@@ -604,6 +604,28 @@ public final class ArcadePortRules {
         };
     }
 
+    /** Initial line sits immediately to the left of the X-axis midpoint (red territory). */
+    public static int turfWarsInitialFrontline(int minX, int maxXExclusive) {
+        if (maxXExclusive <= minX) return -1;
+        return (int) Math.floor((minX + (double) maxXExclusive) / 2.0D) - 1;
+    }
+
+    /** Source-map bounds are exclusive at the maximum coordinate. */
+    public static boolean isTurfWarsWinningLine(int frontline, int teamId, int minX, int maxXExclusive) {
+        if (maxXExclusive <= minX) return false;
+        if (teamId == 0) return frontline >= maxXExclusive - 1;
+        if (teamId == 1) return frontline <= minX;
+        return false;
+    }
+
+    /** Compare territory against the source map's starting line before applying a kill tiebreak. */
+    public static int turfWarsTimeoutLeader(int frontline, int initialFrontline, int redKills, int blueKills) {
+        if (frontline > initialFrontline) return 0;
+        if (frontline < initialFrontline) return 1;
+        if (redKills != blueKills) return redKills > blueKills ? 0 : 1;
+        return -1;
+    }
+
     public static boolean isTurfWarsWinningLine(int frontline, int teamId, int halfSize) {
         if (halfSize < 1) return false;
         if (teamId == 0) return frontline >= halfSize - 1;
