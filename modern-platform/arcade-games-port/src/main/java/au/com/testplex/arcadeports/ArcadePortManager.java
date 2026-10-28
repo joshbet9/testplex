@@ -2072,7 +2072,6 @@ public final class ArcadePortManager implements Listener {
                 if (owner != null && owner.isOnline()) {
                     owner.playSound(owner.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.0F, 1.45F);
                     owner.sendMessage(ChatColor.YELLOW + "Direct hit!");
-                    session.scores.merge(ownerId, 1, Integer::sum);
                 }
                 if (target.getHealth() <= 10.0D) {
                     eliminate(session, target, owner, "was directly hit by TNT");
@@ -2129,9 +2128,14 @@ public final class ArcadePortManager implements Listener {
                     target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0.0D, 1.0D, 0.0D),
                             12, 0.35D, 0.45D, 0.35D, 0.05D);
                     target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.2F);
-                    if (owner != null && owner.isOnline() && distance <= 3.0D) {
-                        owner.playSound(owner.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.0F, 1.45F);
-                        owner.sendMessage(ChatColor.YELLOW + "Direct hit!");
+                    double blastDamage = Math.max(0.0D, 10.0D * (1.0D - distance / 8.0D));
+                    if (blastDamage > 0.0D) {
+                        if (target.getHealth() <= blastDamage) {
+                            eliminate(session, target, owner, "was caught in a TNT blast");
+                            if (active != session) return;
+                        } else {
+                            target.setHealth(target.getHealth() - blastDamage);
+                        }
                     }
                 }
                 return;
