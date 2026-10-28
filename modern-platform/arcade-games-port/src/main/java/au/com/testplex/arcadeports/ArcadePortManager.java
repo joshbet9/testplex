@@ -166,7 +166,6 @@ public final class ArcadePortManager implements Listener {
         session.lastBaconEscalationAt = now;
         session.baconKnockback = ArcadePortRules.initialBaconKnockback(participants.size());
         session.baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
-        session.nextDragonEscapeHazardAt = now + ArcadePortRules.DRAGON_ESCAPE_HAZARD_INTERVAL_MILLIS;
         session.microBarrierActive = type == ArcadePortGame.MICRO_BATTLES;
         session.turfCombat = false;
         session.turfPhaseEndsAt = type == ArcadePortGame.TURF_WARS
@@ -977,7 +976,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void spawnDragonEscapeDragon(Session session) {
-        Location spawn = new Location(session.world, 0.5D, 66.5D, -35.0D);
+        Location spawn = new Location(session.world, 0.5D, 66.5D, -40.0D);
         EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
         dragon.setAI(false);
         dragon.setGravity(false);

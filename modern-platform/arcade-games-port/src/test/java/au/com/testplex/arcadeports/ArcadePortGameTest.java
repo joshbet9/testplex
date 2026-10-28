@@ -191,11 +191,11 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldApplyDragonContactHit(11_500L, 11_500L));
     }
 
-    @Test void dragonEscapeHasARealFinishLine() {
-        assertEquals(77.0D, ArcadePortRules.DRAGON_ESCAPE_FINISH_Z);
-        assertFalse(ArcadePortRules.isDragonEscapeFinishReached(76.99D));
-        assertTrue(ArcadePortRules.isDragonEscapeFinishReached(77.0D));
-        assertTrue(ArcadePortRules.isDragonEscapeFinishReached(80.0D));
+    @Test void dragonEscapeHasAThreeDimensionalFinishWaypoint() {
+        assertEquals(77.5D, ArcadePortRules.DRAGON_ESCAPE_FINISH_Z);
+        assertFalse(ArcadePortRules.isDragonEscapeFinishReached(4.0D, 64.0D, 77.5D));
+        assertTrue(ArcadePortRules.isDragonEscapeFinishReached(0.5D, 64.0D, 77.5D));
+        assertFalse(ArcadePortRules.isDragonEscapeFinishReached(0.5D, 64.0D, 80.51D));
     }
 
     @Test void deathTagChasersConvertRunnersWithoutTagTransfer() {
