@@ -218,7 +218,7 @@ public class AchievementPage extends ShopPageBase<AchievementManager, Achievemen
 		lore.add(ChatColor.GRAY + "View personal bests by mode,");
 		lore.add(ChatColor.GRAY + "maze pattern and kit.");
 		lore.add(ChatColor.YELLOW + "Click to open PB menu.");
-		addButton(47, new ShopItem(Material.BOOK_AND_QUILL, C.cAqua + "Monster Maze Personal Bests",
+		addButton(8, new ShopItem(Material.BOOK_AND_QUILL, C.cAqua + "Monster Maze Personal Bests",
 				lore.toArray(new String[0]), 1, false, false), new IButton()
 		{
 			@Override
