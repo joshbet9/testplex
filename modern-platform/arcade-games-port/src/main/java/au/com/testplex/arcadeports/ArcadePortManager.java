@@ -1368,9 +1368,14 @@ public final class ArcadePortManager implements Listener {
             double distance = target.getLocation().distance(player.getLocation());
             if (distance > 8.0D) continue;
             Vector direction = target.getLocation().toVector().subtract(player.getLocation().toVector());
-            if (direction.lengthSquared() < 0.001D) direction = player.getLocation().getDirection();
-            double proximity = (8.0D - distance) / 8.0D;
-            target.setVelocity(direction.normalize().multiply(0.8D + 0.8D * proximity)
+            direction.setY(0.0D); // Reborn uses a 2D trajectory for horizontal knockback.
+            if (direction.lengthSquared() < 0.001D) {
+                direction = player.getLocation().getDirection();
+                direction.setY(0.0D);
+            }
+            double proximity = ArcadePortRules.quiverGroundPoundHorizontalMultiplier(distance);
+            if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.0D, 1.0D);
+            target.setVelocity(direction.normalize().multiply(0.8D * proximity)
                     .setY(0.8D + 1.0D * proximity));
             target.setFallDistance(0.0F);
             target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 0.8F);
