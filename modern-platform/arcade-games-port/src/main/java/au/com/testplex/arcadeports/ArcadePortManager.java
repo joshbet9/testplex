@@ -766,6 +766,18 @@ public final class ArcadePortManager implements Listener {
 
     private List<Location> spawnLocations(ArcadePortGame type, int count) {
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(type.id());
+        if (sourceMap != null && type == ArcadePortGame.DRAGON_ESCAPE) {
+            // Reborn defines Dragon Escape player starts as GREEN data points, not team spawns.
+            List<Location> authoredGreenSpawns = sourceMap.dataLocations("GREEN");
+            if (authoredGreenSpawns.isEmpty()) authoredGreenSpawns = sourceMap.spawnLocations();
+            if (!authoredGreenSpawns.isEmpty()) {
+                List<Location> chosen = new ArrayList<>();
+                for (int i = 0; i < Math.max(1, count); i++) {
+                    chosen.add(authoredGreenSpawns.get(i % authoredGreenSpawns.size()).clone());
+                }
+                return chosen;
+            }
+        }
         if (sourceMap != null && !sourceMap.spawnLocations().isEmpty()) {
             List<Location> configured = sourceMap.spawnLocations();
             List<Location> chosen = new ArrayList<>();
