@@ -3055,6 +3055,7 @@ public final class ArcadePortManager implements Listener {
         final boolean allowFlight;
         final boolean flying;
         final double health;
+        final double maxHealthBase;
         final int food;
         final float saturation;
         final float walkSpeed;
@@ -3070,6 +3071,8 @@ public final class ArcadePortManager implements Listener {
             allowFlight = p.getAllowFlight();
             flying = p.isFlying();
             health = p.getHealth();
+            var maxHealthAttribute = p.getAttribute(Attribute.MAX_HEALTH);
+            maxHealthBase = maxHealthAttribute == null ? p.getMaxHealth() : maxHealthAttribute.getBaseValue();
             food = p.getFoodLevel();
             saturation = p.getSaturation();
             walkSpeed = p.getWalkSpeed();
@@ -3089,6 +3092,8 @@ public final class ArcadePortManager implements Listener {
             p.setSaturation(saturation);
             p.setWalkSpeed(walkSpeed);
             p.setAllowFlight(allowFlight);
+            var maxHealthAttribute = p.getAttribute(Attribute.MAX_HEALTH);
+            if (maxHealthAttribute != null) maxHealthAttribute.setBaseValue(maxHealthBase);
             double maxHealth = p.getMaxHealth();
             p.setHealth(Math.max(1.0D, Math.min(health, maxHealth)));
             if (allowFlight) p.setFlying(flying);
