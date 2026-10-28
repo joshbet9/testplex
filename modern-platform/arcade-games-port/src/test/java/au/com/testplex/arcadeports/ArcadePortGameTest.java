@@ -244,6 +244,19 @@ class ArcadePortGameTest {
         assertEquals(1.8D, ArcadePortRules.nextBaconKnockback(1.5D), 0.00001D);
     }
 
+    @Test void runnerSourceKitsHaveDistinctCooldownsAndFrostBallRules() {
+        assertEquals("leaper", ArcadePortRules.normalizeRunnerKit("Leaper"));
+        assertEquals("archer", ArcadePortRules.normalizeRunnerKit("runner-archer"));
+        assertEquals("frosty", ArcadePortRules.normalizeRunnerKit("Frosty"));
+        assertNull(ArcadePortRules.normalizeRunnerKit("unknown"));
+        assertEquals(8_000L, ArcadePortRules.RUNNER_LEAP_COOLDOWN_MILLIS);
+        assertEquals(6_000L, ArcadePortRules.RUNNER_QUICKSHOT_COOLDOWN_MILLIS);
+        assertEquals(500L, ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS);
+        assertEquals(16, ArcadePortRules.RUNNER_MAX_FROSTBALLS);
+        assertEquals(40, ArcadePortRules.RUNNER_FROSTBALL_SLOW_TICKS);
+        assertEquals(2, ArcadePortRules.RUNNER_FROSTBALL_SLOW_AMPLIFIER);
+    }
+
     @Test void runnerFloorBlocksFallAfterSixHundredMilliseconds() {
         assertEquals(600L, ArcadePortRules.RUNNER_BLOCK_DECAY_MILLIS);
         assertEquals(1_200L, ArcadePortRules.RUNNER_BLOCK_LIFETIME_MILLIS);

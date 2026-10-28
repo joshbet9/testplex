@@ -14,7 +14,7 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 - Micro Battles — original source map/barrier/spectator markers, Archer/Worker/Fighter loadouts, Fletcher replenishment and Fighter Iron Skin, plus MapCrumbleModule's vertical two-tick map scan and three farthest supported-block removals each tick after the one-second live gate.
 - One in the Quiver — first-to-20 one-arrow kill loop, named Super Arrow regrant, one-second respawn and breakable glass/glass panes (original kit abilities are still to port).
 - Paintball — selectable Rifle, Sniper, Shotgun and Machine Gun kits; projectile-specific paint counts, scope-charge damage, a heat gauge, team-coloured armour, Water Bomb stacks, 250 ms throw gate, SAVE ME marker/revival within three blocks, and nearby teammate cleanse with armour/health restoration.
-- Runner — disappearing floor tiles and dash item.
+- Runner — source Leaper/Archer/Frosty kit identities, 8-second Leap, 6-second Quickshot, Frost Balls replenished every 500 ms up to 16 with Slow II for two seconds, source-map bounds, trail material tracking, 600 ms decay and 1.2-second falling-block lifetime, and radius-2.5 arrow trail marking.
 - Sheep Quest — captureable sheep and score target.
 - Spleef — source kit selection (Snowballer, Brawler and Archer), snowballer replacement cap, Brawler Leap/Smasher, two-arrow Fletcher replenishment, source-timed hunger drain/restoration, source material damage transitions and 3D arrow-radius clearing.
 - Turf Wars — team assignment, bow combat and territory block marking.

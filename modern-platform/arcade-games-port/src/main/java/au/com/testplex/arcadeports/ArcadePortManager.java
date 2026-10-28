@@ -101,6 +101,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> spleefKitPreferences = new HashMap<>();
     private final Map<UUID, String> microKitPreferences = new HashMap<>();
     private final Map<UUID, String> quiverKitPreferences = new HashMap<>();
+    private final Map<UUID, String> runnerKitPreferences = new HashMap<>();
     private final Map<UUID, String> dragonsKitPreferences = new HashMap<>();
     private Session active;
     private BukkitTask pendingStart;
@@ -127,6 +128,7 @@ public final class ArcadePortManager implements Listener {
                 case DRAGONS -> { selectDragonsKit(player, value); return; }
                 case PAINTBALL -> { selectPaintballKit(player, value); return; }
                 case DEATH_TAG -> { selectDeathTagRunnerKit(player, value); return; }
+                case RUNNER -> { selectRunnerKit(player, value); return; }
                 default -> { }
             }
         }
@@ -140,6 +142,7 @@ public final class ArcadePortManager implements Listener {
         else if (Set.of("rifle", "sniper", "shotgun", "machine-gun", "machinegun").contains(value)) selectPaintballKit(player, value);
         else if (ArcadePortRules.normalizeQuiverKit(value) != null) selectQuiverKit(player, value);
         else if (ArcadePortRules.normalizeDragonsKit(value) != null) selectDragonsKit(player, value);
+        else if (value.startsWith("runnerkit-")) selectRunnerKit(player, value);
         else selectDeathTagRunnerKit(player, value);
     }
 
@@ -269,6 +272,28 @@ public final class ArcadePortManager implements Listener {
             giveKit(session, player);
             player.sendMessage(ChatColor.GREEN + "Dragons kit changed to " + kit + ".");
         } else player.sendMessage(ChatColor.GREEN + "Dragons kit set to " + kit + " for your next test.");
+    }
+
+    public void selectRunnerKit(Player player, String requestedKit) {
+        if (player == null) return;
+        String kit = ArcadePortRules.normalizeRunnerKit(requestedKit);
+        if (kit == null) {
+            player.sendMessage(ChatColor.YELLOW + "Runner kits: leaper, archer, frosty. Use runnerkit-archer outside a Runner test.");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        runnerKitPreferences.put(id, kit);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.RUNNER
+                && session.players.containsKey(id) && session.alive.contains(id)) {
+            session.runnerKits.put(id, kit);
+            session.runnerLeapReadyAt.remove(id);
+            session.runnerQuickshotReadyAt.remove(id);
+            session.runnerNextFrostBallAt.put(id,
+                    System.currentTimeMillis() + ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS);
+            giveKit(session, player);
+            player.sendMessage(ChatColor.GREEN + "Runner kit changed to " + kit + ".");
+        } else player.sendMessage(ChatColor.GREEN + "Runner kit set to " + kit + " for your next test.");
     }
 
     public void selectDeathTagRunnerKit(Player player, String requestedKit) {
@@ -499,6 +524,11 @@ public final class ArcadePortManager implements Listener {
             }
             if (type == ArcadePortGame.ONE_IN_THE_QUIVER) {
                 session.quiverKits.put(player.getUniqueId(), quiverKitPreferences.getOrDefault(player.getUniqueId(), "leaper"));
+            }
+            if (type == ArcadePortGame.RUNNER) {
+                UUID playerId = player.getUniqueId();
+                session.runnerKits.put(playerId, runnerKitPreferences.getOrDefault(playerId, "leaper"));
+                session.runnerNextFrostBallAt.put(playerId, now + ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS);
             }
             if (type == ArcadePortGame.DRAGONS) {
                 UUID playerId = player.getUniqueId();
@@ -1161,11 +1191,22 @@ public final class ArcadePortManager implements Listener {
                 givePaintballKit(session, player,
                         session.paintballKits.getOrDefault(player.getUniqueId(), "rifle"));
                 break;
-            case RUNNER:
-                player.getInventory().addItem(namedItem(Material.FEATHER, "Runner Dash", "A short forward burst.", 3));
-                player.getInventory().addItem(new ItemStack(Material.BOW));
-                player.getInventory().addItem(new ItemStack(Material.ARROW, 12));
+            case RUNNER: {
+                String kit = session.runnerKits.getOrDefault(player.getUniqueId(), "leaper");
+                switch (kit) {
+                    case "archer":
+                        player.getInventory().addItem(new ItemStack(Material.BOW));
+                        break;
+                    case "frosty":
+                        // PerkConstructor supplies Frost Balls on its 500 ms recharge cycle.
+                        break;
+                    default:
+                        player.getInventory().addItem(namedItem(Material.IRON_AXE, "Leap",
+                                "Right-click to leap (8-second cooldown)."));
+                        break;
+                }
                 break;
+            }
             case SHEEP_QUEST:
                 player.getInventory().addItem(namedItem(Material.SADDLE, "Shepherd", "Hold to pick up sheep; carry them to your team's pen."));
                 player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
@@ -1834,6 +1875,7 @@ public final class ArcadePortManager implements Listener {
             // Reborn marks the whole standing footprint on every game tick, not only on movement events.
             markRunnerFootprints(session, now);
             processRunnerBlocks(session, now);
+            updateRunnerKits(session, now);
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) updateDragonEscapeChase(session);
         if (session.type == ArcadePortGame.SHEEP_QUEST) {
@@ -3510,6 +3552,20 @@ public final class ArcadePortManager implements Listener {
         session.lastLocations.put(player.getUniqueId(), current.clone());
     }
 
+    private Material runnerTrailMaterial(Player owner) {
+        // With no cosmetic selected, Reborn's default trail is red clay.
+        return Material.RED_TERRACOTTA;
+    }
+
+    private boolean insideRunnerSourceBounds(Session session, int x, int z) {
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (mapData != null && mapData.hasBounds()) {
+            return x >= mapData.minX() && x < mapData.maxX()
+                    && z >= mapData.minZ() && z < mapData.maxZ();
+        }
+        return Math.abs(x) <= HALF_SIZE && Math.abs(z) <= HALF_SIZE;
+    }
+
     private void markRunnerFootprints(Session session, long now) {
         for (UUID id : new HashSet<>(session.alive)) {
             Player player = session.players.get(id);
@@ -3525,22 +3581,25 @@ public final class ArcadePortManager implements Listener {
 
             for (int x = minX; x <= maxX; x++) {
                 for (int z = minZ; z <= maxZ; z++) {
-                    if (Math.abs(x) > HALF_SIZE || Math.abs(z) > HALF_SIZE) continue;
-                    markRunnerBlock(session, session.world.getBlockAt(x, trailY, z), now);
+                    if (!insideRunnerSourceBounds(session, x, z)) continue;
+                    markRunnerBlock(session, session.world.getBlockAt(x, trailY, z), player, now);
                 }
             }
         }
     }
 
-    private void markRunnerBlock(Session session, Block block, long now) {
-        if (active != session || block == null || block.getY() < 0 || block.getY() > 192
-                || Math.abs(block.getX()) > HALF_SIZE || Math.abs(block.getZ()) > HALF_SIZE) return;
-        boolean aboveIsAir = block.getRelative(org.bukkit.block.BlockFace.UP).getType().isAir();
+    private void markRunnerBlock(Session session, Block block, Player owner, long now) {
+        if (active != session || block == null || block.getY() < 0
+                || block.getY() >= session.world.getMaxHeight()
+                || !insideRunnerSourceBounds(session, block.getX(), block.getZ())) return;
+        boolean aboveIsAir = block.getRelative(BlockFace.UP).getType().isAir();
         if (!ArcadePortRules.shouldMarkRunnerBlock(block.getType().isSolid(),
                 block.getType() == Material.BEDROCK, block.isLiquid(), aboveIsAir,
                 session.runnerBlocks.containsKey(block))) return;
-        block.setType(Material.RED_TERRACOTTA, false);
+        Material trail = runnerTrailMaterial(owner);
+        block.setType(trail, false);
         session.runnerBlocks.put(block, now);
+        session.runnerBlockMaterials.put(block, trail);
     }
 
     private void processRunnerBlocks(Session session, long now) {
@@ -3548,20 +3607,25 @@ public final class ArcadePortManager implements Listener {
         while (iterator.hasNext()) {
             Map.Entry<Block, Long> entry = iterator.next();
             Block block = entry.getKey();
-            if (block == null || block.getType() != Material.RED_TERRACOTTA) {
+            Material trail = session.runnerBlockMaterials.get(block);
+            if (block == null || trail == null || block.getType() != trail) {
                 iterator.remove();
+                session.runnerBlockMaterials.remove(block);
                 continue;
             }
             if (!ArcadePortRules.shouldDropRunnerBlock(now - entry.getValue())) continue;
             Location fallingLocation = block.getLocation().add(0.5D, 0.0D, 0.5D);
             block.setType(Material.AIR, false);
             iterator.remove();
-            FallingBlock falling = session.world.spawnFallingBlock(fallingLocation, Material.RED_TERRACOTTA.createBlockData());
+            session.runnerBlockMaterials.remove(block);
+            FallingBlock falling = session.world.spawnFallingBlock(fallingLocation, trail.createBlockData());
             falling.setDropItem(false);
             falling.setHurtEntities(true);
             // Reborn's projectile helper applies a small upward launch before the block falls.
             falling.setVelocity(new Vector(0.0D, 0.3D, 0.0D));
             session.entities.add(falling);
+            session.runnerFallingBlockExpiresAt.put(falling.getUniqueId(),
+                    now + ArcadePortRules.RUNNER_BLOCK_LIFETIME_MILLIS);
         }
     }
 
@@ -3717,10 +3781,68 @@ public final class ArcadePortManager implements Listener {
         session.world.playSound(block.getLocation(), Sound.BLOCK_STONE_BREAK, 0.5F, 1.15F);
     }
 
+    private void updateRunnerKits(Session session, long now) {
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            String kit = session.runnerKits.getOrDefault(id, "leaper");
+            if (!"frosty".equals(kit)) continue;
+            long next = session.runnerNextFrostBallAt.getOrDefault(id,
+                    now + ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS);
+            if (now < next) continue;
+            if (inventoryCount(player, Material.SNOWBALL) < ArcadePortRules.RUNNER_MAX_FROSTBALLS) {
+                player.getInventory().addItem(namedItem(Material.SNOWBALL, "Snowball",
+                        "Frost Balls slow opponents.", 1));
+                player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.7F, 1.0F);
+            }
+            session.runnerNextFrostBallAt.put(id, now + ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS);
+        }
+
+        Iterator<Map.Entry<UUID, Long>> expiry = session.runnerFallingBlockExpiresAt.entrySet().iterator();
+        while (expiry.hasNext()) {
+            Map.Entry<UUID, Long> entry = expiry.next();
+            if (now < entry.getValue()) continue;
+            Entity entity = Bukkit.getEntity(entry.getKey());
+            if (entity instanceof FallingBlock falling && session.entities.remove(falling)) falling.remove();
+            expiry.remove();
+        }
+    }
+
+    private void useRunnerLeap(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        long readyAt = session.runnerLeapReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            player.sendMessage(ChatColor.YELLOW + "Leap ready in " + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s.");
+            return;
+        }
+        session.runnerLeapReadyAt.put(id, now + ArcadePortRules.RUNNER_LEAP_COOLDOWN_MILLIS);
+        Vector velocity = player.getLocation().getDirection().normalize().multiply(1.2D);
+        velocity.setY(1.2D);
+        player.setVelocity(velocity);
+        player.setFallDistance(0.0F);
+        player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 8, 0.2D, 0.15D, 0.2D, 0.02D);
+        player.sendMessage(ChatColor.GREEN + "Leap!");
+    }
+
+    private void useRunnerQuickshot(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        long readyAt = session.runnerQuickshotReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            player.sendMessage(ChatColor.YELLOW + "Quickshot ready in " + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s.");
+            return;
+        }
+        session.runnerQuickshotReadyAt.put(id, now + ArcadePortRules.RUNNER_QUICKSHOT_COOLDOWN_MILLIS);
+        Arrow arrow = player.launchProjectile(Arrow.class);
+        arrow.setVelocity(player.getLocation().getDirection().multiply(1.2D));
+        session.entities.add(arrow);
+        player.playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 0.9F, 1.1F);
+        player.sendMessage(ChatColor.GREEN + "Quickshot!");
+    }
+
     private void handleRunnerFallingBlockHit(Session session, FallingBlock falling, Player target) {
         if (active != session || !session.alive.contains(target.getUniqueId())
                 || !ArcadePortRules.shouldRunnerFallingBlockHit(target.getLocation().getY(), falling.getLocation().getY())
                 || !session.entities.remove(falling)) return;
+        session.runnerFallingBlockExpiresAt.remove(falling.getUniqueId());
         Location impact = falling.getLocation().clone();
         falling.remove();
         Vector recoil = target.getLocation().toVector().subtract(impact.toVector());
@@ -3749,6 +3871,7 @@ public final class ArcadePortManager implements Listener {
                 || !session.entities.contains(falling)) return;
         event.setCancelled(true);
         session.entities.remove(falling);
+        session.runnerFallingBlockExpiresAt.remove(falling.getUniqueId());
         falling.remove();
     }
 
@@ -3843,6 +3966,10 @@ public final class ArcadePortManager implements Listener {
         }
         if (event.getEntity() instanceof Player target && session.players.containsKey(target.getUniqueId())) {
             event.setCancelled(true);
+            if (session.type == ArcadePortGame.RUNNER && event instanceof EntityDamageByEntityEvent runnerDamage) {
+                Entity damager = runnerDamage.getDamager();
+                if (damager instanceof Player || damager instanceof Projectile) return;
+            }
             if (event instanceof EntityDamageByEntityEvent byEntity) {
                 Entity damager = byEntity.getDamager();
                 if (session.type == ArcadePortGame.RUNNER && damager instanceof FallingBlock falling
@@ -3985,6 +4112,23 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
+        if (session.type == ArcadePortGame.RUNNER && event.getEntity() instanceof Snowball snowball
+                && snowball.getShooter() instanceof Player shooter
+                && session.alive.contains(shooter.getUniqueId())
+                && session.players.containsKey(shooter.getUniqueId())
+                && "frosty".equals(session.runnerKits.getOrDefault(shooter.getUniqueId(), "leaper"))) {
+            if (event.getHitEntity() instanceof Player target && session.alive.contains(target.getUniqueId())
+                    && session.players.containsKey(target.getUniqueId())) {
+                target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                        ArcadePortRules.RUNNER_FROSTBALL_SLOW_TICKS,
+                        ArcadePortRules.RUNNER_FROSTBALL_SLOW_AMPLIFIER, false, false, true));
+                target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.7F, 0.8F);
+                target.sendMessage(ChatColor.AQUA + "Frost Ball slowed you!");
+            }
+            snowball.remove();
+            return;
+        }
+
         if (session.type == ArcadePortGame.RUNNER && event.getEntity() instanceof Arrow arrow
                 && arrow.getShooter() instanceof Player shooter && session.alive.contains(shooter.getUniqueId())) {
             Block hit = event.getHitBlock();
@@ -3996,12 +4140,14 @@ public final class ArcadePortManager implements Listener {
                         for (int dz = -2; dz <= 2; dz++) {
                             if (dx * dx + dy * dy + dz * dz > 6.25D) continue;
                             markRunnerBlock(session, session.world.getBlockAt(
-                                    hit.getX() + dx, hit.getY() + dy, hit.getZ() + dz), now);
+                                    hit.getX() + dx, hit.getY() + dy, hit.getZ() + dz), shooter, now);
                         }
                     }
                 }
                 arrow.remove();
             }
+            session.entities.remove(arrow);
+            arrow.remove();
             return;
         }
 
@@ -4047,11 +4193,25 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null) return;
         boolean bombLeftClick = session.type == ArcadePortGame.BOMB_LOBBERS && event.getAction().isLeftClick();
-        if (!event.getAction().isRightClick() && !bombLeftClick) return;
+        boolean runnerLeftClick = session.type == ArcadePortGame.RUNNER && event.getAction().isLeftClick();
+        if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick) return;
         Player player = event.getPlayer();
         if (!session.alive.contains(player.getUniqueId())) return;
         ItemStack heldItem = event.getItem();
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
+        if (session.type == ArcadePortGame.RUNNER) {
+            String kit = session.runnerKits.getOrDefault(player.getUniqueId(), "leaper");
+            if ("leaper".equals(kit) && item == Material.IRON_AXE && event.getAction().isRightClick()) {
+                event.setCancelled(true);
+                useRunnerLeap(session, player, System.currentTimeMillis());
+                return;
+            }
+            if ("archer".equals(kit) && item == Material.BOW && event.getAction().isLeftClick()) {
+                event.setCancelled(true);
+                useRunnerQuickshot(session, player, System.currentTimeMillis());
+                return;
+            }
+        }
         if (session.type == ArcadePortGame.DRAGONS) {
             UUID id = player.getUniqueId();
             String kit = session.dragonKits.getOrDefault(id, "coward");
@@ -4773,6 +4933,12 @@ public final class ArcadePortManager implements Listener {
         String dragonEscapeMapName = "";
         double dragonEscapeSpeedMultiplier = 1.0D;
         final Map<Block, Long> runnerBlocks = new HashMap<>();
+        final Map<Block, Material> runnerBlockMaterials = new HashMap<>();
+        final Map<UUID, String> runnerKits = new HashMap<>();
+        final Map<UUID, Long> runnerLeapReadyAt = new HashMap<>();
+        final Map<UUID, Long> runnerQuickshotReadyAt = new HashMap<>();
+        final Map<UUID, Long> runnerNextFrostBallAt = new HashMap<>();
+        final Map<UUID, Long> runnerFallingBlockExpiresAt = new HashMap<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
         final int participantsAtStart;
         double baconKnockback = 1.5D;

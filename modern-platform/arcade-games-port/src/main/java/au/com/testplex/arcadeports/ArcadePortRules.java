@@ -14,6 +14,12 @@ public final class ArcadePortRules {
     public static final double DRAGON_ESCAPE_BLOCK_RADIUS = 10.0D;
     public static final long RUNNER_BLOCK_DECAY_MILLIS = 600L;
     public static final long RUNNER_BLOCK_LIFETIME_MILLIS = 1_200L;
+    public static final long RUNNER_LEAP_COOLDOWN_MILLIS = 8_000L;
+    public static final long RUNNER_QUICKSHOT_COOLDOWN_MILLIS = 6_000L;
+    public static final long RUNNER_FROSTBALL_INTERVAL_MILLIS = 500L;
+    public static final int RUNNER_MAX_FROSTBALLS = 16;
+    public static final int RUNNER_FROSTBALL_SLOW_TICKS = 40;
+    public static final int RUNNER_FROSTBALL_SLOW_AMPLIFIER = 2;
     public static final long BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS = 50_000L;
     public static final long BACON_MIN_KNOCKBACK_INTERVAL_MILLIS = 5_000L;
     public static final long BACON_HUNGER_INTERVAL_MILLIS = 1_000L;
@@ -190,6 +196,19 @@ public final class ArcadePortRules {
 
     public static boolean shouldDropRunnerBlock(long elapsedMillis) {
         return elapsedMillis >= RUNNER_BLOCK_DECAY_MILLIS;
+    }
+
+    public static String normalizeRunnerKit(String requested) {
+        if (requested == null) return null;
+        String kit = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (kit.startsWith("runnerkit-")) kit = kit.substring("runnerkit-".length());
+        else if (kit.startsWith("runner-")) kit = kit.substring("runner-".length());
+        return switch (kit) {
+            case "leaper" -> "leaper";
+            case "archer" -> "archer";
+            case "frosty" -> "frosty";
+            default -> null;
+        };
     }
 
     /** Reborn only destabilises exposed, non-liquid solid blocks once per trail cycle. */
