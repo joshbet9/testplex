@@ -315,6 +315,9 @@ jobs:
                   "right-click re-applies pad tints after client updates": "refreshTintAfterPadInteraction(final PlayerInteractEvent event)",
                   "repaint retries after delayed block updates": "new long[] {1L, 3L, 6L, 10L}",
                   "right-click objective beacon is cancelled": "boolean objectiveBeacon =",
+
+                  "forces the 1.8 client beacon colour scan immediately": 'new PacketPlayOutUpdateTime(refreshTime, world.getTime(), Boolean.parseBoolean(world.getGameRuleValue("doDaylightCycle")))',
+                  "restores real client world age after refresh": 'new PacketPlayOutUpdateTime(world.getFullTime(), world.getTime(), Boolean.parseBoolean(world.getGameRuleValue("doDaylightCycle")))',
               },
               "Monster Maze": {
                   "persistence opt-in defaults off": 'getBoolean("monstermaze.safe-pad-enhancements.enabled", false)',
@@ -503,10 +506,9 @@ jobs:
                   "Turf Wars cosmetic entry": 'registerGame("turfwars", "Turf Wars"',
                   "Monster Maze source palette defaults": 'case "witch": return "purple"',
                   "beacon swatch reads its own saved colour": 'String beaconSelected = data.getString(base + ".beacon", defaultColour);',
-                  "pad swatch reads its own saved colour": 'String padSelected = data.getString(base + ".safe-pad", defaultColour);',
-                  "a click persists only that swatch": 'data.set(path, parts[2]);',
+                  "pad swatch reads its own saved colour": 'String padSelected = data.getString(base + ".safe-pad", defaultColour);',                  "a click persists only that swatch": 'data.set(path, parts[2]);',
                   "pad and beacon overlays refresh together": 'refreshLiveMonsterMazeColours(player);',
-                  "Mob Set toggles refresh live gameplay": 'refreshLiveMonsterMazeColours(player);',
+                  "Mob Set toggles use their dedicated reconciliation path": 'refreshLiveMonsterMazeMobSets(player);',
               },
               "Map Loader": {
                   "resolves installed map root dynamically": "resolveMapRoot()",

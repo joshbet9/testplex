@@ -62,6 +62,7 @@ import org.bukkit.Color;
 import org.bukkit.Effect;
 import org.bukkit.FireworkEffect;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
@@ -1058,6 +1059,16 @@ public class Maze implements Listener
 		for (SafePad pad : _oldSafePads)
 			if (pad != _safePad && pad != _nextSafePad)
 				pad.refreshViewerCosmeticColours(viewer);
+
+		// Fake glass changes do not invalidate the client's cached beacon beam. Nudge the
+		// client once after all active/preview pad overlays have been sent.
+		if (_safePad != null || _nextSafePad != null)
+		{
+			World padWorld = _safePad != null
+					? _safePad.getLocation().getWorld()
+					: _nextSafePad.getLocation().getWorld();
+			SafePad.refreshBeaconBeamForViewer(viewer, _host.Manager.getPlugin(), padWorld);
+		}
 	}
 
 	private void clearViewerDisguiseOverrides()

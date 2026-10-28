@@ -1049,7 +1049,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                     boolean enabled = isSettingToggleEnabled(player.getUniqueId(), game, feature, setting, option);
                     setSettingToggleEnabled(player.getUniqueId(), game, feature, setting, option, !enabled);
                     if ("monstermaze".equals(game.key) && "mob-sets".equals(setting.key))
-                        refreshLiveMonsterMazeColours(player);
+                        refreshLiveMonsterMazeMobSets(player);
                     player.sendMessage(ChatColor.GREEN + pretty(option) + " is now " + (!enabled ? "enabled" : "disabled") + ".");
                 } else {
                     setSettingChoice(player.getUniqueId(), game, feature, setting, option);
@@ -1187,6 +1187,13 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         ArcadeManager manager = ((Arcade) plugin).getArcadeManager();
         if (manager == null || !(manager.GetGame() instanceof MonsterMaze)) return;
         ((MonsterMaze) manager.GetGame()).refreshSafePadCosmeticsForViewer(player);
+    }
+
+    private void refreshLiveMonsterMazeMobSets(Player player) {
+        if (player == null || !(plugin instanceof Arcade)) return;
+        ArcadeManager manager = ((Arcade) plugin).getArcadeManager();
+        if (manager == null || !(manager.GetGame() instanceof MonsterMaze)) return;
+        ((MonsterMaze) manager.GetGame()).refreshMobSetSettingsForViewer(player);
     }
 
     private World getLobbyWorld() {
