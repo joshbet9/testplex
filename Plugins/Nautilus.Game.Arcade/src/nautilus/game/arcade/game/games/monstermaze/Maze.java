@@ -911,20 +911,31 @@ public class Maze implements Listener
 	{
 		if (player == null || !player.isOnline())
 			return;
+		UUID playerId = player.getUniqueId();
 		String choice = getMobThemeChoiceForPlayer(player);
-		List<String> available = getAvailableMobSets(player.getUniqueId());
+		List<String> available = getAvailableMobSets(playerId);
+		boolean themeChanged = false;
 		if ("random".equals(choice))
 		{
+			String currentConcrete = _viewerMobSetIds.get(playerId);
 			if (available.isEmpty())
+			{
 				applyMobThemeChoice(player, "map_default", true);
-			else
+				themeChanged = true;
+			}
+			else if (currentConcrete == null || !available.contains(currentConcrete))
+			{
 				applyMobThemeChoice(player, "random", false);
+				themeChanged = true;
+			}
 		}
 		else if (!"map_default".equals(choice) && !available.contains(choice))
 		{
 			applyMobThemeChoice(player, "map_default", true);
+			themeChanged = true;
 		}
-		refreshMobDisguisesForViewer(player);
+		if (themeChanged)
+			refreshMobDisguisesForViewer(player);
 		refreshSafePadCosmeticColours(player);
 	}
 
