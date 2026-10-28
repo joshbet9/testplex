@@ -1909,6 +1909,7 @@ public final class ArcadePortManager implements Listener {
         }
         long now = System.currentTimeMillis();
         session.ticks++;
+        updateSourceWaterDamage(session, now);
         if (now >= session.endsAt) {
             if (session.type == ArcadePortGame.SHEEP_QUEST) {
                 Player sheepWinner = sheepQuestLeader(session);
@@ -1980,6 +1981,26 @@ public final class ArcadePortManager implements Listener {
         }
          updateTitles(session);
         checkRoundEnd(session);
+    }
+
+    private void updateSourceWaterDamage(Session session, long now) {
+        SourceMapCatalog.MapData map = sourceMapData.get(session.type.id());
+        int damage = ArcadePortRules.sourceWorldWaterDamage(session.type, map == null ? "" : map.mapName());
+        if (damage <= 0 || now - session.lastWorldWaterDamageAt < 1_000L) return;
+        session.lastWorldWaterDamageAt = now;
+        for (Player player : new ArrayList<>(alivePlayers(session))) {
+            if (!player.isOnline()) continue;
+            boolean inWater = player.getLocation().getBlock().isLiquid()
+                    || player.getEyeLocation().getBlock().isLiquid();
+            if (!inWater) continue;
+            if (player.getHealth() <= damage) {
+                eliminate(session, player, null, "was lost to the water");
+                if (active != session) return;
+            } else {
+                player.setHealth(player.getHealth() - damage);
+                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 0.7F);
+            }
+        }
     }
 
     private void updateBaconBrawl(Session session, long now) {
@@ -5085,6 +5106,7 @@ public final class ArcadePortManager implements Listener {
         final int participantsAtStart;
         double baconKnockback = 1.5D;
         long lastBaconHungerAt;
+        long lastWorldWaterDamageAt;
         long lastBaconEscalationAt;
         long baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
         long startedAt;
