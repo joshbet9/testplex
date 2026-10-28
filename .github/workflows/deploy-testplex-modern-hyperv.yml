@@ -124,11 +124,12 @@ jobs:
           run-id: ${{ inputs.source_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Checkout Monster Maze source world assets
+      - name: Checkout pinned Monster Maze source world assets
         uses: actions/checkout@v4
         with:
           repository: joshbet9/MonsterMaze
-          ref: main
+          # Match the exact 1.21 source revision used for the gameplay port.
+          ref: 231fb1830ca53a3cdd7451391ac3d384a03ec5bb
           path: monstermaze-source
 
       - name: Verify and stage the four JARs and Monster Maze worlds
