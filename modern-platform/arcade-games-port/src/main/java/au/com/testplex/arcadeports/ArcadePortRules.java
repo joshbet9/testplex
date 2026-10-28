@@ -8,21 +8,20 @@ package au.com.testplex.arcadeports;
 public final class ArcadePortRules {
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
     public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
-    private static final int MICRO_BATTLES_BORDER_START_TICK = 600; // 30 seconds
-    private static final int MICRO_BATTLES_BORDER_INTERVAL_TICKS = 400; // 20 seconds
-    private static final double MICRO_BATTLES_BORDER_STEP = 6.0D;
-    private static final double MICRO_BATTLES_BORDER_MINIMUM = 10.0D;
+    public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
+    public static final long MICRO_BATTLES_BARRIER_DURATION_MILLIS = 10_000L;
 
     private ArcadePortRules() {
     }
 
-    public static boolean shouldShrinkMicroBattlesBorder(int elapsedTicks) {
-        return elapsedTicks >= MICRO_BATTLES_BORDER_START_TICK
-                && (elapsedTicks - MICRO_BATTLES_BORDER_START_TICK) % MICRO_BATTLES_BORDER_INTERVAL_TICKS == 0;
+    public static boolean shouldRemoveMicroBarrier(long elapsedMillis) {
+        return elapsedMillis >= MICRO_BATTLES_BARRIER_DURATION_MILLIS;
     }
 
-    public static double nextMicroBattlesBorderSize(double currentSize) {
-        return Math.max(MICRO_BATTLES_BORDER_MINIMUM, currentSize - MICRO_BATTLES_BORDER_STEP);
+    public static boolean shouldPunishMicroIslandExit(long elapsedMillis, double ownDistanceSquared,
+            double nearestOtherDistanceSquared) {
+        return elapsedMillis >= 0L && elapsedMillis < MICRO_BATTLES_CHEAT_WINDOW_MILLIS
+                && nearestOtherDistanceSquared < ownDistanceSquared;
     }
 
     public static boolean isWorldDragonHazard(ArcadePortGame game, boolean trackedEntity, boolean playerOwned) {
