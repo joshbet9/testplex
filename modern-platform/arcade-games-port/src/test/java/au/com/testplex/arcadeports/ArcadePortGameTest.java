@@ -375,6 +375,14 @@ class ArcadePortGameTest {
         assertEquals(10_000L, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
     }
 
+    @Test void dragonEscapeRouteProgressNeverMovesBackAtCourseBends() {
+        assertEquals(0, ArcadePortRules.monotonicDragonEscapeProgress(0, 0, 4));
+        assertEquals(2, ArcadePortRules.monotonicDragonEscapeProgress(2, 1, 4));
+        assertEquals(3, ArcadePortRules.monotonicDragonEscapeProgress(2, 99, 4));
+        assertEquals(0, ArcadePortRules.monotonicDragonEscapeProgress(-1, -99, 4));
+        assertEquals(-1, ArcadePortRules.monotonicDragonEscapeProgress(0, 1, 0));
+    }
+
     @Test void dragonEscapeRouteOnlyDeduplicatesCoincidentWaypoints() {
         assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.0D));
         assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.5D));
