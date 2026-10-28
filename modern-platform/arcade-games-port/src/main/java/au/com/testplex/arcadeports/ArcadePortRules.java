@@ -599,7 +599,22 @@ public final class ArcadePortRules {
     public static final long QUIVER_RESPAWN_DELAY_TICKS = 20L;
     public static final long QUIVER_GROUND_POUND_COOLDOWN_MILLIS = 10_000L;
     public static final long QUIVER_NINJA_VANISH_MILLIS = 1_200L;
-    public static final double QUIVER_REBOUND_MAX_DISTANCE_SQUARED = 1.0D;
+    /** Practical multi-block target-search range for the source's "nearby enemies" chain arrow. */
+    public static final double QUIVER_REBOUND_MAX_DISTANCE_SQUARED = 64.0D;
+    public static final int QUIVER_MAX_ARROW_BOUNCES = 2;
+
+    public static boolean isQuiverReboundTargetInRange(double distanceSquared) {
+        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
+                && distanceSquared <= QUIVER_REBOUND_MAX_DISTANCE_SQUARED;
+    }
+
+    public static boolean shouldQuiverArrowBounce(int remainingBounces) {
+        return remainingBounces > 0;
+    }
+
+    public static int quiverArrowBouncesAfterBounce(int remainingBounces) {
+        return Math.max(0, remainingBounces - 1);
+    }
 
     public static String normalizeQuiverKit(String requested) {
         if (requested == null) return null;
