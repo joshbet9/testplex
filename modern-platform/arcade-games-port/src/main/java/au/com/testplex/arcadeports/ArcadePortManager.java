@@ -3428,10 +3428,13 @@ public final class ArcadePortManager implements Listener {
         } else if (session.type == ArcadePortGame.TURF_WARS) {
             handlePlayerHit(session, shooter, target, "projectile hit");
         } else if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
+            UUID targetId = target.getUniqueId();
             tryQuiverRebound(session, projectile, shooter, target);
             handlePlayerHit(session, shooter, target, "arrow hit");
             projectile.remove();
-            if (active == session && shooter.isOnline() && session.alive.contains(shooter.getUniqueId())) {
+            boolean targetEliminated = !session.alive.contains(targetId);
+            if (active == session && ArcadePortRules.quiverRegrantsArrowAfterHit(targetEliminated)
+                    && shooter.isOnline() && session.alive.contains(shooter.getUniqueId())) {
                 shooter.getInventory().setItem(1, namedItem(Material.ARROW, "Super Arrow",
                         "One arrow per shot; earn another with each kill."));
             }
