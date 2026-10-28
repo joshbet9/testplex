@@ -6,6 +6,7 @@ package au.com.testplex.arcadeports;
  * needing a live Paper server.
  */
 public final class ArcadePortRules {
+    public static final long DRAGON_ESCAPE_HAZARD_INTERVAL_MILLIS = 6_000L;
     public static final long RUNNER_BLOCK_DECAY_MILLIS = 600L;
     public static final long RUNNER_BLOCK_LIFETIME_MILLIS = 1_200L;
     public static final long BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS = 50_000L;
@@ -42,6 +43,10 @@ public final class ArcadePortRules {
 
     public static boolean isWorldDragonHazard(ArcadePortGame game, boolean trackedEntity, boolean playerOwned) {
         return game == ArcadePortGame.DRAGONS && trackedEntity && !playerOwned;
+    }
+
+    public static boolean shouldLaunchDragonEscapeHazard(long nowMillis, long nextLaunchMillis) {
+        return nowMillis >= nextLaunchMillis;
     }
 
     public static boolean isQuiverWinnerScoreReached(int kills) {
