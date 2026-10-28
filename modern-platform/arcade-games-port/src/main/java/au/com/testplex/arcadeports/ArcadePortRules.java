@@ -45,6 +45,7 @@ public final class ArcadePortRules {
     public static final int SPLEEF_SNOWBALLER_MAX_SNOWBALLS = 16;
     public static final long SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS = 6_000L;
     public static final long SPLEEF_SMASHER_COOLDOWN_MILLIS = 250L;
+    public static final long TURF_WARS_INITIAL_BUILD_PHASE_MILLIS = 40_000L;
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
     public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
     public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
