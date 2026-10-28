@@ -629,7 +629,8 @@ public final class ArcadePortManager implements Listener {
             } else {
                 // Solo mechanics test: use an isolated vanilla chaser so Death Tag is still interactive.
                 Player runner = participants.get(0);
-                Zombie chaser = session.world.spawn(new Location(session.world, -9.0D, 64.0D, 0.0D), Zombie.class);
+                Location chaserSpawn = deathTagSoloChaserSpawn(session, runner);
+                Zombie chaser = session.world.spawn(chaserSpawn, Zombie.class);
                 chaser.setCustomName(ChatColor.RED + "Death Tag Test Chaser");
                 chaser.setCustomNameVisible(true);
                 chaser.setRemoveWhenFarAway(false);
@@ -1100,6 +1101,29 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
+    }
+
+    private Location deathTagSoloChaserSpawn(Session session, Player runner) {
+        Location runnerLocation = runner.getLocation();
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (mapData != null) {
+            Location otherSpawn = mapData.spawnLocations().stream()
+                    .filter(spawn -> horizontalDistanceSquared(spawn, runnerLocation) >= 36.0D)
+                    .max(java.util.Comparator.comparingDouble(spawn ->
+                            horizontalDistanceSquared(spawn, runnerLocation)))
+                    .orElse(null);
+            if (otherSpawn != null) return otherSpawn.clone();
+        }
+
+        double direction = runnerLocation.getX() <= 0.0D ? 1.0D : -1.0D;
+        double x = runnerLocation.getX() + direction * 8.0D;
+        double z = runnerLocation.getZ();
+        if (mapData != null && mapData.hasBounds()) {
+            x = Math.max(mapData.minX() + 1.0D, Math.min(mapData.maxX() - 1.0D, x));
+            z = Math.max(mapData.minZ() + 1.0D, Math.min(mapData.maxZ() - 1.0D, z));
+        }
+        return new Location(session.world, x, runnerLocation.getY(), z,
+                runnerLocation.getYaw() + 180.0F, 0.0F);
     }
 
     private void makeDeathTagChaser(Session session, Player player, String reason) {
