@@ -388,6 +388,13 @@ class ArcadePortGameTest {
         assertEquals(10_000L, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
     }
 
+    @Test void dragonEscapeVoidThresholdFollowsLowAltitudeSourceMaps() {
+        assertEquals(58.0D, ArcadePortRules.dragonEscapeVoidThresholdY("Skylands"), 0.00001D);
+        assertEquals(24.0D, ArcadePortRules.dragonEscapeVoidThresholdY("Through Hell"), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.dragonEscapeVoidThresholdY("Pirate Bay"), 0.00001D);
+        assertEquals(58.0D, ArcadePortRules.dragonEscapeVoidThresholdY(null), 0.00001D);
+    }
+
     @Test void dragonEscapeDestructionThrottleChecksNewAreaAfterMovement() {
         assertTrue(ArcadePortRules.shouldProcessDragonEscapeDestruction(0.0D, false));
         assertFalse(ArcadePortRules.shouldProcessDragonEscapeDestruction(0.0D, true));
