@@ -394,11 +394,14 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldPrimeBombLobbersBomb(8_000L, false));
     }
 
-    @Test void baconBrawlOnlyExposesTheThreeRetainedSourceKitsAndDoubleHungerRules() {
+    @Test void baconBrawlExposesTheThreeSourceKitsAndDoubleHungerRules() {
         assertEquals("pig", ArcadePortRules.normalizeBaconBrawlKit("Pig"));
-        assertEquals("mama-pig", ArcadePortRules.normalizeBaconBrawlKit("mama"));
-        assertEquals("mama-pig", ArcadePortRules.normalizeBaconBrawlKit("Mama Pig"));
-        assertEquals("sheep-pig", ArcadePortRules.normalizeBaconBrawlKit("sheep"));
+        assertEquals("pig", ArcadePortRules.normalizeBaconBrawlKit("sheep-pig"));
+        assertEquals("mama-piggles", ArcadePortRules.normalizeBaconBrawlKit("mama"));
+        assertEquals("mama-piggles", ArcadePortRules.normalizeBaconBrawlKit("Mama Pig"));
+        assertEquals("mama-piggles", ArcadePortRules.normalizeBaconBrawlKit("Mama Piggles"));
+        assertEquals("el-muchacho-pigo", ArcadePortRules.normalizeBaconBrawlKit("El Muchacho Pigo"));
+        assertEquals("el-muchacho-pigo", ArcadePortRules.normalizeBaconBrawlKit("body slam"));
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("chris-p-bacon"));
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("unknown"));
         assertEquals(4_000L, ArcadePortRules.BACON_SLOW_UPDATE_INTERVAL_MILLIS);
