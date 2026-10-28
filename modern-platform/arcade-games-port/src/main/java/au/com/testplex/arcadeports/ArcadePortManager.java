@@ -3926,18 +3926,15 @@ public final class ArcadePortManager implements Listener {
     }
 
     private Player topScorerOrLastAlive(Session session) {
+        // Eliminated spectators keep their round score for the final scoreboard, but cannot
+        // win a timeout tie-break. Restrict candidates to players still alive in this round.
         List<Player> alive = alivePlayers(session);
+        if (alive.isEmpty()) return null;
         if (alive.size() == 1) return alive.get(0);
-        UUID best = null;
-        int score = Integer.MIN_VALUE;
-        for (Map.Entry<UUID, Integer> entry : session.scores.entrySet()) {
-            if (entry.getValue() > score) {
-                score = entry.getValue();
-                best = entry.getKey();
-            }
-        }
-        Player top = best == null ? null : session.players.get(best);
-        return top != null && top.isOnline() ? top : alive.stream().findFirst().orElse(null);
+        return alive.stream()
+                .max(java.util.Comparator.comparingInt(player ->
+                        session.scores.getOrDefault(player.getUniqueId(), 0)))
+                .orElse(null);
     }
 
     private void finish(Session session, Player winner, boolean announceWinner) {
