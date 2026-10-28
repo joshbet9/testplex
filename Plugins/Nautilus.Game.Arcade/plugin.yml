@@ -8,3 +8,6 @@ commands:
     aliases: [arcadecosmetic, arcadecosmeticsmenu]
     description: Open the testbed Arcade cosmetic prototypes
     usage: /arcadecosmetics
+  arcadetest:
+    description: Open the isolated Testplex Arcade test bench
+    usage: /arcadetest
