@@ -18,6 +18,7 @@ import org.bukkit.block.Block;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.EnderPearl;
 import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Fireball;
 import org.bukkit.entity.FallingBlock;
