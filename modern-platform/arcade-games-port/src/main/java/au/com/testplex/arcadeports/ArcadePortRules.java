@@ -112,6 +112,14 @@ public final class ArcadePortRules {
         return elapsedMillis < 0L ? 1 : 1 + (int) (elapsedMillis / 30_000L);
     }
 
+    public static boolean shouldSpreadDeathTag(boolean attackerTagged) {
+        return attackerTagged;
+    }
+
+    public static boolean shouldTransferDeathTag(boolean attackerTagged, boolean targetTagged) {
+        return !attackerTagged && targetTagged;
+    }
+
     public static int advanceTurfFrontline(int currentFrontline, int teamId) {
         if (teamId == 0) return currentFrontline + 1;
         if (teamId == 1) return currentFrontline - 1;
