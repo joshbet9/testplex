@@ -454,6 +454,7 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         session.startedAt = now;
         session.endsAt = now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
+                : type == ArcadePortGame.BACON_BRAWL ? ArcadePortRules.BACON_BRAWL_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 600_000L : ROUND_MS);
         session.lastBaconHungerAt = now;
         session.lastBaconSlowUpdateAt = now;
@@ -778,6 +779,17 @@ public final class ArcadePortManager implements Listener {
 
     private List<Location> spawnLocations(ArcadePortGame type, int count) {
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(type.id());
+        if (sourceMap != null && type == ArcadePortGame.BACON_BRAWL) {
+            // Bacon Brawl's source maps define individual starts as GREEN data points.
+            List<Location> authoredSpawns = sourceMap.dataLocations("GREEN");
+            if (!authoredSpawns.isEmpty()) {
+                List<Location> chosen = new ArrayList<>();
+                for (int i = 0; i < Math.max(1, count); i++) {
+                    chosen.add(authoredSpawns.get(i % authoredSpawns.size()).clone());
+                }
+                return chosen;
+            }
+        }
         if (sourceMap != null && type == ArcadePortGame.DRAGON_ESCAPE) {
             // Reborn defines Dragon Escape player starts as GREEN data points, not team spawns.
             List<Location> authoredGreenSpawns = sourceMap.dataLocations("GREEN");
@@ -3337,9 +3349,9 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.participantsAtStart <= 1) return;
-        if (session.type == ArcadePortGame.PAINTBALL || session.type == ArcadePortGame.TURF_WARS
-                || session.type == ArcadePortGame.SHEEP_QUEST || session.type == ArcadePortGame.EVOLUTION
-                || session.type == ArcadePortGame.ONE_IN_THE_QUIVER) return;
+        if (session.type == ArcadePortGame.BACON_BRAWL || session.type == ArcadePortGame.PAINTBALL
+                || session.type == ArcadePortGame.TURF_WARS || session.type == ArcadePortGame.SHEEP_QUEST
+                || session.type == ArcadePortGame.EVOLUTION || session.type == ArcadePortGame.ONE_IN_THE_QUIVER) return;
         if (session.type == ArcadePortGame.DEATH_TAG) {
             List<Player> runners = alivePlayers(session).stream()
                     .filter(p -> !session.tagged.contains(p.getUniqueId()))
@@ -3366,6 +3378,40 @@ public final class ArcadePortManager implements Listener {
 
     private void eliminate(Session session, Player player, Player killer, String reason) {
         if (active != session || player == null) return;
+        if (session.type == ArcadePortGame.BACON_BRAWL
+                && session.alive.contains(player.getUniqueId())) {
+            UUID playerId = player.getUniqueId();
+            clearBaconCloak(session, playerId);
+            session.baconSlams.remove(playerId);
+            session.baconAbilityReadyAt.remove(playerId);
+            if (!session.alive.remove(playerId)) return;
+            if (killer != null && session.scores.containsKey(killer.getUniqueId())) {
+                int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+                killer.sendMessage(ChatColor.GREEN + "Bacon Brawl kill! " + kills + " kills.");
+            }
+            session.respawning.add(playerId);
+            if (player.isOnline()) {
+                player.setGameMode(GameMode.SPECTATOR);
+                player.sendMessage(ChatColor.RED + "Knocked out! Respawning in 1 second.");
+            }
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (active != session || !player.isOnline()
+                        || !session.players.containsKey(playerId) || !session.respawning.remove(playerId)) return;
+                Location spawn = spawnFor(session, player);
+                player.teleport(spawn);
+                player.setGameMode(GameMode.SURVIVAL);
+                player.setHealth(player.getMaxHealth());
+                player.setFoodLevel(20);
+                player.setSaturation(20.0F);
+                player.setFireTicks(0);
+                player.setFallDistance(0.0F);
+                player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+                session.alive.add(playerId);
+                session.lastLocations.put(playerId, spawn.clone());
+                giveKit(session, player);
+            }, ArcadePortRules.BACON_BRAWL_RESPAWN_DELAY_TICKS);
+            return;
+        }
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             clearBaconCloak(session, player.getUniqueId());
         }
@@ -3961,6 +4007,16 @@ public final class ArcadePortManager implements Listener {
      * modes, a personal high score must not announce a losing team as winner.
      */
     private Player timeoutWinner(Session session) {
+        if (session.type == ArcadePortGame.BACON_BRAWL) {
+            List<Player> eligible = session.players.values().stream()
+                    .filter(player -> player != null && player.isOnline())
+                    .toList();
+            List<Integer> kills = eligible.stream()
+                    .map(player -> session.scores.getOrDefault(player.getUniqueId(), 0))
+                    .toList();
+            int leader = ArcadePortRules.baconBrawlUniqueLeaderIndex(kills);
+            return leader < 0 ? null : eligible.get(leader);
+        }
         if (session.type == ArcadePortGame.DEATH_TAG) {
             List<Player> runners = alivePlayers(session).stream()
                     .filter(player -> !session.tagged.contains(player.getUniqueId()))
