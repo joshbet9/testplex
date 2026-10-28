@@ -59,12 +59,12 @@ public final class SnakeGameManager implements Listener {
     private static final String WORLD_NAME = "snake_arena";
     private static final int ARENA_RADIUS = 48;
     private static final int MAX_FOOD = 12;
-    private static final int MAX_HAZARDS = 4;
+    private static final int MAX_HAZARDS = SnakeRules.MAX_HAZARDS;
     private static final int MAX_TAIL_LENGTH = 180;
     private static final int HOTBAR_ROULETTE_SLOT = 8;
     private static final int ROULETTE_STEPS = 12;
-    private static final long FIRST_HAZARD_DELAY_MS = 10_000L;
-    private static final long HAZARD_INTERVAL_MS = 15_000L;
+    private static final long FIRST_HAZARD_DELAY_MS = SnakeRules.FIRST_HAZARD_DELAY_MILLIS;
+    private static final long HAZARD_INTERVAL_MS = SnakeRules.HAZARD_INTERVAL_MILLIS;
     private static final double SEGMENT_SPACING = 1.05D;
 
     private final SnakeModernPlugin plugin;
@@ -487,8 +487,10 @@ public final class SnakeGameManager implements Listener {
         cube.setSize(Math.min(4, hazards.size() + 1));
         cube.setCustomName(ChatColor.GOLD + "Snake Item Box");
         cube.setCustomNameVisible(true);
-        cube.setAI(false);
-        cube.setGravity(false);
+        // Keep the source magma cube's native hop/gravity; only its target-seeking
+        // steering is scripted by moveAndProcessHazards().
+        cube.setAI(true);
+        cube.setGravity(true);
         cube.setSilent(false);
         cube.setRemoveWhenFarAway(false);
         hazards.add(cube);
@@ -510,8 +512,13 @@ public final class SnakeGameManager implements Listener {
             for (SnakeState state : snakes.values()) {
                 if (!state.alive || !state.player.isOnline()) continue;
                 double distance = cube.getLocation().distanceSquared(state.player.getLocation());
-                if (distance < 4.41D) {
-                    if (!state.rouletteActive) beginRoulette(state);
+                if (distance < SnakeRules.HAZARD_CONTACT_RADIUS * SnakeRules.HAZARD_CONTACT_RADIUS) {
+                    if (!SnakeRules.shouldConsumeHazardOnContact(state.rouletteActive)) {
+                        // Reborn leaves this cube in the arena while the current roll finishes.
+                        nearest = null;
+                        break;
+                    }
+                    beginRoulette(state);
                     cube.remove();
                     iterator.remove();
                     nearest = null;
@@ -522,10 +529,14 @@ public final class SnakeGameManager implements Listener {
                     nearest = state;
                 }
             }
-            if (nearest != null && tick % 4 == 0) {
+            if (nearest != null && tick % SnakeRules.HAZARD_STEERING_INTERVAL_TICKS == 0) {
                 Vector direction = nearest.player.getLocation().toVector().subtract(cube.getLocation().toVector());
                 direction.setY(0.0D);
-                if (direction.lengthSquared() > 1.0E-6D) cube.setVelocity(direction.normalize().multiply(0.14D));
+                if (direction.lengthSquared() > 1.0E-6D) {
+                    Vector velocity = direction.normalize().multiply(SnakeRules.HAZARD_STEERING_SPEED);
+                    velocity.setY(cube.getVelocity().getY());
+                    cube.setVelocity(velocity);
+                }
             }
         }
     }
