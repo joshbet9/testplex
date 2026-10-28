@@ -729,6 +729,47 @@ public final class ArcadePortManager implements Listener {
         return new Location(world, x + 0.5D, 64.0D, z + 0.5D);
     }
 
+    private boolean hasGladiatorSourceArenas(Session session) {
+        SourceMapCatalog.MapData data = sourceMapData.get(session.type.id());
+        return data != null
+                && !data.dataLocations(ArcadePortRules.gladiatorsArenaMarkerGroup(session.gladiatorRound)).isEmpty()
+                && data.dataLocations("BLACK").size() >= 2;
+    }
+
+    /** Prefer the actual arena centres in the selected Reborn map; generated centres are test fallback only. */
+    private List<Location> gladiatorArenaCenters(Session session) {
+        if (hasGladiatorSourceArenas(session)) {
+            return sourceMapData.get(session.type.id())
+                    .dataLocations(ArcadePortRules.gladiatorsArenaMarkerGroup(session.gladiatorRound));
+        }
+        List<Location> fallback = new ArrayList<>();
+        for (int i = 0; i < 8; i++) fallback.add(gladiatorArenaCenter(session.world, i));
+        return fallback;
+    }
+
+    /** Reborn marks both combat positions with BLACK; each arena uses its two nearest spawn markers. */
+    private Location[] gladiatorArenaSpawnPair(Session session, Location center, boolean useSourceMap) {
+        if (useSourceMap) {
+            List<Location> candidates = new ArrayList<>(sourceMapData.get(session.type.id()).dataLocations("BLACK"));
+            candidates.sort((left, right) -> Double.compare(
+                    left.distanceSquared(center), right.distanceSquared(center)));
+            Location first = candidates.get(0).clone();
+            Location second = candidates.get(1).clone();
+            first.setDirection(center.toVector().subtract(first.toVector()));
+            second.setDirection(center.toVector().subtract(second.toVector()));
+            first.setPitch(0.0F);
+            second.setPitch(0.0F);
+            return new Location[]{first, second};
+        }
+        Location left = center.clone().add(-2.0D, 0.0D, 0.0D);
+        Location right = center.clone().add(2.0D, 0.0D, 0.0D);
+        left.setYaw(-90.0F);
+        right.setYaw(90.0F);
+        left.setPitch(0.0F);
+        right.setPitch(0.0F);
+        return new Location[]{left, right};
+    }
+
     private void buildGladiatorArena(World world, int arenaSlot, int tier) {
         Location center = gladiatorArenaCenter(world, arenaSlot);
         int cx = center.getBlockX();
@@ -813,17 +854,19 @@ public final class ArcadePortManager implements Listener {
         };
         announce(session, ChatColor.GOLD + "Gladiators — " + roundName + ". Defeat your opponent to advance!");
 
+        boolean useSourceMapArenas = hasGladiatorSourceArenas(session);
+        List<Location> arenaCenters = gladiatorArenaCenters(session);
+
         for (int i = 0; i < advancing.size(); i++) {
             Player player = advancing.get(i);
             int pair = i / 2;
-            int arenaSlot = pair % 8;
+            int arenaSlot = pair % arenaCenters.size();
             session.gladiatorPairs.put(player.getUniqueId(), pair);
-            buildGladiatorArena(session.world, arenaSlot, session.gladiatorRound);
-            Location center = gladiatorArenaCenter(session.world, arenaSlot);
+            if (!useSourceMapArenas) buildGladiatorArena(session.world, arenaSlot, session.gladiatorRound);
+            Location center = arenaCenters.get(arenaSlot);
             boolean left = i % 2 == 0;
-            Location spawn = center.clone().add(left ? -2.0D : 2.0D, 0.0D, 0.0D);
-            spawn.setYaw(left ? -90.0F : 90.0F);
-            spawn.setPitch(0.0F);
+            Location[] combatSpawns = gladiatorArenaSpawnPair(session, center, useSourceMapArenas);
+            Location spawn = combatSpawns[left ? 0 : 1].clone();
             player.leaveVehicle();
             player.teleport(spawn);
             player.setGameMode(GameMode.SURVIVAL);
