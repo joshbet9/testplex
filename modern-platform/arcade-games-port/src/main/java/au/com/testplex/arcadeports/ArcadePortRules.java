@@ -363,6 +363,11 @@ public final class ArcadePortRules {
     public static boolean shouldEnterSheepQuestOvertime(int redSheep, int blueSheep) {
         return redSheep == blueSheep;
     }
+
+    /** Four-team Sheep Quest overtime starts whenever there is no unique leading team. */
+    public static boolean shouldEnterSheepQuestOvertime(int[] teamSheepCounts) {
+        return sheepQuestLeadingTeam(teamSheepCounts) < 0;
+    }
     public static final double SHEEP_QUEST_PLAYER_HIT_DAMAGE = 4.0D;
     public static final int SHEEP_QUEST_INITIAL_SHEEP = 4;
     public static final int SHEEP_QUEST_MAX_CARRY = 3;
