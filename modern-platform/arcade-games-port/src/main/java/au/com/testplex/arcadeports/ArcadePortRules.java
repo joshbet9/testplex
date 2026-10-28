@@ -31,6 +31,12 @@ public final class ArcadePortRules {
         return elapsedMillis >= RUNNER_BLOCK_DECAY_MILLIS;
     }
 
+    public static int spleefProjectileClearRadius(boolean arrow, double velocity) {
+        if (!arrow) return 1;
+        double safeVelocity = Math.max(0.0D, velocity);
+        return Math.max(1, Math.min(3, (int) Math.ceil(0.5D + safeVelocity / 1.6D)));
+    }
+
     public static long nextBaconKnockbackInterval(long currentMillis) {
         return Math.max(BACON_MIN_KNOCKBACK_INTERVAL_MILLIS, currentMillis - 5_000L);
     }
