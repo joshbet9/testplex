@@ -138,6 +138,8 @@ public final class SourceMapCatalog {
                     case "MAX_X" -> { data.maxX = parseInt(value, data.maxX); data.hasMaxX = true; }
                     case "MIN_Z" -> { data.minZ = parseInt(value, data.minZ); data.hasMinZ = true; }
                     case "MAX_Z" -> { data.maxZ = parseInt(value, data.maxZ); data.hasMaxZ = true; }
+                    case "MIN_Y" -> { data.minY = parseInt(value, data.minY); data.hasMinY = true; }
+                    case "MAX_Y" -> { data.maxY = parseInt(value, data.maxY); data.hasMaxY = true; }
                     case "TEAM_NAME" -> {
                         currentTeam = value.isEmpty() ? "Unassigned" : value;
                         data.teamSpawns.computeIfAbsent(currentTeam, ignored -> new ArrayList<>());
@@ -163,8 +165,8 @@ public final class SourceMapCatalog {
 
     public static final class MapData {
         private String mapName = "Unknown";
-        private boolean hasMinX, hasMaxX, hasMinZ, hasMaxZ;
-        private int minX = -40, maxX = 40, minZ = -40, maxZ = 40;
+        private boolean hasMinX, hasMaxX, hasMinZ, hasMaxZ, hasMinY, hasMaxY;
+        private int minX = -40, maxX = 40, minZ = -40, maxZ = 40, minY = 0, maxY = 128;
         private final Map<String, List<Location>> teamSpawns = new LinkedHashMap<>();
         private final Map<String, List<Location>> dataLocations = new LinkedHashMap<>();
         private final Map<String, List<Location>> customLocations = new LinkedHashMap<>();
@@ -190,6 +192,13 @@ public final class SourceMapCatalog {
 
         public String mapName() { return mapName; }
         public boolean hasBounds() { return hasMinX && hasMaxX && hasMinZ && hasMaxZ; }
+        public boolean hasVerticalBounds() { return hasMinY && hasMaxY && maxY >= minY; }
+        public int minX() { return minX; }
+        public int maxX() { return maxX; }
+        public int minZ() { return minZ; }
+        public int maxZ() { return maxZ; }
+        public int minY() { return minY; }
+        public int maxY() { return maxY; }
         public double centerX() { return (minX + maxX) / 2.0D; }
         public double centerZ() { return (minZ + maxZ) / 2.0D; }
         public double width() { return Math.max(1, maxX - minX); }

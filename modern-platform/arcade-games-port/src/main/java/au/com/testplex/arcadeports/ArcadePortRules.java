@@ -41,6 +41,8 @@ public final class ArcadePortRules {
     public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
     public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
     public static final long MICRO_BATTLES_BARRIER_DURATION_MILLIS = 10_000L;
+    public static final int MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK = 3;
+    public static final int MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS = 2;
     public static final long MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS = 20_000L;
     public static final int MICRO_BATTLES_FLETCHER_MAX_ARROWS = 3;
 

@@ -377,6 +377,17 @@ public final class ArcadePortManager implements Listener {
         session.baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
         session.microBarrierActive = type == ArcadePortGame.MICRO_BATTLES;
         SourceMapCatalog.MapData microSourceMap = sourceMapData.get(type.id());
+        if (type == ArcadePortGame.MICRO_BATTLES) {
+            session.microCrumbleMinX = microSourceMap == null ? -HALF_SIZE : microSourceMap.minX();
+            session.microCrumbleMaxX = microSourceMap == null ? HALF_SIZE : microSourceMap.maxX();
+            session.microCrumbleMinZ = microSourceMap == null ? -HALF_SIZE : microSourceMap.minZ();
+            session.microCrumbleMaxZ = microSourceMap == null ? HALF_SIZE : microSourceMap.maxZ();
+            session.microCrumbleMinY = microSourceMap == null ? 0
+                    : microSourceMap.hasVerticalBounds() ? microSourceMap.minY() : 0;
+            session.microCrumbleMaxY = microSourceMap == null ? 96
+                    : microSourceMap.hasVerticalBounds() ? microSourceMap.maxY() : 128;
+            session.microCrumbleScanY = session.microCrumbleMinY;
+        }
         if (type == ArcadePortGame.MICRO_BATTLES && microSourceMap != null) {
             for (Location marker : microSourceMap.customLocations("20")) {
                 Block barrier = marker.getBlock();
@@ -1222,6 +1233,66 @@ public final class ArcadePortManager implements Listener {
         session.quiverArrowBounces.put(rebound.getUniqueId(), 0);
     }
 
+    private void updateMicroCrumble(Session session, long now) {
+        if (active != session || session.type != ArcadePortGame.MICRO_BATTLES) return;
+
+        // Source MapCrumbleModule scans the arena vertically in two-tick slices.
+        if (!session.microCrumbleScanComplete
+                && session.ticks % ArcadePortRules.MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS == 0) {
+            int y = session.microCrumbleScanY;
+            for (int x = session.microCrumbleMinX; x < session.microCrumbleMaxX; x++) {
+                for (int z = session.microCrumbleMinZ; z < session.microCrumbleMaxZ; z++) {
+                    Block block = session.world.getBlockAt(x, y, z);
+                    if (!block.getType().isAir()) session.microCrumbleBlocks.add(block);
+                }
+            }
+            session.microCrumbleScanY++;
+            if (session.microCrumbleScanY > session.microCrumbleMaxY) {
+                session.microCrumbleScanComplete = true;
+                plugin.getLogger().info("Micro Battles source map scan completed with "
+                        + session.microCrumbleBlocks.size() + " crumble candidates.");
+            }
+        }
+
+        // Reborn starts crumbling after one second and removes three blocks per tick,
+        // prioritising blocks furthest from the map's spectator/centre location.
+        if (now - session.startedAt < 1_000L || session.microCrumbleBlocks.isEmpty()) return;
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        double centerX = mapData == null ? 0.0D : mapData.centerX();
+        double centerZ = mapData == null ? 0.0D : mapData.centerZ();
+        for (int i = 0; i < ArcadePortRules.MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK; i++) {
+            Block best = null;
+            double farthest = -1.0D;
+            for (Block candidate : session.microCrumbleBlocks) {
+                double dx = candidate.getX() + 0.5D - centerX;
+                double dz = candidate.getZ() + 0.5D - centerZ;
+                double distanceSquared = dx * dx + dz * dz;
+                if (best == null || distanceSquared > farthest) {
+                    best = candidate;
+                    farthest = distanceSquared;
+                }
+            }
+            if (best == null) break;
+
+            int minimumY = Math.max(0, session.microCrumbleMinY);
+            while (best.getY() > minimumY && !best.getRelative(0, -1, 0).getType().isAir()) {
+                best = best.getRelative(0, -1, 0);
+            }
+            session.microCrumbleBlocks.remove(best);
+            if (best.getType().isAir()) continue;
+
+            String materialName = best.getType().name();
+            if (materialName.endsWith("_DOOR")) best.getRelative(0, 1, 0).setType(Material.AIR, false);
+            if (ThreadLocalRandom.current().nextDouble() > 0.95D) {
+                FallingBlock falling = session.world.spawnFallingBlock(
+                        best.getLocation().add(0.5D, 0.5D, 0.5D), best.getBlockData());
+                falling.setDropItem(false);
+                session.entities.add(falling);
+            }
+            best.setType(Material.AIR, false);
+        }
+    }
+
     private int countNamedItems(Player player, Material material, String expectedName) {
         int count = 0;
         for (ItemStack item : player.getInventory().getContents()) {
@@ -1533,6 +1604,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             enforceMicroBattlesHunger(session);
             updateMicroBattlesArrows(session, now);
+            updateMicroCrumble(session, now);
         }
         if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) updateQuiverKit(session, now);
         if (session.type == ArcadePortGame.DRAGONS && session.ticks % 4 == 0) updateTestDragons(session, now);
@@ -3705,11 +3777,13 @@ public final class ArcadePortManager implements Listener {
             handleSpleefBlockHit(session, event.getPlayer(), event.getBlock(), System.currentTimeMillis());
             return;
         }
-        if (session.type == ArcadePortGame.MICRO_BATTLES && session.alive.contains(event.getPlayer().getUniqueId())
-                && event.getBlock().getType() == Material.COBBLESTONE && event.getBlock().getY() >= 64
-                && event.getBlock().getY() <= 72) {
-            event.setDropItems(false);
-            event.setExpToDrop(0);
+        if (session.type == ArcadePortGame.MICRO_BATTLES
+                && session.alive.contains(event.getPlayer().getUniqueId())) {
+            if (session.microBarrierBlocks.contains(event.getBlock())) {
+                event.setCancelled(true);
+                return;
+            }
+            session.microCrumbleBlocks.remove(event.getBlock());
             return;
         }
         if (session.type == ArcadePortGame.TURF_WARS && session.alive.contains(event.getPlayer().getUniqueId())) {
@@ -3741,12 +3815,16 @@ public final class ArcadePortManager implements Listener {
         if (session == null || event.getBlock().getWorld() != session.world) return;
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             Player player = event.getPlayer();
-            boolean allowed = session.alive.contains(player.getUniqueId())
-                    && event.getBlockPlaced().getType() == Material.COBBLESTONE
-                    && event.getBlockPlaced().getY() >= 64 && event.getBlockPlaced().getY() <= 72
-                    && Math.abs(event.getBlockPlaced().getX()) <= HALF_SIZE
-                    && Math.abs(event.getBlockPlaced().getZ()) <= HALF_SIZE;
+            Block placed = event.getBlockPlaced();
+            boolean insideSourceBounds = placed.getX() >= session.microCrumbleMinX
+                    && placed.getX() < session.microCrumbleMaxX
+                    && placed.getZ() >= session.microCrumbleMinZ
+                    && placed.getZ() < session.microCrumbleMaxZ;
+            boolean allowed = session.alive.contains(player.getUniqueId()) && insideSourceBounds
+                    && placed.getY() > Math.max(0, session.microCrumbleMinY)
+                    && placed.getY() < session.world.getMaxHeight();
             if (!allowed) event.setCancelled(true);
+            else session.microCrumbleBlocks.add(placed);
             return;
         }
         if (session.type == ArcadePortGame.TURF_WARS) {
@@ -4153,6 +4231,10 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> microKits = new HashMap<>();
         final Map<UUID, Long> microNextArrowAt = new HashMap<>();
         final Set<UUID> microFletchedArrows = new HashSet<>();
+        final Set<Block> microCrumbleBlocks = new HashSet<>();
+        int microCrumbleMinX = -20, microCrumbleMaxX = 20, microCrumbleMinZ = -20, microCrumbleMaxZ = 20;
+        int microCrumbleMinY, microCrumbleMaxY = 96, microCrumbleScanY;
+        boolean microCrumbleScanComplete;
         final Map<UUID, String> quiverKits = new HashMap<>();
         final Map<UUID, Integer> quiverArrowBounces = new HashMap<>();
         final Map<UUID, Long> quiverCloakedUntil = new HashMap<>();

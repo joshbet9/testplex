@@ -151,6 +151,8 @@ class ArcadePortGameTest {
         assertNull(ArcadePortRules.normalizeMicroBattlesKit("unknown"));
         assertEquals(20_000L, ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
         assertEquals(3, ArcadePortRules.MICRO_BATTLES_FLETCHER_MAX_ARROWS);
+        assertEquals(3, ArcadePortRules.MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK);
+        assertEquals(2, ArcadePortRules.MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS);
         assertTrue(ArcadePortRules.shouldReplenishMicroArrow(20_000L, 20_000L, 2, 3));
         assertFalse(ArcadePortRules.shouldReplenishMicroArrow(19_999L, 20_000L, 2, 3));
         assertFalse(ArcadePortRules.shouldReplenishMicroArrow(20_000L, 20_000L, 3, 3));
