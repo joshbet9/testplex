@@ -206,4 +206,14 @@ class ArcadePortGameTest {
         assertEquals(1.5D, ArcadePortRules.initialBaconKnockback(3), 0.00001D);
     }
 
+    @Test void sheepQuestUsesFourInitialSheepAndThreeSheepStacks() {
+        assertEquals(4, ArcadePortRules.SHEEP_QUEST_INITIAL_SHEEP);
+        assertEquals(3, ArcadePortRules.SHEEP_QUEST_MAX_CARRY);
+        assertEquals(20_000L, ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS);
+        assertTrue(ArcadePortRules.canCarryAnotherSheep(0));
+        assertTrue(ArcadePortRules.canCarryAnotherSheep(2));
+        assertFalse(ArcadePortRules.canCarryAnotherSheep(3));
+        assertFalse(ArcadePortRules.canCarryAnotherSheep(-1));
+    }
+
 }
