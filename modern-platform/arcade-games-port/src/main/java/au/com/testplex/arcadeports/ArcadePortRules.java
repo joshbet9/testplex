@@ -96,6 +96,10 @@ public final class ArcadePortRules {
         return remainingPieces <= 0;
     }
 
+    public static double paintballHealthAfterHit(int remainingPieces) {
+        return Math.max(2.0D, Math.max(0, remainingPieces) * 5.0D + 1.0D);
+    }
+
     public static boolean isBombDirectHit(double distanceSquared) {
         return distanceSquared >= 0.0D && distanceSquared <= 1.0D;
     }
