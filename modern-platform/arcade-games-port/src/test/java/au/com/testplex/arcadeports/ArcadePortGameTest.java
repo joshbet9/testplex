@@ -545,6 +545,15 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.teamWithBestTimeoutStanding(2, 2, 4, 4));
     }
 
+    @Test void deathTagLightsAlternateBetweenGoldAndWhiteWool() {
+        assertEquals(org.bukkit.Material.WHITE_WOOL,
+                ArcadePortRules.deathTagNextLightMaterial(org.bukkit.Material.GOLD_BLOCK));
+        assertEquals(org.bukkit.Material.GOLD_BLOCK,
+                ArcadePortRules.deathTagNextLightMaterial(org.bukkit.Material.WHITE_WOOL));
+        assertEquals(org.bukkit.Material.GOLD_BLOCK,
+                ArcadePortRules.deathTagNextLightMaterial(org.bukkit.Material.GLOWSTONE));
+    }
+
     @Test void gladiatorsStartingTierScalesWithLobbySize() {
         assertEquals(3, ArcadePortRules.gladiatorsStartingTierForPlayers(1));
         assertEquals(3, ArcadePortRules.gladiatorsStartingTierForPlayers(2));
