@@ -2648,7 +2648,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> paintballKits = new HashMap<>();
         final Map<UUID, Long> paintballLastShotAt = new HashMap<>();
         final Map<UUID, Integer> paintProjectileDamage = new HashMap<>();
-        final Map<UUID, Integer> evolutionLevels = new HashMap<>
+        final Map<UUID, Integer> evolutionLevels = new HashMap<>();
         final Map<Block, Long> evolutionWebs = new HashMap<>();
         final Map<UUID, Integer> gladiatorPairs = new HashMap<>();
         final Set<Integer> gladiatorResolvedPairs = new HashSet<>();
