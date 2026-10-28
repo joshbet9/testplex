@@ -559,12 +559,13 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldFinishDeathTagRound(0, 2));
     }
 
-    @Test void bombLobbersDamageRespectsLegacyArmorPoints() {
+    @Test void bombLobbersDamageRespectsLegacyDamageDependentArmorReduction() {
         assertEquals(10.0D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 0.0D), 0.00001D);
-        assertEquals(7.2D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 7.0D), 0.00001D);
-        assertEquals(5.2D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 12.0D), 0.00001D);
-        assertEquals(4.0D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 15.0D), 0.00001D);
-        assertEquals(2.0D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 25.0D), 0.00001D);
+        assertEquals(9.2D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 7.0D), 0.00001D);
+        assertEquals(7.2D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 12.0D), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 15.0D), 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 20.0D), 0.00001D);
+        assertEquals(9.6D, ArcadePortRules.bombLobbersDamageAfterArmor(1.0D, 15.0D), 0.00001D);
         assertEquals(0.0D, ArcadePortRules.bombLobbersDamageAfterArmor(-1.0D, 15.0D), 0.00001D);
         assertEquals(10.0D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, -5.0D), 0.00001D);
     }
