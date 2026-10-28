@@ -474,9 +474,7 @@ public final class ArcadePortManager implements Listener {
         lastSheepSpawn = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
         if (type == ArcadePortGame.DRAGON_ESCAPE) spawnDragonEscapeDragon(session);
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(type.id());
-        world.setTime(type == ArcadePortGame.DRAGON_ESCAPE
-                ? ArcadePortRules.dragonEscapeWorldTime(sourceMap == null ? "" : sourceMap.mapName())
-                : 6000L);
+        world.setTime(ArcadePortRules.sourceWorldTime(type, sourceMap == null ? "" : sourceMap.mapName()));
         world.setStorm(false);
         world.setThundering(false);
         WorldBorder border = world.getWorldBorder();
