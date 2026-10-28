@@ -191,7 +191,7 @@ public class GameManager implements Listener {
 
     /** True for any mode that receives gameplay QOL fixes (everything except Original). */
     public boolean qolEnabled() {
-        return mode != MazeMode.ORIGINAL;
+        return mode.qolEnabled();
     }
 
     // -------------------- Start / Stop --------------------
@@ -515,10 +515,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
      *  Modern:  35 -> 15 floor, reached by stage 10.
      */
     private int stageTimer(int stage) {
-        if (mode == MazeMode.MODERN) {
-            return Math.max(15, 35 - ((stage - 1) * 20 / 9));
-        }
-        return Math.max(15, 60 - ((stage - 1) * 2));
+        return mode.stageTimerSeconds(stage);
     }
 
     private void decrementPhaseTime() {
@@ -558,7 +555,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 }
             }
 
-            monsterManager.spawnMore(getMode() == MazeMode.MODERN ? 30 : 15);
+            monsterManager.spawnMore(getMode().additionalMonstersPerSafePad());
             stopSafePad();
             playersOnPad.clear();
             padLockIns.clear();
