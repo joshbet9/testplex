@@ -48,6 +48,11 @@ public enum MazeMode {
         return this == MODERN ? 30 : 15;
     }
 
+    /** Speed restores the old 1.8 speeding feel; Modern keeps its boost, Classic opts out. */
+    public boolean speedBoostEnabled() {
+        return this == SPEED || this == MODERN;
+    }
+
     public static MazeMode byName(String name) {
         if (name == null) return null;
         for (MazeMode m : values()) {
