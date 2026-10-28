@@ -419,7 +419,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         lastCompassTargets.clear();
         playersOnPad.clear();
         destroyAllPads();
-        List<Player> arenaPlayers = getArenaWorldPlayers();
+        List<Player> arenaPlayers = getRoundPlayersForCleanup();
         mazeGenerator.returnToLobby();
         scoreboard.clear(arenaPlayers);
 
@@ -953,6 +953,21 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
     static boolean isInArenaWorld(World arenaWorld, World playerWorld) {
         return arenaWorld != null && playerWorld != null && arenaWorld == playerWorld;
+    }
+
+    /** Round participants still need their temporary state restored if they leave the arena world. */
+    private List<Player> getRoundPlayersForCleanup() {
+        Map<UUID, Player> players = new HashMap<UUID, Player>();
+        for (Player player : getArenaWorldPlayers()) players.put(player.getUniqueId(), player);
+        for (UUID id : alive) {
+            Player player = Bukkit.getPlayer(id);
+            if (player != null && player.isOnline()) players.put(id, player);
+        }
+        for (UUID id : spectators) {
+            Player player = Bukkit.getPlayer(id);
+            if (player != null && player.isOnline()) players.put(id, player);
+        }
+        return new ArrayList<Player>(players.values());
     }
 
     private void titleArenaPlayers(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
