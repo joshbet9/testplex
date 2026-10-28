@@ -375,6 +375,12 @@ public final class ArcadePortRules {
         return carriedCount >= 0 && carriedCount < SHEEP_QUEST_MAX_CARRY;
     }
 
+    /** Source Sheep Quest slows carriers progressively, up to the three-sheep limit. */
+    public static int sheepQuestCarrySlownessAmplifier(int carriedCount) {
+        if (carriedCount <= 0) return -1;
+        return Math.min(SHEEP_QUEST_MAX_CARRY - 1, carriedCount - 1);
+    }
+
 
     public static final long PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS = 250L;
     public static final double PAINTBALL_SAVE_ME_RADIUS = 3.0D;
