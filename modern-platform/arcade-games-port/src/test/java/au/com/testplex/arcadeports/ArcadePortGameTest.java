@@ -312,6 +312,23 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.nextSpleefSlowDamageData(14));
     }
 
+    @Test void spleefSlowDamageMatchesLegacyColourDataTransitions() {
+        assertEquals(org.bukkit.Material.YELLOW_WOOL,
+                ArcadePortRules.nextSpleefSlowDamageMaterial(org.bukkit.Material.LIME_WOOL));
+        assertEquals(org.bukkit.Material.YELLOW_WOOL,
+                ArcadePortRules.nextSpleefSlowDamageMaterial(org.bukkit.Material.GREEN_WOOL));
+        assertEquals(org.bukkit.Material.RED_WOOL,
+                ArcadePortRules.nextSpleefSlowDamageMaterial(org.bukkit.Material.YELLOW_WOOL));
+        assertNull(ArcadePortRules.nextSpleefSlowDamageMaterial(org.bukkit.Material.RED_WOOL));
+        assertNull(ArcadePortRules.nextSpleefSlowDamageMaterial(org.bukkit.Material.ORANGE_WOOL));
+        assertNull(ArcadePortRules.nextSpleefSlowDamageMaterial(org.bukkit.Material.BLUE_WOOL));
+        assertEquals(org.bukkit.Material.YELLOW_TERRACOTTA,
+                ArcadePortRules.nextSpleefSlowDamageMaterial(org.bukkit.Material.LIME_TERRACOTTA));
+        assertEquals(org.bukkit.Material.RED_TERRACOTTA,
+                ArcadePortRules.nextSpleefSlowDamageMaterial(org.bukkit.Material.YELLOW_TERRACOTTA));
+        assertNull(ArcadePortRules.nextSpleefSlowDamageMaterial(org.bukkit.Material.ORANGE_TERRACOTTA));
+    }
+
     @Test void spleefOnlyAcceptsSourceFloorMaterialsAsBreakable() {
         assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.SNOW_BLOCK));
         assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.LIGHT_BLUE_WOOL));
