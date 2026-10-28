@@ -407,8 +407,21 @@ public final class ArcadePortRules {
         };
     }
 
+    /** Map/game-specific time overrides; all unconfigured source games inherit Game.WorldTimeSet=12000. */
+    public static long sourceWorldTime(ArcadePortGame game, String mapName) {
+        if (game == null) return 12_000L;
+        return switch (game) {
+            case BOMB_LOBBERS -> mapName != null && mapName.equalsIgnoreCase("Intergalactic")
+                    ? 18_000L : 6_000L;
+            case SHEEP_QUEST -> 2_000L;
+            case DRAGON_ESCAPE -> mapName != null
+                    && mapName.toLowerCase(java.util.Locale.ROOT).contains("hell") ? 16_000L : 12_000L;
+            default -> 12_000L;
+        };
+    }
+
     public static long dragonEscapeWorldTime(String mapName) {
-        return mapName != null && mapName.contains("Hell") ? 16_000L : 6_000L;
+        return sourceWorldTime(ArcadePortGame.DRAGON_ESCAPE, mapName);
     }
 
     /** The source game finishes near its final map waypoint, not anywhere on a Z plane. */
