@@ -1683,7 +1683,13 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onRunnerFallingBlockLand(EntityChangeBlockEvent event) {
         Session session = active;
-        if (session == null || session.type != ArcadePortGame.RUNNER
+        if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.DRAGONS
+                && event.getEntity() instanceof EnderDragon dragon && session.entities.contains(dragon)) {
+            event.setCancelled(true);
+            return;
+        }
+        if (session.type != ArcadePortGame.RUNNER
                 || !(event.getEntity() instanceof FallingBlock falling)
                 || !session.entities.contains(falling)) return;
         event.setCancelled(true);
