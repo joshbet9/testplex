@@ -1393,7 +1393,6 @@ public class Maze implements Listener
 
 				// The timeout is authoritative. A mob collision or ability in this same tick must
 				// not let a player evade map damage by moving away before the damage event resolves.
-				double healthBefore = p.getHealth();
 				try
 				{
 					_host.Manager.GetDamage().NewDamageEvent(p, null, null,
@@ -1405,10 +1404,10 @@ public class Maze implements Listener
 					Bukkit.getLogger().warning("[MonsterMaze] Map-damage event failed for " + p.getName()
 							+ ": " + failure.getClass().getSimpleName());
 				}
-				if (_host.IsAlive(p) && p.isOnline() && !p.isDead() && p.getHealth() >= healthBefore)
+				if (_host.IsAlive(p) && p.isOnline() && !p.isDead() && p.getHealth() > 0.0D)
 				{
-					// Custom damage is occasionally cancelled by unrelated handlers. Bypass that
-					// cancellation at the end-of-stage boundary so a missed pad always eliminates.
+					// Custom damage is occasionally cancelled or reduced by unrelated handlers.
+					// Enforce elimination at the stage boundary even if the damage event partially applies.
 					try { p.setHealth(0.0D); } catch (IllegalArgumentException ignored) { }
 				}
 				UtilTextMiddle.display("", C.cRed + C.Bold + "You weren't on the Safe Pad!", 5, 40, 5, p);
