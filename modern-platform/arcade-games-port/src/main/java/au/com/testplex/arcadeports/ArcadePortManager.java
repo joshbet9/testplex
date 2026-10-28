@@ -1440,8 +1440,13 @@ public final class ArcadePortManager implements Listener {
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
             String kit = session.quiverKits.getOrDefault(id, "leaper");
-            if ("leaper".equals(kit) && player.isOnGround() && !player.getAllowFlight()) {
-                player.setAllowFlight(true);
+            if ("leaper".equals(kit)) {
+                boolean awaitingLanding = session.quiverLeapAwaitingLanding.contains(id);
+                if (ArcadePortRules.shouldRearmQuiverLeap(
+                        player.isOnGround(), awaitingLanding, player.getVelocity().getY())) {
+                    session.quiverLeapAwaitingLanding.remove(id);
+                    if (!player.getAllowFlight()) player.setAllowFlight(true);
+                }
             }
             Long cloakedUntil = session.quiverCloakedUntil.get(id);
             if (cloakedUntil != null && now >= cloakedUntil) clearQuiverCloak(session, id);
@@ -5424,6 +5429,7 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(player.getUniqueId())
                 || !"leaper".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))) return;
         event.setCancelled(true);
+        session.quiverLeapAwaitingLanding.add(player.getUniqueId());
         player.setFlying(false);
         player.setAllowFlight(false);
         Vector direction = player.getLocation().getDirection().normalize().multiply(0.9D);
@@ -5634,6 +5640,7 @@ public final class ArcadePortManager implements Listener {
         boolean microCrumbleScanComplete;
         final Map<UUID, String> quiverKits = new HashMap<>();
         final Map<UUID, Integer> quiverArrowBounces = new HashMap<>();
+        final Set<UUID> quiverLeapAwaitingLanding = new HashSet<>();
         final Map<UUID, Long> quiverCloakedUntil = new HashMap<>();
         final Map<UUID, Long> quiverGroundPoundReadyAt = new HashMap<>();
         long lastSpleefHungerAt;
