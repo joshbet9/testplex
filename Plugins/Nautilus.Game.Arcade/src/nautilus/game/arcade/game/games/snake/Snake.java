@@ -341,8 +341,10 @@ public class Snake extends SoloGame
 
 		if (now >= _nextMagmaHazardAt && _magmaCubes.size() < MAX_MAGMA_HAZARDS)
 		{
-			spawnMagmaCubeHazard();
-			_nextMagmaHazardAt = now + MAGMA_HAZARD_INTERVAL_MS;
+			boolean spawned = spawnMagmaCubeHazard();
+			// Retry shortly if the current map has no safe, loaded floor point near the
+			// players. Do not announce or consume a full interval for a failed spawn.
+			_nextMagmaHazardAt = now + (spawned ? MAGMA_HAZARD_INTERVAL_MS : 5000L);
 		}
 	}
 
@@ -423,25 +425,53 @@ public class Snake extends SoloGame
 		return Math.max(min, Math.min(max, value));
 	}
 
-	/** Spawns a progressively larger visible hazard away from the nearest player's current position. */
-	private void spawnMagmaCubeHazard()
+	/**
+	 * Spawns a progressively larger visible hazard on a real floor tile near the edge
+	 * of the play area. The previous random X/Z + player's current Y could put the cube
+	 * inside a wall or over the void; the chat announcement then looked like a random
+	 * text-only Mario-Kart event even though the entity had no usable spawn point.
+	 */
+	private boolean spawnMagmaCubeHazard()
 	{
 		ArrayList<Player> players = GetPlayers(true);
-		if (players.isEmpty() || GetTeamList().isEmpty() || GetTeamList().get(0).GetSpawns().isEmpty())
-			return;
+		if (players.isEmpty())
+			return false;
 
 		Player target = players.get((int) (Math.random() * players.size()));
 		Location center = GetSpectatorLocation();
-		if (center == null || center.getWorld() == null) center = GetTeamList().get(0).GetSpawns().get(0).clone();
+		if (center == null || center.getWorld() == null || !center.getWorld().equals(target.getWorld()))
+		{
+			if (!GetTeamList().isEmpty() && !GetTeamList().get(0).GetSpawns().isEmpty())
+				center = GetTeamList().get(0).GetSpawns().get(0).clone();
+			else
+				center = target.getLocation().clone();
+		}
 
-		double angle = Math.random() * Math.PI * 2.0;
-		double distance = 22.0 + (_magmaCubes.size() * 3.0);
-		double x = target.getLocation().getX() + Math.cos(angle) * distance;
-		double z = target.getLocation().getZ() + Math.sin(angle) * distance;
-		x = Math.max(center.getX() - 45.0, Math.min(center.getX() + 45.0, x));
-		z = Math.max(center.getZ() - 45.0, Math.min(center.getZ() + 45.0, z));
-		Location spawn = new Location(target.getWorld(), x, target.getLocation().getY(), z);
-		MagmaCube cube = target.getWorld().spawn(spawn, MagmaCube.class);
+		Location spawn = findMagmaCubeSpawn(target, center);
+		if (spawn == null)
+		{
+			Manager.getPlugin().getLogger().warning("[Snake] Could not find a clear floor tile for a Magma Cube hazard; retrying soon.");
+			return false;
+		}
+
+		MagmaCube cube;
+		try
+		{
+			cube = spawn.getWorld().spawn(spawn, MagmaCube.class);
+		}
+		catch (RuntimeException ex)
+		{
+			Manager.getPlugin().getLogger().warning("[Snake] Magma Cube spawn failed: " + ex.getMessage());
+			return false;
+		}
+		if (cube == null || !cube.isValid() || cube.isDead())
+		{
+			if (cube != null && cube.isValid())
+				cube.remove();
+			Manager.getPlugin().getLogger().warning("[Snake] Bukkit did not create a valid Magma Cube hazard.");
+			return false;
+		}
+
 		cube.setSize(Math.min(4, _magmaCubes.size() + 1));
 		cube.setCustomName(ChatColor.RED + "Snake Hazard");
 		cube.setCustomNameVisible(false);
@@ -452,9 +482,57 @@ public class Snake extends SoloGame
 		for (Player player : GetPlayers(true))
 		{
 			player.sendMessage(ChatColor.RED + "" + ChatColor.BOLD + "MAGMA CUBE! "
-					+ ChatColor.GRAY + "A size " + cube.getSize() + " hazard has entered the arena (" + count + "/" + MAX_MAGMA_HAZARDS + ").");
+					+ ChatColor.GRAY + "A size " + cube.getSize() + " hazard has spawned in the arena ("
+					+ count + "/" + MAX_MAGMA_HAZARDS + ").");
 			player.playSound(player.getLocation(), Sound.MAGMACUBE_JUMP, 0.8f, 0.8f);
 		}
+		return true;
+	}
+
+	/** Find a clear three-block-high spawn point with a solid floor, at a random angle from a player. */
+	private Location findMagmaCubeSpawn(Player target, Location center)
+	{
+		if (target == null || !target.isOnline() || center == null || center.getWorld() == null)
+			return null;
+
+		org.bukkit.World world = target.getWorld();
+		Location playerLocation = target.getLocation();
+		double startAngle = Math.random() * Math.PI * 2.0D;
+		int baseY = playerLocation.getBlockY();
+
+		for (int attempt = 0; attempt < 48; attempt++)
+		{
+			double angle = startAngle + attempt * 2.399963229728653D;
+			double distance = 12.0D + ((attempt % 5) * 2.0D);
+			double x = playerLocation.getX() + Math.cos(angle) * distance;
+			double z = playerLocation.getZ() + Math.sin(angle) * distance;
+			x = Math.max(center.getX() - 42.0D, Math.min(center.getX() + 42.0D, x));
+			z = Math.max(center.getZ() - 42.0D, Math.min(center.getZ() + 42.0D, z));
+
+			int blockX = (int) Math.floor(x);
+			int blockZ = (int) Math.floor(z);
+			int minY = Math.max(1, baseY - 7);
+			int maxY = Math.min(world.getMaxHeight() - 4, baseY + 3);
+			for (int y = maxY; y >= minY; y--)
+			{
+				org.bukkit.block.Block ground = world.getBlockAt(blockX, y - 1, blockZ);
+				org.bukkit.block.Block feet = world.getBlockAt(blockX, y, blockZ);
+				org.bukkit.block.Block head = world.getBlockAt(blockX, y + 1, blockZ);
+				org.bukkit.block.Block top = world.getBlockAt(blockX, y + 2, blockZ);
+				if (ground.getType().isSolid()
+						&& feet.getType() == Material.AIR
+						&& head.getType() == Material.AIR
+						&& top.getType() == Material.AIR)
+				{
+					Location result = new Location(world, blockX + 0.5D, y, blockZ + 0.5D,
+							(float) (Math.random() * 360.0D), 0.0F);
+					if (!world.isChunkLoaded(blockX >> 4, blockZ >> 4))
+						world.getChunkAt(blockX >> 4, blockZ >> 4).load();
+					return result;
+				}
+			}
+		}
+		return null;
 	}
 
 	/** Track, steer and collide the hazards. Invulnerability still protects against a cube hit. */
