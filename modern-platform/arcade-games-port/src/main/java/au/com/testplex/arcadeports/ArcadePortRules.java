@@ -62,6 +62,10 @@ public final class ArcadePortRules {
         return remainingPieces <= 0;
     }
 
+    public static boolean isBombDirectHit(double distanceSquared) {
+        return distanceSquared >= 0.0D && distanceSquared <= 1.0D;
+    }
+
     public static int gladiatorsTierForRound(int round) {
         return Math.max(0, Math.min(3, round));
     }
