@@ -20,6 +20,7 @@ import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
+import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Firework;
@@ -213,13 +214,16 @@ public void startGame(Location preferCenter, int requestedPattern) {
     if (state != GameState.IDLE && state != GameState.ENDING) return;
 
     if (center == null) {
-        if (preferCenter != null) {
+        if (preferCenter != null && preferCenter.getWorld() != null) {
             center = preferCenter.clone();
-        } else if (!Bukkit.getOnlinePlayers().isEmpty()) {
-            center = Bukkit.getOnlinePlayers().iterator().next().getLocation();
         } else {
-            broadcast(ChatColor.RED + "[MonsterMaze] No center set. Stand somewhere and /mm setcenter");
-            return;
+            Location configuredCenter = plugin.getMapManager() == null
+                    ? null : plugin.getMapManager().defaultCenter();
+            if (configuredCenter == null || configuredCenter.getWorld() == null) {
+                broadcast(ChatColor.RED + "[MonsterMaze] No arena center configured. Set a map or use /mm setcenter.");
+                return;
+            }
+            center = configuredCenter.clone();
         }
     }
 
@@ -258,7 +262,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             public void run() {
                 if (state != GameState.STARTING) return;
 
-                for (Player p : Bukkit.getOnlinePlayers()) {
+                for (Player p : getArenaWorldPlayers()) {
                     if (p.getGameMode() == GameMode.SPECTATOR) continue;
                     alive.add(p.getUniqueId());
                     preparePlayer(p);
@@ -332,7 +336,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                         if (state != GameState.STARTING) { cancel(); return; }
                         if (t <= 0) { beginLive(); cancel(); return; }
                         broadcast(ChatColor.YELLOW + "Starting in " + ChatColor.WHITE + t + "...");
-                        TextUtil.titleAll("", ChatColor.YELLOW + "" + t, 0, 15, 5);
+                        titleArenaPlayers("", ChatColor.YELLOW + "" + t, 0, 15, 5);
                         t--;
                     }
                 }.runTaskTimer(plugin, 10L, 20L);
@@ -349,7 +353,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         leaderboardBoard.clear();
         for (Player p : getAlivePlayers()) p.closeInventory();
 
-        TextUtil.titleAll("", ChatColor.YELLOW + "" + ChatColor.BOLD + "Get to the Safe Pad!", 5, 40, 5);
+        titleArenaPlayers("", ChatColor.YELLOW + "" + ChatColor.BOLD + "Get to the Safe Pad!", 5, 40, 5);
         broadcast(ChatColor.GREEN + "" + ChatColor.BOLD + "GO!");
 
         secondTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
@@ -413,10 +417,11 @@ public void startGame(Location preferCenter, int requestedPattern) {
         lastCompassTargets.clear();
         playersOnPad.clear();
         destroyAllPads();
+        List<Player> arenaPlayers = getArenaWorldPlayers();
         mazeGenerator.returnToLobby();
-        scoreboard.clear(new ArrayList<Player>(Bukkit.getOnlinePlayers()));
+        scoreboard.clear(arenaPlayers);
 
-        for (Player p : Bukkit.getOnlinePlayers()) {
+        for (Player p : arenaPlayers) {
             p.setExp(0); p.setLevel(0);
             p.getInventory().clear();
             p.getInventory().setArmorContents(null);
@@ -425,7 +430,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             p.setCollidable(true);
             
             // Restore visibility for all players in lobby
-            for (Player target : Bukkit.getOnlinePlayers()) {
+            for (Player target : arenaPlayers) {
                 p.showPlayer(target);
             }
 
@@ -441,7 +446,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         if (center != null) {
             kitManager.spawnSelectors(mazeGenerator.getLobbyCenter());
             refreshLeaderboardBoard();
-            for (Player p : Bukkit.getOnlinePlayers()) {
+            for (Player p : arenaPlayers) {
                 kitManager.openSelector(p);
             }
         }
@@ -526,17 +531,17 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
         if (phaseTimer == 20 || phaseTimer == 15 || phaseTimer == 10
                 || phaseTimer == 5 || phaseTimer == 4) {
-            TextUtil.titleAll("", ChatColor.GREEN + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
+            titleArenaPlayers("", ChatColor.GREEN + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
         }
         if (phaseTimer == 3) {
-            TextUtil.titleAll("", ChatColor.YELLOW + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
+            titleArenaPlayers("", ChatColor.YELLOW + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
         }
         if (phaseTimer == 2) {
-            TextUtil.titleAll("", ChatColor.GOLD + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
+            titleArenaPlayers("", ChatColor.GOLD + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
             spawnSafePad(); // next pad appears
         }
         if (phaseTimer == 1) {
-            TextUtil.titleAll("", ChatColor.RED + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
+            titleArenaPlayers("", ChatColor.RED + "" + ChatColor.BOLD + phaseTimer, 5, 40, 5);
         }
 
         if (phaseTimer == 0) {
@@ -705,7 +710,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         p.setLevel(0);
         
         // Ensure all alive players are visible to each other
-        for (Player online : Bukkit.getOnlinePlayers()) {
+        for (Player online : getArenaWorldPlayers()) {
             p.showPlayer(online);
             online.showPlayer(p);
         }
@@ -933,7 +938,30 @@ public void startGame(Location preferCenter, int requestedPattern) {
         DistanceEntry(Player player, double distance) { this.player = player; this.distance = distance; }
     }
 
-    private void broadcast(String msg) { Bukkit.broadcastMessage(msg); }
+    /** All online players in this isolated Monster Maze lobby/arena world. */
+    private List<Player> getArenaWorldPlayers() {
+        List<Player> players = new ArrayList<Player>();
+        World arenaWorld = center == null ? null : center.getWorld();
+        if (arenaWorld == null) return players;
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (isInArenaWorld(arenaWorld, player.getWorld())) players.add(player);
+        }
+        return players;
+    }
+
+    static boolean isInArenaWorld(World arenaWorld, World playerWorld) {
+        return arenaWorld != null && playerWorld != null && arenaWorld == playerWorld;
+    }
+
+    private void titleArenaPlayers(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
+        for (Player player : getArenaWorldPlayers()) {
+            TextUtil.title(player, title, subtitle, fadeIn, stay, fadeOut);
+        }
+    }
+
+    private void broadcast(String msg) {
+        for (Player player : getArenaWorldPlayers()) player.sendMessage(msg);
+    }
 
     // -------------------- Events --------------------
 
@@ -944,7 +972,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         padLockIns.remove(id);
         lastCompassTargets.remove(id);
         
-        for (Player online : Bukkit.getOnlinePlayers()) {
+        for (Player online : getArenaWorldPlayers()) {
             online.showPlayer(player);
         }
 
