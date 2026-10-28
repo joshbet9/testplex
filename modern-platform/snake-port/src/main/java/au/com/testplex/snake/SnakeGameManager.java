@@ -60,7 +60,6 @@ public final class SnakeGameManager implements Listener {
     private static final int ARENA_RADIUS = 48;
     private static final int MAX_FOOD = 12;
     private static final int MAX_HAZARDS = SnakeRules.MAX_HAZARDS;
-    private static final int MAX_TAIL_LENGTH = 180;
     private static final int HOTBAR_ROULETTE_SLOT = 8;
     private static final int ROULETTE_STEPS = 12;
     private static final long FIRST_HAZARD_DELAY_MS = SnakeRules.FIRST_HAZARD_DELAY_MILLIS;
@@ -283,7 +282,7 @@ public final class SnakeGameManager implements Listener {
         }
         if (now >= nextGrowAt) {
             for (SnakeState state : snakes.values()) {
-                if (state.alive && state.player.isOnline() && state.segments.size() < MAX_TAIL_LENGTH) grow(state, 1);
+                if (state.alive && state.player.isOnline()) grow(state, 1);
             }
             nextGrowAt = now + 1_000L;
         }
@@ -327,9 +326,12 @@ public final class SnakeGameManager implements Listener {
         }
         state.segments.get(0).teleport(next);
         state.path.addFirst(next.clone());
-        while (state.path.size() > 2400) state.path.removeLast();
+        // Retain enough route history for the complete snake even after long source-style rounds.
+        int maxPathPoints = Math.max(2400, state.segments.size() * 8);
+        while (state.path.size() > maxPathPoints) state.path.removeLast();
         moveBodyAlongPath(state);
-        player.setExp((float) Math.min(0.9999D, (double) state.segments.size() / MAX_TAIL_LENGTH));
+        player.setExp((float) Math.min(0.9999D,
+                (double) state.segments.size() / SnakeRules.SPEED_REFERENCE_LENGTH));
     }
 
     private void moveBodyAlongPath(SnakeState state) {
@@ -433,7 +435,7 @@ public final class SnakeGameManager implements Listener {
             boolean eaten = false;
             for (SnakeState state : snakes.values()) {
                 if (!state.alive || !state.player.isOnline()) continue;
-                if (slime.getLocation().distanceSquared(state.player.getLocation()) < 6.25D) {
+                if (SnakeRules.isFoodCollected(slime.getLocation().distanceSquared(state.player.getLocation()))) {
                     grow(state, 2);
                     state.player.playSound(state.player.getLocation(), Sound.ENTITY_GENERIC_EAT, 1.0F, 1.0F);
                     state.player.sendMessage(ChatColor.GREEN + "Slime eaten! Snake length: " + state.segments.size());
@@ -449,12 +451,14 @@ public final class SnakeGameManager implements Listener {
 
     private void grow(SnakeState state, int amount) {
         if (!state.alive || state.segments.isEmpty()) return;
-        for (int n = 0; n < amount && state.segments.size() < MAX_TAIL_LENGTH; n++) {
+        for (int n = 0; n < amount; n++) {
             Sheep last = state.segments.get(state.segments.size() - 1);
             Location loc = last.getLocation().clone();
-            Vector backward = state.player.getLocation().getDirection().setY(0.0D);
-            if (backward.lengthSquared() < 1.0E-6D) backward = new Vector(0, 0, 1);
-            loc.subtract(backward.normalize().multiply(SEGMENT_SPACING));
+            Vector previous = state.segments.size() > 1
+                    ? state.segments.get(state.segments.size() - 2).getLocation().toVector() : null;
+            Vector extension = SnakeRules.tailExtensionDirection(
+                    previous, last.getLocation().toVector(), state.player.getLocation().getDirection());
+            loc.add(extension.multiply(SEGMENT_SPACING));
             Sheep body = spawnSegment(loc, state.color);
             state.segments.add(body);
         }
@@ -638,7 +642,7 @@ public final class SnakeGameManager implements Listener {
                     if (otherState == playerState && i < 3) continue;
                     Sheep segment = otherState.segments.get(i);
                     if (!segment.isValid()) continue;
-                    if (horizontalDistanceSquared(head, segment.getLocation()) < 1.0D) {
+                    if (SnakeRules.isTailCollision(head.distanceSquared(segment.getLocation()))) {
                         eliminate(playerState, otherState == playerState ? null : otherState.player,
                                 otherState == playerState ? "hit your own tail" : "hit " + otherState.player.getName() + "'s tail");
                         hit = true;
@@ -648,12 +652,6 @@ public final class SnakeGameManager implements Listener {
                 if (hit) break;
             }
         }
-    }
-
-    private double horizontalDistanceSquared(Location a, Location b) {
-        double dx = a.getX() - b.getX();
-        double dz = a.getZ() - b.getZ();
-        return dx * dx + dz * dz;
     }
 
     private void eliminate(SnakeState state, Player killer, String reason) {
@@ -774,10 +772,11 @@ public final class SnakeGameManager implements Listener {
             consumeMainHand(event.getPlayer());
             event.getPlayer().leaveVehicle();
             Collections.reverse(state.segments);
+            List<Location> reversedPath = new ArrayList<>();
+            for (Sheep segment : state.segments) reversedPath.add(segment.getLocation());
             state.path.clear();
+            state.path.addAll(SnakeRules.seedReversedBodyPath(reversedPath));
             if (!state.segments.isEmpty()) {
-                Location head = state.segments.get(0).getLocation();
-                state.path.addFirst(head.clone());
                 state.segments.get(0).addPassenger(event.getPlayer());
             }
             state.reverseUntil = now + 2_000L;
