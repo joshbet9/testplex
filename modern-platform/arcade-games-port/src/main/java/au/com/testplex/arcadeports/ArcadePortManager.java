@@ -1060,10 +1060,45 @@ public final class ArcadePortManager implements Listener {
             Player p = session.players.get(id);
             if (!p.isOnline()) continue;
             int score = session.scores.getOrDefault(id, 0);
+            String specific = gameStatusText(session, p);
             p.sendActionBar(ChatColor.GOLD + session.type.displayName() + ChatColor.GRAY + " | " + seconds + "s"
                     + ChatColor.DARK_GRAY + " | " + ChatColor.GREEN + "alive " + alive
-                    + ChatColor.DARK_GRAY + " | " + ChatColor.YELLOW + "score " + score);
+                    + ChatColor.DARK_GRAY + " | " + ChatColor.YELLOW + "score " + score
+                    + (specific.isEmpty() ? "" : ChatColor.DARK_GRAY + " | " + specific));
         }
+    }
+
+    private String gameStatusText(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        return switch (session.type) {
+            case BACON_BRAWL -> "knockback x" + String.format(java.util.Locale.ROOT, "%.1f", session.baconKnockback);
+            case BOMB_LOBBERS -> "TNT " + player.getInventory().getItemInMainHand().getAmount();
+            case DEATH_TAG -> "IT " + session.tagged.size() + " | runners "
+                    + Math.max(0, session.alive.size() - session.tagged.stream().filter(session.alive::contains).count());
+            case DRAGON_ESCAPE -> "finish " + Math.max(0, player.getLocation().getBlockZ()) + "/" + (int) ArcadePortRules.DRAGON_ESCAPE_FINISH_Z;
+            case DRAGONS -> "dragons " + session.entities.stream().filter(EnderDragon.class::isInstance).count();
+            case EVOLUTION -> "stage " + (session.evolutionLevels.getOrDefault(id, 0) + 1) + "/6";
+            case GLADIATORS -> {
+                String tier = switch (session.gladiatorRound) {
+                    case 1 -> "yellow";
+                    case 2 -> "orange";
+                    case 3 -> "red";
+                    default -> "green";
+                };
+                yield tier + " | matches " + Math.max(0, session.gladiatorPairCount - session.gladiatorResolvedPairs.size());
+            }
+            case MICRO_BATTLES -> "team " + (session.teams.getOrDefault(id, 0) + 1) + "/4";
+            case ONE_IN_THE_QUIVER -> "kills " + scoreFor(session, id) + "/20";
+            case PAINTBALL -> "armour " + session.paintPiecesRemaining.getOrDefault(id, 4) + "/4";
+            case RUNNER -> "unstable tiles " + session.runnerBlocks.size();
+            case SHEEP_QUEST -> "pen sheep R" + sheepQuestTeamCount(session, 0) + " B" + sheepQuestTeamCount(session, 1);
+            case SPLEEF -> "snowballs " + player.getInventory().contains(Material.SNOWBALL);
+            case TURF_WARS -> (session.turfCombat ? "COMBAT" : "BUILD") + " | turf " + session.turfFrontlineX;
+        };
+    }
+
+    private int scoreFor(Session session, UUID id) {
+        return session.scores.getOrDefault(id, 0);
     }
 
     private void checkRoundEnd(Session session) {
