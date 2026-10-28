@@ -643,6 +643,11 @@ public final class ArcadePortRules {
         return totalPlayers > 0 && chasers >= 0 && (double) chasers / (double) totalPlayers > 0.25D;
     }
 
+    /** Surviving runners have the Death Tag objective at timeout; chaser scores are only a fallback when none remain. */
+    public static boolean shouldDeathTagRunnerWinTimeout(int runnersRemaining) {
+        return runnersRemaining > 0;
+    }
+
     public static boolean shouldFinishDeathTagRound(int runnersRemaining, int initialPlayers) {
         return initialPlayers > 2 ? runnersRemaining <= 1 : runnersRemaining <= 0;
     }
