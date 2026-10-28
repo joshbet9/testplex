@@ -2078,6 +2078,11 @@ public final class ArcadePortManager implements Listener {
         session.ticks++;
         updateSourceWaterDamage(session, now);
         if (now >= session.endsAt) {
+            if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
+                // Apply any chaser promotions due on the final timer tick before choosing a winner.
+                updateDeathTagChasers(session, now);
+                if (active != session) return;
+            }
             if (session.type == ArcadePortGame.SHEEP_QUEST) {
                 Player sheepWinner = sheepQuestLeader(session);
                 if (sheepWinner != null) {
