@@ -176,6 +176,7 @@ Assert-Contains "Per-mob-set colour selection persists only the selected colour 
 Assert-Contains "Per-mob-set Safe Pad colour uses its independent saved value" $cosmeticsFile 'String padSelected = data.getString(base + ".safe-pad", defaultColour);'
 Assert-Contains "Per-mob-set beacon colour uses its independent saved value" $cosmeticsFile 'String beaconSelected = data.getString(base + ".beacon", defaultColour);'
 Assert-Contains "Changing one saved colour repaints both live overlays" $cosmeticsFile "refreshLiveMonsterMazeColours(player)"
+Assert-Contains "Colour-only refresh does not reconcile mob sets twice" $cosmeticsFile "refreshLiveMonsterMazeMobSets(player)"
 Assert-Contains "Enabled Monster Maze mob sets are exposed to gameplay" $cosmeticsFile "getEnabledMonsterMazeMobSets(UUID playerId)"
 Assert-Contains "Custom mob-set selection is persisted separately from default map appearance" $cosmeticsFile "mob-sets-customized"
 Assert-Contains "Operators can grant the Custom Pack for test runs" $cosmeticsFile "arcadecosmetics unlock <online-player> monstermaze custom-pack"
@@ -258,6 +259,8 @@ Assert-Contains "Mob Theme changes refresh Safe Pad and beacon colours" $mazeFil
 Assert-Contains "Beacon is below the walkable clear-glass surface" $safePadFile "loc.clone().add(0, -1, 0), Material.BEACON"
 Assert-Contains "Beacon base is shifted down two blocks" $safePadFile "loc.clone().add(x, -2, z), Material.IRON_BLOCK"
 Assert-Contains "Beacon colour glass is rendered at floor level" $safePadFile "viewer.sendBlockChange(surface, Material.STAINED_GLASS, colour)"
+Assert-Contains "Beacon refresh forces the next 1.8 beam-segment scan" $safePadFile "new PacketPlayOutUpdateTime(refreshTime, world.getTime())"
+Assert-Contains "Beacon refresh restores the real client world age" $safePadFile "new PacketPlayOutUpdateTime(world.getFullTime(), world.getTime())"
 Assert-Contains "Beacon glass uses the per-mob-set beacon colour setting" $safePadFile "getMonsterMazeBeaconColourData(viewer.getUniqueId(), mobSet)"
 Assert-Contains "Safe Pad clay uses the per-mob-set Safe Pad colour setting" $safePadFile "getMonsterMazeSafePadColourData(viewer.getUniqueId(), mobSet)"
 Assert-Contains "Changing one colour selection refreshes both live overlays" $cosmeticsFile "refreshLiveMonsterMazeColours(player)"
