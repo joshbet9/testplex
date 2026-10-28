@@ -451,10 +451,33 @@ public class Maze implements Listener
 				else
 					UtilAction.velocity(player, UtilAlg.getTrajectory(ent, player), 1, false, 0, 0.75, 1.2, true);
 
-				// Submit a source-aware hit; the Maze recharge is the authoritative cooldown.
-				_host.Manager.GetDamage().NewDamageEvent(player, ent, null,
-						DamageCause.ENTITY_ATTACK, 4, false, true, false,
-						"Monster", "Monster Attack");
+				// Allow only this synchronous mob-contact event through the game damage flags.
+				// Monster Maze otherwise keeps generic PvE and fall damage disabled.
+				double healthBeforeHit = player.getHealth();
+				boolean previousDamagePvE = _host.DamagePvE;
+				boolean previousDamageEvP = _host.DamageEvP;
+				_host.DamagePvE = true;
+				_host.DamageEvP = true;
+				try
+				{
+					_host.Manager.GetDamage().NewDamageEvent(player, ent, null,
+							DamageCause.ENTITY_ATTACK, 4, false, true, false,
+							"Monster", "Monster Attack");
+
+					// Reborn applies CustomDamageEvent synchronously. If another listener cancels it,
+					// still make this confirmed monster collision hurt the player.
+					if (player.isOnline() && !player.isDead() && player.getHealth() >= healthBeforeHit)
+					{
+						player.damage(4.0, ent);
+						if (player.isOnline() && !player.isDead() && player.getHealth() >= healthBeforeHit)
+							player.setHealth(Math.max(0.0, healthBeforeHit - 4.0));
+					}
+				}
+				finally
+				{
+					_host.DamagePvE = previousDamagePvE;
+					_host.DamageEvP = previousDamageEvP;
+				}
 
 				PacketPlayOutAnimation animation = new PacketPlayOutAnimation();
 				animation.a = ent.getEntityId();

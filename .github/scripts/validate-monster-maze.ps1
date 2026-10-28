@@ -234,6 +234,12 @@ Assert-Contains "Mob Theme cycle includes map default and Random Mob" $mazeFile 
 Assert-Contains "Mob Theme selections persist per player" $cosmeticsFile "selected-mob-theme"
 Assert-Contains "Mob Theme changes update viewer-specific disguises" $mazeFile "refreshMobDisguisesForViewer(player)"
 Assert-Contains "Mob Theme changes refresh Safe Pad and beacon colours" $mazeFile "refreshViewerCosmeticColours(viewer)"
+Assert-Contains "Beacon is below the walkable clear-glass surface" $safePadFile "loc.clone().add(0, -1, 0), Material.BEACON"
+Assert-Contains "Beacon base is shifted down two blocks" $safePadFile "loc.clone().add(x, -2, z), Material.IRON_BLOCK"
+Assert-Contains "Beacon colour glass is rendered at floor level" $safePadFile "viewer.sendBlockChange(surface, Material.STAINED_GLASS, colour)"
+Assert-Contains "Upper overlay is reset to the real world block" $safePadFile "Location legacyOverlay = _loc.clone().add(0, 6, 0)"
+Assert-Contains "Mob hits temporarily enable the enemy-vs-player damage gate" $mazeFile "boolean previousDamageEvP = _host.DamageEvP"
+Assert-Contains "Cancelled custom mob damage has a direct health fallback" $mazeFile "player.setHealth(Math.max(0.0, healthBeforeHit - 4.0))"
 Assert-Contains "Monster hits use an explicit entity-attack damage event" $mazeFile "DamageCause.ENTITY_ATTACK, 4, false, true, false"
 Assert-Contains "Speed Jumper is free rather than achievement-gated" $kitFile 'new KitEntityData<>(Skeleton.class, new ItemStack(Material.FEATHER))'
 Assert-Contains "Speed Maverick is gem-unlocked, not achievement-gated" $kitFile "monstermazespeedmaverick"

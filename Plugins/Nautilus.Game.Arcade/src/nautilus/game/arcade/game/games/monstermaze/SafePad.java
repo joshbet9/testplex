@@ -51,48 +51,46 @@ public class SafePad implements Listener
 		}
 		_breakColour = _surfaceColour;
 		
-		//beacon surface
+		// Walkable safe-pad surface. The centre glass tints the beacon beam per viewer.
 		for (int x = -2 ; x < 3 ; x++)
 		{
 			for (int z = -2 ; z < 3 ; z++)
 			{
 				if (x == 0 && z == 0)
-					continue;
-				
-				_blocks.add(new SafePadBlock(loc.clone().add(x, 0, z), Material.STAINED_CLAY, _surfaceColour));
+					_blocks.add(new SafePadBlock(loc.clone().add(0, 0, 0), Material.GLASS, (byte) 0));
+				else
+					_blocks.add(new SafePadBlock(loc.clone().add(x, 0, z), Material.STAINED_CLAY, _surfaceColour));
 			}
 		}
-		
-		// beacon
-		_blocks.add(new SafePadBlock(loc.clone().add(0, 0, 0), Material.BEACON, (byte)0));
-		
-		// beacon base
+
+		// Beacon sits one block below the walkable glass surface.
+		_blocks.add(new SafePadBlock(loc.clone().add(0, -1, 0), Material.BEACON, (byte)0));
+
+		// Its iron base sits another block below the beacon.
 		for (int x = -1 ; x < 2 ; x++)
 		{
 			for (int z = -1 ; z < 2 ; z++)
-			{
-				_blocks.add(new SafePadBlock(loc.clone().add(x, -1, z), Material.IRON_BLOCK, (byte)0));
-			}
-			
-			//Stairs
-			_blocks.add(new SafePadBlock(loc.clone().add(x, -1, 2), Material.QUARTZ_STAIRS, (byte) 7));
-			_blocks.add(new SafePadBlock(loc.clone().add(x, -1, -2), Material.QUARTZ_STAIRS, (byte) 6));
-			_blocks.add(new SafePadBlock(loc.clone().add(2, -1, x), Material.QUARTZ_STAIRS, (byte) 5));
-			_blocks.add(new SafePadBlock(loc.clone().add(-2, -1, x), Material.QUARTZ_STAIRS, (byte) 4));
+				_blocks.add(new SafePadBlock(loc.clone().add(x, -2, z), Material.IRON_BLOCK, (byte)0));
+
+			// Stairs
+			_blocks.add(new SafePadBlock(loc.clone().add(x, -2, 2), Material.QUARTZ_STAIRS, (byte) 7));
+			_blocks.add(new SafePadBlock(loc.clone().add(x, -2, -2), Material.QUARTZ_STAIRS, (byte) 6));
+			_blocks.add(new SafePadBlock(loc.clone().add(2, -2, x), Material.QUARTZ_STAIRS, (byte) 5));
+			_blocks.add(new SafePadBlock(loc.clone().add(-2, -2, x), Material.QUARTZ_STAIRS, (byte) 4));
 		}
-		
-		// corner blocks
-		_blocks.add(new SafePadBlock(loc.clone().add(2, -1, 2), Material.QUARTZ_BLOCK, (byte) 1));
-		_blocks.add(new SafePadBlock(loc.clone().add(-2, -1, 2), Material.QUARTZ_BLOCK, (byte) 1));
-		_blocks.add(new SafePadBlock(loc.clone().add(2, -1, -2), Material.QUARTZ_BLOCK, (byte) 1));
-		_blocks.add(new SafePadBlock(loc.clone().add(-2, -1, -2), Material.QUARTZ_BLOCK, (byte) 1));
-				
+
+		// Corner blocks
+		_blocks.add(new SafePadBlock(loc.clone().add(2, -2, 2), Material.QUARTZ_BLOCK, (byte) 1));
+		_blocks.add(new SafePadBlock(loc.clone().add(-2, -2, 2), Material.QUARTZ_BLOCK, (byte) 1));
+		_blocks.add(new SafePadBlock(loc.clone().add(2, -2, -2), Material.QUARTZ_BLOCK, (byte) 1));
+		_blocks.add(new SafePadBlock(loc.clone().add(-2, -2, -2), Material.QUARTZ_BLOCK, (byte) 1));
+
 		// air slabs
 		for (int x = -2 ; x < 3 ; x++)
 		{
 			for (int z = -2 ; z < 3 ; z++)
 			{
-				_blocks.add(new SafePadBlock(loc.clone().add(x, -2, z), Material.AIR, (byte) 0));
+				_blocks.add(new SafePadBlock(loc.clone().add(x, -3, z), Material.AIR, (byte) 0));
 			}
 		}
 	}
@@ -190,12 +188,25 @@ public class SafePad implements Listener
 	@SuppressWarnings("deprecation")
 	public boolean restoreObjectiveBeaconIfMissing()
 	{
-		if (_loc == null || _loc.getWorld() == null || _loc.getBlock().getType() == Material.BEACON)
+		if (_loc == null || _loc.getWorld() == null)
 			return false;
 
-		MapUtil.QuickChangeBlockAt(_loc, Material.BEACON.getId(), (byte) 0);
-		applyViewerCosmeticColours();
-		return true;
+		Location surface = _loc.clone();
+		Location beacon = _loc.clone().subtract(0, 1, 0);
+		boolean changed = false;
+		if (surface.getBlock().getType() != Material.GLASS)
+		{
+			MapUtil.QuickChangeBlockAt(surface, Material.GLASS.getId(), (byte) 0);
+			changed = true;
+		}
+		if (beacon.getBlock().getType() != Material.BEACON)
+		{
+			MapUtil.QuickChangeBlockAt(beacon, Material.BEACON.getId(), (byte) 0);
+			changed = true;
+		}
+		if (changed)
+			applyViewerCosmeticColours();
+		return changed;
 	}
 
 	public void turnOffBeacon()
@@ -204,8 +215,9 @@ public class SafePad implements Listener
 		{
 			if (bl.getBlockMaterial() == Material.IRON_BLOCK)
 				bl.setMaterial(Material.QUARTZ_BLOCK);
-
-			if (bl.getBlockMaterial() == Material.BEACON)
+			else if (bl.getBlockMaterial() == Material.BEACON)
+				bl.setMaterial(Material.AIR);
+			else if (bl.getBlockMaterial() == Material.GLASS)
 			{
 				bl.setMaterial(Material.STAINED_CLAY);
 				bl.setData(_surfaceColour);
@@ -224,7 +236,7 @@ public class SafePad implements Listener
 			applyViewerCosmeticColours(viewer);
 	}
 
-	/** Refresh the requesting client's Safe Pad tint and beacon-colour filter after Mob Theme changes. */
+	/** Repaint just this client's pad tint and floor-level beacon glass after Mob Theme changes. */
 	@SuppressWarnings("deprecation")
 	public void refreshViewerCosmeticColours(Player viewer)
 	{
@@ -238,31 +250,39 @@ public class SafePad implements Listener
 	{
 		if (viewer == null || !viewer.isOnline() || Host == null || _loc == null || _loc.getWorld() == null)
 			return;
-		Location beamLocation = _loc.clone().add(0, 6, 0);
-		boolean beaconPresent = _loc.getBlock().getType() == Material.BEACON;
-		boolean beamSpaceIsAir = beamLocation.getBlock().getType() == Material.AIR;
+
 		String mobSet = _maze == null ? null : _maze.getMobSetForPlayer(viewer);
 		boolean customPack = mobSet != null && ArcadeCosmeticsMenu.isMonsterMazeCustomPackUnlocked(viewer.getUniqueId());
+		boolean warningTintActive = _breakColour != _surfaceColour;
+
 		for (SafePadBlock block : _blocks)
 		{
 			if (block.getBlockMaterial() != Material.STAINED_CLAY)
 				continue;
-			// Keep the game's green -> yellow -> orange -> red warning sequence visible.
-			boolean warningTintActive = _breakColour != (byte) 5;
 			byte data = customPack && !warningTintActive
 					? (byte) ArcadeCosmeticsMenu.getMonsterMazeSafePadColourData(viewer.getUniqueId(), mobSet)
 					: block.getBlockData();
 			viewer.sendBlockChange(block.getLocation(), Material.STAINED_CLAY, data);
 		}
-		if (customPack && beaconPresent && beamSpaceIsAir)
+
+		// This clear glass tile sits immediately above the lowered beacon. Change only the viewer's glass colour.
+		Location surface = _loc.clone();
+		Location beacon = _loc.clone().subtract(0, 1, 0);
+		if (customPack
+				&& surface.getBlock().getType() == Material.GLASS
+				&& beacon.getBlock().getType() == Material.BEACON)
 		{
 			byte colour = (byte) ArcadeCosmeticsMenu.getMonsterMazeBeaconColourData(viewer.getUniqueId(), mobSet);
-			viewer.sendBlockChange(beamLocation, Material.STAINED_GLASS, colour);
+			viewer.sendBlockChange(surface, Material.STAINED_GLASS, colour);
 		}
 		else
 		{
-			viewer.sendBlockChange(beamLocation, beamLocation.getBlock().getType(), beamLocation.getBlock().getData());
+			viewer.sendBlockChange(surface, surface.getBlock().getType(), surface.getBlock().getData());
 		}
+
+		// Remove any stale client-only overlay left by the earlier native-port build.
+		Location legacyOverlay = _loc.clone().add(0, 6, 0);
+		viewer.sendBlockChange(legacyOverlay, legacyOverlay.getBlock().getType(), legacyOverlay.getBlock().getData());
 	}
 
 	@SuppressWarnings("deprecation")
@@ -278,8 +298,8 @@ public class SafePad implements Listener
 				Location location = block.getLocation();
 				viewer.sendBlockChange(location, location.getBlock().getType(), location.getBlock().getData());
 			}
-			Location beamLocation = _loc.clone().add(0, 6, 0);
-			viewer.sendBlockChange(beamLocation, beamLocation.getBlock().getType(), beamLocation.getBlock().getData());
+			Location legacyOverlay = _loc.clone().add(0, 6, 0);
+			viewer.sendBlockChange(legacyOverlay, legacyOverlay.getBlock().getType(), legacyOverlay.getBlock().getData());
 		}
 	}
 
@@ -295,7 +315,7 @@ public class SafePad implements Listener
 		if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null)
 			return;
 
-		if (event.getClickedBlock().getType() != Material.BEACON)
+		if (event.getClickedBlock().getType() != Material.GLASS)
 			return;
 
 		Location clicked = event.getClickedBlock().getLocation();
@@ -419,7 +439,7 @@ public class SafePad implements Listener
 	{
 		for (SafePadBlock bl : _blocks)
 		{
-			if (bl.getBlockMaterial() == Material.STAINED_CLAY)
+			if (bl.getBlockMaterial() == Material.STAINED_CLAY || bl.getBlockMaterial() == Material.GLASS)
 				bl.restore();
 		}
 		clearViewerCosmeticColours();
