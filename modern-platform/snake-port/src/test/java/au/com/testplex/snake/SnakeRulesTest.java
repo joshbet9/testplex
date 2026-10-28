@@ -12,11 +12,54 @@ class SnakeRulesTest {
         assertEquals(30, SnakeRules.rouletteDurationSecondsForHit(99));
     }
 
-    @Test void lengthMakesTheSnakeFasterAndSpeedKitAddsFiftyPercent() {
-        double shortSnake = SnakeRules.movementSpeed(1, false);
-        double longSnake = SnakeRules.movementSpeed(180, false);
-        assertTrue(longSnake > shortSnake);
-        assertEquals(shortSnake * 1.5D, SnakeRules.movementSpeed(1, true), 0.000001D);
+    @Test void sourceSpeedCurveSaturatesAt126SegmentsButDoesNotCapGrowth() {
+        assertTrue(SnakeRules.movementSpeed(126, false) > SnakeRules.movementSpeed(1, false));
+        assertEquals(SnakeRules.movementSpeed(126, false), SnakeRules.movementSpeed(180, false), 0.000001D);
+        assertEquals(SnakeRules.movementSpeed(126, false), SnakeRules.movementSpeed(1000, false), 0.000001D);
+        assertEquals(SnakeRules.movementSpeed(1, false) * 1.5D,
+                SnakeRules.movementSpeed(1, true), 0.000001D);
+        assertEquals(180, SnakeRules.SPEED_REFERENCE_LENGTH);
+    }
+
+    @Test void foodAndTailCollisionsUseSourceThreeDimensionalRadii() {
+        assertTrue(SnakeRules.isFoodCollected(3.999D));
+        assertFalse(SnakeRules.isFoodCollected(4.0D));
+        assertFalse(SnakeRules.isFoodCollected(Double.NaN));
+        assertTrue(SnakeRules.isTailCollision(1.439D));
+        assertFalse(SnakeRules.isTailCollision(1.44D));
+        assertFalse(SnakeRules.isTailCollision(Double.POSITIVE_INFINITY));
+        assertEquals(2.0D, SnakeRules.FOOD_PICKUP_RADIUS, 0.000001D);
+        assertEquals(1.2D, SnakeRules.SNAKE_TAIL_COLLISION_RADIUS, 0.000001D);
+    }
+
+    @Test void aNewTailSegmentFollowsTheExistingTailDirection() {
+        org.bukkit.util.Vector previous = new org.bukkit.util.Vector(0.0D, 64.0D, 0.0D);
+        org.bukkit.util.Vector last = new org.bukkit.util.Vector(1.0D, 64.0D, 0.0D);
+        org.bukkit.util.Vector facing = new org.bukkit.util.Vector(0.0D, 0.0D, 1.0D);
+        org.bukkit.util.Vector direction = SnakeRules.tailExtensionDirection(previous, last, facing);
+        assertEquals(1.0D, direction.getX(), 0.000001D);
+        assertEquals(0.0D, direction.getY(), 0.000001D);
+        assertEquals(0.0D, direction.getZ(), 0.000001D);
+
+        org.bukkit.util.Vector fallback = SnakeRules.tailExtensionDirection(null, null, facing);
+        assertEquals(0.0D, fallback.getX(), 0.000001D);
+        assertEquals(0.0D, fallback.getZ(), 0.000001D);
+        assertEquals(-1.0D, fallback.getZ() == 0.0D ? fallback.getX() : fallback.getZ(), 0.000001D);
+    }
+
+    @Test void reverserSeedsPathInTheSameOrderAsTheFlippedSegments() {
+        java.util.List<org.bukkit.Location> segments = java.util.List.of(
+                new org.bukkit.Location(null, 8.0D, 64.0D, 2.0D),
+                new org.bukkit.Location(null, 7.0D, 64.0D, 2.0D),
+                new org.bukkit.Location(null, 6.0D, 64.0D, 2.0D));
+        java.util.List<org.bukkit.Location> path = SnakeRules.seedReversedBodyPath(segments);
+        assertEquals(3, path.size());
+        assertEquals(8.0D, path.get(0).getX(), 0.000001D);
+        assertEquals(7.0D, path.get(1).getX(), 0.000001D);
+        assertEquals(6.0D, path.get(2).getX(), 0.000001D);
+        segments.get(0).setX(99.0D);
+        assertEquals(8.0D, path.get(0).getX(), 0.000001D);
+        assertTrue(SnakeRules.seedReversedBodyPath(null).isEmpty());
     }
 
     @Test void driftTurnRateIsBounded() {
