@@ -669,7 +669,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void setPaintballArmor(Session session, Player player) {
-        Color teamColor = session.teams.getOrDefault(player.getUniqueId(), 0) == 0 ? Color.AQUA : Color.RED;
+        Color teamColor = session.teams.getOrDefault(player.getUniqueId(), 0) == 0 ? Color.RED : Color.AQUA;
         ItemStack[] armor = new ItemStack[] {
                 new ItemStack(Material.LEATHER_BOOTS),
                 new ItemStack(Material.LEATHER_LEGGINGS),
