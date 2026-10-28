@@ -51,6 +51,16 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isWorldDragonHazard(ArcadePortGame.BOMB_LOBBERS, true, false));
     }
 
+    @Test void quiverLeaperOnlyRearmsOnLanding() {
+        assertFalse(ArcadePortRules.shouldRearmQuiverLeap(false, true, 0.0D));
+        assertFalse(ArcadePortRules.shouldRearmQuiverLeap(true, true, 0.4D));
+        assertTrue(ArcadePortRules.shouldRearmQuiverLeap(true, true, 0.0D));
+        assertTrue(ArcadePortRules.shouldRearmQuiverLeap(true, true, -0.1D));
+        assertTrue(ArcadePortRules.shouldRearmQuiverLeap(true, false, 0.4D));
+        assertFalse(ArcadePortRules.shouldRearmQuiverLeap(false, false, 0.0D));
+        assertFalse(ArcadePortRules.shouldRearmQuiverLeap(true, true, Double.NaN));
+    }
+
     @Test void quiverOnlyRegrantsArrowAfterElimination() {
         assertFalse(ArcadePortRules.quiverRegrantsArrowAfterHit(false));
         assertTrue(ArcadePortRules.quiverRegrantsArrowAfterHit(true));
