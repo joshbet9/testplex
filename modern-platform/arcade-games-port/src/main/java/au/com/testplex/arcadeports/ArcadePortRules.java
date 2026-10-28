@@ -612,6 +612,13 @@ public final class ArcadePortRules {
         };
     }
 
+    /** Leaper flight can be re-enabled only on landing, never during the launch frame. */
+    public static boolean shouldRearmQuiverLeap(boolean onGround, boolean awaitingLanding, double verticalVelocity) {
+        if (!onGround) return false;
+        if (!awaitingLanding) return true;
+        return Double.isFinite(verticalVelocity) && verticalVelocity <= 0.01D;
+    }
+
     public static boolean shouldRemoveQuiverInvisibilityOnHit(boolean melee, boolean ninja) {
         return melee && ninja;
     }
