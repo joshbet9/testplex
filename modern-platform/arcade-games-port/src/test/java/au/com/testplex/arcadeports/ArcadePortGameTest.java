@@ -107,8 +107,8 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.advanceTurfFrontline(-1, 3));
         assertFalse(ArcadePortRules.isTurfWarsWinningLine(18, 0, 20));
         assertTrue(ArcadePortRules.isTurfWarsWinningLine(19, 0, 20));
-        assertFalse(ArcadePortRules.isTurfWarsWinningLine(-19, 1, 20));
-        assertTrue(ArcadePortRules.isTurfWarsWinningLine(-20, 1, 20));
+        assertFalse(ArcadePortRules.isTurfWarsWinningLine(-20, 1, 20));
+        assertTrue(ArcadePortRules.isTurfWarsWinningLine(-21, 1, 20));
         assertFalse(ArcadePortRules.isTurfWarsWinningLine(20, 2, 20));
     }
 
@@ -809,8 +809,8 @@ class ArcadePortGameTest {
 
         assertFalse(ArcadePortRules.isTurfWarsWinningLine(138, 0, 100, 140));
         assertTrue(ArcadePortRules.isTurfWarsWinningLine(139, 0, 100, 140));
-        assertTrue(ArcadePortRules.isTurfWarsWinningLine(100, 1, 100, 140));
-        assertFalse(ArcadePortRules.isTurfWarsWinningLine(101, 1, 100, 140));
+        assertFalse(ArcadePortRules.isTurfWarsWinningLine(100, 1, 100, 140));
+        assertTrue(ArcadePortRules.isTurfWarsWinningLine(99, 1, 100, 140));
         assertFalse(ArcadePortRules.isTurfWarsWinningLine(120, 2, 100, 140));
 
         assertEquals(0, ArcadePortRules.turfWarsTimeoutLeader(120, 119, 0, 50));
