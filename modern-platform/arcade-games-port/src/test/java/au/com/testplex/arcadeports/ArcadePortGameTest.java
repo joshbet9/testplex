@@ -174,11 +174,12 @@ class ArcadePortGameTest {
                 new org.bukkit.Location(null, 64.0D, 64.0D, 1.0D));
         java.util.List<org.bukkit.Location> ordered =
                 SourceMapCatalog.MapData.orderedRouteMarkers(start, source, 0.75D);
-        assertEquals(3, ordered.size());
-        assertEquals(5.0D, ordered.get(0).getZ(), 0.00001D);
-        assertEquals(64.0D, ordered.get(1).getX(), 0.00001D);
-        assertEquals(1.0D, ordered.get(2).getZ(), 0.00001D);
-        assertEquals(0, SourceMapCatalog.MapData.orderedRouteMarkers(start, null, 0.75D).size());
+        assertEquals(4, ordered.size());
+        assertEquals(0.0D, ordered.get(0).getZ(), 0.00001D); // RED start is waypoint zero.
+        assertEquals(5.0D, ordered.get(1).getZ(), 0.00001D);
+        assertEquals(64.0D, ordered.get(2).getX(), 0.00001D);
+        assertEquals(1.0D, ordered.get(3).getZ(), 0.00001D);
+        assertEquals(1, SourceMapCatalog.MapData.orderedRouteMarkers(start, null, 0.75D).size());
     }
 
     @Test void originalMapCatalogEmbedsThirteenSourceWorldsAndLeavesEvolutionExplicitlyUnmapped() {
