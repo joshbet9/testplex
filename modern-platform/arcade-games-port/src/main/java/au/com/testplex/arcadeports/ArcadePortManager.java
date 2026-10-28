@@ -2069,7 +2069,7 @@ public final class ArcadePortManager implements Listener {
         UUID playerId = player.getUniqueId();
         int team = session.teams.getOrDefault(playerId, -1);
         int owner = session.sheepOwners.getOrDefault(sheep, -1);
-        if (team < 0 || team > 1) return;
+        if (team < 0 || team > 3) return;
         if (owner == team && isInsideSheepPen(session, sheep.getLocation(), team)) {
             player.sendMessage(ChatColor.YELLOW + "That sheep is already safe in your pen.");
             return;
@@ -2081,7 +2081,7 @@ public final class ArcadePortManager implements Listener {
         }
         session.sheepCarriers.put(sheep, playerId);
         sheep.setAI(false);
-        sheep.setColor(team == 0 ? DyeColor.RED : DyeColor.BLUE);
+        sheep.setColor(sheepTeamDyeColor(team));
         player.playSound(player.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 2.0F);
         player.sendMessage(ChatColor.GREEN + "Sheep picked up. Carry it to your team's pen!");
     }
