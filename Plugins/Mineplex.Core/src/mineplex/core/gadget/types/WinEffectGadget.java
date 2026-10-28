@@ -233,6 +233,56 @@ public abstract class WinEffectGadget extends Gadget
 	}
 
 	/**
+	 * Configure a win effect for a sandbox-only isolated test. Unlike normal
+	 * round-end setup, only the invoking player is considered inside the effect;
+	 * this prevents the effect from clearing inventories or cancelling damage
+	 * for other people who remain in the lobby.
+	 */
+	public void setupForTest(Player player, Location loc)
+	{
+		_player = player;
+		_team = new ArrayList<>();
+		_team.add(player);
+		_nonTeam = new ArrayList<>();
+		_other = new ArrayList<>();
+		for (Player online : UtilServer.getPlayers())
+		{
+			if (online != null && online.isOnline() && !online.equals(player))
+			{
+				_other.add(online);
+			}
+		}
+		_allPlayers = new ArrayList<>();
+		_allPlayers.add(player);
+		_start = System.currentTimeMillis();
+		_finish = _start;
+		_baseLocation = loc.clone();
+	}
+
+	/**
+	 * Run the subclass cleanup without the normal round-end global visibility,
+	 * gadget-persistence, or player-loop side effects.
+	 */
+	public void runFinishForTest()
+	{
+		try
+		{
+			finish();
+		}
+		finally
+		{
+			_player = null;
+			_baseLocation = null;
+			_team = null;
+			_nonTeam = null;
+			_other = null;
+			_allPlayers = null;
+			_start = 0L;
+			_finish = 0L;
+		}
+	}
+
+	/**
 	 * Teleport the players to the win room
 	 *
 	 * @see #teleport(Location)
@@ -297,7 +347,7 @@ public abstract class WinEffectGadget extends Gadget
 	@EventHandler
 	public void onFoodLevelChange(FoodLevelChangeEvent event)
 	{
-		if (isRunning())
+		if (isRunning() && (_allPlayers == null || _allPlayers.contains(event.getEntity())))
 		{
 			event.setCancelled(true);
 		}
@@ -306,7 +356,7 @@ public abstract class WinEffectGadget extends Gadget
 	@EventHandler
 	public void onPlayerDamage(EntityDamageEvent event)
 	{
-		if (isRunning())
+		if (isRunning() && (_allPlayers == null || _allPlayers.contains(event.getEntity())))
 		{
 			event.setCancelled(true);
 		}
