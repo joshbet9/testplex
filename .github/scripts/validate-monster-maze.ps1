@@ -173,7 +173,9 @@ Assert-Contains "Per-game pages keep win effects separate from game cosmetic lin
 Assert-NotContains "Per-game pages no longer show a separate win-effect placeholder" $cosmeticsFile "Win Effect Plan"
 Assert-Contains "Custom Pack unlock can be provided by the entitlement adapter" $cosmeticsFile "setMonsterMazeCustomPackUnlocked(UUID playerId, boolean unlocked)"
 Assert-Contains "Per-mob-set colour selection persists only the selected colour setting" $cosmeticsFile 'data.set(path, parts[2]);'
-Assert-Contains "Per-mob-set Safe Pad and beacon colours keep independent settings" $cosmeticsFile 'String padSelected = data.getString(base + ".safe-pad", defaultColour);'
+Assert-Contains "Per-mob-set Safe Pad colour uses its independent saved value" $cosmeticsFile 'String padSelected = data.getString(base + ".safe-pad", defaultColour);'
+Assert-Contains "Per-mob-set beacon colour uses its independent saved value" $cosmeticsFile 'String beaconSelected = data.getString(base + ".beacon", defaultColour);'
+Assert-Contains "Changing one saved colour repaints both live overlays" $cosmeticsFile "refreshLiveMonsterMazeColours(player)"
 Assert-Contains "Enabled Monster Maze mob sets are exposed to gameplay" $cosmeticsFile "getEnabledMonsterMazeMobSets(UUID playerId)"
 Assert-Contains "Custom mob-set selection is persisted separately from default map appearance" $cosmeticsFile "mob-sets-customized"
 Assert-Contains "Operators can grant the Custom Pack for test runs" $cosmeticsFile "arcadecosmetics unlock <online-player> monstermaze custom-pack"
@@ -203,6 +205,7 @@ Assert-Contains "PB browser uses the registered account custom-data manager" $pb
 Assert-Contains "Snake green slime food uses floor-safe spawn search" $snakeFile "findFoodSpawnLocation(origin)"
 Assert-Contains "Snake clones the team start before choosing a food spawn" $snakeFile "GetSpawns().get(0).clone()"
 Assert-Contains "Snake Magma Cubes opt into Reborn creature override" $snakeFile "CreatureAllowOverride = true;"
+Assert-Contains "Magma Cube spawning checks headroom for large sizes" $snakeFile "Block ceiling = world.getBlockAt(blockX, y + 4, blockZ)"
 Assert-Contains "Magma Cube contact starts the Mario-Kart hotbar roll" $snakeFile "beginMagmaRoulette(player)"
 Assert-Contains "Roulette preview animates an item in the player's hotbar" $snakeFile "setItem(ROULETTE_HOTBAR_SLOT, rouletteItem(preview))"
 Assert-Contains "Roulette restores the original hotbar item" $snakeFile "restoreRouletteHotbarItem(player)"
