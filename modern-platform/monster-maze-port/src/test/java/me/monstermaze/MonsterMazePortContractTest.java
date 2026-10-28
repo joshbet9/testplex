@@ -46,6 +46,11 @@ class MonsterMazePortContractTest {
         assertEquals(60, MazeMode.CLASSIC.stageTimerSeconds(1));
         assertEquals(150, MazeMode.CLASSIC.initialMonsterCount());
         assertEquals(15, MazeMode.CLASSIC.additionalMonstersPerSafePad());
+
+        assertTrue(MazeMode.SPEED.speedBoostEnabled());
+        assertTrue(MazeMode.MODERN.speedBoostEnabled());
+        assertFalse(MazeMode.CLASSIC.speedBoostEnabled());
+        assertFalse(MazeMode.ORIGINAL.speedBoostEnabled());
     }
 
     @Test void preservesKitAvailabilityRules() {
