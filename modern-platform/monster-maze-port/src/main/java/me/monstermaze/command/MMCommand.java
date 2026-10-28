@@ -69,7 +69,7 @@ public class MMCommand implements CommandExecutor {
             if(!sender.hasPermission("monstermaze.admin")){sender.sendMessage(ChatColor.RED+"No permission.");return true;}
             if(sub.equals("void")||sub.equals("voidworld")||sub.equals("lobby")){if(!(sender instanceof Player)){sender.sendMessage(ChatColor.RED+"Players only.");return true;}plugin.getVoidWorlds().sendToVoid((Player)sender);return true;}
             if(sub.equals("stop")||sub.equals("force")){gm.forceStop();sender.sendMessage(ChatColor.GREEN+"Monster Maze force stopped.");return true;}
-            if(sub.equals("setcenter")){if(!(sender instanceof Player)){sender.sendMessage(ChatColor.RED+"Only players can set the center.");return true;}Player p=(Player)sender;gm.setCenter(p.getLocation());sender.sendMessage(ChatColor.GREEN+"Lobby box placed at "+p.getLocation().getBlockX()+", "+p.getLocation().getBlockY()+", "+p.getLocation().getBlockZ());return true;}
+            if(sub.equals("setcenter")){if(!(sender instanceof Player)){sender.sendMessage(ChatColor.RED+"Only players can set the center.");return true;}if(gm.isRunning()){sender.sendMessage(ChatColor.RED+"Cannot move the Monster Maze center while a round is running.");return true;}Player p=(Player)sender;gm.setCenter(p.getLocation());sender.sendMessage(ChatColor.GREEN+"Lobby box placed at "+p.getLocation().getBlockX()+", "+p.getLocation().getBlockY()+", "+p.getLocation().getBlockZ());return true;}
             sender.sendMessage(ChatColor.YELLOW+"Build mode remains an admin-only tool.");return true;
         }
 
