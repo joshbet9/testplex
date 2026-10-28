@@ -333,6 +333,15 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.sheepQuestLeadingTeam(0, 0));
     }
 
+    @Test void paintballWaterBombRangeAndCooldownMatchSourceReviveFlow() {
+        assertEquals(250L, ArcadePortRules.PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS);
+        assertEquals(3.0D, ArcadePortRules.PAINTBALL_SAVE_ME_RADIUS, 0.00001D);
+        assertTrue(ArcadePortRules.shouldPaintballWaterBombAffectPlayer(0.0D, true));
+        assertTrue(ArcadePortRules.shouldPaintballWaterBombAffectPlayer(9.0D, true));
+        assertFalse(ArcadePortRules.shouldPaintballWaterBombAffectPlayer(9.01D, true));
+        assertFalse(ArcadePortRules.shouldPaintballWaterBombAffectPlayer(1.0D, false));
+    }
+
     @Test void paintballPlayerIsOutOnlyAfterAllFourArmourPiecesArePainted() {
         int remaining = 4;
         remaining = ArcadePortRules.paintballPiecesAfterHit(remaining, 1);

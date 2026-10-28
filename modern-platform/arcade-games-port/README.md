@@ -13,7 +13,7 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 - Gladiators — four source-style loadout tiers, paired tournament rounds, a five-second combat countdown and 60-second poison limited to unresolved 1v1 duels (original arena maps, per-arena doors/trails and full kit polish still remain).
 - Micro Battles — isolated islands and shrinking border.
 - One in the Quiver — first-to-20 one-arrow kill loop, named Super Arrow regrant, one-second respawn and breakable glass/glass panes (original kit abilities are still to port).
-- Paintball — selectable Rifle, Sniper, Shotgun and Machine Gun kits; projectile-specific paint counts, scope-charge damage, a heat gauge and team-coloured armour (kit perks and revive/Save Me flow remain to port).
+- Paintball — selectable Rifle, Sniper, Shotgun and Machine Gun kits; projectile-specific paint counts, scope-charge damage, a heat gauge, team-coloured armour, Water Bomb stacks, 250 ms throw gate, SAVE ME marker/revival within three blocks, and nearby teammate cleanse with armour/health restoration.
 - Runner — disappearing floor tiles and dash item.
 - Sheep Quest — captureable sheep and score target.
 - Spleef — source kit selection (Snowballer, Brawler and Archer), snowballer replacement cap, Brawler Leap/Smasher, two-arrow Fletcher replenishment, source-timed hunger drain/restoration, source material damage transitions and 3D arrow-radius clearing.

@@ -20,6 +20,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Arrow;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EnderPearl;
 import org.bukkit.entity.EnderDragon;
@@ -32,6 +33,7 @@ import org.bukkit.entity.Projectile;
 import org.bukkit.entity.Sheep;
 import org.bukkit.entity.Snowball;
 import org.bukkit.entity.TNTPrimed;
+import org.bukkit.entity.ThrownPotion;
 import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -1481,10 +1483,19 @@ public final class ArcadePortManager implements Listener {
         }
         session.paintballKits.put(player.getUniqueId(), safeKit);
         player.getInventory().setItem(0, namedItem(weapon, title, lore));
+        int waterBombs = "sniper".equals(safeKit) ? 2 : 3;
+        player.getInventory().setItem(1, namedItem(Material.SPLASH_POTION, "Water Bomb",
+                "Clean painted teammates or revive an eliminated teammate near the SAVE ME marker.", waterBombs));
         setPaintballArmor(session, player);
         player.setExp(0.0F);
         player.setSneaking(false);
         player.updateInventory();
+    }
+
+    private boolean isPaintballWaterBomb(ItemStack item) {
+        if (item == null || item.getType() != Material.SPLASH_POTION
+                || !item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) return false;
+        return "Water Bomb".equals(ChatColor.stripColor(item.getItemMeta().getDisplayName()));
     }
 
     private String paintballKitForItem(ItemStack item) {
@@ -1593,6 +1604,113 @@ public final class ArcadePortManager implements Listener {
             }
         }
         player.getInventory().setArmorContents(armor);
+    }
+
+    private ArmorStand spawnPaintballSaveMeMarker(Session session, Player player) {
+        Location location = player.getLocation().clone();
+        ArmorStand marker = session.world.spawn(location, ArmorStand.class);
+        marker.setArms(true);
+        marker.setBasePlate(false);
+        marker.setGravity(false);
+        marker.setInvulnerable(true);
+        marker.setSilent(true);
+        marker.setCanPickupItems(false);
+        marker.setCustomName(ChatColor.RED + "SAVE ME! " + player.getName());
+        marker.setCustomNameVisible(true);
+        Color teamColor = session.teams.getOrDefault(player.getUniqueId(), 0) == 0 ? Color.RED : Color.AQUA;
+        ItemStack[] armor = new ItemStack[] {
+                new ItemStack(Material.LEATHER_BOOTS), new ItemStack(Material.LEATHER_LEGGINGS),
+                new ItemStack(Material.LEATHER_CHESTPLATE), new ItemStack(Material.LEATHER_HELMET)
+        };
+        for (ItemStack piece : armor) {
+            if (piece.getItemMeta() instanceof LeatherArmorMeta meta) {
+                meta.setColor(teamColor);
+                piece.setItemMeta(meta);
+            }
+        }
+        marker.getEquipment().setBoots(armor[0]);
+        marker.getEquipment().setLeggings(armor[1]);
+        marker.getEquipment().setChestplate(armor[2]);
+        marker.getEquipment().setHelmet(armor[3]);
+        session.entities.add(marker);
+        session.paintballSaveMeMarkers.put(player.getUniqueId(), marker);
+        session.paintballSaveMeLocations.put(player.getUniqueId(), location.clone());
+        return marker;
+    }
+
+    private void removePaintballSaveMeMarker(Session session, UUID outPlayer) {
+        ArmorStand marker = session.paintballSaveMeMarkers.remove(outPlayer);
+        session.paintballSaveMeLocations.remove(outPlayer);
+        if (marker != null) {
+            session.entities.remove(marker);
+            if (marker.isValid()) marker.remove();
+        }
+    }
+
+    private void paintballWaterBombImpact(Session session, Player thrower, Location impact) {
+        if (active != session || session.type != ArcadePortGame.PAINTBALL || thrower == null
+                || impact == null || !session.alive.contains(thrower.getUniqueId())) return;
+        UUID throwerId = thrower.getUniqueId();
+        int throwerTeam = session.teams.getOrDefault(throwerId, -1);
+        if (throwerTeam < 0) return;
+
+        List<UUID> revive = new ArrayList<>();
+        for (Map.Entry<UUID, ArmorStand> entry : new ArrayList<>(session.paintballSaveMeMarkers.entrySet())) {
+            UUID targetId = entry.getKey();
+            ArmorStand marker = entry.getValue();
+            if (marker == null || !marker.isValid()) {
+                removePaintballSaveMeMarker(session, targetId);
+                continue;
+            }
+            if (session.teams.getOrDefault(targetId, -2) != throwerTeam) continue;
+            if (marker.getLocation().clone().add(0.0D, 1.0D, 0.0D).distanceSquared(impact)
+                    <= ArcadePortRules.PAINTBALL_SAVE_ME_RADIUS * ArcadePortRules.PAINTBALL_SAVE_ME_RADIUS) {
+                revive.add(targetId);
+            }
+        }
+
+        for (UUID targetId : revive) {
+            if (active != session) return;
+            Player target = session.players.get(targetId);
+            ArmorStand marker = session.paintballSaveMeMarkers.get(targetId);
+            Location respawn = marker == null ? session.paintballSaveMeLocations.get(targetId) : marker.getLocation().clone();
+            removePaintballSaveMeMarker(session, targetId);
+            if (target == null || !target.isOnline() || respawn == null) continue;
+            session.respawning.remove(targetId);
+            session.alive.add(targetId);
+            target.leaveVehicle();
+            target.setSpectatorTarget(null);
+            target.teleport(respawn);
+            target.setGameMode(GameMode.ADVENTURE);
+            target.setAllowFlight(false);
+            target.setFlying(false);
+            target.setInvulnerable(false);
+            target.setFireTicks(0);
+            target.setHealth(20.0D);
+            target.setFoodLevel(20);
+            target.setSaturation(20.0F);
+            session.paintPiecesRemaining.put(targetId, 4);
+            givePaintballKit(session, target, session.paintballKits.getOrDefault(targetId, "rifle"));
+            target.sendMessage(ChatColor.GREEN + "You were revived by " + thrower.getName() + "!");
+            thrower.sendMessage(ChatColor.GREEN + "Revived " + target.getName() + "!");
+            target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8F, 1.2F);
+            session.lastLocations.put(targetId, respawn.clone());
+        }
+
+        for (Player teammate : alivePlayers(session)) {
+            if (session.teams.getOrDefault(teammate.getUniqueId(), -2) != throwerTeam) continue;
+            if (!ArcadePortRules.shouldPaintballWaterBombAffectPlayer(
+                    teammate.getLocation().distanceSquared(impact), true)) continue;
+            UUID teammateId = teammate.getUniqueId();
+            session.paintPiecesRemaining.put(teammateId, 4);
+            setPaintballArmor(session, teammate);
+            teammate.setHealth(20.0D);
+            teammate.sendMessage(ChatColor.AQUA + "Water Bomb cleaned your paint!");
+            teammate.playSound(teammate.getLocation(), Sound.ENTITY_SPLASH_POTION_BREAK, 0.7F, 1.25F);
+        }
+        thrower.playSound(impact, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 1.25F);
+        impact.getWorld().spawnParticle(Particle.SPLASH, impact, 24, 0.5D, 0.35D, 0.5D, 0.04D);
+        checkRoundEnd(session);
     }
 
     private int applyPaintballHit(Session session, Player attacker, Player target, int paintAmount) {
@@ -2692,6 +2810,19 @@ public final class ArcadePortManager implements Listener {
         }
         if (!session.alive.remove(player.getUniqueId())) return;
         player.leaveVehicle();
+        if (session.type == ArcadePortGame.PAINTBALL && player.isOnline()) {
+            spawnPaintballSaveMeMarker(session, player);
+            player.setGameMode(GameMode.SPECTATOR);
+            player.setAllowFlight(true);
+            player.setFlying(true);
+            player.sendMessage(ChatColor.RED + "Painted out! A teammate can throw a Water Bomb at your SAVE ME marker.");
+            if (killer != null && session.alive.contains(killer.getUniqueId())) {
+                session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+                killer.sendMessage(ChatColor.GREEN + "Paintball elimination!");
+            }
+            checkRoundEnd(session);
+            return;
+        }
         if (session.type == ArcadePortGame.EVOLUTION && player.isOnline()) {
             UUID victimId = player.getUniqueId();
             session.evolutionLifeKills.put(victimId, 0);
@@ -3227,6 +3358,12 @@ public final class ArcadePortManager implements Listener {
         session.dragonContactCooldowns.clear();
         session.paintProjectileDamage.clear();
         session.paintballLastShotAt.clear();
+        session.paintballWaterBombLastThrowAt.clear();
+        session.paintballWaterBombs.clear();
+        for (UUID outPlayer : new ArrayList<>(session.paintballSaveMeMarkers.keySet())) {
+            removePaintballSaveMeMarker(session, outPlayer);
+        }
+        session.paintballSaveMeLocations.clear();
         session.quiverArrowBounces.clear();
         session.quiverCloakedUntil.clear();
         for (Block block : session.evolutionWebs.keySet()) if (block.getType() == Material.COBWEB) block.setType(Material.AIR, false);
@@ -3762,6 +3899,17 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
 
+        if (session.type == ArcadePortGame.PAINTBALL
+                && event.getEntity() instanceof ThrownPotion potion
+                && session.paintballWaterBombs.remove(potion.getUniqueId())) {
+            if (potion.getShooter() instanceof Player thrower) {
+                paintballWaterBombImpact(session, thrower, potion.getLocation().clone());
+            }
+            session.entities.remove(potion);
+            potion.remove();
+            return;
+        }
+
         if (session.type == ArcadePortGame.DRAGONS
                 && event.getEntity() instanceof Arrow dragonArrow
                 && session.dragonTrackedArrows.remove(dragonArrow.getUniqueId())) {
@@ -3946,6 +4094,22 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.PAINTBALL) {
+            if (isPaintballWaterBomb(heldItem)) {
+                event.setCancelled(true);
+                UUID id = player.getUniqueId();
+                long now = System.currentTimeMillis();
+                long last = session.paintballWaterBombLastThrowAt.getOrDefault(id, 0L);
+                if (now - last < ArcadePortRules.PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS) return;
+                session.paintballWaterBombLastThrowAt.put(id, now);
+                consumeHeld(player);
+                ThrownPotion potion = player.launchProjectile(ThrownPotion.class);
+                potion.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(0.8D));
+                session.entities.add(potion);
+                session.paintballWaterBombs.add(potion.getUniqueId());
+                player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.8F, 1.0F);
+                player.sendMessage(ChatColor.AQUA + "Water Bomb thrown!");
+                return;
+            }
             String kit = paintballKitForItem(heldItem);
             if (kit != null) {
                 event.setCancelled(true);
@@ -4512,6 +4676,10 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> paintPiecesRemaining = new HashMap<>();
         final Map<UUID, String> paintballKits = new HashMap<>();
         final Map<UUID, Long> paintballLastShotAt = new HashMap<>();
+        final Map<UUID, Long> paintballWaterBombLastThrowAt = new HashMap<>();
+        final Set<UUID> paintballWaterBombs = new HashSet<>();
+        final Map<UUID, ArmorStand> paintballSaveMeMarkers = new HashMap<>();
+        final Map<UUID, Location> paintballSaveMeLocations = new HashMap<>();
         final Map<UUID, Integer> paintProjectileDamage = new HashMap<>();
         final Map<UUID, Integer> evolutionLevels = new HashMap<>();
         final Map<UUID, Integer> evolutionLifeKills = new HashMap<>();

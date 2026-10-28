@@ -276,6 +276,14 @@ public final class ArcadePortRules {
     }
 
 
+    public static final long PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS = 250L;
+    public static final double PAINTBALL_SAVE_ME_RADIUS = 3.0D;
+
+    public static boolean shouldPaintballWaterBombAffectPlayer(double distanceSquared, boolean sameTeam) {
+        return sameTeam && distanceSquared >= 0.0D
+                && distanceSquared <= PAINTBALL_SAVE_ME_RADIUS * PAINTBALL_SAVE_ME_RADIUS;
+    }
+
     public static int paintballPiecesAfterHit(int remainingPieces, int paintAmount) {
         return Math.max(0, Math.max(0, remainingPieces) - Math.max(0, paintAmount));
     }
