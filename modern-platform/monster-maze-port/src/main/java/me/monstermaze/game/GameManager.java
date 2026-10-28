@@ -873,10 +873,24 @@ public void startGame(Location preferCenter, int requestedPattern) {
     }
 
     private void teleportToSafePadCenter(Player player) {
-        if(player==null||safePad==null||!player.isOnline())return;
-        Location facing=player.getLocation(),destination=safePad.getLocation().clone();
-        destination.setYaw(facing.getYaw());destination.setPitch(facing.getPitch());
-        player.setFallDistance(0.0f);player.setVelocity(new Vector(0,0,0));player.teleport(destination);
+        if (player == null || safePad == null || !player.isOnline()) return;
+        Location from = player.getLocation();
+        Location destination = safePad.getLocation().clone();
+        destination.setYaw(yawToward(from, destination));
+        destination.setPitch(0.0F);
+        player.setFallDistance(0.0F);
+        player.setVelocity(new Vector(0, 0, 0));
+        player.teleport(destination);
+    }
+
+    /** Calculate the horizontal Minecraft yaw needed to face from one point toward another. */
+    static float yawToward(Location from, Location target) {
+        if (from == null || target == null || from.getWorld() == null
+                || from.getWorld() != target.getWorld()) return from == null ? 0.0F : from.getYaw();
+        double dx = target.getX() - from.getX();
+        double dz = target.getZ() - from.getZ();
+        if (dx * dx + dz * dz < 1.0E-6D) return from.getYaw();
+        return (float) Math.toDegrees(Math.atan2(-dx, dz));
     }
 
     /** The first two active pads get a brief, non-damaging celebration firework. */
