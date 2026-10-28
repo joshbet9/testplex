@@ -37,6 +37,11 @@ public final class ArcadePortRules {
         return Math.max(1, Math.min(3, (int) Math.ceil(0.5D + safeVelocity / 1.6D)));
     }
 
+    public static int nextEvolutionLevel(int currentLevel, boolean wonDuel) {
+        int next = currentLevel + (wonDuel ? 1 : -1);
+        return Math.max(0, Math.min(5, next));
+    }
+
     public static long nextBaconKnockbackInterval(long currentMillis) {
         return Math.max(BACON_MIN_KNOCKBACK_INTERVAL_MILLIS, currentMillis - 5_000L);
     }
