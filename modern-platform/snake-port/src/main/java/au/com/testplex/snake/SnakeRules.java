@@ -63,7 +63,9 @@ public final class SnakeRules {
      */
     public static double movementSpeed(int tailLength, boolean speedBoost) {
         double sourceGrowth = Math.min(0.7D, Math.max(0, tailLength) / (double) SPEED_REFERENCE_LENGTH);
-        double speed = 0.18D + (sourceGrowth / 0.7D) * 0.16D;
+        // Legacy CreatureMoveFast uses multiplier 1.2 + 2 * (0.4 + sourceGrowth).
+        // Its effective movement scales at about 0.1 block/tick per multiplier unit.
+        double speed = 0.2D + sourceGrowth * 0.2D;
         return speedBoost ? speed * 1.5D : speed;
     }
 
