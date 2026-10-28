@@ -216,4 +216,11 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.canCarryAnotherSheep(-1));
     }
 
+    @Test void sheepQuestTiesGoToFirstLeadOvertime() {
+        assertTrue(ArcadePortRules.shouldEnterSheepQuestOvertime(0, 0));
+        assertTrue(ArcadePortRules.shouldEnterSheepQuestOvertime(3, 3));
+        assertFalse(ArcadePortRules.shouldEnterSheepQuestOvertime(4, 3));
+        assertFalse(ArcadePortRules.shouldEnterSheepQuestOvertime(2, 5));
+    }
+
 }
