@@ -146,7 +146,7 @@ public class MMCommand implements CommandExecutor {
         sender.sendMessage(ChatColor.WHITE+"/mm start mmr"+ChatColor.GRAY+" - start your weakest MMR configuration");
         sender.sendMessage(ChatColor.WHITE+"/mm map <name>"+ChatColor.GRAY+" - choose the map");
         sender.sendMessage(ChatColor.WHITE+"/mm pattern <1|2|3|random>"+ChatColor.GRAY+" - choose the maze");
-        sender.sendMessage(ChatColor.WHITE+"/mm mode <original|modern|classic>"+ChatColor.GRAY+" - choose the mode");
+        sender.sendMessage(ChatColor.WHITE+"/mm mode <original|speed|modern|classic>"+ChatColor.GRAY+" - choose the mode");
         sender.sendMessage(ChatColor.WHITE+"/mm gui"+ChatColor.GRAY+" - open kit selector");
         sender.sendMessage(ChatColor.WHITE+"/mm kit <kit>"+ChatColor.GRAY+" - choose a kit");
         sender.sendMessage(ChatColor.WHITE+"/mm kits"+ChatColor.GRAY+" - list kits");
