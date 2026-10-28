@@ -5105,8 +5105,16 @@ public final class ArcadePortManager implements Listener {
                 event.setCancelled(true);
                 return;
             }
-            int x = event.getBlockPlaced().getX();
-            if ((team == 0 && x > session.turfFrontlineX) || (team == 1 && x <= session.turfFrontlineX)) {
+            Block placed = event.getBlockPlaced();
+            if (!ArcadePortRules.isTurfWarsBuildWithinBounds(placed.getX(), placed.getZ(),
+                    session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive,
+                    session.turfMinZ, session.turfMaxZExclusive)) {
+                event.setCancelled(true);
+                player.sendMessage(ChatColor.YELLOW + "You must build inside the original arena.");
+                return;
+            }
+            int x = placed.getX();
+            if (!ArcadePortRules.canTurfWarsBuildOnTerritory(team, x, session.turfFrontlineX)) {
                 event.setCancelled(true);
                 player.sendMessage(ChatColor.YELLOW + "You can only build on your team's turf.");
                 return;
