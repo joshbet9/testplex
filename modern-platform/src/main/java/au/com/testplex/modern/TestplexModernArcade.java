@@ -6,6 +6,7 @@ import au.com.testplex.modern.player.PlayerPreferenceStore;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.PluginCommand;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -67,7 +68,7 @@ public final class TestplexModernArcade extends JavaPlugin {
     }
 
     private void bind(String name, String description, SenderAction action) {
-        Command command = getCommand(name);
+        PluginCommand command = getCommand(name);
         if (command == null) {
             throw new IllegalStateException("Missing command definition in plugin.yml: " + name);
         }
