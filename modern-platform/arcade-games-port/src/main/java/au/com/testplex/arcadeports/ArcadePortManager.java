@@ -264,7 +264,8 @@ public final class ArcadePortManager implements Listener {
                         world.getBlockAt(x, 63, z).setType(type.floor(), false);
                     }
                 }
-                world.getBlockAt(cx, 64, cz).setType(Material.CRAFTING_TABLE, false);
+                // Keep the utility block off the exact player spawn block.
+                world.getBlockAt(cx + 2, 64, cz).setType(Material.CRAFTING_TABLE, false);
             }
             return;
         }
@@ -404,9 +405,9 @@ public final class ArcadePortManager implements Listener {
             spawnSheep(session);
             lastSheepSpawn = now + 2_000L;
         }
-        if (session.type == ArcadePortGame.MICRO_BATTLES && session.ticks % 200 == 0) {
+        if (session.type == ArcadePortGame.MICRO_BATTLES && ArcadePortRules.shouldShrinkMicroBattlesBorder(session.ticks)) {
             WorldBorder border = session.world.getWorldBorder();
-            border.setSize(Math.max(10.0D, border.getSize() - 6.0D), 8L);
+            border.setSize(ArcadePortRules.nextMicroBattlesBorderSize(border.getSize()), 8L);
         }
         if (session.type == ArcadePortGame.PAINTBALL && session.ticks % 40 == 0) {
             for (UUID id : session.alive) {
@@ -740,6 +741,17 @@ public final class ArcadePortManager implements Listener {
         session.lastLocations.put(player.getUniqueId(), current.clone());
     }
 
+    private void handleDragonHazardHit(Session session, Fireball fireball, Player target) {
+        if (active != session || !session.alive.contains(target.getUniqueId())) return;
+        Vector recoil = target.getLocation().toVector().subtract(fireball.getLocation().toVector());
+        if (recoil.lengthSquared() < 0.001D) recoil = new Vector(0.0D, 1.0D, 0.0D);
+        target.setVelocity(recoil.normalize().multiply(0.8D).setY(0.55D));
+        target.getWorld().spawnParticle(Particle.FLAME, target.getLocation().add(0.0D, 1.0D, 0.0D),
+                16, 0.35D, 0.4D, 0.35D, 0.05D);
+        target.playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.7F, 1.4F);
+        target.sendMessage(ChatColor.RED + "A dragon fireball knocked you back!");
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         Session session = active;
@@ -750,13 +762,6 @@ public final class ArcadePortManager implements Listener {
                 Entity damager = byEntity.getDamager();
                 if (damager instanceof Player attacker) {
                     handlePlayerHit(session, attacker, target, "melee");
-                } else if (session.type == ArcadePortGame.DRAGONS && damager instanceof Fireball fireball
-                        && fireball.getShooter() == null) {
-                    Vector recoil = target.getLocation().toVector().subtract(fireball.getLocation().toVector());
-                    if (recoil.lengthSquared() < 0.001D) recoil = new Vector(0, 1, 0);
-                    target.setVelocity(recoil.normalize().multiply(0.8D).setY(0.55D));
-                    target.getWorld().spawnParticle(Particle.FLAME, target.getLocation().add(0, 1, 0), 16, 0.35D, 0.4D, 0.35D, 0.05D);
-                    target.playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.7F, 1.4F);
                 } else if (session.type == ArcadePortGame.DEATH_TAG && damager instanceof Zombie zombie
                         && session.entities.contains(zombie)) {
                     eliminate(session, target, null, "was tagged by the chaser");
@@ -769,6 +774,24 @@ public final class ArcadePortManager implements Listener {
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+
+        // Handle Dragons fireballs here rather than relying on damage-event ordering.
+        // World hazards knock players back; player-fired fireballs follow normal combat rules.
+        if (session.type == ArcadePortGame.DRAGONS && event.getEntity() instanceof Fireball fireball
+                && session.entities.contains(fireball)) {
+            ProjectileSource source = fireball.getShooter();
+            if (event.getHitEntity() instanceof Player target && session.alive.contains(target.getUniqueId())) {
+                if (source instanceof Player shooter) {
+                    hitProjectile(session, fireball, shooter, target);
+                } else if (ArcadePortRules.isWorldDragonHazard(session.type,
+                        session.entities.contains(fireball), source instanceof Player)) {
+                    handleDragonHazardHit(session, fireball, target);
+                }
+            }
+            fireball.remove();
+            return;
+        }
+
         if (event.getHitEntity() instanceof Player target && event.getEntity() instanceof Projectile projectile) {
             ProjectileSource source = projectile.getShooter();
             if (source instanceof Player shooter) hitProjectile(session, projectile, shooter, target);
