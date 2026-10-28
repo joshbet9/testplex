@@ -3121,55 +3121,89 @@ public final class ArcadePortManager implements Listener {
                     ignored -> now + ArcadePortRules.bombLobbersCraftmanIntervalMillis(elapsed));
             if (now >= nextGrant) {
                 if (inventoryCount(player, Material.TNT) < ArcadePortRules.BOMB_LOBBERS_MAX_CARRIED) {
-                    player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Left-click to throw at enemy players.", 1));
+                    player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT",
+                            "Left-click to throw at enemy players.", 1));
                 }
-                session.bombNextCraftAt.put(id, now + ArcadePortRules.bombLobbersCraftmanIntervalMillis(elapsed));
+                session.bombNextCraftAt.put(id,
+                        now + ArcadePortRules.bombLobbersCraftmanIntervalMillis(elapsed));
             }
         }
+
         for (Entity entity : new ArrayList<>(session.entities)) {
             if (!(entity instanceof TNTPrimed bomb)) continue;
-            UUID id = bomb.getUniqueId();
+            UUID bombId = bomb.getUniqueId();
             if (!bomb.isValid()) {
-                session.bombOwners.remove(id);
-                session.bombLastLocations.remove(id);
-                session.bombCreatedAt.remove(id);
-                session.bombPrimed.remove(id);
+                removeBombTracking(session, bombId);
                 continue;
             }
-            UUID ownerId = session.bombOwners.get(id);
+            UUID ownerId = session.bombOwners.get(bombId);
             if (ownerId == null) continue;
-            if (session.bombPrimed.contains(id)) continue;
+            if (session.bombPrimed.contains(bombId)) continue;
             Player owner = session.players.get(ownerId);
             if (owner == null || !owner.isOnline() || !session.alive.contains(ownerId)) {
-                session.bombOwners.remove(id);
-                session.bombLastLocations.remove(id);
-                session.bombCreatedAt.remove(id);
-                session.bombPrimed.remove(id);
+                removeBombTracking(session, bombId);
                 session.entities.remove(bomb);
                 bomb.remove();
                 continue;
             }
+
             Location current = bomb.getLocation().clone();
-            Location previous = session.bombLastLocations.put(id, current);
+            Location previous = session.bombLastLocations.put(bombId, current);
             if (previous == null) previous = current;
-            long createdAt = session.bombCreatedAt.getOrDefault(id, now);
+
+            // Direct-hit detection must run before wall/fuse handling so a TNT that
+            // hits a player on the same tick still receives its source-style hit ding.
+            boolean directHit = false;
+            for (Player target : alivePlayers(session)) {
+                UUID targetId = target.getUniqueId();
+                if (targetId.equals(ownerId)) continue;
+                if (session.teams.getOrDefault(ownerId, -1)
+                        .equals(session.teams.getOrDefault(targetId, -2))) continue;
+                double distanceSquared = distanceSquaredToSegment(target.getLocation(), previous, current);
+                if (!ArcadePortRules.isBombDirectHit(distanceSquared)) continue;
+
+                removeBombTracking(session, bombId);
+                session.entities.remove(bomb);
+                bomb.remove();
+                Vector away = target.getLocation().toVector().subtract(current.toVector());
+                if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 0.25D, 1.0D);
+                target.setVelocity(away.normalize().multiply(0.85D).setY(0.45D));
+                target.getWorld().spawnParticle(Particle.EXPLOSION,
+                        target.getLocation().add(0.0D, 1.0D, 0.0D), 1,
+                        0.1D, 0.1D, 0.1D, 0.0D);
+                target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0F, 0.9F);
+                owner.playSound(owner.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.0F, 1.45F);
+                owner.sendMessage(ChatColor.YELLOW + "Direct hit!");
+                if (target.getHealth() <= 10.0D) eliminate(session, target, owner, "was directly hit by TNT");
+                else target.setHealth(target.getHealth() - 10.0D);
+                checkRoundEnd(session);
+                directHit = true;
+                break;
+            }
+            if (directHit || active != session) {
+                if (active != session) return;
+                continue;
+            }
+
+            long createdAt = session.bombCreatedAt.getOrDefault(bombId, now);
             long age = Math.max(0L, now - createdAt);
             boolean touchingSolid = isBombTouchingSolidBlock(bomb);
             if (ArcadePortRules.shouldPrimeBombLobbersBomb(age, touchingSolid)) {
-                session.bombPrimed.add(id);
+                session.bombPrimed.add(bombId);
                 bomb.setFuseTicks(0);
                 continue;
             }
+
+            // The original TNT is re-thrown with its existing velocity as its short
+            // fuse reaches its last second. It only actually detonates on contact
+            // after 3s or unconditionally after 8s.
             if (bomb.getFuseTicks() <= 20) {
                 Vector velocity = bomb.getVelocity().clone();
                 TNTPrimed replacement = session.world.spawn(current, TNTPrimed.class);
                 replacement.setFuseTicks(ArcadePortRules.BOMB_LOBBERS_FUSE_TICKS);
                 replacement.setVelocity(velocity);
+                removeBombTracking(session, bombId);
                 session.entities.remove(bomb);
-                session.bombOwners.remove(id);
-                session.bombLastLocations.remove(id);
-                session.bombCreatedAt.remove(id);
-                session.bombPrimed.remove(id);
                 bomb.remove();
                 UUID replacementId = replacement.getUniqueId();
                 session.entities.add(replacement);
@@ -3177,48 +3211,24 @@ public final class ArcadePortManager implements Listener {
                 session.bombLastLocations.put(replacementId, current.clone());
                 session.bombCreatedAt.put(replacementId, createdAt);
             }
-
-            for (Player target : alivePlayers(session)) {
-                UUID targetId = target.getUniqueId();
-                if (targetId.equals(ownerId)) continue;
-                if (session.teams.getOrDefault(ownerId, -1).equals(session.teams.getOrDefault(targetId, -2))) continue;
-                double distanceSquared = distanceSquaredToSegment(target.getLocation(), previous, current);
-                if (!ArcadePortRules.isBombDirectHit(distanceSquared)) continue;
-
-                session.bombOwners.remove(replacementOrOriginalId(id, session, current));
-                session.bombLastLocations.remove(id);
-                session.bombCreatedAt.remove(id);
-                session.bombPrimed.remove(id);
-                session.entities.remove(bomb);
-                bomb.remove();
-                Vector away = target.getLocation().toVector().subtract(current.toVector());
-                if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 0.25D, 1.0D);
-                target.setVelocity(away.normalize().multiply(0.85D).setY(0.45D));
-                target.getWorld().spawnParticle(Particle.EXPLOSION, target.getLocation().add(0.0D, 1.0D, 0.0D),
-                        1, 0.1D, 0.1D, 0.1D, 0.0D);
-                target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0F, 0.9F);
-                if (owner != null && owner.isOnline()) {
-                    owner.playSound(owner.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.0F, 1.45F);
-                    owner.sendMessage(ChatColor.YELLOW + "Direct hit!");
-                }
-                if (target.getHealth() <= 10.0D) eliminate(session, target, owner, "was directly hit by TNT");
-                else target.setHealth(target.getHealth() - 10.0D);
-                checkRoundEnd(session);
-                break;
-            }
         }
     }
 
+    private void removeBombTracking(Session session, UUID bombId) {
+        session.bombOwners.remove(bombId);
+        session.bombLastLocations.remove(bombId);
+        session.bombCreatedAt.remove(bombId);
+        session.bombPrimed.remove(bombId);
+    }
+
     private boolean isBombTouchingSolidBlock(TNTPrimed bomb) {
-        Location location = bomb.getLocation();
-        Block center = location.getBlock();
+        Block center = bomb.getLocation().getBlock();
         for (int dx = -1; dx <= 1; dx++) {
             for (int dy = -1; dy <= 1; dy++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     if (dx == 0 && dy == 0 && dz == 0) continue;
                     Block nearby = center.getRelative(dx, dy, dz);
-                    if (nearby.isLiquid()) continue;
-                    if (nearby.getType().isSolid()) return true;
+                    if (!nearby.isLiquid() && nearby.getType().isSolid()) return true;
                 }
             }
         }
@@ -3236,10 +3246,8 @@ public final class ArcadePortManager implements Listener {
             if (event.getAction().isRightClick()) current = Math.min(3, current + 1);
             else if (event.getAction().isLeftClick()) current = Math.max(1, current - 1);
             session.bombPitchLevels.put(id, current);
-            ItemStack lever = heldItem.clone();
-            lever.setAmount(current);
-            lever.setItemMeta(namedItem(Material.LEVER, "Velocity Selector",
-                    "Throw power " + current + " (" + ArcadePortRules.bombLobbersPitchVelocity(current) + "x). Right-click +; left-click -.", 1).getItemMeta());
+            ItemStack lever = namedItem(Material.LEVER, "Velocity Selector",
+                    "Throw power " + current + "/3. Right-click +; left-click -.", current);
             player.getInventory().setItemInMainHand(lever);
             player.sendMessage(ChatColor.YELLOW + "TNT throw power: " + current + "/3.");
             return true;
@@ -3253,9 +3261,8 @@ public final class ArcadePortManager implements Listener {
                 return true;
             }
             Vector facing = player.getLocation().getDirection().normalize();
-            int forwardX = (int) Math.round(-facing.getX());
+            int forwardX = (int) Math.round(facing.getX());
             int forwardZ = (int) Math.round(facing.getZ());
-            // The historical kit builds five wide and three high, immediately behind the clicked block.
             int centerX = clicked.getX() + forwardX;
             int centerY = clicked.getY() + 1;
             int centerZ = clicked.getZ() + forwardZ;
@@ -3263,7 +3270,8 @@ public final class ArcadePortManager implements Listener {
             int sideZ = -forwardX;
             for (int width = -2; width <= 2; width++) {
                 for (int height = 0; height < 3; height++) {
-                    Block wall = session.world.getBlockAt(centerX + sideX * width, centerY + height, centerZ + sideZ * width);
+                    Block wall = session.world.getBlockAt(centerX + sideX * width,
+                            centerY + height, centerZ + sideZ * width);
                     wall.setType(Material.STONE_BRICKS, false);
                 }
             }
@@ -3296,10 +3304,6 @@ public final class ArcadePortManager implements Listener {
         velocity.setY(power);
         player.setVelocity(velocity);
         player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.7F, 1.3F);
-    }
-
-    private UUID replacementOrOriginalId(UUID original, Session session, Location ignored) {
-        return original;
     }
 
     private double distanceSquaredToSegment(Location point, Location start, Location end) {
