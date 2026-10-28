@@ -53,10 +53,13 @@ class SnakeRulesTest {
                 new org.bukkit.Location(null, 7.0D, 64.0D, 2.0D),
                 new org.bukkit.Location(null, 6.0D, 64.0D, 2.0D));
         java.util.List<org.bukkit.Location> path = SnakeRules.seedReversedBodyPath(segments);
-        assertEquals(3, path.size());
+        assertEquals(11, path.size());
         assertEquals(8.0D, path.get(0).getX(), 0.000001D);
-        assertEquals(7.0D, path.get(1).getX(), 0.000001D);
-        assertEquals(6.0D, path.get(2).getX(), 0.000001D);
+        assertEquals(7.0D, path.get(5).getX(), 0.000001D);
+        assertEquals(6.0D, path.get(10).getX(), 0.000001D);
+        for (int i = 1; i < path.size(); i++) {
+            assertTrue(path.get(i - 1).distance(path.get(i)) <= 0.200001D);
+        }
         segments.get(0).setX(99.0D);
         assertEquals(8.0D, path.get(0).getX(), 0.000001D);
         assertTrue(SnakeRules.seedReversedBodyPath(null).isEmpty());
