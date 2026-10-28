@@ -148,6 +148,11 @@ public final class ArcadePortRules {
         return nowMillis >= nextArrowAt && namedArrows < Math.max(0, maximum);
     }
 
+    /** Map MAX_Y is exclusive; scanning is complete as soon as the next Y reaches it. */
+    public static boolean isMicroCrumbleScanComplete(int nextY, int maxYExclusive) {
+        return nextY >= maxYExclusive;
+    }
+
     public static boolean shouldRemoveMicroBarrier(long elapsedMillis) {
         return elapsedMillis >= MICRO_BATTLES_BARRIER_DURATION_MILLIS;
     }
