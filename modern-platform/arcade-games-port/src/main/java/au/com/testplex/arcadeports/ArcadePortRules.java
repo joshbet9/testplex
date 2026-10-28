@@ -422,6 +422,11 @@ public final class ArcadePortRules {
         };
     }
 
+    /** One in the Quiver refunds its single arrow only when the hit secures a kill. */
+    public static boolean quiverRegrantsArrowAfterHit(boolean targetEliminated) {
+        return targetEliminated;
+    }
+
     public static double quiverMeleeDamage(String kit) {
         String value = normalizeQuiverKit(kit);
         if (value == null) value = "leaper";
