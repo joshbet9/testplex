@@ -304,6 +304,13 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRunnerFallingBlockHit(70.0D, 64.0D));
     }
 
+    @Test void dragonEscapeHellMapStartsAtNight() {
+        assertEquals(16_000L, ArcadePortRules.dragonEscapeWorldTime("Dragon Escape Hell"));
+        assertEquals(6_000L, ArcadePortRules.dragonEscapeWorldTime("Dragon Escape Pirate"));
+        assertEquals(6_000L, ArcadePortRules.dragonEscapeWorldTime("Standard"));
+        assertEquals(6_000L, ArcadePortRules.dragonEscapeWorldTime(null));
+    }
+
     @Test void dragonEscapeUsesARealChaseProgressAndCourseFinishProximity() {
         assertEquals(0.2D, ArcadePortRules.DRAGON_ESCAPE_CHASE_SPEED, 0.00001D);
         assertEquals(10.0D, ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS, 0.00001D);
