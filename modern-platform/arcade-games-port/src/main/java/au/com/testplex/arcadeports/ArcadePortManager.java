@@ -2092,26 +2092,12 @@ public final class ArcadePortManager implements Listener {
                 if (active != session) return;
             }
             if (session.type == ArcadePortGame.SHEEP_QUEST) {
-                Player sheepWinner = sheepQuestLeader(session);
-                if (sheepWinner != null) {
-                    finish(session, sheepWinner, true);
-                    return;
-                }
-                if (!session.sheepQuestOvertime) {
-                    if (ArcadePortRules.shouldEnterSheepQuestOvertime(sheepQuestTeamCounts(session))) {
-                        session.sheepQuestOvertime = true;
-                        session.endsAt = Long.MAX_VALUE;
-                        announce(session, ChatColor.GOLD + "Sheep Quest is tied! First team to take the lead will win.");
-                    } else {
-                        // A unique leading team without an online participant cannot claim the win.
-                        finish(session, null, true);
-                        return;
-                    }
-                }
+                // Most sheep in the pen at five minutes wins. A tied result is a draw, not overtime.
+                finish(session, sheepQuestLeader(session), true);
             } else {
                 finish(session, timeoutWinner(session), true);
-                return;
             }
+            return;
         }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
@@ -2150,13 +2136,6 @@ public final class ArcadePortManager implements Listener {
             if (now >= lastSheepSpawn && session.sheep.size() < 12) {
                 spawnSheep(session);
                 lastSheepSpawn = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
-            }
-            if (session.sheepQuestOvertime) {
-                Player sheepWinner = sheepQuestLeader(session);
-                if (sheepWinner != null) {
-                    finish(session, sheepWinner, true);
-                    return;
-                }
             }
         }
 
@@ -3213,8 +3192,7 @@ public final class ArcadePortManager implements Listener {
             if (!p.isOnline()) continue;
             int score = session.scores.getOrDefault(id, 0);
             String specific = gameStatusText(session, p);
-            String timeText = session.type == ArcadePortGame.SHEEP_QUEST && session.sheepQuestOvertime
-                    ? "OVERTIME" : seconds + "s";
+            String timeText = seconds + "s";
             p.sendActionBar(ChatColor.GOLD + session.type.displayName() + ChatColor.GRAY + " | " + timeText
                     + ChatColor.DARK_GRAY + " | " + ChatColor.GREEN + "alive " + alive
                     + ChatColor.DARK_GRAY + " | " + ChatColor.YELLOW + "score " + score
@@ -5720,7 +5698,6 @@ public final class ArcadePortManager implements Listener {
         long startedAt;
          boolean microBarrierActive;
         boolean turfCombat;
-        boolean sheepQuestOvertime;
         long turfPhaseEndsAt;
         int turfFrontlineX = -1;
         int turfInitialFrontlineX = -1;
