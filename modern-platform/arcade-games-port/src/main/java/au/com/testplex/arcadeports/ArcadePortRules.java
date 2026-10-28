@@ -199,6 +199,11 @@ public final class ArcadePortRules {
         };
     }
 
+    /** Bomb Lobbers TNT damages opponents only; this remains true if the thrower disconnects. */
+    public static boolean areBombLobbersEnemies(int ownerTeam, int targetTeam) {
+        return ownerTeam >= 0 && targetTeam >= 0 && ownerTeam != targetTeam;
+    }
+
     /**
      * Legacy Minecraft armour reduction with zero toughness:
      * effective armour = min(20, max(armour / 5, armour - damage / 2)).
