@@ -172,7 +172,7 @@ Assert-Contains "Dragon Escape keeps a separate trail line and grouped finish li
 Assert-Contains "Per-game pages keep win effects separate from game cosmetic lines" $cosmeticsFile "Win effects are managed separately in Cosmetics."
 Assert-NotContains "Per-game pages no longer show a separate win-effect placeholder" $cosmeticsFile "Win Effect Plan"
 Assert-Contains "Custom Pack unlock can be provided by the entitlement adapter" $cosmeticsFile "setMonsterMazeCustomPackUnlocked(UUID playerId, boolean unlocked)"
-Assert-Contains "Per-mob-set Safe Pad and beacon colours are stored together" $cosmeticsFile 'data.set(base + ".beacon", parts[2]);'
+Assert-Contains "Per-mob-set colour selection persists only the selected colour setting" $cosmeticsFile 'data.set(path, parts[2]);'
 Assert-Contains "Per-mob-set Safe Pad and beacon colours keep independent settings" $cosmeticsFile 'String padSelected = data.getString(base + ".safe-pad", defaultColour);'
 Assert-Contains "Enabled Monster Maze mob sets are exposed to gameplay" $cosmeticsFile "getEnabledMonsterMazeMobSets(UUID playerId)"
 Assert-Contains "Custom mob-set selection is persisted separately from default map appearance" $cosmeticsFile "mob-sets-customized"
@@ -197,15 +197,19 @@ Assert-Contains "Random maze selection returns the selected non-repeat map" $lay
 Assert-Contains "Fixed pattern selection is available" $layoutFile "getPatternMapPreset"
 Assert-Contains "Pattern selection is configurable" $mazeCoreFile "getPatternMapPreset(_center, getMazeBlockData(), requestedPattern)"
 Assert-Contains "Personal bests use Mineplex custom data" $pbFile "customData.setData(player, key, bestToSave)"
-Assert-Contains "PB recording falls back to the registered Mineplex custom-data manager" $pbFile "Managers.get(CustomDataManager.class)"
+Assert-Contains "PB recording requires the registered Mineplex custom-data manager when needed" $pbFile "Managers.require(CustomDataManager.class)"
 Assert-Contains "PB writes are logged for test-server diagnosis" $pbFile "[MonsterMaze PB] Recorded "
 Assert-Contains "PB browser uses the registered account custom-data manager" $pbPageFile "Managers.require(CustomDataManager.class)"
 Assert-Contains "Snake green slime food uses floor-safe spawn search" $snakeFile "findFoodSpawnLocation(origin)"
 Assert-Contains "Snake clones the team start before choosing a food spawn" $snakeFile "GetSpawns().get(0).clone()"
 Assert-Contains "Snake Magma Cubes opt into Reborn creature override" $snakeFile "CreatureAllowOverride = true;"
 Assert-Contains "Magma Cube contact starts the Mario-Kart hotbar roll" $snakeFile "beginMagmaRoulette(player)"
+Assert-Contains "Roulette preview animates an item in the player's hotbar" $snakeFile "setItem(ROULETTE_HOTBAR_SLOT, rouletteItem(preview))"
+Assert-Contains "Roulette restores the original hotbar item" $snakeFile "restoreRouletteHotbarItem(player)"
 Assert-Contains "Roulette effect durations escalate on successive hits" $snakeFile "new int[] {1, 3, 5, 10, 15, 20, 30}"
 Assert-Contains "Drift limits changes to travel direction so momentum is visible" $snakeFile "MAX_DRIFT_TURN_RADIANS"
+Assert-Contains "Turn Lag uses a balanced per-tick yaw cap" $snakeFile "clamp(delta, -6.0f, 6.0f)"
+Assert-Contains "Overshoot uses a balanced steering multiplier" $snakeFile "delta * 0.35f"
 Assert-NotContains "Snake no longer applies steering debuffs on an unrelated 25-second timer" $snakeFile "ROULETTE_INTERVAL_MS"
 Assert-Contains "Personal best keys distinguish game mode, pattern and kit" $pbFile 'displayPrefix + "pb.pattern" + pattern + "." + slug(kitName)'
 Assert-Contains "Personal bests can be viewed with /game pb" $pbFile "public static void show("
