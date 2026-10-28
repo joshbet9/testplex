@@ -607,7 +607,7 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.MICRO_BATTLES) announce(session, ChatColor.AQUA + "Micro Battles: gather blocks; glass barriers drop after 10 seconds.");
         else announce(session, ChatColor.GOLD + type.displayName() + " started! This is a first-pass mechanics test.");
         if (type == ArcadePortGame.TURF_WARS) {
-            announce(session, ChatColor.GREEN + "Build phase: place your team's wool on your own turf for 20 seconds.");
+            announce(session, ChatColor.GREEN + "Opening build phase: place your team's wool on your own turf for 40 seconds.");
         }
         if (participants.size() == 1) announce(session, ChatColor.GRAY + "Solo test mode: the run will remain available for practice until the timer ends or you reset it.");
         session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
