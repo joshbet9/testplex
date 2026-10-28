@@ -23,18 +23,17 @@ class ArcadePortGameTest {
         assertEquals(ArcadePortGame.BOMB_LOBBERS, ArcadePortGame.fromId("Bomb Lobbers"));
         assertEquals(ArcadePortGame.MICRO_BATTLES, ArcadePortGame.fromId("micro-battles"));
     }
-    @Test void microBattlesBorderWaitsThirtySecondsThenShrinksEveryTwentySeconds() {
-        assertFalse(ArcadePortRules.shouldShrinkMicroBattlesBorder(599));
-        assertTrue(ArcadePortRules.shouldShrinkMicroBattlesBorder(600));
-        assertFalse(ArcadePortRules.shouldShrinkMicroBattlesBorder(999));
-        assertTrue(ArcadePortRules.shouldShrinkMicroBattlesBorder(1000));
-        assertTrue(ArcadePortRules.shouldShrinkMicroBattlesBorder(1400));
+    @Test void microBattlesGlassBarrierDropsAfterTenSeconds() {
+        assertFalse(ArcadePortRules.shouldRemoveMicroBarrier(9_999L));
+        assertTrue(ArcadePortRules.shouldRemoveMicroBarrier(10_000L));
+        assertTrue(ArcadePortRules.shouldRemoveMicroBarrier(12_000L));
     }
 
-    @Test void microBattlesBorderStopsAtItsMinimumSize() {
-        assertEquals(36.0D, ArcadePortRules.nextMicroBattlesBorderSize(42.0D));
-        assertEquals(10.0D, ArcadePortRules.nextMicroBattlesBorderSize(10.0D));
-        assertEquals(10.0D, ArcadePortRules.nextMicroBattlesBorderSize(8.0D));
+    @Test void microBattlesOpeningRestrictionOnlyPunishesLeavingForAnotherIsland() {
+        assertTrue(ArcadePortRules.shouldPunishMicroIslandExit(3_999L, 100.0D, 25.0D));
+        assertFalse(ArcadePortRules.shouldPunishMicroIslandExit(4_000L, 100.0D, 25.0D));
+        assertFalse(ArcadePortRules.shouldPunishMicroIslandExit(3_999L, 25.0D, 100.0D));
+        assertFalse(ArcadePortRules.shouldPunishMicroIslandExit(-1L, 100.0D, 25.0D));
     }
 
     @Test void worldDragonHazardIsNotConfusedWithPlayerFireball() {
