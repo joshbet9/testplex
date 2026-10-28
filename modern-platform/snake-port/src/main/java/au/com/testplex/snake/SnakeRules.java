@@ -15,11 +15,21 @@ public final class SnakeRules {
     public static final double FOOD_PICKUP_RADIUS = 2.0D;
 
     public static final int MAX_HAZARDS = 4;
+    public static final int HAZARD_SPAWN_ATTEMPTS = 48;
+    public static final int HAZARD_SPAWN_BASE_DISTANCE = 12;
+    public static final int HAZARD_SPAWN_DISTANCE_STEP = 2;
+    public static final int HAZARD_SPAWN_DISTANCE_VARIANTS = 5;
     public static final long FIRST_HAZARD_DELAY_MILLIS = 10_000L;
     public static final long HAZARD_INTERVAL_MILLIS = 15_000L;
     public static final int HAZARD_STEERING_INTERVAL_TICKS = 4;
     public static final double HAZARD_STEERING_SPEED = 0.12D;
     public static final double HAZARD_CONTACT_RADIUS = 2.1D;
+
+    /** Match Reborn's golden-angle search distances for finding a clear magma-cube spawn. */
+    public static double hazardSpawnDistance(int attempt) {
+        return HAZARD_SPAWN_BASE_DISTANCE
+                + Math.floorMod(attempt, HAZARD_SPAWN_DISTANCE_VARIANTS) * HAZARD_SPAWN_DISTANCE_STEP;
+    }
 
     /** Legacy Snake leaves an item box available if the player is still rolling an item. */
     public static boolean shouldConsumeHazardOnContact(boolean rouletteActive) {
