@@ -644,6 +644,11 @@ public final class ArcadePortRules {
     }
 
     /** Surviving runners have the Death Tag objective at timeout; chaser scores are only a fallback when none remain. */
+    /** The chaser side wins only after there are no living runners left. */
+    public static boolean deathTagChasersWinRound(int runnersRemaining) {
+        return runnersRemaining <= 0;
+    }
+
     public static boolean shouldDeathTagRunnerWinTimeout(int runnersRemaining) {
         return runnersRemaining > 0;
     }
