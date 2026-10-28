@@ -29,6 +29,14 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldRemoveMicroBarrier(12_000L));
     }
 
+    @Test void microBattlesBorderChecksRespectItsConfiguredCentre() {
+        assertFalse(ArcadePortRules.isOutsideWorldBorder(110.0D, -40.0D, 100.0D, -40.0D, 40.0D));
+        assertFalse(ArcadePortRules.isOutsideWorldBorder(120.0D, -60.0D, 100.0D, -40.0D, 40.0D));
+        assertTrue(ArcadePortRules.isOutsideWorldBorder(120.01D, -40.0D, 100.0D, -40.0D, 40.0D));
+        assertTrue(ArcadePortRules.isOutsideWorldBorder(100.0D, -60.01D, 100.0D, -40.0D, 40.0D));
+        assertTrue(ArcadePortRules.isOutsideWorldBorder(Double.NaN, 0.0D, 0.0D, 0.0D, 100.0D));
+    }
+
     @Test void microBattlesOpeningRestrictionOnlyPunishesLeavingForAnotherIsland() {
         assertTrue(ArcadePortRules.shouldPunishMicroIslandExit(3_999L, 100.0D, 25.0D));
         assertFalse(ArcadePortRules.shouldPunishMicroIslandExit(4_000L, 100.0D, 25.0D));
