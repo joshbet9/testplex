@@ -313,12 +313,11 @@ public class KitManager implements Listener {
                 a.setBaseValue(jumpTarget);
             }
 
-            // Constant speed-boost ("speeding") for lock-pinned players, MODERN only, to echo
-            // the 1.8 ground-level dash as a plain run-speed lift (Speed II ≈ 1.4x sprint).
-            // Applied to players who currently have no jumps (non-Jumper / no-charge Jumper),
-            // kept off Jumpers with charges and off in every other mode. Re-applied each tick
-            // so it never expires and never rides a stale potion icon.
-            boolean boosting = !allowJump && game.getMode() == MazeMode.MODERN && !isPlayerLaunched(p);
+            // Speed and Modern use a Speed II run-speed lift as the modern-client replacement
+            // for the 1.8 ground-level "speeding" dash. Classic opts out. Apply only to players
+            // whose jump is locked (non-Jumper / no-charge Jumper), never while launched.
+            // Re-apply each tick so the effect does not expire during the round.
+            boolean boosting = !allowJump && game.getMode().speedBoostEnabled() && !isPlayerLaunched(p);
             if (boosting) {
                 PotionEffect speed = p.getPotionEffect(PotionEffectType.SPEED);
                 if (speed == null || speed.getAmplifier() != 1 || speed.getDuration() < 400) {
