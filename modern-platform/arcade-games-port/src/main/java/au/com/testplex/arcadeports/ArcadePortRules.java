@@ -37,6 +37,17 @@ public final class ArcadePortRules {
         return elapsedMillis >= RUNNER_BLOCK_DECAY_MILLIS;
     }
 
+    /** Reborn only destabilises exposed, non-liquid solid blocks once per trail cycle. */
+    public static boolean shouldMarkRunnerBlock(boolean solid, boolean bedrock, boolean liquid,
+            boolean aboveIsAir, boolean alreadyMarked) {
+        return solid && !bedrock && !liquid && aboveIsAir && !alreadyMarked;
+    }
+
+    /** Falling blocks only hurt a player when the player is not above the block. */
+    public static boolean shouldRunnerFallingBlockHit(double playerY, double fallingBlockY) {
+        return playerY <= fallingBlockY + 0.5D;
+    }
+
     public static int spleefProjectileClearRadius(boolean arrow, double velocity) {
         if (!arrow) return 1;
         double safeVelocity = Math.max(0.0D, velocity);
