@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 
+import mineplex.core.Managers;
 import mineplex.core.customdata.CustomDataManager;
 import mineplex.core.game.GameDisplay;
 
@@ -37,10 +38,14 @@ public final class MonsterMazePersonalBestManager
         if (game == null || player == null || stage < 1 || pattern < 1 || pattern > 3)
             return;
 
-        final CustomDataManager customData = game.Manager.getCustomDataManager();
         final Plugin plugin = game.Manager.getPlugin();
+        final CustomDataManager customData = getCustomDataManager(game);
         if (customData == null || plugin == null)
+        {
+            if (plugin != null)
+                plugin.getLogger().warning("[MonsterMaze PB] Cannot record a result because CustomDataManager is unavailable.");
             return;
+        }
 
         String displayPrefix = game.GetType().getDisplay().getCustomDataKeyName();
         String kitName = game.GetKit(player) == null ? "unknown" : game.GetKit(player).GetName();
@@ -109,6 +114,9 @@ public final class MonsterMazePersonalBestManager
                             return;
 
                         customData.setData(player, key, bestToSave);
+                        plugin.getLogger().info("[MonsterMaze PB] Recorded " + player.getName()
+                                + " — " + game.GetType().getDisplay().getName() + ", pattern " + pattern
+                                + ", " + kitName(game, player) + ": stage " + bestToSave + ".");
 
                         if (player.isOnline())
                         {
@@ -121,6 +129,14 @@ public final class MonsterMazePersonalBestManager
         });
     }
 
+    private static CustomDataManager getCustomDataManager(MonsterMaze game)
+    {
+        if (game == null)
+            return null;
+        CustomDataManager manager = game.Manager == null ? null : game.Manager.getCustomDataManager();
+        return manager != null ? manager : Managers.get(CustomDataManager.class);
+    }
+
     /**
      * A player with no recorded PB in any native mode/pattern/kit has not yet made
      * measurable progress on this Testplex Monster Maze installation; show tutorial cues.
@@ -129,7 +145,7 @@ public final class MonsterMazePersonalBestManager
     {
         if (game == null || player == null)
             return false;
-        CustomDataManager customData = game.Manager.getCustomDataManager();
+        CustomDataManager customData = getCustomDataManager(game);
         if (customData == null)
             return false;
 
@@ -160,7 +176,7 @@ public final class MonsterMazePersonalBestManager
     public static String getBestForPattern(MonsterMaze game, Player player, int pattern)
     {
         if (game == null || player == null || pattern < 1 || pattern > 3
-                || game.Manager.getCustomDataManager() == null)
+                || getCustomDataManager(game) == null)
             return "Not set";
 
         String prefix = game.GetType().getDisplay().getCustomDataKeyName();
@@ -172,7 +188,7 @@ public final class MonsterMazePersonalBestManager
         for (String kit : kits)
         {
             String key = prefix + "pb.pattern" + pattern + "." + slug(kit);
-            int stage = game.Manager.getCustomDataManager().getData(player, key);
+            int stage = getCustomDataManager(game).getData(player, key);
             if (stage > bestStage)
             {
                 bestStage = stage;
@@ -186,11 +202,11 @@ public final class MonsterMazePersonalBestManager
     public static int getKitBest(MonsterMaze game, Player player, int pattern)
     {
         if (game == null || player == null || pattern < 1 || pattern > 3
-                || game.Manager.getCustomDataManager() == null || game.GetKit(player) == null)
+                || getCustomDataManager(game) == null || game.GetKit(player) == null)
             return 0;
         String prefix = game.GetType().getDisplay().getCustomDataKeyName();
         String kit = game.GetKit(player).GetName();
-        return game.Manager.getCustomDataManager().getData(player,
+        return getCustomDataManager(game).getData(player,
                 prefix + "pb.pattern" + pattern + "." + slug(kit));
     }
 
@@ -200,7 +216,7 @@ public final class MonsterMazePersonalBestManager
         if (game == null || player == null)
             return;
 
-        final CustomDataManager customData = game.Manager.getCustomDataManager();
+        final CustomDataManager customData = getCustomDataManager(game);
         if (customData == null)
         {
             player.sendMessage(ChatColor.RED + "Monster Maze personal-best storage is unavailable on this server.");
