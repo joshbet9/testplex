@@ -86,6 +86,17 @@ public final class MenuService implements Listener {
         inventory.setItem(11, makeItem(icon(game.getIcon()), ChatColor.AQUA + game.getName(), List.of(
                 ChatColor.GRAY + game.getDescription(),
                 ChatColor.YELLOW + "Port status: " + game.getPortStatus().getDisplay())));
+        if ("monster-maze".equals(game.getId())) {
+            boolean engineInstalled = Bukkit.getPluginManager().isPluginEnabled("MonsterMazeModern");
+            ItemStack start = makeItem(engineInstalled ? Material.LIME_CONCRETE : Material.BARRIER,
+                    (engineInstalled ? ChatColor.GREEN : ChatColor.RED) + "Start / Test Monster Maze",
+                    List.of(ChatColor.GRAY + (engineInstalled
+                            ? "Launch a mechanics test run."
+                            : "Install MonsterMazeModern.jar alongside this plugin."),
+                            ChatColor.YELLOW + (engineInstalled ? "Click to run /mm start." : "Engine module not detected.")));
+            mark(start, "launch-game", game, null, null);
+            inventory.setItem(4, start);
+        }
         ItemStack cosmetics = makeItem(Material.CHEST, ChatColor.LIGHT_PURPLE + "Game-specific cosmetics", List.of(
                 ChatColor.GRAY + "Browse this game's own visual identity."));
         mark(cosmetics, "open-lines", game, null, null);
@@ -169,7 +180,14 @@ public final class MenuService implements Listener {
         String optionId = meta.getPersistentDataContainer().get(optionKey, PersistentDataType.STRING);
         GameDefinition game = catalog.getGame(gameId);
 
-        if ("game".equals(action) && game != null) {
+        if ("launch-game".equals(action) && game != null && "monster-maze".equals(game.getId())) {
+            if (!Bukkit.getPluginManager().isPluginEnabled("MonsterMazeModern")) {
+                player.sendMessage(ChatColor.RED + "MonsterMazeModern.jar is not installed on this server yet.");
+                return;
+            }
+            player.closeInventory();
+            player.performCommand("mm start");
+        } else if ("game".equals(action) && game != null) {
             openGameDetails(player, game);
         } else if ("cosmetics-game".equals(action) && game != null) {
             openLines(player, game);

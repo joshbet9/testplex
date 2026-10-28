@@ -1,0 +1,29 @@
+MONSTER MAZE - MODE: ORIGINAL
+==============================
+
+The original Monster Maze experience, recreated as faithfully as possible.
+
+GAMEPLAY
+--------
+- Original stage timer: 60 seconds, decreasing by 2 seconds per stage to a
+  minimum of 15 seconds.
+- 150 starter monsters.
+- Additional monsters are spawned as the run progresses using the original
+  progression.
+- The original monster movement, collision and knockback behaviour is used.
+- The original kit set is available.
+- Jumper has 5 charged jumps.
+- Original does not include the enhanced kit abilities introduced in the
+  other modes.
+- The original "speeding" movement behaviour remains active.
+
+LEADERBOARDS
+------------
+Personal bests are tracked separately by mode, maze pattern and kit.
+The in-game scoreboard and lobby leaderboard use these results.
+
+VERSION NOTE
+------------
+This mode targets Minecraft 1.21.11, so some underlying implementation
+mechanisms necessarily differ from the original 1.8 server while the
+player-facing behaviour is intended to remain faithful.

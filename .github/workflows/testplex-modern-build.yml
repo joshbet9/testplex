@@ -31,28 +31,42 @@ jobs:
           distribution: temurin
           java-version: "25"
           cache: maven
-          cache-dependency-path: modern-platform/pom.xml
+          cache-dependency-path: |
+            modern-platform/pom.xml
+            modern-platform/monster-maze-port/pom.xml
 
       - name: Build and run catalogue tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/pom.xml clean verify
 
-      - name: Verify plugin metadata and packaged classes
+      - name: Build Monster Maze 26.3 port and run contract tests
+        run: mvn --batch-mode --no-transfer-progress -f modern-platform/monster-maze-port/pom.xml clean verify
+
+      - name: Verify modern plugin metadata and packaged classes
         shell: bash
         run: |
           set -euo pipefail
           jar_file="modern-platform/target/TestplexModernArcade.jar"
+          maze_jar="modern-platform/monster-maze-port/target/MonsterMazeModern.jar"
           test -s "$jar_file"
+          test -s "$maze_jar"
           jar tf "$jar_file" | grep -Fxq "plugin.yml"
           jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/TestplexModernArcade.class"
           jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/model/ArcadeCatalog.class"
           unzip -p "$jar_file" plugin.yml | grep -Fxq "api-version: '26.3'"
-          echo "Modern Paper 26.3 plugin artifact verified."
+          jar tf "$maze_jar" | grep -Fxq "plugin.yml"
+          jar tf "$maze_jar" | grep -Fxq "me/monstermaze/MonsterMazePlugin.class"
+          jar tf "$maze_jar" | grep -Fxq "me/monstermaze/maze/MazeGenerator.class"
+          unzip -p "$maze_jar" plugin.yml | grep -Fxq "name: MonsterMazeModern"
+          unzip -p "$maze_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
+          echo "Both modern Paper 26.3 plugin artifacts verified."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
         with:
           name: testplex-modern-paper-26.3
-          path: modern-platform/target/TestplexModernArcade.jar
+          path: |
+            modern-platform/target/TestplexModernArcade.jar
+            modern-platform/monster-maze-port/target/MonsterMazeModern.jar
           if-no-files-found: error
           retention-days: 14
 
@@ -66,6 +80,8 @@ jobs:
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
             echo "- Catalogue: 16 Arcade games"
-            echo "- Initial mechanics targets: Monster Maze and Snake"
+            echo "- Built artifacts: TestplexModernArcade.jar and MonsterMazeModern.jar"
+            echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
+            echo "- Initial mechanics targets: Monster Maze first, Snake next"
             echo "- Server deploy: intentionally not performed by this workflow"
           } >> "$GITHUB_STEP_SUMMARY"

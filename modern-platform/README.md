@@ -11,16 +11,18 @@ This is a separate modern platform inside the Testplex repository. It does **not
 
 The build uses Paper's official Maven repository and a version range for the current 26.3 stable API. The dedicated workflow is .github/workflows/testplex-modern-build.yml; it builds, tests, and publishes the plugin artifact only. It has no automatic server-deployment step.
 
-## Current scaffold
+## Current implementation
 
 - /gamepanel — registered-game catalogue with honest port statuses.
 - /arcadecosmetics — game-specific cosmetic lines and a separate win-effect selector.
 - /arcadetest status — administrative port-status summary.
 - player-preferences.yml — per-player, per-game, per-line preferences; separate from the legacy profile format.
 - All 16 Arcade games are catalogued with distinct concepts for their cosmetic lines and win scenes.
-- Monster Maze and Snake are marked as the first mechanics ports. No games are advertised as ready to play yet.
+- `monster-maze-port/` builds `MonsterMazeModern.jar`, an initial Paper 26.3 port based on the 1.21 implementation in the separate MonsterMaze repository.
+- The Monster Maze entry has a Start / Test action in Game Details when the engine plugin is installed; `/mm start [1|2|3]` is available for direct testing.
+- Snake is the next mechanics port. No game is advertised as fully ready until live-server acceptance checks pass.
 
-**Important:** menu selections currently prove the catalogue and profile storage only. They do not claim that the visual renderers, win scenes, game mechanics, maps, lobby or bot harness have already been ported. Each effect becomes functional only when its game-specific handler is implemented and tested.
+**Important:** the Monster Maze source has been brought into a modern module, but its gameplay on Paper 26.3 is not yet validated in-game. Cosmetic preferences persist, but new visual renderers and win scenes still need to be connected and tested.
 
 ## Isolation from 1.8
 
@@ -30,7 +32,7 @@ Modern server provisioning and deployment should be a separate, explicit step wi
 
 ## Next porting order
 
-1. Finish and verify Monster Maze and Snake requirements against the 1.8 reference.
-2. Implement those two mechanics in the Paper 26.3 game lifecycle and map framework.
-3. Test gameplay before finalising their new cosmetic options.
-4. Port and test each remaining game's mechanics, then build and validate its unique cosmetic line and win scene game by game.
+1. Compile and test the Monster Maze port on Paper 26.3 using the 1.8 server as the reference and its 1.21 source as the compatibility guide.
+2. Port Snake mechanics next; then complete gameplay acceptance for both games.
+3. Only then connect and test their new cosmetic lines and separate win effects.
+4. Port and test the remaining games individually, fixing incompatibilities first and adding new features/cosmetics afterwards.
