@@ -201,6 +201,13 @@ class ArcadePortGameTest {
         }
     }
 
+    @Test void microBattlesGeneratedBarrierFallbackIsLimitedToPrototypeMaps() {
+        assertTrue(ArcadePortRules.shouldRemoveGeneratedMicroBarrier(false, 0));
+        assertFalse(ArcadePortRules.shouldRemoveGeneratedMicroBarrier(true, 0));
+        assertFalse(ArcadePortRules.shouldRemoveGeneratedMicroBarrier(true, 12));
+        assertFalse(ArcadePortRules.shouldRemoveGeneratedMicroBarrier(false, 4));
+    }
+
     @Test void dragonsFlightTargetsStayInsideSourceMapBounds() {
         assertEquals(101.0D, ArcadePortRules.clampDragonSkyTargetCoordinate(50.0D, 100, 140), 0.00001D);
         assertEquals(138.999D, ArcadePortRules.clampDragonSkyTargetCoordinate(200.0D, 100, 140), 0.00001D);
