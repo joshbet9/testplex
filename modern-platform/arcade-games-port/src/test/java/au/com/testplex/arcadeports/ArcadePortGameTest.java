@@ -48,6 +48,14 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.quiverRegrantsArrowAfterHit(true));
     }
 
+    @Test void quiverGroundPoundUsesSourceRadialImpulse() {
+        assertEquals(1.0D, ArcadePortRules.quiverGroundPoundHorizontalMultiplier(0.0D), 0.00001D);
+        assertEquals(0.5D, ArcadePortRules.quiverGroundPoundHorizontalMultiplier(4.0D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.quiverGroundPoundHorizontalMultiplier(8.0D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.quiverGroundPoundHorizontalMultiplier(10.0D), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.quiverGroundPoundHorizontalMultiplier(-1.0D), 0.00001D);
+    }
+
     @Test void oneInTheQuiverNeedsTwentyKillsToWin() {
         assertFalse(ArcadePortRules.isQuiverWinnerScoreReached(0));
         assertFalse(ArcadePortRules.isQuiverWinnerScoreReached(19));
