@@ -60,7 +60,6 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class SnakeGameManager implements Listener {
     private static final String WORLD_NAME = "snake_arena";
     private static final int ARENA_RADIUS = 48;
-    private static final int MAX_FOOD = 12;
     private static final int MAX_HAZARDS = SnakeRules.MAX_HAZARDS;
     private static final int HOTBAR_ROULETTE_SLOT = 8;
     private static final int ROULETTE_STEPS = 12;
@@ -284,7 +283,7 @@ public final class SnakeGameManager implements Listener {
         long now = System.currentTimeMillis();
 
         if (now >= nextFoodAt) {
-            if (foods.size() < MAX_FOOD) spawnFood();
+            spawnFood();
             nextFoodAt = now + 1_000L;
         }
         if (now >= nextGrowAt) {
@@ -405,29 +404,35 @@ public final class SnakeGameManager implements Listener {
 
     private void spawnFood() {
         if (arena == null) return;
-        for (int attempt = 0; attempt < 40; attempt++) {
-            int x = ThreadLocalRandom.current().nextInt(-ARENA_RADIUS + 5, ARENA_RADIUS - 4);
-            int z = ThreadLocalRandom.current().nextInt(-ARENA_RADIUS + 5, ARENA_RADIUS - 4);
-            Block floor = arena.getBlockAt(x, 63, z);
-            Block feet = arena.getBlockAt(x, 64, z);
-            Block head = arena.getBlockAt(x, 65, z);
-            if (!floor.getType().isSolid() || !feet.getType().isAir() || !head.getType().isAir()) continue;
-            boolean crowded = false;
-            for (SnakeState state : snakes.values()) {
-                if (state.alive && state.segments.get(0).getLocation().distanceSquared(new Location(arena, x + .5, 64, z + .5)) < 16.0D) {
-                    crowded = true;
-                    break;
-                }
+        Location origin = arena.getSpawnLocation();
+        double baseY = origin.getY();
+        for (int attempt = 0; attempt < SnakeRules.FOOD_SPAWN_ATTEMPTS; attempt++) {
+            double angle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
+            double distance = SnakeRules.foodSpawnDistance(ThreadLocalRandom.current().nextDouble());
+            int blockX = origin.getBlockX() + (int) Math.round(Math.cos(angle) * distance);
+            int blockZ = origin.getBlockZ() + (int) Math.round(Math.sin(angle) * distance);
+            if (Math.abs(blockX - origin.getBlockX()) >= ARENA_RADIUS - 1
+                    || Math.abs(blockZ - origin.getBlockZ()) >= ARENA_RADIUS - 1) continue;
+            if (!arena.isChunkLoaded(blockX >> 4, blockZ >> 4)) {
+                arena.getChunkAt(blockX >> 4, blockZ >> 4).load();
             }
-            if (crowded) continue;
-            Slime slime = arena.spawn(new Location(arena, x + .5D, 64.0D, z + .5D), Slime.class);
-            slime.setSize(2);
-            slime.setAI(false);
-            slime.setGravity(false);
-            slime.setSilent(true);
-            slime.setRemoveWhenFarAway(false);
-            foods.add(slime);
-            return;
+            int minY = Math.max(1, (int) baseY - 8);
+            int maxY = Math.min(arena.getMaxHeight() - 3, (int) baseY + 4);
+            for (int y = maxY; y >= minY; y--) {
+                Block floor = arena.getBlockAt(blockX, y - 1, blockZ);
+                Block feet = arena.getBlockAt(blockX, y, blockZ);
+                Block head = arena.getBlockAt(blockX, y + 1, blockZ);
+                if (!floor.getType().isSolid() || !feet.getType().isAir() || !head.getType().isAir()) continue;
+                Location spawn = new Location(arena, blockX + 0.5D, y, blockZ + 0.5D);
+                Slime slime = arena.spawn(spawn, Slime.class);
+                slime.setSize(2);
+                slime.setAI(false);
+                slime.setGravity(false);
+                slime.setSilent(true);
+                slime.setRemoveWhenFarAway(false);
+                foods.add(slime);
+                return;
+            }
         }
     }
 
