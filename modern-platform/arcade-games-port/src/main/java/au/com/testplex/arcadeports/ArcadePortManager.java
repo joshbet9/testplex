@@ -2628,7 +2628,10 @@ public final class ArcadePortManager implements Listener {
         List<Location> pen = sourceSheepPenBlocks(session, team);
         if (!pen.isEmpty()) {
             Block sheepBlock = location.getBlock();
-            for (Location marker : pen) if (marker.getBlock().equals(sheepBlock)) return true;
+            for (Location marker : pen) {
+                if (ArcadePortRules.sheepQuestInsidePenMarker(sheepBlock.getX(), sheepBlock.getY(),
+                        sheepBlock.getZ(), marker.getBlockX(), marker.getBlockY(), marker.getBlockZ())) return true;
+            }
             return false;
         }
         Location center = sheepQuestPenCenter(session, team);
@@ -2677,7 +2680,7 @@ public final class ArcadePortManager implements Listener {
             if (owner >= 0) {
                 sheep.setColor(sheepTeamDyeColor(owner));
                 Location pen = sheepQuestPenCenter(session, owner);
-                sheep.teleport(pen.clone().add(0.5D, 0.0D, 0.5D));
+                sheep.teleport(pen.clone());
                 sheep.setAI(false);
             } else {
                 sheep.setColor(DyeColor.WHITE);
@@ -2707,7 +2710,7 @@ public final class ArcadePortManager implements Listener {
                 int owner = session.sheepOwners.getOrDefault(sheep, -1);
                 if (owner >= 0) {
                     Location pen = sheepQuestPenCenter(session, owner);
-                    sheep.teleport(pen.clone().add(0.5D, 0.0D, 0.5D));
+                    sheep.teleport(pen.clone());
                     sheep.setAI(false);
                 }
                 continue;
@@ -2721,7 +2724,7 @@ public final class ArcadePortManager implements Listener {
             if (facing.lengthSquared() < 0.001D) facing = new Vector(0.0D, 0.0D, 1.0D);
             Location following = carrier.getLocation().clone()
                     .subtract(facing.normalize().multiply(1.35D + stackIndex * 0.9D));
-            following.setY(64.0D);
+            following.setY(carrier.getLocation().getY());
             following.setYaw(carrier.getLocation().getYaw());
             following.setPitch(0.0F);
             sheep.teleport(following);
@@ -2756,7 +2759,7 @@ public final class ArcadePortManager implements Listener {
             int owner = session.sheepOwners.getOrDefault(sheep, -1);
             if (owner >= 0 && !isInsideSheepPen(session, sheep.getLocation(), owner)) {
                 Location pen = sheepQuestPenCenter(session, owner);
-                sheep.teleport(pen.clone().add(0.5D, 0.0D, 0.5D));
+                sheep.teleport(pen.clone());
                 sheep.setAI(false);
             }
         }
