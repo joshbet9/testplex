@@ -66,7 +66,7 @@ public final class SnakeGameManager implements Listener {
     private static final int ROULETTE_STEPS = 12;
     private static final long FIRST_HAZARD_DELAY_MS = SnakeRules.FIRST_HAZARD_DELAY_MILLIS;
     private static final long HAZARD_INTERVAL_MS = SnakeRules.HAZARD_INTERVAL_MILLIS;
-    private static final double SEGMENT_SPACING = 1.05D;
+    private static final double SEGMENT_SPACING = SnakeRules.SEGMENT_SPACING;
 
     private final SnakeModernPlugin plugin;
     private final Map<UUID, Player> queue = new LinkedHashMap<>();
