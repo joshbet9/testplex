@@ -21,6 +21,7 @@ import mineplex.core.common.util.F;
 import mineplex.core.common.util.UtilAction;
 import mineplex.core.common.util.UtilAlg;
 import mineplex.core.common.util.UtilBlock;
+import mineplex.core.common.util.UtilFirework;
 import mineplex.core.common.util.UtilEnt;
 import mineplex.core.common.util.UtilMath;
 import mineplex.core.common.util.UtilParticle;
@@ -127,6 +128,7 @@ public class Maze implements Listener
 	private final Set<Integer> _celebratedPadStages = new HashSet<Integer>();
 	private int _firstStageParticleTick;
 	private int _padSpawnCount;
+	private final Set<UUID> _padFireworkTutorialPlayers = new HashSet<UUID>();
 			
 	@SuppressWarnings("deprecation")
 	public Maze(MonsterMaze host, MazePreset maze)
@@ -140,8 +142,14 @@ public class Maze implements Listener
 
 		// A Mob Theme is a per-round toggle, not a persistent preference. Every new game
 		// begins with Map Default for each player; colour customisation remains per mob set.
+		// The first two pad fireworks are an onboarding cue only. Keep an independent viewer
+		// list so experienced players do not receive tutorial fireworks every new match.
 		for (Player player : _host.GetPlayers(false))
+		{
 			applyMobThemeChoice(player, "map_default", false);
+			if (!MonsterMazePersonalBestManager.hasAnyPersonalBest(_host, player))
+				_padFireworkTutorialPlayers.add(player.getUniqueId());
+		}
 
 		// Stale containment can outlive the old preset's location list.
 		clearStaleContainmentGlass();
@@ -1692,33 +1700,24 @@ public class Maze implements Listener
 		if (pad == null || pad.getLocation() == null || pad.getLocation().getWorld() == null)
 			return;
 
-		// The launch signal is an onboarding cue only. Show it for the first two pads
-		// of a fresh run, not every subsequent stage, and launch it well above the maze.
+		// Only the initial pad and its first preview pad are tutorial signals. PacketFirework
+		// is viewer-targeted, so existing players don't see onboarding cues for new players.
 		if (_padSpawnCount >= 2)
 			return;
 		_padSpawnCount++;
+		if (_padFireworkTutorialPlayers.isEmpty())
+			return;
+
 		Location base = pad.getLocation().clone();
 		Location location = base.clone().add(0.5D, 3.0D, 0.5D);
-
-		// Mark every newly spawned objective, including the initial and preview pads.
-		Firework firework = location.getWorld().spawn(location, Firework.class);
-		FireworkMeta meta = firework.getFireworkMeta();
-		Color colour = _padSpawnCount % 3 == 1 ? Color.LIME
-				: _padSpawnCount % 3 == 2 ? Color.AQUA : Color.ORANGE;
-		FireworkEffect effect = FireworkEffect.builder()
-				.with(FireworkEffect.Type.BALL_LARGE)
-				.withColor(colour)
-				.withFade(Color.WHITE)
-				.trail(true)
-				.flicker(true)
-				.build();
-		meta.addEffect(effect);
-		meta.setPower(0);
-		firework.setFireworkMeta(meta);
-
-		for (int dx = -2; dx <= 2; dx += 4)
-			for (int dz = -2; dz <= 2; dz += 4)
-				base.getWorld().playEffect(base.clone().add(dx, 1.0D, dz), Effect.FIREWORKS_SPARK, 0);
+		Color colour = _padSpawnCount == 1 ? Color.LIME : Color.AQUA;
+		for (Player viewer : _host.GetPlayers(false))
+		{
+			if (!_padFireworkTutorialPlayers.contains(viewer.getUniqueId()))
+				continue;
+			UtilFirework.packetPlayFirework(viewer, location, FireworkEffect.Type.BALL_LARGE,
+					colour, true, true);
+		}
 	}
 
 	/** Clear stale hidden Snowman bodies within the current generated maze footprint. */
