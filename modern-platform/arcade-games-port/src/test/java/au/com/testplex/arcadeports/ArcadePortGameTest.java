@@ -126,6 +126,24 @@ class ArcadePortGameTest {
         assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.EVOLUTION));
     }
 
+    @Test void oneInTheQuiverSourceKitsAndMeleeDamageAreExplicit() {
+        assertEquals("leaper", ArcadePortRules.normalizeQuiverKit("Leaper"));
+        assertEquals("brawler", ArcadePortRules.normalizeQuiverKit("quiver-brawler"));
+        assertEquals("enchanter", ArcadePortRules.normalizeQuiverKit("Enchanter"));
+        assertEquals("slam-shot", ArcadePortRules.normalizeQuiverKit("Slam Shot"));
+        assertEquals("ninja", ArcadePortRules.normalizeQuiverKit("Ninja"));
+        assertNull(ArcadePortRules.normalizeQuiverKit("unknown"));
+        assertEquals(5.0D, ArcadePortRules.quiverMeleeDamage("leaper"), 0.00001D);
+        assertEquals(7.0D, ArcadePortRules.quiverMeleeDamage("brawler"), 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.quiverMeleeDamage("enchanter"), 0.00001D);
+        assertEquals(5.5D, ArcadePortRules.quiverMeleeDamage("slam-shot"), 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.quiverMeleeDamage("ninja"), 0.00001D);
+        assertTrue(ArcadePortRules.shouldRemoveQuiverInvisibilityOnHit(true, true));
+        assertFalse(ArcadePortRules.shouldRemoveQuiverInvisibilityOnHit(false, true));
+        assertEquals(10_000L, ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS);
+        assertEquals(1_200L, ArcadePortRules.QUIVER_NINJA_VANISH_MILLIS);
+    }
+
     @Test void microBattlesSourceKitsFletcherAndIronSkinAreExplicit() {
         assertEquals("archer", ArcadePortRules.normalizeMicroBattlesKit("Archer"));
         assertEquals("worker", ArcadePortRules.normalizeMicroBattlesKit("Worker"));

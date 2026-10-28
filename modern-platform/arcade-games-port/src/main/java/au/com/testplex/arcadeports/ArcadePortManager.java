@@ -96,6 +96,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> bombLobbersKitPreferences = new HashMap<>();
     private final Map<UUID, String> spleefKitPreferences = new HashMap<>();
     private final Map<UUID, String> microKitPreferences = new HashMap<>();
+    private final Map<UUID, String> quiverKitPreferences = new HashMap<>();
     private Session active;
     private BukkitTask pendingStart;
     private ArcadePortGame pendingType;
@@ -110,11 +111,28 @@ public final class ArcadePortManager implements Listener {
     public void selectKit(Player player, String requestedKit) {
         if (player == null || requestedKit == null) return;
         String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
-        if (ArcadePortRules.normalizeBaconBrawlKit(value) != null) selectBaconBrawlKit(player, value);
+        Session running = active;
+        if (running != null && running.players.containsKey(player.getUniqueId())) {
+            switch (running.type) {
+                case BACON_BRAWL -> { selectBaconBrawlKit(player, value); return; }
+                case BOMB_LOBBERS -> { selectBombLobbersKit(player, value); return; }
+                case SPLEEF -> { selectSpleefKit(player, value); return; }
+                case MICRO_BATTLES -> { selectMicroBattlesKit(player, value); return; }
+                case ONE_IN_THE_QUIVER -> { selectQuiverKit(player, value); return; }
+                case PAINTBALL -> { selectPaintballKit(player, value); return; }
+                case DEATH_TAG -> { selectDeathTagRunnerKit(player, value); return; }
+                default -> { }
+            }
+        }
+        if (value.startsWith("quiver-")) { selectQuiverKit(player, value); }
+        else if (value.startsWith("spleef-")) { selectSpleefKit(player, value.substring("spleef-".length())); }
+        else if (value.startsWith("micro-")) { selectMicroBattlesKit(player, value.substring("micro-".length())); }
+        else if (ArcadePortRules.normalizeBaconBrawlKit(value) != null) selectBaconBrawlKit(player, value);
         else if (ArcadePortRules.normalizeBombLobbersKit(value) != null) selectBombLobbersKit(player, value);
         else if (ArcadePortRules.normalizeSpleefKit(value) != null) selectSpleefKit(player, value);
         else if (ArcadePortRules.normalizeMicroBattlesKit(value) != null) selectMicroBattlesKit(player, value);
         else if (Set.of("rifle", "sniper", "shotgun", "machine-gun", "machinegun").contains(value)) selectPaintballKit(player, value);
+        else if (ArcadePortRules.normalizeQuiverKit(value) != null) selectQuiverKit(player, value);
         else selectDeathTagRunnerKit(player, value);
     }
 
@@ -194,6 +212,32 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.GREEN + "Micro Battles kit changed to " + kit + ".");
         } else {
             player.sendMessage(ChatColor.GREEN + "Micro Battles kit set to " + kit + " for your next test.");
+        }
+    }
+
+    public void selectQuiverKit(Player player, String requestedKit) {
+        if (player == null) return;
+        String kit = ArcadePortRules.normalizeQuiverKit(requestedKit);
+        if (kit == null) {
+            player.sendMessage(ChatColor.YELLOW + "One in the Quiver kits: leaper, brawler, enchanter, slam-shot, ninja.");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        quiverKitPreferences.put(id, kit);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.ONE_IN_THE_QUIVER
+                && session.players.containsKey(id) && session.alive.contains(id)) {
+            session.quiverKits.put(id, kit);
+            session.quiverGroundPoundReadyAt.remove(id);
+            if (!"ninja".equals(kit)) clearQuiverCloak(session, id);
+            if (!"leaper".equals(kit)) {
+                player.setFlying(false);
+                player.setAllowFlight(false);
+            }
+            giveKit(session, player);
+            player.sendMessage(ChatColor.GREEN + "One in the Quiver kit changed to " + kit + ".");
+        } else {
+            player.sendMessage(ChatColor.GREEN + "One in the Quiver kit set to " + kit + " for your next test.");
         }
     }
 
@@ -409,6 +453,9 @@ public final class ArcadePortManager implements Listener {
                 session.microKits.put(player.getUniqueId(), microKitPreferences.getOrDefault(player.getUniqueId(), "archer"));
                 session.microNextArrowAt.put(player.getUniqueId(),
                         now + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
+            }
+            if (type == ArcadePortGame.ONE_IN_THE_QUIVER) {
+                session.quiverKits.put(player.getUniqueId(), quiverKitPreferences.getOrDefault(player.getUniqueId(), "leaper"));
             }
             Location spawn = spawns.get(i % spawns.size()).clone();
             if (type == ArcadePortGame.MICRO_BATTLES && !sourceMapWorlds.contains(type.id())) {
@@ -1005,11 +1052,40 @@ public final class ArcadePortManager implements Listener {
                 setMicroTeamArmor(session, player);
                 break;
             }
-            case ONE_IN_THE_QUIVER:
-                player.getInventory().addItem(new ItemStack(Material.BOW));
-                player.getInventory().addItem(namedItem(Material.ARROW, "Super Arrow", "One arrow per shot; earn another with each kill."));
-                player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
+            case ONE_IN_THE_QUIVER: {
+                String kit = session.quiverKits.getOrDefault(player.getUniqueId(), "leaper");
+                player.getInventory().setItem(0, new ItemStack(Material.BOW));
+                switch (kit) {
+                    case "brawler":
+                        player.getInventory().setItem(2, new ItemStack(Material.IRON_SWORD));
+                        break;
+                    case "enchanter": {
+                        ItemStack sword = new ItemStack(Material.STONE_SWORD);
+                        sword.addUnsafeEnchantment(Enchantment.UNBREAKING, 1);
+                        player.getInventory().setItem(2, sword);
+                        break;
+                    }
+                    case "slam-shot":
+                        player.getInventory().setItem(2, new ItemStack(Material.DIAMOND_SHOVEL));
+                        break;
+                    case "ninja": {
+                        ItemStack sword = new ItemStack(Material.GOLDEN_SWORD);
+                        ItemMeta meta = sword.getItemMeta();
+                        if (meta != null) {
+                            meta.setUnbreakable(true);
+                            sword.setItemMeta(meta);
+                        }
+                        player.getInventory().setItem(2, sword);
+                        break;
+                    }
+                    default:
+                        player.getInventory().setItem(2, new ItemStack(Material.STONE_SWORD));
+                        break;
+                }
+                player.getInventory().setItem(1, namedItem(Material.ARROW, "Super Arrow",
+                        "One arrow per shot; earn another with each kill."));
                 break;
+            }
             case PAINTBALL:
                 givePaintballKit(session, player,
                         session.paintballKits.getOrDefault(player.getUniqueId(), "rifle"));
@@ -1051,6 +1127,99 @@ public final class ArcadePortManager implements Listener {
                 break;
         }
         player.updateInventory();
+    }
+
+    private void updateQuiverKit(Session session, long now) {
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            String kit = session.quiverKits.getOrDefault(id, "leaper");
+            if ("leaper".equals(kit) && player.isOnGround() && !player.getAllowFlight()) {
+                player.setAllowFlight(true);
+            }
+            Long cloakedUntil = session.quiverCloakedUntil.get(id);
+            if (cloakedUntil != null && now >= cloakedUntil) clearQuiverCloak(session, id);
+        }
+    }
+
+    private void clearQuiverCloak(Session session, UUID playerId) {
+        session.quiverCloakedUntil.remove(playerId);
+        Player player = session.players.get(playerId);
+        if (player != null && player.isOnline()) player.removePotionEffect(PotionEffectType.INVISIBILITY);
+    }
+
+    private void activateQuiverNinjaVanish(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        if (!"ninja".equals(session.quiverKits.getOrDefault(id, "leaper"))) return;
+        session.quiverCloakedUntil.put(id, now + ArcadePortRules.QUIVER_NINJA_VANISH_MILLIS);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 24, 0, false, false, true));
+        player.getWorld().spawnParticle(Particle.LARGE_SMOKE, player.getLocation().add(0.0D, 1.0D, 0.0D),
+                10, 0.25D, 0.4D, 0.25D, 0.02D);
+        player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.8F, 1.6F);
+    }
+
+    private void useQuiverGroundPound(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        long readyAt = session.quiverGroundPoundReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            player.sendMessage(ChatColor.YELLOW + "Ground Pound ready in "
+                    + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s.");
+            return;
+        }
+        session.quiverGroundPoundReadyAt.put(id, now + ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS);
+        for (Player target : alivePlayers(session)) {
+            if (target.equals(player)) continue;
+            double distance = target.getLocation().distance(player.getLocation());
+            if (distance > 8.0D) continue;
+            Vector direction = target.getLocation().toVector().subtract(player.getLocation().toVector());
+            if (direction.lengthSquared() < 0.001D) direction = player.getLocation().getDirection();
+            double proximity = (8.0D - distance) / 8.0D;
+            target.setVelocity(direction.normalize().multiply(0.8D + 0.8D * proximity)
+                    .setY(0.8D + 1.0D * proximity));
+            target.setFallDistance(0.0F);
+            target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 0.8F);
+        }
+        player.getWorld().spawnParticle(Particle.EXPLOSION, player.getLocation(), 1,
+                0.15D, 0.1D, 0.15D, 0.0D);
+        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1.2F, 0.7F);
+        player.sendMessage(ChatColor.GREEN + "Ground Pound!");
+    }
+
+    private void handleQuiverMeleeHit(Session session, Player attacker, Player target) {
+        String kit = session.quiverKits.getOrDefault(attacker.getUniqueId(), "leaper");
+        double damage = ArcadePortRules.quiverMeleeDamage(kit);
+        if (ArcadePortRules.shouldRemoveQuiverInvisibilityOnHit(true, "ninja".equals(kit))) {
+            clearQuiverCloak(session, attacker.getUniqueId());
+        }
+        if (target.getHealth() <= damage) {
+            scoreQuiverKill(session, attacker, target);
+            return;
+        }
+        target.setHealth(target.getHealth() - damage);
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
+    }
+
+    private void tryQuiverRebound(Session session, Projectile projectile, Player shooter, Player struckPlayer) {
+        Integer bounces = session.quiverArrowBounces.remove(projectile.getUniqueId());
+        if (!"enchanter".equals(session.quiverKits.getOrDefault(shooter.getUniqueId(), "leaper"))
+                || bounces == null || bounces <= 0 || active != session) return;
+        Player nearest = null;
+        double nearestDistance = ArcadePortRules.QUIVER_REBOUND_MAX_DISTANCE_SQUARED;
+        Location origin = struckPlayer.getEyeLocation().clone();
+        for (Player candidate : alivePlayers(session)) {
+            if (candidate.equals(shooter) || candidate.equals(struckPlayer)) continue;
+            double distance = candidate.getLocation().distanceSquared(origin);
+            if (distance <= nearestDistance) {
+                nearestDistance = distance;
+                nearest = candidate;
+            }
+        }
+        if (nearest == null) return;
+        Vector trajectory = nearest.getEyeLocation().toVector().subtract(origin.toVector());
+        if (trajectory.lengthSquared() < 0.001D) return;
+        Arrow rebound = session.world.spawnArrow(origin, trajectory.normalize(), 1.2F, 0.0F);
+        rebound.setShooter(shooter);
+        session.entities.add(rebound);
+        session.quiverArrowBounces.put(rebound.getUniqueId(), 0);
     }
 
     private int countNamedItems(Player player, Material material, String expectedName) {
@@ -1365,6 +1534,7 @@ public final class ArcadePortManager implements Listener {
             enforceMicroBattlesHunger(session);
             updateMicroBattlesArrows(session, now);
         }
+        if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) updateQuiverKit(session, now);
         if (session.type == ArcadePortGame.DRAGONS && session.ticks % 4 == 0) updateTestDragons(session, now);
         if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
             updateDeathTagChasers(session, now);
@@ -2549,7 +2719,8 @@ public final class ArcadePortManager implements Listener {
                 }
                 break;
             case ONE_IN_THE_QUIVER:
-                scoreQuiverKill(session, attacker, target);
+                if ("arrow hit".equals(source)) scoreQuiverKill(session, attacker, target);
+                else handleQuiverMeleeHit(session, attacker, target);
                 break;
             default:
                 eliminate(session, target, attacker, source);
@@ -2627,6 +2798,7 @@ public final class ArcadePortManager implements Listener {
         attacker.sendMessage(ChatColor.GREEN + "Quiver kill! " + kills + "/20.");
         checkWinnerForScore(session, attacker);
         if (active != session) return;
+        activateQuiverNinjaVanish(session, attacker, System.currentTimeMillis());
 
         UUID targetId = target.getUniqueId();
         target.leaveVehicle();
@@ -2673,12 +2845,16 @@ public final class ArcadePortManager implements Listener {
             handlePlayerHit(session, shooter, target, "projectile hit");
         } else if (session.type == ArcadePortGame.TURF_WARS) {
             handlePlayerHit(session, shooter, target, "projectile hit");
-        } else if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER || session.type == ArcadePortGame.MICRO_BATTLES) {
+        } else if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
+            tryQuiverRebound(session, projectile, shooter, target);
             handlePlayerHit(session, shooter, target, "arrow hit");
-            if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER && active == session
-                    && shooter.isOnline() && session.alive.contains(shooter.getUniqueId())) {
-                shooter.getInventory().setItem(1, namedItem(Material.ARROW, "Super Arrow", "One arrow per shot; earn another with each kill."));
+            projectile.remove();
+            if (active == session && shooter.isOnline() && session.alive.contains(shooter.getUniqueId())) {
+                shooter.getInventory().setItem(1, namedItem(Material.ARROW, "Super Arrow",
+                        "One arrow per shot; earn another with each kill."));
             }
+        } else if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            handlePlayerHit(session, shooter, target, "arrow hit");
         } else {
             handlePlayerHit(session, shooter, target, "projectile hit");
         }
@@ -2727,6 +2903,8 @@ public final class ArcadePortManager implements Listener {
         session.dragonContactCooldowns.clear();
         session.paintProjectileDamage.clear();
         session.paintballLastShotAt.clear();
+        session.quiverArrowBounces.clear();
+        session.quiverCloakedUntil.clear();
         for (Block block : session.evolutionWebs.keySet()) if (block.getType() == Material.COBWEB) block.setType(Material.AIR, false);
         session.evolutionWebs.clear();
         session.runnerBlocks.clear();
@@ -3187,6 +3365,16 @@ public final class ArcadePortManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onQuiverBowShoot(EntityShootBowEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
+                || !(event.getEntity() instanceof Player player)
+                || !"enchanter".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))
+                || !(event.getProjectile() instanceof Arrow arrow)) return;
+        session.quiverArrowBounces.put(arrow.getUniqueId(), 1);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onMicroBowShoot(EntityShootBowEvent event) {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.MICRO_BATTLES
@@ -3329,6 +3517,13 @@ public final class ArcadePortManager implements Listener {
         if (!session.alive.contains(player.getUniqueId())) return;
         ItemStack heldItem = event.getItem();
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
+        if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
+                && "slam-shot".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))
+                && item == Material.DIAMOND_SHOVEL && event.getAction().isRightClick()) {
+            event.setCancelled(true);
+            useQuiverGroundPound(session, player, System.currentTimeMillis());
+            return;
+        }
         if (session.type == ArcadePortGame.SPLEEF
                 && "brawler".equals(session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer"))
                 && item == Material.IRON_AXE && event.getAction().isRightClick()) {
@@ -3771,6 +3966,23 @@ public final class ArcadePortManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onQuiverDoubleJump(org.bukkit.event.player.PlayerToggleFlightEvent event) {
+        Player player = event.getPlayer();
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
+                || !session.alive.contains(player.getUniqueId())
+                || !"leaper".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))) return;
+        event.setCancelled(true);
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        Vector direction = player.getLocation().getDirection().normalize().multiply(0.9D);
+        direction.setY(Math.max(0.55D, Math.min(0.9D, direction.getY() + 0.35D)));
+        player.setVelocity(direction);
+        player.setFallDistance(0.0F);
+        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.8F, 1.2F);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBombDoubleJump(org.bukkit.event.player.PlayerToggleFlightEvent event) {
         Player player = event.getPlayer();
         Session session = active;
@@ -3941,6 +4153,10 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> microKits = new HashMap<>();
         final Map<UUID, Long> microNextArrowAt = new HashMap<>();
         final Set<UUID> microFletchedArrows = new HashSet<>();
+        final Map<UUID, String> quiverKits = new HashMap<>();
+        final Map<UUID, Integer> quiverArrowBounces = new HashMap<>();
+        final Map<UUID, Long> quiverCloakedUntil = new HashMap<>();
+        final Map<UUID, Long> quiverGroundPoundReadyAt = new HashMap<>();
         long lastSpleefHungerAt;
         final Set<Block> microBarrierBlocks = new HashSet<>();
         final Map<UUID, Long> dragonContactCooldowns = new HashMap<>();

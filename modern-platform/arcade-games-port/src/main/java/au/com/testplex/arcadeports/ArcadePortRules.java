@@ -332,6 +332,38 @@ public final class ArcadePortRules {
     }
 
     public static final long QUIVER_RESPAWN_DELAY_TICKS = 20L;
+    public static final long QUIVER_GROUND_POUND_COOLDOWN_MILLIS = 10_000L;
+    public static final long QUIVER_NINJA_VANISH_MILLIS = 1_200L;
+    public static final double QUIVER_REBOUND_MAX_DISTANCE_SQUARED = 1.0D;
+
+    public static String normalizeQuiverKit(String requested) {
+        if (requested == null) return null;
+        String kit = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (kit.startsWith("quiver-")) kit = kit.substring("quiver-".length());
+        return switch (kit) {
+            case "leaper" -> "leaper";
+            case "brawler" -> "brawler";
+            case "enchanter" -> "enchanter";
+            case "slam-shot", "slamshot", "slam-shooter" -> "slam-shot";
+            case "ninja" -> "ninja";
+            default -> null;
+        };
+    }
+
+    public static double quiverMeleeDamage(String kit) {
+        String value = normalizeQuiverKit(kit);
+        if (value == null) value = "leaper";
+        return switch (value) {
+            case "brawler" -> 7.0D;
+            case "slam-shot" -> 5.5D;
+            case "ninja" -> 4.0D;
+            default -> 5.0D;
+        };
+    }
+
+    public static boolean shouldRemoveQuiverInvisibilityOnHit(boolean melee, boolean ninja) {
+        return melee && ninja;
+    }
 
     public static boolean isQuiverWinnerScoreReached(int kills) {
         return kills >= 20;
