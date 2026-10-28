@@ -1797,6 +1797,36 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private boolean isSpleefFloorBlock(Material material) {
+        return material == Material.SNOW_BLOCK || material == Material.WHITE_WOOL
+                || material == Material.YELLOW_WOOL || material == Material.ORANGE_WOOL
+                || material == Material.RED_WOOL;
+    }
+
+    private void fadeSpleefBlock(Session session, Block block, boolean slowDamage) {
+        if (active != session || session.type != ArcadePortGame.SPLEEF || block == null
+                || block.getWorld() != session.world || block.getY() != 63
+                || !isSpleefFloorBlock(block.getType())) return;
+        if (!slowDamage) {
+            block.setType(Material.AIR, false);
+            session.world.spawnParticle(Particle.CLOUD, block.getLocation().add(0.5D, 0.5D, 0.5D),
+                    4, 0.2D, 0.2D, 0.2D, 0.02D);
+            session.world.playSound(block.getLocation(), Sound.BLOCK_SNOW_BREAK, 0.5F, 1.15F);
+            return;
+        }
+        Material damaged = switch (block.getType()) {
+            case SNOW_BLOCK, WHITE_WOOL -> Material.YELLOW_WOOL;
+            case YELLOW_WOOL -> Material.ORANGE_WOOL;
+            case ORANGE_WOOL -> Material.RED_WOOL;
+            default -> Material.AIR;
+        };
+        block.setType(damaged, false);
+        if (damaged == Material.AIR) {
+            session.world.spawnParticle(Particle.CLOUD, block.getLocation().add(0.5D, 0.5D, 0.5D),
+                    4, 0.2D, 0.2D, 0.2D, 0.02D);
+        }
+    }
+
     private void handleRunnerFallingBlockHit(Session session, FallingBlock falling, Player target) {
         if (active != session || !session.alive.contains(target.getUniqueId())
                 || !session.entities.remove(falling)) return;
@@ -1895,19 +1925,21 @@ public final class ArcadePortManager implements Listener {
                 && session.alive.contains(shooter.getUniqueId())) {
             Block hit = event.getHitBlock();
             if (hit != null) {
-                boolean arrow = projectile instanceof Arrow;
-                double speed = projectile.getVelocity().length();
-                int radius = ArcadePortRules.spleefProjectileClearRadius(arrow, speed);
-                for (int dx = -radius; dx <= radius; dx++) {
-                    for (int dz = -radius; dz <= radius; dz++) {
-                        if (dx * dx + dz * dz > radius * radius) continue;
-                        Block floor = session.world.getBlockAt(hit.getX() + dx, 63, hit.getZ() + dz);
-                        if (floor.getType() == Material.SNOW_BLOCK) {
-                            floor.setType(Material.AIR, false);
-                            session.world.spawnParticle(Particle.CLOUD, floor.getLocation().add(0.5D, 0.5D, 0.5D),
-                                    4, 0.2D, 0.2D, 0.2D, 0.02D);
+                Block center = session.world.getBlockAt(hit.getX(), 63, hit.getZ());
+                if (projectile instanceof Arrow arrow) {
+                    double speed = arrow.getVelocity().length();
+                    int radius = ArcadePortRules.spleefProjectileClearRadius(true, speed);
+                    fadeSpleefBlock(session, center, false);
+                    for (int dx = -radius; dx <= radius; dx++) {
+                        for (int dz = -radius; dz <= radius; dz++) {
+                            if ((dx == 0 && dz == 0) || dx * dx + dz * dz > radius * radius) continue;
+                            fadeSpleefBlock(session, session.world.getBlockAt(
+                                    hit.getX() + dx, 63, hit.getZ() + dz), true);
                         }
                     }
+                } else {
+                    // A snowball breaks exactly the tile it strikes.
+                    fadeSpleefBlock(session, center, false);
                 }
                 projectile.remove();
             }
@@ -2090,7 +2122,8 @@ public final class ArcadePortManager implements Listener {
     public void onBlockBreak(BlockBreakEvent event) {
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
-        if (session.type == ArcadePortGame.SPLEEF && event.getBlock().getY() == 63 && event.getBlock().getType() == Material.SNOW_BLOCK
+        if (session.type == ArcadePortGame.SPLEEF && event.getBlock().getY() == 63
+                && isSpleefFloorBlock(event.getBlock().getType())
                 && session.alive.contains(event.getPlayer().getUniqueId())) {
             event.setDropItems(false);
             event.setExpToDrop(0);
