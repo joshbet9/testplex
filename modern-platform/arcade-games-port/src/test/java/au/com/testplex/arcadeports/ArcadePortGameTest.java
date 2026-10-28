@@ -223,4 +223,14 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldEnterSheepQuestOvertime(2, 5));
     }
 
+    @Test void sheepQuestSupportsFourTeamsAndDetectsTies() {
+        assertEquals(0, ArcadePortRules.sheepQuestLeadingTeam(new int[]{5, 3, 2, 1}));
+        assertEquals(1, ArcadePortRules.sheepQuestLeadingTeam(new int[]{1, 4, 2, 3}));
+        assertEquals(2, ArcadePortRules.sheepQuestLeadingTeam(new int[]{1, 2, 6, 3}));
+        assertEquals(3, ArcadePortRules.sheepQuestLeadingTeam(new int[]{1, 2, 3, 7}));
+        assertEquals(-1, ArcadePortRules.sheepQuestLeadingTeam(new int[]{3, 3, 1, 0}));
+        assertEquals(-1, ArcadePortRules.sheepQuestLeadingTeam(new int[]{2, 2, 2, 2}));
+        assertEquals(-1, ArcadePortRules.sheepQuestLeadingTeam(null));
+    }
+
 }
