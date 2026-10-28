@@ -1015,6 +1015,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         UUID id = player.getUniqueId();
+        scoreboard.clear(Collections.singletonList(player));
         padLockIns.remove(id);
         lastCompassTargets.remove(id);
         
