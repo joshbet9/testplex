@@ -1587,7 +1587,7 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             session.microCrumbleScanY++;
-            if (session.microCrumbleScanY > session.microCrumbleMaxY) {
+            if (ArcadePortRules.isMicroCrumbleScanComplete(session.microCrumbleScanY, session.microCrumbleMaxY)) {
                 session.microCrumbleScanComplete = true;
                 plugin.getLogger().info("Micro Battles source map scan completed with "
                         + session.microCrumbleBlocks.size() + " crumble candidates.");
