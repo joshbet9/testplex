@@ -81,6 +81,17 @@ class SnakeRulesTest {
         assertEquals(-Math.toRadians(8.0D), SnakeRules.clampTurnRadians(-1.2D), 0.000001D);
     }
 
+    @Test void magmaCubeSpawnSearchUsesTheSourceGoldenAngleDistancePattern() {
+        assertEquals(48, SnakeRules.HAZARD_SPAWN_ATTEMPTS);
+        assertEquals(12.0D, SnakeRules.hazardSpawnDistance(0), 0.000001D);
+        assertEquals(14.0D, SnakeRules.hazardSpawnDistance(1), 0.000001D);
+        assertEquals(16.0D, SnakeRules.hazardSpawnDistance(2), 0.000001D);
+        assertEquals(18.0D, SnakeRules.hazardSpawnDistance(3), 0.000001D);
+        assertEquals(20.0D, SnakeRules.hazardSpawnDistance(4), 0.000001D);
+        assertEquals(12.0D, SnakeRules.hazardSpawnDistance(5), 0.000001D);
+        assertEquals(20.0D, SnakeRules.hazardSpawnDistance(49), 0.000001D);
+    }
+
     @Test void itemBoxesMatchSourceTimingAndWaitForActiveRouletteToFinish() {
         assertEquals(4, SnakeRules.MAX_HAZARDS);
         assertEquals(10_000L, SnakeRules.FIRST_HAZARD_DELAY_MILLIS);
