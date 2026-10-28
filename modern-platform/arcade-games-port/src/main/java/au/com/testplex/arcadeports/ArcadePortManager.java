@@ -336,6 +336,24 @@ public final class ArcadePortManager implements Listener {
         return center;
     }
 
+    private void updateDeathTagChasers(Session session, long now) {
+        int requiredChasers = Math.min(session.alive.size(),
+                ArcadePortRules.requiredDeathTagChasers(now - session.startedAt));
+        long taggedAlive = session.tagged.stream().filter(session.alive::contains).count();
+        if (taggedAlive >= requiredChasers) return;
+
+        List<Player> runners = alivePlayers(session).stream()
+                .filter(player -> !session.tagged.contains(player.getUniqueId()))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        while (taggedAlive < requiredChasers && !runners.isEmpty()) {
+            Player promoted = runners.remove(ThreadLocalRandom.current().nextInt(runners.size()));
+            session.tagged.add(promoted.getUniqueId());
+            announce(session, ChatColor.RED + promoted.getName() + " has been forced to become a Chaser.");
+            promoted.sendMessage(ChatColor.YELLOW + "Time is running out! Tag every remaining runner.");
+            taggedAlive++;
+        }
+    }
+
     private void updateMicroBarrier(Session session, long now) {
         if (!session.microBarrierActive || !ArcadePortRules.shouldRemoveMicroBarrier(now - session.startedAt)) return;
         for (int team = 0; team < 4; team++) {
@@ -460,6 +478,9 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
+        if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
+            updateDeathTagChasers(session, now);
+        }
         if (session.type == ArcadePortGame.DRAGONS && now >= lastDragonHazard) {
             launchDragonHazard(session);
             lastDragonHazard = now + 4_500L;
