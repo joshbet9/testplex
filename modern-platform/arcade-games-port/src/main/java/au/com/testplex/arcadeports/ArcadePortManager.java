@@ -631,6 +631,7 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().addItem(new ItemStack(Material.BOW));
                 player.getInventory().addItem(new ItemStack(Material.ARROW, 16));
                 player.getInventory().addItem(new ItemStack(Material.COBBLESTONE, 32));
+                setMicroTeamArmor(session, player);
                 break;
             case ONE_IN_THE_QUIVER:
                 player.getInventory().addItem(new ItemStack(Material.BOW));
@@ -666,6 +667,55 @@ public final class ArcadePortManager implements Listener {
                 break;
         }
         player.updateInventory();
+    }
+
+    private void setMicroTeamArmor(Session session, Player player) {
+        Color teamColor = switch (session.teams.getOrDefault(player.getUniqueId(), 0)) {
+            case 0 -> Color.RED;
+            case 1 -> Color.AQUA;
+            case 2 -> Color.YELLOW;
+            default -> Color.LIME;
+        };
+        ItemStack[] armor = new ItemStack[] {
+                new ItemStack(Material.LEATHER_BOOTS),
+                new ItemStack(Material.LEATHER_LEGGINGS),
+                new ItemStack(Material.LEATHER_CHESTPLATE),
+                new ItemStack(Material.LEATHER_HELMET)
+        };
+        for (ItemStack piece : armor) {
+            if (piece.getItemMeta() instanceof LeatherArmorMeta meta) {
+                meta.setColor(teamColor);
+                piece.setItemMeta(meta);
+            }
+        }
+        player.getInventory().setArmorContents(armor);
+    }
+
+    private void enforceMicroBattlesHunger(Session session) {
+        for (Player player : alivePlayers(session)) {
+            int minimum = ArcadePortRules.microBattlesMinimumFoodLevel(player.getFoodLevel());
+            if (player.getFoodLevel() != minimum) player.setFoodLevel(minimum);
+        }
+    }
+
+    private void applyMicroBattlesHit(Session session, Player attacker, Player target, String source) {
+        if (active != session || !session.alive.contains(attacker.getUniqueId())
+                || !session.alive.contains(target.getUniqueId())) return;
+        boolean projectile = !"melee".equals(source);
+        double damage = ArcadePortRules.microBattlesHitDamage(projectile);
+        if (projectile) {
+            Vector push = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+            if (push.lengthSquared() < 0.0001D) push = attacker.getLocation().getDirection();
+            target.setVelocity(push.normalize().multiply(1.6D).setY(0.35D));
+        }
+        if (target.getHealth() <= damage) {
+            eliminate(session, target, attacker, "was eliminated in Micro Battles");
+            return;
+        }
+        target.setHealth(target.getHealth() - damage);
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
+        target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0.0D, 1.0D, 0.0D),
+                5, 0.25D, 0.35D, 0.25D, 0.05D);
     }
 
     private void setPaintballArmor(Session session, Player player) {
@@ -764,6 +814,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
         if (session.type == ArcadePortGame.GLADIATORS) updateGladiators(session, now);
+        if (session.type == ArcadePortGame.MICRO_BATTLES) enforceMicroBattlesHunger(session);
         if (session.type == ArcadePortGame.DRAGONS && session.ticks % 4 == 0) updateTestDragons(session, now);
         if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
             updateDeathTagChasers(session, now);
@@ -1499,6 +1550,9 @@ public final class ArcadePortManager implements Listener {
                 break;
             case PAINTBALL:
                 applyPaintballHit(session, attacker, target);
+                break;
+            case MICRO_BATTLES:
+                applyMicroBattlesHit(session, attacker, target, source);
                 break;
             case TURF_WARS: {
                 ItemStack heldWeapon = attacker.getInventory().getItemInMainHand();
