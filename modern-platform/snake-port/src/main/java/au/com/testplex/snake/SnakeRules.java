@@ -4,6 +4,18 @@ package au.com.testplex.snake;
 public final class SnakeRules {
     private static final int[] ROULETTE_SECONDS = {1, 3, 5, 10, 15, 20, 30};
 
+    public static final int MAX_HAZARDS = 4;
+    public static final long FIRST_HAZARD_DELAY_MILLIS = 10_000L;
+    public static final long HAZARD_INTERVAL_MILLIS = 15_000L;
+    public static final int HAZARD_STEERING_INTERVAL_TICKS = 4;
+    public static final double HAZARD_STEERING_SPEED = 0.12D;
+    public static final double HAZARD_CONTACT_RADIUS = 2.1D;
+
+    /** Legacy Snake leaves an item box available if the player is still rolling an item. */
+    public static boolean shouldConsumeHazardOnContact(boolean rouletteActive) {
+        return !rouletteActive;
+    }
+
     private SnakeRules() {}
 
     public static int rouletteDurationSecondsForHit(int hitCount) {
