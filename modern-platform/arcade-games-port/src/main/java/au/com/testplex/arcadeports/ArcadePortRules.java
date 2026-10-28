@@ -36,6 +36,10 @@ public final class ArcadePortRules {
         return alivePlayers <= 0 && respawningPlayers <= 0;
     }
 
+    public static int requiredDeathTagChasers(long elapsedMillis) {
+        return elapsedMillis < 0L ? 1 : 1 + (int) (elapsedMillis / 30_000L);
+    }
+
     public static int advanceTurfFrontline(int currentFrontline, int teamId) {
         if (teamId == 0) return currentFrontline + 1;
         if (teamId == 1) return currentFrontline - 1;
