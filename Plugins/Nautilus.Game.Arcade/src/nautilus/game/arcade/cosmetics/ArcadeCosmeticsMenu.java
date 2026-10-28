@@ -423,6 +423,34 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     }
 
     /**
+     * Persistent in-game Monster Maze mob theme. Map Default follows the active map;
+     * custom-pack mob-set rotation is configured separately in the cosmetics menu.
+     */
+    public static String getMonsterMazeSelectedMobTheme(UUID playerId) {
+        if (instance == null || playerId == null) return "map_default";
+        String path = "players." + playerId + ".arcade.monstermaze.selected-mob-theme";
+        String selected = instance.data.getString(path, "map_default");
+        if (selected == null) return "map_default";
+        selected = selected.toLowerCase(Locale.ROOT);
+        if ("map_default".equals(selected) || "random".equals(selected)) return selected;
+        GameDefinition game = instance.games.get("monstermaze");
+        SettingDefinition setting = game == null ? null : game.getSetting("mob-sets");
+        return setting != null && setting.options.contains(selected) ? selected : "map_default";
+    }
+
+    public static void setMonsterMazeSelectedMobTheme(UUID playerId, String mobTheme) {
+        if (instance == null || playerId == null || mobTheme == null) return;
+        String selected = mobTheme.toLowerCase(Locale.ROOT);
+        if (!"map_default".equals(selected) && !"random".equals(selected)) {
+            GameDefinition game = instance.games.get("monstermaze");
+            SettingDefinition setting = game == null ? null : game.getSetting("mob-sets");
+            if (setting == null || !setting.options.contains(selected)) return;
+        }
+        instance.data.set("players." + playerId + ".arcade.monstermaze.selected-mob-theme", selected);
+        instance.save();
+    }
+
+    /**
      * Returns the mob sets a player opted into. An untouched selection returns
      * an empty list so the map's source-defined mob remains the default.
      */

@@ -220,38 +220,48 @@ public class SafePad implements Listener
 	{
 		if (Host == null || _loc == null || _loc.getWorld() == null)
 			return;
+		for (Player viewer : Host.GetPlayers(false))
+			applyViewerCosmeticColours(viewer);
+	}
 
+	/** Refresh the requesting client's Safe Pad tint and beacon-colour filter after Mob Theme changes. */
+	@SuppressWarnings("deprecation")
+	public void refreshViewerCosmeticColours(Player viewer)
+	{
+		if (viewer == null || !viewer.isOnline() || Host == null || _loc == null || _loc.getWorld() == null)
+			return;
+		applyViewerCosmeticColours(viewer);
+	}
+
+	@SuppressWarnings("deprecation")
+	private void applyViewerCosmeticColours(Player viewer)
+	{
+		if (viewer == null || !viewer.isOnline() || Host == null || _loc == null || _loc.getWorld() == null)
+			return;
 		Location beamLocation = _loc.clone().add(0, 6, 0);
 		boolean beaconPresent = _loc.getBlock().getType() == Material.BEACON;
 		boolean beamSpaceIsAir = beamLocation.getBlock().getType() == Material.AIR;
-
-		for (Player viewer : Host.GetPlayers(false))
+		String mobSet = _maze == null ? null : _maze.getMobSetForPlayer(viewer);
+		boolean customPack = mobSet != null && ArcadeCosmeticsMenu.isMonsterMazeCustomPackUnlocked(viewer.getUniqueId());
+		for (SafePadBlock block : _blocks)
 		{
-			String mobSet = _maze == null ? null : _maze.getMobSetForPlayer(viewer);
-			boolean customPack = mobSet != null && ArcadeCosmeticsMenu.isMonsterMazeCustomPackUnlocked(viewer.getUniqueId());
-			for (SafePadBlock block : _blocks)
-			{
-				if (block.getBlockMaterial() != Material.STAINED_CLAY)
-					continue;
-
-				// Keep the game's green -> yellow -> orange -> red warning sequence visible.
-				boolean warningTintActive = _breakColour != (byte) 5;
-				byte data = customPack && !warningTintActive
-						? (byte) ArcadeCosmeticsMenu.getMonsterMazeSafePadColourData(viewer.getUniqueId(), mobSet)
-						: block.getBlockData();
-				viewer.sendBlockChange(block.getLocation(), Material.STAINED_CLAY, data);
-			}
-
-			if (customPack && beaconPresent && beamSpaceIsAir)
-			{
-				byte colour = (byte) ArcadeCosmeticsMenu.getMonsterMazeBeaconColourData(viewer.getUniqueId(), mobSet);
-				// Place the client-only filter higher in the beam so it cannot obstruct players on the pad.
-				viewer.sendBlockChange(beamLocation, Material.STAINED_GLASS, colour);
-			}
-			else
-			{
-				viewer.sendBlockChange(beamLocation, beamLocation.getBlock().getType(), beamLocation.getBlock().getData());
-			}
+			if (block.getBlockMaterial() != Material.STAINED_CLAY)
+				continue;
+			// Keep the game's green -> yellow -> orange -> red warning sequence visible.
+			boolean warningTintActive = _breakColour != (byte) 5;
+			byte data = customPack && !warningTintActive
+					? (byte) ArcadeCosmeticsMenu.getMonsterMazeSafePadColourData(viewer.getUniqueId(), mobSet)
+					: block.getBlockData();
+			viewer.sendBlockChange(block.getLocation(), Material.STAINED_CLAY, data);
+		}
+		if (customPack && beaconPresent && beamSpaceIsAir)
+		{
+			byte colour = (byte) ArcadeCosmeticsMenu.getMonsterMazeBeaconColourData(viewer.getUniqueId(), mobSet);
+			viewer.sendBlockChange(beamLocation, Material.STAINED_GLASS, colour);
+		}
+		else
+		{
+			viewer.sendBlockChange(beamLocation, beamLocation.getBlock().getType(), beamLocation.getBlock().getData());
 		}
 	}
 

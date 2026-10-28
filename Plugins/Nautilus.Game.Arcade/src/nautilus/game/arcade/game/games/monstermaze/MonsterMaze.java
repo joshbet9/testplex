@@ -27,6 +27,7 @@ import mineplex.core.updater.event.UpdateEvent;
 import mineplex.minecraft.game.core.condition.Condition.ConditionType;
 import nautilus.game.arcade.ArcadeManager;
 import nautilus.game.arcade.GameType;
+import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.game.GameTeam;
 import nautilus.game.arcade.game.SoloGame;
@@ -79,6 +80,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -98,9 +100,12 @@ public class MonsterMaze extends SoloGame
 	private final Map<UUID, GameScoreboard> _viewerScoreboards = new HashMap<UUID, GameScoreboard>();
 	private final Map<UUID, org.bukkit.scoreboard.Scoreboard> _previousScoreboards = new HashMap<UUID, org.bukkit.scoreboard.Scoreboard>();
 	private final Map<UUID, ItemStack> _previousCompassItems = new HashMap<UUID, ItemStack>();
+	private final Map<UUID, ItemStack> _previousMobThemeItems = new HashMap<UUID, ItemStack>();
 	private final Map<UUID, ItemStack> _previousVisibilityItems = new HashMap<UUID, ItemStack>();
 	private final Map<UUID, Integer> _visibilityModeData = new HashMap<UUID, Integer>();
 	private static final int VISIBILITY_SLOT = 7;
+	private static final int MOB_THEME_SLOT = 6;
+	private static final String MOB_THEME_ITEM_NAME = "Mob Theme:";
 	private static final int SAFE_PAD_COMPASS_SLOT = 4;
 	private static final int LEGACY_DUPLICATE_COMPASS_SLOT = 1;
 	private static final String VISIBILITY_ITEM_NAME = "Player Visibility:";
@@ -834,6 +839,19 @@ public class MonsterMaze extends SoloGame
 		if (isSafePadCompassItem(legacyCompass))
 			player.getInventory().setItem(LEGACY_DUPLICATE_COMPASS_SLOT, null);
 
+		ItemStack themeItem = player.getInventory().getItem(MOB_THEME_SLOT);
+		ItemStack expectedThemeItem = createMobThemeItem(player);
+		if (!isMobThemeItem(themeItem))
+		{
+			if (!_previousMobThemeItems.containsKey(id))
+				_previousMobThemeItems.put(id, themeItem == null ? null : themeItem.clone());
+			player.getInventory().setItem(MOB_THEME_SLOT, expectedThemeItem);
+		}
+		else if (!themeItem.getItemMeta().getDisplayName().equals(expectedThemeItem.getItemMeta().getDisplayName()))
+		{
+			player.getInventory().setItem(MOB_THEME_SLOT, expectedThemeItem);
+		}
+
 		ItemStack compass = player.getInventory().getItem(SAFE_PAD_COMPASS_SLOT);
 		if (!isSafePadCompassItem(compass))
 		{
@@ -864,6 +882,97 @@ public class MonsterMaze extends SoloGame
 		ItemMeta meta = item.getItemMeta();
 		return meta != null && meta.hasDisplayName()
 				&& meta.getDisplayName().toLowerCase(java.util.Locale.ROOT).contains("safe pad locator");
+	}
+
+	private ItemStack createMobThemeItem(Player player)
+	{
+		String theme = _maze == null
+				? ArcadeCosmeticsMenu.getMonsterMazeSelectedMobTheme(player.getUniqueId())
+				: _maze.getMobThemeChoiceForPlayer(player);
+		ItemStack item;
+		if ("random".equals(theme))
+			item = new ItemStack(Material.NETHER_STAR, 1);
+		else
+		{
+			EntityType iconType = _maze == null ? _monsterType : _maze.getMobEntityTypeForPlayer(player);
+			if (iconType == null)
+				iconType = EntityType.CREEPER;
+			int entityId = iconType.getTypeId();
+			item = new ItemStack(Material.MONSTER_EGG, 1, (short) (entityId < 0 ? 50 : entityId));
+		}
+		ItemMeta meta = item.getItemMeta();
+		meta.setDisplayName(ChatColor.LIGHT_PURPLE + MOB_THEME_ITEM_NAME + " " + ChatColor.YELLOW + displayMobThemeName(theme));
+		meta.setLore(java.util.Arrays.asList(
+				ChatColor.GRAY + "Right-click to cycle mob themes",
+				ChatColor.GRAY + "Changes your mob appearance only",
+				ChatColor.GRAY + "Safe Pad and beacon colours follow the selected mob set"));
+		item.setItemMeta(meta);
+		return item;
+	}
+
+	private String displayMobThemeName(String theme)
+	{
+		if (theme == null || "map_default".equals(theme))
+			return "Map Default";
+		if ("random".equals(theme))
+			return "Random Mob";
+		StringBuilder label = new StringBuilder();
+		for (String word : theme.toLowerCase(java.util.Locale.ROOT).replace('_', ' ').split(" "))
+		{
+			if (word.length() == 0)
+				continue;
+			if (label.length() > 0)
+				label.append(' ');
+			label.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+		}
+		return label.toString();
+	}
+
+	private boolean isMobThemeItem(ItemStack item)
+	{
+		if (item == null || !item.hasItemMeta())
+			return false;
+		ItemMeta meta = item.getItemMeta();
+		return meta != null && meta.hasDisplayName()
+				&& ChatColor.stripColor(meta.getDisplayName()).startsWith(MOB_THEME_ITEM_NAME);
+	}
+
+	@EventHandler
+	public void onMobThemeCycle(PlayerInteractEvent event)
+	{
+		if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK)
+			return;
+		if (!isMobThemeItem(event.getItem()))
+			return;
+		Player player = event.getPlayer();
+		if (_maze == null || !GetPlayers(false).contains(player))
+			return;
+		event.setCancelled(true);
+		String selected = _maze.cycleMobThemeForPlayer(player);
+		player.getInventory().setItem(MOB_THEME_SLOT, createMobThemeItem(player));
+		player.playSound(player.getLocation(), Sound.CLICK, 0.8F, 1.2F);
+		player.sendMessage(ChatColor.LIGHT_PURPLE + MOB_THEME_ITEM_NAME + " "
+				+ ChatColor.YELLOW + displayMobThemeName(selected)
+				+ ChatColor.GRAY + " (personal view).");
+	}
+
+	@EventHandler
+	public void onMobThemeDrop(PlayerDropItemEvent event)
+	{
+		if (isMobThemeItem(event.getItemDrop().getItemStack()))
+			event.setCancelled(true);
+	}
+
+	@EventHandler
+	public void onMobThemeInventoryClick(InventoryClickEvent event)
+	{
+		if (!(event.getWhoClicked() instanceof Player))
+			return;
+		Player player = (Player) event.getWhoClicked();
+		if (isMobThemeItem(event.getCurrentItem()) || isMobThemeItem(event.getCursor())
+				|| event.getHotbarButton() == MOB_THEME_SLOT
+				|| (event.getClickedInventory() == player.getInventory() && event.getSlot() == MOB_THEME_SLOT))
+			event.setCancelled(true);
 	}
 
 	private ItemStack createVisibilityItem(int modeData)
@@ -1031,6 +1140,12 @@ public class MonsterMaze extends SoloGame
 			if (entry.getValue() != null)
 				player.setScoreboard(entry.getValue());
 		}
+		for (Map.Entry<UUID, ItemStack> entry : _previousMobThemeItems.entrySet())
+		{
+			Player player = Bukkit.getPlayer(entry.getKey());
+			if (player != null && player.isOnline())
+				player.getInventory().setItem(MOB_THEME_SLOT, entry.getValue() == null ? null : entry.getValue().clone());
+		}
 		for (Map.Entry<UUID, ItemStack> entry : _previousVisibilityItems.entrySet())
 		{
 			Player player = Bukkit.getPlayer(entry.getKey());
@@ -1046,6 +1161,7 @@ public class MonsterMaze extends SoloGame
 		_viewerScoreboards.clear();
 		_previousScoreboards.clear();
 		_previousCompassItems.clear();
+		_previousMobThemeItems.clear();
 		_previousVisibilityItems.clear();
 		_visibilityModeData.clear();
 	}

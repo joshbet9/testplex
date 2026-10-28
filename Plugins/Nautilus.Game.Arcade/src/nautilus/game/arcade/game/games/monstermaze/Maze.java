@@ -2,12 +2,14 @@ package nautilus.game.arcade.game.games.monstermaze;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
@@ -87,9 +89,17 @@ public class Maze implements Listener
 	private ArrayList<Player> _playersOnPad = new ArrayList<Player>();
 	private HashMap<LivingEntity, MazeMobWaypoint> _ents = new HashMap<LivingEntity, MazeMobWaypoint>();
 	private final HashMap<LivingEntity, Long> _frozenUntil = new HashMap<LivingEntity, Long>();
-	// Keep one player-specific mob set for the run so Safe Pad colours match it.
+	// Keep the selected theme, concrete mob skin and Safe Pad tint consistent per viewer.
+	private final Map<UUID, String> _viewerMobThemeChoices = new HashMap<UUID, String>();
 	private final Map<UUID, String> _viewerMobSetIds = new HashMap<UUID, String>();
 	private final Map<UUID, EntityType> _viewerMobTypes = new HashMap<UUID, EntityType>();
+	// Live overrides sit above grouped base disguises so changing one viewer never changes other players.
+	private final Map<UUID, Map<UUID, DisguiseBase>> _viewerDisguiseOverrides = new HashMap<UUID, Map<UUID, DisguiseBase>>();
+	private static final List<String> MOB_THEME_CYCLE = Collections.unmodifiableList(Arrays.asList(
+			"map_default", "creeper", "skeleton", "spider", "zombie", "slime", "zombie_pigman",
+			"enderman", "cave_spider", "silverfish", "blaze", "magma_cube", "bat", "witch",
+			"endermite", "guardian", "pig", "sheep", "cow", "chicken", "squid", "wolf",
+			"mooshroom", "snowman", "ocelot", "horse", "rabbit", "villager", "random"));
 	private final LinkedList<Location> _pendingSpawnLocations = new LinkedList<Location>();
 	private static final int MAX_MOB_SPAWNS_PER_TICK = 25;
 
@@ -441,9 +451,9 @@ public class Maze implements Listener
 				else
 					UtilAction.velocity(player, UtilAlg.getTrajectory(ent, player), 1, false, 0, 0.75, 1.2, true);
 
-				//Damage Event
-				_host.Manager.GetDamage().NewDamageEvent(player, null, null, 
-						null, 4, false, false, false,
+				// Submit a source-aware hit; the Maze recharge is the authoritative cooldown.
+				_host.Manager.GetDamage().NewDamageEvent(player, ent, null,
+						DamageCause.ENTITY_ATTACK, 4, false, true, false,
 						"Monster", "Monster Attack");
 
 				PacketPlayOutAnimation animation = new PacketPlayOutAnimation();
@@ -769,10 +779,10 @@ public class Maze implements Listener
 		}
 	}
 
-	private void registerMobDisguise(Snowman entity, EntityType mobType, final Set<UUID> viewerIds)
+	private DisguiseBase registerMobDisguise(Snowman entity, EntityType mobType, final Set<UUID> viewerIds)
 	{
-		if (mobType == null || mobType == EntityType.SNOWMAN)
-			return;
+		if (mobType == null)
+			return null;
 
 		DisguiseBase disguise = DisguiseFactory.createDisguise(entity, mobType);
 		if (disguise instanceof DisguiseSlime)
@@ -782,52 +792,168 @@ public class Maze implements Listener
 		if (disguise == null)
 		{
 			Bukkit.getLogger().warning("Monster Maze has no disguise implementation for " + mobType + ".");
-			return;
+			return null;
 		}
 
 		if (viewerIds == null)
 			_host.Manager.GetDisguise().disguise(disguise);
 		else
 			_host.Manager.GetDisguise().disguise(disguise, viewer -> viewerIds.contains(viewer.getUniqueId()));
+		return disguise;
 	}
 
 	private EntityType getMobTypeForPlayer(Player player)
 	{
-		String mobSet = getMobSetForPlayer(player);
-		EntityType selected = mobSet == null ? null : _viewerMobTypes.get(player.getUniqueId());
+		return getMobEntityTypeForPlayer(player);
+	}
+
+	/** Concrete mob skin for this viewer, or the map's source skin. */
+	public EntityType getMobEntityTypeForPlayer(Player player)
+	{
+		if (player == null)
+			return _host.getMonsterType();
+		getMobThemeChoiceForPlayer(player);
+		EntityType selected = _viewerMobTypes.get(player.getUniqueId());
 		return selected == null ? _host.getMonsterType() : selected;
 	}
 
-	/** Returns this viewer's selected mob set, fixed for one game run. */
+	/** Map Default, a named mob theme, or Random Mob, matching the original slot-6 selector. */
+	public String getMobThemeChoiceForPlayer(Player player)
+	{
+		if (player == null)
+			return "map_default";
+		UUID playerId = player.getUniqueId();
+		if (!_viewerMobThemeChoices.containsKey(playerId))
+			applyMobThemeChoice(player, ArcadeCosmeticsMenu.getMonsterMazeSelectedMobTheme(playerId), false);
+		String selected = _viewerMobThemeChoices.get(playerId);
+		return selected == null ? "map_default" : selected;
+	}
+
+	/** The selected concrete mob set is also the key used by Safe Pad/beacon colour cosmetics. */
 	public String getMobSetForPlayer(Player player)
 	{
 		if (player == null)
 			return null;
+		getMobThemeChoiceForPlayer(player);
+		return _viewerMobSetIds.get(player.getUniqueId());
+	}
 
+	/** Cycle the selector and immediately refresh this viewer's mob models and objective colours. */
+	public String cycleMobThemeForPlayer(Player player)
+	{
+		if (player == null)
+			return "map_default";
+		String current = getMobThemeChoiceForPlayer(player);
+		int index = MOB_THEME_CYCLE.indexOf(current);
+		String next = MOB_THEME_CYCLE.get((index < 0 ? 0 : index + 1) % MOB_THEME_CYCLE.size());
+		applyMobThemeChoice(player, next, true);
+		refreshMobDisguisesForViewer(player);
+		refreshSafePadCosmeticColours(player);
+		return next;
+	}
+
+	private void applyMobThemeChoice(Player player, String choice, boolean persist)
+	{
 		UUID playerId = player.getUniqueId();
-		if (_viewerMobSetIds.containsKey(playerId))
-			return _viewerMobSetIds.get(playerId);
-
-		List<String> enabled = ArcadeCosmeticsMenu.getEnabledMonsterMazeMobSets(playerId);
-		if (enabled == null || enabled.isEmpty())
+		String selected = choice == null ? "map_default" : choice.toLowerCase(Locale.ROOT);
+		if (!MOB_THEME_CYCLE.contains(selected))
+			selected = "map_default";
+		String concrete = selected;
+		EntityType type;
+		if ("map_default".equals(selected))
 		{
-			_viewerMobSetIds.put(playerId, null);
-			_viewerMobTypes.put(playerId, _host.getMonsterType());
-			return null;
+			concrete = null;
+			type = _host.getMonsterType();
 		}
-
-		String selected = enabled.get((int) (Math.random() * enabled.size()));
-		EntityType type = entityTypeForMobSet(selected);
-		if (type == null)
+		else
 		{
-			_viewerMobSetIds.put(playerId, null);
-			_viewerMobTypes.put(playerId, _host.getMonsterType());
-			return null;
+			if ("random".equals(selected))
+				concrete = randomConcreteMobSet(playerId);
+			type = entityTypeForMobSet(concrete);
+			if (type == null)
+			{
+				selected = "map_default";
+				concrete = null;
+				type = _host.getMonsterType();
+			}
 		}
+		_viewerMobThemeChoices.put(playerId, selected);
+		_viewerMobSetIds.put(playerId, concrete);
+		_viewerMobTypes.put(playerId, type == null ? _host.getMonsterType() : type);
+		if (persist)
+			ArcadeCosmeticsMenu.setMonsterMazeSelectedMobTheme(playerId, selected);
+	}
 
-		_viewerMobSetIds.put(playerId, selected);
-		_viewerMobTypes.put(playerId, type);
-		return selected;
+	private String randomConcreteMobSet(UUID playerId)
+	{
+		int count = MOB_THEME_CYCLE.size() - 2; // Exclude Map Default and Random Mob.
+		return MOB_THEME_CYCLE.get(1 + Math.floorMod(playerId.hashCode(), count));
+	}
+
+	private void refreshMobDisguisesForViewer(Player viewer)
+	{
+		if (viewer == null || !viewer.isOnline())
+			return;
+		UUID viewerId = viewer.getUniqueId();
+		Map<UUID, DisguiseBase> overrides = _viewerDisguiseOverrides.get(viewerId);
+		if (overrides == null)
+		{
+			overrides = new HashMap<UUID, DisguiseBase>();
+			_viewerDisguiseOverrides.put(viewerId, overrides);
+		}
+		EntityType selectedType = getMobEntityTypeForPlayer(viewer);
+		Set<UUID> onlyThisViewer = Collections.singleton(viewerId);
+		for (LivingEntity living : new ArrayList<LivingEntity>(_ents.keySet()))
+		{
+			if (!(living instanceof Snowman) || !living.isValid())
+				continue;
+			DisguiseBase previous = overrides.remove(living.getUniqueId());
+			if (previous != null)
+			{
+				try
+				{
+					_host.Manager.GetDisguise().undisguise(previous);
+				}
+				catch (Throwable failure)
+				{
+					Bukkit.getLogger().warning("[MonsterMaze] Could not remove previous Mob Theme for "
+							+ viewer.getName() + ": " + failure.getClass().getSimpleName());
+				}
+			}
+			DisguiseBase replacement = registerMobDisguise((Snowman) living, selectedType, onlyThisViewer);
+			if (replacement != null)
+				overrides.put(living.getUniqueId(), replacement);
+		}
+	}
+
+	private void refreshSafePadCosmeticColours(Player viewer)
+	{
+		if (_safePad != null)
+			_safePad.refreshViewerCosmeticColours(viewer);
+		if (_nextSafePad != null && _nextSafePad != _safePad)
+			_nextSafePad.refreshViewerCosmeticColours(viewer);
+		for (SafePad pad : _oldSafePads)
+			if (pad != _safePad && pad != _nextSafePad)
+				pad.refreshViewerCosmeticColours(viewer);
+	}
+
+	private void clearViewerDisguiseOverrides()
+	{
+		for (Map<UUID, DisguiseBase> overrides : _viewerDisguiseOverrides.values())
+		{
+			for (DisguiseBase disguise : new ArrayList<DisguiseBase>(overrides.values()))
+			{
+				try
+				{
+					_host.Manager.GetDisguise().undisguise(disguise);
+				}
+				catch (Throwable ignored)
+				{
+					// The backing mob may already have been removed during round cleanup.
+				}
+			}
+		}
+		_viewerDisguiseOverrides.clear();
 	}
 
 	private EntityType entityTypeForMobSet(String mobSet)
@@ -1562,8 +1688,9 @@ public class Maze implements Listener
 		if (event.GetState() != GameState.Dead)
 			return;
 
-		// The arena/world may be reused by another round. Remove every tracked entity plus
-		// stale backing Snowmen from a previous Maze instance, and restore all objective blocks.
+		// The arena/world may be reused by another round. Remove per-viewer overrides before
+		// clearing backing mobs and restoring objective blocks.
+		clearViewerDisguiseOverrides();
 		for (LivingEntity entity : new ArrayList<LivingEntity>(_ents.keySet()))
 		{
 			if (entity != null && entity.isValid())
@@ -1574,6 +1701,7 @@ public class Maze implements Listener
 		_frozenUntil.clear();
 		_pendingSpawnLocations.clear();
 		_playersOnPad.clear();
+		_viewerMobThemeChoices.clear();
 		_viewerMobSetIds.clear();
 		_viewerMobTypes.clear();
 		_firstStageParticlePath.clear();

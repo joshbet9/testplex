@@ -2008,8 +2008,7 @@ public enum GameKit
 					"Jumper",
 					"monstermazespeedjumper",
 					new String[] { "Three charged jumps; refreshed by Safe Pads.", "Jumping on a Safe Pad is free." },
-					new KitEntityData<>(Skeleton.class, new ItemStack(Material.FEATHER)),
-					getAchievementsFor(AchievementCategory.MONSTER_MAZE)
+					new KitEntityData<>(Skeleton.class, new ItemStack(Material.FEATHER))
 			),
 
 	MONSTER_MAZE_SPEED_SLOW_BALL
@@ -2053,7 +2052,7 @@ public enum GameKit
 					"monstermazespeedmaverick",
 					new String[] { "Monster hits launch you toward the next Safe Pad." },
 					new KitEntityData<>(Skeleton.class, new ItemStack(Material.ARROW)),
-					getAchievementsFor(AchievementCategory.MONSTER_MAZE)
+					5000
 			),
 
 	MONSTER_MAZE_MODERN_JUMPER
@@ -2063,8 +2062,7 @@ public enum GameKit
 					"Jumper",
 					"monstermazemodernjumper",
 					new String[] { "Three charged jumps; refreshed by Safe Pads.", "Jumping on a Safe Pad is free." },
-					new KitEntityData<>(Skeleton.class, new ItemStack(Material.FEATHER)),
-					getAchievementsFor(AchievementCategory.MONSTER_MAZE)
+					new KitEntityData<>(Skeleton.class, new ItemStack(Material.FEATHER))
 			),
 
 	MONSTER_MAZE_MODERN_SLOW_BALL
@@ -2116,7 +2114,7 @@ public enum GameKit
 									Skeleton.class,
 									new ItemStack(Material.ARROW)
 							),
-					getAchievementsFor(AchievementCategory.MONSTER_MAZE)
+					5000
 			),
 
 	// Paintball

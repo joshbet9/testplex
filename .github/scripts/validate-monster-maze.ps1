@@ -228,6 +228,16 @@ Assert-Contains "Bacon Brawl effect is clearly labelled a demo" (Join-Path $repo
 
 Assert-Contains "Speed has separate kit identities" $kitFile "MONSTER_MAZE_SPEED_JUMPER"
 Assert-Contains "Modern has separate kit identities" $kitFile "MONSTER_MAZE_MODERN_JUMPER"
+Assert-Contains "Mob Theme selector uses legacy hotbar slot 6" $mazeCoreFile "MOB_THEME_SLOT = 6"
+Assert-Contains "Mob Theme selector cycles with right-click" $mazeCoreFile "onMobThemeCycle(PlayerInteractEvent event)"
+Assert-Contains "Mob Theme cycle includes map default and Random Mob" $mazeFile '"map_default", "creeper", "skeleton", "spider", "zombie", "slime", "zombie_pigman"'
+Assert-Contains "Mob Theme selections persist per player" $cosmeticsFile "selected-mob-theme"
+Assert-Contains "Mob Theme changes update viewer-specific disguises" $mazeFile "refreshMobDisguisesForViewer(player)"
+Assert-Contains "Mob Theme changes refresh Safe Pad and beacon colours" $mazeFile "refreshViewerCosmeticColours(viewer)"
+Assert-Contains "Monster hits use an explicit entity-attack damage event" $mazeFile "DamageCause.ENTITY_ATTACK, 4, false, true, false"
+Assert-Contains "Speed Jumper is free rather than achievement-gated" $kitFile 'new KitEntityData<>(Skeleton.class, new ItemStack(Material.FEATHER))'
+Assert-Contains "Speed Maverick is gem-unlocked, not achievement-gated" $kitFile "monstermazespeedmaverick"
+Assert-Contains "Modern Maverick is gem-unlocked, not achievement-gated" $kitFile "monstermazemaverick"
 
 Write-Host ""
 if ($failures.Count -gt 0) {
