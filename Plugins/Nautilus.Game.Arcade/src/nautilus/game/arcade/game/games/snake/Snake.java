@@ -352,14 +352,14 @@ public class Snake extends SoloGame
 			Float lagValue = _laggedYaw.get(player);
 			float lagYaw = lagValue == null ? rawYaw : lagValue.floatValue();
 			float delta = wrapYaw(rawYaw - lagYaw);
-			lagYaw += clamp(delta, -8.0f, 8.0f);
+			lagYaw += clamp(delta, -6.0f, 6.0f);
 			_laggedYaw.put(player, Float.valueOf(lagYaw));
 			effectiveYaw = lagYaw;
 		}
 		else if (debuff == ControlDebuff.OVERSHOOT)
 		{
 			float delta = wrapYaw(rawYaw - previousYaw);
-			effectiveYaw = rawYaw + (delta * 0.65f);
+			effectiveYaw = rawYaw + (delta * 0.35f);
 		}
 		else if (debuff == ControlDebuff.WEAK_SHARP_TURN)
 		{
@@ -666,7 +666,7 @@ public class Snake extends SoloGame
 				player.playSound(player.getLocation(), Sound.NOTE_PLING, 1.0F, 1.8F);
 				cancel();
 			}
-		}.runTaskTimer(Manager.GetPlugin(), 0L, 2L);
+		}.runTaskTimer(Manager.getPlugin(), 0L, 2L);
 	}
 
 	private ItemStack rouletteItem(ControlDebuff effect)
