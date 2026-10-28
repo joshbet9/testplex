@@ -724,24 +724,58 @@ jobs:
             echo "Cannot compare map-source revisions safely; using the verified bundle."
           fi
 
-          echo "Uploading Arcade.jar via SCP; avoid the remote rsync receiver that has been stalling."
-          jar_upload_ok=0
-          for attempt in 1 2 3; do
-            if scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
-              -o BatchMode=yes -o StrictHostKeyChecking=yes \
-              -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
-              -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8 \
-              "$ARTIFACT_DIR/Arcade.jar" "$remote:$upload_dir/Arcade.jar"; then
-              jar_upload_ok=1
-              break
-            fi
-            echo "Arcade.jar SCP attempt $attempt/3 failed." >&2
-            if [[ "$attempt" -lt 3 ]]; then sleep 3; fi
+          # The host can SSH normally but has repeatedly timed out on a single
+          # 20 MiB Arcade.jar SCP stream. Transfer small independently checked
+          # chunks instead; the service remains untouched until the complete
+          # assembled JAR passes the end-to-end SHA-256 check below.
+          echo "Uploading Arcade.jar as verified 4 MiB SCP chunks."
+          arcade_local_chunks="$RUNNER_TEMP/testplex-arcade-chunks-$BUILD_SHA"
+          arcade_remote_chunks="$upload_dir/arcade-chunks-$BUILD_SHA"
+          arcade_partial="$upload_dir/Arcade.jar.partial-$BUILD_SHA"
+          mkdir -p "$arcade_local_chunks"
+          split -b 4m -d -a 3 "$ARTIFACT_DIR/Arcade.jar" "$arcade_local_chunks/part-"
+          ssh "${ssh_opts[@]}" "$remote" \
+            "install -d -m 0700 '$arcade_remote_chunks' && rm -f '$arcade_remote_chunks'/part-* '$arcade_remote_chunks'/part-*.partial '$arcade_partial'"
+
+          for chunk in "$arcade_local_chunks"/part-*; do
+            chunk_name="$(basename "$chunk")"
+            chunk_sha="$(sha256sum "$chunk" | cut -d ' ' -f1)"
+            chunk_upload_ok=0
+            for attempt in 1 2 3; do
+              if scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
+                -o BatchMode=yes -o StrictHostKeyChecking=yes \
+                -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+                -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=30 \
+                "$chunk" "$remote:$arcade_remote_chunks/$chunk_name.partial"; then
+                remote_chunk_sha="$(ssh "${ssh_opts[@]}" "$remote" \
+                  "if [[ -s '$arcade_remote_chunks/$chunk_name.partial' ]]; then sha256sum '$arcade_remote_chunks/$chunk_name.partial' | cut -d ' ' -f1; fi" 2>/dev/null || true)"
+                if [[ "$chunk_sha" == "$remote_chunk_sha" ]]; then
+                  ssh "${ssh_opts[@]}" "$remote" \
+                    "mv -f '$arcade_remote_chunks/$chunk_name.partial' '$arcade_remote_chunks/$chunk_name'"
+                  chunk_upload_ok=1
+                  break
+                fi
+              fi
+              echo "Arcade.jar chunk $chunk_name upload attempt $attempt/3 failed verification." >&2
+              if [[ "$attempt" -lt 3 ]]; then sleep 2; fi
+            done
+            [[ "$chunk_upload_ok" -eq 1 ]] || {
+              echo "Could not upload and verify Arcade.jar chunk $chunk_name; the running service has not been touched." >&2
+              exit 1
+            }
           done
-          [[ "$jar_upload_ok" -eq 1 ]] || {
-            echo "Could not upload Arcade.jar after three SCP attempts; the running service has not been touched." >&2
+
+          local_arcade_sha="$(sha256sum "$ARTIFACT_DIR/Arcade.jar" | cut -d ' ' -f1)"
+          remote_arcade_sha="$(ssh "${ssh_opts[@]}" "$remote" \
+            "cat '$arcade_remote_chunks'/part-* > '$arcade_partial' && sha256sum '$arcade_partial' | cut -d ' ' -f1")"
+          [[ "$local_arcade_sha" == "$remote_arcade_sha" ]] || {
+            echo "Assembled Arcade.jar checksum mismatch; refusing deployment." >&2
             exit 1
           }
+          ssh "${ssh_opts[@]}" "$remote" \
+            "mv -f '$arcade_partial' '$upload_dir/Arcade.jar' && rm -rf '$arcade_remote_chunks'"
+          rm -rf "$arcade_local_chunks"
+          echo "Arcade.jar chunks assembled and verified by SHA-256."
 
           local_arcade_sha="$(sha256sum "$ARTIFACT_DIR/Arcade.jar" | cut -d ' ' -f1)"
           remote_arcade_sha="$(ssh "${ssh_opts[@]}" "$remote" "sha256sum '$upload_dir/Arcade.jar' | cut -d ' ' -f1")"
