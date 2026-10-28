@@ -252,4 +252,13 @@ class ArcadePortGameTest {
         assertEquals(2.0D, ArcadePortRules.paintballHealthAfterHit(0), 0.00001D);
     }
 
+    @Test void microBattlesUsesNonLethalWeaponHitsAndMinimumHunger() {
+        assertEquals(4.0D, ArcadePortRules.microBattlesHitDamage(true), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.microBattlesHitDamage(false), 0.00001D);
+        assertEquals(2, ArcadePortRules.microBattlesMinimumFoodLevel(0));
+        assertEquals(2, ArcadePortRules.microBattlesMinimumFoodLevel(2));
+        assertEquals(7, ArcadePortRules.microBattlesMinimumFoodLevel(7));
+        assertEquals(20, ArcadePortRules.microBattlesMinimumFoodLevel(25));
+    }
+
 }
