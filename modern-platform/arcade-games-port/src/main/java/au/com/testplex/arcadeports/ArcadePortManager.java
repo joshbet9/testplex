@@ -232,6 +232,11 @@ public final class ArcadePortManager implements Listener {
                 runner.sendMessage(ChatColor.YELLOW + "Solo test: avoid the chaser; one hit ends the run.");
             }
         }
+        if (type == ArcadePortGame.DEATH_TAG) {
+            for (Player player : participants) {
+                giveDeathTagKit(session, player, session.tagged.contains(player.getUniqueId()));
+            }
+        }
         if (type == ArcadePortGame.SHEEP_QUEST) {
             for (int i = 0; i < 8; i++) spawnSheep(session);
         }
@@ -499,6 +504,43 @@ public final class ArcadePortManager implements Listener {
             center.add(Math.cos(angle) * 1.4D, 0.0D, Math.sin(angle) * 1.4D);
         }
         return center;
+    }
+
+    private void giveDeathTagKit(Session session, Player player, boolean chaser) {
+        player.getInventory().clear();
+        for (PotionEffect effect : player.getActivePotionEffects()) player.removePotionEffect(effect.getType());
+        if (chaser) {
+            player.getInventory().addItem(namedItem(Material.IRON_SWORD, "Chaser", "Tag runners to turn them into chasers."));
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 12_000, 0, false, false, true));
+            player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 12_000, 0, false, false, true));
+        } else {
+            player.getInventory().addItem(namedItem(Material.WOODEN_SWORD, "Runner", "Avoid the undead until you are the last runner."));
+            player.getInventory().addItem(new ItemStack(Material.BOW));
+            player.getInventory().addItem(new ItemStack(Material.ARROW, 4));
+        }
+        player.updateInventory();
+    }
+
+    private void makeDeathTagChaser(Session session, Player player, String reason) {
+        if (active != session || player == null || !session.alive.contains(player.getUniqueId())) return;
+        boolean newlyTagged = session.tagged.add(player.getUniqueId());
+        if (player.isOnline()) {
+            if (player.getLocation().getY() < 59.0D) player.teleport(spawnFor(session, player));
+            player.setGameMode(GameMode.SURVIVAL);
+            player.setHealth(player.getMaxHealth());
+            player.setFoodLevel(20);
+            player.setSaturation(20.0F);
+            player.setFireTicks(0);
+            player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+            giveDeathTagKit(session, player, true);
+            if (newlyTagged) {
+                player.playSound(player.getLocation(), Sound.ENTITY_ZOMBIE_AMBIENT, 1.0F, 1.0F);
+                player.sendMessage(ChatColor.RED + "You are now a Chaser!");
+                session.world.spawnParticle(Particle.FLAME, player.getLocation().add(0.0D, 1.0D, 0.0D),
+                        18, 0.35D, 0.5D, 0.35D, 0.04D);
+            }
+        }
+        if (newlyTagged) announce(session, ChatColor.RED + player.getName() + ChatColor.GRAY + " became a Chaser (" + reason + ").");
     }
 
     private void updateDeathTagChasers(Session session, long now) {
@@ -1151,16 +1193,11 @@ public final class ArcadePortManager implements Listener {
                 || session.type == ArcadePortGame.SHEEP_QUEST || session.type == ArcadePortGame.EVOLUTION
                 || session.type == ArcadePortGame.ONE_IN_THE_QUIVER) return;
         if (session.type == ArcadePortGame.DEATH_TAG) {
-            long untagged = session.players.keySet().stream().filter(id -> session.alive.contains(id) && !session.tagged.contains(id)).count();
-            // A round starts with one tagged chaser, so "one runner left" is not a win
-            // condition. Finish only once the last runner is tagged.
-            if (untagged == 0) {
-                Player winner = session.players.keySet().stream()
-                        .filter(id -> session.alive.contains(id) && session.tagged.contains(id))
-                        .map(session.players::get).filter(p -> p != null && p.isOnline())
-                        .max(java.util.Comparator.comparingInt(p -> session.scores.getOrDefault(p.getUniqueId(), 0)))
-                        .orElse(null);
-                finish(session, winner, true);
+            List<Player> runners = alivePlayers(session).stream()
+                    .filter(p -> !session.tagged.contains(p.getUniqueId()))
+                    .toList();
+            if (ArcadePortRules.shouldFinishDeathTagRound(runners.size(), session.participantsAtStart)) {
+                finish(session, runners.size() == 1 ? runners.get(0) : null, true);
             }
             return;
         }
@@ -1168,7 +1205,14 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void eliminate(Session session, Player player, Player killer, String reason) {
-        if (active != session || player == null || !session.alive.remove(player.getUniqueId())) return;
+        if (active != session || player == null) return;
+        if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1
+                && session.alive.contains(player.getUniqueId())) {
+            makeDeathTagChaser(session, player, reason);
+            checkRoundEnd(session);
+            return;
+        }
+        if (!session.alive.remove(player.getUniqueId())) return;
         player.leaveVehicle();
         if (session.type == ArcadePortGame.EVOLUTION && player.isOnline()) {
             if (killer != null && session.alive.contains(killer.getUniqueId())) {
@@ -1310,26 +1354,13 @@ public final class ArcadePortManager implements Listener {
             case BOMB_LOBBERS:
                 // Bomb Lobbers uses thrown TNT; melee attacks do not deal hits.
                 break;
-            case DEATH_TAG: {
-                UUID attackerId = attacker.getUniqueId();
-                UUID targetId = target.getUniqueId();
-                boolean attackerTagged = session.tagged.contains(attackerId);
-                boolean targetTagged = session.tagged.contains(targetId);
-                if (ArcadePortRules.shouldSpreadDeathTag(attackerTagged)) {
-                    session.tagged.add(targetId);
-                    target.sendMessage(ChatColor.RED + "Tagged! You are now IT.");
-                    attacker.sendMessage(ChatColor.GREEN + "Tag confirmed.");
-                    target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 1.0F, 0.8F);
-                } else if (ArcadePortRules.shouldTransferDeathTag(attackerTagged, targetTagged)) {
-                    session.tagged.remove(targetId);
-                    session.tagged.add(attackerId);
-                    attacker.sendMessage(ChatColor.RED + "You are now IT! The tag has transferred.");
-                    target.sendMessage(ChatColor.GREEN + "You escaped the tag!");
-                    attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 1.0F, 1.2F);
+            case DEATH_TAG:
+                if (session.tagged.contains(attacker.getUniqueId())
+                        && !session.tagged.contains(target.getUniqueId())) {
+                    makeDeathTagChaser(session, target, "was caught by a chaser");
+                    checkRoundEnd(session);
                 }
-                checkRoundEnd(session);
                 break;
-            }
             case PAINTBALL:
                 applyPaintballHit(session, attacker, target);
                 break;
