@@ -2169,8 +2169,10 @@ public final class ArcadePortManager implements Listener {
         session.lastBaconEscalationAt = now;
         session.baconKnockback = ArcadePortRules.nextBaconKnockback(session.baconKnockback);
         session.baconEscalationIntervalMillis = ArcadePortRules.nextBaconKnockbackInterval(session.baconEscalationIntervalMillis);
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            player.sendMessage(ChatColor.GREEN + "The ground begins to tremble... All pigs now take more knockback!");
+        String escalationMessage = ChatColor.GREEN
+                + "The ground begins to tremble... All pigs now take more knockback!";
+        announce(session, escalationMessage);
+        for (Player player : alivePlayers(session)) {
             player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_FLAP, 1.0F, 0.7F);
         }
     }
