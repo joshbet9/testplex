@@ -4697,8 +4697,11 @@ public final class ArcadePortManager implements Listener {
                 session.entities.remove(bomb);
                 bomb.remove();
                 Vector away = target.getLocation().toVector().subtract(current.toVector());
-                if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 0.25D, 1.0D);
-                target.setVelocity(away.normalize().multiply(0.85D).setY(0.45D));
+                away.setY(0.0D);
+                if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 0.0D, 1.0D);
+                // Reborn's direct-hit impulse is deliberately light (.2 horizontal, .2 vertical);
+                // reserve the large blast impulse for the actual explosion.
+                target.setVelocity(away.normalize().multiply(0.2D).setY(0.2D));
                 target.getWorld().spawnParticle(Particle.EXPLOSION,
                         target.getLocation().add(0.0D, 1.0D, 0.0D), 1,
                         0.1D, 0.1D, 0.1D, 0.0D);
