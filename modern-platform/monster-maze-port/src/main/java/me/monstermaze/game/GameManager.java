@@ -30,6 +30,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.meta.FireworkMeta;
@@ -995,6 +996,15 @@ public void startGame(Location preferCenter, int requestedPattern) {
     }
 
     // -------------------- Events --------------------
+
+    @EventHandler
+    public void onWorldChange(PlayerChangedWorldEvent event) {
+        if (state != GameState.STARTING && state != GameState.LIVE) return;
+        Player player = event.getPlayer();
+        if (!alive.contains(player.getUniqueId()) || center == null) return;
+        if (isInArenaWorld(center.getWorld(), player.getWorld())) return;
+        eliminate(player, ChatColor.RED + player.getName() + " left the Monster Maze arena.");
+    }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
