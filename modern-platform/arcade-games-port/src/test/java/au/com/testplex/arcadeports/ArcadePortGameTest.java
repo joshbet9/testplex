@@ -233,4 +233,8 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.sheepQuestLeadingTeam(null));
     }
 
+    @Test void sheepQuestPlayerHitsDropSheepAndDealDamage() {
+        assertEquals(4.0D, ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE, 0.00001D);
+    }
+
 }
