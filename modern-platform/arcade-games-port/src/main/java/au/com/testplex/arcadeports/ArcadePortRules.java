@@ -776,7 +776,7 @@ public final class ArcadePortRules {
     public static boolean isTurfWarsWinningLine(int frontline, int teamId, int minX, int maxXExclusive) {
         if (maxXExclusive <= minX) return false;
         if (teamId == 0) return frontline >= maxXExclusive - 1;
-        if (teamId == 1) return frontline <= minX;
+        if (teamId == 1) return frontline < minX;
         return false;
     }
 
@@ -791,7 +791,7 @@ public final class ArcadePortRules {
     public static boolean isTurfWarsWinningLine(int frontline, int teamId, int halfSize) {
         if (halfSize < 1) return false;
         if (teamId == 0) return frontline >= halfSize - 1;
-        if (teamId == 1) return frontline <= -halfSize;
+        if (teamId == 1) return frontline < -halfSize;
         return false;
     }
 
