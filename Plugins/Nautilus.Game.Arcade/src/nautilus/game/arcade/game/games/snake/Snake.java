@@ -581,6 +581,13 @@ public class Snake extends SoloGame
 				}
 				if (distance < 2.1D)
 				{
+					// If this player is already watching an item roll, leave the cube in
+					// the arena so the next contact can trigger its own roll immediately after.
+					if (_rouletteRollsInProgress.contains(player))
+					{
+						nearest = null;
+						break;
+					}
 					beginMagmaRoulette(player);
 					cube.remove();
 					iterator.remove();
