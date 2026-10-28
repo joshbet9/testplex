@@ -200,4 +200,10 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isBombDirectHit(-0.01D));
     }
 
+    @Test void baconBrawlStartsWithExtraKnockbackForTwoPlayers() {
+        assertEquals(1.8D, ArcadePortRules.initialBaconKnockback(2), 0.00001D);
+        assertEquals(1.5D, ArcadePortRules.initialBaconKnockback(1), 0.00001D);
+        assertEquals(1.5D, ArcadePortRules.initialBaconKnockback(3), 0.00001D);
+    }
+
 }
