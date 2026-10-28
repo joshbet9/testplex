@@ -741,10 +741,21 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         session.ticks++;
         if (now >= session.endsAt) {
-            Player winner = session.type == ArcadePortGame.SHEEP_QUEST
-                    ? sheepQuestLeader(session) : topScorerOrLastAlive(session);
-            finish(session, winner, true);
-            return;
+            if (session.type == ArcadePortGame.SHEEP_QUEST) {
+                Player sheepWinner = sheepQuestLeader(session);
+                if (sheepWinner != null) {
+                    finish(session, sheepWinner, true);
+                    return;
+                }
+                if (!session.sheepQuestOvertime) {
+                    session.sheepQuestOvertime = true;
+                    session.endsAt = Long.MAX_VALUE;
+                    announce(session, ChatColor.GOLD + "Sheep Quest is tied! First team to take the lead will win.");
+                }
+            } else {
+                finish(session, topScorerOrLastAlive(session), true);
+                return;
+            }
         }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
@@ -771,6 +782,13 @@ public final class ArcadePortManager implements Listener {
             if (now >= lastSheepSpawn && session.sheep.size() < 12) {
                 spawnSheep(session);
                 lastSheepSpawn = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
+            }
+            if (session.sheepQuestOvertime) {
+                Player sheepWinner = sheepQuestLeader(session);
+                if (sheepWinner != null) {
+                    finish(session, sheepWinner, true);
+                    return;
+                }
             }
         }
 
@@ -1109,8 +1127,9 @@ public final class ArcadePortManager implements Listener {
         if (red == blue) return null;
         int winningTeam = ArcadePortRules.sheepQuestLeadingTeam(red, blue);
         if (winningTeam < 0) return null;
-        return alivePlayers(session).stream()
-                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
+        return session.players.values().stream()
+                .filter(player -> player != null && player.isOnline()
+                        && session.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
                 .max(java.util.Comparator.comparingInt(player -> session.scores.getOrDefault(player.getUniqueId(), 0)))
                 .orElse(null);
     }
@@ -1143,7 +1162,9 @@ public final class ArcadePortManager implements Listener {
             if (!p.isOnline()) continue;
             int score = session.scores.getOrDefault(id, 0);
             String specific = gameStatusText(session, p);
-            p.sendActionBar(ChatColor.GOLD + session.type.displayName() + ChatColor.GRAY + " | " + seconds + "s"
+            String timeText = session.type == ArcadePortGame.SHEEP_QUEST && session.sheepQuestOvertime
+                    ? "OVERTIME" : seconds + "s";
+            p.sendActionBar(ChatColor.GOLD + session.type.displayName() + ChatColor.GRAY + " | " + timeText
                     + ChatColor.DARK_GRAY + " | " + ChatColor.GREEN + "alive " + alive
                     + ChatColor.DARK_GRAY + " | " + ChatColor.YELLOW + "score " + score
                     + (specific.isEmpty() ? "" : ChatColor.DARK_GRAY + " | " + specific));
@@ -2272,6 +2293,7 @@ public final class ArcadePortManager implements Listener {
         long nextDragonEscapeHazardAt;
         boolean microBarrierActive;
         boolean turfCombat;
+        boolean sheepQuestOvertime;
         long turfPhaseEndsAt;
         int turfFrontlineX = -1;
         long endsAt;
