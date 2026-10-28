@@ -464,10 +464,14 @@ public class SafePad implements Listener
 	
 	public boolean isOn(Entity e)
 	{
-		if (e == null || e.getWorld() != _loc.getWorld())
+		return e != null && isOn(e.getLocation());
+	}
+
+	public boolean isOn(Location entityLocation)
+	{
+		if (entityLocation == null || entityLocation.getWorld() != _loc.getWorld())
 			return false;
 
-		Location entityLocation = e.getLocation();
 		double dx = entityLocation.getX() - _loc.getX();
 		double dz = entityLocation.getZ() - _loc.getZ();
 		double dy = entityLocation.getY() - _loc.getY();
