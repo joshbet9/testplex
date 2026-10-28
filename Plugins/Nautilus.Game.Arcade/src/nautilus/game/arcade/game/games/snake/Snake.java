@@ -496,7 +496,7 @@ public class Snake extends SoloGame
 		return true;
 	}
 
-	/** Find a clear three-block-high spawn point with a solid floor, at a random angle from a player. */
+	/** Find a clear five-block-high spawn point with a solid floor, at a random angle from a player. */
 	private Location findMagmaCubeSpawn(Player target, Location center)
 	{
 		if (target == null || !target.isOnline() || center == null || center.getWorld() == null)
@@ -530,10 +530,14 @@ public class Snake extends SoloGame
 				org.bukkit.block.Block feet = world.getBlockAt(blockX, y, blockZ);
 				org.bukkit.block.Block head = world.getBlockAt(blockX, y + 1, blockZ);
 				org.bukkit.block.Block top = world.getBlockAt(blockX, y + 2, blockZ);
+				org.bukkit.block.Block upper = world.getBlockAt(blockX, y + 3, blockZ);
+				org.bukkit.block.Block ceiling = world.getBlockAt(blockX, y + 4, blockZ);
 				if (ground.getType().isSolid()
 						&& feet.getType() == Material.AIR
 						&& head.getType() == Material.AIR
-						&& top.getType() == Material.AIR)
+						&& top.getType() == Material.AIR
+						&& upper.getType() == Material.AIR
+						&& ceiling.getType() == Material.AIR)
 				{
 					Location result = new Location(world, blockX + 0.5D, y, blockZ + 0.5D,
 							(float) (Math.random() * 360.0D), 0.0F);
