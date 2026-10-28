@@ -317,9 +317,21 @@ class ArcadePortGameTest {
 
     @Test void dragonEscapeHellMapStartsAtNight() {
         assertEquals(16_000L, ArcadePortRules.dragonEscapeWorldTime("Dragon Escape Hell"));
-        assertEquals(6_000L, ArcadePortRules.dragonEscapeWorldTime("Dragon Escape Pirate"));
-        assertEquals(6_000L, ArcadePortRules.dragonEscapeWorldTime("Standard"));
-        assertEquals(6_000L, ArcadePortRules.dragonEscapeWorldTime(null));
+        assertEquals(12_000L, ArcadePortRules.dragonEscapeWorldTime("Dragon Escape Pirate"));
+        assertEquals(12_000L, ArcadePortRules.dragonEscapeWorldTime("Standard"));
+        assertEquals(12_000L, ArcadePortRules.dragonEscapeWorldTime(null));
+    }
+
+    @Test void sourceWorldTimeHonoursPerGameOverridesAndBaseDefault() {
+        assertEquals(6_000L, ArcadePortRules.sourceWorldTime(ArcadePortGame.BOMB_LOBBERS, "Mighty Lava Arena"));
+        assertEquals(18_000L, ArcadePortRules.sourceWorldTime(ArcadePortGame.BOMB_LOBBERS, "Intergalactic"));
+        assertEquals(2_000L, ArcadePortRules.sourceWorldTime(ArcadePortGame.SHEEP_QUEST, "Sheep Quest"));
+        assertEquals(16_000L, ArcadePortRules.sourceWorldTime(ArcadePortGame.DRAGON_ESCAPE, "Hell"));
+        assertEquals(12_000L, ArcadePortRules.sourceWorldTime(ArcadePortGame.DRAGON_ESCAPE, "Pirate"));
+        assertEquals(12_000L, ArcadePortRules.sourceWorldTime(ArcadePortGame.BACON_BRAWL, "Bacon Brawl"));
+        assertEquals(12_000L, ArcadePortRules.sourceWorldTime(ArcadePortGame.SPLEEF, "Spleef"));
+        assertEquals(12_000L, ArcadePortRules.sourceWorldTime(ArcadePortGame.TURF_WARS, "Turf Wars"));
+        assertEquals(12_000L, ArcadePortRules.sourceWorldTime(null, "Unknown"));
     }
 
     @Test void dragonEscapeUsesARealChaseProgressAndCourseFinishProximity() {
