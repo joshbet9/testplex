@@ -488,16 +488,43 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         return instance.isSettingToggleEnabled(playerId, game, feature, setting, mobSet.toLowerCase(Locale.ROOT));
     }
 
+    /** Source-repo Monster Maze palette per concrete mob set; explicit user colours override it. */
+    public static String defaultMonsterMazeMobSetColour(String mobSet) {
+        if (mobSet == null) return "lime";
+        switch (mobSet.toLowerCase(Locale.ROOT).replace('-', '_').replace(' ', '_')) {
+            case "skeleton": return "silver";
+            case "spider": return "black";
+            case "zombie": return "green";
+            case "zombie_pigman": case "pig_zombie": case "magma_cube": case "mooshroom": return "red";
+            case "enderman": case "witch": return "purple";
+            case "cave_spider": return "lightblue";
+            case "silverfish": case "bat": case "wolf": return "gray";
+            case "blaze": case "villager": return "orange";
+            case "endermite": return "magenta";
+            case "guardian": return "cyan";
+            case "pig": case "rabbit": return "pink";
+            case "sheep": case "chicken": case "snowman": return "white";
+            case "cow": case "horse": return "brown";
+            case "squid": return "blue";
+            case "ocelot": return "yellow";
+            case "creeper": case "slime": default: return "lime";
+        }
+    }
+
     public static int getMonsterMazeBeaconColourData(UUID playerId, String mobSet) {
-        return instance == null || playerId == null || mobSet == null ? colourData("white")
-                : colourData(instance.data.getString("players." + playerId + ".arcade.monstermaze.mob-set-colours."
-                        + mobSet.toLowerCase(Locale.ROOT) + ".beacon", "white"));
+        if (mobSet == null) return colourData("lime");
+        String fallback = defaultMonsterMazeMobSetColour(mobSet);
+        if (instance == null || playerId == null) return colourData(fallback);
+        return colourData(instance.data.getString("players." + playerId + ".arcade.monstermaze.mob-set-colours."
+                + mobSet.toLowerCase(Locale.ROOT) + ".beacon", fallback));
     }
 
     public static int getMonsterMazeSafePadColourData(UUID playerId, String mobSet) {
-        return instance == null || playerId == null || mobSet == null ? colourData("lime")
-                : colourData(instance.data.getString("players." + playerId + ".arcade.monstermaze.mob-set-colours."
-                        + mobSet.toLowerCase(Locale.ROOT) + ".safe-pad", "lime"));
+        if (mobSet == null) return colourData("lime");
+        String fallback = defaultMonsterMazeMobSetColour(mobSet);
+        if (instance == null || playerId == null) return colourData(fallback);
+        return colourData(instance.data.getString("players." + playerId + ".arcade.monstermaze.mob-set-colours."
+                + mobSet.toLowerCase(Locale.ROOT) + ".safe-pad", fallback));
     }
 
     private boolean isToggleEnabled(UUID playerId, GameDefinition game, FeatureDefinition feature, String option) {
@@ -810,8 +837,9 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         put(inventory, 4, named(Material.BEACON, ChatColor.AQUA + "Beacon Colour", "Choose the beacon colour for " + pretty(mobSet) + "."));
         put(inventory, 26, named(Material.STAINED_CLAY, ChatColor.GREEN + "Safe Pad Colour", "Choose the Safe Pad surface colour for " + pretty(mobSet) + "."));
         String base = "players." + player.getUniqueId() + ".arcade.monstermaze.mob-set-colours." + mobSet;
-        String beaconSelected = data.getString(base + ".beacon", "white");
-        String padSelected = data.getString(base + ".safe-pad", "lime");
+        String defaultColour = defaultMonsterMazeMobSetColour(mobSet);
+        String beaconSelected = data.getString(base + ".beacon", defaultColour);
+        String padSelected = data.getString(base + ".safe-pad", defaultColour);
         for (int i = 0; i < COLOUR_OPTIONS.length; i++) {
             String colour = COLOUR_OPTIONS[i];
             ItemStack beacon = new ItemStack(Material.STAINED_GLASS_PANE, 1, (short) i);
@@ -1018,6 +1046,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                     }
                     boolean enabled = isSettingToggleEnabled(player.getUniqueId(), game, feature, setting, option);
                     setSettingToggleEnabled(player.getUniqueId(), game, feature, setting, option, !enabled);
+                    if ("monstermaze".equals(game.key) && "mob-sets".equals(setting.key))
+                        refreshLiveMonsterMazeColours(player);
                     player.sendMessage(ChatColor.GREEN + pretty(option) + " is now " + (!enabled ? "enabled" : "disabled") + ".");
                 } else {
                     setSettingChoice(player.getUniqueId(), game, feature, setting, option);
