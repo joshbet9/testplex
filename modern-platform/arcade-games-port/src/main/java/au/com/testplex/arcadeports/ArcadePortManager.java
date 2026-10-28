@@ -1475,6 +1475,11 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && ArcadePortRules.isDragonEscapeFinishReached(event.getTo().getZ())) {
+            finish(session, player, true);
+            return;
+        }
         checkPlayerArena(session, player);
         if (active != session || !session.alive.contains(player.getUniqueId())) return;
         Location previous = session.lastLocations.get(player.getUniqueId());
