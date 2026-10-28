@@ -499,6 +499,12 @@ public final class ArcadePortRules {
     }
 
     /** Reborn kills runners once Douglas's route progress has overtaken theirs. */
+    /** Keep route progress monotonic when a course crosses near one of its earlier waypoints. */
+    public static int monotonicDragonEscapeProgress(int previous, int candidate, int waypointCount) {
+        if (waypointCount <= 0) return -1;
+        return Math.min(waypointCount - 1, Math.max(0, Math.max(previous, candidate)));
+    }
+
     public static boolean isDuplicateDragonEscapeWaypoint(double distance) {
         return Double.isFinite(distance) && distance >= 0.0D
                 && distance < DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE;
