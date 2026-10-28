@@ -24,6 +24,17 @@ class SnakeRulesTest {
         assertEquals(-Math.toRadians(8.0D), SnakeRules.clampTurnRadians(-1.2D), 0.000001D);
     }
 
+    @Test void itemBoxesMatchSourceTimingAndWaitForActiveRouletteToFinish() {
+        assertEquals(4, SnakeRules.MAX_HAZARDS);
+        assertEquals(10_000L, SnakeRules.FIRST_HAZARD_DELAY_MILLIS);
+        assertEquals(15_000L, SnakeRules.HAZARD_INTERVAL_MILLIS);
+        assertEquals(4, SnakeRules.HAZARD_STEERING_INTERVAL_TICKS);
+        assertEquals(0.12D, SnakeRules.HAZARD_STEERING_SPEED, 0.000001D);
+        assertEquals(2.1D, SnakeRules.HAZARD_CONTACT_RADIUS, 0.000001D);
+        assertTrue(SnakeRules.shouldConsumeHazardOnContact(false));
+        assertFalse(SnakeRules.shouldConsumeHazardOnContact(true));
+    }
+
     @Test void yawAndRadianWrappingKeepAnglesInExpectedRanges() {
         assertEquals(-170.0F, SnakeRules.wrapYaw(190.0F), 0.0001F);
         assertEquals(Math.PI / 2.0D, SnakeRules.wrapRadians(5.0D * Math.PI / 2.0D), 0.000001D);
