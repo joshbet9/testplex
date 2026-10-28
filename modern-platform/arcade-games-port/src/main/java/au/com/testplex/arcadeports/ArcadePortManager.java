@@ -173,7 +173,7 @@ public final class ArcadePortManager implements Listener {
                 ? now + ArcadePortRules.TURF_WARS_BUILD_PHASE_MILLIS : 0L;
         session.turfFrontlineX = -1;
         lastDragonHazard = now + 8_000L;
-        lastSheepSpawn = now + 5_000L;
+        lastSheepSpawn = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
         world.setTime(6000L);
         world.setStorm(false);
         world.setThundering(false);
@@ -239,7 +239,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (type == ArcadePortGame.SHEEP_QUEST) {
-            for (int i = 0; i < 8; i++) spawnSheep(session);
+            for (int i = 0; i < ArcadePortRules.SHEEP_QUEST_INITIAL_SHEEP; i++) spawnSheep(session);
         }
         if (type == ArcadePortGame.DRAGONS) spawnTestDragons(session);
         if (type == ArcadePortGame.GLADIATORS && participants.size() > 1) {
@@ -770,7 +770,7 @@ public final class ArcadePortManager implements Listener {
             updateSheepQuest(session);
             if (now >= lastSheepSpawn && session.sheep.size() < 12) {
                 spawnSheep(session);
-                lastSheepSpawn = now + 5_000L;
+                lastSheepSpawn = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
             }
         }
 
@@ -990,6 +990,37 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private int sheepCarriedBy(Session session, UUID playerId) {
+        int count = 0;
+        for (UUID carrier : session.sheepCarriers.values()) if (playerId.equals(carrier)) count++;
+        return count;
+    }
+
+    private void dropSheepFromCarrier(Session session, Player carrier, String reason) {
+        if (carrier == null) return;
+        UUID carrierId = carrier.getUniqueId();
+        List<Sheep> carried = session.sheepCarriers.entrySet().stream()
+                .filter(entry -> carrierId.equals(entry.getValue()))
+                .map(Map.Entry::getKey).collect(java.util.stream.Collectors.toList());
+        if (carried.isEmpty()) return;
+        for (Sheep sheep : carried) {
+            session.sheepCarriers.remove(sheep);
+            if (sheep == null || !sheep.isValid()) continue;
+            int owner = session.sheepOwners.getOrDefault(sheep, -1);
+            if (owner >= 0) {
+                sheep.setColor(owner == 0 ? DyeColor.RED : DyeColor.BLUE);
+                Location pen = sheepQuestPenCenter(session, owner);
+                sheep.teleport(pen.clone().add(0.5D, 0.0D, 0.5D));
+                sheep.setAI(false);
+            } else {
+                sheep.setColor(DyeColor.WHITE);
+                sheep.setAI(true);
+            }
+        }
+        carrier.sendMessage(ChatColor.RED + "You dropped your sheep!");
+        announce(session, ChatColor.YELLOW + carrier.getName() + " dropped their sheep (" + reason + ").");
+    }
+
     private void updateSheepQuest(Session session) {
         java.util.Iterator<Map.Entry<Sheep, UUID>> iterator = session.sheepCarriers.entrySet().iterator();
         while (iterator.hasNext()) {
@@ -1015,9 +1046,14 @@ public final class ArcadePortManager implements Listener {
                 continue;
             }
 
+            List<Sheep> carriedStack = session.sheepCarriers.entrySet().stream()
+                    .filter(carried -> carrierId.equals(carried.getValue()))
+                    .map(Map.Entry::getKey).collect(java.util.stream.Collectors.toList());
+            int stackIndex = Math.max(0, carriedStack.indexOf(sheep));
             Vector facing = carrier.getLocation().getDirection().setY(0.0D);
             if (facing.lengthSquared() < 0.001D) facing = new Vector(0.0D, 0.0D, 1.0D);
-            Location following = carrier.getLocation().clone().subtract(facing.normalize().multiply(1.35D));
+            Location following = carrier.getLocation().clone()
+                    .subtract(facing.normalize().multiply(1.35D + stackIndex * 0.9D));
             following.setY(64.0D);
             following.setYaw(carrier.getLocation().getYaw());
             following.setPitch(0.0F);
@@ -1208,6 +1244,29 @@ public final class ArcadePortManager implements Listener {
 
     private void eliminate(Session session, Player player, Player killer, String reason) {
         if (active != session || player == null) return;
+        if (session.type == ArcadePortGame.SHEEP_QUEST && session.alive.contains(player.getUniqueId())) {
+            dropSheepFromCarrier(session, player, reason);
+            if (!session.alive.remove(player.getUniqueId())) return;
+            UUID playerId = player.getUniqueId();
+            session.respawning.add(playerId);
+            player.setGameMode(GameMode.SPECTATOR);
+            player.sendMessage(ChatColor.RED + "You dropped your sheep and will respawn shortly.");
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (active != session || !player.isOnline()
+                        || !session.players.containsKey(playerId) || !session.respawning.remove(playerId)) return;
+                Location spawn = spawnFor(session, player);
+                player.teleport(spawn);
+                player.setGameMode(GameMode.SURVIVAL);
+                player.setHealth(player.getMaxHealth());
+                player.setFoodLevel(20);
+                player.setSaturation(20.0F);
+                player.setFireTicks(0);
+                session.alive.add(playerId);
+                session.lastLocations.put(playerId, spawn.clone());
+                giveKit(session, player);
+            }, 120L);
+            return;
+        }
         if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1
                 && session.alive.contains(player.getUniqueId())) {
             makeDeathTagChaser(session, player, reason);
@@ -1399,7 +1458,8 @@ public final class ArcadePortManager implements Listener {
                 eliminate(session, target, attacker, "lost a duel");
                 break;
             case SHEEP_QUEST:
-                // Sheep Quest scoring is handled by capturing sheep, not combat.
+                // A hit makes the carrier drop every sheep in their stack.
+                dropSheepFromCarrier(session, target, "was hit");
                 break;
             case ONE_IN_THE_QUIVER:
                 scoreQuiverKill(session, attacker, target);
@@ -1944,8 +2004,9 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "That sheep is already safe in your pen.");
             return;
         }
-        if (session.sheepCarriers.containsValue(playerId)) {
-            player.sendMessage(ChatColor.YELLOW + "Return the sheep you are carrying first.");
+        int carriedCount = sheepCarriedBy(session, playerId);
+        if (!ArcadePortRules.canCarryAnotherSheep(carriedCount)) {
+            player.sendMessage(ChatColor.YELLOW + "You can carry up to three sheep at once.");
             return;
         }
         session.sheepCarriers.put(sheep, playerId);
@@ -2195,7 +2256,7 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> respawning = new HashSet<>();
         final Set<Sheep> sheep = new HashSet<>();
         final Map<Sheep, Integer> sheepOwners = new HashMap<>();
-        final Map<Sheep, UUID> sheepCarriers = new HashMap<>();
+        final Map<Sheep, UUID> sheepCarriers = new LinkedHashMap<>();
         final Set<Entity> entities = new HashSet<>();
         final Map<UUID, UUID> bombOwners = new HashMap<>();
         final Map<UUID, Location> bombLastLocations = new HashMap<>();
