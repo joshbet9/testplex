@@ -1148,24 +1148,19 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Left-click to throw at enemy players.", 1));
                 switch (kit) {
                     case "armorer":
-                        player.getInventory().setArmorContents(new ItemStack[] {
-                                new ItemStack(Material.IRON_BOOTS), new ItemStack(Material.IRON_LEGGINGS),
-                                new ItemStack(Material.IRON_CHESTPLATE), new ItemStack(Material.IRON_HELMET) });
                         break;
                     case "pitcher":
-                        player.getInventory().setArmorContents(new ItemStack[] {
-                                new ItemStack(Material.CHAINMAIL_BOOTS), new ItemStack(Material.CHAINMAIL_LEGGINGS),
-                                new ItemStack(Material.CHAINMAIL_CHESTPLATE), new ItemStack(Material.CHAINMAIL_HELMET) });
                         player.getInventory().setItem(1, namedItem(Material.LEVER, "Velocity Selector",
                                 "Right-click to increase throw power; left-click to decrease.", 2));
                         break;
                     case "waller":
                         player.getInventory().setItem(1, namedItem(Material.STONE_SHOVEL, "Wall Builder",
-                                "Right-click a block to build a 5x3 wall; enemy TNT can break it.", 3));
+                                "Right-click a block to build a 5x3 stone-brick wall.", 3));
                         break;
                     default:
                         break;
                 }
+                setBombLobbersArmor(session, player, kit);
                 player.setAllowFlight(true);
                 player.setFlying(false);
                 break;
@@ -1547,6 +1542,50 @@ public final class ArcadePortManager implements Listener {
             }
             session.microNextArrowAt.put(id, now + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
         }
+    }
+
+    private void setBombLobbersArmor(Session session, Player player, String kit) {
+        Material boots;
+        Material leggings;
+        Material chestplate;
+        Material helmet;
+        if ("armorer".equals(kit)) {
+            boots = Material.IRON_BOOTS;
+            leggings = Material.IRON_LEGGINGS;
+            chestplate = Material.IRON_CHESTPLATE;
+            helmet = Material.IRON_HELMET;
+        } else if ("pitcher".equals(kit)) {
+            boots = Material.CHAINMAIL_BOOTS;
+            leggings = Material.CHAINMAIL_LEGGINGS;
+            chestplate = Material.CHAINMAIL_CHESTPLATE;
+            helmet = Material.CHAINMAIL_HELMET;
+        } else {
+            boots = Material.LEATHER_BOOTS;
+            leggings = Material.LEATHER_LEGGINGS;
+            chestplate = Material.LEATHER_CHESTPLATE;
+            helmet = Material.LEATHER_HELMET;
+        }
+        ItemStack[] armor = new ItemStack[] {
+                new ItemStack(boots), new ItemStack(leggings),
+                new ItemStack(chestplate), new ItemStack(helmet)
+        };
+        if (!"armorer".equals(kit) && !"pitcher".equals(kit)) {
+            int team = session.teams.getOrDefault(player.getUniqueId(), 0);
+            Color color = team == 0 ? Color.RED : Color.BLUE;
+            for (ItemStack piece : armor) {
+                if (piece.getItemMeta() instanceof LeatherArmorMeta meta) {
+                    meta.setColor(color);
+                    piece.setItemMeta(meta);
+                }
+            }
+        }
+        player.getInventory().setArmorContents(armor);
+    }
+
+    private double bombLobbersDamageAfterArmor(Player target, double damage) {
+        var armorAttribute = target.getAttribute(Attribute.ARMOR);
+        double armorPoints = armorAttribute == null ? 0.0D : armorAttribute.getValue();
+        return ArcadePortRules.bombLobbersDamageAfterArmor(damage, armorPoints);
     }
 
     private void setMicroTeamArmor(Session session, Player player) {
@@ -3588,7 +3627,6 @@ public final class ArcadePortManager implements Listener {
         for (Entity entity : new ArrayList<>(session.entities)) if (entity != null && entity.isValid()) entity.remove();
         session.bombOwners.clear();
         session.bombLastLocations.clear();
-        session.bombWallerWallBlocks.clear();
         session.dragonContactCooldowns.clear();
         session.paintProjectileDamage.clear();
         session.paintballLastShotAt.clear();
@@ -4785,8 +4823,12 @@ public final class ArcadePortManager implements Listener {
                 target.playSound(target.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.2F, 1.65F);
                 owner.playSound(owner.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.0F, 1.45F);
                 owner.sendMessage(ChatColor.YELLOW + "Direct hit!");
-                if (target.getHealth() <= 10.0D) eliminate(session, target, owner, "was directly hit by TNT");
-                else target.setHealth(target.getHealth() - 10.0D);
+                double directHitDamage = bombLobbersDamageAfterArmor(target, 10.0D);
+                if (target.getHealth() <= directHitDamage) {
+                    eliminate(session, target, owner, "was directly hit by TNT");
+                } else {
+                    target.setHealth(target.getHealth() - directHitDamage);
+                }
                 checkRoundEnd(session);
                 directHit = true;
                 break;
@@ -4884,7 +4926,6 @@ public final class ArcadePortManager implements Listener {
                     Block wall = session.world.getBlockAt(centerX + sideX * width,
                             centerY + height, centerZ + sideZ * width);
                     wall.setType(Material.STONE_BRICKS, false);
-                    session.bombWallerWallBlocks.add(wall);
                 }
             }
             consumeHeld(player);
@@ -4969,7 +5010,6 @@ public final class ArcadePortManager implements Listener {
                     for (Block block : blocksHit) {
                         if (block == null || block.getWorld() != session.world || block.getType().isAir()) continue;
                         block.setType(Material.AIR, false);
-                        session.bombWallerWallBlocks.remove(block);
                     }
                 }
                 session.entities.remove(bomb);
@@ -4992,6 +5032,9 @@ public final class ArcadePortManager implements Listener {
                             12, 0.35D, 0.45D, 0.35D, 0.05D);
                     target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.2F);
                     double blastDamage = Math.max(0.0D, 10.0D * (1.0D - distance / 8.0D));
+                    if (session.type == ArcadePortGame.BOMB_LOBBERS) {
+                        blastDamage = bombLobbersDamageAfterArmor(target, blastDamage);
+                    }
                     if (blastDamage > 0.0D) {
                         if (target.getHealth() <= blastDamage) {
                             eliminate(session, target, owner, "was caught in a TNT blast");
@@ -5082,7 +5125,6 @@ public final class ArcadePortManager implements Listener {
         final Map<Sheep, Integer> sheepOwners = new HashMap<>();
         final Map<Sheep, UUID> sheepCarriers = new LinkedHashMap<>();
         final Set<Entity> entities = new HashSet<>();
-        final Set<Block> bombWallerWallBlocks = new HashSet<>();
         final Map<UUID, UUID> bombOwners = new HashMap<>();
         final Map<UUID, Location> bombLastLocations = new HashMap<>();
         final Map<UUID, Long> bombCreatedAt = new HashMap<>();
