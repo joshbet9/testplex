@@ -2322,7 +2322,15 @@ public final class ArcadePortManager implements Listener {
         if (direction.lengthSquared() < 1.0E-5D) direction = attacker.getLocation().getDirection();
         double hitKnockback = session.baconKnockback;
         if ("body-slam".equals(source)) hitKnockback = Math.max(hitKnockback, 2.0D);
-        if ("sheep-pig".equals(kit) && "melee".equals(source)) hitKnockback *= 2.5D;
+        if ("sheep-pig".equals(kit) && "melee".equals(source)) {
+            Vector targetLook = target.getLocation().getDirection().setY(0.0D);
+            Vector fromTargetToAttacker = attacker.getLocation().toVector().subtract(target.getLocation().toVector()).setY(0.0D);
+            if (ArcadePortRules.isBaconBrawlBackstab(targetLook.getX(), targetLook.getZ(),
+                    fromTargetToAttacker.getX(), fromTargetToAttacker.getZ())) {
+                hitKnockback *= 2.5D;
+                target.playSound(target.getLocation(), Sound.ENTITY_PIG_DEATH, 1.0F, 2.0F);
+            }
+        }
         target.setVelocity(direction.normalize().multiply(hitKnockback).setY(0.7D));
         target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0, 1, 0), 10, 0.35D, 0.4D, 0.35D, 0.04D);
         attacker.setFoodLevel(Math.min(20, attacker.getFoodLevel() + 2));
@@ -3351,6 +3359,9 @@ public final class ArcadePortManager implements Listener {
 
     private void eliminate(Session session, Player player, Player killer, String reason) {
         if (active != session || player == null) return;
+        if (session.type == ArcadePortGame.BACON_BRAWL) {
+            clearBaconCloak(session, player.getUniqueId());
+        }
         if (session.type == ArcadePortGame.SHEEP_QUEST && session.alive.contains(player.getUniqueId())) {
             dropSheepFromCarrier(session, player, reason);
             if (!session.alive.remove(player.getUniqueId())) return;
@@ -4568,9 +4579,10 @@ public final class ArcadePortManager implements Listener {
                     return;
                 }
                 if (damager instanceof Snowball bacon && session.entities.contains(bacon)
-                        && bacon.getShooter() instanceof Player attacker) {
+                        && bacon.getShooter() instanceof Player) {
+                    // Resolve Bacon Blast hits only in ProjectileHitEvent below. Bukkit may
+                    // raise this damage event first; handling here as well doubles the hit.
                     event.setCancelled(true);
-                    handlePlayerHit(session, attacker, baconTarget, "bacon-blast");
                     return;
                 }
             }
@@ -4579,6 +4591,7 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             event.setCancelled(true);
+            clearBaconCloak(session, baconTarget.getUniqueId());
             double damage = event.getFinalDamage();
             if (damage > 0.0D) {
                 if (baconTarget.getHealth() <= damage) eliminate(session, baconTarget, null,
@@ -4853,11 +4866,18 @@ public final class ArcadePortManager implements Listener {
         if (session == null) return;
         boolean bombLeftClick = session.type == ArcadePortGame.BOMB_LOBBERS && event.getAction().isLeftClick();
         boolean runnerLeftClick = session.type == ArcadePortGame.RUNNER && event.getAction().isLeftClick();
-        if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick) return;
+        boolean baconNonRightClick = session.type == ArcadePortGame.BACON_BRAWL
+                && !event.getAction().isRightClick();
+        if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick && !baconNonRightClick) return;
         Player player = event.getPlayer();
         if (!session.alive.contains(player.getUniqueId())) return;
         ItemStack heldItem = event.getItem();
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
+        if (session.type == ArcadePortGame.BACON_BRAWL && !event.getAction().isRightClick()
+                && "sheep-pig".equals(session.baconKits.getOrDefault(player.getUniqueId(), "pig"))) {
+            clearBaconCloak(session, player.getUniqueId());
+            return;
+        }
         if (session.type == ArcadePortGame.RUNNER) {
             String kit = session.runnerKits.getOrDefault(player.getUniqueId(), "leaper");
             if ("leaper".equals(kit) && item == Material.IRON_AXE && event.getAction().isRightClick()) {
