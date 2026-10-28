@@ -9,7 +9,7 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 - Death Tag — source-style Normal/Alpha chasers, death-triggered conversion, runner speed threshold, Basher/Archer/Traitor/Null runner loadouts, Archer arrow refresh, and flat Iron Skin damage reduction (historical map/light parity and disguise visuals remain).
 - Dragon Escape — generated parkour course, a visible Douglas chase dragon, radius-based course destruction, catch-up elimination and finish proximity (map-data/waypoint parity still needs original assets).
 - Dragons — timed fireball hazards and a Pyro fireball ability.
-- Evolution — combat-driven stage/weapon progression and respawn loop.
+- Evolution — source-form health/damage progression across Iron Golem, Blaze, Spider, Creeper, Slime and Chicken; kills unlock hold-sneak grounded evolution charge, faster with consecutive life kills; 2.2-second form change plus 7-second total animation; stage persists through death with a four-second respawn. Map-platform illusions and the full 1.8 perk/disguise stack remain to port.
 - Gladiators — four source-style loadout tiers, paired tournament rounds, a five-second combat countdown and 60-second poison limited to unresolved 1v1 duels (original arena maps, per-arena doors/trails and full kit polish still remain).
 - Micro Battles — isolated islands and shrinking border.
 - One in the Quiver — first-to-20 one-arrow kill loop, named Super Arrow regrant, one-second respawn and breakable glass/glass panes (original kit abilities are still to port).

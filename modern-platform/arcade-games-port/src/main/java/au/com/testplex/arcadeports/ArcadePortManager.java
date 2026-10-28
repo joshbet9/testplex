@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import org.bukkit.Bukkit;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.ChatColor;
 import org.bukkit.Color;
 import org.bukkit.DyeColor;
@@ -260,7 +261,10 @@ public final class ArcadePortManager implements Listener {
                 session.deathTagRunnerKits.put(player.getUniqueId(),
                         deathTagRunnerKitPreferences.getOrDefault(player.getUniqueId(), "basher"));
             }
-            if (type == ArcadePortGame.EVOLUTION) session.evolutionLevels.put(player.getUniqueId(), 0);
+            if (type == ArcadePortGame.EVOLUTION) {
+                session.evolutionLevels.put(player.getUniqueId(), 0);
+                session.evolutionLifeKills.put(player.getUniqueId(), 0);
+            }
             int teamId = (type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST) ? i % 4 : i % 2;
             session.teams.put(player.getUniqueId(), teamId);
             Location spawn = spawns.get(i % spawns.size()).clone();
@@ -1088,7 +1092,10 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.BACON_BRAWL) updateBaconBrawl(session, now);
         if (session.type == ArcadePortGame.BOMB_LOBBERS) updateBombLobbers(session);
-        if (session.type == ArcadePortGame.EVOLUTION) updateEvolutionWebs(session, now);
+        if (session.type == ArcadePortGame.EVOLUTION) {
+            updateEvolutionProgress(session, now);
+            updateEvolutionWebs(session, now);
+        }
         if (session.type == ArcadePortGame.RUNNER) {
             // Reborn marks the whole standing footprint on every game tick, not only on movement events.
             markRunnerFootprints(session, now);
@@ -1672,35 +1679,46 @@ public final class ArcadePortManager implements Listener {
         if (!session.alive.remove(player.getUniqueId())) return;
         player.leaveVehicle();
         if (session.type == ArcadePortGame.EVOLUTION && player.isOnline()) {
+            UUID victimId = player.getUniqueId();
+            session.evolutionLifeKills.put(victimId, 0);
+            session.evolutionAvailable.remove(victimId);
+            session.evolutionCharge.remove(victimId);
+            session.evolving.remove(victimId);
+            session.evolutionLockedLocations.remove(victimId);
+            session.evolutionWaterMessageAt.remove(victimId);
+            player.setExp(0.0F);
+            player.removePotionEffect(PotionEffectType.SLOWNESS);
+            player.removePotionEffect(PotionEffectType.JUMP_BOOST);
             if (killer != null && session.alive.contains(killer.getUniqueId())) {
-                session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
-                int killerLevel = ArcadePortRules.nextEvolutionLevel(
-                        session.evolutionLevels.getOrDefault(killer.getUniqueId(), 0), true);
-                session.evolutionLevels.put(killer.getUniqueId(), killerLevel);
-                if (ArcadePortRules.isEvolutionWinnerLevel(killerLevel)) {
-                    session.evolutionLevels.put(killer.getUniqueId(), killerLevel);
-                    finish(session, killer, true);
-                    return;
-                }
-                session.evolutionLevels.put(killer.getUniqueId(), killerLevel);
-                giveEvolutionKit(session, killer);
+                UUID killerId = killer.getUniqueId();
+                session.scores.merge(killerId, 1, Integer::sum);
+                int lifeKills = session.evolutionLifeKills.merge(killerId, 1, Integer::sum);
+                session.evolutionAvailable.add(killerId);
+                session.evolutionCharge.remove(killerId);
+                killer.setExp(0.0F);
+                killer.removePotionEffect(PotionEffectType.SLOWNESS);
+                killer.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 60, 0, false, false, true));
+                killer.setHealth(Math.min(killer.getMaxHealth(), killer.getHealth() + killer.getMaxHealth() / 2.0D));
+                killer.sendMessage(ChatColor.GREEN + "Kill registered (" + lifeKills
+                        + " this life). Hold sneak while grounded to evolve.");
+                killer.playSound(killer.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8F, 1.1F);
             }
-            int victimLevel = session.evolutionLevels.getOrDefault(player.getUniqueId(), 0);
-            session.respawning.add(player.getUniqueId());
+            int victimLevel = session.evolutionLevels.getOrDefault(victimId, 0);
+            session.respawning.add(victimId);
             player.setGameMode(GameMode.SPECTATOR);
-            player.sendMessage(ChatColor.RED + "Defeated, but your evolution is retained at stage " + (victimLevel + 1) + ".");
+            player.sendMessage(ChatColor.RED + "Defeated. Respawning with evolution stage " + (victimLevel + 1) + " retained.");
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (active != session || !player.isOnline()
-                        || !session.respawning.remove(player.getUniqueId())) return;
+                        || !session.respawning.remove(victimId)) return;
                 Location spawn = spawnFor(session, player);
                 player.teleport(spawn);
                 player.setGameMode(GameMode.SURVIVAL);
-                player.setHealth(player.getMaxHealth());
                 player.setFoodLevel(20);
                 player.setSaturation(20.0F);
-                session.alive.add(player.getUniqueId());
+                session.alive.add(victimId);
+                session.lastLocations.put(victimId, spawn.clone());
                 giveEvolutionKit(session, player);
-            }, 30L);
+            }, ArcadePortRules.EVOLUTION_RESPAWN_TICKS);
             return;
         }
         if (player.isOnline()) {
@@ -1722,6 +1740,9 @@ public final class ArcadePortManager implements Listener {
         player.getInventory().clear();
         for (PotionEffect effect : player.getActivePotionEffects()) player.removePotionEffect(effect.getType());
         int level = Math.max(0, Math.min(5, session.evolutionLevels.getOrDefault(player.getUniqueId(), 0)));
+        var maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
+        if (maxHealth != null) maxHealth.setBaseValue(ArcadePortRules.evolutionMaxHealth(level));
+        player.setHealth(player.getMaxHealth());
         switch (level) {
             case 0:
                 player.getInventory().addItem(new ItemStack(Material.IRON_SWORD), new ItemStack(Material.SHIELD));
@@ -1755,6 +1776,115 @@ public final class ArcadePortManager implements Listener {
         }
         player.sendMessage(ChatColor.GREEN + "Evolution stage restored: " + (level + 1) + "/6.");
         player.updateInventory();
+    }
+
+    private void updateEvolutionProgress(Session session, long now) {
+        if (active != session) return;
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            if (session.evolving.contains(id)) continue;
+            if (!session.evolutionAvailable.contains(id)) {
+                if (player.getExp() != 0.0F) player.setExp(0.0F);
+                continue;
+            }
+            if (!player.isSneaking()) {
+                cancelEvolutionCharge(session, player);
+                if (now % 2_000L < 50L) player.sendActionBar(ChatColor.GREEN + "Kill an opponent, then hold sneak while grounded to evolve.");
+                continue;
+            }
+            if (player.getLocation().getBlock().isLiquid()) {
+                cancelEvolutionCharge(session, player);
+                long lastNotice = session.evolutionWaterMessageAt.getOrDefault(id, 0L);
+                if (now - lastNotice >= 2_000L) {
+                    session.evolutionWaterMessageAt.put(id, now);
+                    player.sendMessage(ChatColor.YELLOW + "You cannot evolve in water!");
+                }
+                continue;
+            }
+            Block below = player.getLocation().getBlock().getRelative(org.bukkit.block.BlockFace.DOWN);
+            if (!player.isOnGround() || below.getType() == Material.DRAGON_EGG) {
+                if (session.evolutionCharge.containsKey(id)) player.sendActionBar(ChatColor.YELLOW + "Land on solid ground to charge your evolution.");
+                continue;
+            }
+            float progress = session.evolutionCharge.getOrDefault(id, 0.0F);
+            progress = (float) Math.min(0.9999D, progress
+                    + ArcadePortRules.evolutionChargePerTick(session.evolutionLifeKills.getOrDefault(id, 0)));
+            session.evolutionCharge.put(id, progress);
+            player.setExp(progress);
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 4, 1, false, false, true));
+            if (session.ticks % 5 == 0) {
+                player.getWorld().spawnParticle(Particle.HAPPY_VILLAGER,
+                        player.getLocation().add(0.0D, 1.0D, 0.0D), 3, 0.35D, 0.45D, 0.35D, 0.0D);
+            }
+            if (session.ticks % 10 == 0) {
+                player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.55F, progress + 0.6F);
+            }
+            player.sendActionBar(ChatColor.GREEN + "EVOLVING " + ChatColor.WHITE
+                    + Math.min(100, (int) (progress * 100.0F)) + "%");
+            if (progress >= 0.9999F) beginEvolution(session, player);
+        }
+    }
+
+    private void cancelEvolutionCharge(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        session.evolutionCharge.remove(id);
+        player.setExp(0.0F);
+        player.removePotionEffect(PotionEffectType.SLOWNESS);
+        player.removePotionEffect(PotionEffectType.JUMP_BOOST);
+    }
+
+    private void beginEvolution(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        if (active != session || !session.alive.contains(id)
+                || !session.evolutionAvailable.remove(id) || !session.evolving.add(id)) return;
+        session.evolutionCharge.remove(id);
+        session.evolutionLifeKills.put(id, 0);
+        session.evolutionLockedLocations.put(id, player.getLocation().clone());
+        player.setExp(0.0F);
+        player.setSneaking(false);
+        player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+        player.setFireTicks(0);
+        player.setHealth(player.getMaxHealth());
+        player.removePotionEffect(PotionEffectType.SLOWNESS);
+        player.removePotionEffect(PotionEffectType.JUMP_BOOST);
+        player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.8F, 1.0F);
+        player.sendTitle(ChatColor.GREEN + "EVOLVING", ChatColor.YELLOW + "Keep still...", 0, 44, 8);
+        player.sendMessage(ChatColor.GREEN + "Evolution charge complete. Hold still while your form changes.");
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (active != session || !session.evolving.contains(id)) return;
+            if (!player.isOnline() || !session.alive.contains(id)) {
+                session.evolving.remove(id);
+                session.evolutionLockedLocations.remove(id);
+                return;
+            }
+            int nextLevel = ArcadePortRules.nextEvolutionLevel(
+                    session.evolutionLevels.getOrDefault(id, 0), true);
+            session.evolutionLevels.put(id, nextLevel);
+            if (ArcadePortRules.isEvolutionWinnerLevel(nextLevel)) {
+                session.evolving.remove(id);
+                session.evolutionLockedLocations.remove(id);
+                finish(session, player, true);
+                return;
+            }
+            giveEvolutionKit(session, player);
+            player.sendMessage(ChatColor.GREEN + "You evolved into stage " + (nextLevel + 1) + "/6.");
+        }, ArcadePortRules.EVOLUTION_FORM_CHANGE_TICKS);
+
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (active != session || !session.evolving.remove(id)) return;
+            session.evolutionLockedLocations.remove(id);
+            if (!player.isOnline() || !session.alive.contains(id)) return;
+            player.setGameMode(GameMode.SURVIVAL);
+            player.setHealth(player.getMaxHealth());
+            player.setFireTicks(0);
+            player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+            player.removePotionEffect(PotionEffectType.SLOWNESS);
+            player.removePotionEffect(PotionEffectType.JUMP_BOOST);
+            player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0F, 1.0F);
+            player.getWorld().spawnParticle(Particle.EXPLOSION, player.getLocation().add(0.0D, 1.0D, 0.0D),
+                    1, 0.1D, 0.1D, 0.1D, 0.0D);
+        }, ArcadePortRules.EVOLUTION_TOTAL_ANIMATION_TICKS);
     }
 
     private void updateEvolutionWebs(Session session, long now) {
@@ -1795,6 +1925,10 @@ public final class ArcadePortManager implements Listener {
     private void handlePlayerHit(Session session, Player attacker, Player target, String source, int paintballAmount) {
         if (active != session || attacker.equals(target) || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
+        if (session.type == ArcadePortGame.EVOLUTION) {
+            if (session.evolving.contains(attacker.getUniqueId()) || session.evolving.contains(target.getUniqueId())) return;
+            cancelEvolutionCharge(session, target);
+        }
         if (session.type == ArcadePortGame.GLADIATORS) {
             Integer attackerPair = session.gladiatorPairs.get(attacker.getUniqueId());
             Integer targetPair = session.gladiatorPairs.get(target.getUniqueId());
@@ -1875,10 +2009,18 @@ public final class ArcadePortManager implements Listener {
                 applyTurfWarsHit(session, attacker, target, damage);
                 break;
             }
-            case EVOLUTION:
-                target.getWorld().playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 1.0F, 0.8F);
-                eliminate(session, target, attacker, "lost a duel");
+            case EVOLUTION: {
+                int level = Math.max(0, Math.min(5, session.evolutionLevels.getOrDefault(attacker.getUniqueId(), 0)));
+                double damage = ArcadePortRules.evolutionMeleeDamage(level);
+                if (target.getHealth() <= damage) {
+                    target.getWorld().playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 1.0F, 0.8F);
+                    eliminate(session, target, attacker, "was defeated by " + attacker.getName());
+                } else {
+                    target.setHealth(target.getHealth() - damage);
+                    target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
+                }
                 break;
+            }
             case SHEEP_QUEST:
                 // Hits drop a carrier's stack and still deal damage, as in the original TeamGame.
                 dropSheepFromCarrier(session, target, "was hit");
@@ -2146,9 +2288,21 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
         Session session = active;
-        if (session == null || !isInsideSession(session, event.getTo())) return;
+        if (session == null) return;
         Player player = event.getPlayer();
-        if (!session.players.containsKey(player.getUniqueId())) return;
+        UUID playerId = player.getUniqueId();
+        if (!session.players.containsKey(playerId) || event.getTo() == null) return;
+        if (session.type == ArcadePortGame.EVOLUTION && session.evolving.contains(playerId)) {
+            Location locked = session.evolutionLockedLocations.get(playerId);
+            if (locked != null) {
+                Location destination = locked.clone();
+                destination.setYaw(event.getTo().getYaw());
+                destination.setPitch(event.getTo().getPitch());
+                event.setTo(destination);
+            }
+            return;
+        }
+        if (!isInsideSession(session, event.getTo())) return;
         if (session.type == ArcadePortGame.MICRO_BATTLES && session.alive.contains(player.getUniqueId())) {
             int team = session.teams.getOrDefault(player.getUniqueId(), -1);
             if (team >= 0 && team < 4) {
@@ -2456,6 +2610,12 @@ public final class ArcadePortManager implements Listener {
         if (!session.alive.contains(player.getUniqueId())) return;
         ItemStack heldItem = event.getItem();
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
+        if (session.type == ArcadePortGame.EVOLUTION
+                && (session.evolving.contains(player.getUniqueId())
+                || session.evolutionCharge.containsKey(player.getUniqueId()))) {
+            event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.PAINTBALL) {
             String kit = paintballKitForItem(heldItem);
             if (kit != null) {
@@ -2820,6 +2980,12 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> paintballLastShotAt = new HashMap<>();
         final Map<UUID, Integer> paintProjectileDamage = new HashMap<>();
         final Map<UUID, Integer> evolutionLevels = new HashMap<>();
+        final Map<UUID, Integer> evolutionLifeKills = new HashMap<>();
+        final Set<UUID> evolutionAvailable = new HashSet<>();
+        final Map<UUID, Float> evolutionCharge = new HashMap<>();
+        final Set<UUID> evolving = new HashSet<>();
+        final Map<UUID, Location> evolutionLockedLocations = new HashMap<>();
+        final Map<UUID, Long> evolutionWaterMessageAt = new HashMap<>();
         final Map<Block, Long> evolutionWebs = new HashMap<>();
         final Map<UUID, Integer> gladiatorPairs = new HashMap<>();
         final Set<Integer> gladiatorResolvedPairs = new HashSet<>();

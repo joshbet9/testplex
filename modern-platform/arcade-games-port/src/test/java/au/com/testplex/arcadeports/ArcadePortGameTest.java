@@ -148,7 +148,7 @@ class ArcadePortGameTest {
         assertEquals(3, ArcadePortRules.spleefProjectileClearRadius(true, 100.0D));
     }
 
-    @Test void evolutionStagesAdvanceOnKillsAndAreRetainedOnDeath() {
+    @Test void evolutionStagesAdvanceOnlyAfterACompletedCrouchEvolutionAndPersistOnDeath() {
         assertEquals(1, ArcadePortRules.nextEvolutionLevel(0, true));
         assertEquals(6, ArcadePortRules.nextEvolutionLevel(5, true));
         assertEquals(6, ArcadePortRules.nextEvolutionLevel(6, true));
@@ -157,6 +157,33 @@ class ArcadePortGameTest {
         assertEquals(0, ArcadePortRules.nextEvolutionLevel(-1, false));
         assertFalse(ArcadePortRules.isEvolutionWinnerLevel(5));
         assertTrue(ArcadePortRules.isEvolutionWinnerLevel(6));
+        assertEquals(80L, ArcadePortRules.EVOLUTION_RESPAWN_TICKS);
+        assertEquals(44L, ArcadePortRules.EVOLUTION_FORM_CHANGE_TICKS);
+        assertEquals(140L, ArcadePortRules.EVOLUTION_TOTAL_ANIMATION_TICKS);
+    }
+
+    @Test void evolutionUsesSourceFormHealthAndMeleeDamage() {
+        assertEquals(40.0D, ArcadePortRules.evolutionMaxHealth(0));
+        assertEquals(36.0D, ArcadePortRules.evolutionMaxHealth(1));
+        assertEquals(32.0D, ArcadePortRules.evolutionMaxHealth(2));
+        assertEquals(28.0D, ArcadePortRules.evolutionMaxHealth(3));
+        assertEquals(22.0D, ArcadePortRules.evolutionMaxHealth(4));
+        assertEquals(16.0D, ArcadePortRules.evolutionMaxHealth(5));
+        assertEquals(6.0D, ArcadePortRules.evolutionMeleeDamage(0));
+        assertEquals(5.0D, ArcadePortRules.evolutionMeleeDamage(1));
+        assertEquals(5.0D, ArcadePortRules.evolutionMeleeDamage(2));
+        assertEquals(4.0D, ArcadePortRules.evolutionMeleeDamage(3));
+        assertEquals(4.0D, ArcadePortRules.evolutionMeleeDamage(4));
+        assertEquals(3.0D, ArcadePortRules.evolutionMeleeDamage(5));
+    }
+
+    @Test void evolutionChargeAcceleratesWithKillsAndCapsAtTheSourceRate() {
+        assertEquals(0.012D, ArcadePortRules.evolutionChargePerTick(0), 0.00001D);
+        assertEquals(0.012D, ArcadePortRules.evolutionChargePerTick(1), 0.00001D);
+        assertEquals(0.015D, ArcadePortRules.evolutionChargePerTick(2), 0.00001D);
+        assertEquals(0.021D, ArcadePortRules.evolutionChargePerTick(4), 0.00001D);
+        assertEquals(0.022D, ArcadePortRules.evolutionChargePerTick(5), 0.00001D);
+        assertEquals(0.022D, ArcadePortRules.evolutionChargePerTick(50), 0.00001D);
     }
 
     @Test void sheepQuestLeaderRequiresMorePenSheep() {

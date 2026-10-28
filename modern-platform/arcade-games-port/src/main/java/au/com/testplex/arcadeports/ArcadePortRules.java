@@ -57,9 +57,31 @@ public final class ArcadePortRules {
         return Math.max(1, Math.min(3, (int) Math.ceil(0.5D + safeVelocity / 1.6D)));
     }
 
-    public static int nextEvolutionLevel(int currentLevel, boolean wonDuel) {
+    public static final long EVOLUTION_RESPAWN_TICKS = 80L;
+    public static final long EVOLUTION_FORM_CHANGE_TICKS = 44L;
+    public static final long EVOLUTION_TOTAL_ANIMATION_TICKS = 140L;
+
+    public static int nextEvolutionLevel(int currentLevel, boolean wonEvolve) {
         int safeLevel = Math.max(0, Math.min(EVOLUTION_WIN_LEVEL, currentLevel));
-        return wonDuel ? Math.min(EVOLUTION_WIN_LEVEL, safeLevel + 1) : safeLevel;
+        return wonEvolve ? Math.min(EVOLUTION_WIN_LEVEL, safeLevel + 1) : safeLevel;
+    }
+
+    public static double evolutionMaxHealth(int level) {
+        return switch (Math.max(0, Math.min(5, level))) {
+            case 0 -> 40.0D; case 1 -> 36.0D; case 2 -> 32.0D;
+            case 3 -> 28.0D; case 4 -> 22.0D; default -> 16.0D;
+        };
+    }
+
+    public static double evolutionMeleeDamage(int level) {
+        return switch (Math.max(0, Math.min(5, level))) {
+            case 0 -> 6.0D; case 1, 2 -> 5.0D; case 3, 4 -> 4.0D; default -> 3.0D;
+        };
+    }
+
+    public static double evolutionChargePerTick(int killsThisLife) {
+        int extraKills = Math.max(0, killsThisLife - 1);
+        return Math.min(0.022D, 0.012D + 0.003D * extraKills);
     }
 
     public static boolean isEvolutionWinnerLevel(int level) {
