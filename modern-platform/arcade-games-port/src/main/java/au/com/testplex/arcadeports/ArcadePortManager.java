@@ -632,9 +632,9 @@ public final class ArcadePortManager implements Listener {
         return new Location(session.world, team == 0 ? -15.0D : 15.0D, 64.0D, 0.0D);
     }
 
-    private boolean isInsideSheepPen(Location location, int team) {
-        if (location == null || team < 0 || team > 1) return false;
-        Location center = sheepQuestPenCenter(active, team);
+    private boolean isInsideSheepPen(Session session, Location location, int team) {
+        if (session == null || location == null || team < 0 || team > 1) return false;
+        Location center = sheepQuestPenCenter(session, team);
         return location.getWorld() == center.getWorld()
                 && Math.abs(location.getX() - center.getX()) <= 2.5D
                 && Math.abs(location.getZ() - center.getZ()) <= 3.5D;
@@ -697,7 +697,6 @@ public final class ArcadePortManager implements Listener {
             if (horizontalDistanceSquared(carrier.getLocation(), sheepQuestPenCenter(session, team)) > 20.25D) continue;
 
             int previousOwner = session.sheepOwners.getOrDefault(sheep, -1);
-            if (previousOwner == team && isInsideSheepPen(sheep.getLocation(), team)) continue;
             session.sheepOwners.put(sheep, team);
             sheep.setColor(team == 0 ? DyeColor.RED : DyeColor.BLUE);
             sheep.setAI(false);
@@ -705,19 +704,23 @@ public final class ArcadePortManager implements Listener {
             sheep.teleport(pen.clone().add(ThreadLocalRandom.current().nextDouble(-1.0D, 1.0D),
                     0.0D, ThreadLocalRandom.current().nextDouble(-2.0D, 2.0D)));
             iterator.remove();
-            session.scores.merge(carrierId, 1, Integer::sum);
-            carrier.playSound(carrier.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.5F);
-            carrier.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, carrier.getLocation().add(0, 1, 0),
-                    12, 0.35D, 0.4D, 0.35D, 0.04D);
-            announce(session, (previousOwner < 0 ? ChatColor.GREEN + "Sheep captured by " :
-                    ChatColor.YELLOW + "Sheep stolen by ") + carrier.getName() + " for "
-                    + (team == 0 ? ChatColor.RED + "Red" : ChatColor.BLUE + "Blue") + ChatColor.WHITE + "!");
+            if (previousOwner != team) {
+                session.scores.merge(carrierId, 1, Integer::sum);
+                carrier.playSound(carrier.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.5F);
+                carrier.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, carrier.getLocation().add(0, 1, 0),
+                        12, 0.35D, 0.4D, 0.35D, 0.04D);
+                announce(session, (previousOwner < 0 ? ChatColor.GREEN + "Sheep captured by " :
+                        ChatColor.YELLOW + "Sheep stolen by ") + carrier.getName() + " for "
+                        + (team == 0 ? ChatColor.RED + "Red" : ChatColor.BLUE + "Blue") + ChatColor.WHITE + "!");
+            } else {
+                carrier.sendMessage(ChatColor.GREEN + "Sheep returned to your team's pen.");
+            }
         }
 
         for (Sheep sheep : session.sheep) {
             if (!sheep.isValid() || session.sheepCarriers.containsKey(sheep)) continue;
             int owner = session.sheepOwners.getOrDefault(sheep, -1);
-            if (owner >= 0 && !isInsideSheepPen(sheep.getLocation(), owner)) {
+            if (owner >= 0 && !isInsideSheepPen(session, sheep.getLocation(), owner)) {
                 Location pen = sheepQuestPenCenter(session, owner);
                 sheep.teleport(pen.clone().add(0.5D, 0.0D, 0.5D));
                 sheep.setAI(false);
@@ -728,7 +731,7 @@ public final class ArcadePortManager implements Listener {
     private int sheepQuestTeamCount(Session session, int team) {
         int count = 0;
         for (Sheep sheep : session.sheep) {
-            if (session.sheepOwners.getOrDefault(sheep, -1) == team && isInsideSheepPen(sheep.getLocation(), team)) count++;
+            if (session.sheepOwners.getOrDefault(sheep, -1) == team && isInsideSheepPen(session, sheep.getLocation(), team)) count++;
         }
         return count;
     }
@@ -737,7 +740,8 @@ public final class ArcadePortManager implements Listener {
         int red = sheepQuestTeamCount(session, 0);
         int blue = sheepQuestTeamCount(session, 1);
         if (red == blue) return topScorerOrLastAlive(session);
-        int winningTeam = red > blue ? 0 : 1;
+        int winningTeam = ArcadePortRules.sheepQuestLeadingTeam(red, blue);
+        if (winningTeam < 0) return topScorerOrLastAlive(session);
         return alivePlayers(session).stream()
                 .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
                 .max(java.util.Comparator.comparingInt(player -> session.scores.getOrDefault(player.getUniqueId(), 0)))
@@ -1436,7 +1440,7 @@ public final class ArcadePortManager implements Listener {
         int team = session.teams.getOrDefault(playerId, -1);
         int owner = session.sheepOwners.getOrDefault(sheep, -1);
         if (team < 0 || team > 1) return;
-        if (owner == team && isInsideSheepPen(sheep.getLocation(), team)) {
+        if (owner == team && isInsideSheepPen(session, sheep.getLocation(), team)) {
             player.sendMessage(ChatColor.YELLOW + "That sheep is already safe in your pen.");
             return;
         }
