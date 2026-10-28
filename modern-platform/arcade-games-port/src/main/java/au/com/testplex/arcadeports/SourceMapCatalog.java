@@ -298,6 +298,32 @@ public final class SourceMapCatalog {
             return groups;
         }
 
+        /**
+         * Preserve WorldConfig's authored route order and remove only consecutive duplicate markers.
+         * Route points can double back near earlier parts of a course, so nearest-neighbour sorting
+         * is not a safe way to reconstruct Dragon Escape switchbacks.
+         */
+        public static List<Location> orderedRouteMarkers(Location start, List<Location> markers,
+                double duplicateDistance) {
+            List<Location> result = new ArrayList<>();
+            if (markers == null || markers.isEmpty()) return result;
+            Location last = start;
+            double threshold = Double.isFinite(duplicateDistance) ? Math.max(0.0D, duplicateDistance) : 0.0D;
+            double thresholdSquared = threshold * threshold;
+            for (Location marker : markers) {
+                if (marker == null) continue;
+                if (last != null) {
+                    double dx = marker.getX() - last.getX();
+                    double dy = marker.getY() - last.getY();
+                    double dz = marker.getZ() - last.getZ();
+                    if (dx * dx + dy * dy + dz * dz < thresholdSquared) continue;
+                }
+                result.add(marker.clone());
+                last = marker;
+            }
+            return result;
+        }
+
         public List<Location> dataLocations(String name) {
             return copyLocations(dataLocations.get(name == null ? "" : name.toUpperCase(java.util.Locale.ROOT)));
         }
