@@ -206,7 +206,7 @@ class ArcadePortGameTest {
         assertEquals(138.999D, ArcadePortRules.clampDragonSkyTargetCoordinate(200.0D, 100, 140), 0.00001D);
         assertEquals(120.0D, ArcadePortRules.clampDragonSkyTargetCoordinate(Double.NaN, 100, 140), 0.00001D);
         assertEquals(100.5D, ArcadePortRules.clampDragonSkyTargetCoordinate(500.0D, 100, 101), 0.00001D);
-        assertEquals(0.0D, ArcadePortRules.clampDragonSkyTargetCoordinate(-500.0D, -20, 20), 0.00001D);
+        assertEquals(-19.0D, ArcadePortRules.clampDragonSkyTargetCoordinate(-500.0D, -20, 20), 0.00001D);
     }
 
     @Test void sourceMapSpawnsAreInterleavedAcrossConfiguredTeams() {
