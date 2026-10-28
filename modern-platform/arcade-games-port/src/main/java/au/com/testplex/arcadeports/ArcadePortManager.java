@@ -3486,11 +3486,30 @@ public final class ArcadePortManager implements Listener {
         player.updateInventory();
     }
 
+    private void refreshEvolutionFormPerks(Session session, Player player) {
+        int level = Math.max(0, Math.min(5, session.evolutionLevels.getOrDefault(player.getUniqueId(), 0)));
+        PotionEffectType type;
+        int amplifier;
+        switch (level) {
+            case 0 -> { type = PotionEffectType.RESISTANCE; amplifier = 0; }
+            case 1 -> { type = PotionEffectType.FIRE_RESISTANCE; amplifier = 0; }
+            case 2 -> { type = PotionEffectType.SPEED; amplifier = 0; }
+            case 4 -> { type = PotionEffectType.JUMP_BOOST; amplifier = 1; }
+            case 5 -> { type = PotionEffectType.SPEED; amplifier = 1; }
+            default -> { return; }
+        }
+        PotionEffect current = player.getPotionEffect(type);
+        if (current == null || current.getDuration() <= 20 || current.getAmplifier() != amplifier) {
+            player.addPotionEffect(new PotionEffect(type, 60, amplifier, false, false, true));
+        }
+    }
+
     private void updateEvolutionProgress(Session session, long now) {
         if (active != session) return;
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
             if (session.evolving.contains(id)) continue;
+            refreshEvolutionFormPerks(session, player);
             if (!session.evolutionAvailable.contains(id)) {
                 if (player.getExp() != 0.0F) player.setExp(0.0F);
                 continue;
