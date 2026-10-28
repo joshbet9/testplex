@@ -16,6 +16,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
@@ -309,23 +310,74 @@ public class SafePad implements Listener
 		HandlerList.unregisterAll(this);
 	}
 
-	/** Prevent the vanilla Beacon UI opening when a player right-clicks this pad's objective. */
-	@EventHandler
+	/** Prevent the vanilla Beacon UI opening when a player right-clicks the objective glass or beacon. */
+	@EventHandler(priority = EventPriority.HIGHEST)
 	public void onInteract(PlayerInteractEvent event)
 	{
-		if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null)
-			return;
-
-		if (event.getClickedBlock().getType() != Material.GLASS)
+		if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null || _loc == null)
 			return;
 
 		Location clicked = event.getClickedBlock().getLocation();
-		if (clicked.getWorld() == _loc.getWorld()
+		if (clicked.getWorld() != _loc.getWorld())
+			return;
+
+		boolean objectiveGlass = event.getClickedBlock().getType() == Material.GLASS
 				&& clicked.getBlockX() == _loc.getBlockX()
 				&& clicked.getBlockY() == _loc.getBlockY()
-				&& clicked.getBlockZ() == _loc.getBlockZ())
-		{
+				&& clicked.getBlockZ() == _loc.getBlockZ();
+		boolean objectiveBeacon = event.getClickedBlock().getType() == Material.BEACON
+				&& clicked.getBlockX() == _loc.getBlockX()
+				&& clicked.getBlockY() == _loc.getBlockY() - 1
+				&& clicked.getBlockZ() == _loc.getBlockZ();
+		if (objectiveGlass || objectiveBeacon)
 			event.setCancelled(true);
+	}
+
+	/**
+	 * Source Monster Maze repaint fix: right-clicking a pad block makes the client process a
+	 * new block update, which can overwrite the custom per-viewer tint. Re-send our cosmetic
+	 * block changes after the interaction packet and later client/server block updates settle.
+	 */
+	@EventHandler(priority = EventPriority.MONITOR)
+	public void refreshTintAfterPadInteraction(final PlayerInteractEvent event)
+	{
+		if (event.getAction() != Action.RIGHT_CLICK_BLOCK || event.getClickedBlock() == null
+				|| _loc == null || _loc.getWorld() == null)
+			return;
+
+		final Location clicked = event.getClickedBlock().getLocation();
+		if (clicked.getWorld() != _loc.getWorld())
+			return;
+
+		boolean belongsToPad = false;
+		for (SafePadBlock block : _blocks)
+		{
+			Location at = block.getLocation();
+			if (at.getWorld() == clicked.getWorld()
+					&& at.getBlockX() == clicked.getBlockX()
+					&& at.getBlockY() == clicked.getBlockY()
+					&& at.getBlockZ() == clicked.getBlockZ())
+			{
+				belongsToPad = true;
+				break;
+			}
+		}
+		if (!belongsToPad)
+			return;
+
+		final Player viewer = event.getPlayer();
+		for (final long delay : new long[] {1L, 3L, 6L, 10L})
+		{
+			Bukkit.getScheduler().runTaskLater(Host.Manager.getPlugin(), new Runnable()
+			{
+				@Override
+				public void run()
+				{
+					if (viewer.isOnline() && Host != null && _loc != null && _loc.getWorld() != null
+							&& !_blocks.isEmpty())
+						applyViewerCosmeticColours(viewer);
+				}
+			}, delay);
 		}
 	}
 

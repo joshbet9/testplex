@@ -57,7 +57,7 @@ public class MonsterMazePBPage extends ShopPageBase<AchievementManager, Achievem
             CoreClientManager clientManager, DonationManager donationManager, Player player,
             String targetName, PlayerStats targetStats, View view, GameDisplay display, int pattern)
     {
-        super(plugin, shop, clientManager, donationManager, "Monster Maze Personal Bests", player);
+        super(plugin, shop, clientManager, donationManager, pageTitle(view, display, pattern), player);
         _statsManager = statsManager;
         _targetName = targetName;
         _targetStats = targetStats;
@@ -108,12 +108,23 @@ public class MonsterMazePBPage extends ShopPageBase<AchievementManager, Achievem
                         openPatterns(player, GameDisplay.MonsterMazeModern);
                     }
                 });
-        addItem(31, new ShopItem(Material.PAPER, C.cGray + "PBs are personal",
+        addButton(31, new ShopItem(Material.PAPER, C.cGray + "How Monster Maze PBs work",
                 new String[] {
-                        ChatColor.GRAY + "Personal bests are stored separately",
-                        ChatColor.GRAY + "for Original, Speed and Modern,",
-                        ChatColor.GRAY + "then by maze pattern and kit."
-                }, 1, false));
+                        ChatColor.GRAY + "PBs are personal to your account.",
+                        ChatColor.GRAY + "Each mode, pattern and kit is saved",
+                        ChatColor.GRAY + "separately.",
+                        ChatColor.YELLOW + "Click for details."
+                }, 1, false), new IButton()
+        {
+            @Override
+            public void onClick(Player player, ClickType clickType)
+            {
+                player.sendMessage(ChatColor.AQUA + "Monster Maze PBs: "
+                        + ChatColor.WHITE + "Original, Speed and Modern each store personal bests "
+                        + "by maze pattern and kit. Play a run to set or improve a PB.");
+                player.playSound(player.getLocation(), Sound.CLICK, 1, 1);
+            }
+        });
     }
 
     private ShopItem modeItem(GameDisplay display, Material icon)
@@ -158,15 +169,37 @@ public class MonsterMazePBPage extends ShopPageBase<AchievementManager, Achievem
         {
             int best = getKitBest(_display, _pattern, kits[i]);
             String pb = best > 0 ? "Stage " + best : "Not set";
-            addItem(slots[i], new ShopItem(Material.BOOK_AND_QUILL, (byte) 0,
-                    C.cAqua + kits[i],
+            final String selectedKit = kits[i];
+            final String selectedPB = pb;
+            addButton(slots[i], new ShopItem(Material.BOOK_AND_QUILL, (byte) 0,
+                    C.cAqua + selectedKit,
                     new String[] {" ", ChatColor.GRAY + "Maze Pattern " + _pattern,
-                            ChatColor.YELLOW + "Personal Best: " + ChatColor.WHITE + pb},
-                    1, false, false));
+                            ChatColor.YELLOW + "Personal Best: " + ChatColor.WHITE + selectedPB,
+                            ChatColor.GRAY + "Click to show this PB."},
+                    1, false, false), new IButton()
+            {
+                @Override
+                public void onClick(Player player, ClickType clickType)
+                {
+                    player.sendMessage(ChatColor.AQUA + _display.getName() + " PB — "
+                            + ChatColor.WHITE + "Pattern " + _pattern + ", " + selectedKit + ": "
+                            + ChatColor.YELLOW + selectedPB);
+                    player.playSound(player.getLocation(), Sound.CLICK, 1, 1);
+                }
+            });
         }
-        addItem(40, new ShopItem(Material.PAPER, C.cGray + "Selected Mode",
+        addButton(40, new ShopItem(Material.PAPER, C.cGray + "Back to Pattern Selection",
                 new String[] {ChatColor.WHITE + _display.getName(),
-                        ChatColor.GRAY + "Maze Pattern " + _pattern}, 1, false));
+                        ChatColor.GRAY + "Maze Pattern " + _pattern,
+                        ChatColor.YELLOW + "Click to choose another pattern."}, 1, false),
+                new IButton()
+                {
+                    @Override
+                    public void onClick(Player player, ClickType clickType)
+                    {
+                        openPatterns(player, _display);
+                    }
+                });
     }
 
     private int getBestAcrossKits(GameDisplay display, int pattern, String[] kits)
@@ -235,6 +268,21 @@ public class MonsterMazePBPage extends ShopPageBase<AchievementManager, Achievem
         }
     }
 
+    /**
+     * ShopBase identifies pages by inventory title during InventoryCloseEvent. If all three
+     * levels share one title, opening the next level makes the close event mistake the new
+     * page for the old one and removes the shop registration; subsequent Back and item clicks
+     * then appear dead. Use a distinct short title for each navigation level.
+     */
+    private static String pageTitle(View view, GameDisplay display, int pattern)
+    {
+        if (view == View.MODES)
+            return "MM PB | Modes";
+        String mode = display == GameDisplay.MonsterMaze ? "Original"
+                : display == GameDisplay.MonsterMazeSpeed ? "Speed" : "Modern";
+        return view == View.PATTERNS ? "MM PB | " + mode : "MM PB | " + mode + " P" + pattern;
+    }
+
     private void addBackButton()
     {
         addButton(4, new ShopItem(Material.BED, C.cGray + " \u21FD Go Back", new String[0], 1, false),
@@ -249,13 +297,13 @@ public class MonsterMazePBPage extends ShopPageBase<AchievementManager, Achievem
                         }
                         else if (_view == View.PATTERNS)
                         {
-                            getShop().openPageForPlayer(getPlayer(), new MonsterMazePBPage(getPlugin(), _statsManager,
+                            getShop().openPageForPlayer(player, new MonsterMazePBPage(getPlugin(), _statsManager,
                                     getShop(), getClientManager(), getDonationManager(), player, _targetName,
                                     _targetStats));
                         }
                         else
                         {
-                            getShop().openPageForPlayer(getPlayer(), new AchievementPage(getPlugin(), _statsManager,
+                            getShop().openPageForPlayer(player, new AchievementPage(getPlugin(), _statsManager,
                                     AchievementCategory.MONSTER_MAZE, getShop(), getClientManager(),
                                     getDonationManager(), player, _targetName, _targetStats));
                         }
