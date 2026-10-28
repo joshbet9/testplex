@@ -306,8 +306,10 @@ public final class SourceMapCatalog {
         public static List<Location> orderedRouteMarkers(Location start, List<Location> markers,
                 double duplicateDistance) {
             List<Location> result = new ArrayList<>();
-            if (markers == null || markers.isEmpty()) return result;
+            if (start == null && (markers == null || markers.isEmpty())) return result;
             Location last = start;
+            if (start != null) result.add(start.clone());
+            if (markers == null || markers.isEmpty()) return result;
             double threshold = Double.isFinite(duplicateDistance) ? Math.max(0.0D, duplicateDistance) : 0.0D;
             double thresholdSquared = threshold * threshold;
             for (Location marker : markers) {
