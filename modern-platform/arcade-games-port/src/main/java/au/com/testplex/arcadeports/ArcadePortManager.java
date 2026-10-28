@@ -668,9 +668,9 @@ public final class ArcadePortManager implements Listener {
         attacker.playSound(attacker.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 1.4F);
         attacker.sendMessage(ChatColor.YELLOW + "Paint hit! " + after + " armour pieces remaining.");
         if (ArcadePortRules.isPaintballPlayerOut(after)) {
-            session.scores.merge(attacker.getUniqueId(), 1, Integer::sum);
             announce(session, ChatColor.RED + target.getName() + ChatColor.GRAY + " was painted out by "
                     + ChatColor.GREEN + attacker.getName() + ChatColor.GRAY + "!");
+            // eliminate() records the kill score once and checks the last-team-standing condition.
             eliminate(session, target, attacker, "was completely painted");
         }
         return after;
