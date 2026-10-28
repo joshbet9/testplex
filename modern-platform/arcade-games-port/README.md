@@ -26,7 +26,7 @@ Each game gets its own separate modern test world, so arena generation/destructi
 - `/gamepanel` → choose a supported game → **Start / Test**. The coordinator calls `/arcadeport play <game-id>`.
 - `/arcadeport play <id>` — joins a quick-start window, giving others a few seconds to join.
 - `/arcadeport join <id>` then `/arcadeport start <id>` — queue a multi-player test.
-- `/arcadeport kit <jumper|disruptor|warper|digger|armorer|pitcher|waller|pig|mama-pig|sheep-pig|snowballer|brawler|archer|rifle|sniper|shotgun|machine-gun|runner-basher|runner-archer|runner-traitor|runner-null>` — choose a game kit before a test; kit names apply only to games that support them.
+- `/arcadeport kit <jumper|dragon-escape-jumper|dragon-escape-disruptor|dragon-escape-warper|dragon-escape-digger|disruptor|warper|digger|armorer|pitcher|waller|pig|mama-pig|sheep-pig|snowballer|brawler|archer|rifle|sniper|shotgun|machine-gun|runner-basher|runner-archer|runner-traitor|runner-null>` — choose a game kit before a test; use `dragon-escape-...` names to set Dragon Escape kits without a running match.
 - `/arcadeport status`, `/arcadeport stop` (operator only).
 
 Game IDs are: `bacon-brawl`, `bomb-lobbers`, `death-tag`, `dragon-escape`, `dragons`, `evolution`, `gladiators`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`.
