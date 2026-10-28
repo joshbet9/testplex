@@ -46,6 +46,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -2334,7 +2335,7 @@ public final class ArcadePortManager implements Listener {
         target.setVelocity(direction.normalize().multiply(hitKnockback).setY(0.7D));
         target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0, 1, 0), 10, 0.35D, 0.4D, 0.35D, 0.04D);
         attacker.setFoodLevel(Math.min(20, attacker.getFoodLevel() + 2));
-        attacker.setSaturation(5.0F);
+        attacker.setSaturation(ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE);
         attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.8F, 1.1F);
         double damage = ArcadePortRules.BACON_STANDARD_HIT_DAMAGE;
         if (target.getHealth() <= damage) {
@@ -4857,6 +4858,16 @@ public final class ArcadePortManager implements Listener {
                 shooter.playSound(shooter.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 0.7F, 1.5F);
             }
         }
+    }
+
+    @EventHandler
+    public void onBaconFoodLevelChange(FoodLevelChangeEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.BACON_BRAWL
+                || !(event.getEntity() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())) return;
+        // Match the shared legacy Game listener: food updates reset saturation to five.
+        player.setSaturation(ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
