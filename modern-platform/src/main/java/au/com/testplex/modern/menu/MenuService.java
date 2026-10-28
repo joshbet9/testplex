@@ -72,8 +72,8 @@ public final class MenuService implements Listener {
         for (GameDefinition game : catalog.getGames()) {
             if (slot >= inventory.getSize()) break;
             ItemStack item = makeItem(game.getIcon(), ChatColor.LIGHT_PURPLE + game.getName(), List.of(
-                    ChatColor.GRAY + game.getCosmeticLines().size() + " dedicated cosmetic lines",
-                    ChatColor.GRAY + game.getWinEffects().size() + " distinct win-scene choices",
+                    ChatColor.GRAY + String.valueOf(game.getCosmeticLines().size()) + " dedicated cosmetic lines",
+                    ChatColor.GRAY + String.valueOf(game.getWinEffects().size()) + " distinct win-scene choices",
                     ChatColor.DARK_GRAY + "Preferences are scoped to this game."));
             mark(item, "cosmetics-game", game, null, null);
             inventory.setItem(slot++, item);
@@ -106,7 +106,7 @@ public final class MenuService implements Listener {
             ItemStack item = makeItem(line.getIcon(), ChatColor.LIGHT_PURPLE + line.getTitle(), List.of(
                     ChatColor.GRAY + line.getDescription(),
                     ChatColor.YELLOW + "Selection: " + line.getSelectionMode().name(),
-                    ChatColor.GRAY + line.getOptions().size() + " options"));
+                    ChatColor.GRAY + String.valueOf(line.getOptions().size()) + " options"));
             mark(item, "cosmetic-line", game, line, null);
             inventory.setItem(slot++, item);
         }
