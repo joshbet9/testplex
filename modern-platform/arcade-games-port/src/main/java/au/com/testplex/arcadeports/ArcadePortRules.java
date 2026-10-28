@@ -744,6 +744,11 @@ public final class ArcadePortRules {
         return initialPlayers > 2 ? runnersRemaining <= 1 : runnersRemaining <= 0;
     }
 
+    /** Generated island-ring removal must never run against an archived source map. */
+    public static boolean shouldRemoveGeneratedMicroBarrier(boolean sourceMapLoaded, int trackedBarrierCount) {
+        return !sourceMapLoaded && trackedBarrierCount <= 0;
+    }
+
     /** Clamp flying dragon targets inside the authored X/Z map bounds with a one-block safety margin. */
     public static double clampDragonSkyTargetCoordinate(double coordinate, int minInclusive, int maxExclusive) {
         if (!Double.isFinite(coordinate) || maxExclusive <= minInclusive) {
