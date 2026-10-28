@@ -21,6 +21,14 @@ class SnakeRulesTest {
         assertEquals(180, SnakeRules.SPEED_REFERENCE_LENGTH);
     }
 
+    @Test void snakeColorsFollowParticipantOrderAndWrap() {
+        assertEquals(0, SnakeRules.colorIndexForParticipant(0, 16));
+        assertEquals(15, SnakeRules.colorIndexForParticipant(15, 16));
+        assertEquals(0, SnakeRules.colorIndexForParticipant(16, 16));
+        assertEquals(15, SnakeRules.colorIndexForParticipant(-1, 16));
+        assertEquals(0, SnakeRules.colorIndexForParticipant(8, 0));
+    }
+
     @Test void foodAndTailCollisionsUseSourceThreeDimensionalRadii() {
         assertTrue(SnakeRules.isFoodCollected(3.999D));
         assertFalse(SnakeRules.isFoodCollected(4.0D));
