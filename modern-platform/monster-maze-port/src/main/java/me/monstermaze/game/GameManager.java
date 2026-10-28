@@ -73,6 +73,8 @@ public class GameManager implements Listener {
 
     private final Set<UUID> alive = new HashSet<UUID>();
     private final Set<UUID> spectators = new HashSet<UUID>();
+    /** UUIDs included at round start; late entrants in this world must remain outside the match. */
+    private final Set<UUID> roundParticipants = new HashSet<UUID>();
     private final List<Player> playersOnPad = new ArrayList<Player>();
     /** Players who have landed on this stage's Safe Pad; jumping does not clear this lock-in. */
     private final Set<UUID> padLockIns = new HashSet<UUID>();
@@ -214,7 +216,7 @@ public void startGame(Location preferCenter) {
 }
 
 public void startGame(Location preferCenter, int requestedPattern) {
-    if (state != GameState.IDLE && state != GameState.ENDING) return;
+    if (state != GameState.IDLE) return;
 
     if (center == null) {
         if (preferCenter != null && preferCenter.getWorld() != null) {
@@ -250,6 +252,15 @@ public void startGame(Location preferCenter, int requestedPattern) {
         soloMode = false;
         stats.reset();
 
+        // Freeze the participant list before generation so late entrants are not reset or counted.
+        final List<Player> startingPlayers = getArenaWorldPlayers();
+        roundParticipants.clear();
+        for (Player player : startingPlayers) {
+            if (player != null && player.isOnline() && player.getGameMode() != GameMode.SPECTATOR) {
+                roundParticipants.add(player.getUniqueId());
+            }
+        }
+
         // Sync active mode from the plugin's persisted config each game.
         this.mode = plugin.getMode();
         phaseTimer = stageTimer(1);
@@ -265,9 +276,19 @@ public void startGame(Location preferCenter, int requestedPattern) {
             public void run() {
                 if (state != GameState.STARTING) return;
 
-                for (Player p : getArenaWorldPlayers()) {
-                    if (p.getGameMode() == GameMode.SPECTATOR) continue;
-                    alive.add(p.getUniqueId());
+                for (Player p : startingPlayers) {
+                    if (p == null || !p.isOnline()) {
+                        if (p != null) roundParticipants.remove(p.getUniqueId());
+                        continue;
+                    }
+                    UUID playerId = p.getUniqueId();
+                    if (!roundParticipants.contains(playerId)
+                            || !isInArenaWorld(center == null ? null : center.getWorld(), p.getWorld())
+                            || p.getGameMode() == GameMode.SPECTATOR) {
+                        roundParticipants.remove(playerId);
+                        continue;
+                    }
+                    alive.add(playerId);
                     preparePlayer(p);
                     p.teleport(center.clone().add(0.5, 1, 0.5));
                 }
@@ -454,6 +475,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             }
         }
         broadcast(ChatColor.GREEN + "Back in lobby. Pick a kit, then /mm start");
+        roundParticipants.clear();
     }
 
     /** Rebuild + redraw the lobby leaderboard hologram. Safe to call outside a live game. */
@@ -713,7 +735,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         p.setLevel(0);
         
         // Ensure all alive players are visible to each other
-        for (Player online : getArenaWorldPlayers()) {
+        for (Player online : getRoundAudiencePlayers()) {
             p.showPlayer(online);
             online.showPlayer(p);
         }
@@ -976,39 +998,55 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 && arenaWorld != null && playerWorld != null && arenaWorld != playerWorld;
     }
 
-    /** Round participants still need their temporary state restored if they leave the arena world. */
+    /** Only players registered when this round started receive its messages and titles. */
+    private List<Player> getRoundAudiencePlayers() {
+        if (roundParticipants.isEmpty()) return getArenaWorldPlayers();
+        List<Player> players = new ArrayList<Player>();
+        boolean liveAudience = state == GameState.STARTING || state == GameState.LIVE;
+        World arenaWorld = center == null ? null : center.getWorld();
+        for (UUID id : new HashSet<UUID>(roundParticipants)) {
+            Player player = Bukkit.getPlayer(id);
+            if (player == null || !player.isOnline()) continue;
+            if (liveAudience && !isInArenaWorld(arenaWorld, player.getWorld())) continue;
+            players.add(player);
+        }
+        return players;
+    }
+
+    /** Restore only participants captured for this round, wherever they currently are. */
     private List<Player> getRoundPlayersForCleanup() {
-        Map<UUID, Player> players = new HashMap<UUID, Player>();
-        for (Player player : getArenaWorldPlayers()) players.put(player.getUniqueId(), player);
-        for (UUID id : alive) {
+        List<Player> players = new ArrayList<Player>();
+        for (UUID id : new HashSet<UUID>(roundParticipants)) {
             Player player = Bukkit.getPlayer(id);
-            if (player != null && player.isOnline()) players.put(id, player);
+            if (player != null && player.isOnline()) players.add(player);
         }
-        for (UUID id : spectators) {
-            Player player = Bukkit.getPlayer(id);
-            if (player != null && player.isOnline()) players.put(id, player);
-        }
-        return new ArrayList<Player>(players.values());
+        return players;
     }
 
     private void titleArenaPlayers(String title, String subtitle, int fadeIn, int stay, int fadeOut) {
-        for (Player player : getArenaWorldPlayers()) {
+        for (Player player : getRoundAudiencePlayers()) {
             TextUtil.title(player, title, subtitle, fadeIn, stay, fadeOut);
         }
     }
 
     private void broadcast(String msg) {
-        for (Player player : getArenaWorldPlayers()) player.sendMessage(msg);
+        for (Player player : getRoundAudiencePlayers()) player.sendMessage(msg);
     }
 
     // -------------------- Events --------------------
 
     @EventHandler
     public void onWorldChange(PlayerChangedWorldEvent event) {
+        if (state != GameState.STARTING && state != GameState.LIVE) return;
         Player player = event.getPlayer();
-        if (!shouldEliminateForWorldChange(state, alive.contains(player.getUniqueId()),
-                center == null ? null : center.getWorld(), player.getWorld())) return;
-        eliminate(player, ChatColor.RED + player.getName() + " left the Monster Maze arena.");
+        UUID id = player.getUniqueId();
+        if (!roundParticipants.contains(id) || center == null
+                || isInArenaWorld(center.getWorld(), player.getWorld())) return;
+        if (shouldEliminateForWorldChange(state, alive.contains(id), center.getWorld(), player.getWorld())) {
+            eliminate(player, ChatColor.RED + player.getName() + " left the Monster Maze arena.");
+        } else if (state == GameState.STARTING) {
+            roundParticipants.remove(id);
+        }
     }
 
     @EventHandler
@@ -1019,16 +1057,18 @@ public void startGame(Location preferCenter, int requestedPattern) {
         padLockIns.remove(id);
         lastCompassTargets.remove(id);
         
-        for (Player online : getArenaWorldPlayers()) {
+        for (Player online : getRoundPlayersForCleanup()) {
             online.showPlayer(player);
         }
 
-        if (alive.remove(id)) {
-            recordPB(player);
+        boolean wasAlive = alive.remove(id);
+        if (wasAlive) recordPB(player);
+        spectators.remove(id);
+        roundParticipants.remove(id);
+        if (wasAlive) {
             broadcast(ChatColor.GRAY + player.getName() + " left.");
             checkWin();
         }
-        spectators.remove(id);
     }
 
     @EventHandler
