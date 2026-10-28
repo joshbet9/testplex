@@ -2394,7 +2394,7 @@ public final class ArcadePortManager implements Listener {
                         now + ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS);
                 if (now >= next) {
                     int held = countNamedItems(player, Material.EMERALD, "Throwing Sparkler");
-                    if (held < ArcadePortRules.DRAGONS_MAX_SPARKLERS) {
+                    if (ArcadePortRules.shouldReplenishDragonSparkler(now, next, held)) {
                         player.getInventory().addItem(namedItem(Material.EMERALD, "Throwing Sparkler",
                                 "Right-click to throw a sparkler that attracts nearby dragons.", 1));
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8F, 1.0F);
@@ -3660,7 +3660,7 @@ public final class ArcadePortManager implements Listener {
                 boolean attackerChaser = session.tagged.contains(attacker.getUniqueId());
                 boolean targetChaser = session.tagged.contains(target.getUniqueId());
                 if (attackerChaser == targetChaser) break;
-                if (attackerChaser) {
+                if (ArcadePortRules.shouldSpreadDeathTag(attackerChaser, targetChaser)) {
                     double damage = ArcadePortRules.deathTagChaserDamage(
                             session.alphaChasers.contains(attacker.getUniqueId()));
                     if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
@@ -4692,8 +4692,9 @@ public final class ArcadePortManager implements Listener {
             if (center.getWorld() == session.world && !isSpleefProtectedBlock(center.getType())) {
                 restoreSpleefHunger(session, shooter, now);
                 if (projectile instanceof Arrow arrow) {
-                    double radius = 0.5D + arrow.getVelocity().length() / 1.6D;
-                    int limit = (int) Math.ceil(radius);
+                    double arrowSpeed = arrow.getVelocity().length();
+                    double radius = Math.min(3.0D, 0.5D + arrowSpeed / 1.6D);
+                    int limit = ArcadePortRules.spleefProjectileClearRadius(true, arrowSpeed);
                     fadeSpleefBlock(session, center, false);
                     for (int dx = -limit; dx <= limit; dx++) {
                         for (int dy = -limit; dy <= limit; dy++) {
