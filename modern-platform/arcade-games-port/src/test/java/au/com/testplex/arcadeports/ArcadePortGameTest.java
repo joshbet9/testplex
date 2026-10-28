@@ -250,6 +250,19 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.nextSpleefSlowDamageData(14));
     }
 
+    @Test void spleefOnlyAcceptsSourceFloorMaterialsAsBreakable() {
+        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.SNOW_BLOCK));
+        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.LIGHT_BLUE_WOOL));
+        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.RED_TERRACOTTA));
+        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.STONE));
+        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.CRACKED_STONE_BRICKS));
+        assertFalse(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.AIR));
+        assertFalse(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.BEDROCK));
+        assertFalse(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.GLASS));
+        assertFalse(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.OBSIDIAN));
+        assertFalse(ArcadePortRules.isSpleefFloorMaterial(null));
+    }
+
     @Test void bombLobbersKitsPitchLevelsCraftmanAndBombPrimingMatchSourceTiming() {
         assertEquals("jumper", ArcadePortRules.normalizeBombLobbersKit("Jumper"));
         assertEquals("armorer", ArcadePortRules.normalizeBombLobbersKit("armourer"));
