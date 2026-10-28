@@ -114,6 +114,19 @@ public final class ArcadePortRules {
         return Math.max(2.0D, Math.max(0, remainingPieces) * 5.0D + 1.0D);
     }
 
+    /** Mirrors Reborn's per-kit armour-paint counts and the Sniper scope damage gauge. */
+    public static int paintballPaintAmount(String kit, boolean arrow, double scopeCharge) {
+        String safeKit = kit == null ? "rifle" : kit.toLowerCase(java.util.Locale.ROOT);
+        if ("rifle".equals(safeKit)) return 3;
+        if ("sniper".equals(safeKit) && arrow) return paintballSniperPaintDamage(scopeCharge);
+        return 1;
+    }
+
+    public static int paintballSniperPaintDamage(double scopeCharge) {
+        double charge = Math.max(0.0D, Math.min(0.999D, scopeCharge));
+        return 1 + (int) Math.floor(charge * 10.0D / 3.0D);
+    }
+
     public static boolean isBombDirectHit(double distanceSquared) {
         return distanceSquared >= 0.0D && distanceSquared <= 1.0D;
     }

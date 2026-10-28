@@ -13,7 +13,7 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 - Gladiators — compact melee elimination arena.
 - Micro Battles — isolated islands and shrinking border.
 - One in the Quiver — one-arrow kill loop and arrow regrant on elimination.
-- Paintball — snowball hit scoring with teams.
+- Paintball — selectable Rifle, Sniper, Shotgun and Machine Gun kits; projectile-specific paint counts, scope-charge damage, a heat gauge and team-coloured armour (kit perks and revive/Save Me flow remain to port).
 - Runner — disappearing floor tiles and dash item.
 - Sheep Quest — captureable sheep and score target.
 - Spleef — snow floor and shovel-only tile breaks.

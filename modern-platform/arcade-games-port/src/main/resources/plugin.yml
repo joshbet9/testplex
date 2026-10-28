@@ -9,7 +9,7 @@ softdepend:
 commands:
   arcadeport:
     description: Start and test a modern Arcade mechanics prototype
-    usage: /arcadeport <play|join|start|status|stop>
+    usage: /arcadeport <play|join|start|kit|status|stop>
 permissions:
   testplex.arcadeports.admin:
     description: Allows stopping and resetting an Arcade prototype

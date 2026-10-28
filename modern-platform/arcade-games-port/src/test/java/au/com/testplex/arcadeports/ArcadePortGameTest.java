@@ -66,6 +66,19 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isTurfWarsWinningLine(20, 2, 20));
     }
 
+    @Test void paintballKitHitsPaintTheCorrectNumberOfArmourPieces() {
+        assertEquals(3, ArcadePortRules.paintballPaintAmount("rifle", false, 0.0D));
+        assertEquals(3, ArcadePortRules.paintballPaintAmount("rifle", true, 0.999D));
+        assertEquals(1, ArcadePortRules.paintballPaintAmount("shotgun", false, 0.999D));
+        assertEquals(1, ArcadePortRules.paintballPaintAmount("machine-gun", false, 0.999D));
+        assertEquals(1, ArcadePortRules.paintballPaintAmount("sniper", false, 0.999D));
+        assertEquals(1, ArcadePortRules.paintballPaintAmount("sniper", true, 0.0D));
+        assertEquals(2, ArcadePortRules.paintballPaintAmount("sniper", true, 0.3D));
+        assertEquals(3, ArcadePortRules.paintballPaintAmount("sniper", true, 0.6D));
+        assertEquals(4, ArcadePortRules.paintballPaintAmount("sniper", true, 0.999D));
+        assertEquals(1, ArcadePortRules.paintballSniperPaintDamage(-1.0D));
+    }
+
     @Test void respawningPlayersPreventPrematureRoundEnd() {
         assertFalse(ArcadePortRules.shouldFinishWhenNobodyIsAlive(0, 1));
         assertFalse(ArcadePortRules.shouldFinishWhenNobodyIsAlive(1, 0));
