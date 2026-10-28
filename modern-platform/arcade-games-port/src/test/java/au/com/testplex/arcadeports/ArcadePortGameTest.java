@@ -606,6 +606,23 @@ class ArcadePortGameTest {
         assertEquals(4.0D, ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE, 0.00001D);
     }
 
+    @Test void turfWarsFrontlineAndVictoryUseTheSourceMapBounds() {
+        assertEquals(-1, ArcadePortRules.turfWarsInitialFrontline(-20, 20));
+        assertEquals(119, ArcadePortRules.turfWarsInitialFrontline(100, 140));
+        assertEquals(120, ArcadePortRules.turfWarsInitialFrontline(100, 141));
+
+        assertFalse(ArcadePortRules.isTurfWarsWinningLine(138, 0, 100, 140));
+        assertTrue(ArcadePortRules.isTurfWarsWinningLine(139, 0, 100, 140));
+        assertTrue(ArcadePortRules.isTurfWarsWinningLine(100, 1, 100, 140));
+        assertFalse(ArcadePortRules.isTurfWarsWinningLine(101, 1, 100, 140));
+        assertFalse(ArcadePortRules.isTurfWarsWinningLine(120, 2, 100, 140));
+
+        assertEquals(0, ArcadePortRules.turfWarsTimeoutLeader(120, 119, 0, 50));
+        assertEquals(1, ArcadePortRules.turfWarsTimeoutLeader(118, 119, 50, 0));
+        assertEquals(0, ArcadePortRules.turfWarsTimeoutLeader(119, 119, 4, 3));
+        assertEquals(-1, ArcadePortRules.turfWarsTimeoutLeader(119, 119, 4, 4));
+    }
+
     @Test void turfWarsUsesDifferentArrowAndMeleeDamage() {
         assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage(true, false), 0.00001D);
         assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage(true, true), 0.00001D);
