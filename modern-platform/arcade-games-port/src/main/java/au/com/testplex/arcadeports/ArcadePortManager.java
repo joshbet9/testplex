@@ -2669,6 +2669,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         consumeHeld(player);
+        session.dragonEscapeNextTntAt.put(player.getUniqueId(),
+                ArcadePortRules.dragonEscapeNextTntChargeAt(System.currentTimeMillis()));
         Vector direction = player.getEyeLocation().getDirection().normalize();
         Location spawn = player.getEyeLocation().add(direction.clone().multiply(0.8D));
         TNTPrimed mine = session.world.spawn(spawn, TNTPrimed.class);
@@ -2692,7 +2694,7 @@ public final class ArcadePortManager implements Listener {
                 player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.2F);
             }
             session.dragonEscapeNextTntAt.put(id,
-                    now + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
+                    ArcadePortRules.dragonEscapeNextTntChargeAt(now));
         }
     }
 
