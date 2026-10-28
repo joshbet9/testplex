@@ -165,6 +165,20 @@ public final class ArcadePortRules {
     }
 
     /** Legacy Spleef wool/clay data transitions: green -> yellow -> red -> broken. */
+    /** Blocks which are part of the supported source Spleef floor palette. */
+    public static boolean isSpleefFloorMaterial(Material material) {
+        if (material == null) return false;
+        String name = material.name();
+        if (name.endsWith("_WOOL") || name.endsWith("_TERRACOTTA") || material == Material.TERRACOTTA) {
+            return true;
+        }
+        return switch (material) {
+            case SNOW_BLOCK, CLAY, STONE, COBBLESTONE, STONE_BRICKS, MOSSY_STONE_BRICKS,
+                    CRACKED_STONE_BRICKS, GRASS_BLOCK, DIRT, SPRUCE_PLANKS, OAK_PLANKS, BIRCH_PLANKS -> true;
+            default -> false;
+        };
+    }
+
     public static int nextSpleefSlowDamageData(int legacyData) {
         return switch (legacyData) {
             case 5, 13 -> 4;
