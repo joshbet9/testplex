@@ -6,6 +6,7 @@ package au.com.testplex.arcadeports;
  * needing a live Paper server.
  */
 public final class ArcadePortRules {
+    public static final double DRAGON_ESCAPE_FINISH_Z = 77.0D;
     public static final long DRAGON_ESCAPE_HAZARD_INTERVAL_MILLIS = 6_000L;
     public static final long RUNNER_BLOCK_DECAY_MILLIS = 600L;
     public static final long RUNNER_BLOCK_LIFETIME_MILLIS = 1_200L;
@@ -88,6 +89,10 @@ public final class ArcadePortRules {
 
     public static boolean shouldLaunchDragonEscapeHazard(long nowMillis, long nextLaunchMillis) {
         return nowMillis >= nextLaunchMillis;
+    }
+
+    public static boolean isDragonEscapeFinishReached(double z) {
+        return z >= DRAGON_ESCAPE_FINISH_Z;
     }
 
     public static boolean isQuiverWinnerScoreReached(int kills) {
