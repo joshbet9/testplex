@@ -113,6 +113,8 @@ public class GameManager implements Listener {
     public boolean isLive() { return state == GameState.LIVE; }
     public int getStage() { return curSafe; }
     public void setCenter(Location loc) {
+        // A live round's arena world is part of its player/entity isolation boundary.
+        if (loc == null || loc.getWorld() == null || isRunning()) return;
         this.center = loc.clone();
         // Empty world + small pre-game lobby box only
         mazeGenerator.buildLobby(center);
