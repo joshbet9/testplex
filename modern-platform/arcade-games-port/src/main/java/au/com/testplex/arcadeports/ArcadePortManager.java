@@ -2491,7 +2491,8 @@ public final class ArcadePortManager implements Listener {
                         if (distance < bestDistance) { bestDistance = distance; best = candidate; }
                     }
                     if (best == null) break;
-                    if (bestDistance < 3.0D && unordered.size() > 1) {
+                    if (ArcadePortRules.isDuplicateDragonEscapeWaypoint(bestDistance)
+                            && unordered.size() > 1) {
                         unordered.remove(best);
                         continue;
                     }
@@ -2501,10 +2502,6 @@ public final class ArcadePortManager implements Listener {
                     last = waypoint;
                 }
                 session.dragonEscapeMapName = mapData.mapName();
-                List<Location> speedMarkers = mapData.dataLocations("GREEN");
-                if (!speedMarkers.isEmpty() && speedMarkers.get(0).getX() > 0.0D) {
-                    session.dragonEscapeSpeedMultiplier = speedMarkers.get(0).getX() / 100.0D;
-                }
             }
         }
         EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
