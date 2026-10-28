@@ -2306,7 +2306,7 @@ public final class ArcadePortManager implements Listener {
         attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.8F, 1.1F);
         double damage = ArcadePortRules.BACON_STANDARD_HIT_DAMAGE;
         if (target.getHealth() <= damage) {
-            session.scores.merge(attacker.getUniqueId(), 1, Integer::sum);
+            // eliminate() records the kill score for this game; don't count it twice here.
             eliminate(session, target, attacker, "was knocked out by " + attacker.getName());
         } else {
             target.setHealth(target.getHealth() - damage);
