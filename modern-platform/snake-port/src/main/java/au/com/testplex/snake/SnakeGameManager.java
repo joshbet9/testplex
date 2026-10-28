@@ -862,8 +862,16 @@ public final class SnakeGameManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity().getWorld() != arena) return;
-        if (event.getEntity() instanceof Player && snakes.containsKey(event.getEntity().getUniqueId())) {
-            event.setCancelled(true);
+        if (event.getEntity() instanceof Player player) {
+            SnakeState state = snakes.get(player.getUniqueId());
+            if (state != null && state.alive
+                    && SnakeRules.shouldEliminateFromDamageCause(event.getCause().name())) {
+                event.setCancelled(true);
+                eliminate(state, null, "fell into lava");
+                checkEndCondition();
+                return;
+            }
+            if (state != null) event.setCancelled(true);
         } else if (event.getEntity() instanceof Sheep || event.getEntity() instanceof Slime || event.getEntity() instanceof MagmaCube) {
             event.setCancelled(true);
         }
