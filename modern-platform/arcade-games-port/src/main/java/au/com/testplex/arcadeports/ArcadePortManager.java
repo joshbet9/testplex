@@ -128,7 +128,7 @@ public final class ArcadePortManager implements Listener {
         } else player.sendMessage(ChatColor.GREEN + "Bomb Lobbers kit set to " + kit + " for your next test.");
     }
 
-    public void selectBaconBrawlKit(Player player, String requestedKit) {    public void selectBaconBrawlKit(Player player, String requestedKit) {
+    public void selectBaconBrawlKit(Player player, String requestedKit) {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeBaconBrawlKit(requestedKit);
         if (kit == null) {
