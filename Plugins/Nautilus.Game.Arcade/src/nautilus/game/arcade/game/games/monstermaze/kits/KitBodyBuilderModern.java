@@ -125,6 +125,13 @@ public class KitBodyBuilderModern extends KitBodyBuilder
         else
         {
             hand.setAmount(hand.getAmount() - 1);
+            ItemMeta remainingMeta = hand.getItemMeta();
+            remainingMeta.setLore(java.util.Arrays.asList(
+                    C.cGray + "Right-click to activate.",
+                    C.cGray + "10 seconds of monster-hit immunity.",
+                    C.cGray + "Each monster hit removes 2 seconds.",
+                    C.cRed + "Activations: " + hand.getAmount()));
+            hand.setItemMeta(remainingMeta);
             player.setItemInHand(hand);
         }
         player.updateInventory();
