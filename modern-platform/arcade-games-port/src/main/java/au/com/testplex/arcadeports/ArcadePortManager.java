@@ -18,6 +18,7 @@ import org.bukkit.block.Block;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Fireball;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Player;
@@ -230,6 +231,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (type == ArcadePortGame.SHEEP_QUEST) spawnSheep(session);
+        if (type == ArcadePortGame.DRAGONS) spawnTestDragons(session);
         if (type == ArcadePortGame.GLADIATORS && participants.size() > 1) {
             startGladiatorsRound(session, alivePlayers(session), true);
         }
@@ -701,6 +703,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
         if (session.type == ArcadePortGame.GLADIATORS) updateGladiators(session, now);
+        if (session.type == ArcadePortGame.DRAGONS && session.ticks % 4 == 0) updateTestDragons(session, now);
         if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
             updateDeathTagChasers(session, now);
         }
@@ -785,6 +788,75 @@ public final class ArcadePortManager implements Listener {
             for (Player player : alivePlayers(session)) giveTurfWarsWool(session, player);
             announce(session, ChatColor.GREEN + "Build phase! You have 20 seconds to reinforce your team's turf.");
         }
+    }
+
+    private void spawnTestDragons(Session session) {
+        int count = Math.min(5, Math.max(2, (session.participantsAtStart + 2) / 3));
+        for (int i = 0; i < count; i++) {
+            double angle = Math.PI * 2.0D * i / count;
+            Location spawn = new Location(session.world, Math.cos(angle) * 14.0D,
+                    68.0D + (i % 2) * 2.0D, Math.sin(angle) * 14.0D);
+            EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
+            dragon.setCustomName(ChatColor.DARK_PURPLE + "Arcade Dragon");
+            dragon.setCustomNameVisible(false);
+            dragon.setAI(false);
+            dragon.setGravity(false);
+            dragon.setSilent(false);
+            session.entities.add(dragon);
+        }
+        announce(session, ChatColor.DARK_PURPLE + "The dragons are hunting! Repel them with your Pyro fireballs.");
+    }
+
+    private void updateTestDragons(Session session, long now) {
+        List<Player> alive = alivePlayers(session);
+        if (alive.isEmpty()) return;
+        for (Entity entity : new ArrayList<>(session.entities)) {
+            if (!(entity instanceof EnderDragon dragon) || !dragon.isValid()) continue;
+            Player target = alive.stream()
+                    .min(java.util.Comparator.comparingDouble(p -> p.getLocation().distanceSquared(dragon.getLocation())))
+                    .orElse(null);
+            if (target == null) continue;
+            Vector toward = target.getLocation().toVector().subtract(dragon.getLocation().toVector());
+            double distanceSquared = toward.lengthSquared();
+            if (distanceSquared > 1.0D) {
+                Vector flight = toward.normalize().multiply(0.32D);
+                flight.setY(Math.max(-0.08D, Math.min(0.16D, flight.getY() + 0.04D)));
+                dragon.setVelocity(flight);
+            }
+            UUID targetId = target.getUniqueId();
+            if (distanceSquared <= 36.0D
+                    && ArcadePortRules.shouldApplyDragonContactHit(now, session.dragonContactCooldowns.getOrDefault(targetId, 0L))) {
+                session.dragonContactCooldowns.put(targetId, now + 1_500L);
+                applyDragonContactHit(session, dragon, target);
+                if (active != session) return;
+            }
+        }
+    }
+
+    private void applyDragonContactHit(Session session, EnderDragon dragon, Player target) {
+        if (active != session || !session.alive.contains(target.getUniqueId())) return;
+        Vector recoil = target.getLocation().toVector().subtract(dragon.getLocation().toVector());
+        if (recoil.lengthSquared() < 0.001D) recoil = new Vector(0.0D, 1.0D, 0.0D);
+        target.setVelocity(recoil.normalize().multiply(0.85D).setY(0.48D));
+        target.getWorld().spawnParticle(Particle.FLAME, target.getLocation().add(0.0D, 1.0D, 0.0D),
+                18, 0.4D, 0.45D, 0.4D, 0.05D);
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0F, 0.75F);
+        target.sendMessage(ChatColor.RED + "A dragon struck you!");
+        if (target.getHealth() <= 4.0D) {
+            eliminate(session, target, null, "was caught by a dragon");
+        } else {
+            target.setHealth(target.getHealth() - 4.0D);
+        }
+    }
+
+    private void repelDragon(Session session, EnderDragon dragon, Player shooter) {
+        if (active != session || !dragon.isValid()) return;
+        Vector away = dragon.getLocation().toVector().subtract(shooter.getLocation().toVector());
+        if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 0.2D, 1.0D);
+        dragon.setVelocity(away.normalize().multiply(1.35D).setY(0.45D));
+        dragon.getWorld().spawnParticle(Particle.FLAME, dragon.getLocation(), 22, 1.2D, 0.8D, 1.2D, 0.05D);
+        dragon.getWorld().playSound(dragon.getLocation(), Sound.ENTITY_ENDER_DRAGON_HURT, 1.0F, 1.4F);
+        shooter.sendMessage(ChatColor.LIGHT_PURPLE + "Dragon repelled!");
     }
 
     private void launchDragonEscapeHazard(Session session) {
@@ -1126,6 +1198,7 @@ public final class ArcadePortManager implements Listener {
                 && session.teams.getOrDefault(attacker.getUniqueId(), -1).equals(session.teams.getOrDefault(target.getUniqueId(), -2))) return;
         if (session.type == ArcadePortGame.PAINTBALL && "melee".equals(source)) return;
         if (session.type == ArcadePortGame.TURF_WARS && !session.turfCombat) return;
+        if (session.type == ArcadePortGame.DRAGONS) return; // PvP is disabled; use Pyro against dragons.
         if (session.type == ArcadePortGame.SPLEEF) return; // Player combat is disabled; projectiles target the floor.
 
         switch (session.type) {
@@ -1305,6 +1378,7 @@ public final class ArcadePortManager implements Listener {
         }
         for (Entity entity : new ArrayList<>(session.entities)) if (entity != null && entity.isValid()) entity.remove();
         session.bombOwners.clear();
+        session.dragonContactCooldowns.clear();
         session.runnerBlocks.clear();
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             Player player = entry.getValue();
@@ -1493,6 +1567,11 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             return;
         }
+        if (session.type == ArcadePortGame.DRAGONS && event.getEntity() instanceof EnderDragon dragon
+                && session.entities.contains(dragon)) {
+            event.setCancelled(true);
+            return;
+        }
         if (event.getEntity() instanceof Player target && session.players.containsKey(target.getUniqueId())) {
             event.setCancelled(true);
             if (event instanceof EntityDamageByEntityEvent byEntity) {
@@ -1589,6 +1668,8 @@ public final class ArcadePortManager implements Listener {
                         session.entities.contains(fireball), source instanceof Player)) {
                     handleDragonHazardHit(session, fireball, target);
                 }
+            } else if (event.getHitEntity() instanceof EnderDragon dragon && source instanceof Player shooter) {
+                repelDragon(session, dragon, shooter);
             }
             fireball.remove();
             return;
@@ -1861,6 +1942,7 @@ public final class ArcadePortManager implements Listener {
         final Map<Sheep, UUID> sheepCarriers = new HashMap<>();
         final Set<Entity> entities = new HashSet<>();
         final Map<UUID, UUID> bombOwners = new HashMap<>();
+        final Map<UUID, Long> dragonContactCooldowns = new HashMap<>();
         final Map<Block, Long> runnerBlocks = new HashMap<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
         final int participantsAtStart;
