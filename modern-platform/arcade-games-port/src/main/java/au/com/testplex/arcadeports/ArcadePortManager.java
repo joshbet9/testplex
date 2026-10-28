@@ -771,7 +771,8 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
-        if (active != session || now - session.lastBaconEscalationAt < session.baconEscalationIntervalMillis) return;
+        if (active != session || session.baconEscalationIntervalMillis <= 0L
+                || now - session.lastBaconEscalationAt < session.baconEscalationIntervalMillis) return;
         session.lastBaconEscalationAt = now;
         session.baconKnockback = ArcadePortRules.nextBaconKnockback(session.baconKnockback);
         session.baconEscalationIntervalMillis = ArcadePortRules.nextBaconKnockbackInterval(
