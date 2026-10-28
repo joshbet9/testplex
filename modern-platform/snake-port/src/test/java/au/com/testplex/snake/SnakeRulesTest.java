@@ -31,6 +31,13 @@ class SnakeRulesTest {
         assertEquals(0, SnakeRules.colorIndexForParticipant(8, 0));
     }
 
+    @Test void sourceResitRemountsOnlyWhenTheSnakeHeadExistsAndPlayerDismounted() {
+        assertTrue(SnakeRules.shouldResitPlayer(true, false));
+        assertFalse(SnakeRules.shouldResitPlayer(true, true));
+        assertFalse(SnakeRules.shouldResitPlayer(false, false));
+        assertFalse(SnakeRules.shouldResitPlayer(false, true));
+    }
+
     @Test void lavaIsFatalWhileOtherDamageCausesAreCancelled() {
         assertTrue(SnakeRules.shouldEliminateFromDamageCause("LAVA"));
         assertTrue(SnakeRules.shouldEliminateFromDamageCause("lava"));
