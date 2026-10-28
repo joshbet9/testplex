@@ -365,18 +365,6 @@ public final class ArcadePortRules {
         return sheepBlockX == markerX && sheepFeetY == markerFloorY + 1 && sheepBlockZ == markerZ;
     }
 
-    public static boolean shouldEnterSheepQuestOvertime(int redSheep, int blueSheep) {
-        return redSheep == blueSheep;
-    }
-
-    /** Four-team Sheep Quest overtime starts whenever there is no unique leading team. */
-    public static boolean shouldEnterSheepQuestOvertime(int[] teamSheepCounts) {
-        if (teamSheepCounts == null) return true;
-        if (teamSheepCounts.length == 2) {
-            return shouldEnterSheepQuestOvertime(teamSheepCounts[0], teamSheepCounts[1]);
-        }
-        return sheepQuestLeadingTeam(teamSheepCounts) < 0;
-    }
     public static final double SHEEP_QUEST_PLAYER_HIT_DAMAGE = 4.0D;
     public static final int SHEEP_QUEST_INITIAL_SHEEP = 4;
     public static final int SHEEP_QUEST_MAX_CARRY = 3;
