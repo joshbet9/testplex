@@ -514,6 +514,14 @@ public final class ArcadePortRules {
 
     /** Reborn kills runners once Douglas's route progress has overtaken theirs. */
     /** Keep route progress monotonic when a course crosses near one of its earlier waypoints. */
+    /** Fall limits below the minimum authored play surface for known low-altitude Dragon Escape maps. */
+    public static double dragonEscapeVoidThresholdY(String mapName) {
+        String name = mapName == null ? "" : mapName.toLowerCase(java.util.Locale.ROOT);
+        if (name.contains("hell")) return 24.0D;
+        if (name.contains("pirate")) return 0.0D;
+        return 58.0D;
+    }
+
     /** Avoid rechecking the same destruction sphere every server tick. */
     public static boolean shouldProcessDragonEscapeDestruction(double distanceSquared, boolean hasPreviousCenter) {
         return !hasPreviousCenter || !Double.isFinite(distanceSquared) || distanceSquared >= 0.25D;
