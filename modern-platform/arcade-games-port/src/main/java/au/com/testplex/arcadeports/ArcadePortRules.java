@@ -514,6 +514,11 @@ public final class ArcadePortRules {
 
     /** Reborn kills runners once Douglas's route progress has overtaken theirs. */
     /** Keep route progress monotonic when a course crosses near one of its earlier waypoints. */
+    /** Avoid rechecking the same destruction sphere every server tick. */
+    public static boolean shouldProcessDragonEscapeDestruction(double distanceSquared, boolean hasPreviousCenter) {
+        return !hasPreviousCenter || !Double.isFinite(distanceSquared) || distanceSquared >= 0.25D;
+    }
+
     /** The straight X/Z crumble strip belongs only to the generated fallback course. */
     public static boolean shouldCrumbleDragonEscapeFallbackTrack(boolean hasAuthoredRoute, int playerZ) {
         int crumbleZ = playerZ - 5;
