@@ -141,6 +141,13 @@ class ArcadePortGameTest {
                 SourceMapCatalog.MapData.roundRobinGroupOrder(java.util.List.of(0, -1, 0)));
         assertEquals(java.util.List.of(),
                 SourceMapCatalog.MapData.roundRobinGroupOrder(null));
+        assertEquals(0, SourceMapCatalog.MapData.teamIndexForGroup("Red", 0, 4));
+        assertEquals(1, SourceMapCatalog.MapData.teamIndexForGroup("Blue", 1, 4));
+        assertEquals(1, SourceMapCatalog.MapData.teamIndexForGroup("Aqua", 1, 4));
+        assertEquals(2, SourceMapCatalog.MapData.teamIndexForGroup("Green", 2, 4));
+        assertEquals(3, SourceMapCatalog.MapData.teamIndexForGroup("Yellow", 3, 4));
+        assertEquals(3, SourceMapCatalog.MapData.teamIndexForGroup("team-four", 3, 4));
+        assertEquals(0, SourceMapCatalog.MapData.teamIndexForGroup("Green", 2, 2));
     }
 
     @Test void originalMapCatalogEmbedsThirteenSourceWorldsAndLeavesEvolutionExplicitlyUnmapped() {
