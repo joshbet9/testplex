@@ -554,8 +554,7 @@ public final class ArcadePortManager implements Listener {
                 .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         while (taggedAlive < requiredChasers && !runners.isEmpty()) {
             Player promoted = runners.remove(ThreadLocalRandom.current().nextInt(runners.size()));
-            session.tagged.add(promoted.getUniqueId());
-            announce(session, ChatColor.RED + promoted.getName() + " has been forced to become a Chaser.");
+            makeDeathTagChaser(session, promoted, "was forced by the time limit");
             promoted.sendMessage(ChatColor.YELLOW + "Time is running out! Tag every remaining runner.");
             taggedAlive++;
         }
@@ -1355,8 +1354,9 @@ public final class ArcadePortManager implements Listener {
                 // Bomb Lobbers uses thrown TNT; melee attacks do not deal hits.
                 break;
             case DEATH_TAG:
-                if (session.tagged.contains(attacker.getUniqueId())
-                        && !session.tagged.contains(target.getUniqueId())) {
+                if (ArcadePortRules.shouldSpreadDeathTag(
+                        session.tagged.contains(attacker.getUniqueId()),
+                        session.tagged.contains(target.getUniqueId()))) {
                     makeDeathTagChaser(session, target, "was caught by a chaser");
                     checkRoundEnd(session);
                 }
