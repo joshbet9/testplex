@@ -437,10 +437,10 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
-        if (session.type == ArcadePortGame.TURF_WARS && session.ticks % 40 == 0) {
+        if (session.type == ArcadePortGame.TURF_WARS && session.turfCombat && session.ticks % 40 == 0) {
             for (UUID id : session.alive) {
                 Player player = session.players.get(id);
-                if (player != null && player.isOnline() && player.getInventory().getItemInMainHand().getType() != Material.BOW) {
+                if (player != null && player.isOnline() && !player.getInventory().contains(Material.ARROW, 4)) {
                     player.getInventory().addItem(new ItemStack(Material.ARROW, 4));
                 }
             }
@@ -673,9 +673,6 @@ public final class ArcadePortManager implements Listener {
                 break;
             default:
                 eliminate(session, target, attacker, source);
-                if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER && attacker.isOnline()) {
-                    attacker.getInventory().setItem(1, new ItemStack(Material.ARROW, 1));
-                }
                 break;
         }
     }
