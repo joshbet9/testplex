@@ -6,6 +6,8 @@ package au.com.testplex.arcadeports;
  * needing a live Paper server.
  */
 public final class ArcadePortRules {
+    public static final long BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS = 50_000L;
+    public static final long BACON_MIN_KNOCKBACK_INTERVAL_MILLIS = 5_000L;
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
     public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
     public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
@@ -16,6 +18,14 @@ public final class ArcadePortRules {
 
     public static boolean shouldRemoveMicroBarrier(long elapsedMillis) {
         return elapsedMillis >= MICRO_BATTLES_BARRIER_DURATION_MILLIS;
+    }
+
+    public static double nextBaconKnockback(double current) {
+        return current * 1.2D;
+    }
+
+    public static long nextBaconKnockbackInterval(long currentMillis) {
+        return Math.max(BACON_MIN_KNOCKBACK_INTERVAL_MILLIS, currentMillis - 5_000L);
     }
 
     public static boolean shouldPunishMicroIslandExit(long elapsedMillis, double ownDistanceSquared,
