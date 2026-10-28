@@ -176,4 +176,12 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.isDragonEscapeFinishReached(80.0D));
     }
 
+    @Test void deathTagTransfersAndSpreadsTheTagCorrectly() {
+        assertTrue(ArcadePortRules.shouldSpreadDeathTag(true));
+        assertFalse(ArcadePortRules.shouldSpreadDeathTag(false));
+        assertTrue(ArcadePortRules.shouldTransferDeathTag(false, true));
+        assertFalse(ArcadePortRules.shouldTransferDeathTag(true, true));
+        assertFalse(ArcadePortRules.shouldTransferDeathTag(false, false));
+    }
+
 }
