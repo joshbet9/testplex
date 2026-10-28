@@ -10,7 +10,7 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 - Dragon Escape — generated parkour course, a visible Douglas chase dragon, radius-based course destruction, catch-up elimination and finish proximity (map-data/waypoint parity still needs original assets).
 - Dragons — timed fireball hazards and a Pyro fireball ability.
 - Evolution — combat-driven stage/weapon progression and respawn loop.
-- Gladiators — compact melee elimination arena.
+- Gladiators — four source-style loadout tiers, paired tournament rounds, a five-second combat countdown and 60-second poison limited to unresolved 1v1 duels (original arena maps, per-arena doors/trails and full kit polish still remain).
 - Micro Battles — isolated islands and shrinking border.
 - One in the Quiver — first-to-20 one-arrow kill loop, named Super Arrow regrant, one-second respawn and breakable glass/glass panes (original kit abilities are still to port).
 - Paintball — selectable Rifle, Sniper, Shotgun and Machine Gun kits; projectile-specific paint counts, scope-charge damage, a heat gauge and team-coloured armour (kit perks and revive/Save Me flow remain to port).

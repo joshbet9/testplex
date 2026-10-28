@@ -131,6 +131,23 @@ public final class ArcadePortRules {
         return distanceSquared >= 0.0D && distanceSquared <= 1.0D;
     }
 
+    public static final long GLADIATOR_ROUND_COUNTDOWN_MILLIS = 5_000L;
+    public static final long GLADIATOR_POISON_DELAY_MILLIS = 60_000L;
+    public static final long GLADIATOR_POISON_INTERVAL_MILLIS = 1_000L;
+    public static final double GLADIATOR_POISON_DAMAGE = 1.0D;
+
+    public static boolean canGladiatorsFight(long nowMillis, long fightStartsAt,
+            int attackerPair, int targetPair, boolean pairResolved) {
+        return nowMillis >= fightStartsAt && attackerPair >= 0
+                && attackerPair == targetPair && !pairResolved;
+    }
+
+    public static boolean shouldGladiatorPoison(long nowMillis, long roundStartedAt,
+            boolean pairResolved, int playersStillFighting) {
+        return nowMillis >= roundStartedAt + GLADIATOR_POISON_DELAY_MILLIS
+                && !pairResolved && playersStillFighting >= 2;
+    }
+
     public static int gladiatorsTierForRound(int round) {
         return Math.max(0, Math.min(3, round));
     }

@@ -499,7 +499,8 @@ public final class ArcadePortManager implements Listener {
         session.gladiatorPairCount = ArcadePortRules.gladiatorsPairCount(advancing.size());
         session.nextGladiatorRoundAt = 0L;
         session.gladiatorRoundStartedAt = System.currentTimeMillis();
-        session.lastGladiatorPoisonAt = session.gladiatorRoundStartedAt + 60_000L;
+        session.gladiatorFightStartsAt = session.gladiatorRoundStartedAt + ArcadePortRules.GLADIATOR_ROUND_COUNTDOWN_MILLIS;
+        session.lastGladiatorPoisonAt = session.gladiatorRoundStartedAt + ArcadePortRules.GLADIATOR_POISON_DELAY_MILLIS;
         Collections.shuffle(advancing);
 
         String roundName = switch (session.gladiatorRound) {
@@ -543,12 +544,19 @@ public final class ArcadePortManager implements Listener {
     private void updateGladiators(Session session, long now) {
         if (active != session) return;
         if (now >= session.lastGladiatorPoisonAt) {
-            session.lastGladiatorPoisonAt = now + 2_000L;
+            session.lastGladiatorPoisonAt = now + ArcadePortRules.GLADIATOR_POISON_INTERVAL_MILLIS;
             for (Player player : new ArrayList<>(alivePlayers(session))) {
-                if (player.getHealth() <= 2.0D) eliminate(session, player, null, "was defeated by arena poison");
-                else {
-                    player.setHealth(player.getHealth() - 2.0D);
+                UUID playerId = player.getUniqueId();
+                Integer pair = session.gladiatorPairs.get(playerId);
+                if (pair == null || !ArcadePortRules.shouldGladiatorPoison(now,
+                        session.gladiatorRoundStartedAt, session.gladiatorResolvedPairs.contains(pair),
+                        aliveGladiatorPairMembers(session, pair))) continue;
+                if (player.getHealth() <= ArcadePortRules.GLADIATOR_POISON_DAMAGE) {
+                    eliminate(session, player, null, "was defeated by arena poison");
+                } else {
+                    player.setHealth(player.getHealth() - ArcadePortRules.GLADIATOR_POISON_DAMAGE);
                     player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.7F, 0.7F);
+                    player.sendActionBar(ChatColor.RED + "POISON! Keep fighting!");
                 }
                 if (active != session) return;
             }
@@ -560,6 +568,14 @@ public final class ArcadePortManager implements Listener {
             }
             startGladiatorsRound(session, alivePlayers(session), false);
         }
+    }
+
+    private int aliveGladiatorPairMembers(Session session, int pair) {
+        int count = 0;
+        for (UUID id : session.alive) {
+            if (session.gladiatorPairs.get(id) != null && session.gladiatorPairs.get(id) == pair) count++;
+        }
+        return count;
     }
 
     private Location islandSpawn(int index) {
@@ -1779,6 +1795,14 @@ public final class ArcadePortManager implements Listener {
     private void handlePlayerHit(Session session, Player attacker, Player target, String source, int paintballAmount) {
         if (active != session || attacker.equals(target) || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
+        if (session.type == ArcadePortGame.GLADIATORS) {
+            Integer attackerPair = session.gladiatorPairs.get(attacker.getUniqueId());
+            Integer targetPair = session.gladiatorPairs.get(target.getUniqueId());
+            if (!ArcadePortRules.canGladiatorsFight(System.currentTimeMillis(), session.gladiatorFightStartsAt,
+                    attackerPair == null ? -1 : attackerPair,
+                    targetPair == null ? -2 : targetPair,
+                    attackerPair != null && session.gladiatorResolvedPairs.contains(attackerPair))) return;
+        }
         if ((session.type == ArcadePortGame.PAINTBALL || session.type == ArcadePortGame.TURF_WARS
                 || session.type == ArcadePortGame.MICRO_BATTLES || session.type == ArcadePortGame.SHEEP_QUEST)
                 && session.teams.getOrDefault(attacker.getUniqueId(), -1).equals(session.teams.getOrDefault(target.getUniqueId(), -2))) return;
@@ -2802,6 +2826,7 @@ public final class ArcadePortManager implements Listener {
         int gladiatorRound = -1;
         int gladiatorPairCount;
         long gladiatorRoundStartedAt;
+        long gladiatorFightStartsAt;
         long lastGladiatorPoisonAt;
         long nextGladiatorRoundAt;
         final Map<UUID, Integer> teams = new HashMap<>();

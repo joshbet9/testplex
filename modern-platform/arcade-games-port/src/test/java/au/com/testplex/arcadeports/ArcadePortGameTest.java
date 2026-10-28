@@ -188,6 +188,26 @@ class ArcadePortGameTest {
         assertEquals(3, ArcadePortRules.gladiatorsTierForRound(4));
     }
 
+    @Test void gladiatorsWaitFiveSecondsAndKeepCombatInsideTheCurrentDuel() {
+        assertEquals(5_000L, ArcadePortRules.GLADIATOR_ROUND_COUNTDOWN_MILLIS);
+        assertFalse(ArcadePortRules.canGladiatorsFight(4_999L, 5_000L, 0, 0, false));
+        assertTrue(ArcadePortRules.canGladiatorsFight(5_000L, 5_000L, 0, 0, false));
+        assertFalse(ArcadePortRules.canGladiatorsFight(5_000L, 5_000L, 0, 1, false));
+        assertFalse(ArcadePortRules.canGladiatorsFight(5_000L, 5_000L, 0, 0, true));
+        assertFalse(ArcadePortRules.canGladiatorsFight(5_000L, 5_000L, -1, 0, false));
+    }
+
+    @Test void gladiatorsPoisonOnlyUnresolvedDuelsAfterSixtySecondsAtOneDamagePerSecond() {
+        assertEquals(60_000L, ArcadePortRules.GLADIATOR_POISON_DELAY_MILLIS);
+        assertEquals(1_000L, ArcadePortRules.GLADIATOR_POISON_INTERVAL_MILLIS);
+        assertEquals(1.0D, ArcadePortRules.GLADIATOR_POISON_DAMAGE, 0.0001D);
+        assertFalse(ArcadePortRules.shouldGladiatorPoison(59_999L, 0L, false, 2));
+        assertTrue(ArcadePortRules.shouldGladiatorPoison(60_000L, 0L, false, 2));
+        assertFalse(ArcadePortRules.shouldGladiatorPoison(60_000L, 0L, true, 2));
+        assertFalse(ArcadePortRules.shouldGladiatorPoison(60_000L, 0L, false, 1));
+        assertFalse(ArcadePortRules.shouldGladiatorPoison(60_000L, 0L, false, 0));
+    }
+
     @Test void gladiatorsPairPlayersAndOnlyAdvanceAfterEveryMatchResolves() {
         assertEquals(0, ArcadePortRules.gladiatorsPairCount(0));
         assertEquals(1, ArcadePortRules.gladiatorsPairCount(1));
