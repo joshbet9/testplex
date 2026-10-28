@@ -168,6 +168,7 @@ public class MonsterMaze extends SoloGame
 		DamagePvP = false;
 		DamagePvE = false;
 		DamageFall = false;
+		CanAddStats = true;
 		HungerSet = 20;
 		PrepareFreeze = false;
 
