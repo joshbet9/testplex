@@ -183,6 +183,7 @@ public final class ArcadePortManager implements Listener {
             session.players.put(player.getUniqueId(), player);
             session.alive.add(player.getUniqueId());
             session.scores.put(player.getUniqueId(), 0);
+            if (type == ArcadePortGame.EVOLUTION) session.evolutionLevels.put(player.getUniqueId(), 0);
             int teamId = type == ArcadePortGame.MICRO_BATTLES ? i % 4 : i % 2;
             session.teams.put(player.getUniqueId(), teamId);
             Location spawn = spawns.get(i % spawns.size()).clone();
@@ -701,17 +702,30 @@ public final class ArcadePortManager implements Listener {
         if (active != session || player == null || !session.alive.remove(player.getUniqueId())) return;
         player.leaveVehicle();
         if (session.type == ArcadePortGame.EVOLUTION && player.isOnline()) {
-            if (killer != null) {
+            if (killer != null && session.alive.contains(killer.getUniqueId())) {
                 session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
-                checkWinnerForScore(session, killer);
-                if (active != session) return;
+                int killerLevel = ArcadePortRules.nextEvolutionLevel(
+                        session.evolutionLevels.getOrDefault(killer.getUniqueId(), 0), true);
+                session.evolutionLevels.put(killer.getUniqueId(), killerLevel);
+                giveEvolutionKit(session, killer);
+                if (killerLevel >= 5) {
+                    finish(session, killer, true);
+                    return;
+                }
             }
+            int victimLevel = ArcadePortRules.nextEvolutionLevel(
+                    session.evolutionLevels.getOrDefault(player.getUniqueId(), 0), false);
+            session.evolutionLevels.put(player.getUniqueId(), victimLevel);
             player.setGameMode(GameMode.SPECTATOR);
-            player.sendMessage(ChatColor.RED + "You were knocked back to an earlier evolution: " + reason + ".");
+            player.sendMessage(ChatColor.RED + "You were knocked back to evolution stage " + (victimLevel + 1) + ": " + reason + ".");
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (active != session || !player.isOnline()) return;
-                player.teleport(spawnFor(session, player));
+                Location spawn = spawnFor(session, player);
+                player.teleport(spawn);
                 player.setGameMode(GameMode.SURVIVAL);
+                player.setHealth(player.getMaxHealth());
+                player.setFoodLevel(20);
+                player.setSaturation(20.0F);
                 session.alive.add(player.getUniqueId());
                 giveEvolutionKit(session, player);
             }, 30L);
@@ -727,8 +741,9 @@ public final class ArcadePortManager implements Listener {
 
     private void giveEvolutionKit(Session session, Player player) {
         player.getInventory().clear();
-        int level = Math.min(5, session.scores.getOrDefault(player.getUniqueId(), 0));
-        Material weapon = level >= 4 ? Material.DIAMOND_SWORD : level >= 2 ? Material.IRON_SWORD : Material.WOODEN_SWORD;
+        int level = Math.max(0, Math.min(5, session.evolutionLevels.getOrDefault(player.getUniqueId(), 0)));
+        Material weapon = level >= 4 ? Material.DIAMOND_SWORD : level >= 2 ? Material.IRON_SWORD
+                : level == 1 ? Material.STONE_SWORD : Material.WOODEN_SWORD;
         player.getInventory().addItem(new ItemStack(weapon));
         player.sendMessage(ChatColor.GREEN + "Evolution stage restored: " + (level + 1) + ".");
     }
@@ -747,7 +762,6 @@ public final class ArcadePortManager implements Listener {
             finish(session, player, true);
         }
         if (session.type == ArcadePortGame.SHEEP_QUEST && session.scores.getOrDefault(player.getUniqueId(), 0) >= 10) finish(session, player, true);
-        if (session.type == ArcadePortGame.EVOLUTION && session.scores.getOrDefault(player.getUniqueId(), 0) >= 5) finish(session, player, true);
     }
 
     private void handlePlayerHit(Session session, Player attacker, Player target, String source) {
@@ -1457,6 +1471,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, PlayerSnapshot> snapshots = new HashMap<>();
         final Set<UUID> alive = new HashSet<>();
         final Map<UUID, Integer> scores = new HashMap<>();
+        final Map<UUID, Integer> evolutionLevels = new HashMap<>();
         final Map<UUID, Integer> teams = new HashMap<>();
         final Set<UUID> tagged = new HashSet<>();
         final Set<UUID> respawning = new HashSet<>();
