@@ -2575,6 +2575,186 @@ public final class ArcadePortManager implements Listener {
         session.entities.add(dragon);
     }
 
+    private void useDragonEscapeLeap(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        int remaining = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, 0);
+        if (remaining <= 0) {
+            player.sendMessage(ChatColor.YELLOW + "You have used all of your leaps.");
+            return;
+        }
+        remaining--;
+        session.dragonEscapeLeapUsesRemaining.put(id, remaining);
+        if (remaining == 0) {
+            player.getInventory().setItemInMainHand(null);
+        } else {
+            player.getInventory().setItemInMainHand(namedItem(Material.IRON_AXE, "Leap",
+                    "Right-click to leap forward (" + remaining + " uses remaining)."));
+        }
+        Vector direction = player.getLocation().getDirection().normalize();
+        player.setVelocity(direction.multiply(1.0D).setY(0.45D));
+        player.setFallDistance(0.0F);
+        player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 16,
+                0.35D, 0.3D, 0.35D, 0.05D);
+        player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.7F, 1.15F);
+    }
+
+    private void useDragonEscapeWarper(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        if (session.dragonEscapeWarperUsed.contains(id)) {
+            player.sendMessage(ChatColor.YELLOW + "Your Warper pearl has already been used.");
+            return;
+        }
+        int progress = dragonEscapePlayerProgress(session, player);
+        Player ahead = alivePlayers(session).stream()
+                .filter(candidate -> !candidate.getUniqueId().equals(id))
+                .filter(candidate -> dragonEscapePlayerProgress(session, candidate) > progress)
+                .min(java.util.Comparator.comparingInt(candidate -> dragonEscapePlayerProgress(session, candidate)))
+                .orElse(null);
+        if (ahead == null) {
+            player.sendMessage(ChatColor.YELLOW + "There is no player ahead of you to warp to.");
+            return;
+        }
+        Location destination = ahead.getLocation().clone().add(0.0D, 0.15D, 0.0D);
+        if (!player.teleport(destination)) {
+            player.sendMessage(ChatColor.RED + "The warp failed; your pearl has been kept.");
+            return;
+        }
+        consumeHeld(player);
+        session.dragonEscapeWarperUsed.add(id);
+        session.lastLocations.put(id, destination.clone());
+        player.playSound(destination, Sound.ENTITY_ENDERMAN_TELEPORT, 0.9F, 1.2F);
+        player.getWorld().spawnParticle(Particle.PORTAL, destination, 24, 0.3D, 0.5D, 0.3D, 0.2D);
+        player.sendMessage(ChatColor.LIGHT_PURPLE + "Warped to " + ahead.getName() + "!");
+    }
+
+    private int dragonEscapePlayerProgress(Session session, Player player) {
+        if (!session.dragonEscapeWaypoints.isEmpty()) {
+            return getDragonEscapeWaypointIndex(session, player.getLocation());
+        }
+        return player.getLocation().getBlockZ();
+    }
+
+    private void throwDragonEscapeMine(Session session, Player player) {
+        if (inventoryCount(player, Material.TNT) <= 0) {
+            player.sendMessage(ChatColor.YELLOW + "Your next mini explosive is still recharging.");
+            return;
+        }
+        consumeHeld(player);
+        Vector direction = player.getEyeLocation().getDirection().normalize();
+        Location spawn = player.getEyeLocation().add(direction.clone().multiply(0.8D));
+        TNTPrimed mine = session.world.spawn(spawn, TNTPrimed.class);
+        mine.setFuseTicks(12_000);
+        mine.setVelocity(direction.multiply(0.8D).setY(direction.getY() * 0.65D + 0.1D));
+        session.entities.add(mine);
+        session.dragonEscapeMineOwners.put(mine.getUniqueId(), player.getUniqueId());
+        player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.15F);
+    }
+
+    private void updateDragonEscapeResources(Session session, long now) {
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            if (!"disruptor".equals(session.dragonEscapeKits.getOrDefault(id, "jumper"))) continue;
+            long nextAt = session.dragonEscapeNextTntAt.getOrDefault(id,
+                    now + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
+            if (now < nextAt) continue;
+            if (inventoryCount(player, Material.TNT) < ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_MAX_TNT) {
+                player.getInventory().addItem(namedItem(Material.TNT, "Mini Explosive",
+                        "Right-click to throw a trip mine; recharges every 10 seconds."));
+                player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.2F);
+            }
+            session.dragonEscapeNextTntAt.put(id,
+                    now + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
+        }
+    }
+
+    private void updateDragonEscapeMines(Session session) {
+        for (Entity entity : new ArrayList<>(session.entities)) {
+            if (!(entity instanceof TNTPrimed mine) || !mine.isValid()) continue;
+            UUID ownerId = session.dragonEscapeMineOwners.get(mine.getUniqueId());
+            if (ownerId == null) continue;
+            for (Player target : alivePlayers(session)) {
+                if (target.getUniqueId().equals(ownerId)) continue;
+                if (target.getLocation().distanceSquared(mine.getLocation()) <= 1.25D) {
+                    mine.setFuseTicks(0);
+                    target.sendActionBar(ChatColor.RED + "A mini explosive was triggered!");
+                    break;
+                }
+            }
+        }
+    }
+
+    private boolean isDragonEscapeDiggerBlockAllowed(Material material) {
+        return material != null && material.isBlock() && !material.isAir() && !material.isLiquid()
+                && material != Material.BEDROCK && material != Material.BARRIER
+                && material != Material.END_PORTAL && material != Material.END_PORTAL_FRAME
+                && material != Material.COMMAND_BLOCK && material != Material.CHAIN_COMMAND_BLOCK
+                && material != Material.REPEATING_COMMAND_BLOCK && material != Material.STRUCTURE_BLOCK
+                && material != Material.JIGSAW;
+    }
+
+    private boolean isDragonEscapeDiggerBuildLocationAllowed(Session session, Block block) {
+        if (block.getY() < 1 || block.getY() >= session.world.getMaxHeight() - 1) return false;
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (mapData != null && mapData.hasBounds()) {
+            return block.getX() >= mapData.minX() && block.getX() < mapData.maxX()
+                    && block.getZ() >= mapData.minZ() && block.getZ() < mapData.maxZ();
+        }
+        return block.getX() >= -4 && block.getX() <= 4
+                && block.getZ() >= -24 && block.getZ() <= 80;
+    }
+
+    private void useDragonEscapeDigger(Session session, Player player, Block block) {
+        UUID id = player.getUniqueId();
+        int remaining = session.dragonEscapeDiggerUsesRemaining.getOrDefault(
+                id, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
+        if (remaining <= 0) {
+            player.sendMessage(ChatColor.YELLOW + "Your Digger pickaxe has no uses remaining.");
+            return;
+        }
+        if (!isDragonEscapeDiggerBlockAllowed(block.getType())
+                || !isDragonEscapeDiggerBuildLocationAllowed(session, block)
+                || block.getState() instanceof org.bukkit.block.Container) return;
+        Material mined = block.getType();
+        Location dropLocation = block.getLocation().add(0.5D, 0.5D, 0.5D);
+        block.setType(Material.AIR, false);
+        Map<Integer, ItemStack> overflow = player.getInventory().addItem(new ItemStack(mined, 1));
+        for (ItemStack leftover : overflow.values()) player.getWorld().dropItemNaturally(dropLocation, leftover);
+        remaining--;
+        session.dragonEscapeDiggerUsesRemaining.put(id, remaining);
+        if (remaining == 0) {
+            player.getInventory().setItemInMainHand(null);
+        } else {
+            player.getInventory().setItemInMainHand(namedItem(Material.DIAMOND_PICKAXE, "Digger Pickaxe",
+                    "Left-click course blocks to recover and place as shortcuts (" + remaining + " digs left)."));
+        }
+        player.playSound(dropLocation, Sound.BLOCK_STONE_BREAK, 0.75F, 1.2F);
+    }
+
+    private void detonateDragonEscapeMine(Session session, EntityExplodeEvent event, TNTPrimed mine) {
+        UUID ownerId = session.dragonEscapeMineOwners.remove(mine.getUniqueId());
+        event.blockList().clear();
+        event.setCancelled(true);
+        Location blast = mine.getLocation().clone();
+        session.entities.remove(mine);
+        mine.remove();
+        session.world.spawnParticle(Particle.EXPLOSION, blast, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+        session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 1.5F);
+        for (Player target : alivePlayers(session)) {
+            if (ownerId != null && target.getUniqueId().equals(ownerId)) continue;
+            double distanceSquared = target.getLocation().distanceSquared(blast);
+            if (distanceSquared > 16.0D) continue;
+            double distance = Math.sqrt(distanceSquared);
+            Vector away = target.getLocation().toVector().subtract(blast.toVector());
+            if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 1.0D, 0.0D);
+            double force = 1.4D * Math.max(0.25D, 1.0D - distance / 4.5D);
+            target.setVelocity(away.normalize().multiply(force)
+                    .setY(Math.max(0.35D, 0.7D - distance * 0.08D)));
+            target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 20, 1, false, false, true));
+            target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation(), 10,
+                    0.3D, 0.3D, 0.3D, 0.04D);
+        }
+    }
+
     /** Paper-native approximation of Reborn's DragonEscapeData.Move + radius-10 block explosion. */
     private void updateDragonEscapeChase(Session session) {
         EnderDragon dragon = session.dragonEscapeDragon;
@@ -4533,6 +4713,24 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+            String kit = session.dragonEscapeKits.getOrDefault(player.getUniqueId(), "jumper");
+            if (event.getAction().isRightClick() && item == Material.IRON_AXE && !"digger".equals(kit)) {
+                event.setCancelled(true);
+                useDragonEscapeLeap(session, player);
+                return;
+            }
+            if (event.getAction().isRightClick() && item == Material.ENDER_PEARL && "warper".equals(kit)) {
+                event.setCancelled(true);
+                useDragonEscapeWarper(session, player);
+                return;
+            }
+            if (event.getAction().isRightClick() && item == Material.TNT && "disruptor".equals(kit)) {
+                event.setCancelled(true);
+                throwDragonEscapeMine(session, player);
+                return;
+            }
+        }
         if (session.type == ArcadePortGame.DRAGONS) {
             UUID id = player.getUniqueId();
             String kit = session.dragonKits.getOrDefault(id, "coward");
@@ -4678,7 +4876,7 @@ public final class ArcadePortManager implements Listener {
             egg.setVelocity(player.getEyeLocation().getDirection().multiply(1.35D));
             session.entities.add(egg);
             player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.9F, 1.0F);
-        } else if ((session.type == ArcadePortGame.RUNNER || session.type == ArcadePortGame.DRAGON_ESCAPE) && item == Material.FEATHER) {
+        } else if (session.type == ArcadePortGame.RUNNER && item == Material.FEATHER) {
             event.setCancelled(true);
             consumeHeld(player);
             player.setVelocity(player.getLocation().getDirection().multiply(1.0D).setY(0.45D));
@@ -4791,10 +4989,16 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onSpleefBlockDamage(BlockDamageEvent event) {
         Session session = active;
-        if (session == null || session.type != ArcadePortGame.SPLEEF
-                || event.getBlock().getWorld() != session.world
-                || isSpleefProtectedBlock(event.getBlock().getType())
+        if (session == null || event.getBlock().getWorld() != session.world
                 || !session.alive.contains(event.getPlayer().getUniqueId())) return;
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && "digger".equals(session.dragonEscapeKits.getOrDefault(event.getPlayer().getUniqueId(), "jumper"))
+                && event.getPlayer().getInventory().getItemInMainHand().getType() == Material.DIAMOND_PICKAXE) {
+            event.setCancelled(true);
+            useDragonEscapeDigger(session, event.getPlayer(), event.getBlock());
+            return;
+        }
+        if (session.type != ArcadePortGame.SPLEEF || isSpleefProtectedBlock(event.getBlock().getType())) return;
         event.setCancelled(true);
         handleSpleefBlockHit(session, event.getPlayer(), event.getBlock(), System.currentTimeMillis());
     }
@@ -4803,6 +5007,16 @@ public final class ArcadePortManager implements Listener {
     public void onBlockPlace(BlockPlaceEvent event) {
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+            Player player = event.getPlayer();
+            Block placed = event.getBlockPlaced();
+            boolean allowed = session.alive.contains(player.getUniqueId())
+                    && "digger".equals(session.dragonEscapeKits.getOrDefault(player.getUniqueId(), "jumper"))
+                    && isDragonEscapeDiggerBlockAllowed(placed.getType())
+                    && isDragonEscapeDiggerBuildLocationAllowed(session, placed);
+            if (!allowed) event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             Player player = event.getPlayer();
             Block placed = event.getBlockPlaced();
@@ -5099,6 +5313,11 @@ public final class ArcadePortManager implements Listener {
     public void onExplode(EntityExplodeEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE && event.getEntity() instanceof TNTPrimed mine
+                && session.dragonEscapeMineOwners.containsKey(mine.getUniqueId())) {
+            detonateDragonEscapeMine(session, event, mine);
+            return;
+        }
         if (event.getEntity() instanceof TNTPrimed bomb) {
             UUID ownerId = session.bombOwners.remove(bomb.getUniqueId());
             session.bombCreatedAt.remove(bomb.getUniqueId());
