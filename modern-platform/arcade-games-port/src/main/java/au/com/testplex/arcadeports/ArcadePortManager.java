@@ -2575,30 +2575,20 @@ public final class ArcadePortManager implements Listener {
         Location spawn = new Location(session.world, 0.5D, 66.5D, -40.0D);
         SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
         if (mapData != null) {
+            session.dragonEscapeMapName = mapData.mapName();
             List<Location> starts = mapData.dataLocations("RED");
-            List<Location> unordered = new ArrayList<>(mapData.dataLocations("BLACK"));
-            if (!starts.isEmpty() && !unordered.isEmpty()) {
+            List<Location> sourceRoute = mapData.dataLocations("BLACK");
+            if (!starts.isEmpty() && !sourceRoute.isEmpty()) {
                 spawn = starts.get(0).clone();
-                Location last = spawn.clone();
-                while (!unordered.isEmpty()) {
-                    Location best = null;
-                    double bestDistance = Double.POSITIVE_INFINITY;
-                    for (Location candidate : unordered) {
-                        double distance = candidate.distance(last);
-                        if (distance < bestDistance) { bestDistance = distance; best = candidate; }
-                    }
-                    if (best == null) break;
-                    if (ArcadePortRules.isDuplicateDragonEscapeWaypoint(bestDistance)
-                            && unordered.size() > 1) {
-                        unordered.remove(best);
-                        continue;
-                    }
-                    Location waypoint = best.clone().subtract(0.0D, 1.0D, 0.0D);
-                    session.dragonEscapeWaypoints.add(waypoint);
-                    unordered.remove(best);
-                    last = waypoint;
+                Location lastSourceMarker = spawn.clone();
+                // DATA_LOCS is an ordered list in WorldConfig.dat. Preserve authored course order:
+                // a nearest-neighbour sort can jump across nearby switchbacks and bends.
+                for (Location marker : sourceRoute) {
+                    double markerDistance = marker.distance(lastSourceMarker);
+                    if (ArcadePortRules.isDuplicateDragonEscapeWaypoint(markerDistance)) continue;
+                    session.dragonEscapeWaypoints.add(marker.clone().subtract(0.0D, 1.0D, 0.0D));
+                    lastSourceMarker = marker;
                 }
-                session.dragonEscapeMapName = mapData.mapName();
             }
         }
         EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
