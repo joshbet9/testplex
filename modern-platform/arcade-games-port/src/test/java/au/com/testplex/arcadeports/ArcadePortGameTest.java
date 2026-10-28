@@ -140,4 +140,24 @@ class ArcadePortGameTest {
         assertEquals(4, ArcadePortRules.paintballPiecesAfterHit(4, 0));
     }
 
+    @Test void gladiatorsProgressThroughFourArenaTiers() {
+        assertEquals(0, ArcadePortRules.gladiatorsTierForRound(-1));
+        assertEquals(0, ArcadePortRules.gladiatorsTierForRound(0));
+        assertEquals(1, ArcadePortRules.gladiatorsTierForRound(1));
+        assertEquals(2, ArcadePortRules.gladiatorsTierForRound(2));
+        assertEquals(3, ArcadePortRules.gladiatorsTierForRound(3));
+        assertEquals(3, ArcadePortRules.gladiatorsTierForRound(4));
+    }
+
+    @Test void gladiatorsPairPlayersAndOnlyAdvanceAfterEveryMatchResolves() {
+        assertEquals(0, ArcadePortRules.gladiatorsPairCount(0));
+        assertEquals(1, ArcadePortRules.gladiatorsPairCount(1));
+        assertEquals(2, ArcadePortRules.gladiatorsPairCount(3));
+        assertEquals(8, ArcadePortRules.gladiatorsPairCount(16));
+        assertFalse(ArcadePortRules.allGladiatorPairsResolved(4, 3));
+        assertTrue(ArcadePortRules.allGladiatorPairsResolved(4, 4));
+        assertTrue(ArcadePortRules.allGladiatorPairsResolved(4, 5));
+        assertFalse(ArcadePortRules.allGladiatorPairsResolved(0, 0));
+    }
+
 }
