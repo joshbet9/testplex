@@ -686,6 +686,20 @@ public final class ArcadePortRules {
         return (int) Math.ceil((minX + (double) maxXExclusive) / 2.0D) - 1;
     }
 
+    /** Source-map build bounds use an inclusive minimum and exclusive maximum. */
+    public static boolean isTurfWarsBuildWithinBounds(int x, int z,
+            int minX, int maxXExclusive, int minZ, int maxZExclusive) {
+        return maxXExclusive > minX && maxZExclusive > minZ
+                && x >= minX && x < maxXExclusive && z >= minZ && z < maxZExclusive;
+    }
+
+    /** Only the half of the arena on the team's side of the current line may be built on. */
+    public static boolean canTurfWarsBuildOnTerritory(int teamId, int x, int frontline) {
+        if (teamId == 0) return x <= frontline;
+        if (teamId == 1) return x > frontline;
+        return false;
+    }
+
     /** Source-map bounds are exclusive at the maximum coordinate. */
     public static boolean isTurfWarsWinningLine(int frontline, int teamId, int minX, int maxXExclusive) {
         if (maxXExclusive <= minX) return false;
