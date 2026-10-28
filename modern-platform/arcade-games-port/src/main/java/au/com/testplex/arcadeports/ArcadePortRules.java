@@ -126,6 +126,14 @@ public final class ArcadePortRules {
                 && nearestOtherDistanceSquared < ownDistanceSquared;
     }
 
+    public static double microBattlesHitDamage(boolean projectile) {
+        return projectile ? 4.0D : 6.0D;
+    }
+
+    public static int microBattlesMinimumFoodLevel(int foodLevel) {
+        return Math.max(2, Math.min(20, foodLevel));
+    }
+
     public static boolean isWorldDragonHazard(ArcadePortGame game, boolean trackedEntity, boolean playerOwned) {
         return game == ArcadePortGame.DRAGONS && trackedEntity && !playerOwned;
     }
