@@ -173,7 +173,7 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeBaconBrawlKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Bacon Brawl kits: pig, mama-pig, sheep-pig. Chris P. Bacon is intentionally omitted.");
+            player.sendMessage(ChatColor.YELLOW + "Bacon Brawl kits: el-muchacho-pigo, mama-piggles, pig. Chris P. Bacon is intentionally omitted.");
             return;
         }
         baconKitPreferences.put(player.getUniqueId(), kit);
@@ -584,7 +584,7 @@ public final class ArcadePortManager implements Listener {
                     : teamMode ? i % teamCount : i % 2;
             session.teams.put(player.getUniqueId(), teamId);
             if (type == ArcadePortGame.BACON_BRAWL) {
-                session.baconKits.put(player.getUniqueId(), baconKitPreferences.getOrDefault(player.getUniqueId(), "pig"));
+                session.baconKits.put(player.getUniqueId(), baconKitPreferences.getOrDefault(player.getUniqueId(), "el-muchacho-pigo"));
             }
             if (type == ArcadePortGame.BOMB_LOBBERS) {
                 session.bombLobbersKits.put(player.getUniqueId(),
@@ -1249,17 +1249,18 @@ public final class ArcadePortManager implements Listener {
         player.getInventory().clear();
         switch (session.type) {
             case BACON_BRAWL: {
-                String kit = session.baconKits.getOrDefault(player.getUniqueId(), "pig");
+                for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) player.removePotionEffect(effect.getType());
+                String kit = session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo");
                 switch (kit) {
-                    case "mama-pig":
-                        player.getInventory().addItem(namedItem(Material.IRON_AXE, "Mama Pig - Bacon Blast", "Right-click to throw a bacon blast (3s cooldown)."));
+                    case "mama-piggles":
+                        player.getInventory().addItem(namedItem(Material.IRON_AXE, "Mama Piggles - Bacon Blast", "Right-click to throw a bacon blast (3s cooldown)."));
                         player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 60, 1, false, false, false));
                         break;
-                    case "sheep-pig":
-                        player.getInventory().addItem(namedItem(Material.IRON_AXE, "Sheep Pig - Cloak", "Right-click to cloak for 5s (10s cooldown). Backstab for bonus knockback."));
+                    case "pig":
+                        player.getInventory().addItem(namedItem(Material.IRON_AXE, "Pig - Cloak", "Right-click to cloak for 5s (10s cooldown). Backstab for bonus knockback."));
                         break;
                     default:
-                        player.getInventory().addItem(namedItem(Material.IRON_AXE, "Pig - Body Slam", "Right-click to leap and body-slam nearby opponents (8s cooldown)."));
+                        player.getInventory().addItem(namedItem(Material.IRON_AXE, "El Muchacho Pigo - Body Slam", "Right-click to leap and body-slam nearby opponents (8s cooldown)."));
                         break;
                 }
                 break;
@@ -2246,7 +2247,7 @@ public final class ArcadePortManager implements Listener {
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
             PotionEffect speed = player.getPotionEffect(PotionEffectType.SPEED);
-            if ("mama-pig".equals(session.baconKits.getOrDefault(id, "pig"))
+            if ("mama-piggles".equals(session.baconKits.getOrDefault(id, "el-muchacho-pigo"))
                     && (session.ticks % 20 == 0 || speed == null || speed.getDuration() < 20)) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 1, false, false, false));
             }
@@ -2275,10 +2276,10 @@ public final class ArcadePortManager implements Listener {
 
     private void useBaconBrawlAbility(Session session, Player player, long now) {
         UUID id = player.getUniqueId();
-        String kit = session.baconKits.getOrDefault(id, "pig");
+        String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
         long cooldown = switch (kit) {
-            case "mama-pig" -> ArcadePortRules.BACON_BLAST_COOLDOWN_MILLIS;
-            case "sheep-pig" -> ArcadePortRules.BACON_CLOAK_COOLDOWN_MILLIS;
+            case "mama-piggles" -> ArcadePortRules.BACON_BLAST_COOLDOWN_MILLIS;
+            case "pig" -> ArcadePortRules.BACON_CLOAK_COOLDOWN_MILLIS;
             default -> ArcadePortRules.BACON_BODY_SLAM_COOLDOWN_MILLIS;
         };
         long nextReady = session.baconAbilityReadyAt.getOrDefault(id, 0L);
@@ -2288,7 +2289,7 @@ public final class ArcadePortManager implements Listener {
         }
         session.baconAbilityReadyAt.put(id, now + cooldown);
         switch (kit) {
-            case "mama-pig": {
+            case "mama-piggles": {
                 Snowball bacon = player.launchProjectile(Snowball.class);
                 bacon.setItem(new ItemStack(Material.PORKCHOP, 16));
                 Vector velocity = player.getEyeLocation().getDirection().normalize().multiply(1.0D);
@@ -2299,7 +2300,7 @@ public final class ArcadePortManager implements Listener {
                 player.sendMessage(ChatColor.GREEN + "Bacon Blast!");
                 break;
             }
-            case "sheep-pig":
+            case "pig":
                 clearBaconCloak(session, id);
                 session.baconCloakedUntil.put(id, now + ArcadePortRules.BACON_CLOAK_DURATION_MILLIS);
                 player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 100, 0, false, false, false));
@@ -2330,12 +2331,12 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(target.getUniqueId())) return;
         clearBaconCloak(session, attacker.getUniqueId());
         clearBaconCloak(session, target.getUniqueId());
-        String kit = session.baconKits.getOrDefault(attacker.getUniqueId(), "pig");
+        String kit = session.baconKits.getOrDefault(attacker.getUniqueId(), "el-muchacho-pigo");
         Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
         if (direction.lengthSquared() < 1.0E-5D) direction = attacker.getLocation().getDirection();
         double hitKnockback = session.baconKnockback;
         if ("body-slam".equals(source)) hitKnockback = Math.max(hitKnockback, 2.0D);
-        if ("sheep-pig".equals(kit) && "melee".equals(source)) {
+        if ("pig".equals(kit) && "melee".equals(source)) {
             Vector targetLook = target.getLocation().getDirection().setY(0.0D);
             Vector fromTargetToAttacker = attacker.getLocation().toVector().subtract(target.getLocation().toVector()).setY(0.0D);
             if (ArcadePortRules.isBaconBrawlBackstab(targetLook.getX(), targetLook.getZ(),
@@ -4947,7 +4948,7 @@ public final class ArcadePortManager implements Listener {
         ItemStack heldItem = event.getItem();
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
         if (session.type == ArcadePortGame.BACON_BRAWL && !event.getAction().isRightClick()
-                && "sheep-pig".equals(session.baconKits.getOrDefault(player.getUniqueId(), "pig"))) {
+                && "pig".equals(session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo"))) {
             clearBaconCloak(session, player.getUniqueId());
             return;
         }
