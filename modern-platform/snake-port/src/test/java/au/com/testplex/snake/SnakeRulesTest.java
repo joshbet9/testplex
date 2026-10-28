@@ -12,8 +12,10 @@ class SnakeRulesTest {
         assertEquals(30, SnakeRules.rouletteDurationSecondsForHit(99));
     }
 
-    @Test void sourceSpeedCurveSaturatesAt126Segments() {
-        assertTrue(SnakeRules.movementSpeed(126, false) > SnakeRules.movementSpeed(1, false));
+    @Test void sourceSpeedCurveMatchesCreatureMoveFastScaleAndSaturatesAt126Segments() {
+        assertEquals(0.2D + 1.0D / 900.0D, SnakeRules.movementSpeed(1, false), 0.000001D);
+        assertEquals(0.3D, SnakeRules.movementSpeed(90, false), 0.000001D);
+        assertEquals(0.34D, SnakeRules.movementSpeed(126, false), 0.000001D);
         assertEquals(SnakeRules.movementSpeed(126, false), SnakeRules.movementSpeed(180, false), 0.000001D);
         assertEquals(SnakeRules.movementSpeed(126, false), SnakeRules.movementSpeed(1000, false), 0.000001D);
         assertEquals(SnakeRules.movementSpeed(1, false) * 1.5D,
