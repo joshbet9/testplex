@@ -157,7 +157,8 @@ public final class ArcadePortManager implements Listener {
         active = session;
         long now = System.currentTimeMillis();
         session.startedAt = now;
-        session.endsAt = now + (type == ArcadePortGame.SHEEP_QUEST ? 300_000L : ROUND_MS);
+        session.endsAt = now + (type == ArcadePortGame.SHEEP_QUEST ? 300_000L
+                : type == ArcadePortGame.GLADIATORS ? 600_000L : ROUND_MS);
         session.lastBaconHungerAt = now;
         session.lastBaconEscalationAt = now;
         session.baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
@@ -229,6 +230,9 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (type == ArcadePortGame.SHEEP_QUEST) spawnSheep(session);
+        if (type == ArcadePortGame.GLADIATORS && participants.size() > 1) {
+            startGladiatorsRound(session, alivePlayers(session), true);
+        }
         if (type == ArcadePortGame.MICRO_BATTLES) announce(session, ChatColor.AQUA + "Micro Battles: gather blocks; glass barriers drop after 10 seconds.");
         else announce(session, ChatColor.GOLD + type.displayName() + " started! This is a first-pass mechanics test.");
         if (type == ArcadePortGame.TURF_WARS) {
@@ -275,6 +279,10 @@ public final class ArcadePortManager implements Listener {
                     for (int dz = 0; dz <= 2; dz++) world.getBlockAt(x, 63, z + dz).setType(Material.STONE_BRICKS, false);
                 }
             }
+            return;
+        }
+        if (type == ArcadePortGame.GLADIATORS) {
+            for (int slot = 0; slot < 8; slot++) buildGladiatorArena(world, slot, 0);
             return;
         }
         if (type == ArcadePortGame.MICRO_BATTLES) {
@@ -329,6 +337,147 @@ public final class ArcadePortManager implements Listener {
             locations.add(new Location(world, Math.cos(angle) * radius, 64.0D, Math.sin(angle) * radius, (float)(angle * 180.0D / Math.PI + 90.0D), 0.0F));
         }
         return locations;
+    }
+
+    private Location gladiatorArenaCenter(World world, int arenaSlot) {
+        int x = -15 + (Math.floorMod(arenaSlot, 4) * 10);
+        int z = arenaSlot < 4 ? -10 : 10;
+        return new Location(world, x + 0.5D, 64.0D, z + 0.5D);
+    }
+
+    private void buildGladiatorArena(World world, int arenaSlot, int tier) {
+        Location center = gladiatorArenaCenter(world, arenaSlot);
+        int cx = center.getBlockX();
+        int cz = center.getBlockZ();
+        Material floor = gladiatorFloor(tier);
+        for (int x = cx - 4; x <= cx + 4; x++) {
+            for (int z = cz - 4; z <= cz + 4; z++) {
+                world.getBlockAt(x, 63, z).setType(floor, false);
+                boolean wall = Math.abs(x - cx) == 4 || Math.abs(z - cz) == 4;
+                if (wall) for (int y = 64; y <= 66; y++) {
+                    world.getBlockAt(x, y, z).setType(Material.BLACKSTONE, false);
+                }
+            }
+        }
+    }
+
+    private Material gladiatorFloor(int tier) {
+        return switch (Math.max(0, Math.min(3, tier))) {
+            case 1 -> Material.YELLOW_CONCRETE;
+            case 2 -> Material.ORANGE_CONCRETE;
+            case 3 -> Material.RED_CONCRETE;
+            default -> Material.GREEN_CONCRETE;
+        };
+    }
+
+    private void giveGladiatorKit(Session session, Player player) {
+        int tier = Math.max(0, Math.min(3, session.gladiatorRound));
+        Material sword = switch (tier) {
+            case 1 -> Material.STONE_SWORD;
+            case 2 -> Material.IRON_SWORD;
+            case 3 -> Material.DIAMOND_SWORD;
+            default -> Material.WOODEN_SWORD;
+        };
+        Material[] armor = switch (tier) {
+            case 1 -> new Material[]{Material.GOLDEN_BOOTS, Material.GOLDEN_LEGGINGS, Material.GOLDEN_CHESTPLATE, Material.GOLDEN_HELMET};
+            case 2 -> new Material[]{Material.CHAINMAIL_BOOTS, Material.CHAINMAIL_LEGGINGS, Material.CHAINMAIL_CHESTPLATE, Material.CHAINMAIL_HELMET};
+            case 3 -> new Material[]{Material.IRON_BOOTS, Material.IRON_LEGGINGS, Material.IRON_CHESTPLATE, Material.IRON_HELMET};
+            default -> new Material[]{Material.LEATHER_BOOTS, Material.LEATHER_LEGGINGS, Material.LEATHER_CHESTPLATE, Material.LEATHER_HELMET};
+        };
+        player.getInventory().clear();
+        player.getInventory().addItem(new ItemStack(sword), new ItemStack(Material.FISHING_ROD),
+                new ItemStack(Material.BOW), new ItemStack(Material.ARROW, new int[]{3, 5, 7, 10}[tier]));
+        ItemStack[] armorItems = new ItemStack[4];
+        for (int i = 0; i < armorItems.length; i++) {
+            armorItems[i] = new ItemStack(armor[i]);
+            if (armorItems[i].getItemMeta() instanceof LeatherArmorMeta meta) {
+                Color color = switch (tier) {
+                    case 1 -> Color.YELLOW;
+                    case 2 -> Color.ORANGE;
+                    case 3 -> Color.RED;
+                    default -> Color.LIME;
+                };
+                meta.setColor(color);
+                armorItems[i].setItemMeta(meta);
+            }
+        }
+        player.getInventory().setArmorContents(armorItems);
+        player.updateInventory();
+    }
+
+    private void startGladiatorsRound(Session session, List<Player> advancing, boolean initial) {
+        if (active != session || advancing.isEmpty()) return;
+        if (advancing.size() == 1) {
+            finish(session, advancing.get(0), true);
+            return;
+        }
+        session.gladiatorRound = initial ? 0 : Math.min(3, session.gladiatorRound + 1);
+        session.gladiatorPairs.clear();
+        session.gladiatorResolvedPairs.clear();
+        session.gladiatorPairCount = (advancing.size() + 1) / 2;
+        session.nextGladiatorRoundAt = 0L;
+        session.gladiatorRoundStartedAt = System.currentTimeMillis();
+        session.lastGladiatorPoisonAt = session.gladiatorRoundStartedAt + 60_000L;
+        Collections.shuffle(advancing);
+
+        String roundName = switch (session.gladiatorRound) {
+            case 1 -> "Yellow arena";
+            case 2 -> "Orange arena";
+            case 3 -> "Red finals";
+            default -> "Green arena";
+        };
+        announce(session, ChatColor.GOLD + "Gladiators — " + roundName + ". Defeat your opponent to advance!");
+
+        for (int i = 0; i < advancing.size(); i++) {
+            Player player = advancing.get(i);
+            int pair = i / 2;
+            int arenaSlot = pair % 8;
+            session.gladiatorPairs.put(player.getUniqueId(), pair);
+            buildGladiatorArena(session.world, arenaSlot, session.gladiatorRound);
+            Location center = gladiatorArenaCenter(session.world, arenaSlot);
+            boolean left = i % 2 == 0;
+            Location spawn = center.clone().add(left ? -2.0D : 2.0D, 0.0D, 0.0D);
+            spawn.setYaw(left ? -90.0F : 90.0F);
+            spawn.setPitch(0.0F);
+            player.leaveVehicle();
+            player.teleport(spawn);
+            player.setGameMode(GameMode.SURVIVAL);
+            player.setHealth(player.getMaxHealth());
+            player.setFoodLevel(20);
+            player.setSaturation(20.0F);
+            player.setFireTicks(0);
+            player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+            giveGladiatorKit(session, player);
+            session.lastLocations.put(player.getUniqueId(), spawn.clone());
+        }
+        if (advancing.size() % 2 == 1) {
+            int byePair = session.gladiatorPairCount - 1;
+            session.gladiatorResolvedPairs.add(byePair);
+            Player bye = advancing.get(advancing.size() - 1);
+            bye.sendMessage(ChatColor.GREEN + "You have a bye and automatically advance to the next round.");
+        }
+    }
+
+    private void updateGladiators(Session session, long now) {
+        if (active != session) return;
+        if (now >= session.lastGladiatorPoisonAt) {
+            session.lastGladiatorPoisonAt = now + 2_000L;
+            for (Player player : new ArrayList<>(alivePlayers(session))) {
+                if (player.getHealth() <= 2.0D) eliminate(session, player, null, "was defeated by arena poison");
+                else {
+                    player.setHealth(player.getHealth() - 2.0D);
+                    player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.7F, 0.7F);
+                }
+                if (active != session) return;
+            }
+        }
+        if (session.nextGladiatorRoundAt > 0L && now >= session.nextGladiatorRoundAt) {
+            if (session.alive.size() <= 1) {
+                finish(session, alivePlayers(session).stream().findFirst().orElse(null), true);
+                return;
+            }
+            startGladiatorsRound(session, alivePlayers(session), false);
+        }
     }
 
     private Location islandSpawn(int index) {
@@ -423,8 +572,11 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
                 break;
             case GLADIATORS:
-                player.getInventory().addItem(new ItemStack(Material.IRON_SWORD));
-                player.getInventory().addItem(new ItemStack(Material.SHIELD));
+                // The tiered tournament loadout is applied when its arena round starts.
+                player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
+                player.getInventory().addItem(new ItemStack(Material.FISHING_ROD));
+                player.getInventory().addItem(new ItemStack(Material.BOW));
+                player.getInventory().addItem(new ItemStack(Material.ARROW, 3));
                 break;
             case MICRO_BATTLES:
                 player.getInventory().addItem(new ItemStack(Material.STONE_SWORD));
@@ -548,6 +700,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
+        if (session.type == ArcadePortGame.GLADIATORS) updateGladiators(session, now);
         if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
             updateDeathTagChasers(session, now);
         }
@@ -846,6 +999,19 @@ public final class ArcadePortManager implements Listener {
             finish(session, null, true);
             return;
         }
+        if (session.type == ArcadePortGame.GLADIATORS && session.participantsAtStart > 1) {
+            if (session.alive.size() <= 1) {
+                finish(session, alivePlayers(session).stream().findFirst().orElse(null), true);
+                return;
+            }
+            if (session.gladiatorPairCount > 0
+                    && session.gladiatorResolvedPairs.size() >= session.gladiatorPairCount
+                    && session.nextGladiatorRoundAt == 0L) {
+                session.nextGladiatorRoundAt = System.currentTimeMillis() + 2_000L;
+                announce(session, ChatColor.GREEN + "All matches are complete. Advancing the winners...");
+            }
+            return;
+        }
         if ((session.type == ArcadePortGame.MICRO_BATTLES || session.type == ArcadePortGame.PAINTBALL)
                 && session.participantsAtStart > 1) {
             Set<Integer> remainingTeams = new HashSet<>();
@@ -919,6 +1085,13 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "Eliminated: " + reason + ".");
         }
         if (killer != null && session.scores.containsKey(killer.getUniqueId())) session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+        if (session.type == ArcadePortGame.GLADIATORS) {
+            Integer pair = session.gladiatorPairs.get(player.getUniqueId());
+            if (pair != null) {
+                session.gladiatorResolvedPairs.add(pair);
+                if (killer != null && killer.isOnline()) killer.sendMessage(ChatColor.GREEN + "You won your arena fight and advanced!");
+            }
+        }
         checkRoundEnd(session);
     }
 
@@ -1649,6 +1822,10 @@ public final class ArcadePortManager implements Listener {
         PlayerSnapshot snapshot = session.snapshots.get(id);
         if (snapshot != null) pendingRestore.put(id, snapshot);
         if (session.type == ArcadePortGame.DEATH_TAG) session.tagged.remove(id);
+        if (session.type == ArcadePortGame.GLADIATORS) {
+            Integer pair = session.gladiatorPairs.get(id);
+            if (pair != null) session.gladiatorResolvedPairs.add(pair);
+        }
         session.respawning.remove(id);
         session.players.remove(id);
         session.snapshots.remove(id);
@@ -1670,6 +1847,13 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> scores = new HashMap<>();
         final Map<UUID, Integer> paintPiecesRemaining = new HashMap<>();
         final Map<UUID, Integer> evolutionLevels = new HashMap<>();
+        final Map<UUID, Integer> gladiatorPairs = new HashMap<>();
+        final Set<Integer> gladiatorResolvedPairs = new HashSet<>();
+        int gladiatorRound = -1;
+        int gladiatorPairCount;
+        long gladiatorRoundStartedAt;
+        long lastGladiatorPoisonAt;
+        long nextGladiatorRoundAt;
         final Map<UUID, Integer> teams = new HashMap<>();
         final Set<UUID> tagged = new HashSet<>();
         final Set<UUID> respawning = new HashSet<>();
