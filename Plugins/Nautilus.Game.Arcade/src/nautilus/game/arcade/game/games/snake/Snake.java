@@ -319,8 +319,9 @@ public class Snake extends SoloGame
 	}
 
 	/**
-	 * Roulette effects are per-player and last until the next 25-second roll.
-	 * Magma Cubes start after 45 seconds and additional hazards arrive every 30 seconds.
+	 * Magma Cube item-box hazards spawn progressively. Touching one starts a local
+	 * hotbar roll; the selected steering effect lasts for a duration that escalates
+	 * with each player's successive item-box hit.
 	 */
 	@EventHandler
 	public void SnakeRouletteAndHazardSpawn(UpdateEvent event)
