@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import org.bukkit.Material;
+import java.util.Collection;
 
 /**
  * Small deterministic rules used by the mechanics-first Arcade prototypes.
@@ -228,6 +229,9 @@ public final class ArcadePortRules {
     public static final long BOMB_LOBBERS_MAX_FLIGHT_MILLIS = 8_000L;
     public static final int BOMB_LOBBERS_FUSE_TICKS = 60;
     public static final int BOMB_LOBBERS_MAX_CARRIED = 3;
+    public static final double BOMB_LOBBERS_EXPLOSION_SIZE = 4.0D;
+    public static final double BOMB_LOBBERS_EXPLOSION_RADIUS = 4.0D;
+    public static final double BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE = 50.0D;
     public static final long SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS = 4_000L;
     public static final int SPLEEF_HUNGER_DRAIN_PER_INTERVAL = 2;
     public static final long SPLEEF_HUNGER_RESTORE_COOLDOWN_MILLIS = 50L;
@@ -406,6 +410,20 @@ public final class ArcadePortRules {
         };
     }
 
+    /** A deployed test can expose only games that have passed the mechanical-parity acceptance gate. */
+    public static boolean isArcadePortGameEnabled(String gameId, Collection<String> enabledGameIds) {
+        if (gameId == null || enabledGameIds == null) return false;
+        String target = gameId.trim().toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (target.isEmpty()) return false;
+        for (String candidate : enabledGameIds) {
+            if (candidate == null) continue;
+            String normalized = candidate.trim().toLowerCase(java.util.Locale.ROOT)
+                    .replace('_', '-').replace(' ', '-');
+            if (target.equals(normalized)) return true;
+        }
+        return false;
+    }
+
     public static String normalizeBombLobbersKit(String requested) {
         if (requested == null) return null;
         String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
@@ -453,6 +471,29 @@ public final class ArcadePortRules {
     public static boolean shouldPrimeBombLobbersBomb(long ageMillis, boolean touchingSolidBlock) {
         return ageMillis >= BOMB_LOBBERS_MAX_FLIGHT_MILLIS
                 || (ageMillis >= BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS && touchingSolidBlock);
+    }
+
+    /** Reborn's vanilla size-4 explosion damage calculation, capped by its Explosion(50) condition. */
+    public static double bombLobbersBlastDamage(double distanceToBoundingBox, double exposure) {
+        if (!Double.isFinite(distanceToBoundingBox) || distanceToBoundingBox < 0.0D
+                || distanceToBoundingBox > BOMB_LOBBERS_EXPLOSION_SIZE) return 0.0D;
+        double visible = Double.isFinite(exposure) ? Math.max(0.0D, Math.min(1.0D, exposure)) : 0.0D;
+        double impact = (1.0D - distanceToBoundingBox / BOMB_LOBBERS_EXPLOSION_SIZE) * visible;
+        double damage = ((impact * impact + impact) / 2.0D) * 8.0D * BOMB_LOBBERS_EXPLOSION_SIZE + 1.0D;
+        return Math.max(0.0D, Math.min(BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE, damage));
+    }
+
+    public static Material bombLobbersBlockAfterExplosion(Material material) {
+        if (material == null) return Material.AIR;
+        return switch (material) {
+            case STONE, GRANITE, POLISHED_GRANITE, DIORITE, POLISHED_DIORITE, ANDESITE, POLISHED_ANDESITE -> Material.COBBLESTONE;
+            case STONE_BRICKS, MOSSY_STONE_BRICKS, CHISELED_STONE_BRICKS -> Material.CRACKED_STONE_BRICKS;
+            default -> Material.AIR;
+        };
+    }
+
+    public static boolean shouldSuppressBombLobbersSpawnSideExplosion(int throwerTeam, int nearestSpawnTeam) {
+        return throwerTeam >= 0 && nearestSpawnTeam >= 0 && throwerTeam == nearestSpawnTeam;
     }
 
     /** Pig's source passive is +250% knockback, i.e. 3.5 times the normal amount. */

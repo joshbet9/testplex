@@ -1,0 +1,4 @@
+# Only games that have passed their mechanical-parity acceptance gate are available to start.
+# Add the next game only after its source mechanics and unit/build checks are complete.
+enabled-games:
+  - bacon-brawl

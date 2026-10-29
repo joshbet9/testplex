@@ -80,7 +80,9 @@ jobs:
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadePortManager.class"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "name: ArcadeMechanicsModern"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
-          echo "All four modern Paper 26.3 plugin artifacts verified."
+          unzip -p "$arcade_jar" config.yml | grep -Fxq "  - bacon-brawl"
+          ! unzip -p "$arcade_jar" config.yml | grep -Eq "^  - (bomb-lobbers|death-tag|dragon-escape|dragons|evolution|gladiators|micro-battles|one-in-the-quiver|paintball|runner|sheep-quest|spleef|turf-wars)$"
+          echo "All four modern Paper 26.3 plugin artifacts verified; only Bacon Brawl is enabled for live acceptance."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4

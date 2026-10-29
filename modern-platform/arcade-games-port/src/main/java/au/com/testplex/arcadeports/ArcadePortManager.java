@@ -446,9 +446,24 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private boolean isGameEnabled(ArcadePortGame type) {
+        return type != null && ArcadePortRules.isArcadePortGameEnabled(
+                type.id(), plugin.getConfig().getStringList("enabled-games"));
+    }
+
+    public String enabledGamesLabel() {
+        List<String> enabled = plugin.getConfig().getStringList("enabled-games");
+        return enabled.isEmpty() ? "none" : String.join(", ", enabled);
+    }
+
     public void queue(ArcadePortGame type, Player player, boolean quickStart) {
         if (type == null) {
             player.sendMessage(ChatColor.RED + "Unknown game id. Use /arcadeport help for the available IDs.");
+            return;
+        }
+        if (!isGameEnabled(type)) {
+            player.sendMessage(ChatColor.RED + type.displayName()
+                    + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
         if (active != null && active.type == type) {
@@ -479,6 +494,11 @@ public final class ArcadePortManager implements Listener {
     public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender) {
         if (type == null) {
             sender.sendMessage(ChatColor.RED + "Unknown game id.");
+            return;
+        }
+        if (!isGameEnabled(type)) {
+            sender.sendMessage(ChatColor.RED + type.displayName()
+                    + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
         if (active != null) {
@@ -709,6 +729,7 @@ public final class ArcadePortManager implements Listener {
             giveKit(session, player);
             session.lastLocations.put(player.getUniqueId(), spawn.clone());
         }
+        if (type == ArcadePortGame.BOMB_LOBBERS) cacheBombLobbersTeamSpawnCentres(session);
         if (type == ArcadePortGame.BACON_BRAWL) {
             // Player snapshots already hold their pre-match scoreboards at this point.
             // The meter and disguise teams now live only on this match's scoreboard.
@@ -1365,7 +1386,7 @@ public final class ArcadePortManager implements Listener {
                         break;
                 }
                 setBombLobbersArmor(session, player, kit);
-                player.setAllowFlight(true);
+                player.setAllowFlight("jumper".equals(kit));
                 player.setFlying(false);
                 break;
             }
@@ -5011,6 +5032,9 @@ public final class ArcadePortManager implements Listener {
         }
         session.bombOwners.clear();
         session.bombLastLocations.clear();
+        session.bombCreatedAt.clear();
+        session.bombPrimed.clear();
+        session.bombTeamSpawnCentres.clear();
         session.dragonContactCooldowns.clear();
         session.paintProjectileDamage.clear();
         session.paintballLastShotAt.clear();
@@ -5117,7 +5141,7 @@ public final class ArcadePortManager implements Listener {
     public String status() {
         String game = active == null ? "idle" : active.type.displayName() + " (" + active.alive.size() + "/" + active.participantsAtStart + " alive)";
         int queued = queues.values().stream().mapToInt(Map::size).sum();
-        return game + "; queued=" + queued;
+        return game + "; queued=" + queued + "; cleared-games=" + enabledGamesLabel();
     }
 
     public void shutdown() {
@@ -6081,8 +6105,15 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
+        if (session.type == ArcadePortGame.BOMB_LOBBERS && item == Material.TNT
+                && !event.getAction().isLeftClick() && event.getAction() != org.bukkit.event.block.Action.PHYSICAL) {
+            event.setCancelled(true);
+            return;
+        }
         if ((session.type == ArcadePortGame.BOMB_LOBBERS || (session.type == ArcadePortGame.EVOLUTION
-                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 3)) && item == Material.TNT) {
+                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 3))
+                && item == Material.TNT && (session.type != ArcadePortGame.BOMB_LOBBERS
+                || event.getAction().isLeftClick())) {
             event.setCancelled(true);
             consumeHeld(player);
             Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.0D));
@@ -6352,6 +6383,82 @@ public final class ArcadePortManager implements Listener {
         if (session != null && event.getWhoClicked() instanceof Player player && session.players.containsKey(player.getUniqueId())) event.setCancelled(true);
     }
 
+    private void cacheBombLobbersTeamSpawnCentres(Session session) {
+        session.bombTeamSpawnCentres.clear();
+        Map<Integer, double[]> totals = new HashMap<>();
+        Map<Integer, Integer> counts = new HashMap<>();
+        for (UUID id : session.players.keySet()) {
+            int team = session.teams.getOrDefault(id, -1);
+            Location spawn = session.lastLocations.get(id);
+            if (team < 0 || spawn == null || spawn.getWorld() != session.world) continue;
+            double[] total = totals.computeIfAbsent(team, ignored -> new double[3]);
+            total[0] += spawn.getX();
+            total[1] += spawn.getY();
+            total[2] += spawn.getZ();
+            counts.merge(team, 1, Integer::sum);
+        }
+        for (Map.Entry<Integer, double[]> entry : totals.entrySet()) {
+            int count = counts.getOrDefault(entry.getKey(), 0);
+            if (count <= 0) continue;
+            double[] total = entry.getValue();
+            session.bombTeamSpawnCentres.put(entry.getKey(), new Location(session.world,
+                    total[0] / count, total[1] / count, total[2] / count));
+        }
+    }
+
+    private int nearestBombLobbersSpawnTeam(Session session, Location location) {
+        if (session == null || location == null || location.getWorld() != session.world
+                || session.bombTeamSpawnCentres.isEmpty()) return -1;
+        int nearestTeam = -1;
+        double nearestDistanceSquared = Double.POSITIVE_INFINITY;
+        for (Map.Entry<Integer, Location> entry : session.bombTeamSpawnCentres.entrySet()) {
+            double distanceSquared = location.distanceSquared(entry.getValue());
+            if (distanceSquared < nearestDistanceSquared) {
+                nearestDistanceSquared = distanceSquared;
+                nearestTeam = entry.getKey();
+            }
+        }
+        return nearestTeam;
+    }
+
+    private double bombLobbersDistanceToBoundingBox(Location blast, Player target) {
+        org.bukkit.util.BoundingBox box = target.getBoundingBox();
+        double dx = blast.getX() < box.getMinX() ? box.getMinX() - blast.getX()
+                : blast.getX() > box.getMaxX() ? blast.getX() - box.getMaxX() : 0.0D;
+        double dy = blast.getY() < box.getMinY() ? box.getMinY() - blast.getY()
+                : blast.getY() > box.getMaxY() ? blast.getY() - box.getMaxY() : 0.0D;
+        double dz = blast.getZ() < box.getMinZ() ? box.getMinZ() - blast.getZ()
+                : blast.getZ() > box.getMaxZ() ? blast.getZ() - box.getMaxZ() : 0.0D;
+        return Math.sqrt(dx * dx + dy * dy + dz * dz);
+    }
+
+    /** Sample the source explosion's solid-block exposure factor before applying the block list. */
+    private double bombLobbersBlastExposure(Location blast, Player target) {
+        if (blast == null || target == null || blast.getWorld() == null
+                || target.getWorld() != blast.getWorld()) return 0.0D;
+        org.bukkit.util.BoundingBox box = target.getBoundingBox();
+        double[] fractions = {0.2D, 0.5D, 0.8D};
+        int visible = 0;
+        int total = 0;
+        for (double fx : fractions) {
+            for (double fy : fractions) {
+                for (double fz : fractions) {
+                    Location sample = new Location(blast.getWorld(),
+                            box.getMinX() + (box.getMaxX() - box.getMinX()) * fx,
+                            box.getMinY() + (box.getMaxY() - box.getMinY()) * fy,
+                            box.getMinZ() + (box.getMaxZ() - box.getMinZ()) * fz);
+                    Vector ray = sample.toVector().subtract(blast.toVector());
+                    double distance = ray.length();
+                    total++;
+                    if (distance <= 1.0E-6D
+                            || blast.getWorld().rayTraceBlocks(blast, ray.normalize(), distance,
+                                    org.bukkit.FluidCollisionMode.NEVER, true) == null) visible++;
+                }
+            }
+        }
+        return total == 0 ? 0.0D : visible / (double) total;
+    }
+
     private void updateBombLobbers(Session session) {
         long now = System.currentTimeMillis();
         for (Player player : alivePlayers(session)) {
@@ -6404,22 +6511,19 @@ public final class ArcadePortManager implements Listener {
                 double distanceSquared = distanceSquaredToSegment(target.getLocation(), previous, current);
                 if (!ArcadePortRules.isBombDirectHit(distanceSquared)) continue;
 
-                removeBombTracking(session, bombId);
-                session.entities.remove(bomb);
-                bomb.remove();
+                // Reborn's projectile engine damages on collision but lets TNT keep travelling.
+                // The swept segment means modern high-velocity TNT cannot tunnel through targets.
                 Vector away = target.getLocation().toVector().subtract(current.toVector());
                 away.setY(0.0D);
                 if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 0.0D, 1.0D);
-                // Reborn's direct-hit impulse is deliberately light (.2 horizontal, .2 vertical);
-                // reserve the large blast impulse for the actual explosion.
                 target.setVelocity(away.normalize().multiply(0.2D).setY(0.2D));
                 target.getWorld().spawnParticle(Particle.EXPLOSION,
                         target.getLocation().add(0.0D, 1.0D, 0.0D), 1,
                         0.1D, 0.1D, 0.1D, 0.0D);
                 target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0F, 0.9F);
-                // Reborn plays the classic note-pling at the struck player on a direct hit.
+                target.playSound(target.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.7F);
                 target.playSound(target.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.2F, 1.65F);
-                owner.playSound(owner.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 1.0F, 1.45F);
+                owner.playSound(owner.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.25F);
                 owner.sendMessage(ChatColor.YELLOW + "Direct hit!");
                 double directHitDamage = bombLobbersDamageAfterArmor(target, 10.0D);
                 if (target.getHealth() <= directHitDamage) {
@@ -6648,61 +6752,95 @@ public final class ArcadePortManager implements Listener {
             detonateDragonEscapeMine(session, event, mine);
             return;
         }
-        if (event.getEntity() instanceof TNTPrimed bomb) {
-            UUID ownerId = session.bombOwners.remove(bomb.getUniqueId());
-            session.bombCreatedAt.remove(bomb.getUniqueId());
-            session.bombPrimed.remove(bomb.getUniqueId());
-            if (ownerId != null && (session.type == ArcadePortGame.BOMB_LOBBERS
-                    || (session.type == ArcadePortGame.EVOLUTION
-                    && session.evolutionLevels.getOrDefault(ownerId, 0) == 3))) {
-                Location blast = bomb.getLocation().clone();
-                Player owner = session.players.get(ownerId);
-                List<Block> blocksHit = new ArrayList<>(event.blockList());
-                event.blockList().clear();
-                event.setCancelled(true);
-                if (session.type == ArcadePortGame.BOMB_LOBBERS) {
-                    // Keep custom player damage below, but let the explosion carve the map.
-                    // Archived source maps are reloaded before the next round.
-                    for (Block block : blocksHit) {
-                        if (block == null || block.getWorld() != session.world || block.getType().isAir()) continue;
-                        block.setType(Material.AIR, false);
-                    }
-                }
-                session.entities.remove(bomb);
-                session.bombLastLocations.remove(bomb.getUniqueId());
-                bomb.remove();
-                session.world.spawnParticle(Particle.EXPLOSION, blast, 1, 0.0D, 0.0D, 0.0D, 0.0D);
-                session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
+        if (!(event.getEntity() instanceof TNTPrimed bomb)) {
+            event.blockList().clear();
+            event.setCancelled(true);
+            return;
+        }
+
+        UUID bombId = bomb.getUniqueId();
+        UUID ownerId = session.bombOwners.get(bombId);
+        boolean bombLobbersBlast = session.type == ArcadePortGame.BOMB_LOBBERS;
+        boolean evolutionBlast = session.type == ArcadePortGame.EVOLUTION
+                && ownerId != null && session.evolutionLevels.getOrDefault(ownerId, 0) == 3;
+        if (bombLobbersBlast && ownerId != null
+                && ArcadePortRules.shouldSuppressBombLobbersSpawnSideExplosion(
+                        session.teams.getOrDefault(ownerId, -1),
+                        nearestBombLobbersSpawnTeam(session, bomb.getLocation()))) {
+            event.blockList().clear();
+            event.setCancelled(true);
+            removeBombTracking(session, bombId);
+            session.entities.remove(bomb);
+            bomb.remove();
+            return;
+        }
+
+        if (ownerId != null && (bombLobbersBlast || evolutionBlast)) {
+            Location blast = bomb.getLocation().clone();
+            Player owner = session.players.get(ownerId);
+            Map<UUID, Double> blastExposure = new HashMap<>();
+            if (bombLobbersBlast) {
                 for (Player target : alivePlayers(session)) {
-                    if (session.type == ArcadePortGame.BOMB_LOBBERS
-                            && !ArcadePortRules.areBombLobbersEnemies(
-                                    session.teams.getOrDefault(ownerId, -1),
-                                    session.teams.getOrDefault(target.getUniqueId(), -1))) continue;
-                    double distanceSquared = target.getLocation().distanceSquared(blast);
-                    if (distanceSquared > 64.0D) continue;
-                    double distance = Math.sqrt(distanceSquared);
-                    Vector away = target.getLocation().toVector().subtract(blast.toVector());
-                    if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 1.0D, 0.0D);
-                    double force = 1.9D * (1.0D - distance / 8.0D);
-                    target.setVelocity(away.normalize().multiply(force).setY(Math.max(0.25D, 0.65D - distance * 0.045D)));
-                    target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0.0D, 1.0D, 0.0D),
-                            12, 0.35D, 0.45D, 0.35D, 0.05D);
-                    target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.2F);
-                    double blastDamage = Math.max(0.0D, 10.0D * (1.0D - distance / 8.0D));
-                    if (session.type == ArcadePortGame.BOMB_LOBBERS) {
-                        blastDamage = bombLobbersDamageAfterArmor(target, blastDamage);
-                    }
-                    if (blastDamage > 0.0D) {
-                        if (target.getHealth() <= blastDamage) {
-                            eliminate(session, target, owner, "was caught in a TNT blast");
-                            if (active != session) return;
-                        } else {
-                            target.setHealth(target.getHealth() - blastDamage);
-                        }
+                    double distance = bombLobbersDistanceToBoundingBox(blast, target);
+                    if (distance <= ArcadePortRules.BOMB_LOBBERS_EXPLOSION_RADIUS) {
+                        blastExposure.put(target.getUniqueId(), bombLobbersBlastExposure(blast, target));
                     }
                 }
-                return;
             }
+            List<Block> blocksHit = new ArrayList<>(event.blockList());
+            event.blockList().clear();
+            event.setCancelled(true);
+            if (bombLobbersBlast) {
+                // Reborn converts stone to cobble, cracks intact stone bricks, and removes other
+                // impacted blocks (including stone bricks that were already cracked).
+                for (Block block : blocksHit) {
+                    if (block == null || block.getWorld() != session.world || block.getType().isAir()) continue;
+                    block.setType(ArcadePortRules.bombLobbersBlockAfterExplosion(block.getType()), false);
+                }
+            }
+            removeBombTracking(session, bombId);
+            session.entities.remove(bomb);
+            bomb.remove();
+            session.world.spawnParticle(Particle.EXPLOSION, blast, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+            session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
+            for (Player target : alivePlayers(session)) {
+                // Reborn applies its nearby-player explosion condition without team filtering.
+                double distance = bombLobbersBlast
+                        ? bombLobbersDistanceToBoundingBox(blast, target)
+                        : target.getLocation().distance(blast);
+                double radius = bombLobbersBlast ? ArcadePortRules.BOMB_LOBBERS_EXPLOSION_RADIUS : 8.0D;
+                if (distance > radius) continue;
+                double exposure = bombLobbersBlast
+                        ? blastExposure.getOrDefault(target.getUniqueId(), 0.0D) : 1.0D;
+                Vector away = target.getEyeLocation().toVector().subtract(blast.toVector());
+                if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 1.0D, 0.0D);
+                if (bombLobbersBlast) {
+                    double impact = Math.max(0.0D,
+                            1.0D - distance / ArcadePortRules.BOMB_LOBBERS_EXPLOSION_SIZE) * exposure;
+                    target.setVelocity(away.normalize().multiply(impact));
+                } else {
+                    double force = 1.9D * (1.0D - distance / 8.0D);
+                    target.setVelocity(away.normalize().multiply(force)
+                            .setY(Math.max(0.25D, 0.65D - distance * 0.045D)));
+                }
+                target.getWorld().spawnParticle(Particle.CLOUD,
+                        target.getLocation().add(0.0D, 1.0D, 0.0D),
+                        12, 0.35D, 0.45D, 0.35D, 0.05D);
+                target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.2F);
+                double blastDamage = bombLobbersBlast
+                        ? ArcadePortRules.bombLobbersBlastDamage(distance, exposure)
+                        : Math.max(0.0D, 10.0D * (1.0D - distance / 8.0D));
+                if (bombLobbersBlast) blastDamage = bombLobbersDamageAfterArmor(target, blastDamage);
+                if (blastDamage > 0.0D) {
+                    if (target.getHealth() <= blastDamage) {
+                        eliminate(session, target, owner, "was caught in a TNT blast");
+                        if (active != session) return;
+                    } else {
+                        target.setHealth(target.getHealth() - blastDamage);
+                    }
+                }
+            }
+            return;
         }
         event.blockList().clear();
         event.setCancelled(true);
@@ -6831,6 +6969,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Location> bombLastLocations = new HashMap<>();
         final Map<UUID, Long> bombCreatedAt = new HashMap<>();
         final Set<UUID> bombPrimed = new HashSet<>();
+        final Map<Integer, Location> bombTeamSpawnCentres = new HashMap<>();
         final Map<UUID, String> bombLobbersKits = new HashMap<>();
         final Map<UUID, Integer> bombPitchLevels = new HashMap<>();
         final Set<UUID> bombDoubleJumpAvailable = new HashSet<>();

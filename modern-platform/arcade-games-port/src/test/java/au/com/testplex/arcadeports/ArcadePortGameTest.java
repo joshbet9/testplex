@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import org.bukkit.Material;
 import java.util.HashSet;
 import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
@@ -1060,6 +1061,16 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldFinishDeathTagRound(0, 2));
     }
 
+    @Test void deployedArcadeAllowListExposesOnlyAcceptedGameIds() {
+        java.util.List<String> enabled = java.util.List.of("bacon-brawl");
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled("bacon-brawl", enabled));
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled("Bacon_Brawl", enabled));
+        assertFalse(ArcadePortRules.isArcadePortGameEnabled("bomb-lobbers", enabled));
+        assertFalse(ArcadePortRules.isArcadePortGameEnabled("death-tag", enabled));
+        assertFalse(ArcadePortRules.isArcadePortGameEnabled(null, enabled));
+        assertFalse(ArcadePortRules.isArcadePortGameEnabled("bacon-brawl", java.util.List.of()));
+    }
+
     @Test void bombLobbersTntOnlyDamagesAssignedEnemyTeams() {
         assertFalse(ArcadePortRules.areBombLobbersEnemies(0, 0));
         assertFalse(ArcadePortRules.areBombLobbersEnemies(1, 1));
@@ -1067,6 +1078,42 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.areBombLobbersEnemies(1, 0));
         assertFalse(ArcadePortRules.areBombLobbersEnemies(-1, 1));
         assertFalse(ArcadePortRules.areBombLobbersEnemies(0, -1));
+    }
+
+    @Test void bombLobbersBlastDamageMatchesLegacySizeFourCurveAndExposure() {
+        assertEquals(33.0D, ArcadePortRules.bombLobbersBlastDamage(0.0D, 1.0D), 0.00001D);
+        assertEquals(13.0D, ArcadePortRules.bombLobbersBlastDamage(2.0D, 1.0D), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.bombLobbersBlastDamage(3.0D, 1.0D), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.bombLobbersBlastDamage(4.0D, 1.0D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.bombLobbersBlastDamage(4.01D, 1.0D), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.bombLobbersBlastDamage(0.0D, 0.0D), 0.00001D);
+        assertEquals(9.25D, ArcadePortRules.bombLobbersBlastDamage(2.0D, 0.5D), 0.00001D);
+        assertEquals(50.0D, ArcadePortRules.BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE, 0.00001D);
+    }
+
+    @Test void bombLobbersExplosionAppliesOriginalStoneConversions() {
+        assertEquals(Material.COBBLESTONE,
+                ArcadePortRules.bombLobbersBlockAfterExplosion(Material.STONE));
+        assertEquals(Material.COBBLESTONE,
+                ArcadePortRules.bombLobbersBlockAfterExplosion(Material.DIORITE));
+        assertEquals(Material.CRACKED_STONE_BRICKS,
+                ArcadePortRules.bombLobbersBlockAfterExplosion(Material.STONE_BRICKS));
+        assertEquals(Material.CRACKED_STONE_BRICKS,
+                ArcadePortRules.bombLobbersBlockAfterExplosion(Material.MOSSY_STONE_BRICKS));
+        assertEquals(Material.CRACKED_STONE_BRICKS,
+                ArcadePortRules.bombLobbersBlockAfterExplosion(Material.CHISELED_STONE_BRICKS));
+        assertEquals(Material.AIR,
+                ArcadePortRules.bombLobbersBlockAfterExplosion(Material.CRACKED_STONE_BRICKS));
+        assertEquals(Material.AIR,
+                ArcadePortRules.bombLobbersBlockAfterExplosion(Material.GLASS));
+    }
+
+    @Test void bombLobbersExplosionIsSuppressedOnTheThrowersOwnSpawnSide() {
+        assertTrue(ArcadePortRules.shouldSuppressBombLobbersSpawnSideExplosion(0, 0));
+        assertTrue(ArcadePortRules.shouldSuppressBombLobbersSpawnSideExplosion(1, 1));
+        assertFalse(ArcadePortRules.shouldSuppressBombLobbersSpawnSideExplosion(0, 1));
+        assertFalse(ArcadePortRules.shouldSuppressBombLobbersSpawnSideExplosion(1, 0));
+        assertFalse(ArcadePortRules.shouldSuppressBombLobbersSpawnSideExplosion(-1, 0));
     }
 
     @Test void bombLobbersDamageRespectsLegacyDamageDependentArmorReduction() {

@@ -12,6 +12,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     @Override
     public void onEnable() {
+        saveDefaultConfig();
+        if (!getConfig().contains("enabled-games")) {
+            getConfig().set("enabled-games", java.util.List.of("bacon-brawl"));
+            saveConfig();
+        }
         manager = new ArcadePortManager(this);
         if (getCommand("arcadeport") == null) {
             getLogger().severe("Missing /arcadeport command metadata.");
@@ -19,7 +24,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             return;
         }
         getCommand("arcadeport").setExecutor(this);
-        getLogger().info("ArcadeMechanicsModern loaded. These are first-pass mechanical prototypes, not final parity ports.");
+        getLogger().info("ArcadeMechanicsModern loaded. Cleared in-game test games: " + manager.enabledGamesLabel()
+                + ". Other mechanics prototypes stay locked until they pass parity acceptance.");
     }
 
     @Override
@@ -79,7 +85,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a Bomb Lobbers, Bacon Brawl, Dragons, Micro Battles, One in the Quiver, Paintball, Runner, Spleef or Death Tag kit; use runnerkit-<kit> for Runner");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport status" + ChatColor.GRAY + " — active game and queue counts");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport stop" + ChatColor.GRAY + " — operator reset");
-                sender.sendMessage(ChatColor.DARK_GRAY + "IDs: bacon-brawl, bomb-lobbers, death-tag, dragon-escape, dragons, evolution, gladiators, micro-battles, one-in-the-quiver, paintball, runner, sheep-quest, spleef, turf-wars");
+                sender.sendMessage(ChatColor.DARK_GRAY + "Cleared game IDs: " + manager.enabledGamesLabel());
                 return true;
         }
     }
