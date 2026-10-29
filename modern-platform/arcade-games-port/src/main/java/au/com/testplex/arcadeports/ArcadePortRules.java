@@ -345,12 +345,52 @@ public final class ArcadePortRules {
                 || (ageMillis >= BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS && touchingSolidBlock);
     }
 
-    /** Match Reborn's backstab cone: compare the target's backward look with the attacker direction. */
     /** Pig's source passive is +250% knockback, i.e. 3.5 times the normal amount. */
     public static final double BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER = 3.5D;
+    /** PerkBodySlam adds a 2x knockback multiplier to both the hit and its recoil. */
+    public static final double BACON_BODY_SLAM_EXTRA_KNOCKBACK = 2.0D;
 
     public static double baconBrawlKnockbackMultiplier(boolean backstab) {
         return backstab ? BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER : 1.0D;
+    }
+
+    /** DamageManager uses log10(max(damage, 2)) as the base, then multiplies every knockback modifier. */
+    public static double baconBrawlEffectiveKnockback(double damage, double knockbackMultipliers) {
+        double safeDamage = Double.isFinite(damage) ? Math.max(2.0D, damage) : 2.0D;
+        double safeMultiplier = Double.isFinite(knockbackMultipliers)
+                ? Math.max(0.0D, knockbackMultipliers) : 1.0D;
+        return Math.log10(safeDamage) * safeMultiplier;
+    }
+
+    /** Reproduce DamageManager's velocity strength before UtilAction's ground boost. */
+    public static double baconBrawlVelocityStrength(double damage, double knockbackMultipliers,
+            boolean projectile) {
+        double knockback = baconBrawlEffectiveKnockback(damage, knockbackMultipliers);
+        double trajectoryLength = projectile
+                ? Math.sqrt(Math.pow(0.37D * knockback, 2.0D) + 0.06D * 0.06D)
+                : 0.6D * knockback;
+        return 0.2D + trajectoryLength * 0.8D;
+    }
+
+    /** DamageManager adds 0.2 * knockback vertically, caps it, then adds 0.2 when grounded. */
+    public static double baconBrawlVerticalVelocity(double damage, double knockbackMultipliers,
+            boolean projectile, boolean grounded) {
+        double knockback = baconBrawlEffectiveKnockback(damage, knockbackMultipliers);
+        double trajectoryLength = projectile
+                ? Math.sqrt(Math.pow(0.37D * knockback, 2.0D) + 0.06D * 0.06D)
+                : 1.0D;
+        double directionY = projectile && trajectoryLength > 0.0D
+                ? (0.06D / trajectoryLength) * baconBrawlVelocityStrength(damage, knockbackMultipliers, true)
+                : 0.0D;
+        double vertical = Math.min(directionY + Math.abs(0.2D * knockback),
+                0.4D + 0.04D * knockback);
+        return vertical + (grounded ? 0.2D : 0.0D);
+    }
+
+    /** Match UtilAction.velocity for Body Slam's take-off: 1.2 horizontal speed, capped Y, ground boost. */
+    public static double baconBrawlBodySlamLaunchY(double lookDirectionY, boolean grounded) {
+        double directionY = Double.isFinite(lookDirectionY) ? lookDirectionY : 0.0D;
+        return Math.min(0.8D, directionY * 1.2D + 0.2D) + (grounded ? 0.2D : 0.0D);
     }
 
     public static boolean isBaconBrawlBackstab(double targetLookX, double targetLookZ,
