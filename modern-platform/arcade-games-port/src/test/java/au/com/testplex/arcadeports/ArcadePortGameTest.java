@@ -842,20 +842,23 @@ class ArcadePortGameTest {
         assertEquals(16, ArcadePortRules.BACON_BLAST_PROJECTILE_STACK_SIZE);
     }
 
-    @Test void baconBrawlAbilitiesRequireTheSourceIronAxeAndRightClick() {
+    @Test void baconBrawlAbilitiesRequireTheSourceIronAxeAndRightClickButIgnoreTargetSurface() {
         assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
                 org.bukkit.Material.IRON_AXE, false, "el-muchacho-pigo"));
         assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
                 org.bukkit.Material.IRON_AXE, false, "mama-piggles"));
         assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
-                org.bukkit.Material.IRON_AXE, true, "pig"),
-                "Pig cloak is the source perk that also fires on an axe right-click to a usable block");
+                org.bukkit.Material.IRON_AXE, true, "pig"));
+        assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
+                org.bukkit.Material.IRON_AXE, true, "el-muchacho-pigo"),
+                "An interactable block must not suppress the ability.");
+        assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
+                org.bukkit.Material.IRON_AXE, true, "mama-piggles"),
+                "A chest, player or other clicked surface must not suppress the ability.");
         assertFalse(ArcadePortRules.shouldActivateBaconBrawlAbility(false,
                 org.bukkit.Material.IRON_AXE, false, "pig"));
         assertFalse(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
                 org.bukkit.Material.STICK, false, "pig"));
-        assertFalse(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
-                org.bukkit.Material.IRON_AXE, true, "el-muchacho-pigo"));
         assertFalse(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
                 org.bukkit.Material.IRON_AXE, false, "chris-p-bacon"));
     }
