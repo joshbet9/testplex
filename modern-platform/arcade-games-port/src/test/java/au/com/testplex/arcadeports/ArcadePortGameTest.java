@@ -510,6 +510,19 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldAwardBaconPigsInBlankets(7));
     }
 
+    @Test void baconBlastBreaksNearbyArenaBlocksButPreservesProtectedMaterials() {
+        assertEquals(2.0D, ArcadePortRules.BACON_BLAST_TERRAIN_RADIUS, 0.00001D);
+        assertTrue(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.STONE, 0.0D));
+        assertTrue(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.OAK_PLANKS, 4.0D));
+        assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.STONE, 4.01D));
+        assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.AIR, 0.0D));
+        assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.BEDROCK, 0.0D));
+        assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.WATER, 0.0D));
+        assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.LAVA, 0.0D));
+        assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(null, 0.0D));
+        assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.STONE, Double.NaN));
+    }
+
     @Test void baconBrawlCreditsRecentKnockbackForFallAndWaterKillsOnly() {
         assertTrue(ArcadePortRules.shouldCreditBaconFallKill(10_000L, 5_001L, true));
         assertTrue(ArcadePortRules.shouldCreditBaconFallKill(10_000L, 10_000L, true));
