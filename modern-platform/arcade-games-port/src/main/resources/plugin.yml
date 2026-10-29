@@ -6,6 +6,7 @@ author: Testplex
 description: Mechanics-first prototypes for the other 14 Arcade games on Paper 26.3
 softdepend:
   - TestplexModernArcade
+  - packetevents
 commands:
   arcadeport:
     description: Start and test a modern Arcade mechanics prototype
