@@ -29,6 +29,8 @@ import org.bukkit.entity.Egg;
 import org.bukkit.entity.Fireball;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Item;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Pig;
 import org.bukkit.entity.Projectile;
@@ -2306,22 +2308,39 @@ public final class ArcadePortManager implements Listener {
         session.baconNameEntries.clear();
     }
 
-    /** Replace the player's visible model with a synchronized Pig while keeping the real player as the combat authority. */
+    /** Keep the real player authoritative while rendering the source kit's pig or pink Sheep Pig avatar. */
     private void updateBaconPlayerPig(Session session, Player owner, long now) {
         UUID ownerId = owner.getUniqueId();
-        UUID pigId = session.baconPlayerPigs.get(ownerId);
-        Pig avatar = null;
-        if (pigId != null) {
+        UUID avatarId = session.baconPlayerPigs.get(ownerId);
+        boolean sheepKit = "pig".equals(session.baconKits.getOrDefault(ownerId, "el-muchacho-pigo"));
+        LivingEntity avatar = null;
+        if (avatarId != null) {
             for (Entity entity : session.entities) {
-                if (entity instanceof Pig pig && pig.getUniqueId().equals(pigId) && pig.isValid()) {
-                    avatar = pig;
+                if (entity instanceof LivingEntity living && living.getUniqueId().equals(avatarId) && living.isValid()) {
+                    avatar = living;
                     break;
                 }
             }
         }
+        boolean wrongDisguise = avatar != null && (sheepKit != (avatar instanceof Sheep));
+        if (wrongDisguise) {
+            UUID oldId = avatar.getUniqueId();
+            avatar.eject();
+            avatar.remove();
+            session.entities.remove(avatar);
+            session.baconPigOwners.remove(oldId);
+            session.baconPlayerPigs.remove(ownerId);
+            avatar = null;
+        }
         if (avatar == null) {
-            avatar = session.world.spawn(owner.getLocation(), Pig.class);
-            avatar.setAI(false);
+            if (sheepKit) {
+                Sheep sheep = session.world.spawn(owner.getLocation(), Sheep.class);
+                sheep.setColor(DyeColor.PINK);
+                avatar = sheep;
+            } else {
+                avatar = session.world.spawn(owner.getLocation(), Pig.class);
+            }
+            if (avatar instanceof Mob mob) mob.setAI(false);
             avatar.setSilent(true);
             avatar.setRemoveWhenFarAway(false);
             avatar.setCollidable(false);
@@ -2330,6 +2349,7 @@ public final class ArcadePortManager implements Listener {
             session.baconPlayerPigs.put(ownerId, avatar.getUniqueId());
             session.baconPigOwners.put(avatar.getUniqueId(), ownerId);
         }
+        if (avatar instanceof Sheep sheep) sheep.setColor(DyeColor.PINK);
         if (avatar.getLocation().distanceSquared(owner.getLocation()) > 0.01D) {
             avatar.teleport(owner.getLocation());
         }
@@ -2343,11 +2363,11 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private Pig baconPlayerPig(Session session, UUID ownerId) {
-        UUID pigId = session.baconPlayerPigs.get(ownerId);
-        if (pigId == null) return null;
+    private LivingEntity baconPlayerAvatar(Session session, UUID ownerId) {
+        UUID avatarId = session.baconPlayerPigs.get(ownerId);
+        if (avatarId == null) return null;
         for (Entity entity : session.entities) {
-            if (entity instanceof Pig pig && pig.getUniqueId().equals(pigId) && pig.isValid()) return pig;
+            if (entity instanceof LivingEntity living && living.getUniqueId().equals(avatarId) && living.isValid()) return living;
         }
         return null;
     }
@@ -2450,7 +2470,7 @@ public final class ArcadePortManager implements Listener {
             session.baconPigOwners.put(baby.getUniqueId(), ownerId);
         }
 
-        Pig avatar = baconPlayerPig(session, ownerId);
+        LivingEntity avatar = baconPlayerAvatar(session, ownerId);
         if (avatar != null && baby.getVehicle() != avatar) {
             if (baby.getVehicle() != null) baby.leaveVehicle();
             avatar.addPassenger(baby);
@@ -2501,7 +2521,7 @@ public final class ArcadePortManager implements Listener {
             case "pig":
                 clearBaconCloak(session, id);
                 session.baconCloakedUntil.put(id, now + ArcadePortRules.BACON_CLOAK_DURATION_MILLIS);
-                Pig avatar = baconPlayerPig(session, id);
+                LivingEntity avatar = baconPlayerAvatar(session, id);
                 if (avatar != null) avatar.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 100, 0, false, false, false));
                 player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation().add(0, 1, 0), 14, 0.35D, 0.5D, 0.35D, 0.03D);
                 player.sendMessage(ChatColor.GREEN + "Cloak activated for 5 seconds.");
@@ -2521,7 +2541,7 @@ public final class ArcadePortManager implements Listener {
     private void clearBaconCloak(Session session, UUID playerId) {
         boolean wasCloaked = session.baconCloakedUntil.remove(playerId) != null;
         if (wasCloaked) {
-            Pig avatar = baconPlayerPig(session, playerId);
+            LivingEntity avatar = baconPlayerAvatar(session, playerId);
             if (avatar != null) avatar.removePotionEffect(PotionEffectType.INVISIBILITY);
         }
     }
@@ -4910,7 +4930,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.BACON_BRAWL
-                && event.getEntity() instanceof Pig avatar
+                && event.getEntity() instanceof LivingEntity avatar
                 && session.baconPigOwners.containsKey(avatar.getUniqueId())) {
             event.setCancelled(true);
             if (event instanceof EntityDamageByEntityEvent byEntity) {
@@ -5106,7 +5126,7 @@ public final class ArcadePortManager implements Listener {
             Player target = null;
             if (event.getHitEntity() instanceof Player hitPlayer) {
                 target = hitPlayer;
-            } else if (event.getHitEntity() instanceof Pig avatar) {
+            } else if (event.getHitEntity() instanceof LivingEntity avatar) {
                 UUID ownerId = session.baconPigOwners.get(avatar.getUniqueId());
                 if (ownerId != null) target = session.players.get(ownerId);
             }
