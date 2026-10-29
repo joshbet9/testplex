@@ -10,6 +10,7 @@ import org.bukkit.GameMode;
 import org.bukkit.GameRule;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
@@ -62,8 +63,10 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.projectiles.ProjectileSource;
@@ -125,10 +128,16 @@ public final class ArcadePortManager implements Listener {
     private long lastDragonHazard;
     private long lastSheepSpawn;
 
+    private final NamespacedKey statsActionKey;
+    private final NamespacedKey statsCategoryKey;
+    private final NamespacedKey statsGameKey;
     private final ModernArcadeLobby lobby;
 
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
+        this.statsActionKey = new NamespacedKey(plugin, "stats-action");
+        this.statsCategoryKey = new NamespacedKey(plugin, "stats-category");
+        this.statsGameKey = new NamespacedKey(plugin, "stats-game");
         this.lobby = new ModernArcadeLobby(plugin);
         Bukkit.getPluginManager().registerEvents(this, plugin);
         Bukkit.getPluginManager().registerEvents(lobby, plugin);
@@ -5244,6 +5253,73 @@ public final class ArcadePortManager implements Listener {
         plugin.saveConfig();
     }
 
+    private enum StatsPage { ROOT, ARCADE, CATEGORY, GAME }
+
+    private static final class StatsMenuHolder implements InventoryHolder {
+        private final StatsPage page;
+        private final UUID targetId;
+        private final String targetName;
+        private final String categoryId;
+        private Inventory inventory;
+
+        private StatsMenuHolder(StatsPage page, UUID targetId, String targetName, String categoryId) {
+            this.page = page;
+            this.targetId = targetId;
+            this.targetName = targetName;
+            this.categoryId = categoryId;
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return inventory;
+        }
+    }
+
+    // AchievementMainPage's exact 5-row OX layout, and the 1.8 non-Arcade categories.
+    private static final String[][] ROOT_STATS_CATEGORIES = {
+            {"global", "Global", "EMERALD"},
+            {"holiday", "Holiday Achievements", "CAKE"},
+            {"bridges", "The Bridges", "IRON_PICKAXE"},
+            {"survival-games", "Survival Games", "DIAMOND_SWORD"},
+            {"skywars", "Skywars", "FEATHER"},
+            {"wizards", "Wizards", "BLAZE_ROD"},
+            {"castle-assault", "Castle Assault", "DIAMOND_CHESTPLATE"},
+            {"castle-siege", "Castle Siege", "DIAMOND_CHESTPLATE"},
+            {"bawk-bawk-battles", "Bawk Bawk Battles", "EGG"},
+            {"block-hunt", "Block Hunt", "GRASS_BLOCK"},
+            {"smash-mobs", "Super Smash Mobs", "WITHER_SKELETON_SKULL"},
+            {"mine-strike", "MineStrike", "TNT"},
+            {"draw-my-thing", "Draw My Thing", "WRITABLE_BOOK"},
+            {"champions", "Champions", "BEACON"},
+            {"master-builders", "Master Builders", "OAK_PLANKS"},
+            {"speed-builders", "Speed Builders", "QUARTZ_BLOCK"},
+            {"skyfall", "Skyfall", "DIAMOND_BOOTS"},
+            {"gem-hunters", "Gem Hunters", "EMERALD"},
+            {"moba", "Heroes of GWEN", "PRISMARINE_SHARD"},
+            {"cake-wars", "Cake Wars", "CAKE"},
+            {"nano-games", "Nano Games", "EGG"}
+    };
+
+    // Mirrors the legacy ArcadeMainPage order, including Snake and Monster Maze.
+    private static final String[][] ARCADE_STATS_GAMES = {
+            {"dragons", "Dragons", "ENDER_STONE"},
+            {"dragon-escape", "Dragon Escape", "DRAGON_EGG"},
+            {"sheep-quest", "Sheep Quest", "WHITE_WOOL"},
+            {"one-in-the-quiver", "One in the Quiver", "BOW"},
+            {"paintball", "Super Paintball", "ENDER_PEARL"},
+            {"turf-wars", "Turf Wars", "RED_TERRACOTTA"},
+            {"runner", "Runner", "LEATHER_BOOTS"},
+            {"spleef", "Super Spleef", "IRON_SHOVEL"},
+            {"death-tag", "Death Tag", "SKELETON_SKULL"},
+            {"snake", "Snake", "GRAY_WOOL"},
+            {"bacon-brawl", "Bacon Brawl", "PORKCHOP"},
+            {"micro-battles", "Micro Battle", "LAVA_BUCKET"},
+            {"bomb-lobbers", "Bomb Lobbers", "FIRE_CHARGE"},
+            {"evolution", "Evolution", "SLIME_SPAWN_EGG"},
+            {"monster-maze", "Monster Maze", "ROTTEN_FLESH"},
+            {"gladiators", "Gladiators", "IRON_SWORD"}
+    };
+
     public void openStats(Player viewer, String requestedPlayerName) {
         Player target = viewer;
         if (requestedPlayerName != null && !requestedPlayerName.isBlank()
@@ -5263,67 +5339,207 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
-        UUID targetId = target.getUniqueId();
-        String title = ChatColor.BLUE + "Testplex Stats | " + target.getName();
-        org.bukkit.inventory.Inventory inventory = Bukkit.createInventory(null, 54, title);
-
-        int slot = 0;
-        for (ArcadePortGame game : ArcadePortGame.values()) {
-            String path = localStatsPath(targetId, game.id());
-            List<String> lore = new ArrayList<>();
-            lore.add(ChatColor.GRAY + "Completed games: " + ChatColor.WHITE
-                    + plugin.getConfig().getInt(path + "games-played", 0));
-            lore.add(ChatColor.GRAY + "Wins: " + ChatColor.WHITE
-                    + plugin.getConfig().getInt(path + "wins", 0));
-            lore.add(ChatColor.GRAY + "Cumulative score / kills: " + ChatColor.WHITE
-                    + plugin.getConfig().getInt(path + "score", 0));
-            lore.add(ChatColor.GRAY + "Knockouts: " + ChatColor.WHITE
-                    + plugin.getConfig().getInt(path + "knockouts", 0));
-            Session current = active;
-            if (current != null && current.type == game && current.players.containsKey(targetId)) {
-                lore.add("");
-                lore.add(ChatColor.GOLD + "Current test: "
-                        + (current.alive.contains(targetId) ? "Alive" : "Spectating"));
-                lore.add(ChatColor.GRAY + "Current score: "
-                        + current.scores.getOrDefault(targetId, 0));
-            }
-            ItemStack item = new ItemStack(game.floor());
-            ItemMeta meta = item.getItemMeta();
-            meta.setDisplayName(ChatColor.AQUA + game.displayName());
-            meta.setLore(lore);
-            item.setItemMeta(meta);
-            inventory.setItem(slot++, item);
-        }
-        addStatsSummaryItem(inventory, slot++, "Monster Maze", Material.MOSS_BLOCK, targetId, "monster-maze");
-        addStatsSummaryItem(inventory, slot++, "Snake", Material.SLIME_BLOCK, targetId, "snake");
-        ItemStack close = new ItemStack(Material.BARRIER);
-        ItemMeta closeMeta = close.getItemMeta();
-        closeMeta.setDisplayName(ChatColor.RED + "Close");
-        close.setItemMeta(closeMeta);
-        inventory.setItem(49, close);
-        viewer.openInventory(inventory);
+        openStatsMain(viewer, target.getUniqueId(), target.getName());
         viewer.sendMessage(ChatColor.GRAY + "Showing local Testplex acceptance stats for " + target.getName()
-                + ". These are isolated test-server results, not production Mineplex stats.");
+                + ". These remain isolated from production Mineplex stats.");
     }
 
-    private void addStatsSummaryItem(org.bukkit.inventory.Inventory inventory, int slot,
-            String name, Material icon, UUID targetId, String gameId) {
+    private Inventory createStatsInventory(StatsPage page, UUID targetId, String targetName,
+                                           String title, String categoryId) {
+        StatsMenuHolder holder = new StatsMenuHolder(page, targetId, targetName, categoryId);
+        Inventory inventory = Bukkit.createInventory(holder, 54, title);
+        holder.inventory = inventory;
+        return inventory;
+    }
+
+    private void openStatsMain(Player viewer, UUID targetId, String targetName) {
+        Inventory inventory = createStatsInventory(StatsPage.ROOT, targetId, targetName,
+                targetName + "'s Stats", "global");
+        int[] rootSlots = {0, 2, 4, 6, 8, 9, 11, 13, 15, 17, 18, 20, 22, 24, 26, 27, 29, 31, 33, 35, 36};
+        for (int i = 0; i < ROOT_STATS_CATEGORIES.length; i++) {
+            String[] def = ROOT_STATS_CATEGORIES[i];
+            List<String> lore = new ArrayList<>();
+            lore.add(" ");
+            if ("global".equals(def[0])) {
+                lore.add(ChatColor.YELLOW + "Games Played: " + ChatColor.WHITE + totalLocalStat(targetId, "games-played"));
+                lore.add(ChatColor.YELLOW + "Wins: " + ChatColor.WHITE + totalLocalStat(targetId, "wins"));
+                lore.add(ChatColor.YELLOW + "Score / Kills: " + ChatColor.WHITE + totalLocalStat(targetId, "score"));
+                lore.add(ChatColor.YELLOW + "Knockouts: " + ChatColor.WHITE + totalLocalStat(targetId, "knockouts"));
+            } else {
+                lore.add(ChatColor.GRAY + "This category remains in the original 1.8 Stats layout.");
+                lore.add(ChatColor.GRAY + "Its production stats backend is not part of this isolated server.");
+            }
+            lore.add(" ");
+            lore.add(ChatColor.RESET + "Click for more details!");
+            ItemStack item = statsItem(materialOrChest(def[2]), ChatColor.BOLD + def[1], lore,
+                    "open-category", def[0], null);
+            inventory.setItem(rootSlots[i], item);
+        }
+        ItemStack arcade = statsItem(Material.BOW, ChatColor.BOLD + "Arcade Games",
+                List.of(" ", ChatColor.RESET + "Click for more!"), "open-arcade", null, null);
+        inventory.setItem(38, arcade);
+        ItemStack uhc = statsItem(Material.GOLDEN_APPLE, ChatColor.BOLD + "UHC",
+                List.of(" ", ChatColor.RESET + "Click for more!"), "open-category", "uhc", null);
+        inventory.setItem(40, uhc);
+        inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(), "close", null, null));
+        viewer.openInventory(inventory);
+    }
+
+    private void openStatsArcade(Player viewer, UUID targetId, String targetName) {
+        Inventory inventory = createStatsInventory(StatsPage.ARCADE, targetId, targetName, "Arcade Games", "arcade");
+        int slot = 9;
+        for (String[] def : ARCADE_STATS_GAMES) {
+            String gameId = def[0];
+            ItemStack item = statsItem(materialOrChest(def[2]), ChatColor.BOLD + def[1],
+                    gameStatsLore(targetId, gameId, true), "open-game", null, gameId);
+            inventory.setItem(slot, item);
+            slot += ((slot + 1) % 9 == 0) ? 1 : 2;
+        }
+        inventory.setItem(4, statsItem(Material.BED, ChatColor.GRAY + "↩ Go Back", List.of(),
+                "back-main", null, null));
+        inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(),
+                "close", null, null));
+        viewer.openInventory(inventory);
+    }
+
+    private void openStatsCategory(Player viewer, UUID targetId, String targetName, String categoryId) {
+        String categoryName = "global";
+        String icon = "EMERALD";
+        for (String[] def : ROOT_STATS_CATEGORIES) {
+            if (def[0].equals(categoryId)) {
+                categoryName = def[1];
+                icon = def[2];
+                break;
+            }
+        }
+        if ("uhc".equals(categoryId)) {
+            categoryName = "Ultra Hardcore";
+            icon = "GOLDEN_APPLE";
+        }
+        Inventory inventory = createStatsInventory(StatsPage.CATEGORY, targetId, targetName, categoryName, categoryId);
+        if ("global".equals(categoryId)) {
+            int[][] values = {
+                    {29, totalLocalStat(targetId, "games-played")},
+                    {30, totalLocalStat(targetId, "wins")},
+                    {31, totalLocalStat(targetId, "score")},
+                    {32, totalLocalStat(targetId, "knockouts")}
+            };
+            String[] labels = {"Games Played", "Wins", "Score / Kills", "Knockouts"};
+            for (int i = 0; i < values.length; i++) {
+                int value = values[i][1];
+                inventory.setItem(values[i][0], statsItem(value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (value > 0 ? ChatColor.GREEN : ChatColor.RED) + labels[i],
+                        List.of(" ", ChatColor.GRAY + "Recorded by this local test server: " + ChatColor.WHITE + value),
+                        "noop", null, null));
+            }
+            inventory.setItem(22, statsSummaryItem(Material.BOOK, ChatColor.BOLD + "Global Stats",
+                    List.of(ChatColor.GRAY + "Total games played: " + totalLocalStat(targetId, "games-played"),
+                            ChatColor.GRAY + "Total wins: " + totalLocalStat(targetId, "wins"),
+                            ChatColor.GRAY + "Combined score / kills: " + totalLocalStat(targetId, "score"),
+                            ChatColor.GRAY + "Total knockouts: " + totalLocalStat(targetId, "knockouts"))));
+        } else {
+            inventory.setItem(31, statsItem(Material.BARRIER, ChatColor.RED + "No Local Stats",
+                    List.of(ChatColor.GRAY + "This category is shown to preserve the 1.8 layout.",
+                            ChatColor.GRAY + "Its stats aren't tracked by the isolated Arcade test server."),
+                    "noop", null, null));
+            inventory.setItem(22, statsSummaryItem(materialOrChest(icon), ChatColor.BOLD + categoryName + " Stats",
+                    List.of(ChatColor.GRAY + "No local stats source is configured for this category.")));
+        }
+        inventory.setItem(4, statsItem(Material.BED, ChatColor.GRAY + "↩ Go Back", List.of(),
+                "back-main", null, null));
+        inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(),
+                "close", null, null));
+        viewer.openInventory(inventory);
+    }
+
+    private void openStatsGame(Player viewer, UUID targetId, String targetName, String gameId) {
+        if (gameId == null) return;
+        String displayName = statsGameName(gameId);
         String path = localStatsPath(targetId, gameId);
-        ItemStack item = new ItemStack(icon);
+        int played = plugin.getConfig().getInt(path + "games-played", 0);
+        int wins = plugin.getConfig().getInt(path + "wins", 0);
+        int score = plugin.getConfig().getInt(path + "score", 0);
+        int knockouts = plugin.getConfig().getInt(path + "knockouts", 0);
+        Inventory inventory = createStatsInventory(StatsPage.GAME, targetId, targetName, displayName, gameId);
+        int[] slots = {29, 30, 31, 32};
+        int[] values = {played, wins, score, knockouts};
+        String[] labels = {"Games Played", "Wins", "Score / Kills", "Knockouts"};
+        for (int i = 0; i < values.length; i++) {
+            int value = values[i];
+            List<String> lore = List.of(" ",
+                    ChatColor.GRAY + "Recorded by this local test server: " + ChatColor.WHITE + value,
+                    ChatColor.DARK_GRAY + "Not production Mineplex achievement data.");
+            inventory.setItem(slots[i], statsItem(value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                    (value > 0 ? ChatColor.GREEN : ChatColor.RED) + labels[i], lore, "noop", null, null));
+        }
+        inventory.setItem(22, statsSummaryItem(Material.BOOK, ChatColor.BOLD + displayName + " Stats",
+                gameStatsLore(targetId, gameId, false)));
+        inventory.setItem(4, statsItem(Material.BED, ChatColor.GRAY + "↩ Go Back", List.of(),
+                "back-arcade", null, null));
+        inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(),
+                "close", null, null));
+        viewer.openInventory(inventory);
+    }
+
+    private List<String> gameStatsLore(UUID targetId, String gameId, boolean compact) {
+        String path = localStatsPath(targetId, gameId);
+        List<String> lore = new ArrayList<>();
+        lore.add(" ");
+        lore.add(ChatColor.GRAY + "Games Played: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "games-played", 0));
+        lore.add(ChatColor.GRAY + "Wins: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "wins", 0));
+        lore.add(ChatColor.GRAY + "Score / Kills: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "score", 0));
+        lore.add(ChatColor.GRAY + "Knockouts: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "knockouts", 0));
+        if (!compact) lore.add(ChatColor.DARK_GRAY + "Stats recorded by the isolated test server.");
+        else lore.add(ChatColor.RESET + "Click for more details!");
+        Session current = active;
+        if (current != null && current.type != null && current.type.id().equals(gameId)
+                && current.players.containsKey(targetId)) {
+            lore.add(" ");
+            lore.add(ChatColor.GOLD + "Current test: " + (current.alive.contains(targetId) ? "Alive" : "Spectating"));
+            lore.add(ChatColor.GRAY + "Current score: " + current.scores.getOrDefault(targetId, 0));
+        }
+        return lore;
+    }
+
+    private int totalLocalStat(UUID targetId, String metric) {
+        int total = 0;
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            total += plugin.getConfig().getInt(localStatsPath(targetId, game.id()) + metric, 0);
+        }
+        total += plugin.getConfig().getInt(localStatsPath(targetId, "monster-maze") + metric, 0);
+        total += plugin.getConfig().getInt(localStatsPath(targetId, "snake") + metric, 0);
+        return total;
+    }
+
+    private String statsGameName(String gameId) {
+        for (String[] def : ARCADE_STATS_GAMES) if (def[0].equals(gameId)) return def[1];
+        ArcadePortGame game = ArcadePortGame.fromId(gameId);
+        return game == null ? gameId : game.displayName();
+    }
+
+    private Material materialOrChest(String name) {
+        Material material = Material.matchMaterial(name);
+        return material == null ? Material.CHEST : material;
+    }
+
+    private ItemStack statsSummaryItem(Material material, String title, List<String> lore) {
+        ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
-        meta.setDisplayName(ChatColor.AQUA + name);
-        meta.setLore(List.of(
-                ChatColor.GRAY + "Completed games: " + ChatColor.WHITE
-                        + plugin.getConfig().getInt(path + "games-played", 0),
-                ChatColor.GRAY + "Wins: " + ChatColor.WHITE
-                        + plugin.getConfig().getInt(path + "wins", 0),
-                ChatColor.GRAY + "Cumulative score: " + ChatColor.WHITE
-                        + plugin.getConfig().getInt(path + "score", 0),
-                ChatColor.GRAY + "Knockouts: " + ChatColor.WHITE
-                        + plugin.getConfig().getInt(path + "knockouts", 0),
-                ChatColor.DARK_GRAY + "Stats recorded by this isolated test server."));
+        meta.setDisplayName(title);
+        meta.setLore(lore);
         item.setItemMeta(meta);
-        inventory.setItem(slot, item);
+        return item;
+    }
+
+    private ItemStack statsItem(Material material, String title, List<String> lore,
+                                String action, String categoryId, String gameId) {
+        ItemStack item = statsSummaryItem(material, title, lore);
+        ItemMeta meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(statsActionKey, PersistentDataType.STRING, action);
+        if (categoryId != null) meta.getPersistentDataContainer().set(statsCategoryKey, PersistentDataType.STRING, categoryId);
+        if (gameId != null) meta.getPersistentDataContainer().set(statsGameKey, PersistentDataType.STRING, gameId);
+        item.setItemMeta(meta);
+        return item;
     }
 
     private void announce(Session session, String text) {
@@ -6580,13 +6796,33 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        String title = ChatColor.stripColor(event.getView().getTitle());
-        if (title != null && title.startsWith("Testplex Stats |")) {
+        if (event.getView().getTopInventory().getHolder() instanceof StatsMenuHolder holder) {
             event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof Player player)
+                    || event.getClickedInventory() == null
+                    || event.getClickedInventory() != event.getView().getTopInventory()) return;
+            ItemStack clicked = event.getCurrentItem();
+            if (clicked == null || clicked.getType().isAir() || !clicked.hasItemMeta()) return;
+            ItemMeta meta = clicked.getItemMeta();
+            String action = meta.getPersistentDataContainer().get(statsActionKey, PersistentDataType.STRING);
+            String category = meta.getPersistentDataContainer().get(statsCategoryKey, PersistentDataType.STRING);
+            String gameId = meta.getPersistentDataContainer().get(statsGameKey, PersistentDataType.STRING);
+            switch (action == null ? "" : action) {
+                case "close" -> player.closeInventory();
+                case "open-arcade" -> openStatsArcade(player, holder.targetId, holder.targetName);
+                case "open-category" -> openStatsCategory(player, holder.targetId, holder.targetName,
+                        category == null ? "global" : category);
+                case "open-game" -> openStatsGame(player, holder.targetId, holder.targetName, gameId);
+                case "back-main" -> openStatsMain(player, holder.targetId, holder.targetName);
+                case "back-arcade" -> openStatsArcade(player, holder.targetId, holder.targetName);
+                case "back-category" -> openStatsMain(player, holder.targetId, holder.targetName);
+                default -> { }
+            }
             return;
         }
         Session session = active;
-        if (session != null && event.getWhoClicked() instanceof Player player && session.players.containsKey(player.getUniqueId())) event.setCancelled(true);
+        if (session != null && event.getWhoClicked() instanceof Player player
+                && session.players.containsKey(player.getUniqueId())) event.setCancelled(true);
     }
 
     private void cacheBombLobbersTeamSpawnCentres(Session session) {
