@@ -12,9 +12,11 @@ import org.bukkit.entity.Item;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.Cancellable;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 
 import mineplex.core.common.util.C;
 import mineplex.core.common.util.F;
@@ -55,13 +57,27 @@ public class PerkBaconBlast extends Perk implements IThrown
 		if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK)
 			return;
 
-		if (UtilBlock.usable(event.getClickedBlock()))
+		activate(event.getPlayer(), event);
+	}
+
+	/**
+	 * Bukkit reports right-clicking an entity through a separate event rather than
+	 * PlayerInteractEvent. Route both event types through the same activation path
+	 * so the ability works on air, blocks and players without double-consuming charge.
+	 */
+	@EventHandler
+	public void ShootEntity(PlayerInteractEntityEvent event)
+	{
+		if (event.isCancelled())
 			return;
 
-		if (!UtilGear.isAxe(event.getItem()))
-			return;
+		activate(event.getPlayer(), event);
+	}
 
-		Player player = event.getPlayer();
+	private void activate(Player player, Cancellable event)
+	{
+		if (!UtilGear.isAxe(player.getItemInHand()))
+			return;
 
 		if (!Kit.HasKit(player))
 			return;
@@ -70,7 +86,6 @@ public class PerkBaconBlast extends Perk implements IThrown
 			return;
 
 		event.setCancelled(true);
-
 		UtilInv.Update(player);
 
 		org.bukkit.entity.Item ent = player.getWorld().dropItem(player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.5)), ItemStackFactory.Instance.CreateStack(Material.PORK, (byte)0, 16));
@@ -79,17 +94,14 @@ public class PerkBaconBlast extends Perk implements IThrown
 			_cosmeticItems.put(ent, player);
 			BaconBrawlCosmeticEffects.play(player, ent.getLocation(), "bacon-blast-activation");
 		}
-		UtilAction.velocity(ent, player.getLocation().getDirection(), 1, false, 0, 0.2, 10, false);	
+		UtilAction.velocity(ent, player.getLocation().getDirection(), 1, false, 0, 0.2, 10, false);
 
-		Manager.GetProjectile().AddThrow(ent, player, this, -1, true, true, true, true, 
-				null, 1f, 1f, 
-				null, 1, UpdateType.SLOW, 
+		Manager.GetProjectile().AddThrow(ent, player, this, -1, true, true, true, true,
+				null, 1f, 1f,
+				null, 1, UpdateType.SLOW,
 				0.5f);
 
-		//Inform
 		UtilPlayer.message(player, F.main("Game", "You used " + F.skill(GetName()) + "."));
-
-		//Effect
 		player.getWorld().playSound(player.getLocation(), Sound.PIG_IDLE, 2f, 2f);
 	}
 
