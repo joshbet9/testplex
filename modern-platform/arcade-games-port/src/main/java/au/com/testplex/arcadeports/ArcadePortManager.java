@@ -2521,9 +2521,8 @@ public final class ArcadePortManager implements Listener {
             double bestDistanceSquared = Double.POSITIVE_INFINITY;
             for (Player candidate : alivePlayers(session)) {
                 if (candidate.getUniqueId().equals(ownerId)) continue;
-                Vector targetCenter = candidate.getLocation().toVector().add(new Vector(0.0D, 0.9D, 0.0D));
-                double distanceSquared = distanceSquaredToSegment(
-                        targetCenter, previous.toVector().clone(), current.toVector().clone());
+                Location targetCenter = candidate.getLocation().clone().add(0.0D, 0.9D, 0.0D);
+                double distanceSquared = distanceSquaredToSegment(targetCenter, previous, current);
                 if (ArcadePortRules.isBaconBlastNearPlayer(distanceSquared)
                         && distanceSquared < bestDistanceSquared) {
                     target = candidate;
