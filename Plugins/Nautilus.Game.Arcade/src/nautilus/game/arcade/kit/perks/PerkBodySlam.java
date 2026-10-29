@@ -5,14 +5,15 @@ import java.util.HashMap;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.Cancellable;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 
 import mineplex.core.common.util.C;
 import mineplex.core.common.util.F;
 import mineplex.core.common.util.UtilAction;
-import mineplex.core.common.util.UtilBlock;
 import mineplex.core.common.util.UtilEnt;
 import mineplex.core.common.util.UtilMath;
 import mineplex.core.common.util.UtilPlayer;
@@ -52,16 +53,25 @@ public class PerkBodySlam extends Perk
 		if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK)
 			return;
 
-		if (UtilBlock.usable(event.getClickedBlock()))
+		activate(event.getPlayer(), event);
+	}
+
+	@EventHandler
+	public void LeapOnEntity(PlayerInteractEntityEvent event)
+	{
+		if (event.isCancelled())
 			return;
 
-		if (event.getPlayer().getItemInHand() == null)
+		activate(event.getPlayer(), event);
+	}
+
+	private void activate(Player player, Cancellable event)
+	{
+		if (player.getItemInHand() == null)
 			return;
 
-		if (!event.getPlayer().getItemInHand().getType().toString().contains("_AXE"))
-			return; 
-
-		Player player = event.getPlayer();
+		if (!player.getItemInHand().getType().toString().contains("_AXE"))
+			return;
 
 		if (!Kit.HasKit(player))
 			return;
@@ -69,14 +79,14 @@ public class PerkBodySlam extends Perk
 		if (!Recharge.Instance.use(player, GetName(), 8000, true, true))
 			return;
 
+		// Do not let a right-click on a block/entity suppress the ability.
+		event.setCancelled(true);
 		UtilAction.velocity(player, player.getLocation().getDirection(), 1.2, false, 0, 0.2, 0.8, true);
 
-		//Record
 		_live.put(player, System.currentTimeMillis());
 		if (Manager.GetGame().GetType() == GameType.BaconBrawl)
 			BaconBrawlCosmeticEffects.play(player, "body-slam-activation");
 
-		//Inform
 		UtilPlayer.message(player, F.main("Game", "You used " + F.skill(GetName()) + "."));
 	}
 
