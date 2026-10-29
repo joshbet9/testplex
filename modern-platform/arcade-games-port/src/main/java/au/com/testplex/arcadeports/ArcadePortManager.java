@@ -3451,6 +3451,10 @@ public final class ArcadePortManager implements Listener {
             if (killer != null && session.scores.containsKey(killer.getUniqueId())) {
                 int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
                 killer.sendMessage(ChatColor.GREEN + "Bacon Brawl kill! " + kills + " kills.");
+                if (ArcadePortRules.shouldAwardBaconPigsInBlankets(kills)
+                        && session.baconPigsInBlanketsAwarded.add(killer.getUniqueId())) {
+                    killer.sendMessage(ChatColor.GOLD + "Achievement unlocked: Pigs In Blankets — 6 kills in one game!");
+                }
             }
             session.respawning.add(playerId);
             if (player.isOnline()) {
@@ -4178,6 +4182,9 @@ public final class ArcadePortManager implements Listener {
         if (active != session) return;
         active = null;
         if (session.tickTask != null) session.tickTask.cancel();
+        if (announceWinner && session.type == ArcadePortGame.BACON_BRAWL && winner != null) {
+            recordBaconBrawlWin(winner);
+        }
         if (announceWinner) {
             if (session.type == ArcadePortGame.SHEEP_QUEST && winner != null) {
                 int winnerTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
@@ -4225,6 +4232,25 @@ public final class ArcadePortManager implements Listener {
         session.alive.clear();
         session.players.clear();
         session.snapshots.clear();
+    }
+
+    /**
+     * The isolated modern test harness records this selected achievement locally, keyed by UUID.
+     * It does not claim to write to the production Mineplex achievement service.
+     */
+    private void recordBaconBrawlWin(Player winner) {
+        UUID id = winner.getUniqueId();
+        String base = "test-achievements.bacon-brawl." + id;
+        String winsKey = base + ".wins";
+        String achievedKey = base + ".king-of-bacon";
+        int wins = plugin.getConfig().getInt(winsKey, 0) + 1;
+        plugin.getConfig().set(winsKey, wins);
+        if (ArcadePortRules.shouldAwardBaconKingOfBacon(wins)
+                && !plugin.getConfig().getBoolean(achievedKey, false)) {
+            plugin.getConfig().set(achievedKey, true);
+            winner.sendMessage(ChatColor.GOLD + "Achievement unlocked: King of Bacon — 15 wins!");
+        }
+        plugin.saveConfig();
     }
 
     private void announce(Session session, String text) {
@@ -5804,6 +5830,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> baconSlams = new HashMap<>();
         final Map<UUID, Long> baconCloakedUntil = new HashMap<>();
         final Map<UUID, UUID> baconBabyPigs = new HashMap<>();
+        final Set<UUID> baconPigsInBlanketsAwarded = new HashSet<>();
         final Set<UUID> respawning = new HashSet<>();
         final Set<Sheep> sheep = new HashSet<>();
         final Map<Sheep, Integer> sheepOwners = new HashMap<>();
