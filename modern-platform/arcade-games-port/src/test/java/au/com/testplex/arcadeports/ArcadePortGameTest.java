@@ -374,6 +374,19 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isSpleefFloorMaterial(null));
     }
 
+    @Test void bombLobbersExplosionAddsLegacyImpulseInsteadOfReplacingVelocity() {
+        var impulse = ArcadePortRules.bombLobbersExplosionVelocity(
+                new org.bukkit.util.Vector(0.25D, 0.4D, -0.1D),
+                new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D), 0.5D);
+        assertEquals(0.75D, impulse.getX(), 0.00001D);
+        assertEquals(0.4D, impulse.getY(), 0.00001D);
+        assertEquals(-0.1D, impulse.getZ(), 0.00001D);
+        assertEquals(new org.bukkit.util.Vector(0.25D, 0.4D, -0.1D),
+                ArcadePortRules.bombLobbersExplosionVelocity(
+                        new org.bukkit.util.Vector(0.25D, 0.4D, -0.1D),
+                        new org.bukkit.util.Vector(0.0D, 0.0D, 0.0D), 0.5D));
+    }
+
     @Test void bombLobbersDoubleJumpMatchesLegacyVelocityNormaliseThenScale() {
         var jumper = ArcadePortRules.bombLobbersDoubleJumpVelocity(
                 new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D), 1.2D);
