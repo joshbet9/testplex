@@ -362,6 +362,11 @@ public final class ArcadePortRules {
      * The original game is a kill race, so deaths and respawns do not remove a
      * player's accumulated kills from the final comparison.
      */
+    /** The retained Sheep Pig kit is the one source kit whose disguise is a pink sheep. */
+    public static boolean baconBrawlUsesSheepAvatar(String requestedKit) {
+        return "pig".equals(normalizeBaconBrawlKit(requestedKit));
+    }
+
     public static int baconBrawlUniqueLeaderIndex(java.util.List<Integer> kills) {
         if (kills == null || kills.isEmpty()) return -1;
         int bestScore = Integer.MIN_VALUE;
