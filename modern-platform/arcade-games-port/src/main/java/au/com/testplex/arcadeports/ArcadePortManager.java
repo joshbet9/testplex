@@ -4170,12 +4170,9 @@ public final class ArcadePortManager implements Listener {
                 int slamKills = session.baconBodySlamKills.merge(killerId, 1, Integer::sum);
                 if (ArcadePortRules.shouldAwardBaconThreeForOne(slamKills)
                         && session.baconThreeForOneAwarded.add(killerId)) {
-                    String achievementKey = "test-achievements.bacon-brawl." + killerId + ".three-for-one";
-                    if (!plugin.getConfig().getBoolean(achievementKey, false)) {
-                        plugin.getConfig().set(achievementKey, true);
-                        killer.sendMessage(ChatColor.GOLD + "Achievement unlocked: Three for one! — 3 Body Slam kills in one game.");
-                        plugin.saveConfig();
-                    }
+                    awardBaconAchievement(killer,
+                            ArcadePortRules.baconBrawlAchievementConfigKey(killerId, "three-for-one"),
+                            "Three for one! — 3 Body Slam kills in one game.");
                 }
             }
             session.baconLastDamager.remove(playerId);
@@ -4194,7 +4191,9 @@ public final class ArcadePortManager implements Listener {
                 killer.sendMessage(ChatColor.GREEN + "Bacon Brawl kill! " + kills + " kills.");
                 if (ArcadePortRules.shouldAwardBaconPigsInBlankets(kills)
                         && session.baconPigsInBlanketsAwarded.add(killer.getUniqueId())) {
-                    killer.sendMessage(ChatColor.GOLD + "Achievement unlocked: Pigs In Blankets — 6 kills in one game!");
+                    awardBaconAchievement(killer,
+                            ArcadePortRules.baconBrawlAchievementConfigKey(killer.getUniqueId(), "pigs-in-blankets"),
+                            "Pigs In Blankets — 6 kills in one game.");
                 }
             }
             if (player.isOnline()) {
@@ -4995,14 +4994,15 @@ public final class ArcadePortManager implements Listener {
     /** Record the three Bacon Brawl achievements in the isolated test config, never production milestones. */
     private void recordBaconBrawlAchievements(Session session, Player winner) {
         UUID id = winner.getUniqueId();
-        String base = "test-achievements.bacon-brawl." + id;
         long elapsed = Math.max(0L, System.currentTimeMillis() - session.startedAt);
         if (ArcadePortRules.shouldAwardBaconFlashFried(elapsed)) {
-            awardBaconAchievement(winner, base + ".flash-fried",
+            awardBaconAchievement(winner,
+                    ArcadePortRules.baconBrawlAchievementConfigKey(id, "flash-fried"),
                     "Flash Fried — won Bacon Brawl in 60 seconds or less.");
         }
         if (ArcadePortRules.shouldAwardBaconRawPork(!session.baconAbilitiesUsed.contains(id))) {
-            awardBaconAchievement(winner, base + ".raw-pork",
+            awardBaconAchievement(winner,
+                    ArcadePortRules.baconBrawlAchievementConfigKey(id, "raw-pork"),
                     "Raw Pork — won Bacon Brawl without using an ability.");
         }
     }
