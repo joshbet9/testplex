@@ -546,6 +546,20 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldExpireBaconBlast(5_000L, 0L, false));
     }
 
+    @Test void baconBlastImpactSuppressesExplosionHealthDamageOnlyDuringItsOwnImpact() {
+        var explosion = org.bukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_EXPLOSION;
+        var blockExplosion = org.bukkit.event.entity.EntityDamageEvent.DamageCause.BLOCK_EXPLOSION;
+        var fall = org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL;
+        var fire = org.bukkit.event.entity.EntityDamageEvent.DamageCause.FIRE_TICK;
+        assertTrue(ArcadePortRules.shouldSuppressBaconBlastHealthDamage(true, true, explosion));
+        assertTrue(ArcadePortRules.shouldSuppressBaconBlastHealthDamage(true, true, blockExplosion));
+        assertFalse(ArcadePortRules.shouldSuppressBaconBlastHealthDamage(true, false, explosion));
+        assertFalse(ArcadePortRules.shouldSuppressBaconBlastHealthDamage(false, true, explosion));
+        assertFalse(ArcadePortRules.shouldSuppressBaconBlastHealthDamage(true, true, fall));
+        assertFalse(ArcadePortRules.shouldSuppressBaconBlastHealthDamage(true, true, fire));
+        assertFalse(ArcadePortRules.shouldSuppressBaconBlastHealthDamage(true, true, null));
+    }
+
     @Test void baconBlastNeverBreaksSourceArenaBlocks() {
         assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.STONE, 0.0D));
         assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.OAK_PLANKS, 0.0D));
