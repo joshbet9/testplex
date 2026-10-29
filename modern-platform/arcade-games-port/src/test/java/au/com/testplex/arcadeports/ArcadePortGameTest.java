@@ -301,6 +301,20 @@ class ArcadePortGameTest {
         assertEquals(nestedWorld, SourceMapCatalog.locateMapRoot(temporaryDirectory));
     }
 
+    @Test void sourceMapMetadataLookupFindsLegacyConfigWhenPaperMovesTheDimensionFolder(
+            @org.junit.jupiter.api.io.TempDir Path temporaryDirectory) throws Exception {
+        Path legacyRoot = temporaryDirectory.resolve("arcadeport_source_bacon_brawl");
+        Path migratedWorldFolder = temporaryDirectory.resolve(
+                "world/dimensions/minecraft/arcadeport_source_bacon_brawl");
+        java.nio.file.Files.createDirectories(legacyRoot);
+        java.nio.file.Files.createDirectories(migratedWorldFolder);
+        Path legacyConfig = legacyRoot.resolve("WorldConfig.dat");
+        java.nio.file.Files.writeString(legacyConfig, "MAP_NAME:Mighty Lava Arena\\n");
+
+        assertEquals(legacyConfig, SourceMapCatalog.resolveWorldConfigPath(
+                migratedWorldFolder, temporaryDirectory, "arcadeport_source_bacon_brawl"));
+    }
+
     @Test void dragonEscapeMapMarkerQueriesAreNormalised() {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGON_ESCAPE));
         assertEquals("maps/dragon-escape.zip", SourceMapCatalog.resourceFor(ArcadePortGame.DRAGON_ESCAPE));

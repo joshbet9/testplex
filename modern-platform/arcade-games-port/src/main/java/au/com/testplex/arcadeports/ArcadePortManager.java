@@ -1040,8 +1040,19 @@ public final class ArcadePortManager implements Listener {
                 && !sourceMapWorlds.contains(type.id())) {
             SourceMapCatalog.MapData mapData = SourceMapCatalog.read(world);
             if (mapData == null) {
-                throw new IllegalStateException("The selected authentic map has no readable WorldConfig.dat: "
-                        + SourceMapCatalog.selectedResource(plugin, type));
+                Path worldFolder = world.getWorldFolder().toPath();
+                Path legacyConfig = SourceMapCatalog.resolveWorldConfigPath(
+                        worldFolder, Bukkit.getWorldContainer().toPath(), sourceWorldName);
+                throw new IllegalStateException("The selected authentic map has no readable WorldConfig.dat. "
+                        + "World folder=" + worldFolder + ", expected metadata=" + legacyConfig
+                        + ", selected archive=" + SourceMapCatalog.selectedResource(plugin, type));
+            }
+            Path worldConfig = SourceMapCatalog.resolveWorldConfigPath(world.getWorldFolder().toPath(),
+                    Bukkit.getWorldContainer().toPath(), sourceWorldName);
+            if (worldConfig != null && !worldConfig.equals(
+                    world.getWorldFolder().toPath().toAbsolutePath().normalize().resolve("WorldConfig.dat"))) {
+                plugin.getLogger().info("Paper's migrated world folder is " + world.getWorldFolder()
+                        + "; loading authentic map metadata from legacy archive location " + worldConfig + ".");
             }
             sourceMapWorlds.add(type.id());
             sourceMapData.put(type.id(), mapData);

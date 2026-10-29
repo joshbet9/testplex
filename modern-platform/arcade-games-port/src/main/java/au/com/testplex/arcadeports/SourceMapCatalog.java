@@ -532,9 +532,29 @@ public final class SourceMapCatalog {
         }
     }
 
+    /**
+     * Paper 26.3 can expose a migrated custom world's dimension folder from
+     * World#getWorldFolder(), while map-specific legacy metadata such as
+     * WorldConfig.dat remains alongside the original archive extraction.
+     * Prefer the world folder, then check only the reserved source world's
+     * original extraction directory inside the server world container.
+     */
+    static Path resolveWorldConfigPath(Path worldFolder, Path worldContainer, String worldName) {
+        Path local = worldFolder == null ? null : worldFolder.toAbsolutePath().normalize().resolve("WorldConfig.dat");
+        if (local != null && Files.isRegularFile(local)) return local;
+        if (worldContainer == null || !isReservedSourceWorldName(worldName)) return local;
+        Path container = worldContainer.toAbsolutePath().normalize();
+        Path legacyRoot = container.resolve(worldName).normalize();
+        if (!legacyRoot.startsWith(container) || legacyRoot.equals(container)) return local;
+        Path legacyConfig = legacyRoot.resolve("WorldConfig.dat");
+        return Files.isRegularFile(legacyConfig) ? legacyConfig : local;
+    }
+
     public static MapData read(World world) {
-        Path config = world.getWorldFolder().toPath().resolve("WorldConfig.dat");
-        if (!Files.isRegularFile(config)) return null;
+        if (world == null) return null;
+        Path config = resolveWorldConfigPath(world.getWorldFolder().toPath(),
+                Bukkit.getWorldContainer().toPath(), world.getName());
+        if (config == null || !Files.isRegularFile(config)) return null;
         MapData data = new MapData();
         String currentTeam = "Unassigned";
         String currentDataName = "Unassigned";
