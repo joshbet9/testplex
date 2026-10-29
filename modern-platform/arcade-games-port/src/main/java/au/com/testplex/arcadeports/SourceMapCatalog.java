@@ -80,27 +80,76 @@ public final class SourceMapCatalog {
                 && worldName.indexOf('/') < 0 && worldName.indexOf('\\') < 0 && !worldName.contains("..");
     }
 
-    /** Reset only a reserved archived-map world. */
+    /**
+     * Paper 26.3 migrates legacy CraftBukkit world regions from
+     * <world-container>/<name>/region into
+     * <primary-world>/dimensions/minecraft/<name>/region. Reset both the
+     * legacy extraction and that migrated destination before reinstalling an
+     * archived 1.8 map, otherwise Paper refuses to overwrite the old region
+     * files on the next createWorld() call.
+     *
+     * This method intentionally deletes only the exact reserved source-map
+     * directory and its exact Paper migration counterpart; it never clears the
+     * primary world or the shared dimensions directory.
+     */
     public static boolean resetTestWorld(JavaPlugin plugin, String worldName) {
         if (!isReservedSourceWorldName(worldName)) {
             plugin.getLogger().severe("Refusing to reset non-source test world: " + worldName);
             return false;
         }
+
         Path container = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
         Path root = container.resolve(worldName).normalize();
         if (!root.startsWith(container) || root.equals(container)) return false;
+
+        World primaryWorld = Bukkit.getWorlds().stream()
+                .filter(candidate -> candidate.getEnvironment() == World.Environment.NORMAL)
+                .filter(candidate -> !isReservedSourceWorldName(candidate.getName()))
+                .findFirst().orElse(null);
+        if (primaryWorld == null) {
+            plugin.getLogger().severe("Cannot reset source map " + worldName
+                    + ": no primary normal world is loaded to resolve Paper's migrated dimension directory.");
+            return false;
+        }
+        Path primaryRoot = primaryWorld.getWorldFolder().toPath().toAbsolutePath().normalize();
+        if (!primaryRoot.startsWith(container) || primaryRoot.equals(container)) return false;
+        Path migratedRoot = migratedDimensionFolder(primaryRoot, worldName);
+        if (migratedRoot == null || !migratedRoot.startsWith(container)
+                || migratedRoot.equals(container) || migratedRoot.equals(primaryRoot)) return false;
+
         World loaded = Bukkit.getWorld(worldName);
         if (loaded != null && !Bukkit.unloadWorld(loaded, false)) {
             plugin.getLogger().warning("Could not unload source test world " + worldName + "; it is still in use.");
             return false;
         }
-        if (!Files.exists(root)) return true;
-        try (Stream<Path> paths = Files.walk(root)) {
-            for (Path item : paths.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(item);
+
+        try {
+            deleteTreeIfPresent(root);
+            deleteTreeIfPresent(migratedRoot);
+            plugin.getLogger().info("Reset source test map " + worldName
+                    + " including its Paper 26.3 migrated dimension folder.");
             return true;
         } catch (IOException ex) {
             plugin.getLogger().warning("Could not reset source test world " + worldName + ": " + ex.getMessage());
             return false;
+        }
+    }
+
+    /** Returns the isolated Paper-migrated folder for a valid source-map name. */
+    static Path migratedDimensionFolder(Path primaryWorldFolder, String worldName) {
+        if (primaryWorldFolder == null || !isReservedSourceWorldName(worldName)) return null;
+        Path primaryRoot = primaryWorldFolder.toAbsolutePath().normalize();
+        Path migrated = primaryRoot.resolve("dimensions").resolve("minecraft").resolve(worldName).normalize();
+        if (!migrated.startsWith(primaryRoot) || migrated.equals(primaryRoot)) return null;
+        return migrated;
+    }
+
+    private static void deleteTreeIfPresent(Path root) throws IOException {
+        if (!Files.exists(root)) return;
+        try (Stream<Path> paths = Files.walk(root)) {
+            for (Path item : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(item);
+            }
         }
     }
 

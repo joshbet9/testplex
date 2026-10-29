@@ -2,11 +2,20 @@ package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
 import org.bukkit.Material;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadePortGameTest {
+    @Test void sourceMapResetTargetsPaper263MigratedDimensionFolder() {
+        Path primaryWorld = Path.of("/srv/testplex/world");
+        assertEquals(primaryWorld.resolve("dimensions/minecraft/arcadeport_source_bacon_brawl"),
+                SourceMapCatalog.migratedDimensionFolder(primaryWorld, "arcadeport_source_bacon_brawl"));
+        assertNull(SourceMapCatalog.migratedDimensionFolder(primaryWorld, "world"));
+        assertNull(SourceMapCatalog.migratedDimensionFolder(primaryWorld, "../arcadeport_source_bacon_brawl"));
+    }
+
     @Test void modernLobbyScoreboardShowsSelectedGameAndKitAsReadableLabels() {
         assertEquals("Bacon Brawl", ModernLobbyScoreboard.formatGameName("bacon-brawl"));
         assertEquals("Monster Maze", ModernLobbyScoreboard.formatGameName("monster-maze"));
