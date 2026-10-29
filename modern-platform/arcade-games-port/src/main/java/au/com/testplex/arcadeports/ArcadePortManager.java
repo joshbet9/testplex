@@ -6599,7 +6599,6 @@ public final class ArcadePortManager implements Listener {
             session.baconLastSwingAt.remove(id);
             session.baconHitFeedbackUntil.remove(id);
             session.baconLastHitSource.remove(id);
-            restoreBaconDisguiseNameTagEntry(session, id);
         }
         PlayerSnapshot snapshot = session.snapshots.get(id);
         if (snapshot != null) pendingRestore.put(id, snapshot);
