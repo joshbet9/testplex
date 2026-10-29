@@ -1148,12 +1148,19 @@ class ArcadePortGameTest {
         assertEquals(10.0D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, -5.0D), 0.00001D);
     }
 
-    @Test void bombLobbersDirectHitUsesSweptTntCollisionRadius() {
-        assertTrue(ArcadePortRules.isBombDirectHit(0.0D));
-        assertTrue(ArcadePortRules.isBombDirectHit(0.75D));
-        assertTrue(ArcadePortRules.isBombDirectHit(1.0D));
-        assertFalse(ArcadePortRules.isBombDirectHit(1.01D));
-        assertFalse(ArcadePortRules.isBombDirectHit(-0.01D));
+    @Test void bombLobbersDirectHitUsesSourceExpandedTargetBoxAndSweptPath() {
+        assertEquals(1.0D, ArcadePortRules.BOMB_LOBBERS_DIRECT_HIT_BOX_GROW, 0.00001D);
+        var targetBox = new org.bukkit.util.BoundingBox(-0.3D, 0.0D, -0.3D, 0.3D, 1.8D, 0.3D);
+        var start = new org.bukkit.Location(null, -3.0D, 2.5D, 0.0D);
+        var end = new org.bukkit.Location(null, 3.0D, 2.5D, 0.0D);
+        double hitDistance = ArcadePortRules.bombLobbersDirectHitDistanceSquared(start, end, targetBox);
+        assertTrue(Double.isFinite(hitDistance));
+        assertEquals(2.89D, hitDistance, 0.00001D);
+        assertTrue(Double.isInfinite(ArcadePortRules.bombLobbersDirectHitDistanceSquared(
+                new org.bukkit.Location(null, -3.0D, 3.0D, 0.0D),
+                new org.bukkit.Location(null, 3.0D, 3.0D, 0.0D), targetBox)));
+        assertTrue(Double.isInfinite(ArcadePortRules.bombLobbersDirectHitDistanceSquared(
+                start, end, null)));
     }
 
     @Test void baconBrawlStartsWithExtraKnockbackForTwoPlayers() {
