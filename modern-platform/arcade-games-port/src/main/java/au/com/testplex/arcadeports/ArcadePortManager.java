@@ -6666,56 +6666,37 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             Block clicked = event.getClickedBlock();
             if (clicked.isLiquid()) {
-                player.sendMessage(ChatColor.YELLOW + "You may not place a wall in liquid.");
-                return true;
-            }
-            Vector facing = player.getLocation().getDirection().normalize();
-            int forwardX = (int) Math.round(facing.getX());
-            int forwardZ = (int) Math.round(facing.getZ());
-            if (forwardX == 0 && forwardZ == 0) {
-                double yaw = Math.toRadians(player.getLocation().getYaw());
-                forwardX = (int) Math.round(-Math.sin(yaw));
-                forwardZ = (int) Math.round(Math.cos(yaw));
-            }
-            int centerX = clicked.getX() + forwardX;
-            int centerY = clicked.getY() + 1;
-            int centerZ = clicked.getZ() + forwardZ;
-            int sideX = forwardZ;
-            int sideZ = -forwardX;
-            List<Block> wallBlocks = new ArrayList<>(15);
-            SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
-            boolean validFootprint = true;
-            for (int width = -2; width <= 2 && validFootprint; width++) {
-                for (int height = 0; height < 3; height++) {
-                    int x = centerX + sideX * width;
-                    int y = centerY + height;
-                    int z = centerZ + sideZ * width;
-                    if (!insideSourceMapBounds(session, x, z) || y < 1
-                            || y >= session.world.getMaxHeight() - 1
-                            || (mapData != null && mapData.hasVerticalBounds()
-                                && (y < mapData.minY() || y >= mapData.maxY()))) {
-                        validFootprint = false;
-                        break;
-                    }
-                    Block wall = session.world.getBlockAt(x, y, z);
-                    if (!wall.getType().isAir()) {
-                        validFootprint = false;
-                        break;
-                    }
-                    wallBlocks.add(wall);
-                }
-            }
-            if (!validFootprint || wallBlocks.size() != 15) {
-                player.sendMessage(ChatColor.YELLOW + "There is not enough clear space to build that wall.");
+                player.sendMessage(ChatColor.YELLOW + "You may not place a wall in a liquid!");
                 return true;
             }
             long now = System.currentTimeMillis();
             long readyAt = session.bombWallerReadyAt.getOrDefault(id, 0L);
             if (!ArcadePortRules.isBombLobbersWallerReady(now, readyAt)) return true;
-            for (Block wall : wallBlocks) wall.setType(Material.STONE_BRICKS, false);
+
+            // Reborn builds from the clicked block's location and overwrites the 5x3 wall
+            // footprint with regular stone bricks; there is no air-only or map-bound check.
+            int facingIndex = ArcadePortRules.bombLobbersWallFacingIndex(player.getLocation().getYaw());
+            int forwardX = facingIndex == 1 ? 1 : facingIndex == 3 ? -1 : 0;
+            int forwardZ = facingIndex == 2 ? 1 : facingIndex == 0 ? -1 : 0;
+            int centerX = clicked.getX() + forwardX;
+            int centerY = clicked.getY() + 1;
+            int centerZ = clicked.getZ() + forwardZ;
+            int sideX = forwardZ;
+            int sideZ = -forwardX;
+            for (int width = -2; width <= 2; width++) {
+                for (int height = 0; height < 3; height++) {
+                    int x = centerX + sideX * width;
+                    int y = centerY + height;
+                    int z = centerZ + sideZ * width;
+                    Block wall = session.world.getBlockAt(x, y, z);
+                    wall.setType(Material.STONE_BRICKS, false);
+                    wall.getWorld().spawnParticle(Particle.BLOCK,
+                            wall.getLocation().add(0.5D, 0.5D, 0.5D), 5,
+                            0.25D, 0.25D, 0.25D, 0.05D, wall.getBlockData());
+                }
+            }
             session.bombWallerReadyAt.put(id, ArcadePortRules.nextBombLobbersWallerReadyAt(now));
             consumeHeld(player);
-            player.getWorld().playSound(clicked.getLocation(), Sound.BLOCK_STONE_PLACE, 0.8F, 0.9F);
             return true;
         }
         return false;
