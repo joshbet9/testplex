@@ -1184,16 +1184,16 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.areBombLobbersEnemies(0, -1));
     }
 
-    @Test void bombLobbersBlastDamageMatchesVanillaSizeFourCurveAndExplosionConditionCap() {
+    @Test void bombLobbersBlastDamageMatchesVanillaCurvePlusExplosionConditionBonus() {
         assertEquals(8.0D, ArcadePortRules.BOMB_LOBBERS_EXPLOSION_RADIUS, 0.00001D);
-        assertEquals(50.0D, ArcadePortRules.bombLobbersBlastDamage(0.0D, 1.0D), 0.00001D);
-        assertEquals(37.75D, ArcadePortRules.bombLobbersBlastDamage(2.0D, 1.0D), 0.00001D);
-        assertEquals(29.4375D, ArcadePortRules.bombLobbersBlastDamage(3.0D, 1.0D), 0.00001D);
-        assertEquals(22.0D, ArcadePortRules.bombLobbersBlastDamage(4.0D, 1.0D), 0.00001D);
-        assertEquals(1.0D, ArcadePortRules.bombLobbersBlastDamage(8.0D, 1.0D), 0.00001D);
+        assertEquals(107.0D, ArcadePortRules.bombLobbersBlastDamage(0.0D, 1.0D), 0.00001D);
+        assertEquals(75.5D, ArcadePortRules.bombLobbersBlastDamage(2.0D, 1.0D), 0.00001D);
+        assertEquals(58.875D, ArcadePortRules.bombLobbersBlastDamage(3.0D, 1.0D), 0.00001D);
+        assertEquals(44.0D, ArcadePortRules.bombLobbersBlastDamage(4.0D, 1.0D), 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.bombLobbersBlastDamage(8.0D, 1.0D), 0.00001D);
         assertEquals(0.0D, ArcadePortRules.bombLobbersBlastDamage(8.01D, 1.0D), 0.00001D);
-        assertEquals(1.0D, ArcadePortRules.bombLobbersBlastDamage(0.0D, 0.0D), 0.00001D);
-        assertEquals(15.4375D, ArcadePortRules.bombLobbersBlastDamage(2.0D, 0.5D), 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.bombLobbersBlastDamage(0.0D, 0.0D), 0.00001D);
+        assertEquals(30.875D, ArcadePortRules.bombLobbersBlastDamage(2.0D, 0.5D), 0.00001D);
         assertEquals(50.0D, ArcadePortRules.BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE, 0.00001D);
     }
 
