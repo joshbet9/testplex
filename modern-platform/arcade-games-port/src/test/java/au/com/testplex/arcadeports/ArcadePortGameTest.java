@@ -568,6 +568,17 @@ class ArcadePortGameTest {
         assertEquals(1.0D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_401L), 0.00001D);
     }
 
+    @Test void baconBrawlAchievementKeysAreStableAndNamespaced() {
+        java.util.UUID playerId = java.util.UUID.fromString("a3e1b6f0-9950-4de4-a7aa-572e4bd8db12");
+        assertEquals("test-achievements.bacon-brawl.a3e1b6f0-9950-4de4-a7aa-572e4bd8db12.flash-fried",
+                ArcadePortRules.baconBrawlAchievementConfigKey(playerId, "flash-fried"));
+        assertEquals("test-achievements.bacon-brawl.a3e1b6f0-9950-4de4-a7aa-572e4bd8db12.pigs-in-blankets",
+                ArcadePortRules.baconBrawlAchievementConfigKey(playerId, "pigs-in-blankets"));
+        assertEquals("", ArcadePortRules.baconBrawlAchievementConfigKey(null, "flash-fried"));
+        assertEquals("", ArcadePortRules.baconBrawlAchievementConfigKey(playerId, "raw pork"));
+        assertEquals("", ArcadePortRules.baconBrawlAchievementConfigKey(playerId, "../flash-fried"));
+    }
+
     @Test void baconBrawlUsesTheRequestedThreeAchievements() {
         assertEquals(60_000L, ArcadePortRules.BACON_FLASH_FRIED_MAX_WIN_MILLIS);
         assertTrue(ArcadePortRules.shouldAwardBaconFlashFried(0L));
