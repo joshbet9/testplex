@@ -6940,10 +6940,15 @@ public final class ArcadePortManager implements Listener {
             throwBombLobbersTnt(session, attacker);
             return;
         }
-        if ("pitcher".equals(session.bombLobbersKits.getOrDefault(attacker.getUniqueId(), "jumper"))
-                && held != null && held.getType() == Material.LEVER) {
+        String kit = session.bombLobbersKits.getOrDefault(attacker.getUniqueId(), "jumper");
+        if ("pitcher".equals(kit) && held != null && held.getType() == Material.LEVER) {
             event.setCancelled(true);
             adjustBombLobbersPitch(session, attacker, false);
+            return;
+        }
+        if ("waller".equals(kit) && held != null && held.getType() == Material.STONE_SHOVEL) {
+            event.setCancelled(true);
+            useBombLobbersWaller(session, attacker, attacker.getLocation().getBlock().getRelative(0, -1, 0));
         }
     }
 
@@ -7708,10 +7713,15 @@ public final class ArcadePortManager implements Listener {
             throwBombLobbersTnt(session, player);
             return;
         }
-        if ("pitcher".equals(session.bombLobbersKits.getOrDefault(player.getUniqueId(), "jumper"))
-                && item == Material.LEVER) {
+        String kit = session.bombLobbersKits.getOrDefault(player.getUniqueId(), "jumper");
+        if ("pitcher".equals(kit) && item == Material.LEVER) {
             event.setCancelled(true);
             adjustBombLobbersPitch(session, player, true);
+            return;
+        }
+        if ("waller".equals(kit) && item == Material.STONE_SHOVEL) {
+            event.setCancelled(true);
+            useBombLobbersWaller(session, player, player.getLocation().getBlock().getRelative(0, -1, 0));
         }
     }
 
@@ -8533,6 +8543,41 @@ public final class ArcadePortManager implements Listener {
         return true;
     }
 
+    private void useBombLobbersWaller(Session session, Player player, Block clicked) {
+        if (session == null || player == null || clicked == null) return;
+        if (clicked.isLiquid()) {
+            player.sendMessage(ChatColor.YELLOW + "You may not place a wall in a liquid!");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        long readyAt = session.bombWallerReadyAt.getOrDefault(id, 0L);
+        if (!ArcadePortRules.isBombLobbersWallerReady(now, readyAt)) return;
+
+        int facingIndex = ArcadePortRules.bombLobbersWallFacingIndex(player.getLocation().getYaw());
+        int forwardX = facingIndex == 1 ? 1 : facingIndex == 3 ? -1 : 0;
+        int forwardZ = facingIndex == 2 ? 1 : facingIndex == 0 ? -1 : 0;
+        int centerX = clicked.getX() + forwardX;
+        int centerY = clicked.getY() + 1;
+        int centerZ = clicked.getZ() + forwardZ;
+        int sideX = forwardZ;
+        int sideZ = -forwardX;
+        for (int width = -2; width <= 2; width++) {
+            for (int height = 0; height < 3; height++) {
+                int x = centerX + sideX * width;
+                int y = centerY + height;
+                int z = centerZ + sideZ * width;
+                Block wall = session.world.getBlockAt(x, y, z);
+                wall.setType(Material.STONE_BRICKS, false);
+                wall.getWorld().spawnParticle(Particle.BLOCK,
+                        wall.getLocation().add(0.5D, 0.5D, 0.5D), 5,
+                        0.25D, 0.25D, 0.25D, 0.05D, wall.getBlockData());
+            }
+        }
+        session.bombWallerReadyAt.put(id, ArcadePortRules.nextBombLobbersWallerReadyAt(now));
+        consumeHeld(player);
+    }
+
     private boolean handleBombLobbersKitInteract(Session session, Player player,
             PlayerInteractEvent event, ItemStack heldItem) {
         if (heldItem == null) return false;
@@ -8544,41 +8589,13 @@ public final class ArcadePortManager implements Listener {
             return true;
         }
         if ("waller".equals(kit) && heldItem.getType() == Material.STONE_SHOVEL
-                && event.getAction().isRightClick() && event.getClickedBlock() != null) {
+                && (event.getAction().isRightClick() || event.getAction().isLeftClick())) {
             event.setCancelled(true);
             Block clicked = event.getClickedBlock();
-            if (clicked.isLiquid()) {
-                player.sendMessage(ChatColor.YELLOW + "You may not place a wall in a liquid!");
-                return true;
-            }
-            long now = System.currentTimeMillis();
-            long readyAt = session.bombWallerReadyAt.getOrDefault(id, 0L);
-            if (!ArcadePortRules.isBombLobbersWallerReady(now, readyAt)) return true;
-
-            // Reborn builds from the clicked block's location and overwrites the 5x3 wall
-            // footprint with regular stone bricks; there is no air-only or map-bound check.
-            int facingIndex = ArcadePortRules.bombLobbersWallFacingIndex(player.getLocation().getYaw());
-            int forwardX = facingIndex == 1 ? 1 : facingIndex == 3 ? -1 : 0;
-            int forwardZ = facingIndex == 2 ? 1 : facingIndex == 0 ? -1 : 0;
-            int centerX = clicked.getX() + forwardX;
-            int centerY = clicked.getY() + 1;
-            int centerZ = clicked.getZ() + forwardZ;
-            int sideX = forwardZ;
-            int sideZ = -forwardX;
-            for (int width = -2; width <= 2; width++) {
-                for (int height = 0; height < 3; height++) {
-                    int x = centerX + sideX * width;
-                    int y = centerY + height;
-                    int z = centerZ + sideZ * width;
-                    Block wall = session.world.getBlockAt(x, y, z);
-                    wall.setType(Material.STONE_BRICKS, false);
-                    wall.getWorld().spawnParticle(Particle.BLOCK,
-                            wall.getLocation().add(0.5D, 0.5D, 0.5D), 5,
-                            0.25D, 0.25D, 0.25D, 0.05D, wall.getBlockData());
-                }
-            }
-            session.bombWallerReadyAt.put(id, ArcadePortRules.nextBombLobbersWallerReadyAt(now));
-            consumeHeld(player);
+            // Air and entity clicks have no clickedBlock. Use the block at the player's
+            // feet so the wall is still anchored one block ahead at ground level.
+            if (clicked == null) clicked = player.getLocation().getBlock().getRelative(0, -1, 0);
+            useBombLobbersWaller(session, player, clicked);
             return true;
         }
         return false;
