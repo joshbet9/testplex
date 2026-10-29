@@ -5412,6 +5412,9 @@ public final class ArcadePortManager implements Listener {
         session.bombPrimed.clear();
         session.bombDirectHitResolved.clear();
         session.bombTeamSpawnCentres.clear();
+        session.bombCompassMenuTargets.clear();
+        session.bombSpectateNextTeleportAt.clear();
+        session.bombNextCompassUpdateAt = 0L;
         session.dragonContactCooldowns.clear();
         session.paintProjectileDamage.clear();
         session.paintballLastShotAt.clear();
@@ -5440,8 +5443,10 @@ public final class ArcadePortManager implements Listener {
                     player.removePotionEffect(PotionEffectType.RESISTANCE);
                     session.baconInvincibleUntil.remove(entry.getKey());
                 }
-                if (session.type == ArcadePortGame.BACON_BRAWL
-                        && isBaconCompassMenuTitle(player.getOpenInventory().getTitle())) {
+                if ((session.type == ArcadePortGame.BACON_BRAWL
+                        && isBaconCompassMenuTitle(player.getOpenInventory().getTitle()))
+                        || (session.type == ArcadePortGame.BOMB_LOBBERS
+                        && isBombLobbersCompassMenuTitle(player.getOpenInventory().getTitle()))) {
                     player.closeInventory();
                 }
                 snapshot.restore(player);
@@ -6728,6 +6733,28 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.type == ArcadePortGame.BOMB_LOBBERS
+                && !session.alive.contains(player.getUniqueId())
+                && isBombTrackingCompass(heldItem)) {
+            event.setCancelled(true);
+            if (event.getAction().isRightClick()) {
+                openBombLobbersCompassMenu(session, player);
+            } else if (event.getAction().isLeftClick()) {
+                long now = System.currentTimeMillis();
+                long readyAt = session.bombSpectateNextTeleportAt.getOrDefault(player.getUniqueId(), 0L);
+                if (!ArcadePortRules.isBombLobbersSpectatorTeleportReady(now, readyAt)) return;
+                Player target = nearestBombLobbersEnemy(session, player);
+                if (target != null) {
+                    player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                    player.setCompassTarget(target.getLocation());
+                    session.bombSpectateNextTeleportAt.put(player.getUniqueId(),
+                            ArcadePortRules.nextBombLobbersSpectatorTeleportAt(now));
+                } else {
+                    player.sendMessage(ChatColor.YELLOW + "There are no living opponents to track.");
+                }
+            }
+            return;
+        }
         if (!session.alive.contains(player.getUniqueId())) return;
         if (session.type == ArcadePortGame.BACON_BRAWL && isBaconMeterItem(heldItem)) {
             event.setCancelled(true);
@@ -7229,6 +7256,155 @@ public final class ArcadePortManager implements Listener {
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 
+    /** Mirrors the legacy CompassModule: spectators track nearest opponents, never their own team. */
+    private void updateBombLobbersSpectatorCompasses(Session session) {
+        List<Player> targets = alivePlayers(session);
+        if (targets.isEmpty()) return;
+        for (Player spectator : session.players.values()) {
+            if (spectator == null || !spectator.isOnline()
+                    || session.alive.contains(spectator.getUniqueId())) continue;
+            UUID spectatorId = spectator.getUniqueId();
+            int spectatorTeam = session.teams.getOrDefault(spectatorId, -1);
+            List<Player> enemies = targets.stream()
+                    .filter(target -> ArcadePortRules.shouldBombLobbersCompassTrackTeam(
+                            spectatorTeam, session.teams.getOrDefault(target.getUniqueId(), -1)))
+                    .toList();
+            if (enemies.isEmpty()) continue;
+
+            boolean hasCompass = false;
+            for (ItemStack item : spectator.getInventory().getContents()) {
+                if (isBombTrackingCompass(item)) {
+                    hasCompass = true;
+                    break;
+                }
+            }
+            if (!hasCompass) {
+                spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
+                        "Tracks the nearest enemy player."));
+            }
+
+            Player target = enemies.stream()
+                    .min(java.util.Comparator.comparingDouble(candidate ->
+                            candidate.getLocation().distanceSquared(spectator.getLocation())))
+                    .orElse(null);
+            if (target == null) continue;
+            spectator.setCompassTarget(target.getLocation());
+            if (isBombTrackingCompass(spectator.getInventory().getItemInMainHand())) {
+                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                double height = target.getLocation().getY() - spectator.getLocation().getY();
+                int targetTeam = session.teams.getOrDefault(target.getUniqueId(), -1);
+                ChatColor color = targetTeam == 1 ? ChatColor.AQUA : ChatColor.RED;
+                spectator.sendActionBar(ChatColor.WHITE + "" + ChatColor.BOLD + "Nearest Target: "
+                        + color + target.getName() + ChatColor.WHITE + ChatColor.BOLD + " | Distance: "
+                        + color + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                        + ChatColor.WHITE + ChatColor.BOLD + " | Height: "
+                        + color + String.format(java.util.Locale.ROOT, "%.1f", height));
+            }
+        }
+    }
+
+    private boolean isBombTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && ChatColor.stripColor(meta.getDisplayName()).equals("Tracking Compass");
+    }
+
+    private Player nearestBombLobbersEnemy(Session session, Player spectator) {
+        if (session == null || spectator == null) return null;
+        int spectatorTeam = session.teams.getOrDefault(spectator.getUniqueId(), -1);
+        return alivePlayers(session).stream()
+                .filter(target -> ArcadePortRules.shouldBombLobbersCompassTrackTeam(
+                        spectatorTeam, session.teams.getOrDefault(target.getUniqueId(), -1)))
+                .min(java.util.Comparator.comparingDouble(candidate ->
+                        candidate.getLocation().distanceSquared(spectator.getLocation())))
+                .orElse(null);
+    }
+
+    private void openBombLobbersCompassMenu(Session session, Player spectator) {
+        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.DARK_GREEN + "Spectator Menu");
+        inventory.setItem(4, namedItem(Material.COMPASS, "Tracking Compass",
+                "Choose an enemy player to follow."));
+
+        int[] slots = {
+                19, 20, 21, 22, 23, 24, 25,
+                28, 29, 30, 31, 32, 33, 34,
+                37, 38, 39, 40, 41, 42, 43,
+                46, 47, 48, 49, 50, 51, 52
+        };
+        Map<Integer, UUID> targetsBySlot = new HashMap<>();
+        int spectatorTeam = session.teams.getOrDefault(spectator.getUniqueId(), -1);
+        List<Player> targets = alivePlayers(session).stream()
+                .filter(target -> ArcadePortRules.shouldBombLobbersCompassTrackTeam(
+                        spectatorTeam, session.teams.getOrDefault(target.getUniqueId(), -1)))
+                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        for (int i = 0; i < targets.size() && i < slots.length; i++) {
+            Player target = targets.get(i);
+            int slot = slots[i];
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            if (head.getItemMeta() instanceof SkullMeta meta) {
+                meta.setOwningPlayer(target);
+                int targetTeam = session.teams.getOrDefault(target.getUniqueId(), -1);
+                ChatColor color = targetTeam == 1 ? ChatColor.AQUA : ChatColor.RED;
+                meta.setDisplayName(color + target.getName());
+                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                double height = target.getLocation().getY() - spectator.getLocation().getY();
+                String kit = session.bombLobbersKits.getOrDefault(target.getUniqueId(), "jumper");
+                meta.setLore(List.of(
+                        ChatColor.GRAY + "Kit: " + kit,
+                        ChatColor.GRAY + "Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance),
+                        ChatColor.GRAY + "Height difference: " + String.format(java.util.Locale.ROOT, "%.1f", height),
+                        ChatColor.YELLOW + "Left-click: Teleport",
+                        ChatColor.YELLOW + "Right-click: Spectate"));
+                head.setItemMeta(meta);
+            }
+            inventory.setItem(slot, head);
+            targetsBySlot.put(slot, target.getUniqueId());
+        }
+        session.bombCompassMenuTargets.put(spectator.getUniqueId(), targetsBySlot);
+        spectator.openInventory(inventory);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onBombLobbersCompassMenuClick(InventoryClickEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.BOMB_LOBBERS
+                || !isBombLobbersCompassMenuTitle(event.getView().getTitle())) return;
+        event.setCancelled(true);
+        if (!(event.getWhoClicked() instanceof Player spectator)) return;
+        int slot = event.getRawSlot();
+        if (slot < 0 || slot >= event.getView().getTopInventory().getSize()) return;
+        Map<Integer, UUID> targets = session.bombCompassMenuTargets.get(spectator.getUniqueId());
+        UUID targetId = targets == null ? null : targets.get(slot);
+        if (targetId == null) return;
+        Player target = session.players.get(targetId);
+        session.bombCompassMenuTargets.remove(spectator.getUniqueId());
+        spectator.closeInventory();
+        if (target == null || !target.isOnline() || !session.alive.contains(targetId)
+                || !ArcadePortRules.shouldBombLobbersCompassTrackTeam(
+                        session.teams.getOrDefault(spectator.getUniqueId(), -1),
+                        session.teams.getOrDefault(targetId, -1))) {
+            spectator.sendMessage(ChatColor.YELLOW + "That opponent is no longer available.");
+            return;
+        }
+        if (event.isRightClick()) {
+            spectator.setSpectatorTarget(target);
+        } else {
+            long now = System.currentTimeMillis();
+            long readyAt = session.bombSpectateNextTeleportAt.getOrDefault(spectator.getUniqueId(), 0L);
+            if (!ArcadePortRules.isBombLobbersSpectatorTeleportReady(now, readyAt)) return;
+            spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+            session.bombSpectateNextTeleportAt.put(spectator.getUniqueId(),
+                    ArcadePortRules.nextBombLobbersSpectatorTeleportAt(now));
+        }
+        spectator.setCompassTarget(target.getLocation());
+    }
+
+    private boolean isBombLobbersCompassMenuTitle(String title) {
+        return (ChatColor.DARK_GREEN + "Spectator Menu").equals(title);
+    }
+
     /** Match vanilla 1.8 World#getBlockDensity sampling for the source explosion's exposure factor. */
     private double bombLobbersBlastExposure(Location blast, Player target) {
         if (blast == null || target == null || blast.getWorld() == null
@@ -7263,6 +7439,10 @@ public final class ArcadePortManager implements Listener {
 
     private void updateBombLobbers(Session session) {
         long now = System.currentTimeMillis();
+        if (now >= session.bombNextCompassUpdateAt) {
+            session.bombNextCompassUpdateAt = now + 250L;
+            updateBombLobbersSpectatorCompasses(session);
+        }
         if (now >= session.bombNextBoundaryCheckAt) {
             session.bombNextBoundaryCheckAt = now + 1_000L;
             for (Player player : new ArrayList<>(alivePlayers(session))) {
@@ -7844,6 +8024,9 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> bombWallerReadyAt = new HashMap<>();
         final Map<UUID, Long> bombNextCraftAt = new HashMap<>();
         long bombNextBoundaryCheckAt;
+        long bombNextCompassUpdateAt;
+        final Map<UUID, Map<Integer, UUID>> bombCompassMenuTargets = new HashMap<>();
+        final Map<UUID, Long> bombSpectateNextTeleportAt = new HashMap<>();
         final Map<UUID, String> spleefKits = new HashMap<>();
         final Map<UUID, Long> spleefLeapReadyAt = new HashMap<>();
         final Map<UUID, Long> spleefSmasherReadyAt = new HashMap<>();

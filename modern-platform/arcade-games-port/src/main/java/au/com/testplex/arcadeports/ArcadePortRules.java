@@ -233,6 +233,25 @@ public final class ArcadePortRules {
                 || nowMillis - createdAtMillis >= BACON_BLAST_MAX_FLIGHT_MILLIS;
     }
     public static final long BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS = 3_000L;
+    /** The source spectator-compass menu rate-limits direct teleports for three seconds. */
+    public static final long BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS = 3_000L;
+
+    public static boolean shouldBombLobbersCompassTrackTeam(int spectatorTeam, int targetTeam) {
+        return targetTeam >= 0 && (spectatorTeam < 0 || spectatorTeam != targetTeam);
+    }
+
+    public static boolean isBombLobbersSpectatorTeleportReady(long nowMillis, long readyAtMillis) {
+        return nowMillis >= 0L && readyAtMillis >= 0L && nowMillis >= readyAtMillis;
+    }
+
+    public static long nextBombLobbersSpectatorTeleportAt(long nowMillis) {
+        if (nowMillis < 0L) return BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS;
+        if (nowMillis > Long.MAX_VALUE - BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS) {
+            return Long.MAX_VALUE;
+        }
+        return nowMillis + BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS;
+    }
+
     /** Reborn's Waller perk uses a 100 ms Recharge gate between wall placements. */
     public static final long BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS = 100L;
     public static final long BOMB_LOBBERS_MAX_FLIGHT_MILLIS = 8_000L;

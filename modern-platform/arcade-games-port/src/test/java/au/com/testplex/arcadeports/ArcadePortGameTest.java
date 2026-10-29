@@ -587,6 +587,18 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("unknown"));
     }
 
+    @Test void bombLobbersSpectatorCompassTargetsOnlyOpponentsAndUsesThreeSecondTeleportCooldown() {
+        assertTrue(ArcadePortRules.shouldBombLobbersCompassTrackTeam(0, 1));
+        assertFalse(ArcadePortRules.shouldBombLobbersCompassTrackTeam(0, 0));
+        assertTrue(ArcadePortRules.shouldBombLobbersCompassTrackTeam(-1, 1));
+        assertFalse(ArcadePortRules.shouldBombLobbersCompassTrackTeam(0, -1));
+        assertEquals(3_000L, ArcadePortRules.BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
+        assertTrue(ArcadePortRules.isBombLobbersSpectatorTeleportReady(1_000L, 1_000L));
+        assertFalse(ArcadePortRules.isBombLobbersSpectatorTeleportReady(2_999L, 3_000L));
+        assertTrue(ArcadePortRules.isBombLobbersSpectatorTeleportReady(3_000L, 3_000L));
+        assertEquals(4_000L, ArcadePortRules.nextBombLobbersSpectatorTeleportAt(1_000L));
+    }
+
     @Test void bombLobbersTntRemainsTrackedAfterThrowerElimination() {
         // IsPlaying remains true for an eliminated spectator; only leaving the server removes tracking.
         assertTrue(ArcadePortRules.shouldKeepBombLobbersBombTracked(true));
