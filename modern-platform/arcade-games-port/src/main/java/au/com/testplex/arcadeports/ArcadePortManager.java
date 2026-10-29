@@ -6866,12 +6866,13 @@ public final class ArcadePortManager implements Listener {
                 double exposure = bombLobbersBlast
                         ? blastExposure.getOrDefault(target.getUniqueId(), 0.0D) : 1.0D;
                 Vector away = target.getEyeLocation().toVector().subtract(blast.toVector());
-                if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 1.0D, 0.0D);
                 if (bombLobbersBlast) {
                     double impact = Math.max(0.0D,
                             1.0D - distance / ArcadePortRules.BOMB_LOBBERS_EXPLOSION_SIZE) * exposure;
-                    target.setVelocity(away.normalize().multiply(impact));
+                    target.setVelocity(ArcadePortRules.bombLobbersExplosionVelocity(
+                            target.getVelocity(), away, impact));
                 } else {
+                    if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 1.0D, 0.0D);
                     double force = 1.9D * (1.0D - distance / 8.0D);
                     target.setVelocity(away.normalize().multiply(force)
                             .setY(Math.max(0.25D, 0.65D - distance * 0.045D)));
