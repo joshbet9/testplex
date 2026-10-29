@@ -70,7 +70,7 @@ public final class ModernLobbyScoreboard {
         lines.add(ChatColor.BLUE.toString());
         lines.add(ChatColor.RED.toString() + ChatColor.BOLD + "Website");
         lines.add(ChatColor.WHITE + website);
-        lines.add(ChatColor.DARK_PURPLE.toString() + ChatColor.STRIKETHROUGH + "---------------");
+        lines.add("----------------");
 
         int score = lines.size();
         for (String line : lines) {
