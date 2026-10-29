@@ -6565,8 +6565,8 @@ public final class ArcadePortManager implements Listener {
                 session.bombDirectHitResolved.add(bombId);
                 Vector away = target.getLocation().toVector().subtract(current.toVector());
                 away.setY(0.0D);
-                if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 0.0D, 1.0D);
-                target.setVelocity(away.normalize().multiply(0.2D).setY(0.2D));
+                target.setFallDistance(0.0F);
+                target.setVelocity(ArcadePortRules.bombLobbersDirectHitVelocity(away, target.isOnGround()));
                 target.getWorld().spawnParticle(Particle.EXPLOSION,
                         target.getLocation().add(0.0D, 1.0D, 0.0D), 1,
                         0.1D, 0.1D, 0.1D, 0.0D);
