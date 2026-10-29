@@ -2440,12 +2440,14 @@ public final class ArcadePortManager implements Listener {
             baby.setBaby();
             baby.setCustomName(ChatColor.LIGHT_PURPLE + "Baby Piggles");
             baby.setCustomNameVisible(false);
-            baby.setInvulnerable(true);
+            // Reborn transfers damage dealt to Baby Piggles onto Mama Piggles' player.
+            baby.setInvulnerable(false);
             baby.setSilent(true);
             baby.setAI(false);
             baby.setRemoveWhenFarAway(false);
             session.entities.add(baby);
             session.baconBabyPigs.put(ownerId, baby.getUniqueId());
+            session.baconPigOwners.put(baby.getUniqueId(), ownerId);
         }
 
         Vector forward = owner.getLocation().getDirection().setY(0.0D);
@@ -2460,6 +2462,7 @@ public final class ArcadePortManager implements Listener {
     private void removeBaconBabyPig(Session session, UUID ownerId) {
         UUID pigId = session.baconBabyPigs.remove(ownerId);
         if (pigId == null) return;
+        session.baconPigOwners.remove(pigId);
         for (Entity entity : new ArrayList<>(session.entities)) {
             if (entity.getUniqueId().equals(pigId)) {
                 entity.remove();
