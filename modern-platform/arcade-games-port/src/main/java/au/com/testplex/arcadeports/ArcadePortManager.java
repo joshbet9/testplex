@@ -3594,8 +3594,7 @@ public final class ArcadePortManager implements Listener {
                 && session.alive.contains(player.getUniqueId())) {
             UUID playerId = player.getUniqueId();
             if (killer == null && reason != null) {
-                boolean fallKnockout = "fell from the arena".equals(reason)
-                        || "was lost to the water".equals(reason);
+                boolean fallKnockout = ArcadePortRules.isBaconArenaKnockoutReason(reason);
                 long lastHitAt = session.baconLastDamagedAt.getOrDefault(playerId, 0L);
                 if (ArcadePortRules.shouldCreditBaconFallKill(
                         System.currentTimeMillis(), lastHitAt, fallKnockout)) {
