@@ -5059,6 +5059,15 @@ public final class ArcadePortManager implements Listener {
     /** Record the three Bacon Brawl achievements in the isolated test config, never production milestones. */
     private void recordBaconBrawlAchievements(Session session, Player winner) {
         UUID id = winner.getUniqueId();
+        String winsKey = ArcadePortRules.baconBrawlAchievementConfigKey(id, "wins");
+        int totalWins = Math.max(0, plugin.getConfig().getInt(winsKey, 0)) + 1;
+        plugin.getConfig().set(winsKey, totalWins);
+        plugin.saveConfig();
+        if (ArcadePortRules.shouldAwardBaconBrawlWinsMilestone(totalWins)) {
+            awardBaconAchievement(winner,
+                    ArcadePortRules.baconBrawlAchievementConfigKey(id, "15-wins"),
+                    "Bacon Brawl Veteran — won 15 games.");
+        }
         long elapsed = Math.max(0L, System.currentTimeMillis() - session.startedAt);
         if (ArcadePortRules.shouldAwardBaconFlashFried(elapsed)) {
             awardBaconAchievement(winner,
