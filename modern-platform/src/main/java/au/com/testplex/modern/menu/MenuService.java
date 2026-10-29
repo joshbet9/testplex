@@ -280,6 +280,46 @@ public final class MenuService implements Listener {
         String optionId = meta.getPersistentDataContainer().get(optionKey, PersistentDataType.STRING);
         GameDefinition game = catalog.getGame(gameId);
 
+        if (CORE_COSMETICS_TITLE.equals(title)) {
+            if ("core-arcade-cosmetics".equals(action)) openCosmeticsHome(player);
+            else if ("core-category".equals(action)) {
+                if ("game-cosmetics".equals(optionId)) openCosmeticsHome(player);
+                else if ("win-effects".equals(optionId)) openWinEffectsHome(player);
+                else openCoreCosmeticInfo(player, ChatColor.stripColor(meta.getDisplayName()));
+            }
+            return;
+        }
+        if (title.startsWith("Cosmetics | ")) {
+            if ("back-core-cosmetics".equals(action)) openCoreCosmeticsHome(player);
+            return;
+        }
+        if (title.equals(COSMETICS_TITLE)) {
+            if ("game".equals(action) && game != null) openGameDetails(player, game);
+            else if ("Close".equalsIgnoreCase(ChatColor.stripColor(meta.getDisplayName()))) player.closeInventory();
+            return;
+        }
+        if (title.equals(WIN_HOME_TITLE)) {
+            if ("win-effects-game".equals(action) && game != null) openWinEffects(player, game);
+            else if ("back-core-cosmetics".equals(action)) openCoreCosmeticsHome(player);
+            return;
+        }
+        if (title.startsWith(WIN_HOME_TITLE + " | ")) {
+            if ("back-win-home".equals(action)) openWinEffectsHome(player);
+            else if ("win-option".equals(action) && game != null && optionId != null) {
+                preferences.chooseWinEffect(player.getUniqueId(), game, optionId);
+                openWinEffects(player, game);
+                player.sendMessage(ChatColor.GREEN + "Saved the " + game.getName() + " win effect.");
+            }
+            return;
+        }
+        if (title.startsWith(GAME_TITLE) && "back-arcade-cosmetics".equals(action)) {
+            openCosmeticsHome(player);
+            return;
+        }
+        if (title.startsWith(LINES_TITLE) && "back-lines".equals(action)) {
+            if (game != null) openGameDetails(player, game);
+            return;
+        }
         if (PANEL_TITLE.equals(title)) {
             if ("panel-set-game".equals(action)) openGameSelection(player, false);
             else if ("panel-rotation".equals(action)) openGameSelection(player, true);
@@ -343,9 +383,9 @@ public final class MenuService implements Listener {
         } else if ("game".equals(action) && game != null) {
             openGameDetails(player, game);
         } else if ("cosmetics-game".equals(action) && game != null) {
-            openLines(player, game);
+            openGameDetails(player, game);
         } else if ("open-lines".equals(action) && game != null) {
-            openLines(player, game);
+            openGameDetails(player, game);
         } else if ("cosmetic-line".equals(action) && game != null && lineId != null) {
             CosmeticLineDefinition line = findLine(game, lineId);
             if (line != null) openOptions(player, game, line);
@@ -368,7 +408,7 @@ public final class MenuService implements Listener {
             player.closeInventory();
             player.performCommand("stats");
         } else if ("open-cosmetics-home".equals(action)) {
-            openCosmeticsHome(player);
+            openCoreCosmeticsHome(player);
         } else if ("close-panel".equals(action)) {
             player.closeInventory();
         } else if ("back-panel".equals(action)) {
@@ -376,7 +416,7 @@ public final class MenuService implements Listener {
         } else if ("back-game".equals(action) && game != null) {
             openGameDetails(player, game);
         } else if ("back-lines".equals(action) && game != null) {
-            openLines(player, game);
+            openGameDetails(player, game);
         }
     }
 
