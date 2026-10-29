@@ -21,6 +21,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /** Simple modern inventory UI. Game-specific renderers are registered alongside each port. */
@@ -34,6 +35,7 @@ public final class MenuService implements Listener {
     private static final String LINES_TITLE = "Arcade Cosmetics | Feature | ";
     private static final String OPTIONS_TITLE = "Arcade Cosmetics | Setting | ";
     private static final String WINS_TITLE = "Arcade Cosmetics | Win Effects | ";
+    private static final String WIN_HOME_TITLE = "Arcade Cosmetics | Win Effects";
     private static final int[] LEGACY_GAME_SLOTS = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
 
     private final JavaPlugin plugin;
@@ -99,6 +101,79 @@ public final class MenuService implements Listener {
     }
 
     /** ArcadeCosmeticsMenu's original 1.8 54-slot game grid and fixed slots. */
+    /** Core Cosmetics screen ported from the 1.8 fixed-slot layout. */
+    public void openCoreCosmeticsHome(Player player) {
+        Inventory inventory = Bukkit.createInventory(null, 54, CORE_COSMETICS_TITLE);
+        String[][] entries = {
+                {"1","NETHER_STAR","Particle Effects","Show particles as you walk."},
+                {"4","DIAMOND_SWORD","Weapon Names","Rename weapons in supported games."},
+                {"7","GOLDEN_HELMET","Hats","Wear hats in supported lobbies."},
+                {"10","ARROW","Arrow Effects","Change arrow trails."},
+                {"13","CAKE","Win Effects","Choose a per-game win celebration."},
+                {"16","DIAMOND_CHESTPLATE","Costumes","Wear a costume in supported lobbies."},
+                {"19","SKELETON_SKULL","Death Animations","Choose a death animation."},
+                {"21","TORCH","Game Cosmetics","Open per-game Arcade cosmetics."},
+                {"22","DIAMOND","Power Play Club Rewards","View local Testplex options."},
+                {"23","LEVER","Kit Selector Particles","Choose kit-selection particles."},
+                {"25","LEATHER","Morphs","Choose a lobby morph."},
+                {"28","GOLDEN_BOOTS","Double Jump Effects","Show double-jump effects."},
+                {"31","NAME_TAG","Taunts","Choose taunts for supported games."},
+                {"34","BANNER","Flags","Show a country flag in the lobby."},
+                {"40","PAPER","Level Colors","Choose a level prefix colour."},
+                {"47","LEAD","Balloons","Choose a lobby balloon."},
+                {"48","MUSIC_DISC_13","Music","Choose lobby music."},
+                {"49","MELON","Gadgets","Use supported lobby gadgets."},
+                {"50","IRON_HORSE_ARMOR","Mounts","Choose a lobby mount."},
+                {"51","BONE","Pets","Choose a lobby pet."}
+        };
+        for (String[] entry : entries) {
+            ItemStack item = makeItem(icon(entry[1]), ChatColor.RESET + entry[2],
+                    List.of(ChatColor.GRAY + entry[3], ChatColor.YELLOW + "Click to open."));
+            mark(item, "core-category", null, null, entry[2].toLowerCase(Locale.ROOT).replace(' ', '-'));
+            inventory.setItem(Integer.parseInt(entry[0]), item);
+        }
+        inventory.setItem(46, makeItem(Material.LIGHT_BLUE_STAINED_GLASS_PANE,
+                ChatColor.AQUA + "Testplex Arcade Cosmetics",
+                List.of(ChatColor.GRAY + "Production Mineplex Core ownership and donation services are not installed.")));
+        ItemStack arcade = makeItem(Material.JUKEBOX,
+                ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Arcade Cosmetics",
+                List.of(ChatColor.GRAY + "Open the per-game Arcade cosmetic lines.",
+                        ChatColor.YELLOW + "Click to browse all Arcade games."));
+        mark(arcade, "core-arcade-cosmetics", null, null, null);
+        inventory.setItem(52, arcade);
+        for (int slot = 0; slot < inventory.getSize(); slot++) {
+            if (inventory.getItem(slot) == null) {
+                inventory.setItem(slot, makeItem(Material.CYAN_STAINED_GLASS_PANE, ChatColor.DARK_GRAY + " ", List.of()));
+            }
+        }
+        player.openInventory(inventory);
+    }
+
+    private void openCoreCosmeticInfo(Player player, String category) {
+        Inventory inventory = Bukkit.createInventory(null, 27, "Cosmetics | " + category);
+        inventory.setItem(13, makeItem(Material.BARRIER, ChatColor.RED + category + " not installed",
+                List.of(ChatColor.GRAY + "The production Mineplex Core gadget/ownership backend",
+                        ChatColor.GRAY + "is not part of this isolated Paper 26.3 server.",
+                        ChatColor.YELLOW + "Use Arcade Cosmetics for available Testplex options.")));
+        inventory.setItem(22, backItem("Back to Cosmetics", "back-core-cosmetics", null));
+        player.openInventory(inventory);
+    }
+
+    private void openWinEffectsHome(Player player) {
+        Inventory inventory = Bukkit.createInventory(null, 54, WIN_HOME_TITLE);
+        int index = 0;
+        for (GameDefinition game : catalog.getGames()) {
+            if (index >= LEGACY_GAME_SLOTS.length) break;
+            ItemStack item = makeItem(icon(game.getIcon()), ChatColor.YELLOW + game.getName(),
+                    List.of(ChatColor.GRAY + game.getWinEffects().size() + " win-effect choices",
+                            ChatColor.GREEN + "Click to configure"));
+            mark(item, "win-effects-game", game, null, null);
+            inventory.setItem(LEGACY_GAME_SLOTS[index++], item);
+        }
+        inventory.setItem(49, backItem("Back to Cosmetics", "back-core-cosmetics", null));
+        player.openInventory(inventory);
+    }
+
     public void openCosmeticsHome(Player player) {
         Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.BLACK + COSMETICS_TITLE);
         int index = 0;
