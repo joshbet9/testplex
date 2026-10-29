@@ -24,17 +24,86 @@ public final class ArcadePortRules {
     public static final int RUNNER_MAX_FROSTBALLS = 16;
     public static final int RUNNER_FROSTBALL_SLOW_TICKS = 40;
     public static final int RUNNER_FROSTBALL_SLOW_AMPLIFIER = 2;
-    /** Selected community balance value for the King of Bacon win achievement. */
-    public static final int BACON_BRAWL_KING_OF_BACON_WINS = 15;
+    /** Meter charge comes from the source damage value recorded for each successful hit. */
+    public static final int BACON_METER_MAX = 100;
+    public static final int BACON_METER_MIN_ABILITY = 10;
+    public static final double BACON_METER_GAIN_PER_DAMAGE = 5.0D;
+    public static final long BACON_TIMED_HIT_SPAM_WINDOW_MILLIS = 250L;
+    public static final long BACON_TIMED_HIT_GOOD_MIN_MILLIS = 500L;
+    public static final long BACON_TIMED_HIT_GOOD_MAX_MILLIS = 900L;
+    public static final long BACON_TIMED_HIT_OK_MIN_MILLIS = 251L;
+    public static final long BACON_TIMED_HIT_OK_MAX_MILLIS = 499L;
+    public static final long BACON_TIMED_HIT_LATE_MAX_MILLIS = 1_400L;
+    public static final long BACON_HIT_FEEDBACK_MILLIS = 1_000L;
+    public static final long BACON_PIG_INVINCIBILITY_MIN_MILLIS = 500L;
+    public static final long BACON_PIG_INVINCIBILITY_MAX_MILLIS = 5_000L;
+    public static final long BACON_FLASH_FRIED_MAX_WIN_MILLIS = 60_000L;
+    public static final int BACON_THREE_FOR_ONE_BODY_SLAM_KILLS = 3;
     /** Pigs In Blankets is earned by six kills in a single game. */
     public static final int BACON_BRAWL_PIGS_IN_BLANKETS_KILLS = 6;
+
+    public static int baconMeterGainForDamage(double damage) {
+        if (!Double.isFinite(damage) || damage <= 0.0D) return 0;
+        return (int) Math.min(BACON_METER_MAX,
+                Math.ceil(damage * BACON_METER_GAIN_PER_DAMAGE));
+    }
+
+    public static int nextBaconMeter(int current, double damage) {
+        int charge = Math.max(0, Math.min(BACON_METER_MAX, current));
+        return Math.min(BACON_METER_MAX, charge + baconMeterGainForDamage(damage));
+    }
+
+    public static boolean canUseBaconMeterAbility(int percent) {
+        return percent >= BACON_METER_MIN_ABILITY;
+    }
+
+    /** Lower charge still permits the ability; higher charge increases its knockback. */
+    public static double baconBodySlamMeterMultiplier(int percent) {
+        int charge = Math.max(0, Math.min(BACON_METER_MAX, percent));
+        return 0.5D + charge / 200.0D;
+    }
+
+    /** The Pig kit spends its fill on a temporary invincibility window, capped at five seconds. */
+    public static long baconPigInvincibilityDurationMillis(int percent) {
+        int charge = Math.max(0, Math.min(BACON_METER_MAX, percent));
+        if (!canUseBaconMeterAbility(charge)) return 0L;
+        return BACON_PIG_INVINCIBILITY_MIN_MILLIS
+                + Math.round((BACON_PIG_INVINCIBILITY_MAX_MILLIS
+                        - BACON_PIG_INVINCIBILITY_MIN_MILLIS) * charge / (double) BACON_METER_MAX);
+    }
+
+    /** Mama Piggles spends meter to set Bacon Blast launch and impact power. */
+    public static double baconBlastPowerMultiplier(int percent) {
+        int charge = Math.max(0, Math.min(BACON_METER_MAX, percent));
+        return 0.5D + 1.5D * charge / BACON_METER_MAX;
+    }
+
+    /** Spamming within the same short click window weakens hits; well-timed hits are rewarded. */
+    public static double baconTimedHitKnockbackMultiplier(long intervalMillis) {
+        if (intervalMillis < 0L) return 1.0D;
+        if (intervalMillis <= BACON_TIMED_HIT_SPAM_WINDOW_MILLIS) return 0.65D;
+        if (intervalMillis >= BACON_TIMED_HIT_GOOD_MIN_MILLIS
+                && intervalMillis <= BACON_TIMED_HIT_GOOD_MAX_MILLIS) return 1.6D;
+        if (intervalMillis >= BACON_TIMED_HIT_OK_MIN_MILLIS
+                && intervalMillis <= BACON_TIMED_HIT_OK_MAX_MILLIS) return 1.1D;
+        if (intervalMillis <= BACON_TIMED_HIT_LATE_MAX_MILLIS) return 1.25D;
+        return 1.0D;
+    }
 
     public static boolean shouldAwardBaconPigsInBlankets(int killsThisGame) {
         return killsThisGame >= BACON_BRAWL_PIGS_IN_BLANKETS_KILLS;
     }
 
-    public static boolean shouldAwardBaconKingOfBacon(int wins) {
-        return wins >= BACON_BRAWL_KING_OF_BACON_WINS;
+    public static boolean shouldAwardBaconFlashFried(long roundMillis) {
+        return roundMillis >= 0L && roundMillis <= BACON_FLASH_FRIED_MAX_WIN_MILLIS;
+    }
+
+    public static boolean shouldAwardBaconRawPork(boolean usedAbilityThisGame) {
+        return !usedAbilityThisGame;
+    }
+
+    public static boolean shouldAwardBaconThreeForOne(int bodySlamKills) {
+        return bodySlamKills >= BACON_THREE_FOR_ONE_BODY_SLAM_KILLS;
     }
 
     /** Suppress vanilla health damage caused synchronously by our non-block-breaking Bacon Blast impact. */
