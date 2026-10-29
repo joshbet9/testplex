@@ -535,6 +535,7 @@ class ArcadePortGameTest {
 
     @Test void baconBrawlRecognisesSourceArenaHazardKillReasons() {
         assertTrue(ArcadePortRules.isBaconArenaKnockoutReason("fell from the arena"));
+        assertTrue(ArcadePortRules.isBaconArenaKnockoutReason("FALL"));
         assertTrue(ArcadePortRules.isBaconArenaKnockoutReason("was lost to the water"));
         assertTrue(ArcadePortRules.isBaconArenaKnockoutReason("LAVA"));
         assertTrue(ArcadePortRules.isBaconArenaKnockoutReason("hot_floor"));
