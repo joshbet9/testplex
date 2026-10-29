@@ -48,6 +48,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private static final String QUEUE_TITLE = "Team Select | Queue";
     private static final String BOT_MENU_PREFIX = "Bot Cosmetics | ";
     private static final String[] THEMES = {"porky", "inferno", "frost", "slime", "royal", "confetti"};
+    private static final String[] GENERIC_PREVIEW_THEMES = {"classic", "inferno", "frost", "slime", "royal", "confetti"};
     private static final String[] BOMB_LOBBERS_THEMES = {
             "classic", "ember", "shockwave", "spark", "confetti", "frost", "slime"
     };
@@ -325,7 +326,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             return;
         }
 
-        String[] themes = selectedGame == ArcadePortGame.BOMB_LOBBERS ? BOMB_LOBBERS_THEMES : THEMES;
+        String[] themes = selectedGame == ArcadePortGame.BOMB_LOBBERS ? BOMB_LOBBERS_THEMES : GENERIC_PREVIEW_THEMES;
         int columns = selectedGame == ArcadePortGame.BOMB_LOBBERS ? 7 : 6;
         int left = columns == 7 ? -9 : -7;
         Material iconMaterial = showcaseIcon(selectedGame);
