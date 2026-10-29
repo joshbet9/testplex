@@ -90,6 +90,11 @@ public final class ArcadePortRules {
         return 1.0D;
     }
 
+    /** Reborn kit selection is a pre-round choice; live Bacon Brawl changes apply next game. */
+    public static boolean shouldDeferBaconBrawlKitChange(boolean activeBaconRound) {
+        return activeBaconRound;
+    }
+
     /** Stable test-server key; production achievement storage remains a separate integration. */
     public static String baconBrawlAchievementConfigKey(java.util.UUID playerId, String achievementSlug) {
         if (playerId == null || achievementSlug == null
