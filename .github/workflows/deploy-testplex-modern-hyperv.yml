@@ -336,10 +336,24 @@ jobs:
           echo "Disk usage after staging-cache cleanup:"
           df -h /var/tmp
           df -i /var/tmp
+          avail_kb="$(df -Pk /var/tmp | awk 'END {print $4}')"
+          if [[ ! "$avail_kb" =~ ^[0-9]+$ ]] || (( avail_kb < 2097152 )); then
+            echo "Only ${avail_kb:-unknown} KiB free in /var/tmp after staging cleanup; refusing upload unless at least 2 GiB is available." >&2
+            exit 1
+          fi
+          echo "Available space after stale-cache cleanup: $((avail_kb / 1024)) MiB."
           install -d -m 0700 -- "$upload_dir"
           REMOTE_STAGE_PREP
-          scp -p -P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv" \
-            -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+          # Keep SCP's SSH session alive and emit transfer diagnostics. The prior
+          # attempt stalled with "server not responding" during SCP after the VM
+          # filesystem reached 100%; fail cleanly instead of hanging indefinitely.
+          scp_opts=(-p -P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15
+            -o ServerAliveCountMax=8 -o TCPKeepAlive=yes -v)
+          echo "Uploading verified modern artifacts to the isolated VM."
+          timeout --foreground --signal=TERM 12m scp "${scp_opts[@]}" \
             "$STAGE_DIR/TestplexModernArcade.jar" \
             "$STAGE_DIR/MonsterMazeModern.jar" \
             "$STAGE_DIR/SnakeModern.jar" \
@@ -347,10 +361,9 @@ jobs:
             "$STAGE_DIR/MonsterMazeMaps.tar.gz" \
             "$STAGE_DIR/MonsterMazeMapsSource.txt" \
             "$remote:$upload_dir/"
-          scp -p -P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv" \
-            -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+          timeout --foreground --signal=TERM 3m scp "${scp_opts[@]}" \
             "$STAGE_DIR/SHA256SUMS" "$remote:$upload_dir/SHA256SUMS"
-          ssh "${ssh_opts[@]}" "$remote" "cd '$upload_dir' && sha256sum -c SHA256SUMS"
+          ssh "${ssh_opts[@]}" "$remote" "echo 'Disk after transfer:'; df -h /var/tmp; du -sh '$upload_dir'; cd '$upload_dir' && sha256sum -c SHA256SUMS"
           echo "upload_dir=$upload_dir" >> "$GITHUB_OUTPUT"
 
       - name: Provision and start only testplex-modern.service
