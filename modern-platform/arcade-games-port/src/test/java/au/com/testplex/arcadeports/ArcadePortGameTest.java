@@ -508,7 +508,7 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isBaconBrawlBackstab(Double.NaN, 1.0D, 0.0D, -1.0D));
     }
 
-remove unsupported Baby Piggles attack test    @Test void baconBrawlAchievementThresholdsUseSelectedValues() {
+    @Test void baconBrawlAchievementThresholdsUseSelectedValues() {
         assertEquals(15, ArcadePortRules.BACON_BRAWL_KING_OF_BACON_WINS);
         assertFalse(ArcadePortRules.shouldAwardBaconKingOfBacon(14));
         assertTrue(ArcadePortRules.shouldAwardBaconKingOfBacon(15));
