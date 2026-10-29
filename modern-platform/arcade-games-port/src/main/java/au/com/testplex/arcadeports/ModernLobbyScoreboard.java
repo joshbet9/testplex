@@ -69,17 +69,17 @@ public final class ModernLobbyScoreboard {
         lines.add(ChatColor.AQUA.toString() + ChatColor.BOLD + "Server");
         lines.add(ChatColor.WHITE + serverName);
         lines.add(ChatColor.GREEN.toString() + ChatColor.BOLD + "Game");
-        lines.add(ChatColor.WHITE + gameName);
+        lines.add(ChatColor.AQUA + gameName);
         lines.add(ChatColor.GOLD.toString() + ChatColor.BOLD + "Kit");
-        lines.add(ChatColor.WHITE + kitName);
+        lines.add(ChatColor.LIGHT_PURPLE + kitName);
         lines.add(ChatColor.GREEN.toString() + ChatColor.BOLD + "Gems");
         lines.add(ChatColor.WHITE + gems);
         lines.add(ChatColor.YELLOW.toString() + ChatColor.BOLD + "Shards");
-        lines.add(ChatColor.WHITE + shards);
+        lines.add(ChatColor.GRAY + shards);
         lines.add(ChatColor.GOLD.toString() + ChatColor.BOLD + "Rank");
-        lines.add(ChatColor.WHITE + rank);
+        lines.add(ChatColor.DARK_GREEN + rank);
         lines.add(ChatColor.RED.toString() + ChatColor.BOLD + "Website");
-        lines.add(ChatColor.WHITE + website);
+        lines.add(ChatColor.DARK_AQUA + website);
         lines.add("----------------");
 
         int score = lines.size();
