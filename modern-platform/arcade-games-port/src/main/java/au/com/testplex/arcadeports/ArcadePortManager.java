@@ -2491,7 +2491,7 @@ public final class ArcadePortManager implements Listener {
         String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
         String ability = switch (kit) {
             case "mama-piggles" -> "Bacon Blast power";
-            case "pig" -> "Invincibility duration";
+            case "pig" -> "Cloak duration";
             default -> "Body Slam strength";
         };
         String displayName = ChatColor.GOLD + "Ability Meter: " + percent + "%";
