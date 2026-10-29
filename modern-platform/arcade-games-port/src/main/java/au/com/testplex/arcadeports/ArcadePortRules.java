@@ -463,6 +463,11 @@ public final class ArcadePortRules {
         };
     }
 
+    /** Reborn throws on every live PlayerInteractEvent except a physical click. */
+    public static boolean shouldThrowBombLobbersOnAction(boolean physicalAction) {
+        return !physicalAction;
+    }
+
     /** Mirrors UtilAction.velocity for the in-air, uncontrolled PerkDoubleJump used by these kits. */
     public static org.bukkit.util.Vector bombLobbersDoubleJumpVelocity(
             org.bukkit.util.Vector lookDirection, double power) {
