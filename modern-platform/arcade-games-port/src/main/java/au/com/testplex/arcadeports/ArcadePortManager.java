@@ -2317,9 +2317,40 @@ public final class ArcadePortManager implements Listener {
         session.baconNameEntries.clear();
     }
 
+    /**
+     * Packet-level Mineplex disguise is approximated with a server-side avatar. Hide the real
+     * player from other viewers while the pig/sheep proxy is present, remembering only viewers
+     * this session hid so other plugins' pre-existing visibility choices can be preserved.
+     */
+    private void hideBaconPlayerFromViewers(Session session, Player owner) {
+        UUID ownerId = owner.getUniqueId();
+        Set<UUID> hiddenViewers = session.baconHiddenViewersByOwner
+                .computeIfAbsent(ownerId, ignored -> new HashSet<>());
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            if (viewer.equals(owner) || !viewer.isOnline()) continue;
+            if (viewer.canSee(owner)) {
+                viewer.hidePlayer(plugin, owner);
+                hiddenViewers.add(viewer.getUniqueId());
+            }
+        }
+    }
+
+    private void cleanupBaconPlayerVisibility(Session session) {
+        for (Map.Entry<UUID, Set<UUID>> entry : session.baconHiddenViewersByOwner.entrySet()) {
+            Player owner = session.players.get(entry.getKey());
+            if (owner == null || !owner.isOnline()) continue;
+            for (UUID viewerId : entry.getValue()) {
+                Player viewer = Bukkit.getPlayer(viewerId);
+                if (viewer != null && viewer.isOnline()) viewer.showPlayer(plugin, owner);
+            }
+        }
+        session.baconHiddenViewersByOwner.clear();
+    }
+
     /** Keep the real player authoritative while rendering the source kit's pig or pink Sheep Pig avatar. */
     private void updateBaconPlayerPig(Session session, Player owner, long now) {
         UUID ownerId = owner.getUniqueId();
+        hideBaconPlayerFromViewers(session, owner);
         UUID avatarId = session.baconPlayerPigs.get(ownerId);
         boolean sheepKit = ArcadePortRules.baconBrawlUsesSheepAvatar(
                 session.baconKits.getOrDefault(ownerId, "el-muchacho-pigo"));
@@ -4498,6 +4529,7 @@ public final class ArcadePortManager implements Listener {
         session.evolutionWebs.clear();
         session.runnerBlocks.clear();
         cleanupBaconDisguiseNameTags(session);
+        if (session.type == ArcadePortGame.BACON_BRAWL) cleanupBaconPlayerVisibility(session);
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             Player player = entry.getValue();
             PlayerSnapshot snapshot = session.snapshots.get(entry.getKey());
@@ -6141,6 +6173,7 @@ public final class ArcadePortManager implements Listener {
         Team baconDisguiseTeam;
         final Map<UUID, Team> baconPreviousNameTeams = new HashMap<>();
         final Map<UUID, String> baconNameEntries = new HashMap<>();
+        final Map<UUID, Set<UUID>> baconHiddenViewersByOwner = new HashMap<>();
         final Map<UUID, UUID> baconPlayerPigs = new HashMap<>();
         final Map<UUID, UUID> baconPigOwners = new HashMap<>();
         final Set<UUID> baconPigsInBlanketsAwarded = new HashSet<>();
