@@ -293,7 +293,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         else if(now>=b.nextAttackAt){Vector away=nearest.getLocation().toVector().subtract(e.getLocation().toVector()).setY(0);if(away.lengthSquared()<0.01)away=new Vector(0,0,1);nearest.setVelocity(away.normalize().multiply(Math.min(1.35,Math.max(0.65,manager.baconBrawlKnockbackValue(e.getWorld())))).setY(0.42));nearest.sendActionBar(ChatColor.RED+b.name+ChatColor.GRAY+" hit you!");nearest.getWorld().spawnParticle(particle(b.theme),nearest.getLocation().add(0,1,0),8,0.4,0.3,0.4,0.01);b.nextAttackAt=now+1400;}
         e.getWorld().spawnParticle(particle(b.theme),e.getLocation().add(0,1,0),2,0.2,0.2,0.2,0.01);
     }
-    private Particle particle(String theme){return switch(theme){case "inferno"->Particle.FLAME;case "frost"->Particle.SNOWFLAKE;case "slime"->Particle.SLIME;case "royal"->Particle.END_ROD;case "confetti"->Particle.HAPPY_VILLAGER;default->Particle.CRIT;};}
+    private Particle particle(String theme){return switch(theme){case "inferno"->Particle.FLAME;case "frost"->Particle.SNOWFLAKE;case "slime"->Particle.CRIT;case "royal"->Particle.END_ROD;case "confetti"->Particle.HAPPY_VILLAGER;default->Particle.CRIT;};}
 
     public void deployBots(ArcadePortGame game,List<Location> spawns){
         if(game!=ArcadePortGame.BACON_BRAWL||spawns.isEmpty()){returnBotsToLobby();return;}int index=0;
