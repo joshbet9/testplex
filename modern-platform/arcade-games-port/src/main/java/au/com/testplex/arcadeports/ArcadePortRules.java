@@ -483,6 +483,18 @@ public final class ArcadePortRules {
         };
     }
 
+    /**
+     * Legacy updateParticles uses offsets=(1,1,1), speed=0 for Aqua and
+     * offsets=(0,0,0), speed=1 for the other team; count remains 2 in both cases.
+     */
+    public static double bombLobbersTrailOffset(int teamId) {
+        return teamId == 1 ? 1.0D : 0.0D;
+    }
+
+    public static double bombLobbersTrailSpeed(int teamId) {
+        return teamId == 1 ? 0.0D : 1.0D;
+    }
+
     /** Number of 0.2-block trail samples including the previous position. */
     public static int bombLobbersTrailSampleCount(double segmentLength) {
         if (!Double.isFinite(segmentLength) || segmentLength < 0.0D) return 0;

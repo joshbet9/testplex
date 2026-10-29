@@ -7640,7 +7640,12 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    /** Mirrors BombLobbers.updateParticles: team-coloured red dust along each airborne TNT segment. */
+    /**
+     * Mirrors BombLobbers.updateParticles: two legacy RED_DUST particles per 0.2-block
+     * sample, with the original team-dependent spread and speed. Despite the source's
+     * branch on team, its count is 2 (not 0), so the trail uses default red dust rather
+     * than RGB-tinted particles.
+     */
     private void renderBombLobbersTrail(Session session, UUID ownerId, Location previous, Location current) {
         if (session == null || ownerId == null || previous == null || current == null
                 || previous.getWorld() != session.world || current.getWorld() != session.world) return;
@@ -7650,15 +7655,17 @@ public final class ArcadePortManager implements Listener {
         int samples = ArcadePortRules.bombLobbersTrailSampleCount(distance);
         if (samples <= 0) return;
 
-        Color teamColor = ArcadePortRules.bombLobbersTeamColor(
-                session.teams.getOrDefault(ownerId, 0));
-        Particle.DustOptions dust = new Particle.DustOptions(teamColor, 1.0F);
+        int team = session.teams.getOrDefault(ownerId, 0);
+        double spread = ArcadePortRules.bombLobbersTrailOffset(team);
+        double speed = ArcadePortRules.bombLobbersTrailSpeed(team);
+        Particle.DustOptions dust = new Particle.DustOptions(Color.RED, 1.0F);
         Vector direction = segment.multiply(1.0D / distance);
         for (int sample = 0; sample < samples; sample++) {
             double offset = sample * ArcadePortRules.BOMB_LOBBERS_TRAIL_SAMPLE_SPACING;
             if (offset > distance) break;
             Location point = previous.clone().add(direction.clone().multiply(offset)).add(0.0D, 0.5D, 0.0D);
-            session.world.spawnParticle(Particle.DUST, point, 2, 0.0D, 0.0D, 0.0D, 0.0D, dust);
+            session.world.spawnParticle(Particle.DUST, point, 2,
+                    spread, spread, spread, speed, dust);
         }
     }
 

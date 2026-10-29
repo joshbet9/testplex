@@ -617,6 +617,15 @@ class ArcadePortGameTest {
         assertEquals(org.bukkit.Color.WHITE, ArcadePortRules.bombLobbersTeamColor(-1));
     }
 
+    @Test void bombLobbersTrailMatchesLegacyTeamSpreadAndSpeedRatherThanTintingTeams() {
+        assertEquals(0.0D, ArcadePortRules.bombLobbersTrailOffset(0), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.bombLobbersTrailSpeed(0), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.bombLobbersTrailOffset(1), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.bombLobbersTrailSpeed(1), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.bombLobbersTrailOffset(-1), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.bombLobbersTrailSpeed(-1), 0.00001D);
+    }
+
     @Test void bombLobbersTntTrailUsesSourceTwoParticlePointSpacing() {
         assertEquals(1, ArcadePortRules.bombLobbersTrailSampleCount(0.0D));
         assertEquals(2, ArcadePortRules.bombLobbersTrailSampleCount(0.2D));
