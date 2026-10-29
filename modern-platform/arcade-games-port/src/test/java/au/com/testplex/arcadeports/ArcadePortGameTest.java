@@ -649,7 +649,7 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.2D, 0.8D, 2.0D));
         assertTrue(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.6D, 0.8D, 2.0D));
         assertFalse(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.8D, 0.5D, 2.0D));
-        assertFalse(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.8D, 0.6D, 0.5D));
+        assertFalse(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.8D, 0.1D, 0.5D));
         assertTrue(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.8D, -1.0D, 2.0D));
         assertFalse(ArcadePortRules.isBaconBlastPlayerBeforeBlock(Double.NaN, 0.5D, 2.0D));
         assertFalse(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.5D, 0.5D, Double.NaN));
