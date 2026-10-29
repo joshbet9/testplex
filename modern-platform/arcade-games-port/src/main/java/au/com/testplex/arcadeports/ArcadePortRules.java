@@ -387,32 +387,9 @@ public final class ArcadePortRules {
         return "pig".equals(normalized) || !clickedUsableBlock;
     }
 
-    /**
-     * Return the unique highest-kill player's index, or -1 for empty/tied scores.
-     * The original game is a kill race, so deaths and respawns do not remove a
-     * player's accumulated kills from the final comparison.
-     */
     /** The retained Sheep Pig kit is the one source kit whose disguise is a pink sheep. */
     public static boolean baconBrawlUsesSheepAvatar(String requestedKit) {
         return "pig".equals(normalizeBaconBrawlKit(requestedKit));
-    }
-
-    public static int baconBrawlUniqueLeaderIndex(java.util.List<Integer> kills) {
-        if (kills == null || kills.isEmpty()) return -1;
-        int bestScore = Integer.MIN_VALUE;
-        int bestIndex = -1;
-        boolean tied = false;
-        for (int i = 0; i < kills.size(); i++) {
-            int score = kills.get(i) == null ? 0 : kills.get(i);
-            if (score > bestScore) {
-                bestScore = score;
-                bestIndex = i;
-                tied = false;
-            } else if (score == bestScore) {
-                tied = true;
-            }
-        }
-        return tied ? -1 : bestIndex;
     }
 
     public static double initialBaconKnockback(int playerCount) {
