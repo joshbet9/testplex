@@ -87,6 +87,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -115,6 +116,9 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> runnerKitPreferences = new HashMap<>();
     private final Map<UUID, String> dragonsKitPreferences = new HashMap<>();
     private final Map<UUID, String> dragonEscapeKitPreferences = new HashMap<>();
+    /** Packet-thread-safe entity-ID lookup for the optional Bacon client hit bridge. */
+    private final Map<Integer, UUID> baconAvatarOwnersByEntityId = new ConcurrentHashMap<>();
+    private Object baconAvatarPacketBridge;
     private Session active;
     private BukkitTask pendingStart;
     private ArcadePortGame pendingType;
@@ -124,6 +128,69 @@ public final class ArcadePortManager implements Listener {
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
         Bukkit.getPluginManager().registerEvents(this, plugin);
+        registerOptionalBaconPacketBridge();
+    }
+
+    /**
+     * PacketEvents is optional: no PacketEvents class is loaded unless that plugin is installed.
+     * Bare Paper keeps the previous server-side-avatar hit handling as a fallback.
+     */
+    private void registerOptionalBaconPacketBridge() {
+        org.bukkit.plugin.Plugin packetEvents = Bukkit.getPluginManager().getPlugin("packetevents");
+        if (packetEvents == null || !packetEvents.isEnabled()) {
+            plugin.getLogger().info("PacketEvents not found; using fallback Bacon Brawl avatar hit handling.");
+            return;
+        }
+        try {
+            Class<?> bridgeType = Class.forName(
+                    "au.com.testplex.arcadeports.BaconAvatarPacketBridge", true, plugin.getClass().getClassLoader());
+            Object bridge = bridgeType
+                    .getConstructor(ArcadeMechanicsModernPlugin.class, ArcadePortManager.class)
+                    .newInstance(plugin, this);
+            bridgeType.getMethod("register").invoke(bridge);
+            baconAvatarPacketBridge = bridge;
+            plugin.getLogger().info("Bacon Brawl packet hitbox bridge enabled.");
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().warning("Could not enable Bacon Brawl packet hitbox bridge; using fallback: "
+                    + exception.getMessage());
+        }
+    }
+
+    private void unregisterOptionalBaconPacketBridge() {
+        Object bridge = baconAvatarPacketBridge;
+        baconAvatarPacketBridge = null;
+        if (bridge == null) return;
+        try {
+            bridge.getClass().getMethod("unregister").invoke(bridge);
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().warning("Could not unregister Bacon Brawl packet bridge cleanly: "
+                    + exception.getMessage());
+        }
+    }
+
+    /** Safe for packet-thread lookups; the owner mapping is published via a concurrent map. */
+    public boolean isBaconAvatarEntityId(int entityId) {
+        return baconAvatarOwnersByEntityId.containsKey(entityId);
+    }
+
+    /** The packet adapter has cancelled the proxy attack packet; apply the hit to the hidden player. */
+    public void handleBaconAvatarPacketAttack(Player attacker, int avatarEntityId) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.BACON_BRAWL
+                || attacker == null || !attacker.isOnline()) return;
+        UUID targetId = baconAvatarOwnersByEntityId.get(avatarEntityId);
+        if (targetId == null) return;
+        Player target = session.players.get(targetId);
+        boolean accepted = ArcadePortRules.shouldAcceptBaconAvatarPacketHit(
+                session.type == ArcadePortGame.BACON_BRAWL,
+                session.alive.contains(attacker.getUniqueId()),
+                target != null && target.isOnline() && session.alive.contains(targetId),
+                targetId.equals(attacker.getUniqueId()),
+                target == null ? Double.POSITIVE_INFINITY
+                        : attacker.getEyeLocation().distanceSquared(target.getEyeLocation()),
+                target != null && attacker.hasLineOfSight(target));
+        if (!accepted || target == null) return;
+        handleBaconBrawlHit(session, attacker, target, "melee");
     }
 
     public void selectKit(Player player, String requestedKit) {
@@ -2528,6 +2595,7 @@ public final class ArcadePortManager implements Listener {
         boolean wrongDisguise = avatar != null && (sheepKit != (avatar instanceof Sheep));
         if (wrongDisguise) {
             UUID oldId = avatar.getUniqueId();
+            baconAvatarOwnersByEntityId.remove(avatar.getEntityId());
             avatar.eject();
             avatar.remove();
             session.entities.remove(avatar);
@@ -2553,6 +2621,7 @@ public final class ArcadePortManager implements Listener {
             session.entities.add(avatar);
             session.baconPlayerPigs.put(ownerId, avatar.getUniqueId());
             session.baconPigOwners.put(avatar.getUniqueId(), ownerId);
+            baconAvatarOwnersByEntityId.put(avatar.getEntityId(), ownerId);
         }
         if (avatar instanceof Sheep sheep) sheep.setColor(DyeColor.PINK);
         if (avatar.getLocation().distanceSquared(owner.getLocation()) > 0.01D) {
@@ -2583,6 +2652,7 @@ public final class ArcadePortManager implements Listener {
             session.baconPigOwners.remove(pigId);
             for (Entity entity : new ArrayList<>(session.entities)) {
                 if (entity.getUniqueId().equals(pigId)) {
+                    baconAvatarOwnersByEntityId.remove(entity.getEntityId());
                     entity.remove();
                     session.entities.remove(entity);
                     break;
@@ -2801,6 +2871,7 @@ public final class ArcadePortManager implements Listener {
             session.entities.add(baby);
             session.baconBabyPigs.put(ownerId, baby.getUniqueId());
             session.baconPigOwners.put(baby.getUniqueId(), ownerId);
+            baconAvatarOwnersByEntityId.put(baby.getEntityId(), ownerId);
         }
 
         LivingEntity avatar = baconPlayerAvatar(session, ownerId);
@@ -2818,6 +2889,7 @@ public final class ArcadePortManager implements Listener {
         session.baconPigOwners.remove(pigId);
         for (Entity entity : new ArrayList<>(session.entities)) {
             if (entity.getUniqueId().equals(pigId)) {
+                baconAvatarOwnersByEntityId.remove(entity.getEntityId());
                 entity.remove();
                 session.entities.remove(entity);
                 break;
@@ -4920,7 +4992,10 @@ public final class ArcadePortManager implements Listener {
             if (block != null && block.getWorld() == session.world) block.setBlockData(entry.getValue(), false);
         }
         session.deathTagOriginalLightBlocks.clear();
-        for (Entity entity : new ArrayList<>(session.entities)) if (entity != null && entity.isValid()) entity.remove();
+        for (Entity entity : new ArrayList<>(session.entities)) {
+            if (entity != null) baconAvatarOwnersByEntityId.remove(entity.getEntityId());
+            if (entity != null && entity.isValid()) entity.remove();
+        }
         session.bombOwners.clear();
         session.bombLastLocations.clear();
         session.dragonContactCooldowns.clear();
@@ -5030,6 +5105,8 @@ public final class ArcadePortManager implements Listener {
 
     public void shutdown() {
         stop("plugin shutdown");
+        unregisterOptionalBaconPacketBridge();
+        baconAvatarOwnersByEntityId.clear();
         for (Map.Entry<UUID, PlayerSnapshot> entry : new ArrayList<>(pendingRestore.entrySet())) {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player != null && player.isOnline()) entry.getValue().restore(player);
