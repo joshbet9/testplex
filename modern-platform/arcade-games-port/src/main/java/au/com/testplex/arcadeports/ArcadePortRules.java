@@ -37,6 +37,15 @@ public final class ArcadePortRules {
         return wins >= BACON_BRAWL_KING_OF_BACON_WINS;
     }
 
+    /** Suppress vanilla health damage caused synchronously by our non-block-breaking Bacon Blast impact. */
+    public static boolean shouldSuppressBaconBlastHealthDamage(boolean baconBrawl,
+            boolean duringTrackedBlastImpact,
+            org.bukkit.event.entity.EntityDamageEvent.DamageCause cause) {
+        return baconBrawl && duringTrackedBlastImpact
+                && (cause == org.bukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_EXPLOSION
+                    || cause == org.bukkit.event.entity.EntityDamageEvent.DamageCause.BLOCK_EXPLOSION);
+    }
+
     /** Bacon Blast calls the source explosion with block damage disabled. */
     public static boolean baconBlastShouldBreakBlock(org.bukkit.Material material, double distanceSquared) {
         return false;
