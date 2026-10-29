@@ -4,10 +4,12 @@ import org.bukkit.Effect;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.Cancellable;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 
 import mineplex.core.common.util.C;
 import mineplex.core.common.util.F;
@@ -34,34 +36,47 @@ public class PerkPigCloak extends Perk
 	@EventHandler
 	public void Use(PlayerInteractEvent event)
 	{
-		Player player = event.getPlayer();
-
 		if (!UtilEvent.isAction(event, ActionType.R))
 			return;
-		
-		if (!UtilGear.isAxe(event.getItem()))
-			return; 
-		
+
+		if (event.isCancelled())
+			return;
+
+		activate(event.getPlayer(), event);
+	}
+
+	@EventHandler
+	public void UseOnEntity(PlayerInteractEntityEvent event)
+	{
+		if (event.isCancelled())
+			return;
+
+		activate(event.getPlayer(), event);
+	}
+
+	private void activate(Player player, Cancellable event)
+	{
+		if (!UtilGear.isAxe(player.getItemInHand()))
+			return;
+
 		if (!Kit.HasKit(player))
 			return;
-		
+
 		event.setCancelled(true);
 
 		if (!Recharge.Instance.use(player, GetName(), GetName(), 10000, true, true))
 			return;
 
-		//Action
 		Manager.GetCondition().Factory().Cloak(GetName(), player, player, 5, false, false);
 		if (Manager.GetGame().GetType() == GameType.BaconBrawl)
 			BaconBrawlCosmeticEffects.play(player, "cloak-activation");
 
-		for (int i=0 ; i<3 ; i++)
+		for (int i = 0; i < 3; i++)
 		{
 			player.getWorld().playSound(player.getLocation(), Sound.SHEEP_SHEAR, 2f, 0.5f);
 			player.getWorld().playEffect(player.getLocation(), Effect.STEP_SOUND, 80);
 		}
-		
-		//Inform
+
 		UtilPlayer.message(player, F.main("Skill", "You used " + F.skill(GetName()) + "."));
 	}
 
