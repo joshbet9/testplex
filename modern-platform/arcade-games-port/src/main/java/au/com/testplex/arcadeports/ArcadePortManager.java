@@ -63,6 +63,8 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.projectiles.ProjectileSource;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -453,6 +455,7 @@ public final class ArcadePortManager implements Listener {
         if (!sourceMapWorlds.contains(type.id())) buildArena(type, world);
         Session session = new Session(type, world, participants);
         active = session;
+        if (type == ArcadePortGame.BACON_BRAWL) setupBaconDisguiseNameTags(session, participants);
         long now = System.currentTimeMillis();
         session.startedAt = now;
         session.endsAt = now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
@@ -2241,6 +2244,65 @@ public final class ArcadePortManager implements Listener {
         for (Player player : alivePlayers(session)) {
             player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_FLAP, 1.0F, 0.7F);
         }
+    }
+
+    /**
+     * Hide the invisible player nameplates while their synced Pig avatars are visible.
+     * Existing main-scoreboard team membership is remembered and restored after the round.
+     */
+    private void setupBaconDisguiseNameTags(Session session, List<Player> participants) {
+        if (Bukkit.getScoreboardManager() == null) return;
+        Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
+        String teamName = "bb" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
+        try {
+            Team disguiseTeam = scoreboard.registerNewTeam(teamName);
+            disguiseTeam.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.NEVER);
+            session.baconDisguiseScoreboard = scoreboard;
+            session.baconDisguiseTeam = disguiseTeam;
+            for (Player player : participants) {
+                String entry = player.getName();
+                Team previous = scoreboard.getEntryTeam(entry);
+                session.baconPreviousNameTeams.put(player.getUniqueId(), previous == disguiseTeam ? null : previous);
+                session.baconNameEntries.put(player.getUniqueId(), entry);
+                disguiseTeam.addEntry(entry);
+            }
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            plugin.getLogger().warning("Could not hide Bacon Brawl player nameplates: " + exception.getMessage());
+            cleanupBaconDisguiseNameTags(session);
+        }
+    }
+
+    private void cleanupBaconDisguiseNameTags(Session session) {
+        Team disguiseTeam = session.baconDisguiseTeam;
+        Scoreboard scoreboard = session.baconDisguiseScoreboard;
+        if (disguiseTeam == null || scoreboard == null) return;
+        for (Map.Entry<UUID, String> entry : session.baconNameEntries.entrySet()) {
+            try {
+                disguiseTeam.removeEntry(entry.getValue());
+            } catch (IllegalStateException ignored) {
+                // Another plugin may already have removed the temporary team.
+            }
+            Team previous = session.baconPreviousNameTeams.get(entry.getKey());
+            if (previous == null) continue;
+            try {
+                Team currentlyRegistered = scoreboard.getTeam(previous.getName());
+                if (currentlyRegistered != null && currentlyRegistered != disguiseTeam) {
+                    currentlyRegistered.addEntry(entry.getValue());
+                }
+            } catch (IllegalArgumentException | IllegalStateException exception) {
+                plugin.getLogger().warning("Could not restore scoreboard team for " + entry.getValue()
+                        + " after Bacon Brawl: " + exception.getMessage());
+            }
+        }
+        try {
+            if (scoreboard.getTeam(disguiseTeam.getName()) != null) disguiseTeam.unregister();
+        } catch (IllegalStateException ignored) {
+            // Already unregistered by another plugin.
+        }
+        session.baconDisguiseTeam = null;
+        session.baconDisguiseScoreboard = null;
+        session.baconPreviousNameTeams.clear();
+        session.baconNameEntries.clear();
     }
 
     /** Replace the player's visible model with a synchronized Pig while keeping the real player as the combat authority. */
@@ -4335,6 +4397,7 @@ public final class ArcadePortManager implements Listener {
         for (Block block : session.evolutionWebs.keySet()) if (block.getType() == Material.COBWEB) block.setType(Material.AIR, false);
         session.evolutionWebs.clear();
         session.runnerBlocks.clear();
+        cleanupBaconDisguiseNameTags(session);
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             Player player = entry.getValue();
             PlayerSnapshot snapshot = session.snapshots.get(entry.getKey());
@@ -6005,6 +6068,10 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> baconCloakedUntil = new HashMap<>();
         final Map<UUID, UUID> baconBabyPigs = new HashMap<>();
         final Map<UUID, Long> baconBabyAttackReadyAt = new HashMap<>();
+        Scoreboard baconDisguiseScoreboard;
+        Team baconDisguiseTeam;
+        final Map<UUID, Team> baconPreviousNameTeams = new HashMap<>();
+        final Map<UUID, String> baconNameEntries = new HashMap<>();
         final Map<UUID, UUID> baconPlayerPigs = new HashMap<>();
         final Map<UUID, UUID> baconPigOwners = new HashMap<>();
         final Set<UUID> baconPigsInBlanketsAwarded = new HashSet<>();
