@@ -463,7 +463,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private void spawnBotEntity(Bot b,Location at,boolean inGame){
         if(at==null||at.getWorld()==null)return;LivingEntity actor;
         if("pink-sheep".equals(b.form)){Sheep sheep=at.getWorld().spawn(at,Sheep.class);sheep.setColor(DyeColor.PINK);actor=sheep;}else actor=at.getWorld().spawn(at,Pig.class);
-        actor.setInvulnerable(true);actor.setRemoveWhenFarAway(false);actor.setPersistent(false);actor.setSilent(true);actor.setCustomNameVisible(true);actor.setCollidable(true);
+        // Keep the entity damageable at the Paper level so melee attacks reach EntityDamageByEntityEvent.
+        // onBotDamage cancels all damage and applies controlled Bacon Brawl knockback instead.
+        actor.setInvulnerable(false);actor.setRemoveWhenFarAway(false);actor.setPersistent(false);actor.setSilent(true);actor.setCustomNameVisible(true);actor.setCollidable(true);
         actor.getPersistentDataContainer().set(botKey,PersistentDataType.STRING,b.key);actor.getPersistentDataContainer().set(themeKey,PersistentDataType.STRING,b.theme);actor.getPersistentDataContainer().set(formKey,PersistentDataType.STRING,b.form);
         if(actor instanceof Mob mob)mob.setAI(false);b.actor=actor;b.actorLocation=at.clone();b.inGame=inGame;b.arenaSpawn=at.clone();refreshBotAppearance(b);
     }
