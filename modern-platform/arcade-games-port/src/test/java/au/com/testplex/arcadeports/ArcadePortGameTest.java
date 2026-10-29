@@ -742,6 +742,8 @@ class ArcadePortGameTest {
     @Test void baconBrawlKnockbackEscalatesOnShorteningSourceIntervals() {
         assertEquals(50_000L, ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS);
         assertEquals(50_000L, ArcadePortRules.nextBaconKnockbackInterval(0, 8));
+        assertEquals(20_000L, ArcadePortRules.nextBaconKnockbackInterval(0, 2),
+                "two players at round start use the accelerated escalation cadence");
         assertEquals(45_000L, ArcadePortRules.nextBaconKnockbackInterval(1, 3));
         assertEquals(20_000L, ArcadePortRules.nextBaconKnockbackInterval(1, 2));
         assertEquals(20_000L, ArcadePortRules.nextBaconKnockbackInterval(1, 1));

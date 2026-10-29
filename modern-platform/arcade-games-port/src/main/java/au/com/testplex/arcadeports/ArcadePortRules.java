@@ -750,7 +750,7 @@ public final class ArcadePortRules {
         return pairCount > 0 && resolvedPairs >= pairCount;
     }
 
-    /** Reborn shortens the interval by five seconds after each escalation; two survivors accelerate it. */
+    /** Reborn shortens each interval by five seconds; any two-survivor state caps it at 20 seconds. */
     public static final int BACON_BRAWL_MAX_KNOCKBACK_ESCALATIONS =
             (int) (BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS / BACON_KNOCKBACK_INTERVAL_STEP_MILLIS);
     public static final long BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS = 20_000L;
@@ -762,7 +762,7 @@ public final class ArcadePortRules {
         long sourceInterval = Math.max(BACON_MIN_KNOCKBACK_INTERVAL_MILLIS,
                 BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS
                         - completedEscalations * BACON_KNOCKBACK_INTERVAL_STEP_MILLIS);
-        if (completedEscalations > 0 && alivePlayers <= 2) {
+        if (alivePlayers <= 2) {
             return Math.min(sourceInterval, BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS);
         }
         return sourceInterval;
