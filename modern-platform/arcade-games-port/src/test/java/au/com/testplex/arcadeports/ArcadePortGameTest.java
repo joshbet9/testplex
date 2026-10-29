@@ -403,6 +403,17 @@ class ArcadePortGameTest {
                         new org.bukkit.util.Vector(0.0D, 0.0D, 0.0D), true));
     }
 
+    @Test void bombLobbersDoubleJumpAppliesLegacyGroundBoostAfterVelocityCap() {
+        assertEquals(50L, ArcadePortRules.BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS);
+        assertEquals(1_050L, ArcadePortRules.nextBombLobbersDoubleJumpReadyAt(1_000L));
+        var airborne = ArcadePortRules.bombLobbersDoubleJumpVelocity(
+                new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D), 1.2D, false);
+        var grounded = ArcadePortRules.bombLobbersDoubleJumpVelocity(
+                new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D), 1.2D, true);
+        assertEquals(airborne.getY() + 0.2D, grounded.getY(), 0.00001D);
+        assertTrue(grounded.getY() > 1.2D);
+    }
+
     @Test void bombLobbersExplosionAddsLegacyImpulseInsteadOfReplacingVelocity() {
         var impulse = ArcadePortRules.bombLobbersExplosionVelocity(
                 new org.bukkit.util.Vector(0.25D, 0.4D, -0.1D),
