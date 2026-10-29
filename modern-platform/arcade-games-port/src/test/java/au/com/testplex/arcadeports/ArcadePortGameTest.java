@@ -654,6 +654,8 @@ class ArcadePortGameTest {
         assertEquals(1.75D, ArcadePortRules.bombLobbersPitchVelocity(1), 0.00001D);
         assertEquals(2.0D, ArcadePortRules.bombLobbersPitchVelocity(2), 0.00001D);
         assertEquals(2.25D, ArcadePortRules.bombLobbersPitchVelocity(3), 0.00001D);
+        assertEquals(12_345L, ArcadePortRules.bombLobbersFirstCraftReadyAt(12_345L));
+        assertEquals(0L, ArcadePortRules.bombLobbersFirstCraftReadyAt(-1L));
         assertEquals(8_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(0L));
         assertEquals(8_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(20_000L));
         assertEquals(7_000L, ArcadePortRules.bombLobbersCraftmanIntervalMillis(20_001L));

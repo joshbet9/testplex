@@ -616,6 +616,11 @@ public final class ArcadePortRules {
         return (1.0D - Math.floor(1.0D / step) * step) / 2.0D;
     }
 
+    /** Source Recharge has no entry before first use, so first Craftman grant is immediately ready. */
+    public static long bombLobbersFirstCraftReadyAt(long nowMillis) {
+        return Math.max(0L, nowMillis);
+    }
+
     public static long bombLobbersCraftmanIntervalMillis(long liveMillis) {
         if (liveMillis <= 20_000L) return 8_000L;
         if (liveMillis <= 40_000L) return 7_000L;

@@ -7533,8 +7533,11 @@ public final class ArcadePortManager implements Listener {
                 if (!player.getAllowFlight()) player.setAllowFlight(true);
             }
             long elapsed = Math.max(0L, now - session.startedAt);
+            // Recharge.use() returns true immediately when the source cooldown key is absent.
+            // The opening Craftman grant therefore arrives on the first live FAST update, then
+            // subsequent grants use the game-time-dependent 8/7/6/5/4-second intervals.
             long nextGrant = session.bombNextCraftAt.computeIfAbsent(id,
-                    ignored -> now + ArcadePortRules.bombLobbersCraftmanIntervalMillis(elapsed));
+                    ignored -> ArcadePortRules.bombLobbersFirstCraftReadyAt(now));
             if (now >= nextGrant) {
                 if (inventoryCount(player, Material.TNT) < ArcadePortRules.BOMB_LOBBERS_MAX_CARRIED) {
                     player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT",
