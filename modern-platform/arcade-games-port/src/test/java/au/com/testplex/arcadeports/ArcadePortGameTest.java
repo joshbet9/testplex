@@ -486,16 +486,6 @@ class ArcadePortGameTest {
         assertEquals(16, ArcadePortRules.BACON_BLAST_PROJECTILE_STACK_SIZE);
     }
 
-    @Test void baconBrawlAbilitiesAreMeterGatedWithoutTimeCooldowns() {
-        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("el-muchacho-pigo"));
-        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("mama-piggles"));
-        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("pig"));
-        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("sheep-pig"));
-        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("chris-p-bacon"));
-        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("unknown"));
-        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis(null));
-    }
-
     @Test void baconBrawlAbilitiesRequireTheSourceIronAxeAndRightClick() {
         assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
                 org.bukkit.Material.IRON_AXE, false, "el-muchacho-pigo"));
@@ -589,7 +579,6 @@ class ArcadePortGameTest {
         assertEquals(0L, ArcadePortRules.baconPigInvincibilityDurationMillis(9));
         assertEquals(1_175L, ArcadePortRules.baconPigInvincibilityDurationMillis(15));
         assertEquals(5_000L, ArcadePortRules.baconPigInvincibilityDurationMillis(100));
-        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("pig"));
         assertTrue(ArcadePortRules.isBaconInvincibilityActive(1_000L, 1_001L));
         assertFalse(ArcadePortRules.isBaconInvincibilityActive(1_001L, 1_001L));
         assertFalse(ArcadePortRules.isBaconInvincibilityActive(1_002L, 1_001L));
@@ -623,10 +612,6 @@ class ArcadePortGameTest {
         assertEquals("", ArcadePortRules.baconBrawlAchievementConfigKey(null, "flash-fried"));
         assertEquals("", ArcadePortRules.baconBrawlAchievementConfigKey(playerId, "raw pork"));
         assertEquals("", ArcadePortRules.baconBrawlAchievementConfigKey(playerId, "../flash-fried"));
-    }
-
-    @Test void baconBrawlFifteenWinsRemainAMilestoneNotAnAchievement() {
-        assertEquals(15, ArcadePortRules.BACON_BRAWL_WINS_MILESTONE_REQUIRED);
     }
 
     @Test void baconBrawlUsesTheRequestedThreeAchievements() {

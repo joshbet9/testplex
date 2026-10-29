@@ -47,14 +47,6 @@ public final class ArcadePortRules {
     public static final int BACON_THREE_FOR_ONE_BODY_SLAM_KILLS = 3;
     /** Pigs In Blankets is earned by six kills in a single game. */
     public static final int BACON_BRAWL_PIGS_IN_BLANKETS_KILLS = 6;
-    /** Existing progression milestone threshold; do not also award a separate game achievement. */
-    public static final int BACON_BRAWL_WINS_MILESTONE_REQUIRED = 15;
-
-    /** Supported Bacon Brawl abilities are gated by earned meter, not a wall-clock cooldown. */
-    public static long baconBrawlAbilityCooldownMillis(String requestedKit) {
-        return normalizeBaconBrawlKit(requestedKit) == null ? 0L : 0L;
-    }
-
     public static int baconMeterGainForDamage(double damage) {
         if (!Double.isFinite(damage) || damage <= 0.0D) return 0;
         return (int) Math.min(BACON_METER_MAX,

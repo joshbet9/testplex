@@ -5079,10 +5079,6 @@ public final class ArcadePortManager implements Listener {
     /** Record local Bacon Brawl achievements in isolated test config, never production milestones. */
     private void recordBaconBrawlAchievements(Session session, Player winner) {
         UUID id = winner.getUniqueId();
-        String winsKey = ArcadePortRules.baconBrawlAchievementConfigKey(id, "wins");
-        int totalWins = Math.max(0, plugin.getConfig().getInt(winsKey, 0)) + 1;
-        plugin.getConfig().set(winsKey, totalWins);
-        plugin.saveConfig();
         long elapsed = Math.max(0L, System.currentTimeMillis() - session.startedAt);
         if (ArcadePortRules.shouldAwardBaconFlashFried(elapsed)) {
             awardBaconAchievement(winner,
@@ -5648,8 +5644,8 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FIRE_TICK) {
-                // Fire ticks do not deal health damage in the round, but Reborn still ends Cloak
-                // on the incoming damage event, so the visual effect must not remain active.
+                // Fire ticks are ignored by the round's health model and do not end the
+                // Pig's independent meter-driven invincibility window.
                 event.setCancelled(true);
                     return;
             }

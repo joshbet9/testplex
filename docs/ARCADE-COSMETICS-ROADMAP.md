@@ -1,7 +1,7 @@
 # Arcade Cosmetics — Game-by-Game Proposal
 
 **Status:** Design proposal / implementation roadmap  
-**Scope:** The Arcade Cosmetics menu, per-game cosmetic concepts, and scripted win-effect ideas for the Mineplex Reborn test instance. This document records intent; it does not claim that the proposed items or win effects have been implemented.
+**Scope:** This is a design-only catalogue of possible Arcade cosmetic concepts and scripted win effects. It is not part of the current 16-game mechanical-parity acceptance gate. Defer implementation for every game except Monster Maze, where customisation is a core pillar and is tracked in the dedicated Monster Maze work.
 
 ## 1. Menu structure
 
@@ -35,9 +35,9 @@ The list is the planned scope recorded here; verify it against the actual rotati
 For every game, the **cosmetic** is the player-selectable appearance or effect used during normal play. The **win effect** is a short, staged gameplay-style sequence using the existing map and mechanics to celebrate the winner. These are separate features and should be tracked and tested separately.
 
 ### Bacon Brawl
-- **Cosmetic line:** Ability-linked visual effects rather than worn accessories: a Soul Fire Flame Bacon Blast trail, electric-spark Body Slam trail, and glowing/totem-particle signal while Pig invincibility is active.
-- **Win effect:** Torpedo/body-slam into four players, sending them flying off the edge.
-- **Implementation notes:** Reuse the game's existing projectiles, ability timing and pig/sheep avatars. Visual effects must not change hitboxes, knockback, ability duration or match outcomes; selectable cosmetic variants can be layered on later.
+- **Cosmetics (deferred):** Potential pig/sheep accessories or ability-effect variants.
+- **Win effect (deferred):** Torpedo/body-slam into four players, sending them flying off the edge.
+- **Implementation notes:** No cosmetic selector or victory scene is part of Bacon Brawl's current mechanical-parity goal.
 
 ### Bomb Lobbers
 - **Cosmetics:** TNT explosion/impact effects.
