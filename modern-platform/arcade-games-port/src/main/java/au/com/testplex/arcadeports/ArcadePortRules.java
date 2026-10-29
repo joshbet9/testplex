@@ -439,6 +439,12 @@ public final class ArcadePortRules {
         };
     }
 
+    /** Only the source Armorer (iron) and Pitcher (chainmail) kits equip armour. */
+    public static boolean bombLobbersKitUsesArmor(String kit) {
+        String normalized = normalizeBombLobbersKit(kit);
+        return "armorer".equals(normalized) || "pitcher".equals(normalized);
+    }
+
     /** Bomb Lobbers TNT damages opponents only; this remains true if the thrower disconnects. */
     public static boolean areBombLobbersEnemies(int ownerTeam, int targetTeam) {
         return ownerTeam >= 0 && targetTeam >= 0 && ownerTeam != targetTeam;
