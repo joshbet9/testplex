@@ -4264,6 +4264,16 @@ public final class ArcadePortManager implements Listener {
                 int winnerTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
                 announce(session, sheepTeamChatColor(winnerTeam) + sheepTeamName(winnerTeam)
                         + ChatColor.GOLD + " team won Sheep Quest!");
+            } else if (session.type == ArcadePortGame.BACON_BRAWL) {
+                if (winner != null) {
+                    int kills = session.scores.getOrDefault(winner.getUniqueId(), 0);
+                    announce(session, ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName()
+                            + " won Bacon Brawl with " + kills + (kills == 1 ? " kill!" : " kills!"));
+                } else {
+                    int topKills = session.scores.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+                    announce(session, ChatColor.YELLOW + "Bacon Brawl ended in a tie at " + topKills
+                            + (topKills == 1 ? " kill." : " kills."));
+                }
             } else {
                 announce(session, winner == null ? ChatColor.YELLOW + "Round ended." : ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won " + session.type.displayName() + "!");
             }
