@@ -155,13 +155,31 @@ public final class SourceMapCatalog {
         return resources.isEmpty() ? null : resources.get(0);
     }
 
-    private static boolean isResourceForGame(JavaPlugin plugin, ArcadePortGame game, String resource) {
-        if (resource == null || plugin.getResource(resource) == null) return false;
+    /**
+     * True only when the configured resource exists in this plugin and belongs to
+     * the selected game's supported archive folders. The old maps/<game>.zip
+     * resources remain valid for backwards-compatible configurations.
+     */
+    public static boolean isInstalledResource(JavaPlugin plugin, ArcadePortGame game, String resource) {
+        return plugin != null && resourcePathBelongsToGame(game, resource)
+                && plugin.getResource(resource) != null;
+    }
+
+    /** Pure path validation, kept separate so the game's resource mapping is unit-testable. */
+    static boolean resourcePathBelongsToGame(ArcadePortGame game, String resource) {
+        if (game == null || resource == null || resource.isBlank()
+                || resource.startsWith("/") || resource.contains("..") || resource.contains("\\\\")) {
+            return false;
+        }
         if (resource.equals(resourceFor(game))) return true;
         return mapFoldersFor(game).stream()
                 .map(folder -> "source-maps/" + folder + "/")
                 .anyMatch(resource::startsWith)
                 && resource.toLowerCase(java.util.Locale.ROOT).endsWith(".zip");
+    }
+
+    private static boolean isResourceForGame(JavaPlugin plugin, ArcadePortGame game, String resource) {
+        return isInstalledResource(plugin, game, resource);
     }
 
     /** All usable maps for a game, ordered with the currently selected map first. */

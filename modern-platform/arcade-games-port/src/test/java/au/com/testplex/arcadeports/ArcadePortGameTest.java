@@ -21,6 +21,25 @@ class ArcadePortGameTest {
                 "Evolution has no legacy map archive folder and must not be given an invented one");
     }
 
+    @Test void selectedMapArchivePathsAreValidatedAgainstTheirGame() {
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.BACON_BRAWL, "source-maps/Bacon Brawl/BaconBrawl_Castle.zip"));
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.PAINTBALL, "source-maps/Super Paintball/SP_Arena.zip"));
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.BACON_BRAWL, "maps/bacon-brawl.zip"),
+                "Pre-map-selector configurations using the legacy default resource remain valid");
+
+        assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.BACON_BRAWL, "source-maps/Bomb Lobbers/Lobbers_Docks.zip"),
+                "A valid archive belonging to another game must not be accepted");
+        assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.BACON_BRAWL, "source-maps/Bacon Brawl/../../maps/bomb-lobbers.zip"));
+        assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.BACON_BRAWL, "source-maps/Bacon Brawl/not-a-map.txt"));
+        assertFalse(SourceMapCatalog.resourcePathBelongsToGame(ArcadePortGame.BACON_BRAWL, null));
+    }
+
     @Test void sourceMapResetTargetsPaper263MigratedDimensionFolder() {
         Path primaryWorld = Path.of("/srv/testplex/world");
         assertEquals(primaryWorld.resolve("dimensions/minecraft/arcadeport_source_bacon_brawl"),

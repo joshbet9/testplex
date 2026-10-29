@@ -592,7 +592,7 @@ public final class ArcadePortManager implements Listener {
         if (SourceMapCatalog.hasMap(type)) {
             String selectedResource = plugin.getConfig().getString("selected-maps." + type.id(),
                     SourceMapCatalog.resourceFor(type));
-            if (!SourceMapCatalog.resourceFor(type).equals(selectedResource)) {
+            if (!SourceMapCatalog.isInstalledResource(plugin, type, selectedResource)) {
                 sender.sendMessage(ChatColor.RED + "The selected map is no longer installed for " + type.displayName()
                         + ". Open Set Game and choose an installed map again.");
                 return;
@@ -709,7 +709,7 @@ public final class ArcadePortManager implements Listener {
         if (SourceMapCatalog.hasMap(type)) {
             String selectedResource = plugin.getConfig().getString("selected-maps." + type.id(),
                     SourceMapCatalog.resourceFor(type));
-            if (!SourceMapCatalog.resourceFor(type).equals(selectedResource)) {
+            if (!SourceMapCatalog.isInstalledResource(plugin, type, selectedResource)) {
                 sender.sendMessage(ChatColor.RED + "The selected map is no longer installed for " + type.displayName()
                         + ". Open Set Game and choose an installed map again.");
                 return;
