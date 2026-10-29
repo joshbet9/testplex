@@ -474,6 +474,12 @@ class ArcadePortGameTest {
         assertEquals(1.8D, ArcadePortRules.nextBaconKnockback(1.5D), 0.00001D);
     }
 
+    @Test void baconPigBackstabAddsTwoHundredAndFiftyPercentKnockback() {
+        assertEquals(1.0D, ArcadePortRules.baconBrawlKnockbackMultiplier(false), 0.00001D);
+        assertEquals(3.5D, ArcadePortRules.BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER, 0.00001D);
+        assertEquals(5.25D, 1.5D * ArcadePortRules.baconBrawlKnockbackMultiplier(true), 0.00001D);
+    }
+
     @Test void sheepPigBackstabBonusOnlyAppliesFromBehind() {
         assertTrue(ArcadePortRules.isBaconBrawlBackstab(0.0D, 1.0D, 0.0D, -1.0D));
         assertTrue(ArcadePortRules.isBaconBrawlBackstab(1.0D, 0.0D, -1.0D, 0.0D));
