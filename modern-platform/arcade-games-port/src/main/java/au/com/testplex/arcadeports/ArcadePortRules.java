@@ -222,6 +222,22 @@ public final class ArcadePortRules {
                 && distanceSquared <= BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED;
     }
 
+    /**
+     * Resolve swept Bacon Blast collision order. A player's collision radius may touch the
+     * projectile before its centre projection reaches a wall; otherwise the first block wins.
+     * blockFraction < 0 means the swept path contains no block collision.
+     */
+    public static boolean isBaconBlastPlayerBeforeBlock(double playerFraction,
+            double blockFraction, double segmentLength) {
+        if (!Double.isFinite(playerFraction) || playerFraction < 0.0D || playerFraction > 1.0D
+                || !Double.isFinite(segmentLength) || segmentLength < 0.0D) return false;
+        if (!Double.isFinite(blockFraction) || blockFraction < 0.0D) return true;
+        if (blockFraction > 1.0D || segmentLength <= 1.0E-6D) return false;
+        double playerNearEdge = playerFraction
+                - Math.sqrt(BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED) / segmentLength;
+        return playerNearEdge <= blockFraction;
+    }
+
     public static boolean shouldExpireBaconBlast(long nowMillis, long createdAtMillis, boolean touchingBlock) {
         return touchingBlock || createdAtMillis <= 0L || nowMillis < createdAtMillis
                 || nowMillis - createdAtMillis >= BACON_BLAST_MAX_FLIGHT_MILLIS;
