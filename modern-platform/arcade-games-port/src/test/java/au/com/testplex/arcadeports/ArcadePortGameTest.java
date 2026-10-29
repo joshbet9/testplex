@@ -474,10 +474,8 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.BACON_BRAWL_HITS_DAMAGE_HEALTH,
                 "source hits heal back the damage and rely on knockback for arena knock-outs");
         assertEquals(2.0D, ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER, 0.00001D);
-        assertEquals(8_000L, ArcadePortRules.BACON_BODY_SLAM_COOLDOWN_MILLIS);
-        assertEquals(3_000L, ArcadePortRules.BACON_BLAST_COOLDOWN_MILLIS);
-        assertEquals(10_000L, ArcadePortRules.BACON_CLOAK_COOLDOWN_MILLIS);
-        assertEquals(5_000L, ArcadePortRules.BACON_CLOAK_DURATION_MILLIS);
+        assertEquals(100, ArcadePortRules.BACON_METER_MAX,
+                "ability charge is damage-metered rather than time-cooled");
         assertEquals(1.8D, ArcadePortRules.initialBaconKnockback(2), 0.00001D,
                 "two-player rounds start with stronger knockback");
         assertEquals(1.5D, ArcadePortRules.initialBaconKnockback(3), 0.00001D);
@@ -538,11 +536,49 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isBaconBrawlBackstab(Double.NaN, 1.0D, 0.0D, -1.0D));
     }
 
-    @Test void baconBrawlAchievementThresholdsUseSelectedValues() {
-        assertEquals(15, ArcadePortRules.BACON_BRAWL_KING_OF_BACON_WINS);
-        assertFalse(ArcadePortRules.shouldAwardBaconKingOfBacon(14));
-        assertTrue(ArcadePortRules.shouldAwardBaconKingOfBacon(15));
-        assertTrue(ArcadePortRules.shouldAwardBaconKingOfBacon(30));
+    @Test void baconBrawlMetersRewardDamageAndControlAbilityStrength() {
+        assertEquals(100, ArcadePortRules.BACON_METER_MAX);
+        assertEquals(10, ArcadePortRules.BACON_METER_MIN_ABILITY);
+        assertEquals(10, ArcadePortRules.baconMeterGainForDamage(2.0D));
+        assertEquals(30, ArcadePortRules.baconMeterGainForDamage(6.0D));
+        assertEquals(0, ArcadePortRules.baconMeterGainForDamage(Double.NaN));
+        assertEquals(0, ArcadePortRules.baconMeterGainForDamage(-1.0D));
+        assertEquals(30, ArcadePortRules.nextBaconMeter(20, 2.0D));
+        assertEquals(100, ArcadePortRules.nextBaconMeter(95, 6.0D));
+        assertFalse(ArcadePortRules.canUseBaconMeterAbility(9));
+        assertTrue(ArcadePortRules.canUseBaconMeterAbility(10));
+        assertEquals(0.55D, ArcadePortRules.baconBodySlamMeterMultiplier(10), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.baconBodySlamMeterMultiplier(100), 0.00001D);
+        assertEquals(0L, ArcadePortRules.baconPigInvincibilityDurationMillis(9));
+        assertTrue(ArcadePortRules.baconPigInvincibilityDurationMillis(10) > 0L);
+        assertEquals(5_000L, ArcadePortRules.baconPigInvincibilityDurationMillis(100));
+        assertEquals(0.65D, ArcadePortRules.baconBlastPowerMultiplier(10), 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.baconBlastPowerMultiplier(100), 0.00001D);
+    }
+
+    @Test void baconBrawlRewardsRhythmAndDiscouragesRapidClicking() {
+        assertEquals(0.65D, ArcadePortRules.baconTimedHitKnockbackMultiplier(0L), 0.00001D);
+        assertEquals(0.65D, ArcadePortRules.baconTimedHitKnockbackMultiplier(250L), 0.00001D);
+        assertEquals(1.1D, ArcadePortRules.baconTimedHitKnockbackMultiplier(251L), 0.00001D);
+        assertEquals(1.1D, ArcadePortRules.baconTimedHitKnockbackMultiplier(499L), 0.00001D);
+        assertEquals(1.6D, ArcadePortRules.baconTimedHitKnockbackMultiplier(500L), 0.00001D);
+        assertEquals(1.6D, ArcadePortRules.baconTimedHitKnockbackMultiplier(900L), 0.00001D);
+        assertEquals(1.25D, ArcadePortRules.baconTimedHitKnockbackMultiplier(901L), 0.00001D);
+        assertEquals(1.25D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_400L), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_401L), 0.00001D);
+    }
+
+    @Test void baconBrawlUsesTheRequestedThreeAchievementsAndKeepsKingOfBaconRemoved() {
+        assertEquals(60_000L, ArcadePortRules.BACON_FLASH_FRIED_MAX_WIN_MILLIS);
+        assertTrue(ArcadePortRules.shouldAwardBaconFlashFried(0L));
+        assertTrue(ArcadePortRules.shouldAwardBaconFlashFried(60_000L));
+        assertFalse(ArcadePortRules.shouldAwardBaconFlashFried(60_001L));
+        assertTrue(ArcadePortRules.shouldAwardBaconRawPork(false));
+        assertFalse(ArcadePortRules.shouldAwardBaconRawPork(true));
+        assertEquals(3, ArcadePortRules.BACON_THREE_FOR_ONE_BODY_SLAM_KILLS);
+        assertFalse(ArcadePortRules.shouldAwardBaconThreeForOne(2));
+        assertTrue(ArcadePortRules.shouldAwardBaconThreeForOne(3));
+        assertTrue(ArcadePortRules.shouldAwardBaconThreeForOne(4));
         assertEquals(6, ArcadePortRules.BACON_BRAWL_PIGS_IN_BLANKETS_KILLS);
         assertFalse(ArcadePortRules.shouldAwardBaconPigsInBlankets(5));
         assertTrue(ArcadePortRules.shouldAwardBaconPigsInBlankets(6));
