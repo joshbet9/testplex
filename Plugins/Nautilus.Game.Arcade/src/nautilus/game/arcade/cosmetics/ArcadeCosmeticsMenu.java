@@ -74,6 +74,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private static final String DEATHTAG_LABEL_PREFIX = "Runner Trail: ";
     private static final String DRAGONESCAPE_SHOWCASE_TAG = "TESTPLEX_DRAGONESCAPE_SHOWCASE:STYLE:";
     private static final String DRAGONESCAPE_LABEL_PREFIX = "Finish Style: ";
+    private static final String GENERIC_SHOWCASE_TAG = "TESTPLEX_ARCADE_SHOWCASE:";
+    private static final String GENERIC_SHOWCASE_LABEL_PREFIX = "Arcade Preview: ";
     private static final String[] COLOUR_OPTIONS = {
             "white", "orange", "magenta", "lightblue", "yellow", "lime", "pink", "gray",
             "silver", "cyan", "purple", "blue", "brown", "green", "red", "black"
@@ -92,6 +94,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
     private final List<ArmorStand> bombLobbersShowcaseEntities = new ArrayList<ArmorStand>();
     private final List<ArmorStand> deathTagShowcaseEntities = new ArrayList<ArmorStand>();
     private final List<ArmorStand> dragonEscapeShowcaseEntities = new ArrayList<ArmorStand>();
+    private final List<ArmorStand> genericShowcaseEntities = new ArrayList<ArmorStand>();
 
     public ArcadeCosmeticsMenu(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -1163,6 +1166,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             clearBombLobbersShowcase();
             clearDeathTagShowcase();
             clearDragonEscapeShowcase();
+            clearGenericShowcase();
             World lobbyWorld = getLobbyWorld();
             if (lobbyWorld != null) removePersistedBaconBrawlShowcase(lobbyWorld);
             String game = event.GetGame().GetName();
@@ -1170,6 +1174,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             else if ("Bomb Lobbers".equalsIgnoreCase(game)) createBombLobbersShowcase();
             else if ("Death Tag".equalsIgnoreCase(game)) createDeathTagShowcase();
             else if ("Dragon Escape".equalsIgnoreCase(game)) createDragonEscapeShowcase();
+            else createGenericGameShowcase(game);
             return;
         }
         if (event.GetState() == GameState.Prepare || event.GetState() == GameState.Live
@@ -1178,6 +1183,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             clearBombLobbersShowcase();
             clearDeathTagShowcase();
             clearDragonEscapeShowcase();
+            clearGenericShowcase();
         }
     }
 
@@ -1367,6 +1373,144 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
         bombLobbersShowcaseEntities.clear();
     }
 
+    /**
+     * Generic lobby showcase for every game without a bespoke animal/particle
+     * display. Each selectable cosmetic (including composite settings) gets its
+     * own floating icon, label and preview particles, so adding a new game's
+     * settings automatically makes its lobby preview available as well.
+     */
+    private void createGenericGameShowcase(String gameName) {
+        if (!(plugin instanceof Arcade)) return;
+        ArcadeManager manager = ((Arcade) plugin).getArcadeManager();
+        if (manager == null || manager.GetLobby() == null || manager.GetLobby().getSpawn() == null) return;
+
+        GameDefinition game = gameFromDisplayName(gameName);
+        if (game == null && gameName != null
+                && gameName.toLowerCase(Locale.ROOT).startsWith("monster maze")) {
+            game = games.get("monstermaze");
+        }
+        if (game == null) {
+            plugin.getLogger().warning("No Arcade cosmetic definition found for pregame showcase: " + gameName);
+            return;
+        }
+
+        Location lobbySpawn = manager.GetLobby().getSpawn();
+        World world = lobbySpawn.getWorld();
+        if (world == null) return;
+        removePersistedBaconBrawlShowcase(world);
+
+        List<ShowcaseChoice> choices = new ArrayList<ShowcaseChoice>();
+        for (FeatureDefinition feature : game.features) {
+            if (feature.isComposite()) {
+                for (SettingDefinition setting : feature.settings) {
+                    for (String option : setting.options) {
+                        short data = settingOptionDurability(game, setting, option);
+                        choices.add(new ShowcaseChoice(feature.key + ":" + setting.key, setting.displayName,
+                                option, setting.icon, data));
+                    }
+                }
+            } else {
+                for (String option : feature.options) {
+                    choices.add(new ShowcaseChoice(feature.key, feature.displayName, option,
+                            feature.icon, optionDurability(feature, option)));
+                }
+            }
+        }
+
+        if (choices.isEmpty()) {
+            plugin.getLogger().info("No selectable cosmetic options to preview for " + game.displayName + ".");
+            return;
+        }
+
+        // The 7-column grid matches the existing showcase footprint and grows
+        // forward in rows for games with many available options (for example mob sets).
+        int columns = 7;
+        for (int i = 0; i < choices.size(); i++) {
+            ShowcaseChoice choice = choices.get(i);
+            int column = i % columns;
+            int row = i / columns;
+            int x = lobbySpawn.getBlockX() - 9 + column * 3;
+            int z = lobbySpawn.getBlockZ() + 18 + row * 4;
+            Location display = new Location(world, x + 0.5,
+                    world.getHighestBlockYAt(x, z) + 1.0, z + 0.5);
+            display.setDirection(lobbySpawn.toVector().subtract(display.toVector()));
+
+            Material material = choice.icon == null || choice.icon == Material.AIR
+                    ? Material.FIREWORK : choice.icon;
+            ArmorStand icon = world.spawn(display.clone().subtract(0.0, 0.18, 0.0), ArmorStand.class);
+            icon.setVisible(false);
+            icon.setSmall(true);
+            icon.setGravity(false);
+            icon.setBasePlate(false);
+            icon.setArms(false);
+            icon.setMarker(true);
+            icon.setCanPickupItems(false);
+            icon.setHelmet(new ItemStack(material, 1, choice.durability));
+            icon.setCustomName(GENERIC_SHOWCASE_TAG + game.key + ":" + choice.key + ":" + choice.option);
+            icon.setCustomNameVisible(false);
+            genericShowcaseEntities.add(icon);
+
+            ArmorStand label = world.spawn(display.clone().add(0.0, 0.65, 0.0), ArmorStand.class);
+            label.setVisible(false);
+            label.setSmall(false);
+            label.setGravity(false);
+            label.setBasePlate(false);
+            label.setArms(false);
+            label.setMarker(true);
+            label.setCanPickupItems(false);
+            label.setCustomName(ChatColor.GOLD + GENERIC_SHOWCASE_LABEL_PREFIX
+                    + choice.title + ": " + pretty(choice.option));
+            label.setCustomNameVisible(true);
+            genericShowcaseEntities.add(label);
+        }
+        plugin.getLogger().info("Created generic pregame cosmetic showcase for " + game.displayName
+                + " (" + choices.size() + " options).");
+    }
+
+    @EventHandler
+    public void updateGenericShowcaseParticles(UpdateEvent event) {
+        if (event.getType() != UpdateType.TICK || event.getTick() % 10 != 0
+                || genericShowcaseEntities.isEmpty()) return;
+        for (ArmorStand stand : new ArrayList<ArmorStand>(genericShowcaseEntities)) {
+            if (stand == null || stand.isDead() || !stand.isValid()) continue;
+            String name = stand.getCustomName();
+            if (name == null || !name.startsWith(GENERIC_SHOWCASE_TAG)) continue;
+            int lastColon = name.lastIndexOf(':');
+            if (lastColon < GENERIC_SHOWCASE_TAG.length()) continue;
+            String option = name.substring(lastColon + 1).toLowerCase(Locale.ROOT);
+            previewGenericShowcaseOption(stand.getLocation().clone().add(0.0, 0.7, 0.0), option);
+        }
+    }
+
+    private void previewGenericShowcaseOption(Location point, String option) {
+        if (point == null || point.getWorld() == null || "off".equals(option) || "silent".equals(option)) return;
+        if (option.contains("ember") || option.contains("inferno") || option.contains("fire")
+                || option.contains("flame") || option.contains("dragon-roar")) {
+            UtilParticle.PlayParticle(ParticleType.FLAME, point, 0.18F, 0.22F, 0.18F, 0.01F, 5, ViewDist.NORMAL);
+        } else if (option.contains("frost") || option.contains("snow") || option.contains("ice")) {
+            UtilParticle.PlayParticle(ParticleType.SNOW_SHOVEL, point, 0.18F, 0.20F, 0.18F, 0.01F, 5, ViewDist.NORMAL);
+        } else if (option.contains("void") || option.contains("ender") || option.contains("portal")) {
+            UtilParticle.PlayParticle(ParticleType.PORTAL, point, 0.18F, 0.20F, 0.18F, 0.01F, 5, ViewDist.NORMAL);
+        } else if (option.contains("confetti") || option.contains("heart") || option.contains("solar")
+                || option.contains("spark") || option.contains("neon") || option.contains("charged")) {
+            UtilParticle.PlayParticle(ParticleType.FIREWORKS_SPARK, point, 0.20F, 0.20F, 0.20F, 0.02F, 6, ViewDist.NORMAL);
+        } else if (option.contains("slime") || option.contains("nature") || option.contains("forest")
+                || option.contains("green") || option.contains("pastel")) {
+            UtilParticle.PlayParticle(ParticleType.HAPPY_VILLAGER, point, 0.18F, 0.20F, 0.18F, 0.01F, 5, ViewDist.NORMAL);
+        } else if (option.contains("smoke")) {
+            UtilParticle.PlayParticle(ParticleType.SMOKE, point, 0.18F, 0.20F, 0.18F, 0.01F, 5, ViewDist.NORMAL);
+        } else if (!option.contains("classic") && !option.contains("default") && !option.contains("matching")) {
+            UtilParticle.PlayParticle(ParticleType.CRIT, point, 0.16F, 0.18F, 0.16F, 0.01F, 4, ViewDist.NORMAL);
+        }
+    }
+
+    private void clearGenericShowcase() {
+        for (ArmorStand stand : new ArrayList<ArmorStand>(genericShowcaseEntities)) {
+            if (stand != null && !stand.isDead()) stand.remove();
+        }
+        genericShowcaseEntities.clear();
+    }
+
     private void createDeathTagShowcase() {
         if (!(plugin instanceof Arcade)) return;
         ArcadeManager manager = ((Arcade) plugin).getArcadeManager();
@@ -1476,9 +1620,11 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                     || name.startsWith(BOMB_LOBBERS_SHOWCASE_TAG)
                     || name.startsWith(DEATHTAG_SHOWCASE_TAG)
                     || name.startsWith(DRAGONESCAPE_SHOWCASE_TAG)
+                    || name.startsWith(GENERIC_SHOWCASE_TAG)
                     || (plainName != null && (plainName.startsWith(BOMB_LOBBERS_LABEL_PREFIX)
                     || plainName.startsWith(DEATHTAG_LABEL_PREFIX)
-                    || plainName.startsWith(DRAGONESCAPE_LABEL_PREFIX))))) {
+                    || plainName.startsWith(DRAGONESCAPE_LABEL_PREFIX)
+                    || plainName.startsWith(GENERIC_SHOWCASE_LABEL_PREFIX))))) {
                 entity.remove();
             } else if (entity instanceof Pig && name.startsWith(ChatColor.GOLD + "Pig - ")) {
                 entity.remove();
@@ -1495,6 +1641,7 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             clearBombLobbersShowcase();
             clearDeathTagShowcase();
             clearDragonEscapeShowcase();
+            clearGenericShowcase();
         }
     }
 
@@ -1516,7 +1663,8 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 || baconBrawlShowcaseAccessories.contains(event.getEntity())
                 || bombLobbersShowcaseEntities.contains(event.getEntity())
                 || deathTagShowcaseEntities.contains(event.getEntity())
-                || dragonEscapeShowcaseEntities.contains(event.getEntity())) {
+                || dragonEscapeShowcaseEntities.contains(event.getEntity())
+                || genericShowcaseEntities.contains(event.getEntity())) {
             event.setCancelled(true);
         }
     }
@@ -1629,6 +1777,22 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
             result.append(token.substring(0, 1).toUpperCase(Locale.ROOT)).append(token.substring(1));
         }
         return result.toString();
+    }
+
+    private static final class ShowcaseChoice {
+        private final String key;
+        private final String title;
+        private final String option;
+        private final Material icon;
+        private final short durability;
+
+        private ShowcaseChoice(String key, String title, String option, Material icon, short durability) {
+            this.key = key;
+            this.title = title;
+            this.option = option;
+            this.icon = icon;
+            this.durability = durability;
+        }
     }
 
     private static final class GameDefinition {
