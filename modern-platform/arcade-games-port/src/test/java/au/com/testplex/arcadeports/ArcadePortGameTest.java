@@ -326,6 +326,31 @@ class ArcadePortGameTest {
         assertTrue(java.nio.file.Files.isRegularFile(modernRoot.resolve("region/r.0.0.mca")));
     }
 
+    @Test void authenticBaconBrawlArchiveCanSupplyWorldConfigAfterPaperRemovesLegacyFolder() throws Exception {
+        try (var input = getClass().getClassLoader().getResourceAsStream("maps/bacon-brawl.zip")) {
+            assertNotNull(input, "Bacon Brawl authentic source archive must be packaged");
+            String worldConfig = null;
+            try (var zip = new java.util.zip.ZipInputStream(input)) {
+                java.util.zip.ZipEntry entry;
+                while ((entry = zip.getNextEntry()) != null) {
+                    if (entry.getName().equals("WorldConfig.dat")) {
+                        worldConfig = new String(zip.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                        break;
+                    }
+                    zip.closeEntry();
+                }
+            }
+            assertNotNull(worldConfig, "The selected Bacon Brawl archive must carry Reborn map metadata");
+            SourceMapCatalog.MapData parsed = SourceMapCatalog.parseMapConfig(
+                    null, java.util.Arrays.asList(worldConfig.split("\\R", -1)));
+            assertNotNull(parsed);
+            assertEquals("Mighty Lava Arena", parsed.mapName());
+            assertTrue(parsed.teamSpawnLocationsForName("Green").size() >= 16,
+                    "Bacon Brawl needs its original 16 Green free-for-all starts even when Paper deletes the legacy folder");
+            assertEquals(4, parsed.minY());
+        }
+    }
+
     @Test void paper26SourceMapNormalisationRejectsAmbiguousExistingRegionData(
             @org.junit.jupiter.api.io.TempDir Path temporaryDirectory) throws Exception {
         Path worldRoot = temporaryDirectory.resolve("arcadeport_source_bacon_brawl");
