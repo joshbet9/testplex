@@ -475,6 +475,24 @@ class ArcadePortGameTest {
         assertEquals(1.8D, ArcadePortRules.nextBaconKnockback(1.5D), 0.00001D);
     }
 
+    @Test void baconBrawlAbilitiesRequireTheSourceIronAxeAndRightClick() {
+        assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
+                org.bukkit.Material.IRON_AXE, false, "el-muchacho-pigo"));
+        assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
+                org.bukkit.Material.IRON_AXE, false, "mama-piggles"));
+        assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
+                org.bukkit.Material.IRON_AXE, true, "pig"),
+                "Pig cloak is the source perk that also fires on an axe right-click to a usable block");
+        assertFalse(ArcadePortRules.shouldActivateBaconBrawlAbility(false,
+                org.bukkit.Material.IRON_AXE, false, "pig"));
+        assertFalse(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
+                org.bukkit.Material.STICK, false, "pig"));
+        assertFalse(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
+                org.bukkit.Material.IRON_AXE, true, "el-muchacho-pigo"));
+        assertFalse(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
+                org.bukkit.Material.IRON_AXE, false, "chris-p-bacon"));
+    }
+
     @Test void baconPigBackstabAddsTwoHundredAndFiftyPercentKnockback() {
         assertEquals(1.0D, ArcadePortRules.baconBrawlKnockbackMultiplier(false), 0.00001D);
         assertEquals(3.5D, ArcadePortRules.BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER, 0.00001D);
