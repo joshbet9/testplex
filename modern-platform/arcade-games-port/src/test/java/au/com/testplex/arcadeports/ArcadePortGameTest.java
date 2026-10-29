@@ -528,6 +528,18 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.STONE, Double.NaN));
     }
 
+    @Test void baconBrawlRecognisesSourceArenaHazardKillReasons() {
+        assertTrue(ArcadePortRules.isBaconArenaKnockoutReason("fell from the arena"));
+        assertTrue(ArcadePortRules.isBaconArenaKnockoutReason("was lost to the water"));
+        assertTrue(ArcadePortRules.isBaconArenaKnockoutReason("LAVA"));
+        assertTrue(ArcadePortRules.isBaconArenaKnockoutReason("hot_floor"));
+        assertTrue(ArcadePortRules.isBaconArenaKnockoutReason("Magma Block"));
+        assertTrue(ArcadePortRules.isBaconArenaKnockoutReason("void"));
+        assertFalse(ArcadePortRules.isBaconArenaKnockoutReason("starved"));
+        assertFalse(ArcadePortRules.isBaconArenaKnockoutReason("melee"));
+        assertFalse(ArcadePortRules.isBaconArenaKnockoutReason(null));
+    }
+
     @Test void baconBrawlCreditsRecentKnockbackForFallAndWaterKillsOnly() {
         assertTrue(ArcadePortRules.shouldCreditBaconFallKill(10_000L, 5_001L, true));
         assertTrue(ArcadePortRules.shouldCreditBaconFallKill(10_000L, 10_000L, true));
