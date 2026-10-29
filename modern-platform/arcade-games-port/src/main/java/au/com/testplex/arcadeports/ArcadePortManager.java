@@ -3002,7 +3002,16 @@ public final class ArcadePortManager implements Listener {
                     + ArcadePortRules.BACON_METER_MIN_ABILITY + "% charge.");
             return;
         }
+        long readyAt = session.baconAbilityReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            long secondsRemaining = Math.max(1L, (readyAt - now + 999L) / 1_000L);
+            player.sendMessage(ChatColor.YELLOW + "Ability recharges in " + secondsRemaining + "s.");
+            return;
+        }
+        long cooldown = ArcadePortRules.baconBrawlAbilityCooldownMillis(kit);
+        if (cooldown <= 0L) return;
 
+        session.baconAbilityReadyAt.put(id, now + cooldown);
         session.baconAbilitiesUsed.add(id);
         session.baconMeters.put(id, 0);
         updateBaconMeterItem(session, player);
@@ -5043,6 +5052,7 @@ public final class ArcadePortManager implements Listener {
         session.baconLastHitSource.clear();
         session.baconMeters.clear();
         session.baconAbilitiesUsed.clear();
+        session.baconAbilityReadyAt.clear();
         session.baconSlamPowerPercent.clear();
         session.baconBodySlamKills.clear();
         session.baconThreeForOneAwarded.clear();
@@ -6687,6 +6697,7 @@ public final class ArcadePortManager implements Listener {
             session.baconInvincibleUntil.remove(id);
             session.baconMeters.remove(id);
             session.baconAbilitiesUsed.remove(id);
+            session.baconAbilityReadyAt.remove(id);
             session.baconLastSwingAt.remove(id);
             session.baconHitFeedbackUntil.remove(id);
             session.baconLastHitSource.remove(id);
@@ -6752,6 +6763,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> baconKits = new HashMap<>();
         final Map<UUID, Integer> baconMeters = new HashMap<>();
         final Set<UUID> baconAbilitiesUsed = new HashSet<>();
+        final Map<UUID, Long> baconAbilityReadyAt = new HashMap<>();
         final Map<UUID, Integer> baconSlamPowerPercent = new HashMap<>();
         final Map<UUID, Integer> baconBodySlamKills = new HashMap<>();
         final Set<UUID> baconThreeForOneAwarded = new HashSet<>();
