@@ -1405,6 +1405,9 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 for (SettingDefinition setting : feature.settings) {
                     for (String option : setting.options) {
                         short data = settingOptionDurability(game, setting, option);
+                        if ("monstermaze".equals(game.key) && "mob-sets".equals(setting.key)) {
+                            data = (short) mobEggData(option);
+                        }
                         choices.add(new ShowcaseChoice(feature.key + ":" + setting.key, setting.displayName,
                                 option, setting.icon, data));
                     }
