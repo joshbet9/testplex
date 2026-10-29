@@ -6461,21 +6461,26 @@ public final class ArcadePortManager implements Listener {
         return Math.sqrt(dx * dx + dy * dy + dz * dz);
     }
 
-    /** Sample the source explosion's solid-block exposure factor before applying the block list. */
+    /** Match vanilla 1.8 World#getBlockDensity sampling for the source explosion's exposure factor. */
     private double bombLobbersBlastExposure(Location blast, Player target) {
         if (blast == null || target == null || blast.getWorld() == null
                 || target.getWorld() != blast.getWorld()) return 0.0D;
         org.bukkit.util.BoundingBox box = target.getBoundingBox();
-        double[] fractions = {0.2D, 0.5D, 0.8D};
+        double xStep = ArcadePortRules.bombLobbersExposureSampleStep(box.getWidth());
+        double yStep = ArcadePortRules.bombLobbersExposureSampleStep(box.getHeight());
+        double zStep = ArcadePortRules.bombLobbersExposureSampleStep(box.getDepth());
+        if (!Double.isFinite(xStep) || !Double.isFinite(yStep) || !Double.isFinite(zStep)) return 0.0D;
+        double xOffset = ArcadePortRules.bombLobbersExposureSampleOffset(xStep);
+        double zOffset = ArcadePortRules.bombLobbersExposureSampleOffset(zStep);
         int visible = 0;
         int total = 0;
-        for (double fx : fractions) {
-            for (double fy : fractions) {
-                for (double fz : fractions) {
+        for (float fx = 0.0F; fx <= 1.0F; fx = (float) (fx + xStep)) {
+            for (float fy = 0.0F; fy <= 1.0F; fy = (float) (fy + yStep)) {
+                for (float fz = 0.0F; fz <= 1.0F; fz = (float) (fz + zStep)) {
                     Location sample = new Location(blast.getWorld(),
-                            box.getMinX() + (box.getMaxX() - box.getMinX()) * fx,
-                            box.getMinY() + (box.getMaxY() - box.getMinY()) * fy,
-                            box.getMinZ() + (box.getMaxZ() - box.getMinZ()) * fz);
+                            box.getMinX() + box.getWidth() * fx + xOffset,
+                            box.getMinY() + box.getHeight() * fy,
+                            box.getMinZ() + box.getDepth() * fz + zOffset);
                     Vector ray = sample.toVector().subtract(blast.toVector());
                     double distance = ray.length();
                     total++;
