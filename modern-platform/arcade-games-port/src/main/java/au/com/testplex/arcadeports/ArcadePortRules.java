@@ -86,6 +86,11 @@ public final class ArcadePortRules {
     public static final long BACON_BLAST_MAX_FLIGHT_MILLIS = 5_000L;
     public static final double BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED = 1.0D;
 
+    public static boolean isBaconBlastBlockImpact(boolean onGround, boolean inLiquid,
+            boolean insideSolidBlock, boolean stationaryAgainstSolidBlock) {
+        return onGround || inLiquid || insideSolidBlock || stationaryAgainstSolidBlock;
+    }
+
     public static boolean isBaconBlastNearPlayer(double distanceSquared) {
         return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
                 && distanceSquared <= BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED;
