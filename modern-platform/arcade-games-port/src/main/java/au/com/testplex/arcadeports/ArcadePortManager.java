@@ -1386,7 +1386,8 @@ public final class ArcadePortManager implements Listener {
                         break;
                 }
                 setBombLobbersArmor(session, player, kit);
-                player.setAllowFlight("jumper".equals(kit));
+                // PerkDoubleJump enables flight-toggle readiness for every kit while grounded.
+                player.setAllowFlight(false);
                 player.setFlying(false);
                 break;
             }
@@ -6506,7 +6507,11 @@ public final class ArcadePortManager implements Listener {
         }
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
-            if (!player.isFlying() && player.isOnGround()) session.bombDoubleJumpAvailable.add(id);
+            if (!player.isFlying() && player.isOnGround()
+                    && now >= session.bombDoubleJumpReadyAt.getOrDefault(id, 0L)) {
+                session.bombDoubleJumpAvailable.add(id);
+                if (!player.getAllowFlight()) player.setAllowFlight(true);
+            }
             long elapsed = Math.max(0L, now - session.startedAt);
             long nextGrant = session.bombNextCraftAt.computeIfAbsent(id,
                     ignored -> now + ArcadePortRules.bombLobbersCraftmanIntervalMillis(elapsed));
@@ -6724,22 +6729,25 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.BOMB_LOBBERS
                 || !session.alive.contains(player.getUniqueId())) return;
-        event.setCancelled(true);
-        player.setFlying(false);
         UUID id = player.getUniqueId();
-        if (player.isOnGround()) {
-            Vector velocity = player.getVelocity();
-            player.setVelocity(new Vector(velocity.getX(), 0.42D, velocity.getZ()));
-            session.bombDoubleJumpAvailable.add(id);
+        // The source perk only permits the toggle when grounded readiness has recharged.
+        if (!session.bombDoubleJumpAvailable.remove(id)) {
+            event.setCancelled(true);
+            player.setFlying(false);
+            player.setAllowFlight(false);
             return;
         }
-        if (!session.bombDoubleJumpAvailable.remove(id)) return;
+        event.setCancelled(true);
+        player.setFlying(false);
+        player.setAllowFlight(false);
         String kit = session.bombLobbersKits.getOrDefault(id, "jumper");
         double power = "jumper".equals(kit) || "waller".equals(kit) ? 1.2D : 0.9D;
         Vector velocity = ArcadePortRules.bombLobbersDoubleJumpVelocity(
-                player.getLocation().getDirection(), power);
+                player.getLocation().getDirection(), power, player.isOnGround());
         player.setFallDistance(0.0F);
         player.setVelocity(velocity);
+        session.bombDoubleJumpReadyAt.put(id,
+                ArcadePortRules.nextBombLobbersDoubleJumpReadyAt(System.currentTimeMillis()));
         player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.7F, 1.3F);
     }
 
@@ -7013,6 +7021,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> bombLobbersKits = new HashMap<>();
         final Map<UUID, Integer> bombPitchLevels = new HashMap<>();
         final Set<UUID> bombDoubleJumpAvailable = new HashSet<>();
+        final Map<UUID, Long> bombDoubleJumpReadyAt = new HashMap<>();
         final Map<UUID, Long> bombWallerReadyAt = new HashMap<>();
         final Map<UUID, Long> bombNextCraftAt = new HashMap<>();
         long bombNextBoundaryCheckAt;
