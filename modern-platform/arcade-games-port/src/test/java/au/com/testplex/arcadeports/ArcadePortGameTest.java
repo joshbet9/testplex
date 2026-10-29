@@ -7,6 +7,20 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadePortGameTest {
+    @Test void modernLobbyScoreboardShowsSelectedGameAndKitAsReadableLabels() {
+        assertEquals("Bacon Brawl", ModernLobbyScoreboard.formatGameName("bacon-brawl"));
+        assertEquals("Monster Maze", ModernLobbyScoreboard.formatGameName("monster-maze"));
+        assertEquals("El Muchacho Pigo", ModernLobbyScoreboard.formatKitName("el-muchacho-pigo"));
+        assertEquals("Default", ModernLobbyScoreboard.formatKitName("Default"));
+        assertEquals("Not selected", ModernLobbyScoreboard.formatGameName(""));
+    }
+
+    @Test void configuredTestplexOwnerReceivesOwnerRankInsteadOfGenericAdminRank() {
+        assertEquals("Owner", ModernLobbyScoreboard.rankName(true, true));
+        assertEquals("Admin", ModernLobbyScoreboard.rankName(false, true));
+        assertEquals("No Rank", ModernLobbyScoreboard.rankName(false, false));
+    }
+
     @Test void modernArcadeLobbyHotbarMatchesLegacyTestplexSandboxItems() {
         assertEquals(4, ModernArcadeLobby.HOTBAR_COSMETICS_SLOT);
         assertEquals(8, ModernArcadeLobby.HOTBAR_GAME_PANEL_SLOT);
