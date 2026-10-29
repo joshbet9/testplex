@@ -257,14 +257,26 @@ public final class ModernArcadeLobby implements Listener {
         buildDisplayPad(world, (int) KIT_DISPLAY_X, 0, Material.RED_WOOL);
         buildDisplayPad(world, (int) TEAM_DISPLAY_X, 0, Material.BLUE_WOOL);
 
-        // Legacy podium and amplifier datapoint share the original centre at Z=-15.
-        for (int x = -1; x <= 1; x++) {
-            for (int z = -16; z <= -14; z++) {
+        // Port of LegacyGameLobbyManager.setPodium(new Location(world, 0, 101.5, -15), emerald).
+        // The 4x4 emerald floor is surrounded by a 6x6 dark outline; the 2x2 top
+        // emerald blocks and slab caps sit one and two blocks above the grass plane.
+        for (int x = -2; x <= 1; x++) {
+            for (int z = -17; z <= -14; z++) {
                 world.getBlockAt(x, FLOOR_Y, z).setType(Material.EMERALD_BLOCK, false);
             }
         }
-        world.getBlockAt(0, FLOOR_Y + 1, -15).setType(Material.SEA_LANTERN, false);
-        world.getBlockAt(0, FLOOR_Y + 2, -15).setType(Material.AIR, false);
+        for (int x = -3; x <= 2; x++) {
+            for (int z = -18; z <= -13; z++) {
+                if (x >= -2 && x <= 1 && z >= -17 && z <= -14) continue;
+                world.getBlockAt(x, FLOOR_Y, z).setType(Material.BLACK_WOOL, false);
+            }
+        }
+        for (int x = -1; x <= 0; x++) {
+            for (int z = -16; z <= -15; z++) {
+                world.getBlockAt(x, FLOOR_Y + 1, z).setType(Material.EMERALD_BLOCK, false);
+                world.getBlockAt(x, FLOOR_Y + 2, z).setType(Material.STONE_SLAB, false);
+            }
+        }
 
         display(world, "missions", new Location(world, MISSIONS_X, MISSIONS_Y, MISSIONS_Z),
                 ChatColor.GOLD + "" + ChatColor.BOLD + "MISSIONS");
@@ -289,6 +301,8 @@ public final class ModernArcadeLobby implements Listener {
     }
 
     private void buildDisplayPad(World world, int centerX, int centerZ, Material color) {
+        // Original 1.8 datapoint: coloured 4x4 floor, dark 6x6 outline,
+        // four raised colour blocks and slab caps at the kit/team display.
         for (int dx = -2; dx <= 1; dx++) {
             for (int dz = -2; dz <= 1; dz++) {
                 world.getBlockAt(centerX + dx, FLOOR_Y, centerZ + dz).setType(color, false);
@@ -298,6 +312,12 @@ public final class ModernArcadeLobby implements Listener {
             for (int dz = -3; dz <= 2; dz++) {
                 if (dx >= -2 && dx <= 1 && dz >= -2 && dz <= 1) continue;
                 world.getBlockAt(centerX + dx, FLOOR_Y, centerZ + dz).setType(Material.BLACK_WOOL, false);
+            }
+        }
+        for (int dx : new int[] {-1, 0}) {
+            for (int dz : new int[] {-1, 0}) {
+                world.getBlockAt(centerX + dx, FLOOR_Y + 1, centerZ + dz).setType(color, false);
+                world.getBlockAt(centerX + dx, FLOOR_Y + 2, centerZ + dz).setType(Material.STONE_SLAB, false);
             }
         }
     }

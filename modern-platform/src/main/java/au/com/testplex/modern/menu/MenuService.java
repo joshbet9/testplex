@@ -63,6 +63,19 @@ public final class MenuService implements Listener {
             mark(item, "game", game, null, null);
             inventory.setItem(slot++, item);
         }
+        ItemStack stats = makeItem(Material.BOOK, ChatColor.AQUA + "Stats", List.of(
+                ChatColor.GRAY + "Review local Testplex acceptance results.",
+                ChatColor.YELLOW + "Click to open /stats."));
+        mark(stats, "open-stats", null, null, null);
+        inventory.setItem(45, stats);
+        ItemStack cosmetics = makeItem(Material.CHEST, ChatColor.LIGHT_PURPLE + "Cosmetics", List.of(
+                ChatColor.GRAY + "Browse Arcade-specific cosmetic preferences.",
+                ChatColor.YELLOW + "Click to open the cosmetics menu."));
+        mark(cosmetics, "open-cosmetics-home", null, null, null);
+        inventory.setItem(49, cosmetics);
+        ItemStack close = makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of());
+        mark(close, "close-panel", null, null, null);
+        inventory.setItem(53, close);
         player.openInventory(inventory);
     }
 
@@ -236,6 +249,13 @@ public final class MenuService implements Listener {
             player.sendMessage(ChatColor.GREEN + "Saved the " + game.getName() + " win effect.");
             player.sendMessage(ChatColor.GRAY + "The win-scene renderer is wired during that game's port.");
             openWinEffects(player, game);
+        } else if ("open-stats".equals(action)) {
+            player.closeInventory();
+            player.performCommand("stats");
+        } else if ("open-cosmetics-home".equals(action)) {
+            openCosmeticsHome(player);
+        } else if ("close-panel".equals(action)) {
+            player.closeInventory();
         } else if ("back-panel".equals(action)) {
             openGamePanel(player);
         } else if ("back-game".equals(action) && game != null) {
