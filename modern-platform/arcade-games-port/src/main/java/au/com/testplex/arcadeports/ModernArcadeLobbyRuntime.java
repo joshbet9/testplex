@@ -48,7 +48,6 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private static final String QUEUE_TITLE = "Team Select | Queue";
     private static final String BOT_MENU_PREFIX = "Bot Cosmetics | ";
     private static final String[] THEMES = {"porky", "inferno", "frost", "slime", "royal", "confetti"};
-    private static final String[] GENERIC_PREVIEW_THEMES = {"classic", "inferno", "frost", "slime", "royal", "confetti"};
     private static final String[] BOMB_LOBBERS_THEMES = {
             "classic", "ember", "shockwave", "spark", "confetti", "frost", "slime"
     };
@@ -326,10 +325,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             return;
         }
 
-        String[] themes = selectedGame == ArcadePortGame.BOMB_LOBBERS ? BOMB_LOBBERS_THEMES : GENERIC_PREVIEW_THEMES;
-        int columns = selectedGame == ArcadePortGame.BOMB_LOBBERS ? 7 : 6;
-        int left = columns == 7 ? -9 : -7;
-        Material iconMaterial = showcaseIcon(selectedGame);
+        String[] themes = showcaseOptions(selectedGame);
+        int columns = Math.min(7, Math.max(3, themes.length));
+        int left = columns == 7 ? -9 : -(columns - 1) * 2;
+        String titlePrefix = selectedGame == ArcadePortGame.BOMB_LOBBERS
+                ? "TNT Impact: " : selectedGame.displayName() + " Preview: ";
         for (int i = 0; i < themes.length; i++) {
             String theme = themes[i];
             int column = i % columns;
@@ -347,7 +347,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             icon.setMarker(true);
             icon.setInvulnerable(true);
             icon.setCanPickupItems(false);
-            icon.setHelmet(new ItemStack(iconMaterial));
+            icon.setHelmet(new ItemStack(showcaseIcon(selectedGame, theme)));
             icon.setCustomName("showcase:" + theme);
             icon.setCustomNameVisible(false);
             icon.getPersistentDataContainer().set(themeKey, PersistentDataType.STRING, "showcase:" + theme);
@@ -362,31 +362,66 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             label.setMarker(true);
             label.setInvulnerable(true);
             label.setCanPickupItems(false);
-            String title = selectedGame == ArcadePortGame.BOMB_LOBBERS ? "TNT Impact: " : selectedGame.displayName() + " Preview: ";
-            label.setCustomName(ChatColor.GOLD + title + pretty(theme));
+            label.setCustomName(ChatColor.GOLD + titlePrefix + pretty(theme));
             label.setCustomNameVisible(true);
             label.getPersistentDataContainer().set(themeKey, PersistentDataType.STRING, "showcase-label");
             showcase.add(label);
         }
     }
 
-    private Material showcaseIcon(ArcadePortGame game) {
+    /**
+     * Keep the lobby preview specific to the selected game's own cosmetic prototype options.
+     */
+    private String[] showcaseOptions(ArcadePortGame game) {
         return switch (game) {
-            case BOMB_LOBBERS -> Material.TNT;
-            case DEATH_TAG -> Material.ROTTEN_FLESH;
-            case DRAGON_ESCAPE -> Material.BEACON;
-            case DRAGONS -> Material.FIRE_CHARGE;
-            case EVOLUTION -> Material.DRAGON_EGG;
-            case GLADIATORS -> Material.IRON_SWORD;
-            case MICRO_BATTLES -> Material.LIGHT_BLUE_STAINED_GLASS;
-            case ONE_IN_THE_QUIVER -> Material.ARROW;
-            case PAINTBALL -> Material.SNOWBALL;
-            case RUNNER -> Material.WHITE_CONCRETE;
-            case SHEEP_QUEST -> Material.WHITE_WOOL;
-            case SPLEEF -> Material.IRON_SHOVEL;
-            case TURF_WARS -> Material.BOW;
-            default -> game.floor();
+            case BOMB_LOBBERS -> BOMB_LOBBERS_THEMES;
+            case DEATH_TAG -> new String[] {"bark-footprints", "soul-ribbons", "lantern-motes"};
+            case DRAGON_ESCAPE -> new String[] {"dragon-eye", "sky-compass", "wing-flare",
+                    "skylands-gate", "dragon-roar", "cloud-surf"};
+            case DRAGONS -> new String[] {"ember-wing", "phoenix-arc", "molten-orbit"};
+            case EVOLUTION -> new String[] {"shell-fragments", "nature-bloom", "void-unfold"};
+            case GLADIATORS -> new String[] {"arena-challenger", "red-sand", "oath-mark"};
+            case MICRO_BATTLES -> new String[] {"cracked-ice", "prism-grid", "molten-seam",
+                    "sweeping-tape", "warning-pips", "shatter-line"};
+            case ONE_IN_THE_QUIVER -> new String[] {"bullseye-dash", "fletching-sparks", "ricochet-rune"};
+            case PAINTBALL -> new String[] {"chrome-marker", "splatter-cannon", "neon-suppressor",
+                    "colourburst", "paint-drip", "stencil-stamp"};
+            case RUNNER -> new String[] {"red-walk", "chalk-dashes", "ribbon-replay"};
+            case SHEEP_QUEST -> new String[] {"sheep-bell", "wool-confetti", "shepherd-flare"};
+            case SPLEEF -> new String[] {"snowburst", "ice-shards", "chalk-grid"};
+            case TURF_WARS -> new String[] {"team-sigil", "turf-crack", "painted-chevron"};
+            default -> new String[] {"classic", "inferno", "frost"};
         };
+    }
+
+    private Material showcaseIcon(ArcadePortGame game, String option) {
+        String value = option == null ? "" : option.toLowerCase(Locale.ROOT);
+        if (game == ArcadePortGame.BOMB_LOBBERS) {
+            if (value.contains("tnt") || "classic".equals(value) || "ember".equals(value)) return Material.TNT;
+            if ("shockwave".equals(value)) return Material.TARGET;
+            if ("spark".equals(value) || "confetti".equals(value)) return Material.FIREWORK_ROCKET;
+            if ("frost".equals(value)) return Material.SNOWBALL;
+            if ("slime".equals(value)) return Material.SLIME_BALL;
+        }
+        if (value.contains("lantern") || value.contains("soul")) return Material.SOUL_LANTERN;
+        if (value.contains("footprint") || value.contains("bark")) return Material.OAK_LEAVES;
+        if (value.contains("dragon-eye")) return Material.ENDER_EYE;
+        if (value.contains("compass")) return Material.COMPASS;
+        if (value.contains("wing") || value.contains("feather")) return Material.FEATHER;
+        if (value.contains("gate") || value.contains("marker")) return Material.BEACON;
+        if (value.contains("dragon") || value.contains("flame") || value.contains("ember")) return Material.FIRE_CHARGE;
+        if (value.contains("cloud") || value.contains("snow") || value.contains("ice") || value.contains("frost")) return Material.SNOWBALL;
+        if (value.contains("shell") || value.contains("evolution") || value.contains("void")) return Material.DRAGON_EGG;
+        if (value.contains("nature") || value.contains("bloom")) return Material.OAK_SAPLING;
+        if (value.contains("sand") || value.contains("oath") || value.contains("arena")) return Material.IRON_SWORD;
+        if (value.contains("prism") || value.contains("glass") || value.contains("shatter")) return Material.LIGHT_BLUE_STAINED_GLASS;
+        if (value.contains("arrow") || value.contains("bullseye") || value.contains("fletching") || value.contains("ricochet")) return Material.ARROW;
+        if (value.contains("paint") || value.contains("splatter") || value.contains("chrome") || value.contains("neon") || value.contains("colourburst")) return Material.SNOWBALL;
+        if (value.contains("ribbon") || value.contains("chalk") || value.contains("red-walk")) return Material.GLOW_INK_SAC;
+        if (value.contains("sheep") || value.contains("wool") || value.contains("fleece") || value.contains("shepherd")) return Material.WHITE_WOOL;
+        if (value.contains("shovel") || value.contains("shards")) return Material.IRON_SHOVEL;
+        if (value.contains("turf") || value.contains("sigil") || value.contains("chevron")) return Material.TARGET;
+        return game.floor();
     }
 
     @EventHandler
@@ -583,16 +618,31 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         e.getWorld().spawnParticle(particle(b.theme),e.getLocation().add(0,1,0),2,0.2,0.2,0.2,0.01);
     }
     private Particle particle(String theme) {
-        return switch (theme) {
-            case "inferno", "ember" -> Particle.FLAME;
-            case "frost" -> Particle.SNOWFLAKE;
-            case "slime" -> Particle.CRIT;
-            case "royal" -> Particle.END_ROD;
-            case "confetti" -> Particle.HAPPY_VILLAGER;
-            case "spark" -> Particle.FIREWORK;
-            case "shockwave" -> Particle.DAMAGE_INDICATOR;
-            default -> Particle.CRIT;
-        };
+        String value = theme == null ? "" : theme.toLowerCase(Locale.ROOT);
+        if (value.contains("ember") || value.contains("inferno") || value.contains("flame")
+                || value.contains("dragon-roar") || value.contains("molten")) return Particle.FLAME;
+        if (value.contains("frost") || value.contains("snow") || value.contains("ice")) return Particle.SNOWFLAKE;
+        if (value.contains("slime")) return Particle.CRIT;
+        if (value.contains("royal") || value.contains("lantern") || value.contains("sky-compass")
+                || value.contains("oath")) return Particle.END_ROD;
+        if (value.contains("confetti") || value.contains("wool") || value.contains("nature")
+                || value.contains("bloom")) return Particle.HAPPY_VILLAGER;
+        if (value.contains("spark") || value.contains("wing") || value.contains("fletching")
+                || value.contains("starburst")) return Particle.FIREWORK;
+        if (value.contains("shockwave") || value.contains("target") || value.contains("bullseye")
+                || value.contains("turf-crack")) return Particle.DAMAGE_INDICATOR;
+        if (value.contains("soul") || value.contains("void")) return Particle.SOUL;
+        if (value.contains("paint") || value.contains("splatter") || value.contains("colourburst")
+                || value.contains("stencil")) return Particle.SPLASH;
+        if (value.contains("bark") || value.contains("footprint") || value.contains("chalk")
+                || value.contains("red-walk") || value.contains("ribbon")) return Particle.COMPOSTER;
+        if (value.contains("dragon-eye") || value.contains("ender")) return Particle.PORTAL;
+        if (value.contains("cloud")) return Particle.CLOUD;
+        if (value.contains("prism") || value.contains("shatter") || value.contains("pixel-crater")) return Particle.CRIT;
+        if (value.contains("warning") || value.contains("turtle") || value.contains("pips")) return Particle.ELECTRIC_SPARK;
+        if (value.contains("sheep") || value.contains("shepherd")) return Particle.ITEM;
+        if (value.contains("arena") || value.contains("red-sand")) return Particle.CRIT;
+        return Particle.CRIT;
     }
 
     List<LivingEntity> botTargets(World world, ArcadePortGame game) {
