@@ -7393,7 +7393,7 @@ public final class ArcadePortManager implements Listener {
         player.setSaturation(ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE);
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onPlayerInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
@@ -7405,6 +7405,17 @@ public final class ArcadePortManager implements Listener {
         if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick && !baconNonRightClick) return;
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
+        if (event.isCancelled()) {
+            boolean forceBaconAbility = session.type == ArcadePortGame.BACON_BRAWL
+                    && event.getAction().isRightClick() && heldItem != null
+                    && heldItem.getType() == Material.IRON_AXE
+                    && session.alive.contains(player.getUniqueId());
+            boolean forceBombThrow = session.type == ArcadePortGame.BOMB_LOBBERS
+                    && heldItem != null && heldItem.getType() == Material.TNT
+                    && (event.getAction().isRightClick() || event.getAction().isLeftClick())
+                    && session.alive.contains(player.getUniqueId());
+            if (!forceBaconAbility && !forceBombThrow) return;
+        }
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && !session.alive.contains(player.getUniqueId())
                 && isBaconTrackingCompass(heldItem)) {
