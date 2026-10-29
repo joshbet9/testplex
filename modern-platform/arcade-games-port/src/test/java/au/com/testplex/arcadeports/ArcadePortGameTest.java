@@ -7,6 +7,25 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadePortGameTest {
+    @Test void modernArcadeLobbyMatchesTheLegacyTestplexPlaneAndDatapoints() {
+        assertEquals("testplex_arcade_lobby_v1", ModernArcadeLobby.WORLD_NAME);
+        assertEquals(-50, ModernArcadeLobby.PLANE_MIN);
+        assertEquals(50, ModernArcadeLobby.PLANE_MAX_EXCLUSIVE);
+        assertEquals(100, ModernArcadeLobby.FLOOR_Y);
+        assertEquals(0.0D, ModernArcadeLobby.SPAWN_X, 0.00001D);
+        assertEquals(104.0D, ModernArcadeLobby.SPAWN_Y, 0.00001D);
+        assertEquals(0.0D, ModernArcadeLobby.SPAWN_Z, 0.00001D);
+        assertEquals(-3.5D, ModernArcadeLobby.MISSIONS_X, 0.00001D);
+        assertEquals(44.0D, ModernArcadeLobby.GAME_TEXT_Z, 0.00001D);
+        assertEquals(-40.0D, ModernArcadeLobby.KIT_TEXT_X, 0.00001D);
+        assertEquals(40.0D, ModernArcadeLobby.TEAM_TEXT_X, 0.00001D);
+        assertEquals(-44.0D, ModernArcadeLobby.ADV_TEXT_Z, 0.00001D);
+        assertEquals(-17.0D, ModernArcadeLobby.KIT_DISPLAY_X, 0.00001D);
+        assertEquals(18.0D, ModernArcadeLobby.TEAM_DISPLAY_X, 0.00001D);
+        assertEquals(-15.0D, ModernArcadeLobby.AMP_STAND_Z, 0.00001D);
+    }
+
+
     @Test void exposesTheFourteenGamesNotCoveredByDedicatedMechanicsModules() {
         assertEquals(14, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();

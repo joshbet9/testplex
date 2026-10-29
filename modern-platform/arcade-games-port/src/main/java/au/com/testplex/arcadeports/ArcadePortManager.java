@@ -125,9 +125,14 @@ public final class ArcadePortManager implements Listener {
     private long lastDragonHazard;
     private long lastSheepSpawn;
 
+    private final ModernArcadeLobby lobby;
+
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
+        this.lobby = new ModernArcadeLobby(plugin);
         Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(lobby, plugin);
+        lobby.ensureWorld();
         registerOptionalBaconPacketBridge();
     }
 
@@ -470,6 +475,7 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "That game is already in progress. Use /arcadeport status or queue the next game.");
             return;
         }
+        lobby.ensurePlayerInLobby(player);
         for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(player.getUniqueId());
         queues.computeIfAbsent(type.id(), ignored -> new LinkedHashMap<>()).put(player.getUniqueId(), player);
         player.sendMessage(ChatColor.GREEN + "Queued for " + type.displayName() + ". " +
@@ -541,6 +547,16 @@ public final class ArcadePortManager implements Listener {
         if (world == null) {
             sender.sendMessage(ChatColor.RED + "The test world could not be loaded. Check the server log.");
             return;
+        }
+        // Archived 1.8 region files are not safe to trust merely because their WorldConfig
+        // parsed. Validate the actual spawn blocks on the 26.3 runtime before releasing players.
+        if (type == ArcadePortGame.BACON_BRAWL && sourceMapWorlds.contains(type.id())
+                && !hasSafeBaconSourceSpawns(world, sourceMapData.get(type.id()), participants.size())) {
+            plugin.getLogger().warning("Bacon Brawl source arena failed spawn-safety validation; using the isolated modern fallback arena for this round.");
+            sourceMapWorlds.remove(type.id());
+            sourceMapData.remove(type.id());
+            clearBaconFallbackArena(world);
+            world.setSpawnLocation(0, 64, 0);
         }
         if (!sourceMapWorlds.contains(type.id())) buildArena(type, world);
         Session session = new Session(type, world, participants);
@@ -636,8 +652,11 @@ public final class ArcadePortManager implements Listener {
         List<Location> spawns = spawnLocations(type, participants.size());
         for (int i = 0; i < participants.size(); i++) {
             Player player = participants.get(i);
-            PlayerSnapshot snapshot = pendingRestore.remove(player.getUniqueId());
-            if (snapshot == null) snapshot = new PlayerSnapshot(player);
+            PlayerSnapshot pendingSnapshot = pendingRestore.remove(player.getUniqueId());
+            if (pendingSnapshot != null) pendingSnapshot.restore(player);
+            lobby.ensurePlayerInLobby(player);
+            // Always snapshot the controlled lobby state, never the server's old survival spawn.
+            PlayerSnapshot snapshot = new PlayerSnapshot(player);
             session.snapshots.put(player.getUniqueId(), snapshot);
             session.players.put(player.getUniqueId(), player);
             session.alive.add(player.getUniqueId());
@@ -818,6 +837,59 @@ public final class ArcadePortManager implements Listener {
         world.setGameRule(GameRule.KEEP_INVENTORY, true);
         if (!sourceMapWorlds.contains(type.id())) world.setSpawnLocation(0, 64, 0);
         return world;
+    }
+
+    /**
+     * Validate the actual source spawn blocks before using the legacy arena archive.
+     * WorldConfig.dat by itself is not proof that a converted 1.8 chunk is playable.
+     */
+    private boolean hasSafeBaconSourceSpawns(World world, SourceMapCatalog.MapData sourceMap, int participantCount) {
+        if (world == null || sourceMap == null) return false;
+        List<Location> sourceSpawns = sourceMap.teamSpawnLocationsForName("Green");
+        if (sourceSpawns.isEmpty()) sourceSpawns = sourceMap.dataLocations("GREEN");
+        if (sourceSpawns.isEmpty()) return false;
+        int checkCount = Math.min(Math.max(1, participantCount), sourceSpawns.size());
+        for (int i = 0; i < checkCount; i++) {
+            Location spawn = sourceSpawns.get(i);
+            if (spawn == null || spawn.getWorld() != world
+                    || spawn.getY() < world.getMinHeight() + 2.0D
+                    || spawn.getY() >= world.getMaxHeight() - 2.0D) return false;
+            int x = spawn.getBlockX();
+            int y = spawn.getBlockY();
+            int z = spawn.getBlockZ();
+            world.getChunkAt(x >> 4, z >> 4).load();
+            Block floor = world.getBlockAt(x, y - 1, z);
+            Block feet = world.getBlockAt(x, y, z);
+            Block head = world.getBlockAt(x, y + 1, z);
+            Material floorType = floor.getType();
+            if (!floorType.isSolid()
+                    || floorType == Material.MAGMA_BLOCK
+                    || floorType == Material.CAMPFIRE
+                    || floorType == Material.SOUL_CAMPFIRE
+                    || !feet.isPassable()
+                    || !head.isPassable()
+                    || feet.getType() == Material.LAVA
+                    || feet.getType() == Material.WATER
+                    || head.getType() == Material.LAVA
+                    || head.getType() == Material.WATER) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Clear only the small centre volume used by the safe fallback arena. */
+    private void clearBaconFallbackArena(World world) {
+        int minY = Math.max(0, world.getMinHeight());
+        int maxY = Math.min(80, world.getMaxHeight() - 1);
+        for (int x = -HALF_SIZE - 2; x <= HALF_SIZE + 2; x++) {
+            for (int z = -HALF_SIZE - 2; z <= HALF_SIZE + 2; z++) {
+                for (int y = minY; y <= maxY; y++) {
+                    Block block = world.getBlockAt(x, y, z);
+                    if (!block.getType().isAir()) block.setType(Material.AIR, false);
+                }
+            }
+        }
     }
 
     private void buildArena(ArcadePortGame type, World world) {
@@ -5059,6 +5131,8 @@ public final class ArcadePortManager implements Listener {
                     player.closeInventory();
                 }
                 snapshot.restore(player);
+                if (!lobby.isLobbyWorld(player.getWorld())) lobby.sendToLobby(player);
+                else lobby.ensurePanelItem(player);
             } else pendingRestore.put(entry.getKey(), snapshot);
         }
         session.sheep.clear();
@@ -6922,8 +6996,14 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        PlayerSnapshot snapshot = pendingRestore.remove(event.getPlayer().getUniqueId());
-        if (snapshot != null) Bukkit.getScheduler().runTask(plugin, () -> { if (event.getPlayer().isOnline()) snapshot.restore(event.getPlayer()); });
+        Player player = event.getPlayer();
+        PlayerSnapshot snapshot = pendingRestore.remove(player.getUniqueId());
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) return;
+            if (snapshot != null) snapshot.restore(player);
+            if (!lobby.isLobbyWorld(player.getWorld())) lobby.sendToLobby(player);
+            else lobby.ensurePanelItem(player);
+        });
     }
 
     private static final class Session {
