@@ -76,10 +76,10 @@ public final class ArcadePortRules {
                 && nowMillis - lastHitAtMillis <= BACON_FALL_KILL_CREDIT_WINDOW_MILLIS;
     }
 
-    /** Original Bacon Brawl is decided by kills at the two-minute mark. */
-    public static final long BACON_BRAWL_ROUND_MILLIS = 120_000L;
-    public static final long BACON_BRAWL_RESPAWN_DELAY_TICKS = 20L;
+    /** Reborn Bacon Brawl has no fixed timer; SoloGame ends when at most one player remains alive. */
+    public static final boolean BACON_BRAWL_HAS_ROUND_TIMER = false;
     public static final long BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS = 50_000L;
+    public static final long BACON_KNOCKBACK_INTERVAL_STEP_MILLIS = 5_000L;
     public static final long BACON_MIN_KNOCKBACK_INTERVAL_MILLIS = 5_000L;
     public static final long BACON_SLOW_UPDATE_INTERVAL_MILLIS = 4_000L;
     public static final long BACON_HUNGER_INTERVAL_MILLIS = 4_000L;
@@ -617,14 +617,26 @@ public final class ArcadePortRules {
         return pairCount > 0 && resolvedPairs >= pairCount;
     }
 
-    public static final int BACON_BRAWL_MAX_KNOCKBACK_ESCALATIONS = 2;
+    /** Reborn shortens the interval by five seconds after each escalation; two survivors accelerate it. */
+    public static final int BACON_BRAWL_MAX_KNOCKBACK_ESCALATIONS =
+            (int) (BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS / BACON_KNOCKBACK_INTERVAL_STEP_MILLIS);
     public static final long BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS = 20_000L;
-    /** At most two source escalations; make the remaining escalation faster in a two-player endgame. */
+
     public static long nextBaconKnockbackInterval(int completedEscalations, int alivePlayers) {
-        if (completedEscalations <= 0) return BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
-        if (completedEscalations >= BACON_BRAWL_MAX_KNOCKBACK_ESCALATIONS) return 0L;
-        return alivePlayers <= 2 ? BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS
-                : BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
+        if (completedEscalations < 0 || completedEscalations >= BACON_BRAWL_MAX_KNOCKBACK_ESCALATIONS) {
+            return 0L;
+        }
+        long sourceInterval = Math.max(BACON_MIN_KNOCKBACK_INTERVAL_MILLIS,
+                BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS
+                        - completedEscalations * BACON_KNOCKBACK_INTERVAL_STEP_MILLIS);
+        if (completedEscalations > 0 && alivePlayers <= 2) {
+            return Math.min(sourceInterval, BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS);
+        }
+        return sourceInterval;
+    }
+
+    public static boolean shouldFinishBaconBrawl(int alivePlayers) {
+        return alivePlayers <= 1;
     }
 
     /** Test a player against a world border whose centre may not be at world origin. */
