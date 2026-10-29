@@ -471,7 +471,10 @@ jobs:
           # This is an isolated acceptance-test server; don't inherit a whitelist
           # setting from an earlier server.properties file.
           set_property white-list "false"
-          sudo -n grep -Eq '^white-list=false
+          sudo -n grep -Fxq "white-list=false" "$SERVER_DIR/server.properties" || {
+            echo "Failed to disable the whitelist on the isolated modern server." >&2
+            exit 1
+          }
           set_property view-distance "5"
           set_property simulation-distance "4"
           sudo -n chown monstermaze:monstermaze "$SERVER_DIR/server.properties"
