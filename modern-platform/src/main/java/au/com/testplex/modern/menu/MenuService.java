@@ -282,7 +282,7 @@ public final class MenuService implements Listener {
                             "§1",
                             ChatColor.YELLOW + "Left-Click " + ChatColor.GRAY + (ready
                                     ? "to select this game."
-                                    : "to view the parity gate; this game is not enabled yet."),
+                                    : "to select the lobby game; starting stays gated until parity is cleared."),
                             ChatColor.YELLOW + "Right-Click " + ChatColor.GRAY + "to choose an installed map.",
                             ChatColor.DARK_GRAY + "Port status: " + game.getPortStatus().getDisplay()));
             mark(item, rotation ? "panel-rotation-select" : "panel-game-select", game, null, null);
@@ -609,6 +609,9 @@ public final class MenuService implements Listener {
             plugin.saveConfig();
             if (!Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern")) {
                 player.sendMessage(ChatColor.RED + "The modern map catalogue is not installed.");
+            } else if (!isMechanicsPortGame(game.getId())) {
+                player.sendMessage(ChatColor.YELLOW + game.getName()
+                        + " uses a dedicated game module; its map selector is not wired into the shared Arcade map menu yet.");
             } else {
                 player.closeInventory();
                 player.performCommand("arcadeport maps " + game.getId());
@@ -646,24 +649,36 @@ public final class MenuService implements Listener {
         } else if ((SET_GAME_TITLE.equals(title) || "Edit Game Rotation".equals(title))
                 && ("panel-game-select".equals(action) || "panel-rotation-select".equals(action))) {
             if (game == null) return;
-            if (!"bacon-brawl".equals(game.getId())
-                    || !Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern")) {
-                player.sendMessage(ChatColor.RED + game.getName() + " is not enabled for modern acceptance yet.");
-            } else if ("panel-rotation-select".equals(action)) {
-                plugin.getConfig().set("game-panel.selected-game", game.getId());
-                List<String> rotation = new ArrayList<>(plugin.getConfig().getStringList("game-panel.rotation"));
-                if (!rotation.contains(game.getId())) rotation.add(game.getId());
-                plugin.getConfig().set("game-panel.rotation", rotation);
-                plugin.saveConfig();
-                player.sendMessage(ChatColor.GREEN + game.getName() + " added to the local test rotation.");
-                openGameSelection(player, true);
+            if ("panel-rotation-select".equals(action)) {
+                if (!"bacon-brawl".equals(game.getId())
+                        || !Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern")) {
+                    player.sendMessage(ChatColor.RED + game.getName()
+                            + " is not cleared for the modern test rotation yet.");
+                } else {
+                    plugin.getConfig().set("game-panel.selected-game", game.getId());
+                    List<String> rotation = new ArrayList<>(plugin.getConfig().getStringList("game-panel.rotation"));
+                    if (!rotation.contains(game.getId())) rotation.add(game.getId());
+                    plugin.getConfig().set("game-panel.rotation", rotation);
+                    plugin.saveConfig();
+                    player.sendMessage(ChatColor.GREEN + game.getName() + " added to the local test rotation.");
+                    openGameSelection(player, true);
+                }
             } else {
                 plugin.getConfig().set("game-panel.selected-game", game.getId());
                 plugin.saveConfig();
-                player.closeInventory();
-                player.performCommand("arcadeport lobby " + game.getId());
-                player.sendMessage(ChatColor.GREEN + "Selected " + game.getName()
-                        + ". Right-click the game to choose a map, then use Start Game in the Game Panel.");
+                if (Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern")
+                        && isMechanicsPortGame(game.getId())) {
+                    player.closeInventory();
+                    player.performCommand("arcadeport lobby " + game.getId());
+                    player.sendMessage(ChatColor.GREEN + "Selected " + game.getName()
+                            + ". The lobby kit/team displays and Game/Kit scoreboard have been refreshed. "
+                            + "Start Game remains gated until this game's parity is cleared.");
+                } else {
+                    player.closeInventory();
+                    player.sendMessage(ChatColor.YELLOW + game.getName()
+                            + " is selected in the Game Panel, but its dedicated lobby integration is not connected "
+                            + "to the shared kit/team pads yet.");
+                }
             }
         } else if ("back-panel".equals(action)) {
             openGamePanel(player);
@@ -729,6 +744,12 @@ public final class MenuService implements Listener {
 
     private String targetKeyValue(ItemMeta meta) {
         return meta.getPersistentDataContainer().get(targetKey, PersistentDataType.STRING);
+    }
+
+    private boolean isMechanicsPortGame(String gameId) {
+        return List.of("bacon-brawl", "bomb-lobbers", "death-tag", "dragon-escape", "dragons",
+                "evolution", "gladiators", "micro-battles", "one-in-the-quiver", "paintball",
+                "runner", "sheep-quest", "spleef", "turf-wars").contains(gameId);
     }
 
     private boolean isCohost(Player player) {

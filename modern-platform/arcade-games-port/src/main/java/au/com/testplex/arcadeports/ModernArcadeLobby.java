@@ -194,6 +194,22 @@ public final class ModernArcadeLobby implements Listener {
         lobbyScoreboard.apply(player);
     }
 
+    /** Reapply the live game/kit sidebar to players currently in the Arcade lobby. */
+    public void refreshLobbyScoreboards() {
+        World world = ensureWorld();
+        if (world == null) return;
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (online.getWorld() == world) lobbyScoreboard.apply(online);
+        }
+    }
+
+    /** Refresh a single tester after their selected kit changes. */
+    public void refreshPlayerScoreboard(Player player) {
+        if (player != null && player.isOnline() && isLobbyWorld(player.getWorld())) {
+            lobbyScoreboard.apply(player);
+        }
+    }
+
     private ItemStack createHotbarItem(Material type, String title, List<String> lore, String action) {
         ItemStack item = new ItemStack(type);
         ItemMeta meta = item.getItemMeta();

