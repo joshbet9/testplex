@@ -2287,27 +2287,37 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void restoreBaconDisguiseNameTagEntry(Session session, UUID playerId) {
+        String entry = session.baconNameEntries.remove(playerId);
+        Team disguiseTeam = session.baconDisguiseTeam;
+        Scoreboard scoreboard = session.baconDisguiseScoreboard;
+        if (entry == null) return;
+        if (disguiseTeam != null) {
+            try {
+                disguiseTeam.removeEntry(entry);
+            } catch (IllegalStateException ignored) {
+                // Another plugin may already have removed the temporary team.
+            }
+        }
+        Team previous = session.baconPreviousNameTeams.remove(playerId);
+        if (previous == null || scoreboard == null) return;
+        try {
+            Team currentlyRegistered = scoreboard.getTeam(previous.getName());
+            if (currentlyRegistered != null && currentlyRegistered != disguiseTeam) {
+                currentlyRegistered.addEntry(entry);
+            }
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            plugin.getLogger().warning("Could not restore scoreboard team for " + entry
+                    + " after Bacon Brawl: " + exception.getMessage());
+        }
+    }
+
     private void cleanupBaconDisguiseNameTags(Session session) {
         Team disguiseTeam = session.baconDisguiseTeam;
         Scoreboard scoreboard = session.baconDisguiseScoreboard;
         if (disguiseTeam == null || scoreboard == null) return;
-        for (Map.Entry<UUID, String> entry : session.baconNameEntries.entrySet()) {
-            try {
-                disguiseTeam.removeEntry(entry.getValue());
-            } catch (IllegalStateException ignored) {
-                // Another plugin may already have removed the temporary team.
-            }
-            Team previous = session.baconPreviousNameTeams.get(entry.getKey());
-            if (previous == null) continue;
-            try {
-                Team currentlyRegistered = scoreboard.getTeam(previous.getName());
-                if (currentlyRegistered != null && currentlyRegistered != disguiseTeam) {
-                    currentlyRegistered.addEntry(entry.getValue());
-                }
-            } catch (IllegalArgumentException | IllegalStateException exception) {
-                plugin.getLogger().warning("Could not restore scoreboard team for " + entry.getValue()
-                        + " after Bacon Brawl: " + exception.getMessage());
-            }
+        for (UUID playerId : new ArrayList<>(session.baconNameEntries.keySet())) {
+            restoreBaconDisguiseNameTagEntry(session, playerId);
         }
         try {
             if (scoreboard.getTeam(disguiseTeam.getName()) != null) disguiseTeam.unregister();
@@ -6280,6 +6290,7 @@ public final class ArcadePortManager implements Listener {
             removeBaconBabyPig(session, id);
             removeBaconPlayerPig(session, id);
             restoreBaconPlayerVisibilityForOwner(session, id, player);
+            restoreBaconDisguiseNameTagEntry(session, id);
             session.baconSlams.remove(id);
         }
         PlayerSnapshot snapshot = session.snapshots.get(id);
