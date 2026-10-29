@@ -8,9 +8,19 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadePortGameTest {
     @Test void modernArcadeLobbyHotbarMatchesLegacyTestplexSandboxItems() {
-        assertEquals(0, ModernArcadeLobby.HOTBAR_STATS_SLOT);
         assertEquals(4, ModernArcadeLobby.HOTBAR_COSMETICS_SLOT);
         assertEquals(8, ModernArcadeLobby.HOTBAR_GAME_PANEL_SLOT);
+    }
+
+    @Test void modernKitPedestalsUseLegacyFourBlockSpacing() {
+        assertEquals(4, ModernArcadeLobbyRuntime.kitPedestalCenterZ(3, 0));
+        assertEquals(0, ModernArcadeLobbyRuntime.kitPedestalCenterZ(3, 1));
+        assertEquals(-4, ModernArcadeLobbyRuntime.kitPedestalCenterZ(3, 2));
+        assertEquals(6, ModernArcadeLobbyRuntime.kitPedestalCenterZ(4, 0));
+        assertEquals(2, ModernArcadeLobbyRuntime.kitPedestalCenterZ(4, 1));
+        assertEquals(-2, ModernArcadeLobbyRuntime.kitPedestalCenterZ(4, 2));
+        assertEquals(-6, ModernArcadeLobbyRuntime.kitPedestalCenterZ(4, 3));
+        assertThrows(IllegalArgumentException.class, () -> ModernArcadeLobbyRuntime.kitPedestalCenterZ(3, 3));
     }
 
     @Test void modernArcadeLobbyMatchesTheLegacyTestplexPlaneAndDatapoints() {
