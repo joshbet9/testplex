@@ -462,6 +462,20 @@ public final class ArcadePortRules {
         };
     }
 
+    /** Mirrors UtilAction.velocity for the in-air, uncontrolled PerkDoubleJump used by these kits. */
+    public static org.bukkit.util.Vector bombLobbersDoubleJumpVelocity(
+            org.bukkit.util.Vector lookDirection, double power) {
+        if (lookDirection == null || !Double.isFinite(power) || power <= 0.0D
+                || lookDirection.lengthSquared() <= 1.0E-12D) {
+            return new org.bukkit.util.Vector(0.0D, 0.0D, 0.0D);
+        }
+        org.bukkit.util.Vector velocity = lookDirection.clone();
+        velocity.setY(power);
+        velocity.normalize().multiply(power);
+        if (velocity.getY() > power) velocity.setY(power);
+        return velocity;
+    }
+
     public static long bombLobbersCraftmanIntervalMillis(long liveMillis) {
         if (liveMillis <= 20_000L) return 8_000L;
         if (liveMillis <= 40_000L) return 7_000L;
