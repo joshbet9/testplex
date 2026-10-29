@@ -39,8 +39,9 @@ public final class ArcadePortRules {
     public static final long BACON_TIMED_HIT_OK_MAX_MILLIS = 499L;
     public static final long BACON_TIMED_HIT_LATE_MAX_MILLIS = 1_400L;
     public static final long BACON_HIT_FEEDBACK_MILLIS = 1_000L;
-    public static final long BACON_PIG_INVINCIBILITY_MIN_MILLIS = 500L;
-    public static final long BACON_PIG_INVINCIBILITY_MAX_MILLIS = 5_000L;
+    /** Source Sheep Pig Cloak lasts five seconds; the requested meter scales its duration below that cap. */
+    public static final long BACON_SHEEP_CLOAK_MIN_MILLIS = 500L;
+    public static final long BACON_SHEEP_CLOAK_MAX_MILLIS = 5_000L;
     public static final long BACON_FLASH_FRIED_MAX_WIN_MILLIS = 60_000L;
     public static final int BACON_THREE_FOR_ONE_BODY_SLAM_KILLS = 3;
     /** Pigs In Blankets is earned by six kills in a single game. */
@@ -78,13 +79,13 @@ public final class ArcadePortRules {
         return 0.5D + charge / 200.0D;
     }
 
-    /** The Pig kit spends its fill on a temporary invincibility window, capped at five seconds. */
-    public static long baconPigInvincibilityDurationMillis(int percent) {
+    /** Sheep Pig spends meter on Cloak, with the Reborn five-second duration as the maximum. */
+    public static long baconSheepCloakDurationMillis(int percent) {
         int charge = Math.max(0, Math.min(BACON_METER_MAX, percent));
         if (!canUseBaconMeterAbility(charge)) return 0L;
-        return BACON_PIG_INVINCIBILITY_MIN_MILLIS
-                + Math.round((BACON_PIG_INVINCIBILITY_MAX_MILLIS
-                        - BACON_PIG_INVINCIBILITY_MIN_MILLIS) * charge / (double) BACON_METER_MAX);
+        return BACON_SHEEP_CLOAK_MIN_MILLIS
+                + Math.round((BACON_SHEEP_CLOAK_MAX_MILLIS
+                        - BACON_SHEEP_CLOAK_MIN_MILLIS) * charge / (double) BACON_METER_MAX);
     }
 
     /** Mama Piggles spends meter to set Bacon Blast launch and impact power. */
