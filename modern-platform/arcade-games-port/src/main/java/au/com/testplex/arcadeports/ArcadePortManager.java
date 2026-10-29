@@ -2208,6 +2208,14 @@ public final class ArcadePortManager implements Listener {
         player.getInventory().setItem(ArcadePortRules.BOMB_LOBBERS_TEAM_BADGE_SLOT, teamBadge);
     }
 
+    private boolean isBombLobbersTeamLockedItem(ItemStack item) {
+        if (item == null || item.getType().isAir() || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null || !meta.hasDisplayName()) return false;
+        String name = ChatColor.stripColor(meta.getDisplayName());
+        return "Team Armor".equals(name) || "Red Team".equals(name) || "Aqua Team".equals(name);
+    }
+
     private ItemStack bombLobbersTeamArmorPiece(Material material, Color teamColor, ChatColor chatColor) {
         ItemStack item = new ItemStack(material);
         LeatherArmorMeta meta = (LeatherArmorMeta) item.getItemMeta();
@@ -6756,6 +6764,15 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.type == ArcadePortGame.BOMB_LOBBERS
+                && event.getAction().isRightClick() && isBombLobbersTeamLockedItem(heldItem)) {
+            // TeamArmorModule prevents the slot-9 chestplate from being equipped as real armour.
+            event.setCancelled(true);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (player.isOnline()) player.updateInventory();
+            }, 1L);
+            return;
+        }
         if (!session.alive.contains(player.getUniqueId())) return;
         if (session.type == ArcadePortGame.BACON_BRAWL && isBaconMeterItem(heldItem)) {
             event.setCancelled(true);
@@ -7147,6 +7164,24 @@ public final class ArcadePortManager implements Listener {
      * Bomb Lobbers disables both chest and block inventories in the legacy game.
      * Do not interfere with plugin-owned menus such as the spectator compass menu.
      */
+    /** Prevent moving or swapping the source TeamArmorModule's protected gear. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBombLobbersTeamArmorMove(InventoryClickEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.BOMB_LOBBERS
+                || !session.players.containsKey(event.getWhoClicked().getUniqueId())) return;
+        ItemStack hotbarSwap = null;
+        if (event.getWhoClicked() instanceof Player player) {
+            int button = event.getHotbarButton();
+            if (button >= 0) hotbarSwap = player.getInventory().getItem(button);
+        }
+        if (isBombLobbersTeamLockedItem(event.getCurrentItem())
+                || isBombLobbersTeamLockedItem(event.getCursor())
+                || isBombLobbersTeamLockedItem(hotbarSwap)) {
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBombLobbersBlockInventoryOpen(InventoryOpenEvent event) {
         Session session = active;
