@@ -462,8 +462,9 @@ class ArcadePortGameTest {
                 "the selected balance change doubles Bacon Brawl hunger drain");
         assertEquals(5.0F, ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE, 0.00001F);
         assertEquals(4.0D, ArcadePortRules.BACON_STARVATION_DAMAGE, 0.00001D);
-        assertEquals(6.0D, ArcadePortRules.BACON_STANDARD_HIT_DAMAGE, 0.00001D);
-        assertEquals(2.0D, ArcadePortRules.BACON_BODY_SLAM_RECOIL_DAMAGE, 0.00001D);
+        assertFalse(ArcadePortRules.BACON_BRAWL_HITS_DAMAGE_HEALTH,
+                "source hits heal back the damage and rely on knockback for arena knock-outs");
+        assertEquals(2.0D, ArcadePortRules.BACON_BODY_SLAM_EXTRA_KNOCKBACK, 0.00001D);
         assertEquals(8_000L, ArcadePortRules.BACON_BODY_SLAM_COOLDOWN_MILLIS);
         assertEquals(3_000L, ArcadePortRules.BACON_BLAST_COOLDOWN_MILLIS);
         assertEquals(10_000L, ArcadePortRules.BACON_CLOAK_COOLDOWN_MILLIS);
@@ -489,17 +490,7 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isBaconBrawlBackstab(Double.NaN, 1.0D, 0.0D, -1.0D));
     }
 
-    @Test void babyPigglesCompanionHitsOnlyWhenReadyAndCloseToAnOpponent() {
-        assertEquals(1_500L, ArcadePortRules.BACON_BABY_PIG_ATTACK_COOLDOWN_MILLIS);
-        assertTrue(ArcadePortRules.shouldBaconBabyPigAttack(5_000L, 5_000L, 0.0D));
-        assertTrue(ArcadePortRules.shouldBaconBabyPigAttack(5_001L, 5_000L, 2.25D));
-        assertFalse(ArcadePortRules.shouldBaconBabyPigAttack(4_999L, 5_000L, 1.0D));
-        assertFalse(ArcadePortRules.shouldBaconBabyPigAttack(5_000L, 5_000L, 2.26D));
-        assertFalse(ArcadePortRules.shouldBaconBabyPigAttack(5_000L, 5_000L, Double.NaN));
-        assertFalse(ArcadePortRules.shouldBaconBabyPigAttack(5_000L, 5_000L, -1.0D));
-    }
-
-    @Test void baconBrawlAchievementThresholdsUseSelectedValues() {
+remove unsupported Baby Piggles attack test    @Test void baconBrawlAchievementThresholdsUseSelectedValues() {
         assertEquals(15, ArcadePortRules.BACON_BRAWL_KING_OF_BACON_WINS);
         assertFalse(ArcadePortRules.shouldAwardBaconKingOfBacon(14));
         assertTrue(ArcadePortRules.shouldAwardBaconKingOfBacon(15));
@@ -510,15 +501,11 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldAwardBaconPigsInBlankets(7));
     }
 
-    @Test void baconBlastBreaksNearbyArenaBlocksButPreservesProtectedMaterials() {
-        assertEquals(2.0D, ArcadePortRules.BACON_BLAST_TERRAIN_RADIUS, 0.00001D);
-        assertTrue(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.STONE, 0.0D));
-        assertTrue(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.OAK_PLANKS, 4.0D));
-        assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.STONE, 4.01D));
-        assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.AIR, 0.0D));
+    @Test void baconBlastNeverBreaksSourceArenaBlocks() {
+        assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.STONE, 0.0D));
+        assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.OAK_PLANKS, 0.0D));
         assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.BEDROCK, 0.0D));
         assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.WATER, 0.0D));
-        assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.LAVA, 0.0D));
         assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(null, 0.0D));
         assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.STONE, Double.NaN));
     }
