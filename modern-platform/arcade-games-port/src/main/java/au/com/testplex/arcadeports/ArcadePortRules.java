@@ -231,8 +231,9 @@ public final class ArcadePortRules {
     public static final long BOMB_LOBBERS_MAX_FLIGHT_MILLIS = 8_000L;
     public static final int BOMB_LOBBERS_FUSE_TICKS = 60;
     public static final int BOMB_LOBBERS_MAX_CARRIED = 3;
+    /** Vanilla 1.8 TNT size parameter; entity damage reaches twice this distance. */
     public static final double BOMB_LOBBERS_EXPLOSION_SIZE = 4.0D;
-    public static final double BOMB_LOBBERS_EXPLOSION_RADIUS = 4.0D;
+    public static final double BOMB_LOBBERS_EXPLOSION_RADIUS = BOMB_LOBBERS_EXPLOSION_SIZE * 2.0D;
     public static final double BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE = 50.0D;
     public static final long SPLEEF_HUNGER_DRAIN_INTERVAL_MILLIS = 4_000L;
     public static final int SPLEEF_HUNGER_DRAIN_PER_INTERVAL = 2;
@@ -542,13 +543,14 @@ public final class ArcadePortRules {
         return Math.round((playerYaw + 180.0F) / 90.0F) & 0x3;
     }
 
-    /** Reborn's vanilla size-4 explosion damage calculation, capped by its Explosion(50) condition. */
+    /** Vanilla 1.8 size-4 TNT entity damage, capped by Reborn's Explosion(50) condition. */
     public static double bombLobbersBlastDamage(double distanceToBoundingBox, double exposure) {
         if (!Double.isFinite(distanceToBoundingBox) || distanceToBoundingBox < 0.0D
-                || distanceToBoundingBox > BOMB_LOBBERS_EXPLOSION_SIZE) return 0.0D;
+                || distanceToBoundingBox > BOMB_LOBBERS_EXPLOSION_RADIUS) return 0.0D;
         double visible = Double.isFinite(exposure) ? Math.max(0.0D, Math.min(1.0D, exposure)) : 0.0D;
-        double impact = (1.0D - distanceToBoundingBox / BOMB_LOBBERS_EXPLOSION_SIZE) * visible;
-        double damage = ((impact * impact + impact) / 2.0D) * 8.0D * BOMB_LOBBERS_EXPLOSION_SIZE + 1.0D;
+        double impact = (1.0D - distanceToBoundingBox / BOMB_LOBBERS_EXPLOSION_RADIUS) * visible;
+        double damage = ((impact * impact + impact) / 2.0D)
+                * (7.0D * BOMB_LOBBERS_EXPLOSION_RADIUS) + 1.0D;
         return Math.max(0.0D, Math.min(BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE, damage));
     }
 
