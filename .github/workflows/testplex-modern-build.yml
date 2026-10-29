@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   build-modern-arcade:
@@ -111,3 +112,13 @@ jobs:
             echo "- Gameplay ports: Monster Maze/Snake plus 14 mechanics-first prototypes; in-game validation still required"
             echo "- Server deploy: intentionally not performed by this workflow"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-modern-hyperv:
+    name: Auto-deploy successful modern build to isolated Hyper-V
+    needs: build-modern-arcade
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' }}
+    uses: ./.github/workflows/deploy-testplex-modern-hyperv.yml
+    with:
+      deploy_to_modern_test_server: true
+      source_run_id: ${{ github.run_id }}
+    secrets: inherit
