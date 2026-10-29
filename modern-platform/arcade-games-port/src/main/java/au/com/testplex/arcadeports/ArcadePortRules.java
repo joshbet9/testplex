@@ -18,6 +18,29 @@ public final class ArcadePortRules {
     public static final double DRAGON_ESCAPE_BLOCK_RADIUS = 10.0D;
     /** Only discard effectively coincident markers; close BLACK markers are valid route steps. */
     public static final double DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE = 0.75D;
+    public static final String[] DRAGON_ESCAPE_BEACON_COLORS = {
+            "white", "red", "orange", "yellow", "lime", "green", "cyan",
+            "light-blue", "blue", "purple", "magenta", "pink"
+    };
+
+    public static String dragonEscapeMapStorageKey(String mapResource) {
+        if (mapResource == null || mapResource.isBlank()) return "";
+        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+                mapResource.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    public static String formatDragonEscapeTime(long millis) {
+        if (millis < 0L) return "--:--.---";
+        long minutes = millis / 60_000L;
+        long seconds = millis / 1_000L % 60L;
+        long ms = millis % 1_000L;
+        return String.format(java.util.Locale.ROOT, "%d:%02d.%03d", minutes, seconds, ms);
+    }
+
+    public static String formatDragonEscapeDelta(long deltaMillis) {
+        if (deltaMillis == 0L) return "0:00.000";
+        return (deltaMillis > 0L ? "+" : "-") + formatDragonEscapeTime(Math.abs(deltaMillis));
+    }
     public static final long RUNNER_BLOCK_DECAY_MILLIS = 600L;
     public static final long RUNNER_BLOCK_LIFETIME_MILLIS = 1_200L;
     public static final long RUNNER_LEAP_COOLDOWN_MILLIS = 8_000L;

@@ -1241,6 +1241,21 @@ class ArcadePortGameTest {
                 ArcadePortRules.dragonEscapeNextTntChargeAt(-1_000L) - (-1_000L));
     }
 
+    @Test void dragonEscapePersonalBestKeysAndRaceTimesAreStable() {
+        String key = ArcadePortRules.dragonEscapeMapStorageKey("source-maps/Dragon Escape/Map A.zip");
+        assertFalse(key.isBlank());
+        assertFalse(key.contains("/"));
+        assertFalse(key.contains("."));
+        assertEquals(key, ArcadePortRules.dragonEscapeMapStorageKey("source-maps/Dragon Escape/Map A.zip"));
+        assertEquals("", ArcadePortRules.dragonEscapeMapStorageKey(null));
+        assertEquals("0:00.000", ArcadePortRules.formatDragonEscapeTime(0L));
+        assertEquals("1:02.345", ArcadePortRules.formatDragonEscapeTime(62_345L));
+        assertEquals("--:--.---", ArcadePortRules.formatDragonEscapeTime(-1L));
+        assertEquals("+0:03.100", ArcadePortRules.formatDragonEscapeDelta(3_100L));
+        assertEquals("-0:01.250", ArcadePortRules.formatDragonEscapeDelta(-1_250L));
+        assertEquals("0:00.000", ArcadePortRules.formatDragonEscapeDelta(0L));
+    }
+
     @Test void dragonEscapeRouteOnlyDeduplicatesCoincidentWaypoints() {
         assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.0D));
         assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.5D));

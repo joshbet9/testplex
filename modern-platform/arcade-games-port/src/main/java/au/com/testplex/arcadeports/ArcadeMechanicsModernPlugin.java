@@ -167,6 +167,24 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
                 manager.selectKit(player, args[1]);
                 return true;
+            case "ghost":
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                manager.setDragonEscapeGhost(player, args.length > 1 ? args[1] : "toggle");
+                return true;
+            case "dragoncolor":
+            case "dragoncolour":
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                if (args.length < 2) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport dragoncolor <" + String.join("|", ArcadePortRules.DRAGON_ESCAPE_BEACON_COLORS) + ">");
+                    sender.sendMessage(ChatColor.GRAY + "Current beacon colour: " + manager.dragonEscapeBeaconColor(player.getUniqueId()));
+                } else manager.setDragonEscapeBeaconColor(player, args[1]);
+                return true;
             case "status":
                 sender.sendMessage(ChatColor.GOLD + "Modern Arcade ports: " + ChatColor.WHITE + manager.status());
                 return true;
@@ -183,6 +201,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join <game-id>" + ChatColor.GRAY + " — queue to join a multiplayer test");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a Bomb Lobbers, Bacon Brawl, Dragons, Micro Battles, One in the Quiver, Paintball, Runner, Spleef or Death Tag kit; use runnerkit-<kit> for Runner");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport ghost <on|off|toggle>" + ChatColor.GRAY + " — show or hide your Dragon Escape PB ghost");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport dragoncolor <colour>" + ChatColor.GRAY + " — set your Dragon Escape leader beacon colour");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport status" + ChatColor.GRAY + " — active game and queue counts");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport stop" + ChatColor.GRAY + " — operator reset");
                 sender.sendMessage(ChatColor.DARK_GRAY + "Cleared game IDs: " + manager.enabledGamesLabel());
