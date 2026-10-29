@@ -256,24 +256,6 @@ jobs:
           echo "Preflight passed: target is isolated, legacy Testplex is inactive, and memory/port checks passed."
           REMOTE_PREFLIGHT
 
-      - name: Restore legacy Testplex if modern deployment fails
-        if: ${{ failure() && steps.remote-preflight.outputs.legacy_was_active == 'true' }}
-        shell: bash
-        env:
-          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
-          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
-          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
-        run: |
-          set -euo pipefail
-          SSH_PORT="$HYPERV_SSH_PORT"
-          [[ -n "$SSH_PORT" ]] || SSH_PORT=22
-          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
-          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
-            -o BatchMode=yes -o StrictHostKeyChecking=yes
-            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
-            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
-          ssh "${ssh_opts[@]}" "$remote" 'set -euo pipefail; sudo -n systemctl stop testplex-modern.service 2>/dev/null || true; sudo -n systemctl start testplex-reborn.service; sudo -n systemctl is-active testplex-reborn.service'
-
       - name: Upload verified JARs to the isolated directory
         id: upload
         shell: bash
@@ -607,6 +589,24 @@ jobs:
           echo "Service: testplex-modern.service (disabled at boot by default)"
           echo "Endpoint, when the host's Tailscale/firewall routing allows it: 100.98.188.97:25568"
           echo "The legacy testplex-reborn.service and standalone Monster Maze units were not modified."
+
+      - name: Restore legacy Testplex if modern deployment fails
+        if: ${{ failure() && steps.remote-preflight.outputs.legacy_was_active == 'true' }}
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          SSH_PORT="$HYPERV_SSH_PORT"
+          [[ -n "$SSH_PORT" ]] || SSH_PORT=22
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
+          ssh "${ssh_opts[@]}" "$remote" 'set -euo pipefail; sudo -n systemctl stop testplex-modern.service 2>/dev/null || true; sudo -n systemctl start testplex-reborn.service; sudo -n systemctl is-active testplex-reborn.service'
 
       - name: Write deployment summary
         if: always()
