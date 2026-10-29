@@ -64,7 +64,8 @@ jobs:
           oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
           tags: tag:github-actions
-          ping: 100.98.188.97
+          # Reachability is verified by the subsequent strict SSH preflight.
+          # Tailscale ICMP ping can be blocked even when SSH is allowed, so do not gate deployment on ping.
 
       - name: Prepare SSH credentials
         shell: bash
