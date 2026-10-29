@@ -6,6 +6,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.UUID;
 
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -16,11 +17,14 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TNTPrimed;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.Cancellable;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.entity.ExplosionPrimeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.metadata.FixedMetadataValue;
 
@@ -79,6 +83,7 @@ public class BombLobbers extends TeamGame implements IThrown
 	private final Map<GameTeam, Location> _averageSpawns = new HashMap<>();
 	private final Map<TNTPrimed, BombToken> _tnt = new HashMap<>();
 	private final Map<Player, Double> _kills = new HashMap<>();
+	private final Map<UUID, Long> _lastTNTInput = new HashMap<>();
 
 	@SuppressWarnings("unchecked")
 	public BombLobbers(ArcadeManager manager)
@@ -232,15 +237,60 @@ public class BombLobbers extends TeamGame implements IThrown
 			return;
 		}
 
-
-		Player player = event.getPlayer();
-		ItemStack itemStack = player.getItemInHand();
-
-		if (!IsAlive(player) || itemStack == null || itemStack.getType() != Material.TNT)
+		if (event.getAction() != Action.LEFT_CLICK_AIR && event.getAction() != Action.LEFT_CLICK_BLOCK
+				&& event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK)
 		{
 			return;
 		}
 
+		throwTNT(event.getPlayer(), event);
+	}
+
+	/** Right-clicking an entity is delivered through a separate Bukkit event. */
+	@EventHandler(priority = EventPriority.HIGHEST)
+	public void throwTNTOnEntity(PlayerInteractEntityEvent event)
+	{
+		if (!IsLive())
+			return;
+
+		throwTNT(event.getPlayer(), event);
+	}
+
+	/**
+	 * Left-click attacks against players/entities do not reliably produce a
+	 * LEFT_CLICK_BLOCK/AIR interaction. A held TNT is a throw control in this
+	 * game, not a melee weapon, so convert the attack into one TNT throw.
+	 */
+	@EventHandler(priority = EventPriority.HIGHEST)
+	public void throwTNTOnAttack(EntityDamageByEntityEvent event)
+	{
+		if (!IsLive() || !(event.getDamager() instanceof Player))
+			return;
+
+		Player player = (Player) event.getDamager();
+		ItemStack item = player.getItemInHand();
+		if (!IsAlive(player) || item == null || item.getType() != Material.TNT)
+			return;
+
+		throwTNT(player, event);
+	}
+
+	private void throwTNT(Player player, Cancellable event)
+	{
+		ItemStack itemStack = player.getItemInHand();
+		if (!IsAlive(player) || itemStack == null || itemStack.getType() != Material.TNT)
+			return;
+
+		// An entity attack may be preceded by an interaction packet for the same
+		// click. Consume it once, but don't impose a gameplay cooldown on later throws.
+		long now = System.currentTimeMillis();
+		Long lastInput = _lastTNTInput.get(player.getUniqueId());
+		if (lastInput != null && now - lastInput.longValue() < 30L)
+		{
+			event.setCancelled(true);
+			return;
+		}
+		_lastTNTInput.put(player.getUniqueId(), now);
 		event.setCancelled(true);
 
 		UtilInv.remove(player, Material.TNT, (byte) 0, 1);
@@ -264,11 +314,8 @@ public class BombLobbers extends TeamGame implements IThrown
 		}
 
 		Manager.GetProjectile().AddThrow(tnt, player, this, -1L, true, true, false, true, .2F, canHit);
-
 		Manager.getPlugin().getServer().getPluginManager().callEvent(new TNTThrowEvent(player, tnt));
-
 		_tnt.put(tnt, new BombToken(player));
-
 		AddGems(player, 0.5, "TNT Thrown", true, true);
 	}
 
