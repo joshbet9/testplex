@@ -25,12 +25,16 @@ import java.util.Set;
 
 /** Simple modern inventory UI. Game-specific renderers are registered alongside each port. */
 public final class MenuService implements Listener {
-    private static final String PANEL_TITLE = "Modern Arcade | Game Panel";
-    private static final String COSMETICS_TITLE = "Modern Arcade | Cosmetics";
-    private static final String GAME_TITLE = "Modern Arcade | Game | ";
-    private static final String LINES_TITLE = "Modern Arcade | Lines | ";
-    private static final String OPTIONS_TITLE = "Modern Arcade | Options | ";
-    private static final String WINS_TITLE = "Modern Arcade | Win Effects | ";
+    private static final String PANEL_TITLE = "Game Panel";
+    private static final String SET_GAME_TITLE = "Set Game";
+    private static final String GAME_OPTIONS_TITLE = "Game Options";
+    private static final String CORE_COSMETICS_TITLE = "Cosmetics";
+    private static final String COSMETICS_TITLE = "Arcade Cosmetics | Games";
+    private static final String GAME_TITLE = "Arcade Cosmetics | Game | ";
+    private static final String LINES_TITLE = "Arcade Cosmetics | Feature | ";
+    private static final String OPTIONS_TITLE = "Arcade Cosmetics | Setting | ";
+    private static final String WINS_TITLE = "Arcade Cosmetics | Win Effects | ";
+    private static final int[] LEGACY_GAME_SLOTS = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
 
     private final JavaPlugin plugin;
     private final ArcadeCatalog catalog;
@@ -50,32 +54,47 @@ public final class MenuService implements Listener {
         optionKey = new NamespacedKey(plugin, "option-id");
     }
 
+    /** Legacy Game Panel geometry from Reborn's four-row MenuPage. */
     public void openGamePanel(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 54, PANEL_TITLE);
+        Inventory inventory = Bukkit.createInventory(null, 36, PANEL_TITLE);
+        inventory.setItem(4, makeItem(Material.BEACON,
+                ChatColor.GREEN + "" + ChatColor.BOLD + "Testplex Arcade Game Panel",
+                List.of(" ",
+                        ChatColor.YELLOW + "Players Online: " + ChatColor.WHITE + Bukkit.getOnlinePlayers().size(),
+                        ChatColor.YELLOW + "Players Max: " + ChatColor.WHITE + Bukkit.getMaxPlayers(),
+                        ChatColor.GRAY + "Use this panel to select games and maps.")));
+        panelButton(inventory, 10, Material.EMERALD_BLOCK, "Start Game", "panel-start");
+        panelButton(inventory, 19, Material.REDSTONE_BLOCK, "Stop Game", "panel-stop");
+        panelButton(inventory, 16, Material.LAVA_BUCKET, "Remove Player", "panel-remove");
+        panelButton(inventory, 12, Material.WRITABLE_BOOK, "Set Game", "panel-set-game");
+        panelButton(inventory, 21, Material.BOOK, "Edit Game Rotation", "panel-rotation");
+        panelButton(inventory, 14, Material.COMPARATOR, "Game Options", "panel-options");
+        panelButton(inventory, 25, Material.WATER_BUCKET, "Un-Remove Player", "panel-unremove");
+        player.openInventory(inventory);
+    }
+
+    private void panelButton(Inventory inventory, int slot, Material material, String label, String action) {
+        ItemStack item = makeItem(material, label, List.of(ChatColor.GRAY + "Click to open."));
+        mark(item, action, null, null, null);
+        inventory.setItem(slot, item);
+    }
+
+    private void openGameSelection(Player player, boolean rotation) {
+        Inventory inventory = Bukkit.createInventory(null, 54, rotation ? "Edit Game Rotation" : SET_GAME_TITLE);
         int slot = 0;
         for (GameDefinition game : catalog.getGames()) {
-            if (slot >= inventory.getSize()) break;
-            ItemStack item = makeItem(game.getIcon(), ChatColor.AQUA + game.getName(), List.of(
-                    ChatColor.GRAY + game.getDescription(),
-                    "",
-                    ChatColor.YELLOW + "Port status: " + game.getPortStatus().getDisplay(),
-                    ChatColor.DARK_GRAY + (game.isReadyForTest() ? "Ready for testing" : "Not yet playable")));
-            mark(item, "game", game, null, null);
-            inventory.setItem(slot++, item);
+            if (slot >= LEGACY_GAME_SLOTS.length) break;
+            boolean ready = "bacon-brawl".equals(game.getId())
+                    && Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern");
+            ItemStack item = makeItem(ready ? icon(game.getIcon()) : Material.BARRIER,
+                    (ready ? ChatColor.GREEN : ChatColor.RED) + game.getName(),
+                    List.of(ChatColor.GRAY + game.getDescription(),
+                            ChatColor.YELLOW + (ready ? "Left-click to select this game." : "Not enabled for 26.3 acceptance yet.")));
+            mark(item, rotation ? "panel-rotation-select" : "panel-game-select", game, null, null);
+            inventory.setItem(LEGACY_GAME_SLOTS[slot++], item);
         }
-        ItemStack stats = makeItem(Material.BOOK, ChatColor.AQUA + "Stats", List.of(
-                ChatColor.GRAY + "Review local Testplex acceptance results.",
-                ChatColor.YELLOW + "Click to open /stats."));
-        mark(stats, "open-stats", null, null, null);
-        inventory.setItem(45, stats);
-        ItemStack cosmetics = makeItem(Material.CHEST, ChatColor.LIGHT_PURPLE + "Cosmetics", List.of(
-                ChatColor.GRAY + "Browse Arcade-specific cosmetic preferences.",
-                ChatColor.YELLOW + "Click to open the cosmetics menu."));
-        mark(cosmetics, "open-cosmetics-home", null, null, null);
-        inventory.setItem(49, cosmetics);
-        ItemStack close = makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of());
-        mark(close, "close-panel", null, null, null);
-        inventory.setItem(53, close);
+        inventory.setItem(4, backItem("Go Back", "back-panel", null));
+        inventory.setItem(49, makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of()));
         player.openInventory(inventory);
     }
 
@@ -192,7 +211,11 @@ public final class MenuService implements Listener {
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         String title = ChatColor.stripColor(event.getView().getTitle());
-        if (title == null || !title.startsWith("Modern Arcade |")) return;
+        if (title == null || !(title.equals(PANEL_TITLE) || title.equals(SET_GAME_TITLE)
+                || title.equals("Edit Game Rotation") || title.equals(GAME_OPTIONS_TITLE)
+                || title.equals("Remove Player") || title.equals("Un-Remove Player")
+                || title.equals(CORE_COSMETICS_TITLE) || title.startsWith("Cosmetics | ")
+                || title.startsWith("Arcade Cosmetics |"))) return;
         event.setCancelled(true);
         if (event.getClickedInventory() == null || event.getClickedInventory() != event.getView().getTopInventory()) return;
 
@@ -205,7 +228,47 @@ public final class MenuService implements Listener {
         String optionId = meta.getPersistentDataContainer().get(optionKey, PersistentDataType.STRING);
         GameDefinition game = catalog.getGame(gameId);
 
-        if ("launch-game".equals(action) && game != null) {
+        if (PANEL_TITLE.equals(title)) {
+            if ("panel-set-game".equals(action)) openGameSelection(player, false);
+            else if ("panel-rotation".equals(action)) openGameSelection(player, true);
+            else if ("panel-options".equals(action)) {
+                player.sendMessage(ChatColor.YELLOW + "Modern game options are handled by the isolated test runtime.");
+            } else if ("panel-remove".equals(action) || "panel-unremove".equals(action)) {
+                player.sendMessage(ChatColor.YELLOW + "Player moderation is managed by the isolated server operator.");
+            } else if ("panel-start".equals(action)) {
+                if (!player.isOp() && !player.hasPermission("testplex.modern.admin")) {
+                    player.sendMessage(ChatColor.RED + "Operator permission required to start a game.");
+                } else {
+                    player.closeInventory();
+                    player.performCommand("arcadeport start "
+                            + plugin.getConfig().getString("game-panel.selected-game", "bacon-brawl"));
+                }
+            } else if ("panel-stop".equals(action)) {
+                if (!player.isOp() && !player.hasPermission("testplex.arcadeports.admin")) {
+                    player.sendMessage(ChatColor.RED + "Operator permission required to stop a game.");
+                } else {
+                    player.closeInventory();
+                    player.performCommand("arcadeport stop");
+                }
+            }
+        } else if ((SET_GAME_TITLE.equals(title) || "Edit Game Rotation".equals(title))
+                && ("panel-game-select".equals(action) || "panel-rotation-select".equals(action))) {
+            if (game == null) return;
+            if (!"bacon-brawl".equals(game.getId())
+                    || !Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern")) {
+                player.sendMessage(ChatColor.RED + game.getName() + " is not enabled for modern acceptance yet.");
+            } else {
+                plugin.getConfig().set("game-panel.selected-game", game.getId());
+                plugin.saveConfig();
+                player.closeInventory();
+                boolean autoStart = plugin.getConfig().getBoolean("test-options.game-auto-start", false);
+                player.performCommand("arcadeport " + (autoStart ? "play " : "join ") + game.getId());
+                player.sendMessage(ChatColor.GREEN + "Selected " + game.getName() + "."
+                        + (autoStart ? " Quick test start requested." : " Use Start Game in /gamepanel when players are queued."));
+            }
+        } else if ("back-panel".equals(action)) {
+            openGamePanel(player);
+        } else if ("launch-game".equals(action) && game != null) {
             String enginePlugin = null;
             String startCommand = null;
             if ("monster-maze".equals(game.getId())) {
