@@ -2558,6 +2558,30 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void breakBaconBlastTerrain(Session session, Location impact) {
+        if (impact == null || impact.getWorld() != session.world) return;
+        int radius = (int) Math.ceil(ArcadePortRules.BACON_BLAST_TERRAIN_RADIUS);
+        double radiusSquared = ArcadePortRules.BACON_BLAST_TERRAIN_RADIUS
+                * ArcadePortRules.BACON_BLAST_TERRAIN_RADIUS;
+        Block center = impact.getBlock();
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dy = -radius; dy <= radius; dy++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    double blockX = dx + center.getX() + 0.5D - impact.getX();
+                    double blockY = dy + center.getY() + 0.5D - impact.getY();
+                    double blockZ = dz + center.getZ() + 0.5D - impact.getZ();
+                    double distanceSquared = blockX * blockX + blockY * blockY + blockZ * blockZ;
+                    Block block = center.getRelative(dx, dy, dz);
+                    if (distanceSquared > radiusSquared
+                            || !ArcadePortRules.baconBlastShouldBreakBlock(block.getType(), distanceSquared)
+                            || block.getState() instanceof org.bukkit.block.Container) continue;
+                    session.baconOriginalBlocks.putIfAbsent(block, block.getBlockData().clone());
+                    block.setType(Material.AIR, false);
+                }
+            }
+        }
+    }
+
     private void handleBaconBrawlHit(Session session, Player attacker, Player target, String source) {
         if (active != session || attacker.equals(target)
                 || !session.alive.contains(attacker.getUniqueId())
@@ -4400,6 +4424,11 @@ public final class ArcadePortManager implements Listener {
             if (block != null && block.getWorld() == session.world) block.setBlockData(entry.getValue(), false);
         }
         session.deathTagOriginalLightBlocks.clear();
+        for (Map.Entry<Block, BlockData> entry : session.baconOriginalBlocks.entrySet()) {
+            Block block = entry.getKey();
+            if (block != null && block.getWorld() == session.world) block.setBlockData(entry.getValue(), false);
+        }
+        session.baconOriginalBlocks.clear();
         for (Entity entity : new ArrayList<>(session.entities)) if (entity != null && entity.isValid()) entity.remove();
         session.bombOwners.clear();
         session.bombLastLocations.clear();
@@ -5129,6 +5158,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && event.getEntity() instanceof Snowball bacon && session.entities.contains(bacon)) {
             Location impact = bacon.getLocation().clone();
+            breakBaconBlastTerrain(session, impact);
             Player target = null;
             if (event.getHitEntity() instanceof Player hitPlayer) {
                 target = hitPlayer;
@@ -6092,6 +6122,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> baconBabyAttackReadyAt = new HashMap<>();
         final Map<UUID, UUID> baconLastDamager = new HashMap<>();
         final Map<UUID, Long> baconLastDamagedAt = new HashMap<>();
+        final Map<Block, BlockData> baconOriginalBlocks = new LinkedHashMap<>();
         Scoreboard baconDisguiseScoreboard;
         Team baconDisguiseTeam;
         final Map<UUID, Team> baconPreviousNameTeams = new HashMap<>();
