@@ -2335,14 +2335,18 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void restoreBaconPlayerVisibilityForOwner(Session session, UUID ownerId, Player owner) {
+        Set<UUID> hiddenViewers = session.baconHiddenViewersByOwner.remove(ownerId);
+        if (hiddenViewers == null || owner == null || !owner.isOnline()) return;
+        for (UUID viewerId : hiddenViewers) {
+            Player viewer = Bukkit.getPlayer(viewerId);
+            if (viewer != null && viewer.isOnline()) viewer.showPlayer(plugin, owner);
+        }
+    }
+
     private void cleanupBaconPlayerVisibility(Session session) {
-        for (Map.Entry<UUID, Set<UUID>> entry : session.baconHiddenViewersByOwner.entrySet()) {
-            Player owner = session.players.get(entry.getKey());
-            if (owner == null || !owner.isOnline()) continue;
-            for (UUID viewerId : entry.getValue()) {
-                Player viewer = Bukkit.getPlayer(viewerId);
-                if (viewer != null && viewer.isOnline()) viewer.showPlayer(plugin, owner);
-            }
+        for (UUID ownerId : new ArrayList<>(session.baconHiddenViewersByOwner.keySet())) {
+            restoreBaconPlayerVisibilityForOwner(session, ownerId, session.players.get(ownerId));
         }
         session.baconHiddenViewersByOwner.clear();
     }
@@ -6119,6 +6123,7 @@ public final class ArcadePortManager implements Listener {
             clearBaconCloak(session, id);
             removeBaconBabyPig(session, id);
             removeBaconPlayerPig(session, id);
+            restoreBaconPlayerVisibilityForOwner(session, id, player);
             session.baconSlams.remove(id);
         }
         PlayerSnapshot snapshot = session.snapshots.get(id);
