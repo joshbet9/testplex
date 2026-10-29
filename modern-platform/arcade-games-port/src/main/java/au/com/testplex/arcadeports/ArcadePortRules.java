@@ -647,19 +647,21 @@ public final class ArcadePortRules {
     }
 
     /**
-     * Reborn's EXPLOSION condition cancels the original event damage and replaces it with
-     * min(original event damage, 50). The ceiling is therefore a final damage cap, not a bonus.
-     * Vanilla emits no explosion damage event when the exposure-scaled impact is zero.
+     * Spigot 1.8.8 casts vanilla explosion damage to int using
+     * ((impact^2 + impact) / 2) * (8 * radius) + 1. Mineplex's EXPLOSION
+     * condition cancels the original value and replaces it with min(value, 50).
+     * Even zero exposure yields the vanilla minimum of 1 for an entity inside or on the radius.
      */
     public static double bombLobbersBlastDamage(double distanceToTarget, double exposure) {
         if (!Double.isFinite(distanceToTarget) || distanceToTarget < 0.0D
-                || distanceToTarget >= BOMB_LOBBERS_EXPLOSION_RADIUS) return 0.0D;
+                || distanceToTarget > BOMB_LOBBERS_EXPLOSION_RADIUS) return 0.0D;
         double visible = Double.isFinite(exposure) ? Math.max(0.0D, Math.min(1.0D, exposure)) : 0.0D;
         double impact = (1.0D - distanceToTarget / BOMB_LOBBERS_EXPLOSION_RADIUS) * visible;
-        if (impact <= 0.0D) return 0.0D;
         double vanillaDamage = ((impact * impact + impact) / 2.0D)
-                * (7.0D * BOMB_LOBBERS_EXPLOSION_RADIUS) + 1.0D;
-        return Math.min(vanillaDamage, BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE);
+                * (8.0D * BOMB_LOBBERS_EXPLOSION_RADIUS) + 1.0D;
+        // In v1_8_R3 Explosion.a(), damageEntity receives (float) ((int) rawDamage).
+        int legacyIntegerDamage = (int) vanillaDamage;
+        return Math.min(legacyIntegerDamage, BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE);
     }
 
     public static Material bombLobbersBlockAfterExplosion(Material material) {

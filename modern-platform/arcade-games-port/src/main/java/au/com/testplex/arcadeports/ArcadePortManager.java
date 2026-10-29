@@ -7877,7 +7877,9 @@ public final class ArcadePortManager implements Listener {
                 for (Player target : alivePlayers(session)) {
                     // Vanilla 1.8 evaluates explosion intensity at the entity's head position;
                     // block density is still sampled over the complete bounding box.
-                    double distance = target.getEyeLocation().distance(blast);
+                    // v1_8_R3 uses Entity.f(x,y,z) (the entity's base position) for
+                    // radial damage; the head height is used only for the knockback direction.
+                    double distance = target.getLocation().distance(blast);
                     if (distance <= ArcadePortRules.BOMB_LOBBERS_EXPLOSION_RADIUS) {
                         blastExposure.put(target.getUniqueId(), bombLobbersBlastExposure(blast, target));
                     }
@@ -7901,9 +7903,7 @@ public final class ArcadePortManager implements Listener {
             session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
             for (Player target : alivePlayers(session)) {
                 // Reborn applies its nearby-player explosion condition without team filtering.
-                double distance = bombLobbersBlast
-                        ? target.getEyeLocation().distance(blast)
-                        : target.getLocation().distance(blast);
+                double distance = target.getLocation().distance(blast);
                 double radius = bombLobbersBlast ? ArcadePortRules.BOMB_LOBBERS_EXPLOSION_RADIUS : 8.0D;
                 if (distance > radius) continue;
                 double exposure = bombLobbersBlast
