@@ -177,6 +177,10 @@ public final class ArcadePortRules {
     public static boolean shouldAwardBombLobbersTwoBirdsOneStone(int killsFromOneTnt) {
         return killsFromOneTnt >= BOMB_LOBBERS_TWO_BIRDS_KILLS;
     }
+    public static int nextBombLobbersTntKillCount(int currentKills, boolean creditedKill) {
+        int current = Math.max(0, currentKills);
+        return creditedKill ? Math.min(64, current + 1) : current;
+    }
     public static boolean shouldAwardBombLobbersTeamPlayer(int assistsThisGame) {
         return assistsThisGame >= BOMB_LOBBERS_TEAM_PLAYER_ASSISTS;
     }

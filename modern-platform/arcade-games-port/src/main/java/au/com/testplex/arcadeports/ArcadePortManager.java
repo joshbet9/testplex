@@ -5676,6 +5676,7 @@ public final class ArcadePortManager implements Listener {
         session.bombCreatedAt.clear();
         session.bombPrimed.clear();
         session.bombDirectHitResolved.clear();
+        session.bombKillsByTnt.clear();
         session.bombTeamSpawnCentres.clear();
         session.bombCompassMenuTargets.clear();
         session.bombSpectateNextTeleportAt.clear();
@@ -5835,10 +5836,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void recordBombLobbersAchievements(Session session, Player winner) {
-        for (Map.Entry<UUID, Integer> entry : session.scores.entrySet()) {
+        for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             UUID id = entry.getKey();
-            Player player = session.players.get(id);
-            if (ArcadePortRules.shouldAwardBombLobbersUltimateKiller(entry.getValue())) {
+            Player player = entry.getValue();
+            if (ArcadePortRules.shouldAwardBombLobbersUltimateKiller(session.scores.getOrDefault(id, 0))) {
                 awardBombLobbersAchievement(player, BombLobbersAchievement.ULTIMATE_KILLER.configKey(id),
                         "Ultimate Killer — 5 kills in one game.");
             }
@@ -5848,30 +5849,36 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (winner == null) return;
-        UUID winnerId = winner.getUniqueId();
-        boolean winnerAlive = session.alive.contains(winnerId);
-        if (ArcadePortRules.shouldAwardBombLobbersDoubleJump(true, winnerAlive,
-                session.bombDoubleJumpUsed.contains(winnerId))) {
-            awardBombLobbersAchievement(winner, BombLobbersAchievement.WHATS_A_DOUBLE_JUMP.configKey(winnerId),
-                    "What's a double jump? — won without double jumping while alive.");
-        }
-        if (winnerAlive && bombLobbersAliveTeammates(session, winnerId) == 1
-                && session.bombMvpPressurePlayers.contains(winnerId)) {
-            awardBombLobbersAchievement(winner, BombLobbersAchievement.THE_MVP.configKey(winnerId),
-                    "The MVP — won after surviving alone against at least 3 opponents.");
-        }
-        if ("armorer".equals(session.bombLobbersKits.getOrDefault(winnerId, "jumper"))) {
-            awardBombLobbersAchievement(winner, BombLobbersAchievement.BLAST_PROOF.configKey(winnerId),
-                    "Blast Proof — won as the Armorer.");
-        }
-        if (!session.bombPlayersDamaged.contains(winnerId)) {
-            awardBombLobbersAchievement(winner, BombLobbersAchievement.JELLY_SKIN.configKey(winnerId),
-                    "Jelly Skin — won without taking damage.");
-        }
-        int wins = plugin.getConfig().getInt(localStatsPath(winnerId, ArcadePortGame.BOMB_LOBBERS.id()) + "wins", 0);
-        if (ArcadePortRules.shouldAwardBombLobbersMasterBomber(wins)) {
-            awardBombLobbersAchievement(winner, BombLobbersAchievement.MASTER_BOMBER.configKey(winnerId),
-                    "Master Bomber — won 30 Bomb Lobbers games.");
+        int winningTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
+        for (UUID winnerId : new HashSet<>(session.alive)) {
+            if (session.teams.getOrDefault(winnerId, -2) != winningTeam) continue;
+            Player winningPlayer = session.players.get(winnerId);
+            if (winningPlayer == null) continue;
+            if (ArcadePortRules.shouldAwardBombLobbersDoubleJump(true, true,
+                    session.bombDoubleJumpUsed.contains(winnerId))) {
+                awardBombLobbersAchievement(winningPlayer,
+                        BombLobbersAchievement.WHATS_A_DOUBLE_JUMP.configKey(winnerId),
+                        "What's a double jump? — won without double jumping while alive.");
+            }
+            if (bombLobbersAliveTeammates(session, winnerId) == 1
+                    && session.bombMvpPressurePlayers.contains(winnerId)) {
+                awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.THE_MVP.configKey(winnerId),
+                        "The MVP — won after surviving alone against at least 3 opponents.");
+            }
+            if ("armorer".equals(session.bombLobbersKits.getOrDefault(winnerId, "jumper"))) {
+                awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.BLAST_PROOF.configKey(winnerId),
+                        "Blast Proof — won as the Armorer.");
+            }
+            if (!session.bombPlayersDamaged.contains(winnerId)) {
+                awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.JELLY_SKIN.configKey(winnerId),
+                        "Jelly Skin — won without taking damage.");
+            }
+            int wins = plugin.getConfig().getInt(
+                    localStatsPath(winnerId, ArcadePortGame.BOMB_LOBBERS.id()) + "wins", 0);
+            if (ArcadePortRules.shouldAwardBombLobbersMasterBomber(wins)) {
+                awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.MASTER_BOMBER.configKey(winnerId),
+                        "Master Bomber — won 30 Bomb Lobbers games.");
+            }
         }
     }
 
@@ -5897,6 +5904,7 @@ public final class ArcadePortManager implements Listener {
     private void recordLocalStats(Session session, Player winner, boolean completed) {
         if (!completed) return;
         UUID winnerId = winner == null ? null : winner.getUniqueId();
+        int winningTeam = winnerId == null ? -1 : session.teams.getOrDefault(winnerId, -1);
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             UUID id = entry.getKey();
             String path = localStatsPath(id, session.type.id());
@@ -5909,7 +5917,10 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().set(path + "knockouts",
                         plugin.getConfig().getInt(path + "knockouts", 0) + 1);
             }
-            if (winnerId != null && winnerId.equals(id)) {
+            boolean won = winnerId != null && (winnerId.equals(id)
+                    || (session.type == ArcadePortGame.BOMB_LOBBERS && session.alive.contains(id)
+                        && session.teams.getOrDefault(id, -2) == winningTeam));
+            if (won) {
                 plugin.getConfig().set(path + "wins",
                         plugin.getConfig().getInt(path + "wins", 0) + 1);
             }
@@ -8193,7 +8204,14 @@ public final class ArcadePortManager implements Listener {
                     plugin.getConfig().set(directHitsPath, plugin.getConfig().getInt(directHitsPath, 0) + 1);
                 }
                 if (target.getHealth() <= directHitDamage) {
-                    eliminate(session, target, session.alive.contains(ownerId) ? owner : null, "was directly hit by TNT");
+                    int killsFromThisTnt = session.bombKillsByTnt.merge(bombId, 1, Integer::sum);
+                    if (ArcadePortRules.shouldAwardBombLobbersTwoBirdsOneStone(killsFromThisTnt)
+                            && owner != null && owner.isOnline() && session.players.containsKey(ownerId)) {
+                        awardBombLobbersAchievement(owner, BombLobbersAchievement.TWO_BIRDS_ONE_STONE.configKey(ownerId),
+                                "Two birds, one stone — killed 2 players with one TNT.");
+                    }
+                    eliminate(session, target, owner != null && owner.isOnline() && session.players.containsKey(ownerId)
+                            ? owner : null, "was directly hit by TNT");
                 } else {
                     target.setHealth(target.getHealth() - directHitDamage);
                 }
@@ -8267,6 +8285,7 @@ public final class ArcadePortManager implements Listener {
         session.bombCreatedAt.remove(bombId);
         session.bombPrimed.remove(bombId);
         session.bombDirectHitResolved.remove(bombId);
+        session.bombKillsByTnt.remove(bombId);
     }
 
     private boolean isBombTouchingAnyBlock(TNTPrimed bomb) {
@@ -8445,6 +8464,7 @@ public final class ArcadePortManager implements Listener {
 
         UUID bombId = bomb.getUniqueId();
         UUID ownerId = session.bombOwners.get(bombId);
+        int priorTntKills = session.bombKillsByTnt.getOrDefault(bombId, 0);
         boolean bombLobbersBlast = session.type == ArcadePortGame.BOMB_LOBBERS;
         boolean evolutionBlast = session.type == ArcadePortGame.EVOLUTION
                 && ownerId != null && session.evolutionLevels.getOrDefault(ownerId, 0) == 3;
@@ -8499,7 +8519,7 @@ public final class ArcadePortManager implements Listener {
             bomb.remove();
             session.world.spawnParticle(Particle.EXPLOSION, blast, 1, 0.0D, 0.0D, 0.0D, 0.0D);
             session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
-            int killsFromThisTnt = 0;
+            int killsFromThisTnt = priorTntKills;
             for (Player target : alivePlayers(session)) {
                 // Reborn applies its nearby-player explosion condition without team filtering.
                 double distance = target.getLocation().distance(blast);
@@ -8533,16 +8553,17 @@ public final class ArcadePortManager implements Listener {
                         recordBombLobbersDamage(session, target, ownerId, System.currentTimeMillis());
                     }
                     if (target.getHealth() <= blastDamage) {
-                        if (bombLobbersBlast && owner != null && owner.isOnline() && session.alive.contains(ownerId)
-                                && !target.getUniqueId().equals(ownerId)) {
-                            killsFromThisTnt++;
+                        if (bombLobbersBlast && owner != null && owner.isOnline()
+                                && session.players.containsKey(ownerId) && !target.getUniqueId().equals(ownerId)) {
+                            killsFromThisTnt = ArcadePortRules.nextBombLobbersTntKillCount(killsFromThisTnt, true);
                             if (ArcadePortRules.shouldAwardBombLobbersTwoBirdsOneStone(killsFromThisTnt)) {
                                 awardBombLobbersAchievement(owner,
                                         BombLobbersAchievement.TWO_BIRDS_ONE_STONE.configKey(ownerId),
                                         "Two birds, one stone — killed 2 players with one TNT.");
                             }
                         }
-                        eliminate(session, target, owner != null && session.alive.contains(ownerId) ? owner : null, "was caught in a TNT blast");
+                        eliminate(session, target, owner != null && owner.isOnline() && session.players.containsKey(ownerId)
+                                ? owner : null, "was caught in a TNT blast");
                         if (active != session) return;
                     } else {
                         target.setHealth(target.getHealth() - blastDamage);
@@ -8681,6 +8702,7 @@ public final class ArcadePortManager implements Listener {
         final Map<Sheep, UUID> sheepCarriers = new LinkedHashMap<>();
         final Set<Entity> entities = new HashSet<>();
         final Map<UUID, UUID> bombOwners = new HashMap<>();
+        final Map<UUID, Integer> bombKillsByTnt = new HashMap<>();
         final Map<UUID, Location> bombLastLocations = new HashMap<>();
         final Map<UUID, Long> bombCreatedAt = new HashMap<>();
         final Set<UUID> bombPrimed = new HashSet<>();

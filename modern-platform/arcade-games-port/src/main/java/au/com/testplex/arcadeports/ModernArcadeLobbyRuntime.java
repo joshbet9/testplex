@@ -517,26 +517,68 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
     /** Fallback for clients/plugins that suppress the normal entity-damage event for NPC targets. */
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=false)
-    public void onBotAttackSwing(PlayerAnimationEvent event){
-        if(!"ARM_SWING".equals(event.getAnimationType().name()))return;
-        Player attacker=event.getPlayer();
-        if(!manager.isActiveGame(attacker.getWorld(),ArcadePortGame.BACON_BRAWL))return;
-        long now=System.currentTimeMillis();java.util.UUID id=attacker.getUniqueId();
-        if(now-lastBotSwingAtByAttacker.getOrDefault(id,0L)<120L)return;
-        lastBotSwingAtByAttacker.put(id,now);
-        if(now-lastBotHitAtByAttacker.getOrDefault(id,0L)<180L)return;
-        Location eye=attacker.getEyeLocation();Vector direction=eye.getDirection();
-        var result=attacker.getWorld().rayTraceEntities(eye,direction,3.8D,0.45D,
-                candidate->candidate instanceof LivingEntity && candidate.getPersistentDataContainer().has(botKey,PersistentDataType.STRING));
-        if(result==null||!(result.getHitEntity() instanceof LivingEntity actor)||!attacker.hasLineOfSight(actor))return;
-        String key=actor.getPersistentDataContainer().get(botKey,PersistentDataType.STRING);Bot b=key==null?null:bots.get(key);
-        if(b==null||!b.inGame||actor.getWorld()!=attacker.getWorld())return;
-        Bukkit.getScheduler().runTaskLater(plugin,()->{
-            if(!attacker.isOnline()||!actor.isValid()||!manager.isActiveGame(actor.getWorld(),ArcadePortGame.BACON_BRAWL))return;
-            if(System.currentTimeMillis()-lastBotHitAtByAttacker.getOrDefault(id,0L)<250L)return;
-            if(attacker.getLocation().distanceSquared(actor.getLocation())>16.0D||!attacker.hasLineOfSight(actor))return;
-            applyBotHit(b,actor,attacker,2.0D);
-        },1L);
+    public void onBotAttackSwing(PlayerAnimationEvent event) {
+        if (!"ARM_SWING".equals(event.getAnimationType().name())) return;
+        registerBotHitFromSwing(event.getPlayer());
+    }
+
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=false)
+    public void onBotLeftClick(PlayerInteractEvent event) {
+        if (event.getAction() != Action.LEFT_CLICK_AIR && event.getAction() != Action.LEFT_CLICK_BLOCK) return;
+        registerBotHitFromSwing(event.getPlayer());
+    }
+
+    private void registerBotHitFromSwing(Player attacker) {
+        if (attacker == null || !attacker.isOnline()
+                || !manager.isActiveGame(attacker.getWorld(), ArcadePortGame.BACON_BRAWL)) return;
+        long now = System.currentTimeMillis();
+        java.util.UUID id = attacker.getUniqueId();
+        if (now - lastBotSwingAtByAttacker.getOrDefault(id, 0L) < 100L
+                || now - lastBotHitAtByAttacker.getOrDefault(id, 0L) < 180L) return;
+
+        Location eye = attacker.getEyeLocation();
+        Vector direction = eye.getDirection().normalize();
+        LivingEntity actor = null;
+        var ray = attacker.getWorld().rayTraceEntities(eye, direction, 4.25D, 0.9D,
+                candidate -> candidate instanceof LivingEntity
+                        && candidate.getPersistentDataContainer().has(botKey, PersistentDataType.STRING));
+        if (ray != null && ray.getHitEntity() instanceof LivingEntity hit
+                && attacker.hasLineOfSight(hit)) actor = hit;
+
+        if (actor == null) {
+            double bestAlong = Double.POSITIVE_INFINITY;
+            for (Entity candidate : attacker.getWorld().getNearbyEntities(
+                    eye, 4.25D, 4.25D, 4.25D,
+                    entity -> entity instanceof LivingEntity
+                            && entity.getPersistentDataContainer().has(botKey, PersistentDataType.STRING))) {
+                if (!(candidate instanceof LivingEntity living) || !attacker.hasLineOfSight(candidate)) continue;
+                Vector delta = living.getBoundingBox().getCenter().subtract(eye.toVector());
+                double along = delta.dot(direction);
+                if (along < 0.0D || along > 4.25D || along >= bestAlong) continue;
+                Vector nearest = eye.toVector().add(direction.clone().multiply(along));
+                if (living.getBoundingBox().getCenter().distanceSquared(nearest) <= 1.35D * 1.35D) {
+                    actor = living;
+                    bestAlong = along;
+                }
+            }
+        }
+        if (actor == null) return;
+        String key = actor.getPersistentDataContainer().get(botKey, PersistentDataType.STRING);
+        Bot bot = key == null ? null : bots.get(key);
+        if (bot == null || actor.getWorld() != attacker.getWorld()) return;
+
+        lastBotSwingAtByAttacker.put(id, now);
+        LivingEntity target = actor;
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!attacker.isOnline() || !target.isValid()
+                    || target.getWorld() != attacker.getWorld()
+                    || !manager.isActiveGame(target.getWorld(), ArcadePortGame.BACON_BRAWL)
+                    || System.currentTimeMillis() - lastBotHitAtByAttacker.getOrDefault(id, 0L) < 250L
+                    || attacker.getLocation().distanceSquared(target.getLocation()) > 20.25D
+                    || !attacker.hasLineOfSight(target)) return;
+            bot.inGame = true;
+            applyBotHit(bot, target, attacker, 2.0D);
+        }, 1L);
     }
 
     private void applyBotHit(Bot bot,LivingEntity actor,Player attacker,double rawDamage){
