@@ -5695,6 +5695,7 @@ public final class ArcadePortManager implements Listener {
             if (entity != null && entity.isValid()) entity.remove();
         }
         session.bombOwners.clear();
+        session.bombLastThrowAt.clear();
         session.bombLastLocations.clear();
         session.bombCreatedAt.clear();
         session.bombPrimed.clear();
@@ -6919,6 +6920,23 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
         if (session.type == ArcadePortGame.BOMB_LOBBERS
+                && event instanceof EntityDamageByEntityEvent byEntity
+                && byEntity.getDamager() instanceof Player attacker) {
+            long lastThrow = session.bombLastThrowAt.getOrDefault(attacker.getUniqueId(), 0L);
+            if (lastThrow > 0L && System.currentTimeMillis() - lastThrow < 180L) {
+                // The left-click interaction already threw and consumed TNT.
+                event.setCancelled(true);
+                return;
+            }
+            ItemStack held = attacker.getInventory().getItemInMainHand();
+            if (held != null && held.getType() == Material.TNT) {
+                // Left-clicking an entity is delivered as damage, not an interact event.
+                event.setCancelled(true);
+                throwBombLobbersTnt(session, attacker);
+                return;
+            }
+        }
+        if (session.type == ArcadePortGame.BOMB_LOBBERS
                 && event.getEntity() instanceof Player bombTarget
                 && session.players.containsKey(bombTarget.getUniqueId())) {
             if (event instanceof EntityDamageByEntityEvent byEntity
@@ -7519,34 +7537,25 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
-        if ((session.type == ArcadePortGame.BOMB_LOBBERS || (session.type == ArcadePortGame.EVOLUTION
-                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 3))
-                && item == Material.TNT
-                && (session.type == ArcadePortGame.BOMB_LOBBERS
-                    ? ArcadePortRules.shouldThrowBombLobbersOnAction(
-                        event.getAction() == org.bukkit.event.block.Action.PHYSICAL)
-                    : event.getAction().isLeftClick())) {
+        if (session.type == ArcadePortGame.BOMB_LOBBERS && item == Material.TNT) {
             event.setCancelled(true);
-            if (session.type == ArcadePortGame.BOMB_LOBBERS) {
-                String throwsPath = localStatsPath(player.getUniqueId(), "bomb-lobbers") + "thrown";
-                plugin.getConfig().set(throwsPath, plugin.getConfig().getInt(throwsPath, 0) + 1);
-            }
+            throwBombLobbersTnt(session, player);
+            return;
+        }
+        if (session.type == ArcadePortGame.EVOLUTION && item == Material.TNT
+                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 3
+                && event.getAction().isLeftClick()) {
+            event.setCancelled(true);
             consumeHeld(player);
             Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.0D));
             TNTPrimed bomb = session.world.spawn(spawn, TNTPrimed.class);
             bomb.setFuseTicks(ArcadePortRules.BOMB_LOBBERS_FUSE_TICKS);
-            double pitchVelocity = "pitcher".equals(session.bombLobbersKits.get(player.getUniqueId()))
-                    ? ArcadePortRules.bombLobbersPitchVelocity(session.bombPitchLevels.getOrDefault(player.getUniqueId(), 2))
-                    : 2.0D;
-            Vector velocity = player.getLocation().getDirection().normalize().multiply(pitchVelocity);
-            velocity.setY(velocity.getY() + 0.1D);
-            bomb.setVelocity(velocity);
+            bomb.setVelocity(player.getLocation().getDirection().normalize().multiply(2.0D).setY(
+                    player.getLocation().getDirection().getY() * 2.0D + 0.1D));
             session.entities.add(bomb);
             session.bombOwners.put(bomb.getUniqueId(), player.getUniqueId());
             session.bombLastLocations.put(bomb.getUniqueId(), spawn.clone());
             session.bombCreatedAt.put(bomb.getUniqueId(), System.currentTimeMillis());
-            session.bombPrimed.remove(bomb.getUniqueId());
-            // The native TNTPrimed entity already plays the legacy fuse sound; do not add a second throw sound.
         } else if (session.type == ArcadePortGame.EVOLUTION
                 && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 1 && item == Material.FIRE_CHARGE) {
             event.setCancelled(true);
@@ -7614,6 +7623,42 @@ public final class ArcadePortManager implements Listener {
         if (held.getType().isAir()) return;
         if (held.getAmount() <= 1) player.getInventory().setItemInMainHand(null);
         else held.setAmount(held.getAmount() - 1);
+    }
+
+    /**
+     * Some Bukkit right-click inputs target an entity and never raise PlayerInteractEvent.
+     * Route those clicks through the exact same Bacon ability / Bomb Lobbers control paths.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onArcadeEntityInteract(PlayerInteractEntityEvent event) {
+        if (event.getHand() != EquipmentSlot.HAND) return;
+        Session session = active;
+        if (session == null) return;
+        Player player = event.getPlayer();
+        if (!session.alive.contains(player.getUniqueId())) return;
+        ItemStack held = player.getInventory().getItemInMainHand();
+        Material item = held == null ? Material.AIR : held.getType();
+
+        if (session.type == ArcadePortGame.BACON_BRAWL && item == Material.IRON_AXE) {
+            String kit = session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo");
+            if (ArcadePortRules.shouldActivateBaconBrawlAbility(true, item, false, kit)) {
+                event.setCancelled(true);
+                useBaconBrawlAbility(session, player, System.currentTimeMillis());
+            }
+            return;
+        }
+
+        if (session.type != ArcadePortGame.BOMB_LOBBERS) return;
+        if (item == Material.TNT) {
+            event.setCancelled(true);
+            throwBombLobbersTnt(session, player);
+            return;
+        }
+        if ("pitcher".equals(session.bombLobbersKits.getOrDefault(player.getUniqueId(), "jumper"))
+                && item == Material.LEVER) {
+            event.setCancelled(true);
+            adjustBombLobbersPitch(session, player, true);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -8358,6 +8403,52 @@ public final class ArcadePortManager implements Listener {
         return false;
     }
 
+    private void adjustBombLobbersPitch(Session session, Player player, boolean increase) {
+        UUID id = player.getUniqueId();
+        int current = session.bombPitchLevels.getOrDefault(id, 2);
+        current = increase ? Math.min(3, current + 1) : Math.max(1, current - 1);
+        session.bombPitchLevels.put(id, current);
+        ItemStack lever = namedItem(Material.LEVER, "Velocity Selector",
+                "Throw power " + current + "/3. Right-click +; left-click -.", current);
+        player.getInventory().setItem(1, lever);
+        player.updateInventory();
+        player.sendMessage(ChatColor.YELLOW + "TNT throw power: " + current + "/3.");
+    }
+
+    private boolean throwBombLobbersTnt(Session session, Player player) {
+        if (active != session || session.type != ArcadePortGame.BOMB_LOBBERS
+                || player == null || !player.isOnline()
+                || !session.alive.contains(player.getUniqueId())) return false;
+
+        long now = System.currentTimeMillis();
+        UUID ownerId = player.getUniqueId();
+        long lastThrow = session.bombLastThrowAt.getOrDefault(ownerId, 0L);
+        if (lastThrow > 0L && now - lastThrow < 180L) return true;
+
+        ItemStack held = player.getInventory().getItemInMainHand();
+        if (held == null || held.getType() != Material.TNT) return false;
+        session.bombLastThrowAt.put(ownerId, now);
+        String throwsPath = localStatsPath(ownerId, "bomb-lobbers") + "thrown";
+        plugin.getConfig().set(throwsPath, plugin.getConfig().getInt(throwsPath, 0) + 1);
+        consumeHeld(player);
+
+        Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.0D));
+        TNTPrimed bomb = session.world.spawn(spawn, TNTPrimed.class);
+        bomb.setFuseTicks(ArcadePortRules.BOMB_LOBBERS_FUSE_TICKS);
+        double pitchVelocity = "pitcher".equals(session.bombLobbersKits.get(ownerId))
+                ? ArcadePortRules.bombLobbersPitchVelocity(session.bombPitchLevels.getOrDefault(ownerId, 2))
+                : 2.0D;
+        Vector velocity = player.getLocation().getDirection().normalize().multiply(pitchVelocity);
+        velocity.setY(velocity.getY() + 0.1D);
+        bomb.setVelocity(velocity);
+        session.entities.add(bomb);
+        session.bombOwners.put(bomb.getUniqueId(), ownerId);
+        session.bombLastLocations.put(bomb.getUniqueId(), spawn.clone());
+        session.bombCreatedAt.put(bomb.getUniqueId(), now);
+        session.bombPrimed.remove(bomb.getUniqueId());
+        return true;
+    }
+
     private boolean handleBombLobbersKitInteract(Session session, Player player,
             PlayerInteractEvent event, ItemStack heldItem) {
         if (heldItem == null) return false;
@@ -8365,15 +8456,7 @@ public final class ArcadePortManager implements Listener {
         String kit = session.bombLobbersKits.getOrDefault(id, "jumper");
         if ("pitcher".equals(kit) && heldItem.getType() == Material.LEVER) {
             event.setCancelled(true);
-            int current = session.bombPitchLevels.getOrDefault(id, 2);
-            if (event.getAction().isRightClick()) current = Math.min(3, current + 1);
-            else if (event.getAction().isLeftClick()) current = Math.max(1, current - 1);
-            session.bombPitchLevels.put(id, current);
-            ItemStack lever = namedItem(Material.LEVER, "Velocity Selector",
-                    "Throw power " + current + "/3. Right-click +; left-click -.", current);
-            player.getInventory().setItem(1, lever);
-            player.updateInventory();
-            player.sendMessage(ChatColor.YELLOW + "TNT throw power: " + current + "/3.");
+            adjustBombLobbersPitch(session, player, event.getAction().isRightClick());
             return true;
         }
         if ("waller".equals(kit) && heldItem.getType() == Material.STONE_SHOVEL
@@ -8758,6 +8841,7 @@ public final class ArcadePortManager implements Listener {
         final Map<Sheep, UUID> sheepCarriers = new LinkedHashMap<>();
         final Set<Entity> entities = new HashSet<>();
         final Map<UUID, UUID> bombOwners = new HashMap<>();
+        final Map<UUID, Long> bombLastThrowAt = new HashMap<>();
         final Map<UUID, Integer> bombKillsByTnt = new HashMap<>();
         final Map<UUID, Location> bombLastLocations = new HashMap<>();
         final Map<UUID, Long> bombCreatedAt = new HashMap<>();
