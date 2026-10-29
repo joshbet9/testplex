@@ -2,3 +2,7 @@
 # Add the next game only after its source mechanics and unit/build checks are complete.
 enabled-games:
   - bacon-brawl
+
+# Named account allowed operator access on this isolated modern test server.
+admin-usernames:
+  - joshbet9

@@ -14,7 +14,7 @@ commands:
     aliases: [arcadestats]
   arcadeport:
     description: Start and test a modern Arcade mechanics prototype
-    usage: /arcadeport <play|join|start|kit|status|stop>
+    usage: /arcadeport <play|join|start|kit|maps|status|stop>
 permissions:
   testplex.arcadeports.admin:
     description: Allows stopping and resetting an Arcade prototype

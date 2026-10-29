@@ -497,6 +497,24 @@ public final class ArcadePortManager implements Listener {
         }, JOIN_WINDOW_TICKS);
     }
 
+    public void startFromLobby(ArcadePortGame type, org.bukkit.command.CommandSender sender) {
+        if (type == null) {
+            sender.sendMessage(ChatColor.RED + "Unknown game id.");
+            return;
+        }
+        if (!isGameEnabled(type)) {
+            sender.sendMessage(ChatColor.RED + type.displayName()
+                    + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
+            return;
+        }
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.isOnline() && lobby.isLobbyWorld(player.getWorld())) {
+                queues.computeIfAbsent(type.id(), ignored -> new LinkedHashMap<>()).put(player.getUniqueId(), player);
+            }
+        }
+        startQueued(type, sender instanceof Player ? (Player) sender : null, sender);
+    }
+
     public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender) {
         if (type == null) {
             sender.sendMessage(ChatColor.RED + "Unknown game id.");
@@ -506,6 +524,15 @@ public final class ArcadePortManager implements Listener {
             sender.sendMessage(ChatColor.RED + type.displayName()
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
+        }
+        if (SourceMapCatalog.hasMap(type)) {
+            String selectedResource = plugin.getConfig().getString("selected-maps." + type.id(),
+                    SourceMapCatalog.resourceFor(type));
+            if (!SourceMapCatalog.resourceFor(type).equals(selectedResource)) {
+                sender.sendMessage(ChatColor.RED + "The selected map is no longer installed for " + type.displayName()
+                        + ". Open Set Game and choose an installed map again.");
+                return;
+            }
         }
         if (active != null) {
             sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running: " + active.type.displayName() + ".");

