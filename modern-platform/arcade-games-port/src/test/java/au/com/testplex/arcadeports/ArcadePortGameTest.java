@@ -531,6 +531,14 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isBaconBlastNearPlayer(Double.NaN));
         assertFalse(ArcadePortRules.isBaconBlastNearPlayer(-1.0D));
 
+        assertTrue(ArcadePortRules.isBaconBlastBlockImpact(true, false, false, false));
+        assertTrue(ArcadePortRules.isBaconBlastBlockImpact(false, true, false, false));
+        assertTrue(ArcadePortRules.isBaconBlastBlockImpact(false, false, true, false));
+        assertTrue(ArcadePortRules.isBaconBlastBlockImpact(false, false, false, true),
+                "a stationary pork item touching a side wall must detonate");
+        assertFalse(ArcadePortRules.isBaconBlastBlockImpact(false, false, false, false),
+                "flying past the arena floor does not itself detonate the item");
+
         assertFalse(ArcadePortRules.shouldExpireBaconBlast(5_999L, 1_000L, false));
         assertTrue(ArcadePortRules.shouldExpireBaconBlast(6_000L, 1_000L, false));
         assertTrue(ArcadePortRules.shouldExpireBaconBlast(1_100L, 1_000L, true));
