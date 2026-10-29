@@ -3,7 +3,10 @@ package nautilus.game.arcade.game.games.lobbers.kits;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.Cancellable;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.inventory.ItemStack;
 
 import mineplex.core.common.util.F;
@@ -111,38 +114,59 @@ public class KitPitcher extends Kit
 	@EventHandler
 	public void changeFuse(PlayerInteractEvent event)
 	{
-		if (!Manager.GetGame().IsLive())
+		if (!UtilEvent.isAction(event, ActionType.R) && !UtilEvent.isAction(event, ActionType.L))
 			return;
 
-		if (!Manager.IsAlive(event.getPlayer()))
+		changeFuse(event.getPlayer(), event.getItem(), UtilEvent.isAction(event, ActionType.R), event);
+	}
+
+	@EventHandler
+	public void changeFuseOnEntity(PlayerInteractEntityEvent event)
+	{
+		changeFuse(event.getPlayer(), event.getPlayer().getItemInHand(), true, event);
+	}
+
+	@EventHandler
+	public void changeFuseOnAttack(EntityDamageByEntityEvent event)
+	{
+		if (!(event.getDamager() instanceof Player))
 			return;
 
-		if (!HasKit(event.getPlayer()))
+		Player player = (Player) event.getDamager();
+		changeFuse(player, player.getItemInHand(), false, event);
+	}
+
+	private void changeFuse(Player player, ItemStack heldItem, boolean increase, Cancellable event)
+	{
+		if (!Manager.GetGame().IsLive() || !Manager.IsAlive(player) || !HasKit(player))
 			return;
 
-		if (!UtilInv.IsItem(event.getItem(), Material.LEVER, (byte) 0))
+		if (!UtilInv.IsItem(heldItem, Material.LEVER, (byte) 0))
 			return;
 
-		int amount = event.getPlayer().getInventory().getItem(1).getAmount();
+		// The lever selects throw power, so clicking an entity should not punch or
+		// interact with it. Keep the 1/2/3 selector semantics unchanged.
+		event.setCancelled(true);
+		ItemStack selector = player.getInventory().getItem(1);
+		if (selector == null || selector.getType() != Material.LEVER)
+			return;
 
-		//Right
-		if (UtilEvent.isAction(event, ActionType.R))
+		int amount = selector.getAmount();
+		if (increase)
 		{
 			if (amount >= 3)
 				return;
 
-			UtilInv.insert(event.getPlayer(), new ItemBuilder(Material.LEVER).setTitle(F.item("Velocity Selector")).build());
-			UtilInv.Update(event.getPlayer());
+			UtilInv.insert(player, new ItemBuilder(Material.LEVER).setTitle(F.item("Velocity Selector")).build());
 		}
-		//Left
-		else if (UtilEvent.isAction(event, ActionType.L))
+		else
 		{
 			if (amount <= 1)
 				return;
 
-			UtilInv.remove(event.getPlayer(), Material.LEVER, (byte) 0, 1);
-			UtilInv.Update(event.getPlayer());
+			UtilInv.remove(player, Material.LEVER, (byte) 0, 1);
 		}
+		UtilInv.Update(player);
 	}
 
 	private double getVelocity(int amount)
