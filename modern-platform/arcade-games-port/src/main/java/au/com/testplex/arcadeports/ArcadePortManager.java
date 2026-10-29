@@ -1260,6 +1260,7 @@ public final class ArcadePortManager implements Listener {
                 String kit = session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo");
                 player.getInventory().setArmorContents(new ItemStack[4]);
                 player.getInventory().setItemInOffHand(null);
+                player.getInventory().setItem(0, new ItemStack(Material.IRON_AXE));
                 if ("mama-piggles".equals(kit)) {
                     player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 60, 1, false, false, false));
                 }
@@ -5327,6 +5328,11 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.BACON_BRAWL && event.getAction().isRightClick()) {
+            String kit = session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo");
+            boolean clickedUsableBlock = event.getClickedBlock() != null
+                    && event.getClickedBlock().getType().isInteractable();
+            if (!ArcadePortRules.shouldActivateBaconBrawlAbility(event.getAction().isRightClick(),
+                    item, clickedUsableBlock, kit)) return;
             event.setCancelled(true);
             useBaconBrawlAbility(session, player, System.currentTimeMillis());
             return;
@@ -5458,18 +5464,6 @@ public final class ArcadePortManager implements Listener {
                 || event.getCause() != PlayerTeleportEvent.TeleportCause.ENDER_PEARL
                 || !session.players.containsKey(event.getPlayer().getUniqueId())) return;
         event.setCancelled(true);
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onInteractBaconPig(PlayerInteractEntityEvent event) {
-        Session session = active;
-        Player player = event.getPlayer();
-        if (session == null || session.type != ArcadePortGame.BACON_BRAWL
-                || !(event.getRightClicked() instanceof Pig avatar)
-                || !session.baconPigOwners.containsKey(avatar.getUniqueId())
-                || !session.alive.contains(player.getUniqueId())) return;
-        event.setCancelled(true);
-        useBaconBrawlAbility(session, player, System.currentTimeMillis());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
