@@ -40,6 +40,12 @@ public final class ArcadePortRules {
     public static final long BACON_TIMED_HIT_OK_MAX_MILLIS = 499L;
     public static final long BACON_TIMED_HIT_LATE_MAX_MILLIS = 1_400L;
     public static final long BACON_HIT_FEEDBACK_MILLIS = 1_000L;
+    /** Reborn ends Sheep Pig Cloak on any accepted damage event, including fire ticks and explosions. */
+    public static boolean shouldEndBaconSheepCloakOnDamageCause(
+            org.bukkit.event.entity.EntityDamageEvent.DamageCause cause) {
+        return cause != null;
+    }
+
     /** Source Sheep Pig Cloak lasts five seconds; the requested meter scales its duration below that cap. */
     public static final long BACON_SHEEP_CLOAK_MIN_MILLIS = 500L;
     public static final long BACON_SHEEP_CLOAK_MAX_MILLIS = 5_000L;
