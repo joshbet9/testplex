@@ -1416,6 +1416,17 @@ class ArcadePortGameTest {
         assertEquals(10.0D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, -5.0D), 0.00001D);
     }
 
+    @Test void bombLobbersDirectHitCannotPassThroughTheFirstSolidBlock() {
+        assertTrue(ArcadePortRules.shouldResolveBombLobbersDirectHitBeforeBlock(4.0D, 9.0D));
+        assertTrue(ArcadePortRules.shouldResolveBombLobbersDirectHitBeforeBlock(9.0D, 9.0D));
+        assertFalse(ArcadePortRules.shouldResolveBombLobbersDirectHitBeforeBlock(9.01D, 9.0D));
+        assertTrue(ArcadePortRules.shouldResolveBombLobbersDirectHitBeforeBlock(
+                4.0D, Double.POSITIVE_INFINITY));
+        assertFalse(ArcadePortRules.shouldResolveBombLobbersDirectHitBeforeBlock(
+                Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY));
+        assertFalse(ArcadePortRules.shouldResolveBombLobbersDirectHitBeforeBlock(4.0D, Double.NaN));
+    }
+
     @Test void bombLobbersDirectHitUsesSourceExpandedTargetBoxAndSweptPath() {
         assertEquals(1.0D, ArcadePortRules.BOMB_LOBBERS_DIRECT_HIT_BOX_GROW, 0.00001D);
         var targetBox = new org.bukkit.util.BoundingBox(-0.3D, 0.0D, -0.3D, 0.3D, 1.8D, 0.3D);

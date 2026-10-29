@@ -7319,8 +7319,23 @@ public final class ArcadePortManager implements Listener {
             if (previous == null) previous = current;
             if (!bomb.isOnGround()) renderBombLobbersTrail(session, ownerId, previous, current);
 
-            // Reborn ray-tests the moving TNT segment against expanded target boxes and
-            // resolves the first collision along the flight, not whichever player is iterated first.
+            // Reborn ray-traces blocks first and clips entity collision to that first block hit.
+            // Without this, a swept bounding-box test can register direct hits through solid walls.
+            Location entitySweepEnd = current;
+            double blockHitDistanceSquared = Double.POSITIVE_INFINITY;
+            Vector segment = current.toVector().subtract(previous.toVector());
+            double segmentLength = segment.length();
+            if (Double.isFinite(segmentLength) && segmentLength > 1.0E-6D) {
+                org.bukkit.util.RayTraceResult blockHit = session.world.rayTraceBlocks(
+                        previous, segment.clone().multiply(1.0D / segmentLength), segmentLength,
+                        org.bukkit.FluidCollisionMode.NEVER, true);
+                if (blockHit != null && blockHit.getHitPosition() != null) {
+                    blockHitDistanceSquared = previous.toVector().distanceSquared(blockHit.getHitPosition());
+                    entitySweepEnd = blockHit.getHitPosition().toLocation(session.world);
+                }
+            }
+
+            // Pick the first enemy intersection before the first block, not the first player iteration.
             Player directTarget = null;
             double directHitDistanceSquared = Double.POSITIVE_INFINITY;
             if (ArcadePortRules.shouldCheckBombLobbersDirectHit(
@@ -7332,8 +7347,10 @@ public final class ArcadePortManager implements Listener {
                             session.teams.getOrDefault(ownerId, -1),
                             session.teams.getOrDefault(targetId, -1))) continue;
                     double hitDistanceSquared = ArcadePortRules.bombLobbersDirectHitDistanceSquared(
-                            previous, current, target.getBoundingBox());
-                    if (hitDistanceSquared < directHitDistanceSquared) {
+                            previous, entitySweepEnd, target.getBoundingBox());
+                    if (ArcadePortRules.shouldResolveBombLobbersDirectHitBeforeBlock(
+                            hitDistanceSquared, blockHitDistanceSquared)
+                            && hitDistanceSquared < directHitDistanceSquared) {
                         directTarget = target;
                         directHitDistanceSquared = hitDistanceSquared;
                     }

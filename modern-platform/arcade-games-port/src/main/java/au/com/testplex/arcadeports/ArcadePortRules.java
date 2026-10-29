@@ -643,6 +643,18 @@ public final class ArcadePortRules {
         return playerTeam >= 0 && nearestSpawnTeam >= 0 && playerTeam != nearestSpawnTeam;
     }
 
+    /**
+     * Source collision checks entities only up to the first block intersection on the TNT segment.
+     * Positive infinity means the ray did not hit a block; invalid entity distances never hit.
+     */
+    public static boolean shouldResolveBombLobbersDirectHitBeforeBlock(
+            double entityHitDistanceSquared, double blockHitDistanceSquared) {
+        if (!Double.isFinite(entityHitDistanceSquared) || entityHitDistanceSquared < 0.0D) return false;
+        if (blockHitDistanceSquared == Double.POSITIVE_INFINITY) return true;
+        return Double.isFinite(blockHitDistanceSquared) && blockHitDistanceSquared >= 0.0D
+                && entityHitDistanceSquared <= blockHitDistanceSquared;
+    }
+
     /** Mirrors the projectile wrapper returning after its first direct-hit callback. */
     public static boolean shouldCheckBombLobbersDirectHit(boolean alreadyHitThisFlight) {
         return !alreadyHitThisFlight;
