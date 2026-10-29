@@ -468,9 +468,23 @@ public final class ArcadePortRules {
         return !physicalAction;
     }
 
-    /** Mirrors UtilAction.velocity for the in-air, uncontrolled PerkDoubleJump used by these kits. */
+    /** Legacy PerkDoubleJump is recharged by Recharge.useForce(player, perkName, 50). */
+    public static final long BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS = 50L;
+
+    public static long nextBombLobbersDoubleJumpReadyAt(long nowMillis) {
+        if (nowMillis < 0L) return BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS;
+        if (nowMillis > Long.MAX_VALUE - BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS) return Long.MAX_VALUE;
+        return nowMillis + BOMB_LOBBERS_DOUBLE_JUMP_RECHARGE_MILLIS;
+    }
+
+    /** Mirrors UtilAction.velocity for PerkDoubleJump's view vector, Y cap, and optional ground boost. */
     public static org.bukkit.util.Vector bombLobbersDoubleJumpVelocity(
             org.bukkit.util.Vector lookDirection, double power) {
+        return bombLobbersDoubleJumpVelocity(lookDirection, power, false);
+    }
+
+    public static org.bukkit.util.Vector bombLobbersDoubleJumpVelocity(
+            org.bukkit.util.Vector lookDirection, double power, boolean grounded) {
         if (lookDirection == null || !Double.isFinite(power) || power <= 0.0D
                 || lookDirection.lengthSquared() <= 1.0E-12D) {
             return new org.bukkit.util.Vector(0.0D, 0.0D, 0.0D);
@@ -479,6 +493,7 @@ public final class ArcadePortRules {
         velocity.setY(power);
         velocity.normalize().multiply(power);
         if (velocity.getY() > power) velocity.setY(power);
+        if (grounded) velocity.setY(velocity.getY() + 0.2D);
         return velocity;
     }
 
