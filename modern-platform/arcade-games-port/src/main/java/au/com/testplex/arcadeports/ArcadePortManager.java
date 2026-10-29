@@ -465,10 +465,6 @@ public final class ArcadePortManager implements Listener {
         if (!sourceMapWorlds.contains(type.id())) buildArena(type, world);
         Session session = new Session(type, world, participants);
         active = session;
-        if (type == ArcadePortGame.BACON_BRAWL) {
-            setupBaconDisguiseNameTags(session, participants);
-            setupBaconMeterScoreboard(session);
-        }
         long now = System.currentTimeMillis();
         session.startedAt = now;
         session.endsAt = type == ArcadePortGame.BACON_BRAWL
@@ -652,6 +648,12 @@ public final class ArcadePortManager implements Listener {
             player.getInventory().clear();
             giveKit(session, player);
             session.lastLocations.put(player.getUniqueId(), spawn.clone());
+        }
+        if (type == ArcadePortGame.BACON_BRAWL) {
+            // Player snapshots already hold their pre-match scoreboards at this point.
+            // The meter and disguise teams now live only on this match's scoreboard.
+            setupBaconDisguiseNameTags(session, participants);
+            setupBaconMeterScoreboard(session);
         }
         if (type == ArcadePortGame.DEATH_TAG) {
             if (participants.size() > 1) {
@@ -2279,7 +2281,7 @@ public final class ArcadePortManager implements Listener {
      */
     private void setupBaconDisguiseNameTags(Session session, List<Player> participants) {
         if (Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
+        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
         String teamName = "bb" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         try {
             Team disguiseTeam = scoreboard.registerNewTeam(teamName);
@@ -2287,6 +2289,7 @@ public final class ArcadePortManager implements Listener {
             session.baconDisguiseScoreboard = scoreboard;
             session.baconDisguiseTeam = disguiseTeam;
             for (Player player : participants) {
+                player.setScoreboard(scoreboard);
                 String entry = player.getName();
                 Team previous = scoreboard.getEntryTeam(entry);
                 session.baconPreviousNameTeams.put(player.getUniqueId(), previous == disguiseTeam ? null : previous);
@@ -2344,7 +2347,13 @@ public final class ArcadePortManager implements Listener {
 
     private void setupBaconMeterScoreboard(Session session) {
         if (Bukkit.getScoreboardManager() == null) return;
-        Scoreboard scoreboard = Bukkit.getScoreboardManager().getMainScoreboard();
+        Scoreboard scoreboard = session.baconDisguiseScoreboard;
+        if (scoreboard == null) {
+            scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+            for (Player player : session.players.values()) {
+                if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
+            }
+        }
         session.baconMeterScoreboard = scoreboard;
         session.baconPreviousSidebar = scoreboard.getObjective(DisplaySlot.SIDEBAR);
         String objectiveName = "bbm" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
@@ -6813,6 +6822,7 @@ public final class ArcadePortManager implements Listener {
         final int food;
         final float saturation;
         final float walkSpeed;
+        final Scoreboard scoreboard;
         PlayerSnapshot(Player p) {
             location = p.getLocation().clone();
             inventory = cloneItems(p.getInventory().getContents());
@@ -6831,6 +6841,7 @@ public final class ArcadePortManager implements Listener {
             food = p.getFoodLevel();
             saturation = p.getSaturation();
             walkSpeed = p.getWalkSpeed();
+            scoreboard = p.getScoreboard();
         }
         void restore(Player p) {
             if (p == null || !p.isOnline()) return;
@@ -6848,6 +6859,7 @@ public final class ArcadePortManager implements Listener {
             p.setFoodLevel(food);
             p.setSaturation(saturation);
             p.setWalkSpeed(walkSpeed);
+            p.setScoreboard(scoreboard);
             p.setAllowFlight(allowFlight);
             var maxHealthAttribute = p.getAttribute(Attribute.MAX_HEALTH);
             if (maxHealthAttribute != null) maxHealthAttribute.setBaseValue(maxHealthBase);
