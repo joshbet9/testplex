@@ -9,7 +9,7 @@ This is a separate modern platform inside the Testplex repository. It does **not
 - Java **25**
 - Maven 3.9+
 
-The build uses Paper's official Maven repository and a version range for the current 26.3 stable API. The dedicated workflow is .github/workflows/testplex-modern-build.yml; it builds, tests, and publishes the plugin artifact only. It has no automatic server-deployment step.
+The build uses Paper's official Maven repository and a version range for the current 26.3 stable API. The dedicated workflow is `.github/workflows/testplex-modern-build.yml`; it builds, tests, and publishes the plugin artifact. A successful push to `feat/testplex-modern-26.3-platform` then automatically invokes `.github/workflows/deploy-testplex-modern-hyperv.yml` with the artifact from that same run. Pull requests and manually dispatched build-only runs do not auto-deploy. The isolated server uses `/home/monstermaze/servers/testplex-modern`, `testplex-modern.service`, and port `25568`; deployment refuses to run while legacy Testplex or standalone Monster Maze services are active.
 
 ## Current implementation
 
