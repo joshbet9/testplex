@@ -486,6 +486,20 @@ public final class ArcadePortRules {
         return velocity.add(explosionToTarget.clone().normalize().multiply(Math.min(1.0D, impact)));
     }
 
+    /** Mirrors UtilAction.velocity for the 2-D direction used by a Bomb Lobbers direct hit. */
+    public static org.bukkit.util.Vector bombLobbersDirectHitVelocity(
+            org.bukkit.util.Vector targetTrajectory, boolean grounded) {
+        if (targetTrajectory == null || targetTrajectory.lengthSquared() <= 1.0E-12D) {
+            return new org.bukkit.util.Vector(0.0D, 0.0D, 0.0D);
+        }
+        org.bukkit.util.Vector velocity = targetTrajectory.clone();
+        velocity.normalize().multiply(0.2D);
+        velocity.setY(velocity.getY() + 0.2D);
+        if (velocity.getY() > 0.4D) velocity.setY(0.4D);
+        if (grounded) velocity.setY(velocity.getY() + 0.2D);
+        return velocity;
+    }
+
     public static long bombLobbersCraftmanIntervalMillis(long liveMillis) {
         if (liveMillis <= 20_000L) return 8_000L;
         if (liveMillis <= 40_000L) return 7_000L;
