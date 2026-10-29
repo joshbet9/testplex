@@ -89,7 +89,7 @@ public final class ArcadePortRules {
     /** Ordinary Bacon Brawl hits use knockback; health loss is reserved for arena/environment hazards. */
     public static final boolean BACON_BRAWL_HITS_DAMAGE_HEALTH = false;
     /** Body Slam applies a second knockback component in addition to the game-wide knockback. */
-    public static final double BACON_BODY_SLAM_EXTRA_KNOCKBACK = 2.0D;
+    public static final double BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER = 2.0D;
 
     /** Bacon Blast is a thrown pork item that ends on impact or after five seconds in flight. */
     public static final long BACON_BLAST_MAX_FLIGHT_MILLIS = 5_000L;
@@ -346,7 +346,7 @@ public final class ArcadePortRules {
     }
 
     /** Pig's source passive is +250% knockback, i.e. 3.5 times the normal amount. */
-    public static final double BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER = 3.5D;
+    public static final double BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER = 2.5D;
     /** PerkBodySlam applies the existing BACON_BODY_SLAM_EXTRA_KNOCKBACK value as a multiplier. */
     public static double baconBrawlKnockbackMultiplier(boolean backstab) {
         return backstab ? BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER : 1.0D;
