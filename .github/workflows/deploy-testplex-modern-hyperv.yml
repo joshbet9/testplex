@@ -175,7 +175,8 @@ jobs:
           echo "stage_dir=$stage_dir" >> "$GITHUB_OUTPUT"
           echo "Verified four modern JARs ($SOURCE_SHA) and seven Monster Maze source worlds ($map_source_sha)"
 
-      - name: Validate isolated remote target and legacy downtime
+      - name: Validate isolated remote target and record legacy state
+        id: remote-preflight
         shell: bash
         env:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
@@ -192,6 +193,17 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
+
+          # Record whether this deploy needs to restore the legacy server if any
+          # later preflight, upload, or modern-server startup step fails.
+          legacy_state="$(ssh "${ssh_opts[@]}" "$remote" "sudo -n systemctl is-active testplex-reborn.service 2>/dev/null || true")"
+          [[ -n "$legacy_state" ]] || { echo "Cannot verify testplex-reborn.service state." >&2; exit 1; }
+          if [[ "$legacy_state" == "active" ]]; then
+            echo "legacy_was_active=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "legacy_was_active=false" >> "$GITHUB_OUTPUT"
+          fi
+
           ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_PREFLIGHT'
           set -euo pipefail
           sudo -n true
@@ -200,26 +212,13 @@ jobs:
             echo "Cannot verify testplex-reborn.service state; refusing deployment." >&2
             exit 1
           fi
-          if [[ "$legacy_state" == "active" ]]; then
-            echo "testplex-reborn.service is active. Stop it intentionally outside this workflow first; this workflow will never stop the legacy server." >&2
-            exit 1
-          fi
           for unit in monstermaze-18.service monstermaze-21.service; do
             state="$(sudo -n systemctl is-active "$unit" 2>/dev/null || true)"
             if [[ "$state" == "active" ]]; then
-              echo "$unit is active. Stop it intentionally outside this workflow first; this workflow will not stop legacy services." >&2
+              echo "$unit is active. Deployment will not stop or overwrite standalone Monster Maze services; stop them before deploying modern Testplex." >&2
               exit 1
             fi
           done
-          if pgrep -f '[s]pigot-1\.8\.8-1\.9-SNAPSHOT\.jar' >/dev/null 2>&1; then
-            echo "A legacy 1.8 Spigot process is still running outside systemd; refusing deployment." >&2
-            exit 1
-          fi
-          available_mb="$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)"
-          if [[ "$available_mb" -lt 2300 ]]; then
-            echo "Only $available_mb MB is available. This VM is too constrained for a safe Paper test deployment." >&2
-            exit 1
-          fi
           server_dir="/home/monstermaze/servers/testplex-modern"
           if [[ -L "$server_dir" ]]; then
             echo "Modern server directory must not be a symlink." >&2
@@ -235,8 +234,45 @@ jobs:
               exit 1
             fi
           fi
-          echo "Preflight passed: legacy services are inactive, target is isolated, and memory/port checks passed."
+          if [[ "$legacy_state" == "active" ]]; then
+            echo "Stopping testplex-reborn.service automatically to free memory for the modern Paper server."
+            sudo -n systemctl stop testplex-reborn.service
+            stopped=false
+            for attempt in $(seq 1 15); do
+              if ! sudo -n systemctl is-active --quiet testplex-reborn.service; then stopped=true; break; fi
+              sleep 2
+            done
+            [[ "$stopped" == "true" ]] || { echo "Legacy Testplex service did not stop cleanly." >&2; exit 1; }
+          fi
+          if pgrep -f '[s]pigot-1\.8\.8-1\.9-SNAPSHOT\.jar' >/dev/null 2>&1; then
+            echo "A legacy 1.8 Spigot process remains active outside systemd; refusing deployment." >&2
+            exit 1
+          fi
+          available_mb="$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)"
+          if [[ "$available_mb" -lt 2300 ]]; then
+            echo "Only $available_mb MB is available after stopping legacy Testplex. The VM is too constrained for safe Paper deployment." >&2
+            exit 1
+          fi
+          echo "Preflight passed: target is isolated, legacy Testplex is inactive, and memory/port checks passed."
           REMOTE_PREFLIGHT
+
+      - name: Restore legacy Testplex if modern deployment fails
+        if: ${{ failure() && steps.remote-preflight.outputs.legacy_was_active == 'true' }}
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          SSH_PORT="$HYPERV_SSH_PORT"
+          [[ -n "$SSH_PORT" ]] || SSH_PORT=22
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
+          ssh "${ssh_opts[@]}" "$remote" 'set -euo pipefail; sudo -n systemctl stop testplex-modern.service 2>/dev/null || true; sudo -n systemctl start testplex-reborn.service; sudo -n systemctl is-active testplex-reborn.service'
 
       - name: Upload verified JARs to the isolated directory
         id: upload
