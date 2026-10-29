@@ -21,6 +21,13 @@ This is the manual runtime checklist for the isolated Mineplex Reborn test serve
 | Watch from the second client | The equipped effect is visible to the other client as well as its owner. |
 | Choose nothing on a fresh player | Stock game visuals remain unchanged. |
 
+## Lobby cosmetic showcase coverage
+
+- Cycle through all 16 supported game types and confirm the lobby display changes to the selected game's showcase during Recruit and is removed before the map starts.
+- Bacon Brawl, Bomb Lobbers, Death Tag and Dragon Escape retain their dedicated previews. Every other game should show the choices/settings defined in the shared Arcade Cosmetics menu, including composite settings and the larger Monster Maze mob-set list.
+- Check that particles are visible from another client, the labels remain paired with the right item, and changing game or restarting the Arcade plugin leaves no stale showcase entities behind.
+- Open the normal Cosmetics menu, enter Arcade Cosmetics, and confirm the selected option and the lobby preview are associated with the same game/option.
+
 ## Native game cosmetics
 
 ### Snake
@@ -37,6 +44,9 @@ This is the manual runtime checklist for the isolated Mineplex Reborn test serve
 ### Bacon Brawl
 - Equip Crown, Top Hat, Chef and Diamond in separate runs.
 - Confirm each theme changes the sparkle trail around that player's pig disguise and that each player's effect remains independent.
+- Land successive melee hits and ability hits. The attacker should get a per-hit action-bar indicator, and the target should get a visible impact burst/sound.
+- At the start of the round, confirm the indicator says the timed knockback boost is inactive; after the timed knockback escalation starts, confirm the indicator reports the active multiplier on each hit.
+- Hit a summoned Bacon Brawl test dummy and confirm the hit impact and action-bar feedback appear. Dummies are test targets, not real Players, so don't count them as proof of player-only stats/team mechanics.
 
 ### Dragon Escape
 - Equip different trail colours on two runners.
