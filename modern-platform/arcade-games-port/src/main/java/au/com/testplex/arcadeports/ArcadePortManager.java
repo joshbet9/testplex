@@ -103,6 +103,7 @@ public final class ArcadePortManager implements Listener {
     private static final int HALF_SIZE = 20;
     private static final long ROUND_MS = 180_000L;
     private static final long JOIN_WINDOW_TICKS = 100L;
+    static final int MANUAL_START_COUNTDOWN_SECONDS = 20;
     private final ArcadeMechanicsModernPlugin plugin;
     private final Map<String, LinkedHashMap<UUID, Player>> queues = new HashMap<>();
     private final Map<String, World> worlds = new HashMap<>();
@@ -606,15 +607,16 @@ public final class ArcadePortManager implements Listener {
         Player requester = sender instanceof Player player && lobby.isLobbyWorld(player.getWorld())
                 ? player : null;
         manualStartType = type;
-        final int[] secondsRemaining = {20};
+        final int[] secondsRemaining = {MANUAL_START_COUNTDOWN_SECONDS};
         String hostName = sender instanceof Player player ? player.getName() : "An operator";
         sender.sendMessage(ChatColor.GREEN + type.displayName()
-                + " start countdown started: 20 seconds. Players will be moved when the countdown ends.");
+                + " start countdown started: " + MANUAL_START_COUNTDOWN_SECONDS
+                + " seconds. Players will be moved when the countdown ends.");
         for (Player player : onlineQueuedPlayers(type)) {
             player.sendMessage(ChatColor.AQUA + "" + ChatColor.BOLD + hostName
                     + ChatColor.AQUA + " has started the game.");
         }
-        updateLobbyCountdownStatus(type, 20);
+        updateLobbyCountdownStatus(type, MANUAL_START_COUNTDOWN_SECONDS);
 
         manualStartCountdown = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (active != null) {
@@ -643,7 +645,7 @@ public final class ArcadePortManager implements Listener {
             for (Player player : onlineQueuedPlayers(type)) {
                 player.sendActionBar(ChatColor.GOLD + type.displayName() + ChatColor.YELLOW
                         + " starts in " + remaining + "s");
-                if (remaining == 20 || remaining == 15 || remaining == 10 || remaining <= 5) {
+                if (remaining == MANUAL_START_COUNTDOWN_SECONDS || remaining == 15 || remaining == 10 || remaining <= 5) {
                     player.sendTitle(ChatColor.GOLD + type.displayName(),
                             ChatColor.YELLOW + "Starting in " + remaining + "s", 0, 22, 0);
                 }
