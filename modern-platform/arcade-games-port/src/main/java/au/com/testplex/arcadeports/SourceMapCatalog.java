@@ -102,21 +102,6 @@ public final class SourceMapCatalog {
         Path root = container.resolve(worldName).normalize();
         if (!root.startsWith(container) || root.equals(container)) return false;
 
-        World primaryWorld = Bukkit.getWorlds().stream()
-                .filter(candidate -> candidate.getEnvironment() == World.Environment.NORMAL)
-                .filter(candidate -> !isReservedSourceWorldName(candidate.getName()))
-                .findFirst().orElse(null);
-        if (primaryWorld == null) {
-            plugin.getLogger().severe("Cannot reset source map " + worldName
-                    + ": no primary normal world is loaded to resolve Paper's migrated dimension directory.");
-            return false;
-        }
-        Path primaryRoot = primaryWorld.getWorldFolder().toPath().toAbsolutePath().normalize();
-        if (!primaryRoot.startsWith(container) || primaryRoot.equals(container)) return false;
-        Path migratedRoot = migratedDimensionFolder(primaryRoot, worldName);
-        if (migratedRoot == null || !migratedRoot.startsWith(container)
-                || migratedRoot.equals(container) || migratedRoot.equals(primaryRoot)) return false;
-
         World loaded = Bukkit.getWorld(worldName);
         if (loaded != null && !Bukkit.unloadWorld(loaded, false)) {
             plugin.getLogger().warning("Could not unload source test world " + worldName + "; it is still in use.");
@@ -124,29 +109,109 @@ public final class SourceMapCatalog {
         }
 
         try {
-            deleteTreeIfPresent(root);
-            deleteTreeIfPresent(migratedRoot);
+            // Paper's legacy-world migration target is relative to the primary
+            // server world (the live error explicitly reports ./world/...). Do
+            // not assume the first normal Bukkit World is that folder: plugins
+            // may create their own NORMAL environments before the next reset.
+            List<Path> migratedRoots = findMigratedDimensionFolders(container, worldName);
+            deleteTreeIfPresent(root, container, worldName);
+            for (Path migratedRoot : migratedRoots) {
+                deleteTreeIfPresent(migratedRoot, container, worldName);
+                plugin.getLogger().info("Removed Paper-migrated source-map folder " + migratedRoot);
+            }
             plugin.getLogger().info("Reset source test map " + worldName
-                    + " including its Paper 26.3 migrated dimension folder.");
+                    + " including " + migratedRoots.size() + " discovered Paper 26.3 migrated dimension folder(s).");
             return true;
         } catch (IOException ex) {
-            plugin.getLogger().warning("Could not reset source test world " + worldName + ": " + ex.getMessage());
+            plugin.getLogger().log(java.util.logging.Level.WARNING,
+                    "Could not fully reset source test world " + worldName + ": " + ex.getMessage(), ex);
             return false;
         }
+    }
+
+    /**
+     * Find the exact migrated folder under each plausible server-world root.
+     * Includes Paper's observed default ./world path, loaded world's actual
+     * folders, and direct child world directories. Candidate matching remains
+     * confined to dimensions/minecraft/<reserved source-world name>; unrelated
+     * world data is never a deletion target.
+     */
+    private static List<Path> findMigratedDimensionFolders(Path container, String worldName) throws IOException {
+        if (container == null || !isReservedSourceWorldName(worldName)) return List.of();
+        Path safeContainer = container.toAbsolutePath().normalize();
+        java.util.Set<Path> worldRoots = new java.util.LinkedHashSet<>();
+        worldRoots.add(safeContainer.resolve("world").normalize());
+
+        for (World world : Bukkit.getWorlds()) {
+            if (world == null || isReservedSourceWorldName(world.getName())) continue;
+            Path candidate = world.getWorldFolder().toPath().toAbsolutePath().normalize();
+            if (candidate.startsWith(safeContainer) && !candidate.equals(safeContainer)
+                    && !Files.isSymbolicLink(candidate)) worldRoots.add(candidate);
+        }
+
+        if (Files.isDirectory(safeContainer)) {
+            try (Stream<Path> children = Files.list(safeContainer)) {
+                children.filter(Files::isDirectory)
+                        .filter(candidate -> !Files.isSymbolicLink(candidate))
+                        .map(candidate -> candidate.toAbsolutePath().normalize())
+                        .filter(candidate -> candidate.startsWith(safeContainer) && !candidate.equals(safeContainer))
+                        .filter(candidate -> !isReservedSourceWorldName(candidate.getFileName().toString()))
+                        .forEach(worldRoots::add);
+            }
+        }
+
+        List<Path> migratedRoots = new ArrayList<>();
+        for (Path worldRoot : worldRoots) {
+            if (worldRoot == null || !worldRoot.startsWith(safeContainer) || worldRoot.equals(safeContainer)
+                    || Files.isSymbolicLink(worldRoot)
+                    || isReservedSourceWorldName(worldRoot.getFileName().toString())) continue;
+            Path migrated = migratedDimensionFolder(worldRoot, worldName);
+            if (migrated != null && migrated.startsWith(safeContainer)
+                    && !migrated.equals(safeContainer) && Files.exists(migrated)
+                    && !Files.isSymbolicLink(migrated)) migratedRoots.add(migrated);
+        }
+        return migratedRoots.stream().distinct().toList();
     }
 
     /** Returns the isolated Paper-migrated folder for a valid source-map name. */
     static Path migratedDimensionFolder(Path primaryWorldFolder, String worldName) {
         if (primaryWorldFolder == null || !isReservedSourceWorldName(worldName)) return null;
         Path primaryRoot = primaryWorldFolder.toAbsolutePath().normalize();
+        if (isReservedSourceWorldName(primaryRoot.getFileName().toString())) return null;
         Path migrated = primaryRoot.resolve("dimensions").resolve("minecraft").resolve(worldName).normalize();
         if (!migrated.startsWith(primaryRoot) || migrated.equals(primaryRoot)) return null;
         return migrated;
     }
 
-    private static void deleteTreeIfPresent(Path root) throws IOException {
-        if (!Files.exists(root)) return;
-        try (Stream<Path> paths = Files.walk(root)) {
+    private static void deleteTreeIfPresent(Path root, Path container, String worldName) throws IOException {
+        if (root == null || container == null || !isReservedSourceWorldName(worldName)) {
+            throw new IOException("Refusing to delete an unvalidated source-map path.");
+        }
+        Path safeContainer = container.toAbsolutePath().normalize();
+        Path safeRoot = root.toAbsolutePath().normalize();
+        Path legacyRoot = safeContainer.resolve(worldName).normalize();
+        boolean legacySourceRoot = safeRoot.equals(legacyRoot);
+
+        boolean migratedDimensionRoot = false;
+        Path minecraft = safeRoot.getParent();
+        Path dimensions = minecraft == null ? null : minecraft.getParent();
+        Path primaryRoot = dimensions == null ? null : dimensions.getParent();
+        if (safeRoot.getFileName() != null
+                && worldName.equals(safeRoot.getFileName().toString())
+                && minecraft != null && "minecraft".equals(minecraft.getFileName().toString())
+                && dimensions != null && "dimensions".equals(dimensions.getFileName().toString())
+                && primaryRoot != null && primaryRoot.startsWith(safeContainer)
+                && !primaryRoot.equals(safeContainer) && primaryRoot.getFileName() != null
+                && !isReservedSourceWorldName(primaryRoot.getFileName().toString())) {
+            migratedDimensionRoot = true;
+        }
+        if ((!legacySourceRoot && !migratedDimensionRoot)
+                || !safeRoot.startsWith(safeContainer) || safeRoot.equals(safeContainer)) {
+            throw new IOException("Refusing to delete non-reserved world path: " + safeRoot);
+        }
+
+        if (!Files.exists(safeRoot)) return;
+        try (Stream<Path> paths = Files.walk(safeRoot)) {
             for (Path item : paths.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(item);
             }

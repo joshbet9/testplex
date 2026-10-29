@@ -634,9 +634,20 @@ public final class MenuService implements Listener {
                 if (!isAdmin(player)) {
                     player.sendMessage(ChatColor.RED + "Operator permission required to start a game.");
                 } else {
+                    String selectedGame = plugin.getConfig().getString("game-panel.selected-game", "bacon-brawl");
                     player.closeInventory();
-                    player.performCommand("arcadeport start "
-                            + plugin.getConfig().getString("game-panel.selected-game", "bacon-brawl"));
+                    try {
+                        boolean handled = player.performCommand("arcadeport start " + selectedGame);
+                        if (!handled) {
+                            player.sendMessage(ChatColor.RED + "The Start Game command was not handled. "
+                                    + "Check that ArcadeMechanicsModern is enabled and see the server logs.");
+                        }
+                    } catch (RuntimeException exception) {
+                        plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                                "Game Panel Start Game click failed for " + selectedGame + ".", exception);
+                        player.sendMessage(ChatColor.RED + "Start Game failed with a server error. "
+                                + "The full exception was logged; the round was not confirmed as started.");
+                    }
                 }
             } else if ("panel-stop".equals(action)) {
                 if (!isAdmin(player)) {

@@ -103,6 +103,7 @@ public final class ArcadePortManager implements Listener {
     private static final int HALF_SIZE = 20;
     private static final long ROUND_MS = 180_000L;
     private static final long JOIN_WINDOW_TICKS = 100L;
+    static final int MANUAL_START_COUNTDOWN_SECONDS = 20;
     private final ArcadeMechanicsModernPlugin plugin;
     private final Map<String, LinkedHashMap<UUID, Player>> queues = new HashMap<>();
     private final Map<String, World> worlds = new HashMap<>();
@@ -125,6 +126,8 @@ public final class ArcadePortManager implements Listener {
     private Session active;
     private BukkitTask pendingStart;
     private ArcadePortGame pendingType;
+    private BukkitTask manualStartCountdown;
+    private ArcadePortGame manualStartType;
     private long lastDragonHazard;
     private long lastSheepSpawn;
 
@@ -523,16 +526,31 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "That game is already in progress. Use /arcadeport status or queue the next game.");
             return;
         }
+        if (manualStartCountdown != null && manualStartType != type) {
+            player.sendMessage(ChatColor.RED + manualStartType.displayName()
+                    + " is already counting down. Wait for that round to start before queueing another game.");
+            return;
+        }
         lobby.ensurePlayerInLobby(player);
         for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(player.getUniqueId());
         queues.computeIfAbsent(type.id(), ignored -> new LinkedHashMap<>()).put(player.getUniqueId(), player);
-        player.sendMessage(ChatColor.GREEN + "Queued for " + type.displayName() + ". " +
-                (quickStart ? "Starting after a short join window so friends can join too." : "An operator/player can use /arcadeport start " + type.id() + "."));
+        String nextAction = manualStartCountdown != null && manualStartType == type
+                ? "The existing start countdown is already running."
+                : quickStart ? "Starting after a short join window so friends can join too."
+                : "An operator/player can use /arcadeport start " + type.id() + ".";
+        player.sendMessage(ChatColor.GREEN + "Queued for " + type.displayName() + ". " + nextAction);
         if (quickStart) scheduleQuickStart(type);
     }
 
     private void scheduleQuickStart(ArcadePortGame type) {
         if (active != null) return;
+        if (manualStartCountdown != null) {
+            for (Player player : onlineQueuedPlayers(type)) {
+                player.sendMessage(ChatColor.YELLOW + manualStartType.displayName()
+                        + " already has a start countdown; the queued quick-start will not create a second timer.");
+            }
+            return;
+        }
         if (pendingStart != null) {
             if (pendingType == type) return;
             pendingStart.cancel();
@@ -545,6 +563,11 @@ public final class ArcadePortManager implements Listener {
         }, JOIN_WINDOW_TICKS);
     }
 
+    /**
+     * The legacy 1.8 Start Game button called StateCountdown(game, 20, true),
+     * announcing the start before the round actually became live. Keep that
+     * visible 20-second countdown instead of teleporting everyone immediately.
+     */
     public void startFromLobby(ArcadePortGame type, org.bukkit.command.CommandSender sender) {
         if (type == null) {
             sender.sendMessage(ChatColor.RED + "Unknown game id.");
@@ -555,12 +578,121 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
-        for (Player player : Bukkit.getOnlinePlayers()) {
-            if (player.isOnline() && lobby.isLobbyWorld(player.getWorld())) {
-                queues.computeIfAbsent(type.id(), ignored -> new LinkedHashMap<>()).put(player.getUniqueId(), player);
+        if (active != null) {
+            sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running: "
+                    + active.type.displayName() + ".");
+            return;
+        }
+        if (manualStartCountdown != null) {
+            sender.sendMessage(ChatColor.YELLOW + manualStartType.displayName()
+                    + " already has a start countdown running. Please wait for it to finish.");
+            return;
+        }
+        if (SourceMapCatalog.hasMap(type)) {
+            String selectedResource = plugin.getConfig().getString("selected-maps." + type.id(),
+                    SourceMapCatalog.resourceFor(type));
+            if (!SourceMapCatalog.resourceFor(type).equals(selectedResource)) {
+                sender.sendMessage(ChatColor.RED + "The selected map is no longer installed for " + type.displayName()
+                        + ". Open Set Game and choose an installed map again.");
+                return;
             }
         }
-        startQueued(type, sender instanceof Player ? (Player) sender : null, sender);
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.isOnline() && lobby.isLobbyWorld(player.getWorld())) {
+                queues.computeIfAbsent(type.id(), ignored -> new LinkedHashMap<>())
+                        .put(player.getUniqueId(), player);
+            }
+        }
+        LinkedHashMap<UUID, Player> queue = queues.get(type.id());
+        boolean anyQueued = queue != null
+                && queue.values().stream().anyMatch(player -> player != null && player.isOnline());
+        if (!anyQueued) {
+            sender.sendMessage(ChatColor.YELLOW + "No players are in the Arcade lobby to start "
+                    + type.displayName() + ". Join the lobby first.");
+            return;
+        }
+
+        if (pendingStart != null) {
+            pendingStart.cancel();
+            pendingStart = null;
+            pendingType = null;
+        }
+
+        Player requester = sender instanceof Player player && lobby.isLobbyWorld(player.getWorld())
+                ? player : null;
+        manualStartType = type;
+        final int[] secondsRemaining = {MANUAL_START_COUNTDOWN_SECONDS};
+        String hostName = sender instanceof Player player ? player.getName() : "An operator";
+        sender.sendMessage(ChatColor.GREEN + type.displayName()
+                + " start countdown started: " + MANUAL_START_COUNTDOWN_SECONDS
+                + " seconds. Players will be moved when the countdown ends.");
+        for (Player player : onlineQueuedPlayers(type)) {
+            player.sendMessage(ChatColor.AQUA + "" + ChatColor.BOLD + hostName
+                    + ChatColor.AQUA + " has started the game.");
+        }
+        updateLobbyCountdownStatus(type, MANUAL_START_COUNTDOWN_SECONDS);
+
+        manualStartCountdown = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (active != null) {
+                cancelManualStartCountdown(type, ChatColor.RED + "The countdown was cancelled because "
+                        + active.type.displayName() + " is already running.");
+                return;
+            }
+            int remaining = secondsRemaining[0];
+            if (remaining <= 0) {
+                manualStartCountdown = null;
+                manualStartType = null;
+                clearLobbyCountdownStatus();
+                lobby.refreshLobbyScoreboards();
+                try {
+                    startQueued(type, requester, sender);
+                } catch (RuntimeException exception) {
+                    plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                            "Unhandled error while starting " + type.displayName() + " after its countdown.", exception);
+                    sender.sendMessage(ChatColor.RED + "Could not start " + type.displayName()
+                            + ". The error was logged on the server; no successful round start was recorded.");
+                }
+                return;
+            }
+
+            updateLobbyCountdownStatus(type, remaining);
+            for (Player player : onlineQueuedPlayers(type)) {
+                player.sendActionBar(ChatColor.GOLD + type.displayName() + ChatColor.YELLOW
+                        + " starts in " + remaining + "s");
+                if (remaining == MANUAL_START_COUNTDOWN_SECONDS || remaining == 15 || remaining == 10 || remaining <= 5) {
+                    player.sendTitle(ChatColor.GOLD + type.displayName(),
+                            ChatColor.YELLOW + "Starting in " + remaining + "s", 0, 22, 0);
+                }
+            }
+            secondsRemaining[0]--;
+        }, 1L, 20L);
+    }
+
+    private List<Player> onlineQueuedPlayers(ArcadePortGame type) {
+        LinkedHashMap<UUID, Player> queue = queues.get(type.id());
+        if (queue == null) return List.of();
+        return queue.values().stream().filter(player -> player != null && player.isOnline()).toList();
+    }
+
+    private void updateLobbyCountdownStatus(ArcadePortGame type, int secondsRemaining) {
+        if (type == ArcadePortGame.BACON_BRAWL) {
+            plugin.getConfig().set("lobby-countdown-status", "Starting in " + secondsRemaining + "s");
+            lobby.refreshLobbyScoreboards();
+        }
+    }
+
+    private void clearLobbyCountdownStatus() {
+        plugin.getConfig().set("lobby-countdown-status", null);
+        lobby.refreshLobbyScoreboards();
+    }
+
+    private void cancelManualStartCountdown(ArcadePortGame type, String message) {
+        if (manualStartCountdown != null) manualStartCountdown.cancel();
+        manualStartCountdown = null;
+        manualStartType = null;
+        clearLobbyCountdownStatus();
+        for (Player player : onlineQueuedPlayers(type)) player.sendMessage(message);
     }
 
     public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender) {
@@ -614,7 +746,52 @@ public final class ArcadePortManager implements Listener {
             worlds.remove(type.id());
             sourceMapWorlds.remove(type.id());
             sourceMapData.remove(type.id());
-            world = createWorld(type);
+            try {
+                world = createWorld(type);
+            } catch (RuntimeException firstFailure) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        "Archived map load failed for " + type.displayName()
+                                + "; cleaning the isolated source and retrying once.", firstFailure);
+                world = null;
+                boolean reset = SourceMapCatalog.resetTestWorld(plugin, sourceWorldName);
+                sourceMapWorlds.remove(type.id());
+                sourceMapData.remove(type.id());
+                worlds.remove(type.id());
+                if (reset) {
+                    try {
+                        world = createWorld(type);
+                    } catch (RuntimeException retryFailure) {
+                        plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                                "Archived map retry failed for " + type.displayName()
+                                        + "; will use the isolated fallback arena.", retryFailure);
+                        world = null;
+                    }
+                }
+
+                if (world == null) {
+                    // A corrupt/incompatible archived map must not make Start Game
+                    // silently fail. Keep testing possible in the dedicated proto
+                    // world while preserving a complete log explaining the fallback.
+                    SourceMapCatalog.resetTestWorld(plugin, sourceWorldName);
+                    sourceMapWorlds.remove(type.id());
+                    sourceMapData.remove(type.id());
+                    worlds.remove(type.id());
+                    try {
+                        world = createWorld(type, false);
+                        if (world != null && type == ArcadePortGame.BACON_BRAWL) clearBaconFallbackArena(world);
+                        if (world != null) {
+                            sender.sendMessage(ChatColor.YELLOW + "The archived " + type.displayName()
+                                    + " map could not be loaded; starting in the isolated fallback arena.");
+                            plugin.getLogger().warning(type.displayName()
+                                    + " is running on its isolated fallback arena after source-map load failed.");
+                        }
+                    } catch (RuntimeException fallbackFailure) {
+                        plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                                "Fallback world creation failed for " + type.displayName() + ".", fallbackFailure);
+                        world = null;
+                    }
+                }
+            }
             if (world != null) worlds.put(type.id(), world);
         } else {
             world = worlds.computeIfAbsent(type.id(), ignored -> createWorld(type));
@@ -874,15 +1051,20 @@ public final class ArcadePortManager implements Listener {
     }
 
     private World createWorld(ArcadePortGame type) {
+        return createWorld(type, true);
+    }
+
+    private World createWorld(ArcadePortGame type, boolean allowSourceMap) {
         String sourceWorldName = "arcadeport_source_" + type.id().replace('-', '_');
-        World world = Bukkit.getWorld(sourceWorldName);
-        if (world == null && SourceMapCatalog.hasMap(type)
+        World world = allowSourceMap ? Bukkit.getWorld(sourceWorldName) : null;
+        if (allowSourceMap && world == null && SourceMapCatalog.hasMap(type)
                 && SourceMapCatalog.install(plugin, type, sourceWorldName)) {
             WorldCreator creator = new WorldCreator(sourceWorldName)
                     .environment(World.Environment.NORMAL).generateStructures(false);
             world = creator.createWorld();
         }
-        if (world != null && SourceMapCatalog.hasMap(type) && !sourceMapWorlds.contains(type.id())) {
+        if (allowSourceMap && world != null && SourceMapCatalog.hasMap(type)
+                && !sourceMapWorlds.contains(type.id())) {
             SourceMapCatalog.MapData mapData = SourceMapCatalog.read(world);
             sourceMapWorlds.add(type.id());
             if (mapData != null) {
@@ -5606,6 +5788,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void shutdown() {
+        if (manualStartCountdown != null) manualStartCountdown.cancel();
+        manualStartCountdown = null;
+        manualStartType = null;
+        clearLobbyCountdownStatus();
         stop("plugin shutdown");
         lobbyRuntime.shutdown();
         unregisterOptionalBaconPacketBridge();
