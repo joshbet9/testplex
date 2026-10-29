@@ -6744,7 +6744,7 @@ public final class ArcadePortManager implements Listener {
                 long now = System.currentTimeMillis();
                 long readyAt = session.bombSpectateNextTeleportAt.getOrDefault(player.getUniqueId(), 0L);
                 if (!ArcadePortRules.isBombLobbersSpectatorTeleportReady(now, readyAt)) return;
-                Player target = nearestBombLobbersEnemy(session, player);
+                Player target = nearestBombLobbersSpectateTarget(session, player);
                 if (target != null) {
                     player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
                     player.setCompassTarget(target.getLocation());
@@ -7328,12 +7328,10 @@ public final class ArcadePortManager implements Listener {
                 && ChatColor.stripColor(meta.getDisplayName()).equals("Tracking Compass");
     }
 
-    private Player nearestBombLobbersEnemy(Session session, Player spectator) {
+    /** The source compass needle tracks enemies, but its left-click teleport targets any living player. */
+    private Player nearestBombLobbersSpectateTarget(Session session, Player spectator) {
         if (session == null || spectator == null) return null;
-        int spectatorTeam = session.teams.getOrDefault(spectator.getUniqueId(), -1);
         return alivePlayers(session).stream()
-                .filter(target -> ArcadePortRules.shouldBombLobbersCompassTrackTeam(
-                        spectatorTeam, session.teams.getOrDefault(target.getUniqueId(), -1)))
                 .min(java.util.Comparator.comparingDouble(candidate ->
                         candidate.getLocation().distanceSquared(spectator.getLocation())))
                 .orElse(null);
@@ -7351,10 +7349,9 @@ public final class ArcadePortManager implements Listener {
                 46, 47, 48, 49, 50, 51, 52
         };
         Map<Integer, UUID> targetsBySlot = new HashMap<>();
-        int spectatorTeam = session.teams.getOrDefault(spectator.getUniqueId(), -1);
+        // The legacy Spectator Menu lists every living player, even though the needle itself
+        // tracks only an opposing team.
         List<Player> targets = alivePlayers(session).stream()
-                .filter(target -> ArcadePortRules.shouldBombLobbersCompassTrackTeam(
-                        spectatorTeam, session.teams.getOrDefault(target.getUniqueId(), -1)))
                 .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
                 .toList();
         for (int i = 0; i < targets.size() && i < slots.length; i++) {
@@ -7399,10 +7396,7 @@ public final class ArcadePortManager implements Listener {
         Player target = session.players.get(targetId);
         session.bombCompassMenuTargets.remove(spectator.getUniqueId());
         spectator.closeInventory();
-        if (target == null || !target.isOnline() || !session.alive.contains(targetId)
-                || !ArcadePortRules.shouldBombLobbersCompassTrackTeam(
-                        session.teams.getOrDefault(spectator.getUniqueId(), -1),
-                        session.teams.getOrDefault(targetId, -1))) {
+        if (target == null || !target.isOnline() || !session.alive.contains(targetId)) {
             spectator.sendMessage(ChatColor.YELLOW + "That opponent is no longer available.");
             return;
         }
