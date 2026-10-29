@@ -2500,7 +2500,9 @@ public final class ArcadePortManager implements Listener {
 
     private void restoreBaconPlayerVisibilityForOwner(Session session, UUID ownerId, Player owner) {
         Set<UUID> hiddenViewers = session.baconHiddenViewersByOwner.remove(ownerId);
-        if (hiddenViewers == null || owner == null || !owner.isOnline()) return;
+        // showPlayer also clears the viewer's hidden-entity state if the target has just quit;
+        // requiring owner.isOnline() here leaks the hide state across a reconnect.
+        if (hiddenViewers == null || owner == null) return;
         for (UUID viewerId : hiddenViewers) {
             Player viewer = Bukkit.getPlayer(viewerId);
             if (viewer != null && viewer.isOnline()) viewer.showPlayer(plugin, owner);
