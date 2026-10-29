@@ -2801,7 +2801,8 @@ public final class ArcadePortManager implements Listener {
                 break;
             default:
                 Vector leap = player.getLocation().getDirection().normalize().multiply(1.2D);
-                leap.setY(0.2D);
+                leap.setY(ArcadePortRules.baconBrawlBodySlamLaunchY(
+                        player.getLocation().getDirection().getY(), player.isOnGround()));
                 player.setVelocity(leap);
                 session.baconSlams.put(id, now + 1_000L);
                 player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 12, 0.3D, 0.25D, 0.3D, 0.05D);
@@ -2820,6 +2821,15 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void handleBaconBrawlHit(Session session, Player attacker, Player target, String source) {
+        double rawDamage = switch (source) {
+            case "body-slam", "bacon-blast" -> 6.0D;
+            default -> 2.0D;
+        };
+        handleBaconBrawlHit(session, attacker, target, source, rawDamage, null);
+    }
+
+    private void handleBaconBrawlHit(Session session, Player attacker, Player target, String source,
+            double rawDamage, Vector projectileVelocity) {
         if (active != session || attacker.equals(target)
                 || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
@@ -2827,24 +2837,26 @@ public final class ArcadePortManager implements Listener {
         clearBaconCloak(session, target.getUniqueId());
         session.baconLastDamager.put(target.getUniqueId(), attacker.getUniqueId());
         session.baconLastDamagedAt.put(target.getUniqueId(), System.currentTimeMillis());
+
         String kit = session.baconKits.getOrDefault(attacker.getUniqueId(), "el-muchacho-pigo");
-        Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
-        if (direction.lengthSquared() < 1.0E-5D) direction = attacker.getLocation().getDirection();
-        double hitKnockback = session.baconKnockback;
+        double knockbackMultiplier = session.baconKnockback;
         if ("body-slam".equals(source)) {
-            hitKnockback += ArcadePortRules.BACON_BODY_SLAM_EXTRA_KNOCKBACK;
+            knockbackMultiplier *= ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER;
         }
         if ("pig".equals(kit) && "melee".equals(source)) {
             Vector targetLook = target.getLocation().getDirection().setY(0.0D);
-            Vector fromTargetToAttacker = attacker.getLocation().toVector().subtract(target.getLocation().toVector()).setY(0.0D);
+            Vector fromTargetToAttacker = attacker.getLocation().toVector()
+                    .subtract(target.getLocation().toVector()).setY(0.0D);
             if (ArcadePortRules.isBaconBrawlBackstab(targetLook.getX(), targetLook.getZ(),
                     fromTargetToAttacker.getX(), fromTargetToAttacker.getZ())) {
-                hitKnockback *= ArcadePortRules.baconBrawlKnockbackMultiplier(true);
+                knockbackMultiplier *= ArcadePortRules.baconBrawlKnockbackMultiplier(true);
                 target.playSound(target.getLocation(), Sound.ENTITY_PIG_DEATH, 1.0F, 2.0F);
             }
         }
-        target.setVelocity(direction.normalize().multiply(hitKnockback).setY(0.7D));
-        target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0, 1, 0), 10, 0.35D, 0.4D, 0.35D, 0.04D);
+        target.setVelocity(baconBrawlKnockbackVelocity(attacker, target, rawDamage,
+                knockbackMultiplier, projectileVelocity));
+        target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0, 1, 0),
+                10, 0.35D, 0.4D, 0.35D, 0.04D);
         attacker.setFoodLevel(Math.min(20, attacker.getFoodLevel() + 2));
         attacker.setSaturation(ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE);
         attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.8F, 1.1F);
@@ -2853,23 +2865,30 @@ public final class ArcadePortManager implements Listener {
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
         if (active == session && "body-slam".equals(source)
                 && session.alive.contains(attacker.getUniqueId())) {
-            // Reborn raises a reciprocal recoil damage event from the struck player to the slammer.
-            // That event restores health, gives the struck player the hunger-on-hit reward, and
-            // lets that player receive fall-kill credit if the slammer is knocked off the arena.
+            // Reborn generates a second custom event: 2 damage to the slammer, with the same 2x kit multiplier.
             long now = System.currentTimeMillis();
             session.baconLastDamager.put(attacker.getUniqueId(), target.getUniqueId());
             session.baconLastDamagedAt.put(attacker.getUniqueId(), now);
             target.setFoodLevel(Math.min(20, target.getFoodLevel() + 2));
             target.setSaturation(ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE);
-
-            Vector recoilDirection = attacker.getLocation().toVector()
-                    .subtract(target.getLocation().toVector()).setY(0.0D);
-            if (recoilDirection.lengthSquared() < 1.0E-5D) {
-                recoilDirection = direction.clone().multiply(-1.0D).setY(0.0D);
-            }
-            if (recoilDirection.lengthSquared() < 1.0E-5D) recoilDirection = new Vector(0.0D, 0.0D, -1.0D);
-            attacker.setVelocity(recoilDirection.normalize().multiply(hitKnockback).setY(0.5D));
+            attacker.setVelocity(baconBrawlKnockbackVelocity(target, attacker, 2.0D,
+                    session.baconKnockback * ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER, null));
         }
+    }
+
+    /** Port DamageManager's logarithmic base and UtilAction's strength, vertical cap and ground boost. */
+    private Vector baconBrawlKnockbackVelocity(Player source, Player target, double rawDamage,
+            double knockbackMultipliers, Vector projectileVelocity) {
+        boolean projectile = projectileVelocity != null;
+        Vector direction = projectile
+                ? projectileVelocity.clone().setY(0.0D)
+                : target.getLocation().toVector().subtract(source.getLocation().toVector()).setY(0.0D);
+        if (direction.lengthSquared() < 1.0E-5D) direction = source.getLocation().getDirection().setY(0.0D);
+        if (direction.lengthSquared() < 1.0E-5D) direction = new Vector(0.0D, 0.0D, 1.0D);
+        double strength = ArcadePortRules.baconBrawlVelocityStrength(rawDamage, knockbackMultipliers, projectile);
+        double vertical = ArcadePortRules.baconBrawlVerticalVelocity(
+                rawDamage, knockbackMultipliers, projectile, target.isOnGround());
+        return direction.normalize().multiply(strength).setY(vertical);
     }
 
     private void updateTurfWarsPhase(Session session, long now) {
@@ -4490,7 +4509,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void hitProjectile(Session session, Projectile projectile, Player shooter, Player target) {
-        if (session.type == ArcadePortGame.BOMB_LOBBERS) {
+        if (session.type == ArcadePortGame.BACON_BRAWL) {
+            if (session.baconHandledProjectiles.remove(projectile.getUniqueId())) return;
+            handleBaconBrawlHit(session, shooter, target, "projectile hit",
+                    2.0D, projectile.getVelocity());
+        } else if (session.type == ArcadePortGame.BOMB_LOBBERS) {
             handlePlayerHit(session, shooter, target, "bomb hit");
         } else if (session.type == ArcadePortGame.PAINTBALL) {
             int paintAmount = session.paintProjectileDamage.getOrDefault(projectile.getUniqueId(), 1);
@@ -5227,7 +5250,12 @@ public final class ArcadePortManager implements Listener {
                 UUID ownerId = session.baconPigOwners.get(avatar.getUniqueId());
                 Player target = ownerId == null ? null : session.players.get(ownerId);
                 if (attacker != null && target != null && !attacker.getUniqueId().equals(ownerId)) {
-                    handlePlayerHit(session, attacker, target, source);
+                    if (byEntity.getDamager() instanceof Projectile projectile) {
+                        handleBaconBrawlHit(session, attacker, target, source,
+                                event.getDamage(), projectile.getVelocity());
+                    } else {
+                        handleBaconBrawlHit(session, attacker, target, source, event.getDamage(), null);
+                    }
                 }
             }
             return;
@@ -5244,15 +5272,17 @@ public final class ArcadePortManager implements Listener {
                 Entity damager = byEntity.getDamager();
                 if (damager instanceof Player attacker) {
                     event.setCancelled(true);
-                    handlePlayerHit(session, attacker, baconTarget, "melee");
+                    handleBaconBrawlHit(session, attacker, baconTarget, "melee", event.getDamage(), null);
                     return;
                 }
                 if (damager instanceof Projectile projectile
-                        && projectile.getShooter() instanceof Player) {
-                    // The projectile-hit handler applies Bacon Brawl's knockback-only combat
-                    // response. Cancel vanilla health damage here so it cannot be applied first.
+                        && projectile.getShooter() instanceof Player shooter) {
+                    // Use incoming damage and projectile direction now, then skip the subsequent
+                    // projectile callback so the knockback-only hit is resolved exactly once.
                     event.setCancelled(true);
-                    clearBaconCloak(session, baconTarget.getUniqueId());
+                    session.baconHandledProjectiles.add(projectile.getUniqueId());
+                    handleBaconBrawlHit(session, shooter, baconTarget, "projectile hit",
+                            event.getDamage(), projectile.getVelocity());
                     return;
                 }
             }
@@ -6365,6 +6395,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> baconCloakedUntil = new HashMap<>();
         final Map<UUID, UUID> baconBabyPigs = new HashMap<>();
         final Map<UUID, Item> baconBlastItems = new HashMap<>();
+        final Set<UUID> baconHandledProjectiles = new HashSet<>();
         final Map<UUID, UUID> baconBlastOwners = new HashMap<>();
         final Map<UUID, Location> baconBlastLastLocations = new HashMap<>();
         final Map<UUID, Long> baconBlastCreatedAt = new HashMap<>();
