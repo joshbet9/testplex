@@ -334,6 +334,15 @@ public final class ArcadePortRules {
         };
     }
 
+    /** Source kits activate only when an iron axe is right-clicked. Body Slam and Bacon Blast
+     * defer to interactive blocks; Pig's cloak perk runs on any right-click with its axe. */
+    public static boolean shouldActivateBaconBrawlAbility(boolean rightClick, org.bukkit.Material held,
+            boolean clickedUsableBlock, String kit) {
+        String normalized = normalizeBaconBrawlKit(kit);
+        if (!rightClick || held != org.bukkit.Material.IRON_AXE || normalized == null) return false;
+        return "pig".equals(normalized) || !clickedUsableBlock;
+    }
+
     /**
      * Return the unique highest-kill player's index, or -1 for empty/tied scores.
      * The original game is a kill race, so deaths and respawns do not remove a
