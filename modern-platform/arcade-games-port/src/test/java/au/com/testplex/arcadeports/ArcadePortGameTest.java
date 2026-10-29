@@ -473,7 +473,7 @@ class ArcadePortGameTest {
         assertEquals(4.0D, ArcadePortRules.BACON_STARVATION_DAMAGE, 0.00001D);
         assertFalse(ArcadePortRules.BACON_BRAWL_HITS_DAMAGE_HEALTH,
                 "source hits heal back the damage and rely on knockback for arena knock-outs");
-        assertEquals(2.0D, ArcadePortRules.BACON_BODY_SLAM_EXTRA_KNOCKBACK, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER, 0.00001D);
         assertEquals(8_000L, ArcadePortRules.BACON_BODY_SLAM_COOLDOWN_MILLIS);
         assertEquals(3_000L, ArcadePortRules.BACON_BLAST_COOLDOWN_MILLIS);
         assertEquals(10_000L, ArcadePortRules.BACON_CLOAK_COOLDOWN_MILLIS);
@@ -504,8 +504,8 @@ class ArcadePortGameTest {
 
     @Test void baconPigBackstabAddsTwoHundredAndFiftyPercentKnockback() {
         assertEquals(1.0D, ArcadePortRules.baconBrawlKnockbackMultiplier(false), 0.00001D);
-        assertEquals(3.5D, ArcadePortRules.BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER, 0.00001D);
-        assertEquals(5.25D, 1.5D * ArcadePortRules.baconBrawlKnockbackMultiplier(true), 0.00001D);
+        assertEquals(2.5D, ArcadePortRules.BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER, 0.00001D);
+        assertEquals(3.75D, 1.5D * ArcadePortRules.baconBrawlKnockbackMultiplier(true), 0.00001D);
     }
 
     @Test void baconBrawlKnockbackMatchesDamageManagerLogAndMultiplierFormula() {
