@@ -44,6 +44,33 @@ public final class SourceMapCatalog {
         };
     }
 
+    /** Read the legacy map display name directly from its embedded archive, without loading a world. */
+    public static String displayName(JavaPlugin plugin, ArcadePortGame game) {
+        String resource = resourceFor(game);
+        if (resource == null) return null;
+        InputStream raw = plugin.getResource(resource);
+        if (raw == null) return null;
+        try (ZipInputStream zip = new ZipInputStream(raw)) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                if (entry.getName().endsWith("WorldConfig.dat")) {
+                    java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+                    zip.transferTo(bytes);
+                    for (String line : bytes.toString(StandardCharsets.UTF_8).split("\\R")) {
+                        if (line.trim().toUpperCase(java.util.Locale.ROOT).startsWith("MAP_NAME:")) {
+                            String name = line.substring(line.indexOf(':') + 1).trim();
+                            if (!name.isEmpty()) return name;
+                        }
+                    }
+                }
+                zip.closeEntry();
+            }
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Could not read map name for " + game.displayName() + ": " + exception.getMessage());
+        }
+        return game.displayName() + " Source Map";
+    }
+
     public static boolean hasMap(ArcadePortGame game) {
         return resourceFor(game) != null;
     }
