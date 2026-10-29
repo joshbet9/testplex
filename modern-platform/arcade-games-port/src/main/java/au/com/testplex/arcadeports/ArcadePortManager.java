@@ -6348,8 +6348,25 @@ public final class ArcadePortManager implements Listener {
         if (session == null || event.getEntity().getWorld() != session.world) return;
         if (session.type == ArcadePortGame.BOMB_LOBBERS
                 && event.getEntity() instanceof Player bombTarget
-                && session.players.containsKey(bombTarget.getUniqueId())
-                && !(event instanceof EntityDamageByEntityEvent)) {
+                && session.players.containsKey(bombTarget.getUniqueId())) {
+            if (event instanceof EntityDamageByEntityEvent byEntity
+                    && byEntity.getDamager() instanceof TNTPrimed tnt
+                    && ArcadePortRules.shouldSuppressNativeBombLobbersTntDamage(
+                            session.bombOwners.containsKey(tnt.getUniqueId()))) {
+                // Managed TNT hits are resolved by updateBombLobbers() or onExplode().
+                // Suppress the vanilla entity-damage event so custom source damage is applied once.
+                event.setCancelled(true);
+                return;
+            }
+            if (event instanceof EntityDamageByEntityEvent) return;
+
+            if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.BLOCK_EXPLOSION
+                    || event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_EXPLOSION) {
+                // EntityExplodeEvent applies the authentic radius, exposure, armor and knockback.
+                // Let that custom path be the sole source of TNT blast damage.
+                event.setCancelled(true);
+                return;
+            }
             if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL
                     && "jumper".equals(session.bombLobbersKits.getOrDefault(bombTarget.getUniqueId(), "jumper"))) {
                 event.setCancelled(true);

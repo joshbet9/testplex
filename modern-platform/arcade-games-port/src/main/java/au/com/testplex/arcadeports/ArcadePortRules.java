@@ -677,6 +677,11 @@ public final class ArcadePortRules {
         return throwerTeam >= 0 && nearestSpawnTeam >= 0 && throwerTeam == nearestSpawnTeam;
     }
 
+    /** Managed TNT damage is handled once by the custom source-compatible projectile/explosion path. */
+    public static boolean shouldSuppressNativeBombLobbersTntDamage(boolean managedBomb) {
+        return managedBomb;
+    }
+
     /** The source cancels a TNT detonation if its thrower is unavailable or it is on that team's own side. */
     public static boolean shouldCancelBombLobbersExplosion(
             boolean throwerOnline, int throwerTeam, int explosionSideTeam) {

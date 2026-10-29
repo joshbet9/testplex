@@ -1377,6 +1377,11 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isArcadePortGameEnabled("bacon-brawl", java.util.List.of()));
     }
 
+    @Test void bombLobbersManagedTntUsesOnlyCustomDirectAndExplosionDamage() {
+        assertTrue(ArcadePortRules.shouldSuppressNativeBombLobbersTntDamage(true));
+        assertFalse(ArcadePortRules.shouldSuppressNativeBombLobbersTntDamage(false));
+    }
+
     @Test void bombLobbersTntIsCancelledForOfflineThrowerOrOwnSide() {
         assertTrue(ArcadePortRules.shouldCancelBombLobbersExplosion(false, 0, 1));
         assertTrue(ArcadePortRules.shouldCancelBombLobbersExplosion(true, 0, 0));
