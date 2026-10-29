@@ -548,6 +548,12 @@ class ArcadePortGameTest {
                 "starvation and Body Slam recoil do not receive opponent kill credit");
         assertFalse(ArcadePortRules.shouldCreditBaconFallKill(9_000L, 10_000L, true));
         assertFalse(ArcadePortRules.shouldCreditBaconFallKill(10_000L, 0L, true));
+        assertTrue(ArcadePortRules.shouldCreditBaconFallKill(10_000L, 5_001L,
+                ArcadePortRules.isBaconArenaKnockoutReason("lava")));
+        assertTrue(ArcadePortRules.shouldCreditBaconFallKill(10_000L, 5_001L,
+                ArcadePortRules.isBaconArenaKnockoutReason("hot_floor")));
+        assertFalse(ArcadePortRules.shouldCreditBaconFallKill(10_000L, 5_001L,
+                ArcadePortRules.isBaconArenaKnockoutReason("starved")));
     }
 
     @Test void baconBrawlAwardsTheUniqueHighestKillCountAtTimeout() {
