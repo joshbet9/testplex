@@ -221,8 +221,8 @@ jobs:
             exit 1
           fi
           if ! sudo -n systemctl is-active --quiet testplex-modern.service; then
-            if ss -ltn | awk '$4 ~ /:25566$/ {found=1} END {exit !found}'; then
-              echo "Port 25566 is already in use by a non-modern service." >&2
+            if ss -ltn | awk '$4 ~ /:25568$/ {found=1} END {exit !found}'; then
+              echo "Port 25568 is already in use by a non-modern service." >&2
               exit 1
             fi
           fi
@@ -406,7 +406,7 @@ jobs:
           sudo -n chown monstermaze:monstermaze "$SERVER_DIR/.testplex-modern-deployed-build" "$SERVER_DIR/.testplex-paper-build" "$SERVER_DIR/eula.txt"
 
           if ! sudo -n test -f "$SERVER_DIR/server.properties"; then
-            printf 'motd=TESTPLEX MODERN 26.3 ISOLATED TEST SERVER\nserver-port=25566\nserver-ip=\nonline-mode=true\nmax-players=16\nview-distance=5\nsimulation-distance=4\n' \
+            printf 'motd=TESTPLEX MODERN 26.3 ISOLATED TEST SERVER\nserver-port=25568\nserver-ip=\nonline-mode=true\nmax-players=16\nview-distance=5\nsimulation-distance=4\n' \
               | sudo -n tee "$SERVER_DIR/server.properties" >/dev/null
             sudo -n chown monstermaze:monstermaze "$SERVER_DIR/server.properties"
           fi
@@ -420,7 +420,7 @@ jobs:
             fi
           }
           set_property motd "TESTPLEX MODERN 26.3 ISOLATED TEST SERVER"
-          set_property server-port "25566"
+          set_property server-port "25568"
           set_property server-ip ""
           set_property online-mode "true"
           set_property max-players "16"
@@ -546,8 +546,8 @@ jobs:
               exit 1
             fi
           done
-          if ! sudo -n ss -ltn | awk '$4 ~ /:25566$/ {found=1} END {exit !found}'; then
-            echo "Paper reports ready but port 25566 is not listening." >&2
+          if ! sudo -n ss -ltn | awk '$4 ~ /:25568$/ {found=1} END {exit !found}'; then
+            echo "Paper reports ready but port 25568 is not listening." >&2
             rollback
             exit 1
           fi
@@ -558,7 +558,7 @@ jobs:
 
           echo "Modern deployment completed. Server directory: /home/monstermaze/servers/testplex-modern"
           echo "Service: testplex-modern.service (disabled at boot by default)"
-          echo "Endpoint, when the host's Tailscale/firewall routing allows it: 100.98.188.97:25566"
+          echo "Endpoint, when the host's Tailscale/firewall routing allows it: 100.98.188.97:25568"
           echo "The legacy testplex-reborn.service and standalone Monster Maze units were not modified."
 
       - name: Write deployment summary
@@ -573,7 +573,7 @@ jobs:
             echo "- Source build SHA: $SOURCE_SHA"
             echo "- Destination: /home/monstermaze/servers/testplex-modern"
             echo "- Dedicated unit: testplex-modern.service"
-            echo "- Dedicated Minecraft port: 25566"
+            echo "- Dedicated Minecraft port: 25568"
             echo "- Legacy services: preflight rejects deployment if any legacy service is active; the workflow never stops or overwrites them"
             echo "- Rollback: modern-only backup created before replacement; startup is checked before success"
           } >> "$GITHUB_STEP_SUMMARY"
