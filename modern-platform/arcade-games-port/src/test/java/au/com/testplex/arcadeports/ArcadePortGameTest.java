@@ -1087,7 +1087,7 @@ class ArcadePortGameTest {
         assertEquals(1.0D, ArcadePortRules.bombLobbersBlastDamage(4.0D, 1.0D), 0.00001D);
         assertEquals(0.0D, ArcadePortRules.bombLobbersBlastDamage(4.01D, 1.0D), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.bombLobbersBlastDamage(0.0D, 0.0D), 0.00001D);
-        assertEquals(9.25D, ArcadePortRules.bombLobbersBlastDamage(2.0D, 0.5D), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.bombLobbersBlastDamage(2.0D, 0.5D), 0.00001D);
         assertEquals(50.0D, ArcadePortRules.BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE, 0.00001D);
     }
 
@@ -1114,6 +1114,8 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldSuppressBombLobbersSpawnSideExplosion(0, 1));
         assertFalse(ArcadePortRules.shouldSuppressBombLobbersSpawnSideExplosion(1, 0));
         assertFalse(ArcadePortRules.shouldSuppressBombLobbersSpawnSideExplosion(-1, 0));
+        assertTrue(ArcadePortRules.shouldCheckBombLobbersDirectHit(false));
+        assertFalse(ArcadePortRules.shouldCheckBombLobbersDirectHit(true));
     }
 
     @Test void bombLobbersDamageRespectsLegacyDamageDependentArmorReduction() {

@@ -5034,6 +5034,7 @@ public final class ArcadePortManager implements Listener {
         session.bombLastLocations.clear();
         session.bombCreatedAt.clear();
         session.bombPrimed.clear();
+        session.bombDirectHitResolved.clear();
         session.bombTeamSpawnCentres.clear();
         session.dragonContactCooldowns.clear();
         session.paintProjectileDamage.clear();
@@ -6503,6 +6504,8 @@ public final class ArcadePortManager implements Listener {
             // hits a player on the same tick still receives its source-style hit ding.
             boolean directHit = false;
             for (Player target : alivePlayers(session)) {
+                if (!ArcadePortRules.shouldCheckBombLobbersDirectHit(
+                        session.bombDirectHitResolved.contains(bombId))) break;
                 UUID targetId = target.getUniqueId();
                 if (targetId.equals(ownerId)) continue;
                 if (!ArcadePortRules.areBombLobbersEnemies(
@@ -6511,8 +6514,9 @@ public final class ArcadePortManager implements Listener {
                 double distanceSquared = distanceSquaredToSegment(target.getLocation(), previous, current);
                 if (!ArcadePortRules.isBombDirectHit(distanceSquared)) continue;
 
-                // Reborn's projectile engine damages on collision but lets TNT keep travelling.
+                // Reborn's projectile engine invokes the direct-hit callback only once per tracking flight.
                 // The swept segment means modern high-velocity TNT cannot tunnel through targets.
+                session.bombDirectHitResolved.add(bombId);
                 Vector away = target.getLocation().toVector().subtract(current.toVector());
                 away.setY(0.0D);
                 if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 0.0D, 1.0D);
@@ -6574,6 +6578,7 @@ public final class ArcadePortManager implements Listener {
         session.bombLastLocations.remove(bombId);
         session.bombCreatedAt.remove(bombId);
         session.bombPrimed.remove(bombId);
+        session.bombDirectHitResolved.remove(bombId);
     }
 
     private boolean isBombTouchingSolidBlock(TNTPrimed bomb) {
@@ -6969,6 +6974,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Location> bombLastLocations = new HashMap<>();
         final Map<UUID, Long> bombCreatedAt = new HashMap<>();
         final Set<UUID> bombPrimed = new HashSet<>();
+        final Set<UUID> bombDirectHitResolved = new HashSet<>();
         final Map<Integer, Location> bombTeamSpawnCentres = new HashMap<>();
         final Map<UUID, String> bombLobbersKits = new HashMap<>();
         final Map<UUID, Integer> bombPitchLevels = new HashMap<>();

@@ -496,6 +496,11 @@ public final class ArcadePortRules {
         return throwerTeam >= 0 && nearestSpawnTeam >= 0 && throwerTeam == nearestSpawnTeam;
     }
 
+    /** Mirrors the projectile wrapper returning after its first direct-hit callback. */
+    public static boolean shouldCheckBombLobbersDirectHit(boolean alreadyHitThisFlight) {
+        return !alreadyHitThisFlight;
+    }
+
     /** Pig's source passive is +250% knockback, i.e. 3.5 times the normal amount. */
     public static final double BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER = 2.5D;
     /** PerkBodySlam applies its 2.0 knockback value as a multiplier to both damage events. */
