@@ -63,6 +63,12 @@ This is the manual runtime checklist for the isolated Mineplex Reborn test serve
 - Confirm the stained-glass dust trail matches each player's theme and is visible to the second client.
 - Confirm the game loop remains smooth and the effect stops after the player is eliminated.
 
+### Bomb Lobbers
+- With TNT selected, left- and right-click air, blocks, and another entity. Each input should throw exactly one TNT, consume exactly one item, and preserve team/friendly-fire rules.
+- With Pitcher kit, test the velocity selector lever with both left- and right-clicks on air, blocks and another entity. It should adjust the selector only and must not cause an unintended melee hit or duplicate update.
+- Throw TNT directly at a summoned Bomb Lobbers test bot. Confirm the direct-hit ding, visible particles and temporary `DIRECT HIT!` label appear. The bot is a test dummy, not a real player, so it must not be counted as a normal player kill.
+- Check the pregame TNT impact showcase contains all available impact choices and is cleared when the game leaves Recruit. Repeat the showcase check for every game; games without custom displays should use the generic per-option showcase.
+
 ## Snake gameplay mechanics
 
 The timings below are measured from the start of the Live state. Normal green slime food should continue spawning and be edible throughout.
