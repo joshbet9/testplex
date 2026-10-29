@@ -549,7 +549,7 @@ public final class ArcadePortRules {
     public static Material bombLobbersBlockAfterExplosion(Material material) {
         if (material == null) return Material.AIR;
         return switch (material) {
-            case STONE, GRANITE, POLISHED_GRANITE, DIORITE, POLISHED_DIORITE, ANDESITE, POLISHED_ANDESITE -> Material.COBBLESTONE;
+            case STONE -> Material.COBBLESTONE;
             case STONE_BRICKS, MOSSY_STONE_BRICKS, CHISELED_STONE_BRICKS -> Material.CRACKED_STONE_BRICKS;
             default -> Material.AIR;
         };
