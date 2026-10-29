@@ -875,13 +875,17 @@ public final class ArcadePortRules {
         };
     }
 
-    /** Source kits activate only when an iron axe is right-clicked. Body Slam and Bacon Blast
-     * defer to interactive blocks; Pig's cloak perk runs on any right-click with its axe. */
+    /**
+     * Modern test controls deliberately accept an axe right-click on any target.
+     * Bukkit reports air/block clicks as PlayerInteractEvent and entity clicks as
+     * PlayerInteractEntityEvent; callers route both into this same ability gate.
+     * Keep the clickedUsableBlock parameter for call-site compatibility, but do not
+     * let looking at a chest, player or other surface suppress the ability.
+     */
     public static boolean shouldActivateBaconBrawlAbility(boolean rightClick, org.bukkit.Material held,
             boolean clickedUsableBlock, String kit) {
         String normalized = normalizeBaconBrawlKit(kit);
-        if (!rightClick || held != org.bukkit.Material.IRON_AXE || normalized == null) return false;
-        return "pig".equals(normalized) || !clickedUsableBlock;
+        return rightClick && held == org.bukkit.Material.IRON_AXE && normalized != null;
     }
 
     /** The retained Sheep Pig kit is the one source kit whose disguise is a pink sheep. */
