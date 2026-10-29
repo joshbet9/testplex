@@ -110,7 +110,7 @@ jobs:
             echo "- Built artifacts: TestplexModernArcade.jar, MonsterMazeModern.jar, SnakeModern.jar and ArcadeMechanicsModern.jar"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Gameplay ports: Monster Maze/Snake plus 14 mechanics-first prototypes; in-game validation still required"
-            echo "- Server deploy: intentionally not performed by this workflow"
+            echo "- Server deploy: successful pushes to feat/testplex-modern-26.3-platform automatically invoke the isolated Hyper-V deploy job; pull requests and manual build-only runs do not deploy"
           } >> "$GITHUB_STEP_SUMMARY"
 
   deploy-modern-hyperv:
