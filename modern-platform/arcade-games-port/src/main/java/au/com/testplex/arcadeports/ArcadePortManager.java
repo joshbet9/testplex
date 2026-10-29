@@ -2466,6 +2466,8 @@ public final class ArcadePortManager implements Listener {
                         + ChatColor.GRAY + " • Right-click");
             }
         }
+        updateBaconSpectatorCompasses(session);
+
         for (Map.Entry<UUID, Long> entry : new ArrayList<>(session.baconSlams.entrySet())) {
             UUID slammerId = entry.getKey();
             Player slammer = session.players.get(slammerId);
@@ -2490,6 +2492,41 @@ public final class ArcadePortManager implements Listener {
      * Mama Piggles' Baby Piggles companion is a client-visible baby pig. It is
      * invulnerable and follows the owner; normal player hitboxes remain authoritative.
      */
+    /** Reborn's CompassModule gives eliminated Bacon Brawl players a live nearest-opponent tracker. */
+    private void updateBaconSpectatorCompasses(Session session) {
+        List<Player> targets = alivePlayers(session);
+        if (targets.isEmpty()) return;
+        for (Player spectator : session.players.values()) {
+            if (spectator == null || !spectator.isOnline()
+                    || session.alive.contains(spectator.getUniqueId())) continue;
+            boolean hasCompass = Arrays.stream(spectator.getInventory().getContents())
+                    .anyMatch(this::isBaconTrackingCompass);
+            if (!hasCompass) {
+                spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
+                        "Tracks the nearest surviving pig."));
+            }
+            Player target = targets.stream()
+                    .min(java.util.Comparator.comparingDouble(candidate ->
+                            candidate.getLocation().distanceSquared(spectator.getLocation())))
+                    .orElse(null);
+            if (target != null) spectator.setCompassTarget(target.getLocation());
+        }
+    }
+
+    private boolean isBaconTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && ChatColor.stripColor(meta.getDisplayName()).equals("Tracking Compass");
+    }
+
+    private Player nearestAliveBaconTarget(Session session, Player spectator) {
+        return alivePlayers(session).stream()
+                .min(java.util.Comparator.comparingDouble(candidate ->
+                        candidate.getLocation().distanceSquared(spectator.getLocation())))
+                .orElse(null);
+    }
+
     private void updateBaconBabyPig(Session session, Player owner, long now) {
         UUID ownerId = owner.getUniqueId();
         UUID pigId = session.baconBabyPigs.get(ownerId);
@@ -3630,6 +3667,21 @@ public final class ArcadePortManager implements Listener {
         for (UUID id : session.players.keySet()) {
             Player p = session.players.get(id);
             if (!p.isOnline()) continue;
+            if (session.type == ArcadePortGame.BACON_BRAWL
+                    && !session.alive.contains(id)
+                    && isBaconTrackingCompass(p.getInventory().getItemInMainHand())) {
+                Player target = nearestAliveBaconTarget(session, p);
+                if (target != null) {
+                    double distance = Math.sqrt(target.getLocation().distanceSquared(p.getLocation()));
+                    double height = target.getLocation().getY() - p.getLocation().getY();
+                    p.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.YELLOW + target.getName()
+                            + ChatColor.WHITE + " | Distance: " + ChatColor.YELLOW
+                            + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                            + ChatColor.WHITE + " | Height: " + ChatColor.YELLOW
+                            + String.format(java.util.Locale.ROOT, "%.1f", height));
+                    continue;
+                }
+            }
             int score = session.scores.getOrDefault(id, 0);
             String specific = gameStatusText(session, p);
             String timeText = session.endsAt > 0L ? seconds + "s" : "survive";
@@ -3799,6 +3851,7 @@ public final class ArcadePortManager implements Listener {
             }
             if (player.isOnline()) {
                 player.setGameMode(GameMode.SPECTATOR);
+                player.getInventory().clear();
                 player.sendMessage(ChatColor.RED + "Knocked out! You are out of Bacon Brawl.");
             }
             // Bacon Brawl is Reborn's last-pig-standing SoloGame: eliminated players do not respawn.
@@ -5355,6 +5408,15 @@ public final class ArcadePortManager implements Listener {
                 shooter.playSound(shooter.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 0.7F, 1.5F);
             }
         }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBaconTrackingCompassDrop(org.bukkit.event.player.PlayerDropItemEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.BACON_BRAWL
+                || !isBaconTrackingCompass(event.getItemDrop().getItemStack())) return;
+        event.setCancelled(true);
+        event.getPlayer().sendMessage(ChatColor.YELLOW + "You cannot drop the Tracking Compass.");
     }
 
     @EventHandler
