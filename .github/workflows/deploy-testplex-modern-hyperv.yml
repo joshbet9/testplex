@@ -94,14 +94,25 @@ jobs:
           artifacts_json="$RUNNER_TEMP/testplex-modern-source-artifacts.json"
           curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
             "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID" -o "$run_json"
-          jq -e --arg repo "$GITHUB_REPOSITORY" --arg branch "feat/testplex-modern-26.3-platform" '
-            .status == "completed" and .conclusion == "success" and
+          # In auto-deploy mode, this is the caller workflow's own run. It is
+          # still in_progress while this deployment job executes, but the
+          # caller's needs: build-modern-arcade gate guarantees the build job
+          # succeeded. Manual dispatch must continue to use a completed,
+          # successful build from an earlier run.
+          if [[ "$SOURCE_RUN_ID" == "$GITHUB_RUN_ID" ]]; then
+            SOURCE_RUN_MODE="same-run"
+          else
+            SOURCE_RUN_MODE="completed-run"
+          fi
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg branch "feat/testplex-modern-26.3-platform" --arg mode "$SOURCE_RUN_MODE" '
+            (if $mode == "same-run" then .status == "in_progress"
+             else .status == "completed" and .conclusion == "success" end) and
             .head_branch == $branch and
             ((.head_repository.full_name // "") | ascii_downcase) == ($repo | ascii_downcase) and
             .path == ".github/workflows/testplex-modern-build.yml" and
             (.head_sha | test("^[0-9a-f]{40}$"))
           ' "$run_json" >/dev/null || {
-            echo "Source run must be a successful Testplex Modern build from feat/testplex-modern-26.3-platform in this repository." >&2
+            echo "Source must be this in-progress modern build (automatic mode, after its build job passed) or a completed successful Testplex Modern build from feat/testplex-modern-26.3-platform in this repository." >&2
             exit 1
           }
           source_sha="$(jq -er '.head_sha' "$run_json")"
