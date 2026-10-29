@@ -297,8 +297,46 @@ class ArcadePortGameTest {
         java.nio.file.Files.createDirectories(nestedWorld);
         java.nio.file.Files.write(nestedWorld.resolve("level.dat"), new byte[] {1, 2, 3});
         java.nio.file.Files.writeString(nestedWorld.resolve("WorldConfig.dat"), "MAP_NAME:Mighty Lava Arena\\n");
+        java.nio.file.Files.createDirectories(nestedWorld.resolve("region"));
+        java.nio.file.Files.write(nestedWorld.resolve("region/r.0.0.mca"), new byte[] {1});
 
         assertEquals(nestedWorld, SourceMapCatalog.locateMapRoot(temporaryDirectory));
+    }
+
+    @Test void legacySourceMapStorageIsNormalisedForPaper26WithoutOverwritingTerrain(
+            @org.junit.jupiter.api.io.TempDir Path temporaryDirectory) throws Exception {
+        Path worldRoot = temporaryDirectory.resolve("arcadeport_source_bacon_brawl");
+        java.nio.file.Files.createDirectories(worldRoot.resolve("region"));
+        java.nio.file.Files.write(worldRoot.resolve("region/r.0.0.mca"), new byte[] {1, 2, 3});
+        java.nio.file.Files.createDirectories(worldRoot.resolve("entities"));
+        java.nio.file.Files.write(worldRoot.resolve("entities/r.0.0.mca"), new byte[] {4});
+        java.nio.file.Files.write(worldRoot.resolve("level.dat"), new byte[] {1});
+        java.nio.file.Files.writeString(worldRoot.resolve("WorldConfig.dat"), "MAP_NAME:Mighty Lava Arena\\n");
+
+        SourceMapCatalog.preparePaper26WorldStorage(worldRoot);
+        Path modernRoot = worldRoot.resolve("dimensions/minecraft/overworld");
+        assertTrue(java.nio.file.Files.isRegularFile(modernRoot.resolve("region/r.0.0.mca")));
+        assertTrue(java.nio.file.Files.isRegularFile(modernRoot.resolve("entities/r.0.0.mca")));
+        assertFalse(java.nio.file.Files.exists(worldRoot.resolve("region")));
+        assertTrue(java.nio.file.Files.isRegularFile(worldRoot.resolve("level.dat")));
+        assertTrue(java.nio.file.Files.isRegularFile(worldRoot.resolve("WorldConfig.dat")));
+
+        // The structural conversion is idempotent after a partial retry.
+        SourceMapCatalog.preparePaper26WorldStorage(worldRoot);
+        assertTrue(java.nio.file.Files.isRegularFile(modernRoot.resolve("region/r.0.0.mca")));
+    }
+
+    @Test void paper26SourceMapNormalisationRejectsAmbiguousExistingRegionData(
+            @org.junit.jupiter.api.io.TempDir Path temporaryDirectory) throws Exception {
+        Path worldRoot = temporaryDirectory.resolve("arcadeport_source_bacon_brawl");
+        java.nio.file.Files.createDirectories(worldRoot.resolve("region"));
+        java.nio.file.Files.write(worldRoot.resolve("region/r.0.0.mca"), new byte[] {1});
+        Path modernRegion = worldRoot.resolve("dimensions/minecraft/overworld/region");
+        java.nio.file.Files.createDirectories(modernRegion);
+        java.nio.file.Files.write(modernRegion.resolve("r.0.0.mca"), new byte[] {2});
+
+        org.junit.jupiter.api.Assertions.assertThrows(java.io.IOException.class,
+                () -> SourceMapCatalog.preparePaper26WorldStorage(worldRoot));
     }
 
     @Test void sourceMapMetadataLookupFindsLegacyConfigWhenPaperMovesTheDimensionFolder(
