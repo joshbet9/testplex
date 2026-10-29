@@ -24,6 +24,19 @@ public final class ArcadePortRules {
     public static final int RUNNER_MAX_FROSTBALLS = 16;
     public static final int RUNNER_FROSTBALL_SLOW_TICKS = 40;
     public static final int RUNNER_FROSTBALL_SLOW_AMPLIFIER = 2;
+    /** Selected community balance value for the King of Bacon win achievement. */
+    public static final int BACON_BRAWL_KING_OF_BACON_WINS = 15;
+    /** Pigs In Blankets is earned by six kills in a single game. */
+    public static final int BACON_BRAWL_PIGS_IN_BLANKETS_KILLS = 6;
+
+    public static boolean shouldAwardBaconPigsInBlankets(int killsThisGame) {
+        return killsThisGame >= BACON_BRAWL_PIGS_IN_BLANKETS_KILLS;
+    }
+
+    public static boolean shouldAwardBaconKingOfBacon(int wins) {
+        return wins >= BACON_BRAWL_KING_OF_BACON_WINS;
+    }
+
     /** Original Bacon Brawl is decided by kills at the two-minute mark. */
     public static final long BACON_BRAWL_ROUND_MILLIS = 120_000L;
     public static final long BACON_BRAWL_RESPAWN_DELAY_TICKS = 20L;
