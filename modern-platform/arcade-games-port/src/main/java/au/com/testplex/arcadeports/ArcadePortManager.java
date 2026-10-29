@@ -2499,8 +2499,13 @@ public final class ArcadePortManager implements Listener {
         for (Player spectator : session.players.values()) {
             if (spectator == null || !spectator.isOnline()
                     || session.alive.contains(spectator.getUniqueId())) continue;
-            boolean hasCompass = Arrays.stream(spectator.getInventory().getContents())
-                    .anyMatch(this::isBaconTrackingCompass);
+            boolean hasCompass = false;
+            for (ItemStack item : spectator.getInventory().getContents()) {
+                if (isBaconTrackingCompass(item)) {
+                    hasCompass = true;
+                    break;
+                }
+            }
             if (!hasCompass) {
                 spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
                         "Tracks the nearest surviving pig."));
