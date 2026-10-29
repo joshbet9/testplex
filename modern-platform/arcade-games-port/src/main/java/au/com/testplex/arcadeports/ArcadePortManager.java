@@ -5733,6 +5733,11 @@ public final class ArcadePortManager implements Listener {
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
         session.alive.remove(id);
+        if (session.type == ArcadePortGame.BACON_BRAWL) {
+            clearBaconCloak(session, id);
+            removeBaconBabyPig(session, id);
+            session.baconSlams.remove(id);
+        }
         PlayerSnapshot snapshot = session.snapshots.get(id);
         if (snapshot != null) pendingRestore.put(id, snapshot);
         if (session.type == ArcadePortGame.DEATH_TAG) session.tagged.remove(id);
