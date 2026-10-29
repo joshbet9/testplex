@@ -13,6 +13,8 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Effect;
+import org.bukkit.Sound;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -26,8 +28,11 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.Inventory;
@@ -40,6 +45,10 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import net.minecraft.server.v1_8_R3.ChatComponentText;
+import net.minecraft.server.v1_8_R3.PacketPlayOutChat;
+import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
+
 import mineplex.core.gadget.GadgetManager;
 import mineplex.core.gadget.types.Gadget;
 import mineplex.core.gadget.types.GadgetType;
@@ -50,6 +59,7 @@ import nautilus.game.arcade.Arcade;
 import nautilus.game.arcade.ArcadeManager;
 import nautilus.game.arcade.game.Game;
 import nautilus.game.arcade.game.Game.GameState;
+import nautilus.game.arcade.game.games.baconbrawl.BaconBrawl;
 
 /**
  * Testbed-only lobby tools for replaying native Arcade win effects and summoning
@@ -641,6 +651,10 @@ public final class ArcadeTestHarness implements CommandExecutor, Listener
 
                 ArmorStand stand = (ArmorStand) bukkitEntity;
                 stand.setGravity(false);
+                // The disguise makes the dummy look like a Player to clients. A marker
+                // stand removes the server-side collision box while retaining the entity
+                // id used by attack packets, so it can still act as a target.
+                stand.setMarker(true);
                 stand.setArms(true);
                 stand.setBasePlate(false);
                 stand.setSmall(false);
@@ -732,6 +746,104 @@ public final class ArcadeTestHarness implements CommandExecutor, Listener
             plugin.getLogger().log(java.util.logging.Level.FINE, "Bot disguise was already removed", ex);
         }
         if (bot.stand != null && !bot.stand.isDead()) bot.stand.remove();
+    }
+
+    /**
+     * Target dummies are not Players, so normal game hit-feedback handlers won't
+     * necessarily run for them. Supply a visible per-hit impact and an action-bar
+     * status so they remain useful for hit/cooldown testing.
+     */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBotHit(EntityDamageByEntityEvent event)
+    {
+        BotActor bot = findBot(event.getEntity());
+        if (bot == null || bot.stand == null || !bot.stand.isValid())
+            return;
+
+        Player attacker = playerDamager(event.getDamager());
+        Location impact = bot.stand.getLocation().clone().add(0.0D, 1.25D, 0.0D);
+        impact.getWorld().playEffect(impact, Effect.STEP_SOUND, Material.REDSTONE_BLOCK);
+        impact.getWorld().playSound(impact, Sound.HURT_FLESH, 0.8F, 1.0F);
+
+        if (attacker != null && attacker.isOnline())
+        {
+            boolean boosted = false;
+            double multiplier = 1.0D;
+            Game game = arcadeManager == null ? null : arcadeManager.GetGame();
+            if (game instanceof BaconBrawl)
+            {
+                multiplier = ((BaconBrawl) game).getTimedKnockbackMultiplier();
+                boosted = multiplier > 1.0001D;
+            }
+            String text = boosted
+                    ? ChatColor.GREEN + "TIMED BOOST! " + ChatColor.YELLOW + "Knockback x"
+                        + String.format(Locale.ROOT, "%.2f", multiplier)
+                    : ChatColor.GREEN + "HIT! " + ChatColor.GRAY + bot.game.name;
+            sendHitActionBar(attacker, text);
+        }
+
+        // A short floating label makes the target's impact obvious to spectators too.
+        final ArmorStand label = impact.getWorld().spawn(impact.clone().add(0.0D, 0.65D, 0.0D), ArmorStand.class);
+        label.setVisible(false);
+        label.setSmall(true);
+        label.setGravity(false);
+        label.setBasePlate(false);
+        label.setArms(false);
+        label.setMarker(true);
+        label.setCanPickupItems(false);
+        label.setCustomName(ChatColor.RED + "" + ChatColor.BOLD + (boostedHitActive() ? "BOOSTED HIT!" : "HIT!"));
+        label.setCustomNameVisible(true);
+        Bukkit.getScheduler().runTaskLater(plugin, new Runnable()
+        {
+            @Override
+            public void run()
+            {
+                if (label.isValid() && !label.isDead())
+                    label.remove();
+            }
+        }, 10L);
+    }
+
+    private boolean boostedHitActive()
+    {
+        Game game = arcadeManager == null ? null : arcadeManager.GetGame();
+        return game instanceof BaconBrawl
+                && ((BaconBrawl) game).getTimedKnockbackMultiplier() > 1.0001D;
+    }
+
+    private BotActor findBot(Entity entity)
+    {
+        if (entity == null) return null;
+        for (BotActor bot : bots)
+        {
+            if (bot.stand == entity) return bot;
+        }
+        return null;
+    }
+
+    private Player playerDamager(Entity entity)
+    {
+        if (entity instanceof Player) return (Player) entity;
+        if (entity instanceof Projectile)
+        {
+            Object shooter = ((Projectile) entity).getShooter();
+            if (shooter instanceof Player) return (Player) shooter;
+        }
+        return null;
+    }
+
+    private void sendHitActionBar(Player player, String message)
+    {
+        try
+        {
+            ((CraftPlayer) player).getHandle().playerConnection.sendPacket(
+                    new PacketPlayOutChat(new ChatComponentText(message), (byte) 2));
+        }
+        catch (Exception ex)
+        {
+            // Feedback must never interrupt the match if a test actor isn't backed by a normal CraftPlayer.
+            player.sendMessage(message);
+        }
     }
 
     @EventHandler
