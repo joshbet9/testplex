@@ -500,6 +500,18 @@ public final class ArcadePortRules {
         return velocity;
     }
 
+    /** Vanilla 1.8 World#getBlockDensity uses a sample step based on each bounding-box dimension. */
+    public static double bombLobbersExposureSampleStep(double dimension) {
+        if (!Double.isFinite(dimension) || dimension < 0.0D) return Double.NaN;
+        return 1.0D / (dimension * 2.0D + 1.0D);
+    }
+
+    /** Vanilla offsets the X/Z sample grid to centre it across the unit interval. */
+    public static double bombLobbersExposureSampleOffset(double step) {
+        if (!Double.isFinite(step) || step <= 0.0D) return 0.0D;
+        return (1.0D - Math.floor(1.0D / step) * step) / 2.0D;
+    }
+
     public static long bombLobbersCraftmanIntervalMillis(long liveMillis) {
         if (liveMillis <= 20_000L) return 8_000L;
         if (liveMillis <= 40_000L) return 7_000L;
