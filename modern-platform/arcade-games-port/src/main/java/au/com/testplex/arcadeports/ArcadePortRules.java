@@ -677,6 +677,13 @@ public final class ArcadePortRules {
         return throwerTeam >= 0 && nearestSpawnTeam >= 0 && throwerTeam == nearestSpawnTeam;
     }
 
+    /** The source cancels a TNT detonation if its thrower is unavailable or it is on that team's own side. */
+    public static boolean shouldCancelBombLobbersExplosion(
+            boolean throwerOnline, int throwerTeam, int explosionSideTeam) {
+        return !throwerOnline
+                || shouldSuppressBombLobbersSpawnSideExplosion(throwerTeam, explosionSideTeam);
+    }
+
     /** Reborn eliminates a Bomb Lobbers player once they cross into another team's side. */
     public static boolean shouldEliminateBombLobbersForSide(int playerTeam, int nearestSpawnTeam) {
         return playerTeam >= 0 && nearestSpawnTeam >= 0 && playerTeam != nearestSpawnTeam;

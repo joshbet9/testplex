@@ -587,6 +587,11 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("unknown"));
     }
 
+    @Test void bombLobbersUsesItsLegacyFiveDamageWaterPenalty() {
+        assertEquals(5, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.BOMB_LOBBERS, "Mighty Lava Arena"));
+        assertEquals(0, ArcadePortRules.sourceWorldWaterDamage(ArcadePortGame.BACON_BRAWL, "Mighty Lava Arena"));
+    }
+
     @Test void bombLobbersSpectatorCompassTargetsOnlyOpponentsAndUsesThreeSecondTeleportCooldown() {
         assertTrue(ArcadePortRules.shouldBombLobbersCompassTrackTeam(0, 1));
         assertFalse(ArcadePortRules.shouldBombLobbersCompassTrackTeam(0, 0));
@@ -1370,6 +1375,15 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isArcadePortGameEnabled("death-tag", enabled));
         assertFalse(ArcadePortRules.isArcadePortGameEnabled(null, enabled));
         assertFalse(ArcadePortRules.isArcadePortGameEnabled("bacon-brawl", java.util.List.of()));
+    }
+
+    @Test void bombLobbersTntIsCancelledForOfflineThrowerOrOwnSide() {
+        assertTrue(ArcadePortRules.shouldCancelBombLobbersExplosion(false, 0, 1));
+        assertTrue(ArcadePortRules.shouldCancelBombLobbersExplosion(true, 0, 0));
+        assertTrue(ArcadePortRules.shouldCancelBombLobbersExplosion(true, 1, 1));
+        assertFalse(ArcadePortRules.shouldCancelBombLobbersExplosion(true, 0, 1));
+        assertFalse(ArcadePortRules.shouldCancelBombLobbersExplosion(true, -1, 1),
+                "Unknown team assignment does not automatically count as own side");
     }
 
     @Test void bombLobbersTntOnlyDamagesAssignedEnemyTeams() {

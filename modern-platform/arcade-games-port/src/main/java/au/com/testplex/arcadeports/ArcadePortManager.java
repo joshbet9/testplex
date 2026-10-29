@@ -2688,8 +2688,9 @@ public final class ArcadePortManager implements Listener {
         session.lastWorldWaterDamageAt = now;
         for (Player player : new ArrayList<>(alivePlayers(session))) {
             if (!player.isOnline()) continue;
-            boolean inWater = player.getLocation().getBlock().isLiquid()
-                    || player.getEyeLocation().getBlock().isLiquid();
+            // Legacy UtilEnt.isInWater reads the entity's NMS inWater flag, which
+            // accounts for the bounding box, not just the feet/eye block cells.
+            boolean inWater = player.isInWater();
             if (!inWater) continue;
             if (player.getHealth() <= damage) {
                 eliminate(session, player, null, "was lost to the water");
@@ -7857,10 +7858,13 @@ public final class ArcadePortManager implements Listener {
         boolean bombLobbersBlast = session.type == ArcadePortGame.BOMB_LOBBERS;
         boolean evolutionBlast = session.type == ArcadePortGame.EVOLUTION
                 && ownerId != null && session.evolutionLevels.getOrDefault(ownerId, 0) == 3;
-        if (bombLobbersBlast && ownerId != null
-                && ArcadePortRules.shouldSuppressBombLobbersSpawnSideExplosion(
-                        session.teams.getOrDefault(ownerId, -1),
-                        nearestBombLobbersSpawnTeam(session, bomb.getLocation()))) {
+        Player owner = ownerId == null ? null : session.players.get(ownerId);
+        if (bombLobbersBlast && ArcadePortRules.shouldCancelBombLobbersExplosion(
+                owner != null && owner.isOnline(),
+                session.teams.getOrDefault(ownerId, -1),
+                nearestBombLobbersSpawnTeam(session, bomb.getLocation()))) {
+            // Reborn cancels and removes TNT whose thrower left the match, or whose
+            // explosion is still on its own side. Never allow an orphaned TNT to blast.
             event.blockList().clear();
             event.setCancelled(true);
             removeBombTracking(session, bombId);
@@ -7871,7 +7875,6 @@ public final class ArcadePortManager implements Listener {
 
         if (ownerId != null && (bombLobbersBlast || evolutionBlast)) {
             Location blast = bomb.getLocation().clone();
-            Player owner = session.players.get(ownerId);
             Map<UUID, Double> blastExposure = new HashMap<>();
             if (bombLobbersBlast) {
                 for (Player target : alivePlayers(session)) {
