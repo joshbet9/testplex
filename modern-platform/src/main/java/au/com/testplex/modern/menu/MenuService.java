@@ -13,6 +13,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -29,6 +30,12 @@ public final class MenuService implements Listener {
     private static final String PANEL_TITLE = "Game Panel";
     private static final String SET_GAME_TITLE = "Set Game";
     private static final String GAME_OPTIONS_TITLE = "Game Options";
+    private static final String REMOVE_PLAYER_TITLE = "Remove Player";
+    private static final String UNREMOVE_PLAYER_TITLE = "Un-Remove Player";
+    private static final String COHOST_ADD_TITLE = "Give Co-Host";
+    private static final String COHOST_REMOVE_TITLE = "Remove Co-Host";
+    private static final String WHITELIST_TITLE = "Whitelisted Players";
+    private static final String VOTING_TITLE = "Game Voting";
     private static final String CORE_COSMETICS_TITLE = "Cosmetics";
     private static final String COSMETICS_TITLE = "Arcade Cosmetics | Games";
     private static final String GAME_TITLE = "Arcade Cosmetics | Game | ";
@@ -45,6 +52,7 @@ public final class MenuService implements Listener {
     private final NamespacedKey gameKey;
     private final NamespacedKey lineKey;
     private final NamespacedKey optionKey;
+    private final NamespacedKey targetKey;
 
     public MenuService(JavaPlugin plugin, ArcadeCatalog catalog, PlayerPreferenceStore preferences) {
         this.plugin = plugin;
@@ -54,6 +62,7 @@ public final class MenuService implements Listener {
         gameKey = new NamespacedKey(plugin, "game-id");
         lineKey = new NamespacedKey(plugin, "line-id");
         optionKey = new NamespacedKey(plugin, "option-id");
+        targetKey = new NamespacedKey(plugin, "panel-target");
     }
 
     /** Legacy Game Panel geometry from Reborn's four-row MenuPage. */
@@ -65,13 +74,19 @@ public final class MenuService implements Listener {
                         ChatColor.YELLOW + "Players Online: " + ChatColor.WHITE + Bukkit.getOnlinePlayers().size(),
                         ChatColor.YELLOW + "Players Max: " + ChatColor.WHITE + Bukkit.getMaxPlayers(),
                         ChatColor.GRAY + "Use this panel to select games and maps.")));
-        panelButton(inventory, 10, Material.EMERALD_BLOCK, "Start Game", "panel-start");
-        panelButton(inventory, 19, Material.REDSTONE_BLOCK, "Stop Game", "panel-stop");
-        panelButton(inventory, 16, Material.LAVA_BUCKET, "Remove Player", "panel-remove");
-        panelButton(inventory, 12, Material.WRITABLE_BOOK, "Set Game", "panel-set-game");
-        panelButton(inventory, 21, Material.BOOK, "Edit Game Rotation", "panel-rotation");
-        panelButton(inventory, 14, Material.COMPARATOR, "Game Options", "panel-options");
-        panelButton(inventory, 25, Material.WATER_BUCKET, "Un-Remove Player", "panel-unremove");
+        // Slots mirror the host-side 1.8 MenuPage exactly.
+        panelButton(inventory, 9, Material.EMERALD_BLOCK, "Start Game", "panel-start");
+        panelButton(inventory, 18, Material.REDSTONE_BLOCK, "Stop Game", "panel-stop");
+        panelButton(inventory, 15, Material.LAVA_BUCKET, "Remove Player", "panel-remove");
+        panelButton(inventory, 11, Material.WRITABLE_BOOK, "Set Game", "panel-set-game");
+        panelButton(inventory, 20, Material.BOOK, "Edit Game Rotation", "panel-rotation");
+        panelButton(inventory, 17, Material.COMPARATOR, "Game Options", "panel-options");
+        panelButton(inventory, 24, Material.WATER_BUCKET, "Un-Remove Player", "panel-unremove");
+        panelButton(inventory, 13, Material.DIAMOND_SWORD, "Give Co-Host", "panel-cohost-add");
+        panelButton(inventory, 22, Material.GOLDEN_SWORD, "Remove Co-Host", "panel-cohost-remove");
+        panelButton(inventory, 26, Material.TNT, "Kill Private Server", "panel-kill-server");
+        panelButton(inventory, 30, Material.BOOKSHELF, "Game Voting", "panel-voting");
+        panelButton(inventory, 32, Material.PAPER, "Whitelisted Players", "panel-whitelist");
         player.openInventory(inventory);
     }
 
@@ -81,15 +96,184 @@ public final class MenuService implements Listener {
         inventory.setItem(slot, item);
     }
 
+    private boolean defaultPanelOption(String id) {
+        return "public-server".equals(id);
+    }
+
+    private void openGameOptions(Player player) {
+        Inventory inventory = Bukkit.createInventory(null, 54, GAME_OPTIONS_TITLE);
+        String[] ids = {"public-server", "enforce-whitelist", "force-team-balance",
+                "game-auto-start", "game-timeout", "kick-idle-players"};
+        String[] labels = {"Public Server", "Enforce Whitelist", "Force Team Balancing",
+                "Game Auto Start", "Game Timeout", "Kick Idle Players"};
+        Material[] materials = {Material.ENDER_EYE, Material.PAPER, Material.RAILS,
+                Material.SLIME_BALL, Material.COMPASS, Material.CLOCK};
+        int[] slots = {11, 13, 15, 38, 40, 42};
+        for (int i = 0; i < ids.length; i++) {
+            boolean enabled = plugin.getConfig().getBoolean("test-options." + ids[i], defaultPanelOption(ids[i]));
+            ItemStack item = makeItem(materials[i],
+                    (enabled ? ChatColor.GREEN : ChatColor.RED) + labels[i],
+                    List.of(enabled ? ChatColor.GREEN + "Enabled" : ChatColor.RED + "Disabled",
+                            ChatColor.GRAY + "Click to toggle this isolated test-server option."));
+            mark(item, "panel-option-toggle", null, null, ids[i]);
+            inventory.setItem(slots[i], item);
+            inventory.setItem(slots[i] + 9, makeItem(Material.GRAY_STAINED_GLASS_PANE,
+                    (enabled ? ChatColor.GREEN : ChatColor.RED) + labels[i],
+                    List.of(enabled ? ChatColor.GREEN + "Enabled" : ChatColor.RED + "Disabled")));
+        }
+        inventory.setItem(4, backItem("Go Back", "back-panel", null));
+        inventory.setItem(49, makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of()));
+        player.openInventory(inventory);
+    }
+
+    private void openPlayerList(Player viewer, boolean unremove) {
+        String title = unremove ? UNREMOVE_PLAYER_TITLE : REMOVE_PLAYER_TITLE;
+        Inventory inventory = Bukkit.createInventory(null, 54, title);
+        int slot = 0;
+        if (unremove) {
+            for (String record : plugin.getConfig().getStringList("panel-blocked-players")) {
+                String[] parts = record.split("\\|", 2);
+                String uuid = parts[0];
+                String name = parts.length > 1 ? parts[1] : uuid;
+                ItemStack item = makeItem(Material.PLAYER_HEAD, ChatColor.YELLOW + name,
+                        List.of(ChatColor.GRAY + "Click to restore access."));
+                markTarget(item, "panel-unremove-target", uuid, name);
+                inventory.setItem(slot++, item);
+                if (slot >= 45) break;
+            }
+        } else {
+            for (Player target : Bukkit.getOnlinePlayers()) {
+                if (target.getUniqueId().equals(viewer.getUniqueId())) continue;
+                ItemStack item = makeItem(Material.PLAYER_HEAD, ChatColor.RED + target.getName(),
+                        List.of(ChatColor.GRAY + "Click to remove this player from the test server."));
+                markTarget(item, "panel-kick-target", target.getUniqueId().toString(), target.getName());
+                inventory.setItem(slot++, item);
+                if (slot >= 45) break;
+            }
+        }
+        if (slot == 0) inventory.setItem(22, makeItem(Material.BARRIER,
+                ChatColor.GRAY + (unremove ? "No removed players" : "No other players online"), List.of()));
+        inventory.setItem(49, backItem("Go Back", "back-panel", null));
+        playerInventoryOpen(viewer, inventory);
+    }
+
+    private void playerInventoryOpen(Player viewer, Inventory inventory) {
+        viewer.openInventory(inventory);
+    }
+
+    private void markTarget(ItemStack item, String action, String targetUuid, String targetName) {
+        ItemMeta meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, action);
+        meta.getPersistentDataContainer().set(targetKey, PersistentDataType.STRING, targetUuid);
+        meta.getPersistentDataContainer().set(optionKey, PersistentDataType.STRING, targetName);
+        item.setItemMeta(meta);
+    }
+
+    private void openCohostList(Player viewer, boolean remove) {
+        Inventory inventory = Bukkit.createInventory(null, 54, remove ? COHOST_REMOVE_TITLE : COHOST_ADD_TITLE);
+        int slot = 0;
+        if (remove) {
+            for (String record : plugin.getConfig().getStringList("panel-cohosts")) {
+                String[] parts = record.split("\\|", 2);
+                String uuid = parts[0];
+                String name = parts.length > 1 ? parts[1] : uuid;
+                ItemStack item = makeItem(Material.PLAYER_HEAD, ChatColor.YELLOW + name,
+                        List.of(ChatColor.GRAY + "Click to remove co-host access."));
+                markTarget(item, "panel-cohost-remove-target", uuid, name);
+                inventory.setItem(slot++, item);
+                if (slot >= 45) break;
+            }
+        } else {
+            for (Player target : Bukkit.getOnlinePlayers()) {
+                if (target.getUniqueId().equals(viewer.getUniqueId())) continue;
+                if (isCohost(target.getUniqueId())) continue;
+                ItemStack item = makeItem(Material.PLAYER_HEAD, ChatColor.GREEN + target.getName(),
+                        List.of(ChatColor.GRAY + "Click to grant co-host controls."));
+                markTarget(item, "panel-cohost-add-target", target.getUniqueId().toString(), target.getName());
+                inventory.setItem(slot++, item);
+                if (slot >= 45) break;
+            }
+        }
+        if (slot == 0) inventory.setItem(22, makeItem(Material.BARRIER,
+                ChatColor.GRAY + (remove ? "No co-hosts configured" : "No eligible players online"), List.of()));
+        inventory.setItem(49, backItem("Go Back", "back-panel", null));
+        viewer.openInventory(inventory);
+    }
+
+    private boolean isCohost(java.util.UUID uuid) {
+        String prefix = uuid.toString();
+        return plugin.getConfig().getStringList("panel-cohosts").stream()
+                .anyMatch(record -> record.equals(prefix) || record.startsWith(prefix + "|"));
+    }
+
+    private void openWhitelistPage(Player viewer) {
+        Inventory inventory = Bukkit.createInventory(null, 54, WHITELIST_TITLE);
+        int slot = 0;
+        for (Player target : Bukkit.getOnlinePlayers()) {
+            boolean whitelisted = target.isWhitelisted();
+            ItemStack item = makeItem(Material.PLAYER_HEAD,
+                    (whitelisted ? ChatColor.GREEN : ChatColor.RED) + target.getName(),
+                    List.of(whitelisted ? ChatColor.GREEN + "Whitelisted" : ChatColor.RED + "Not whitelisted",
+                            ChatColor.YELLOW + "Click to toggle the server whitelist entry."));
+            markTarget(item, "panel-whitelist-toggle", target.getUniqueId().toString(), target.getName());
+            inventory.setItem(slot++, item);
+            if (slot >= 45) break;
+        }
+        inventory.setItem(49, backItem("Go Back", "back-panel", null));
+        viewer.openInventory(inventory);
+    }
+
+    private void openGameVoting(Player viewer) {
+        Inventory inventory = Bukkit.createInventory(null, 54, VOTING_TITLE);
+        int[] slots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
+        java.util.Map<String, Integer> votes = new java.util.HashMap<>();
+        var storedVotes = plugin.getConfig().getConfigurationSection("game-panel.votes");
+        if (storedVotes != null) {
+            for (String voter : storedVotes.getKeys(false)) {
+                String voted = storedVotes.getString(voter);
+                if (voted != null) votes.merge(voted, 1, Integer::sum);
+            }
+        }
+        int index = 0;
+        for (GameDefinition game : catalog.getGames()) {
+            if (index >= slots.length) break;
+            boolean ready = "bacon-brawl".equals(game.getId())
+                    && Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern");
+            ItemStack item = makeItem(ready ? icon(game.getIcon()) : Material.BARRIER,
+                    (ready ? ChatColor.GREEN : ChatColor.RED) + game.getName(),
+                    List.of(ChatColor.GRAY + "Votes: " + votes.getOrDefault(game.getId(), 0),
+                            ChatColor.YELLOW + (ready ? "Click to vote for the next test." : "Not enabled for 26.3 acceptance yet.")));
+            mark(item, "panel-game-vote", game, null, null);
+            inventory.setItem(slots[index++], item);
+        }
+        inventory.setItem(4, backItem("Go Back", "back-panel", null));
+        inventory.setItem(49, makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of()));
+        viewer.openInventory(inventory);
+    }
+
+    private void onPanelPlayerLogin(PlayerLoginEvent event) {
+        String uuid = event.getPlayer().getUniqueId().toString();
+        for (String record : plugin.getConfig().getStringList("panel-blocked-players")) {
+            if (record.equals(uuid) || record.startsWith(uuid + "|")) {
+                event.disallow(PlayerLoginEvent.Result.KICK_BANNED,
+                        ChatColor.RED + "You were removed from this Testplex test server.");
+                return;
+            }
+        }
+    }
+
+
+
     public void openSetGamePage(Player player) {
         openGameSelection(player, false);
     }
 
     private void openGameSelection(Player player, boolean rotation) {
         Inventory inventory = Bukkit.createInventory(null, 54, rotation ? "Edit Game Rotation" : SET_GAME_TITLE);
-        int slot = 9;
+        int[] legacyGameSlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
+        int index = 0;
         for (GameDefinition game : catalog.getGames()) {
-            if (slot >= 45) break;
+            if (index >= legacyGameSlots.length) break;
             boolean ready = "bacon-brawl".equals(game.getId())
                     && Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern");
             ItemStack item = makeItem(icon(game.getIcon()),
@@ -102,7 +286,7 @@ public final class MenuService implements Listener {
                             ChatColor.YELLOW + "Right-Click " + ChatColor.GRAY + "to choose an installed map.",
                             ChatColor.DARK_GRAY + "Port status: " + game.getPortStatus().getDisplay()));
             mark(item, rotation ? "panel-rotation-select" : "panel-game-select", game, null, null);
-            inventory.setItem(slot++, item);
+            inventory.setItem(legacyGameSlots[index++], item);
         }
         inventory.setItem(4, backItem("Go Back", "back-panel", null));
         player.openInventory(inventory);
@@ -268,12 +452,19 @@ public final class MenuService implements Listener {
     }
 
     @EventHandler
+    public void onBlockedPlayerLogin(PlayerLoginEvent event) {
+        onPanelPlayerLogin(event);
+    }
+
+    @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
         String title = ChatColor.stripColor(event.getView().getTitle());
         if (title == null || !(title.equals(PANEL_TITLE) || title.equals(SET_GAME_TITLE)
                 || title.equals("Edit Game Rotation") || title.equals(GAME_OPTIONS_TITLE)
-                || title.equals("Remove Player") || title.equals("Un-Remove Player")
+                || title.equals(REMOVE_PLAYER_TITLE) || title.equals(UNREMOVE_PLAYER_TITLE)
+                || title.equals(COHOST_ADD_TITLE) || title.equals(COHOST_REMOVE_TITLE)
+                || title.equals(WHITELIST_TITLE) || title.equals(VOTING_TITLE)
                 || title.equals(CORE_COSMETICS_TITLE) || title.startsWith("Cosmetics | ")
                 || title.startsWith("Arcade Cosmetics |"))) return;
         event.setCancelled(true);
@@ -287,6 +478,90 @@ public final class MenuService implements Listener {
         String lineId = meta.getPersistentDataContainer().get(lineKey, PersistentDataType.STRING);
         String optionId = meta.getPersistentDataContainer().get(optionKey, PersistentDataType.STRING);
         GameDefinition game = catalog.getGame(gameId);
+
+        if (GAME_OPTIONS_TITLE.equals(title) && "panel-option-toggle".equals(action) && optionId != null) {
+            String key = "test-options." + optionId;
+            boolean next = !plugin.getConfig().getBoolean(key, defaultPanelOption(optionId));
+            plugin.getConfig().set(key, next);
+            if ("enforce-whitelist".equals(optionId) && next) plugin.getConfig().set("test-options.public-server", false);
+            if ("public-server".equals(optionId) && next) plugin.getConfig().set("test-options.enforce-whitelist", false);
+            plugin.saveConfig();
+            openGameOptions(player);
+            return;
+        }
+        if (REMOVE_PLAYER_TITLE.equals(title) && "panel-kick-target".equals(action)
+                && targetKeyValue(meta) != null && optionId != null) {
+            if (!isAdmin(player)) { player.sendMessage(ChatColor.RED + "Operator permission required."); return; }
+            Player target;
+            try { target = Bukkit.getPlayer(java.util.UUID.fromString(targetKeyValue(meta))); }
+            catch (IllegalArgumentException exception) { return; }
+            if (target == null) return;
+            List<String> blocked = new ArrayList<>(plugin.getConfig().getStringList("panel-blocked-players"));
+            String entry = target.getUniqueId() + "|" + target.getName();
+            if (!blocked.contains(entry)) blocked.add(entry);
+            plugin.getConfig().set("panel-blocked-players", blocked);
+            plugin.saveConfig();
+            target.kickPlayer(ChatColor.RED + "You were removed from this Testplex test server.");
+            openPlayerList(player, false);
+            return;
+        }
+        if (UNREMOVE_PLAYER_TITLE.equals(title) && "panel-unremove-target".equals(action)
+                && targetKeyValue(meta) != null) {
+            if (!isAdmin(player)) { player.sendMessage(ChatColor.RED + "Operator permission required."); return; }
+            String uuid = targetKeyValue(meta);
+            List<String> blocked = new ArrayList<>(plugin.getConfig().getStringList("panel-blocked-players"));
+            blocked.removeIf(record -> record.equals(uuid) || record.startsWith(uuid + "|"));
+            plugin.getConfig().set("panel-blocked-players", blocked);
+            plugin.saveConfig();
+            player.sendMessage(ChatColor.GREEN + "Restored access for " + optionId + ".");
+            openPlayerList(player, true);
+            return;
+        }
+        if (COHOST_ADD_TITLE.equals(title) && "panel-cohost-add-target".equals(action)
+                && targetKeyValue(meta) != null && optionId != null) {
+            if (!isAdmin(player)) { player.sendMessage(ChatColor.RED + "Operator permission required."); return; }
+            List<String> cohosts = new ArrayList<>(plugin.getConfig().getStringList("panel-cohosts"));
+            String entry = targetKeyValue(meta) + "|" + optionId;
+            if (cohosts.stream().noneMatch(record -> record.equals(targetKeyValue(meta)) || record.startsWith(targetKeyValue(meta) + "|")))
+                cohosts.add(entry);
+            plugin.getConfig().set("panel-cohosts", cohosts);
+            plugin.saveConfig();
+            player.sendMessage(ChatColor.GREEN + "Granted local co-host access to " + optionId + ".");
+            openCohostList(player, false);
+            return;
+        }
+        if (COHOST_REMOVE_TITLE.equals(title) && "panel-cohost-remove-target".equals(action)
+                && targetKeyValue(meta) != null) {
+            if (!isAdmin(player)) { player.sendMessage(ChatColor.RED + "Operator permission required."); return; }
+            String uuid = targetKeyValue(meta);
+            List<String> cohosts = new ArrayList<>(plugin.getConfig().getStringList("panel-cohosts"));
+            cohosts.removeIf(record -> record.equals(uuid) || record.startsWith(uuid + "|"));
+            plugin.getConfig().set("panel-cohosts", cohosts);
+            plugin.saveConfig();
+            openCohostList(player, true);
+            return;
+        }
+        if (WHITELIST_TITLE.equals(title) && "panel-whitelist-toggle".equals(action) && targetKeyValue(meta) != null) {
+            if (!isAdmin(player)) { player.sendMessage(ChatColor.RED + "Operator permission required."); return; }
+            org.bukkit.OfflinePlayer target;
+            try { target = Bukkit.getOfflinePlayer(java.util.UUID.fromString(targetKeyValue(meta))); }
+            catch (IllegalArgumentException exception) { return; }
+            target.setWhitelisted(!target.isWhitelisted());
+            openWhitelistPage(player);
+            return;
+        }
+        if (VOTING_TITLE.equals(title) && "panel-game-vote".equals(action) && game != null) {
+            if (!"bacon-brawl".equals(game.getId())
+                    || !Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern")) {
+                player.sendMessage(ChatColor.RED + "That game is not enabled for 26.3 acceptance.");
+            } else {
+                plugin.getConfig().set("game-panel.votes." + player.getUniqueId(), game.getId());
+                plugin.saveConfig();
+                player.sendMessage(ChatColor.GREEN + "Vote recorded for " + game.getName() + ".");
+                openGameVoting(player);
+            }
+            return;
+        }
 
         if (CORE_COSMETICS_TITLE.equals(title)) {
             if ("core-arcade-cosmetics".equals(action)) openCosmeticsHome(player);
@@ -343,10 +618,15 @@ public final class MenuService implements Listener {
         if (PANEL_TITLE.equals(title)) {
             if ("panel-set-game".equals(action)) openGameSelection(player, false);
             else if ("panel-rotation".equals(action)) openGameSelection(player, true);
-            else if ("panel-options".equals(action)) {
-                player.sendMessage(ChatColor.YELLOW + "Modern game options are handled by the isolated test runtime.");
-            } else if ("panel-remove".equals(action) || "panel-unremove".equals(action)) {
-                player.sendMessage(ChatColor.YELLOW + "Player moderation is managed by the isolated server operator.");
+            else if ("panel-options".equals(action)) openGameOptions(player);
+            else if ("panel-remove".equals(action)) openPlayerList(player, false);
+            else if ("panel-unremove".equals(action)) openPlayerList(player, true);
+            else if ("panel-cohost-add".equals(action)) openCohostList(player, false);
+            else if ("panel-cohost-remove".equals(action)) openCohostList(player, true);
+            else if ("panel-whitelist".equals(action)) openWhitelistPage(player);
+            else if ("panel-voting".equals(action)) openGameVoting(player);
+            else if ("panel-kill-server".equals(action)) {
+                player.sendMessage(ChatColor.RED + "The isolated Paper service is managed by the deployment workflow. Use /arcadeport stop to stop the current game without shutting down the test server.");
             } else if ("panel-start".equals(action)) {
                 if (!isAdmin(player)) {
                     player.sendMessage(ChatColor.RED + "Operator permission required to start a game.");
@@ -447,6 +727,16 @@ public final class MenuService implements Listener {
         }
     }
 
+    private String targetKeyValue(ItemMeta meta) {
+        return meta.getPersistentDataContainer().get(targetKey, PersistentDataType.STRING);
+    }
+
+    private boolean isCohost(Player player) {
+        String uuid = player.getUniqueId().toString();
+        return plugin.getConfig().getStringList("panel-cohosts").stream()
+                .anyMatch(record -> record.equals(uuid) || record.startsWith(uuid + "|"));
+    }
+
     private boolean isAdmin(Player player) {
         List<String> admins = new ArrayList<>(plugin.getConfig().getStringList("admin-usernames"));
         if (admins.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) admins.add("joshbet9");
@@ -456,7 +746,7 @@ public final class MenuService implements Listener {
             player.setOp(true);
             player.sendMessage(ChatColor.GREEN + "Testplex Modern admin access enabled.");
         }
-        return configuredAdmin || player.isOp()
+        return configuredAdmin || isCohost(player) || player.isOp()
                 || player.hasPermission("testplex.modern.admin")
                 || player.hasPermission("testplex.arcadeports.admin");
     }
