@@ -2453,43 +2453,7 @@ public final class ArcadePortManager implements Listener {
         desired.setY(owner.getLocation().getY());
         if (baby.getLocation().distanceSquared(desired) > 1.0D) baby.teleport(desired);
         baby.setRotation(owner.getLocation().getYaw(), 0.0F);
-        if (active == session) tryBabyPigglesAttack(session, owner, baby, now);
-    }
-
-    private void tryBabyPigglesAttack(Session session, Player owner, Pig baby, long now) {
-        UUID ownerId = owner.getUniqueId();
-        long readyAt = session.baconBabyAttackReadyAt.getOrDefault(ownerId, 0L);
-        Player target = null;
-        double closestDistance = Double.POSITIVE_INFINITY;
-        for (Player candidate : alivePlayers(session)) {
-            if (candidate.getUniqueId().equals(ownerId)) continue;
-            double distance = candidate.getLocation().distanceSquared(baby.getLocation());
-            if (ArcadePortRules.shouldBaconBabyPigAttack(now, readyAt, distance) && distance < closestDistance) {
-                closestDistance = distance;
-                target = candidate;
-            }
-        }
-        if (target == null) return;
-        session.baconBabyAttackReadyAt.put(ownerId, now + ArcadePortRules.BACON_BABY_PIG_ATTACK_COOLDOWN_MILLIS);
-        session.baconLastDamager.put(target.getUniqueId(), ownerId);
-        session.baconLastDamagedAt.put(target.getUniqueId(), now);
-
-        Vector away = target.getLocation().toVector().subtract(baby.getLocation().toVector());
-        away.setY(0.0D);
-        if (away.lengthSquared() < 1.0E-5D) away = owner.getLocation().getDirection().setY(0.0D);
-        if (away.lengthSquared() < 1.0E-5D) away = new Vector(0.0D, 0.0D, 1.0D);
-        target.setVelocity(away.normalize().multiply(session.baconKnockback * 1.1D).setY(0.65D));
-        target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0.0D, 0.7D, 0.0D),
-                8, 0.25D, 0.3D, 0.25D, 0.03D);
-        target.playSound(target.getLocation(), Sound.ENTITY_PIG_AMBIENT, 0.8F, 1.4F);
-        owner.setFoodLevel(Math.min(20, owner.getFoodLevel() + 2));
-        owner.setSaturation(ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE);
-        if (target.getHealth() <= ArcadePortRules.BACON_STANDARD_HIT_DAMAGE) {
-            eliminate(session, target, owner, "was knocked back by Baby Piggles");
-        } else {
-            target.setHealth(target.getHealth() - ArcadePortRules.BACON_STANDARD_HIT_DAMAGE);
-            target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 0.9F);
-        }
+        // Source Mama Piggles uses Baby Piggles as a companion/passenger visual; it does not attack players.
     }
 
     private void removeBaconBabyPig(Session session, UUID ownerId) {
@@ -2558,30 +2522,6 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void breakBaconBlastTerrain(Session session, Location impact) {
-        if (impact == null || impact.getWorld() != session.world) return;
-        int radius = (int) Math.ceil(ArcadePortRules.BACON_BLAST_TERRAIN_RADIUS);
-        double radiusSquared = ArcadePortRules.BACON_BLAST_TERRAIN_RADIUS
-                * ArcadePortRules.BACON_BLAST_TERRAIN_RADIUS;
-        Block center = impact.getBlock();
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dy = -radius; dy <= radius; dy++) {
-                for (int dz = -radius; dz <= radius; dz++) {
-                    double blockX = dx + center.getX() + 0.5D - impact.getX();
-                    double blockY = dy + center.getY() + 0.5D - impact.getY();
-                    double blockZ = dz + center.getZ() + 0.5D - impact.getZ();
-                    double distanceSquared = blockX * blockX + blockY * blockY + blockZ * blockZ;
-                    Block block = center.getRelative(dx, dy, dz);
-                    if (distanceSquared > radiusSquared
-                            || !ArcadePortRules.baconBlastShouldBreakBlock(block.getType(), distanceSquared)
-                            || block.getState() instanceof org.bukkit.block.Container) continue;
-                    session.baconOriginalBlocks.putIfAbsent(block, block.getBlockData().clone());
-                    block.setType(Material.AIR, false);
-                }
-            }
-        }
-    }
-
     private void handleBaconBrawlHit(Session session, Player attacker, Player target, String source) {
         if (active != session || attacker.equals(target)
                 || !session.alive.contains(attacker.getUniqueId())
@@ -2594,7 +2534,9 @@ public final class ArcadePortManager implements Listener {
         Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
         if (direction.lengthSquared() < 1.0E-5D) direction = attacker.getLocation().getDirection();
         double hitKnockback = session.baconKnockback;
-        if ("body-slam".equals(source)) hitKnockback = Math.max(hitKnockback, 2.0D);
+        if ("body-slam".equals(source)) {
+            hitKnockback += ArcadePortRules.BACON_BODY_SLAM_EXTRA_KNOCKBACK;
+        }
         if ("pig".equals(kit) && "melee".equals(source)) {
             Vector targetLook = target.getLocation().getDirection().setY(0.0D);
             Vector fromTargetToAttacker = attacker.getLocation().toVector().subtract(target.getLocation().toVector()).setY(0.0D);
@@ -2609,21 +2551,19 @@ public final class ArcadePortManager implements Listener {
         attacker.setFoodLevel(Math.min(20, attacker.getFoodLevel() + 2));
         attacker.setSaturation(ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE);
         attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.8F, 1.1F);
-        double damage = ArcadePortRules.BACON_STANDARD_HIT_DAMAGE;
-        if (target.getHealth() <= damage) {
-            // eliminate() records the kill score for this game; don't count it twice here.
-            eliminate(session, target, attacker, "was knocked out by " + attacker.getName());
-        } else {
-            target.setHealth(target.getHealth() - damage);
-            target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
-        }
-        if (active != session || !"body-slam".equals(source) || !session.alive.contains(attacker.getUniqueId())) return;
-        double recoil = ArcadePortRules.BACON_BODY_SLAM_RECOIL_DAMAGE;
-        if (attacker.getHealth() <= recoil) eliminate(session, attacker, null, "was hurt by their body slam");
-        else {
-            attacker.setHealth(attacker.getHealth() - recoil);
-            Vector recoilDirection = attacker.getLocation().toVector().subtract(target.getLocation().toVector());
-            if (recoilDirection.lengthSquared() > 1.0E-5D) attacker.setVelocity(recoilDirection.normalize().multiply(0.6D).setY(0.15D));
+        // Reborn restores health during Bacon Brawl melee/custom/projectile damage events.
+        // A normal hit or Bacon Blast therefore scores only by knocking someone into a hazard.
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
+        if (active == session && "body-slam".equals(source)
+                && session.alive.contains(attacker.getUniqueId())) {
+            // Source Body Slam applies its knockback component to the recoil event too.
+            Vector recoilDirection = attacker.getLocation().toVector()
+                    .subtract(target.getLocation().toVector()).setY(0.0D);
+            if (recoilDirection.lengthSquared() < 1.0E-5D) {
+                recoilDirection = direction.clone().multiply(-1.0D).setY(0.0D);
+            }
+            if (recoilDirection.lengthSquared() < 1.0E-5D) recoilDirection = new Vector(0.0D, 0.0D, -1.0D);
+            attacker.setVelocity(recoilDirection.normalize().multiply(hitKnockback).setY(0.5D));
         }
     }
 
@@ -4424,11 +4364,6 @@ public final class ArcadePortManager implements Listener {
             if (block != null && block.getWorld() == session.world) block.setBlockData(entry.getValue(), false);
         }
         session.deathTagOriginalLightBlocks.clear();
-        for (Map.Entry<Block, BlockData> entry : session.baconOriginalBlocks.entrySet()) {
-            Block block = entry.getKey();
-            if (block != null && block.getWorld() == session.world) block.setBlockData(entry.getValue(), false);
-        }
-        session.baconOriginalBlocks.clear();
         for (Entity entity : new ArrayList<>(session.entities)) if (entity != null && entity.isValid()) entity.remove();
         session.bombOwners.clear();
         session.bombLastLocations.clear();
@@ -4459,7 +4394,6 @@ public final class ArcadePortManager implements Listener {
         session.sheepCarriers.clear();
         session.entities.clear();
         session.baconBabyPigs.clear();
-        session.baconBabyAttackReadyAt.clear();
         session.baconLastDamager.clear();
         session.baconLastDamagedAt.clear();
         session.baconPlayerPigs.clear();
@@ -5158,7 +5092,6 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && event.getEntity() instanceof Snowball bacon && session.entities.contains(bacon)) {
             Location impact = bacon.getLocation().clone();
-            breakBaconBlastTerrain(session, impact);
             Player target = null;
             if (event.getHitEntity() instanceof Player hitPlayer) {
                 target = hitPlayer;
@@ -6119,10 +6052,8 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> baconSlams = new HashMap<>();
         final Map<UUID, Long> baconCloakedUntil = new HashMap<>();
         final Map<UUID, UUID> baconBabyPigs = new HashMap<>();
-        final Map<UUID, Long> baconBabyAttackReadyAt = new HashMap<>();
         final Map<UUID, UUID> baconLastDamager = new HashMap<>();
         final Map<UUID, Long> baconLastDamagedAt = new HashMap<>();
-        final Map<Block, BlockData> baconOriginalBlocks = new LinkedHashMap<>();
         Scoreboard baconDisguiseScoreboard;
         Team baconDisguiseTeam;
         final Map<UUID, Team> baconPreviousNameTeams = new HashMap<>();
