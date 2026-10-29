@@ -2235,6 +2235,11 @@ public final class ArcadePortManager implements Listener {
                 } else player.setHealth(player.getHealth() - ArcadePortRules.BACON_STARVATION_DAMAGE);
             }
         }
+        // Re-evaluate the second escalation using the current alive count. A match that
+        // drops to two players after the first escalation must accelerate without waiting
+        // for a stale interval calculated while three or more players were alive.
+        session.baconEscalationIntervalMillis = ArcadePortRules.nextBaconKnockbackInterval(
+                session.baconKnockbackEscalations, alivePlayers(session).size());
         if (active != session || session.baconEscalationIntervalMillis <= 0L
                 || now - session.lastBaconEscalationAt < session.baconEscalationIntervalMillis) return;
         session.lastBaconEscalationAt = now;
