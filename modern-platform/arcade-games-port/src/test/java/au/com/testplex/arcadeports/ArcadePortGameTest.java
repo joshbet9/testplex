@@ -581,6 +581,15 @@ class ArcadePortGameTest {
         assertEquals(10_000L, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
     }
 
+    @Test void sourceMapFallThresholdUsesVerticalBoundsInsteadOfFixedY58() {
+        assertEquals(3.0D, ArcadePortRules.sourceMapVoidThresholdY(true, 4), 0.00001D);
+        assertEquals(13.0D, ArcadePortRules.sourceMapVoidThresholdY(true, 14), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.sourceMapVoidThresholdY(true, 0), 0.00001D);
+        assertEquals(58.0D, ArcadePortRules.sourceMapVoidThresholdY(false, 4), 0.00001D);
+        assertTrue(13.0D > ArcadePortRules.sourceMapVoidThresholdY(true, 4),
+                "Mighty Lava Arena Bacon Brawl starts around Y=13 and must not be eliminated on spawn");
+    }
+
     @Test void dragonEscapeVoidThresholdFollowsLowAltitudeSourceMaps() {
         assertEquals(58.0D, ArcadePortRules.dragonEscapeVoidThresholdY("Skylands"), 0.00001D);
         assertEquals(24.0D, ArcadePortRules.dragonEscapeVoidThresholdY("Through Hell"), 0.00001D);
