@@ -2560,7 +2560,15 @@ public final class ArcadePortManager implements Listener {
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
         if (active == session && "body-slam".equals(source)
                 && session.alive.contains(attacker.getUniqueId())) {
-            // Source Body Slam applies its knockback component to the recoil event too.
+            // Reborn raises a reciprocal recoil damage event from the struck player to the slammer.
+            // That event restores health, gives the struck player the hunger-on-hit reward, and
+            // lets that player receive fall-kill credit if the slammer is knocked off the arena.
+            long now = System.currentTimeMillis();
+            session.baconLastDamager.put(attacker.getUniqueId(), target.getUniqueId());
+            session.baconLastDamagedAt.put(attacker.getUniqueId(), now);
+            target.setFoodLevel(Math.min(20, target.getFoodLevel() + 2));
+            target.setSaturation(ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE);
+
             Vector recoilDirection = attacker.getLocation().toVector()
                     .subtract(target.getLocation().toVector()).setY(0.0D);
             if (recoilDirection.lengthSquared() < 1.0E-5D) {
