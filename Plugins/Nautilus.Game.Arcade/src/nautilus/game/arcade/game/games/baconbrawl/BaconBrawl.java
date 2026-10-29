@@ -10,6 +10,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
+import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
+
+import net.minecraft.server.v1_8_R3.ChatComponentText;
+import net.minecraft.server.v1_8_R3.PacketPlayOutChat;
+import org.bukkit.craftbukkit.v1_8_R3.entity.CraftPlayer;
 
 import mineplex.core.common.util.C;
 import mineplex.core.common.util.UtilPlayer;
@@ -131,6 +136,47 @@ public class BaconBrawl extends SoloGame
 		{
 			UtilPlayer.hunger(damager, 2);
 		}
+	}
+
+	/**
+	 * Give immediate, per-hit feedback and expose the timed knockback escalation.
+	 * The classic Bacon Brawl boost rises every timed escalation in update(); the
+	 * multiplier displayed here is the actual value used by the knockback handler.
+	 */
+	@EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+	public void hitFeedback(CustomDamageEvent event)
+	{
+		if (!IsLive() || event.GetDamageePlayer() == null)
+			return;
+
+		Player attacker = event.GetDamagerPlayer(true);
+		Player target = event.GetDamageePlayer();
+		if (attacker == null || target == null || attacker.equals(target) || !IsAlive(attacker))
+			return;
+
+		DamageCause cause = event.GetCause();
+		if (cause != DamageCause.ENTITY_ATTACK && cause != DamageCause.PROJECTILE && cause != DamageCause.CUSTOM)
+			return;
+
+		double multiplier = getTimedKnockbackMultiplier();
+		boolean boosted = multiplier > 1.0001D;
+		String feedback = boosted
+				? C.cGreen + C.Bold + "TIMED BOOST! " + C.cYellow + "Knockback x" + String.format(java.util.Locale.ROOT, "%.2f", multiplier)
+				: C.cGreen + C.Bold + "HIT! " + C.cGray + "Timed boost inactive";
+		((CraftPlayer) attacker).getHandle().playerConnection.sendPacket(
+				new PacketPlayOutChat(new ChatComponentText(feedback), (byte) 2));
+
+		// The target gets a visible impact burst as well as the attacker's hit marker.
+		BaconBrawlCosmeticEffects.preview(target.getLocation().clone().add(0, 1.0, 0),
+				BaconBrawlCosmeticEffects.choice(attacker.getUniqueId()),
+				boosted ? "boosted-hit-impact" : "hit-impact");
+		target.getWorld().playSound(target.getLocation(), Sound.HURT_FLESH, 0.8F, boosted ? 1.35F : 1.0F);
+	}
+
+	/** Actual timed multiplier applied to Bacon Brawl hits. */
+	public double getTimedKnockbackMultiplier()
+	{
+		return _knockbackMagnitude / 1.5D;
 	}
 
 	@EventHandler(priority = EventPriority.HIGH)
