@@ -187,6 +187,7 @@ public final class ArcadePortManager implements Listener {
                 && session.players.containsKey(player.getUniqueId()) && session.alive.contains(player.getUniqueId())) {
             clearBaconCloak(session, player.getUniqueId());
             session.baconSlams.remove(player.getUniqueId());
+            session.baconAbilityReadyAt.remove(player.getUniqueId());
             if (!"mama-piggles".equals(kit)) removeBaconBabyPig(session, player.getUniqueId());
             session.baconKits.put(player.getUniqueId(), kit);
             giveKit(session, player);
@@ -2312,7 +2313,8 @@ public final class ArcadePortManager implements Listener {
     private void updateBaconPlayerPig(Session session, Player owner, long now) {
         UUID ownerId = owner.getUniqueId();
         UUID avatarId = session.baconPlayerPigs.get(ownerId);
-        boolean sheepKit = "pig".equals(session.baconKits.getOrDefault(ownerId, "el-muchacho-pigo"));
+        boolean sheepKit = ArcadePortRules.baconBrawlUsesSheepAvatar(
+                session.baconKits.getOrDefault(ownerId, "el-muchacho-pigo"));
         LivingEntity avatar = null;
         if (avatarId != null) {
             for (Entity entity : session.entities) {
