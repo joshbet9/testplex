@@ -3,6 +3,7 @@ package au.com.testplex.arcadeports;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.DyeColor;
+import org.bukkit.EntityEffect;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -46,6 +47,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private static final String QUEUE_TITLE = "Team Select | Queue";
     private static final String BOT_MENU_PREFIX = "Bot Cosmetics | ";
     private static final String[] THEMES = {"porky", "inferno", "frost", "slime", "royal", "confetti"};
+    private static final String[] BOMB_LOBBERS_THEMES = {
+            "classic", "ember", "shockwave", "spark", "confetti", "frost", "slime"
+    };
     private static final int[] KIT_MENU_SLOTS = {10, 11, 12, 13, 14, 15, 16, 17, 18};
     private static final Material[] PEDESTAL_COLORS = {
             Material.YELLOW_WOOL, Material.LIME_WOOL, Material.PINK_WOOL,
@@ -298,24 +302,89 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         showcase.clear();
         for (Entity e : world.getEntities()) {
             String tag = e.getPersistentDataContainer().get(themeKey, PersistentDataType.STRING);
-            if (tag != null && tag.startsWith("showcase:")) e.remove();
+            if (tag != null && (tag.startsWith("showcase:") || "showcase-label".equals(tag))) e.remove();
         }
-        if (selectedGame != ArcadePortGame.BACON_BRAWL) return;
-        int[] xs = {-9,-6,-3,0,3,6}, zs = {18,26};
-        String[] names = {"Porky","Inferno","Frost","Slime","Royal","Confetti"};
-        for (int row=0; row<2; row++) for (int col=0; col<THEMES.length; col++) {
-            Location at = new Location(world, xs[col]+0.5D, ModernArcadeLobby.FLOOR_Y+1.0D, zs[row]+0.5D);
-            LivingEntity demo;
-            if (row == 0) demo = world.spawn(at, Pig.class);
-            else {
-                Sheep sheep = world.spawn(at, Sheep.class); sheep.setColor(DyeColor.PINK); demo = sheep;
+        if (selectedGame == ArcadePortGame.BACON_BRAWL) {
+            int[] xs = {-9,-6,-3,0,3,6}, zs = {18,26};
+            String[] names = {"Porky","Inferno","Frost","Slime","Royal","Confetti"};
+            for (int row=0; row<2; row++) for (int col=0; col<THEMES.length; col++) {
+                Location at = new Location(world, xs[col]+0.5D, ModernArcadeLobby.FLOOR_Y+1.0D, zs[row]+0.5D);
+                LivingEntity demo;
+                if (row == 0) demo = world.spawn(at, Pig.class);
+                else {
+                    Sheep sheep = world.spawn(at, Sheep.class); sheep.setColor(DyeColor.PINK); demo = sheep;
+                }
+                demo.setCustomName((row==0 ? ChatColor.GOLD+"Pig - " : ChatColor.LIGHT_PURPLE+"Pink Sheep - ")+names[col]+" Set");
+                demo.setCustomNameVisible(true); demo.setInvulnerable(true); demo.setRemoveWhenFarAway(false);
+                demo.setPersistent(false); demo.setSilent(true); demo.setCollidable(false);
+                if(demo instanceof Mob mob) mob.setAI(false);
+                demo.getPersistentDataContainer().set(themeKey, PersistentDataType.STRING, "showcase:"+THEMES[col]);
+                showcase.add(demo);
             }
-            demo.setCustomName((row==0 ? ChatColor.GOLD+"Pig - " : ChatColor.LIGHT_PURPLE+"Pink Sheep - ")+names[col]+" Set");
-            demo.setCustomNameVisible(true); demo.setInvulnerable(true); demo.setRemoveWhenFarAway(false);
-            demo.setPersistent(false); demo.setSilent(true); if(demo instanceof Mob mob) mob.setAI(false);
-            demo.getPersistentDataContainer().set(themeKey, PersistentDataType.STRING, "showcase:"+THEMES[col]);
-            showcase.add(demo);
+            return;
         }
+
+        String[] themes = selectedGame == ArcadePortGame.BOMB_LOBBERS ? BOMB_LOBBERS_THEMES : THEMES;
+        int columns = selectedGame == ArcadePortGame.BOMB_LOBBERS ? 7 : 6;
+        int left = columns == 7 ? -9 : -7;
+        Material iconMaterial = showcaseIcon(selectedGame);
+        for (int i = 0; i < themes.length; i++) {
+            String theme = themes[i];
+            int column = i % columns;
+            int row = i / columns;
+            int x = lobby.spawnLocation().getBlockX() + left + column * 3;
+            int z = lobby.spawnLocation().getBlockZ() + 18 + row * 4;
+            Location at = new Location(world, x + 0.5D, ModernArcadeLobby.FLOOR_Y + 1.0D, z + 0.5D);
+
+            ArmorStand icon = world.spawn(at.clone().subtract(0.0D, 0.18D, 0.0D), ArmorStand.class);
+            icon.setVisible(false);
+            icon.setSmall(true);
+            icon.setGravity(false);
+            icon.setBasePlate(false);
+            icon.setArms(false);
+            icon.setMarker(true);
+            icon.setInvulnerable(true);
+            icon.setCanPickupItems(false);
+            icon.setHelmet(new ItemStack(iconMaterial));
+            icon.setCustomName("showcase:" + theme);
+            icon.setCustomNameVisible(false);
+            icon.getPersistentDataContainer().set(themeKey, PersistentDataType.STRING, "showcase:" + theme);
+            showcase.add(icon);
+
+            ArmorStand label = world.spawn(at.clone().add(0.0D, 0.65D, 0.0D), ArmorStand.class);
+            label.setVisible(false);
+            label.setSmall(false);
+            label.setGravity(false);
+            label.setBasePlate(false);
+            label.setArms(false);
+            label.setMarker(true);
+            label.setInvulnerable(true);
+            label.setCanPickupItems(false);
+            String title = selectedGame == ArcadePortGame.BOMB_LOBBERS ? "TNT Impact: " : selectedGame.displayName() + " Preview: ";
+            label.setCustomName(ChatColor.GOLD + title + pretty(theme));
+            label.setCustomNameVisible(true);
+            label.getPersistentDataContainer().set(themeKey, PersistentDataType.STRING, "showcase-label");
+            showcase.add(label);
+        }
+    }
+
+    private Material showcaseIcon(ArcadePortGame game) {
+        return switch (game) {
+            case BOMB_LOBBERS -> Material.TNT;
+            case DEATH_TAG -> Material.ROTTEN_FLESH;
+            case DRAGON_ESCAPE -> Material.BEACON;
+            case DRAGONS -> Material.FIRE_CHARGE;
+            case EVOLUTION -> Material.DRAGON_EGG;
+            case GLADIATORS -> Material.IRON_SWORD;
+            case MICRO_BATTLES -> Material.LIGHT_BLUE_STAINED_GLASS;
+            case ONE_IN_THE_QUIVER -> Material.ARROW;
+            case PAINTBALL -> Material.SNOWBALL;
+            case RUNNER -> Material.WHITE_CONCRETE;
+            case SHEEP_QUEST -> Material.WHITE_WOOL;
+            case SPLEEF -> Material.IRON_SHOVEL;
+            case TURF_WARS -> Material.BOW;
+            default -> game.floor();
+        };
     }
 
     @EventHandler
@@ -462,13 +531,13 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private String key(String n){return n==null?"":n.toLowerCase(Locale.ROOT).trim().replaceAll("[^a-z0-9_-]","-");}
     private boolean removeBot(String n){Bot b=bots.remove(key(n));if(b==null)return false;if(b.actor!=null&&b.actor.isValid())b.actor.remove();plugin.getConfig().set("test-bots."+b.key,null);plugin.saveConfig();refreshDisplays();return true;}
     private void saveBot(Bot b){String p="test-bots."+b.key+".";plugin.getConfig().set(p+"name",b.name);plugin.getConfig().set(p+"theme",b.theme);plugin.getConfig().set(p+"form",b.form);plugin.getConfig().set(p+"kit",b.kit);plugin.saveConfig();}
-    private void replaceBotEntity(Bot b){if(b.actor!=null&&b.actor.isValid())b.actor.remove();Location at=b.actorLocation==null||b.actorLocation.getWorld()!=lobby.ensureWorld()?lobby.spawnLocation().add(0,-3,8):b.actorLocation.clone();spawnBotEntity(b,at,manager.isActiveGame(at.getWorld(),selectedGame));}
+    private void replaceBotEntity(Bot b){if(b.actor!=null&&b.actor.isValid())b.actor.remove();Location at=b.actorLocation==null||b.actorLocation.getWorld()!=lobby.ensureWorld()?lobby.spawnLocation().add(0,-3,8):b.actorLocation.clone();spawnBotEntity(b,at,b.inGame&&b.deployedGame!=null&&manager.isActiveGame(at.getWorld(),b.deployedGame));}
     private void spawnBotEntity(Bot b,Location at,boolean inGame){
         if(at==null||at.getWorld()==null)return;LivingEntity actor;
         if("pink-sheep".equals(b.form)){Sheep sheep=at.getWorld().spawn(at,Sheep.class);sheep.setColor(DyeColor.PINK);actor=sheep;}else actor=at.getWorld().spawn(at,Pig.class);
         // Keep the entity damageable at the Paper level so melee attacks reach EntityDamageByEntityEvent.
         // onBotDamage cancels all damage and applies controlled Bacon Brawl knockback instead.
-        actor.setInvulnerable(false);actor.setRemoveWhenFarAway(false);actor.setPersistent(false);actor.setSilent(true);actor.setCustomNameVisible(true);actor.setCollidable(true);
+        actor.setInvulnerable(false);actor.setRemoveWhenFarAway(false);actor.setPersistent(false);actor.setSilent(true);actor.setCustomNameVisible(true);actor.setCollidable(false);
         actor.getPersistentDataContainer().set(botKey,PersistentDataType.STRING,b.key);actor.getPersistentDataContainer().set(themeKey,PersistentDataType.STRING,b.theme);actor.getPersistentDataContainer().set(formKey,PersistentDataType.STRING,b.form);
         if(actor instanceof Mob mob)mob.setAI(false);b.actor=actor;b.actorLocation=at.clone();b.inGame=inGame;b.arenaSpawn=at.clone();refreshBotAppearance(b);
     }
@@ -484,13 +553,26 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private void tick(){
         refreshDisplays();World world=lobby.ensureWorld();
-        for(Entity e:new ArrayList<>(showcase)){if(e==null||!e.isValid()||e.getWorld()!=world)continue;String value=e.getPersistentDataContainer().get(themeKey,PersistentDataType.STRING);String theme=value!=null&&value.startsWith("showcase:")?value.substring(9):"porky";e.getWorld().spawnParticle(particle(theme),e.getLocation().add(0,1,0),3,0.2,0.3,0.2,0.01);}
+        for (Entity e : new ArrayList<>(showcase)) {
+            if (e == null || !e.isValid() || e.getWorld() != world) continue;
+            String value = e.getPersistentDataContainer().get(themeKey, PersistentDataType.STRING);
+            if (value == null || !value.startsWith("showcase:")) continue;
+            String theme = value.substring("showcase:".length());
+            e.getWorld().spawnParticle(particle(theme), e.getLocation().add(0, 1, 0), 3, 0.2, 0.3, 0.2, 0.01);
+        }
         long now=System.currentTimeMillis();for(Bot b:bots.values())tickBot(b,now,world);
     }
     private void tickBot(Bot b,long now,World lobbyWorld){
         Entity e=b.actor;if(!(e instanceof LivingEntity actor)||!e.isValid()){Location at=b.actorLocation==null?lobby.spawnLocation().add(0,-3,8):b.actorLocation.clone();spawnBotEntity(b,at,b.inGame);return;}
-        if(selectedGame!=ArcadePortGame.BACON_BRAWL||!manager.isActiveGame(e.getWorld(),selectedGame)){if(e.getWorld()!=lobbyWorld&&b.inGame)returnBotsToLobby();return;}
-        List<Player> targets=manager.botTargets(e.getWorld(),selectedGame);Player nearest=null;double distance=Double.POSITIVE_INFINITY;
+        if(!b.inGame||b.deployedGame==null||!manager.isActiveGame(e.getWorld(),b.deployedGame)){
+            if(e.getWorld()!=lobbyWorld&&b.inGame)returnBotsToLobby();
+            return;
+        }
+        if(b.deployedGame!=ArcadePortGame.BACON_BRAWL){
+            e.getWorld().spawnParticle(particle(b.theme),e.getLocation().add(0,1,0),2,0.2,0.2,0.2,0.01);
+            return;
+        }
+        List<Player> targets=manager.botTargets(e.getWorld(),b.deployedGame);Player nearest=null;double distance=Double.POSITIVE_INFINITY;
         for(Player p:targets){double d=p.getLocation().distanceSquared(e.getLocation());if(d<distance){distance=d;nearest=p;}}
         if(nearest==null)return;
         if(e.getLocation().getY()<e.getWorld().getMinHeight()+8){if(b.arenaSpawn!=null)actor.teleport(b.arenaSpawn);return;}
@@ -498,22 +580,61 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         else if(now>=b.nextAttackAt){Vector away=nearest.getLocation().toVector().subtract(e.getLocation().toVector()).setY(0);if(away.lengthSquared()<0.01)away=new Vector(0,0,1);nearest.setVelocity(away.normalize().multiply(Math.min(1.35,Math.max(0.65,manager.baconBrawlKnockbackValue(e.getWorld())))).setY(0.42));nearest.sendActionBar(ChatColor.RED+b.name+ChatColor.GRAY+" hit you!");nearest.getWorld().spawnParticle(particle(b.theme),nearest.getLocation().add(0,1,0),8,0.4,0.3,0.4,0.01);b.nextAttackAt=now+1400;}
         e.getWorld().spawnParticle(particle(b.theme),e.getLocation().add(0,1,0),2,0.2,0.2,0.2,0.01);
     }
-    private Particle particle(String theme){return switch(theme){case "inferno"->Particle.FLAME;case "frost"->Particle.SNOWFLAKE;case "slime"->Particle.CRIT;case "royal"->Particle.END_ROD;case "confetti"->Particle.HAPPY_VILLAGER;default->Particle.CRIT;};}
+    private Particle particle(String theme) {
+        return switch (theme) {
+            case "inferno", "ember" -> Particle.FLAME;
+            case "frost" -> Particle.SNOWFLAKE;
+            case "slime" -> Particle.CRIT;
+            case "royal" -> Particle.END_ROD;
+            case "confetti" -> Particle.HAPPY_VILLAGER;
+            case "spark" -> Particle.FIREWORK;
+            case "shockwave" -> Particle.DAMAGE_INDICATOR;
+            default -> Particle.CRIT;
+        };
+    }
+
+    List<LivingEntity> botTargets(World world, ArcadePortGame game) {
+        List<LivingEntity> targets = new ArrayList<>();
+        if (world == null || game == null) return targets;
+        for (Bot bot : bots.values()) {
+            if (!bot.inGame || bot.deployedGame != game || bot.actor == null
+                    || !bot.actor.isValid() || bot.actor.getWorld() != world
+                    || !(bot.actor instanceof LivingEntity living)) continue;
+            targets.add(living);
+        }
+        return targets;
+    }
 
     public void deployBots(ArcadePortGame game,List<Location> spawns){
-        if(game!=ArcadePortGame.BACON_BRAWL||spawns.isEmpty()){returnBotsToLobby();return;}int index=0;
+        if(game==null||spawns.isEmpty()){returnBotsToLobby();return;}int index=0;
         for(Bot b:bots.values()){Location target=spawns.get(index++%spawns.size()).clone();target.add(index%2==0?3:-3,0,index%3==0?2:-2);
-            if(b.actor==null||!b.actor.isValid())spawnBotEntity(b,target,true);else b.actor.teleport(target);b.inGame=true;b.arenaSpawn=target.clone();b.actorLocation=target.clone();refreshBotAppearance(b);}
+            if(b.actor==null||!b.actor.isValid())spawnBotEntity(b,target,true);else b.actor.teleport(target);
+            b.inGame=true;b.deployedGame=game;b.arenaSpawn=target.clone();b.actorLocation=target.clone();refreshBotAppearance(b);}
     }
     public void returnBotsToLobby(){Location base=lobby.spawnLocation();if(base==null)return;int index=0;
-        for(Bot b:bots.values()){Location home=base.clone().add(index++*1.6D-3,-3,8);if(b.actor==null||!b.actor.isValid())spawnBotEntity(b,home,false);else{b.actor.teleport(home);b.actor.setVelocity(new Vector());if(b.actor instanceof Mob mob)mob.setAI(false);}b.inGame=false;b.actorLocation=home.clone();b.arenaSpawn=null;refreshBotAppearance(b);}
+        for(Bot b:bots.values()){Location home=base.clone().add(index++*1.6D-3,-3,8);if(b.actor==null||!b.actor.isValid())spawnBotEntity(b,home,false);else{b.actor.teleport(home);b.actor.setVelocity(new Vector());if(b.actor instanceof Mob mob)mob.setAI(false);}b.inGame=false;b.deployedGame=null;b.actorLocation=home.clone();b.arenaSpawn=null;refreshBotAppearance(b);}
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
     public void onBotDamage(EntityDamageEvent e){
         Entity entity=e.getEntity();String key=entity.getPersistentDataContainer().get(botKey,PersistentDataType.STRING);
-        if(key==null){String tag=entity.getPersistentDataContainer().get(themeKey,PersistentDataType.STRING);if(entity.getPersistentDataContainer().has(kitNpcKey,PersistentDataType.STRING)||entity.getPersistentDataContainer().has(teamNpcKey,PersistentDataType.STRING)||(tag!=null&&tag.startsWith("showcase:")))e.setCancelled(true);return;}
-        e.setCancelled(true);if(!(entity instanceof LivingEntity actor)||!(e instanceof EntityDamageByEntityEvent be)||!(be.getDamager() instanceof Player attacker)||!manager.isActiveGame(entity.getWorld(),ArcadePortGame.BACON_BRAWL))return;
-        Bot b=bots.get(key);if(b==null)return;applyBotHit(b,actor,attacker,e.getDamage());
+        if(key==null){
+            String tag=entity.getPersistentDataContainer().get(themeKey,PersistentDataType.STRING);
+            if(entity.getPersistentDataContainer().has(kitNpcKey,PersistentDataType.STRING)
+                    ||entity.getPersistentDataContainer().has(teamNpcKey,PersistentDataType.STRING)
+                    ||(tag!=null&&(tag.startsWith("showcase:")||"showcase-label".equals(tag))))e.setCancelled(true);
+            return;
+        }
+        e.setCancelled(true);
+        if(!(entity instanceof LivingEntity actor)||!(e instanceof EntityDamageByEntityEvent be)
+                ||!(be.getDamager() instanceof Player attacker))return;
+        Bot b=bots.get(key);
+        if(b==null||!b.inGame||b.deployedGame==null
+                ||!manager.isActiveGame(entity.getWorld(),b.deployedGame))return;
+        if(b.deployedGame==ArcadePortGame.BACON_BRAWL) {
+            applyBotHit(b,actor,attacker,e.getDamage());
+        } else {
+            showBotImpact(b,actor,attacker,ChatColor.YELLOW+"HIT!",ChatColor.GREEN+"Hit bot "+b.name);
+        }
     }
     /** Fallback for clients/plugins that suppress the normal entity-damage event for NPC targets. */
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=false)
@@ -583,19 +704,57 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private void applyBotHit(Bot bot,LivingEntity actor,Player attacker,double rawDamage){
         actor.setNoDamageTicks(0);
+        ArcadePortManager.BaconBrawlBotHitResult hit = manager.recordBaconBrawlBotHit(attacker,bot.name,rawDamage);
+        double timingMultiplier = hit.timingMultiplier();
         Vector dir=actor.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0);
         if(dir.lengthSquared()<0.01)dir=new Vector(0,0,1);
-        actor.setVelocity(dir.normalize().multiply(Math.min(1.5,Math.max(0.65,manager.baconBrawlKnockbackValue(actor.getWorld())))).setY(0.4));
-        int meter=manager.recordBaconBrawlBotHit(attacker,bot.name,rawDamage);
+        double knockback = manager.baconBrawlKnockbackValue(actor.getWorld()) * timingMultiplier;
+        actor.setVelocity(dir.normalize().multiply(Math.min(1.5,Math.max(0.65,knockback))).setY(0.4));
         lastBotHitAtByAttacker.put(attacker.getUniqueId(),System.currentTimeMillis());
-        attacker.sendActionBar(ChatColor.GREEN+"Hit bot "+bot.name+(meter>=0?" | Meter "+meter+"%":""));
-        actor.getWorld().spawnParticle(particle(bot.theme),actor.getLocation().add(0,1,0),8,0.4,0.3,0.4,0.01);
+        String quality = timingMultiplier >= 1.5D ? ChatColor.GREEN+"TIMED HIT"
+                : timingMultiplier < 1.0D ? ChatColor.RED+"TOO FAST" : ChatColor.YELLOW+"HIT";
+        String actionbar = quality+ChatColor.WHITE+" | KB x"+String.format(Locale.ROOT,"%.2f",timingMultiplier)
+                +(hit.meter()>=0?ChatColor.GRAY+" | Meter "+ChatColor.GREEN+hit.meter()+"%":"");
+        showBotImpact(bot,actor,attacker,quality,actionbar);
+    }
+
+    private void showBotImpact(Bot bot,LivingEntity actor,Player attacker,String visibleLabel,String actionbar) {
+        actor.playEffect(EntityEffect.HURT);
+        actor.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,actor.getLocation().add(0,1,0),5,0.28,0.35,0.28,0.01);
+        actor.getWorld().spawnParticle(particle(bot.theme),actor.getLocation().add(0,1,0),12,0.4,0.4,0.4,0.02);
+        Sound hurt = actor instanceof Pig ? Sound.ENTITY_PIG_HURT : Sound.ENTITY_SHEEP_HURT;
+        actor.getWorld().playSound(actor.getLocation(),hurt,1.0F,1.0F);
+        if(attacker!=null&&attacker.isOnline())attacker.sendActionBar(actionbar);
+        final ArmorStand label=actor.getWorld().spawn(actor.getLocation().clone().add(0,1.8D,0),ArmorStand.class);
+        label.setVisible(false);label.setSmall(true);label.setGravity(false);label.setBasePlate(false);
+        label.setArms(false);label.setMarker(true);label.setInvulnerable(true);label.setCanPickupItems(false);
+        label.setCustomName(visibleLabel);label.setCustomNameVisible(true);
+        Bukkit.getScheduler().runTaskLater(plugin,()->{if(label.isValid()&&!label.isDead())label.remove();},16L);
+    }
+
+    /** Called by the TNT sweep when a Bomb Lobbers test bot is struck directly. */
+    public void showBombLobbersBotDirectHit(LivingEntity target, Player thrower, Location bombLocation) {
+        if (target == null || !target.isValid()) return;
+        String key = target.getPersistentDataContainer().get(botKey,PersistentDataType.STRING);
+        Bot bot = key == null ? null : bots.get(key);
+        if (bot == null) return;
+        Vector away = bombLocation == null ? target.getLocation().toVector()
+                .subtract(thrower == null ? target.getLocation().clone().subtract(0,0,1).toVector() : thrower.getLocation().toVector())
+                : target.getLocation().toVector().subtract(bombLocation.toVector());
+        if (away.lengthSquared()<0.01D) away=new Vector(0,0,1);
+        target.setVelocity(away.normalize().multiply(0.8D).setY(0.35D));
+        if (thrower != null && thrower.isOnline()) {
+            showBotImpact(bot,target,thrower,ChatColor.GOLD+"DIRECT HIT!",
+                    ChatColor.GREEN+"DIRECT HIT!"+ChatColor.GRAY+" | "+bot.name);
+        } else {
+            showBotImpact(bot,target,null,ChatColor.GOLD+"DIRECT HIT!", "");
+        }
     }
 
     public void shutdown(){if(task!=null)task.cancel();returnBotsToLobby();for(Entity e:new ArrayList<>(showcase))if(e!=null&&e.isValid())e.remove();for(Entity e:new ArrayList<>(kitNpcs))if(e!=null&&e.isValid())e.remove();if(teamNpc!=null&&teamNpc.isValid())teamNpc.remove();}
 
     private final class Bot{
-        final String key,name;String theme,form,kit;Entity actor;Location actorLocation,arenaSpawn;boolean inGame;long nextAttackAt;
+        final String key,name;String theme,form,kit;Entity actor;Location actorLocation,arenaSpawn;boolean inGame;ArcadePortGame deployedGame;long nextAttackAt;
         Bot(String key,String name,String theme,String form,String kit){this.key=key;this.name=name;this.theme=List.of(THEMES).contains(theme)?theme:"porky";this.form="pink-sheep".equals(form)?"pink-sheep":"pig";this.kit=ArcadePortRules.normalizeBaconBrawlKit(kit)==null?"el-muchacho-pigo":kit;}
     }
 }
