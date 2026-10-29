@@ -1157,10 +1157,17 @@ public final class ArcadePortManager implements Listener {
                 Block feet = world.getBlockAt(x, y, z);
                 Block head = world.getBlockAt(x, y + 1, z);
                 Material floorType = floor.getType();
-                if (!floorType.isSolid()
+                if (floor.isPassable()
                         || floorType == Material.MAGMA_BLOCK
                         || floorType == Material.CAMPFIRE
                         || floorType == Material.SOUL_CAMPFIRE
+                        || floorType == Material.FIRE
+                        || floorType == Material.SOUL_FIRE
+                        || floorType == Material.CACTUS
+                        || floorType == Material.POWDER_SNOW
+                        || floorType == Material.SWEET_BERRY_BUSH
+                        || floorType == Material.WITHER_ROSE
+                        || floorType == Material.POINTED_DRIPSTONE
                         || !feet.isPassable()
                         || !head.isPassable()
                         || feet.getType() == Material.LAVA
