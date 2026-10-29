@@ -296,6 +296,13 @@ public final class ArcadePortRules {
     }
 
     /** Match Reborn's backstab cone: compare the target's backward look with the attacker direction. */
+    /** Pig's source passive is +250% knockback, i.e. 3.5 times the normal amount. */
+    public static final double BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER = 3.5D;
+
+    public static double baconBrawlKnockbackMultiplier(boolean backstab) {
+        return backstab ? BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER : 1.0D;
+    }
+
     public static boolean isBaconBrawlBackstab(double targetLookX, double targetLookZ,
             double attackerFromTargetX, double attackerFromTargetZ) {
         double lookLength = Math.hypot(targetLookX, targetLookZ);
