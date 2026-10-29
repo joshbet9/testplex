@@ -244,6 +244,19 @@ jobs:
               exit 1
             fi
           fi
+          # Stop an existing modern instance too, so the memory check measures
+          # the headroom available for a clean restart rather than counting its
+          # currently resident JVM heap against itself.
+          if sudo -n systemctl is-active --quiet testplex-modern.service; then
+            echo "Stopping the current modern server for a clean deployment."
+            sudo -n systemctl stop testplex-modern.service
+            stopped=false
+            for attempt in $(seq 1 15); do
+              if ! sudo -n systemctl is-active --quiet testplex-modern.service; then stopped=true; break; fi
+              sleep 2
+            done
+            [[ "$stopped" == "true" ]] || { echo "Modern Testplex did not stop cleanly." >&2; exit 1; }
+          fi
           # The VM is memory-constrained. Stop competing legacy game services
           # automatically; the outer workflow restores their previous state if
           # anything fails, and successful deploys leave only modern Paper up.
@@ -613,7 +626,7 @@ jobs:
           echo "The legacy testplex-reborn.service and standalone Monster Maze units were not modified."
 
       - name: Restore previously running game servers if modern deployment fails
-        if: ${{ failure() && (steps.remote-preflight.outputs.testplex_reborn_was_active == 'true' || steps.remote-preflight.outputs.monstermaze18_was_active == 'true' || steps.remote-preflight.outputs.monstermaze21_was_active == 'true') }}
+        if: ${{ failure() && (steps.remote-preflight.outputs.testplex_reborn_was_active == 'true' || steps.remote-preflight.outputs.monstermaze18_was_active == 'true' || steps.remote-preflight.outputs.monstermaze21_was_active == 'true' || steps.remote-preflight.outputs.modern_was_active == 'true') }}
         shell: bash
         env:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
@@ -639,7 +652,9 @@ jobs:
           mm18="$2"
           mm21="$3"
           modern="$4"
-          if [[ "$modern" != "true" ]]; then
+          if [[ "$modern" == "true" ]]; then
+            sudo -n systemctl start testplex-modern.service
+          else
             sudo -n systemctl stop testplex-modern.service 2>/dev/null || true
           fi
           [[ "$reborn" != "true" ]] || sudo -n systemctl start testplex-reborn.service
