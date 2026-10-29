@@ -48,6 +48,27 @@ public final class ArcadePortRules {
         return wins >= BACON_BRAWL_KING_OF_BACON_WINS;
     }
 
+    /** Approximate source Bacon Blast's destructible terrain impact radius; tune during live acceptance. */
+    public static final double BACON_BLAST_TERRAIN_RADIUS = 2.0D;
+
+    public static boolean baconBlastShouldBreakBlock(org.bukkit.Material material, double distanceSquared) {
+        if (material == null || !Double.isFinite(distanceSquared) || distanceSquared < 0.0D
+                || distanceSquared > BACON_BLAST_TERRAIN_RADIUS * BACON_BLAST_TERRAIN_RADIUS) return false;
+        return material != org.bukkit.Material.AIR
+                && material != org.bukkit.Material.BEDROCK
+                && material != org.bukkit.Material.BARRIER
+                && material != org.bukkit.Material.WATER
+                && material != org.bukkit.Material.LAVA
+                && material != org.bukkit.Material.BUBBLE_COLUMN
+                && material != org.bukkit.Material.END_PORTAL
+                && material != org.bukkit.Material.END_PORTAL_FRAME
+                && material != org.bukkit.Material.COMMAND_BLOCK
+                && material != org.bukkit.Material.CHAIN_COMMAND_BLOCK
+                && material != org.bukkit.Material.REPEATING_COMMAND_BLOCK
+                && material != org.bukkit.Material.STRUCTURE_BLOCK
+                && material != org.bukkit.Material.JIGSAW;
+    }
+
     /** Recent hit credit keeps knock-off kills attached to the attacker who caused the fall. */
     public static final long BACON_FALL_KILL_CREDIT_WINDOW_MILLIS = 5_000L;
 
