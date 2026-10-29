@@ -1823,25 +1823,14 @@ public final class ArcadePortManager implements Listener {
             chestplate = Material.CHAINMAIL_CHESTPLATE;
             helmet = Material.CHAINMAIL_HELMET;
         } else {
-            boots = Material.LEATHER_BOOTS;
-            leggings = Material.LEATHER_LEGGINGS;
-            chestplate = Material.LEATHER_CHESTPLATE;
-            helmet = Material.LEATHER_HELMET;
+            // Jumper and Waller inherit Kit.ApplyKit and do not equip armour in Reborn.
+            player.getInventory().setArmorContents(new ItemStack[4]);
+            return;
         }
         ItemStack[] armor = new ItemStack[] {
                 new ItemStack(boots), new ItemStack(leggings),
                 new ItemStack(chestplate), new ItemStack(helmet)
         };
-        if (!"armorer".equals(kit) && !"pitcher".equals(kit)) {
-            int team = session.teams.getOrDefault(player.getUniqueId(), 0);
-            Color color = team == 0 ? Color.RED : Color.BLUE;
-            for (ItemStack piece : armor) {
-                if (piece.getItemMeta() instanceof LeatherArmorMeta meta) {
-                    meta.setColor(color);
-                    piece.setItemMeta(meta);
-                }
-            }
-        }
         player.getInventory().setArmorContents(armor);
     }
 
