@@ -3014,7 +3014,7 @@ public final class ArcadePortManager implements Listener {
                 double power = ArcadePortRules.baconBlastPowerMultiplier(charge);
                 Vector direction = player.getEyeLocation().getDirection().normalize();
                 Location launchLocation = player.getEyeLocation().add(direction.clone().multiply(1.5D));
-                Item bacon = player.getWorld().dropItem(launchLocation, new ItemStack(Material.PORKCHOP, 1));
+                Item bacon = player.getWorld().dropItem(launchLocation, new ItemStack(Material.PORKCHOP, ArcadePortRules.BACON_BLAST_PROJECTILE_STACK_SIZE));
                 bacon.setPickupDelay(Short.MAX_VALUE);
                 Vector velocity = direction.clone().multiply(0.6D + power * 0.4D);
                 velocity.setY(velocity.getY() + 0.15D + power * 0.15D);
