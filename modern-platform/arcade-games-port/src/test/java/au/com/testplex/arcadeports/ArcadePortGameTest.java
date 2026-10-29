@@ -395,6 +395,16 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldPrimeBombLobbersBomb(8_000L, false));
     }
 
+    @Test void bombLobbersWallerRespectsSourceShortPlacementCooldown() {
+        assertEquals(100L, ArcadePortRules.BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS);
+        assertTrue(ArcadePortRules.isBombLobbersWallerReady(1_000L, 0L));
+        long readyAt = ArcadePortRules.nextBombLobbersWallerReadyAt(1_000L);
+        assertEquals(1_100L, readyAt);
+        assertFalse(ArcadePortRules.isBombLobbersWallerReady(1_099L, readyAt));
+        assertTrue(ArcadePortRules.isBombLobbersWallerReady(1_100L, readyAt));
+        assertTrue(ArcadePortRules.isBombLobbersWallerReady(1_101L, readyAt));
+    }
+
     @Test void baconBrawlSourceArchiveContainsTheRequiredGreenSpawnMarkers() throws Exception {
         try (var input = getClass().getClassLoader().getResourceAsStream("maps/bacon-brawl.zip")) {
             assertNotNull(input, "Bacon Brawl must use its embedded Reborn source map");
