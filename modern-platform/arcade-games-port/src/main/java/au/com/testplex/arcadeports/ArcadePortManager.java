@@ -4677,8 +4677,13 @@ public final class ArcadePortManager implements Listener {
             Player player = entry.getValue();
             PlayerSnapshot snapshot = session.snapshots.get(entry.getKey());
             if (snapshot == null) continue;
-            if (player != null && player.isOnline()) snapshot.restore(player);
-            else pendingRestore.put(entry.getKey(), snapshot);
+            if (player != null && player.isOnline()) {
+                if (session.type == ArcadePortGame.BACON_BRAWL
+                        && isBaconCompassMenuTitle(player.getOpenInventory().getTitle())) {
+                    player.closeInventory();
+                }
+                snapshot.restore(player);
+            } else pendingRestore.put(entry.getKey(), snapshot);
         }
         session.sheep.clear();
         session.sheepOwners.clear();
