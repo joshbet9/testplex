@@ -645,6 +645,16 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldAwardBaconPigsInBlankets(7));
     }
 
+    @Test void baconBlastResolvesTheFirstCollisionAlongItsSweptPath() {
+        assertTrue(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.2D, 0.8D, 2.0D));
+        assertTrue(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.6D, 0.8D, 2.0D));
+        assertFalse(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.8D, 0.5D, 2.0D));
+        assertFalse(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.8D, 0.6D, 0.5D));
+        assertTrue(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.8D, -1.0D, 2.0D));
+        assertFalse(ArcadePortRules.isBaconBlastPlayerBeforeBlock(Double.NaN, 0.5D, 2.0D));
+        assertFalse(ArcadePortRules.isBaconBlastPlayerBeforeBlock(0.5D, 0.5D, Double.NaN));
+    }
+
     @Test void baconBlastThrownItemUsesSweptHitRadiusAndSafeExpiry() {
         assertTrue(ArcadePortRules.isBaconBlastNearPlayer(0.0D));
         assertTrue(ArcadePortRules.isBaconBlastNearPlayer(0.25D));
