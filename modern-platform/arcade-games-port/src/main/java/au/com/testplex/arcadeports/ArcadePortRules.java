@@ -28,6 +28,7 @@ public final class ArcadePortRules {
     /** Original Reborn kit cooldowns; meter charge adds power but does not bypass recharge. */
     public static final long BACON_BODY_SLAM_COOLDOWN_MILLIS = 8_000L;
     public static final long BACON_BLAST_COOLDOWN_MILLIS = 3_000L;
+    public static final int BACON_BLAST_PROJECTILE_STACK_SIZE = 16;
     public static final long BACON_SHEEP_CLOAK_COOLDOWN_MILLIS = 10_000L;
     public static final int BACON_METER_MAX = 100;
     public static final int BACON_METER_MIN_ABILITY = 10;
