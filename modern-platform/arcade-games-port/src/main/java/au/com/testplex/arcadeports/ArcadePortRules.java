@@ -109,7 +109,7 @@ public final class ArcadePortRules {
         return 1.0D;
     }
 
-    public static final double BACON_AVATAR_MAX_ATTACK_DISTANCE_SQUARED = 16.0D;
+    public static final double BACON_AVATAR_MAX_ATTACK_DISTANCE_SQUARED = 12.25D;
 
     /** Packet-hit remapping must still respect the live round, target eligibility, reach and LOS. */
     public static boolean shouldAcceptBaconAvatarPacketHit(boolean activeBaconRound,
