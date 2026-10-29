@@ -54,6 +54,7 @@ import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -7140,6 +7141,23 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         event.setCancelled(true);
+    }
+
+    /**
+     * Bomb Lobbers disables both chest and block inventories in the legacy game.
+     * Do not interfere with plugin-owned menus such as the spectator compass menu.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBombLobbersBlockInventoryOpen(InventoryOpenEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.BOMB_LOBBERS
+                || !(event.getPlayer() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())) return;
+        Object holder = event.getInventory().getHolder();
+        if (holder instanceof org.bukkit.block.BlockState
+                || holder instanceof org.bukkit.block.DoubleChest) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
