@@ -134,11 +134,20 @@ public final class SourceMapCatalog {
     public static String selectedResource(JavaPlugin plugin, ArcadePortGame game) {
         if (game == null) return null;
         String configured = plugin.getConfig().getString("selected-maps." + game.id());
-        if (isResourceForGame(plugin, game, configured)) return configured;
-
         String legacy = resourceFor(game);
         String legacyName = displayName(plugin, legacy);
         List<String> resources = bundledMapResources(plugin, game);
+
+        // Older builds persisted the single hand-bundled ZIP as the selected map.
+        // Translate that setting to the matching archive from update/maps when it
+        // exists, so upgrades expose and actually run the full legacy map asset.
+        if (configured != null && configured.equals(legacy)) {
+            for (String resource : resources) {
+                if (mapNameFromResource(resource).equalsIgnoreCase(legacyName)) return resource;
+            }
+            if (plugin.getResource(configured) != null) return configured;
+        }
+        if (isResourceForGame(plugin, game, configured)) return configured;
         for (String resource : resources) {
             if (mapNameFromResource(resource).equalsIgnoreCase(legacyName)) return resource;
         }
