@@ -1,6 +1,18 @@
 name: Deploy Testplex Modern Paper 26.3 to isolated Hyper-V
 
 on:
+  # Reusable by the modern build workflow so deployment starts automatically
+  # only after the verified build job succeeds. Manual dispatch remains available.
+  workflow_call:
+    inputs:
+      deploy_to_modern_test_server:
+        description: Deploy the selected successful build to the isolated modern test server
+        required: true
+        type: boolean
+      source_run_id:
+        description: Successful Testplex Modern Paper 26.3 build run ID (uploads all four modern JARs)
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       deploy_to_modern_test_server:
