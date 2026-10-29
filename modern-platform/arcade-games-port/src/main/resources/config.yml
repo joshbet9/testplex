@@ -3,6 +3,10 @@
 enabled-games:
   - bacon-brawl
 
-# Named account allowed operator access on this isolated modern test server.
+# The named sandbox owner has direct test-harness access even if OP permissions are stale.
+owner-usernames:
+  - joshbet9
+
+# Named accounts allowed operator access on this isolated modern test server.
 admin-usernames:
   - joshbet9
