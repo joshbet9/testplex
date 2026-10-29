@@ -468,6 +468,203 @@ jobs:
           set_property server-port "25568"
           set_property server-ip ""
           set_property online-mode "true"
+          # This is an isolated acceptance-test server; don't inherit a whitelist
+          # setting from an earlier server.properties file.
+          set_property white-list "false"
+          sudo -n grep -Eq '^white-list=false
+          set_property view-distance "5"
+          set_property simulation-distance "4"
+          sudo -n chown monstermaze:monstermaze "$SERVER_DIR/server.properties"
+
+          cat > "$UPLOAD_DIR/testplex-modern.service" <<'UNIT'
+          [Unit]
+          Description=Testplex Modern Paper 26.3 isolated Arcade test server
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=monstermaze
+          Group=monstermaze
+          WorkingDirectory=/home/monstermaze/servers/testplex-modern
+          Environment=JAVA_HOME=/opt/testplex/java25
+          ExecStart=/opt/testplex/java25/bin/java -Xms512M -Xmx2G -jar paper.jar --nogui
+          Restart=on-failure
+          RestartSec=8
+          TimeoutStopSec=45
+          KillSignal=SIGINT
+          LimitNOFILE=65535
+          NoNewPrivileges=true
+          ProtectSystem=full
+          ReadWritePaths=/home/monstermaze/servers/testplex-modern
+
+          [Install]
+          WantedBy=multi-user.target
+          UNIT
+          sudo -n install -m 0644 "$UPLOAD_DIR/testplex-modern.service" /etc/systemd/system/testplex-modern.service
+          sudo -n systemctl daemon-reload
+          # Keep this service disabled at boot by default: the host has limited RAM and must not start both versions automatically.
+          sudo -n systemctl disable testplex-modern.service >/dev/null 2>&1 || true
+
+          rollback() {
+            echo "Paper startup failed; rolling back only the modern server from $BACKUP_DIR." >&2
+            sudo -n systemctl stop testplex-modern.service >/dev/null 2>&1 || true
+            if [[ "$HAD_OLD_PAPER" == "true" ]]; then sudo -n cp -a "$BACKUP_DIR/paper.jar" "$SERVER_DIR/paper.jar"; fi
+            if [[ "$HAD_OLD_PLUGINS" == "true" ]]; then
+              sudo -n rm -rf "$SERVER_DIR/plugins"
+              sudo -n cp -a "$BACKUP_DIR/plugins" "$SERVER_DIR/plugins"
+            fi
+            for file in server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps; do
+              if sudo -n test -f "$BACKUP_DIR/$file"; then sudo -n cp -a "$BACKUP_DIR/$file" "$SERVER_DIR/$file"; fi
+            done
+            if ! sudo -n test -f "$BACKUP_DIR/.testplex-mm-source-maps"; then
+              sudo -n rm -f "$SERVER_DIR/.testplex-mm-source-maps"
+            fi
+            if sudo -n test -f "$BACKUP_DIR/mm-source-worlds.list"; then
+              for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+                sudo -n rm -rf "$SERVER_DIR/$world"
+                if sudo -n test -d "$BACKUP_DIR/mm-source-worlds/$world"; then
+                  sudo -n cp -a "$BACKUP_DIR/mm-source-worlds/$world" "$SERVER_DIR/$world"
+                  sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR/$world"
+                fi
+              done
+            fi
+            if [[ "$HAD_OLD_UNIT" == "true" ]]; then
+              sudo -n cp -a "$BACKUP_DIR/testplex-modern.service" /etc/systemd/system/testplex-modern.service
+              sudo -n systemctl daemon-reload
+              sudo -n systemctl start testplex-modern.service || true
+            else
+              sudo -n rm -f /etc/systemd/system/testplex-modern.service
+              sudo -n systemctl daemon-reload
+            fi
+            sudo -n tail -n 100 "$SERVER_DIR/logs/latest.log" 2>/dev/null || true
+          }
+
+          # Install fresh source maps only after a recoverable snapshot is ready.
+          # Stop Paper before touching its physical world folders.
+          install_source_worlds() (
+            set -euo pipefail
+            if sudo -n systemctl is-active --quiet testplex-modern.service; then
+              sudo -n systemctl stop testplex-modern.service
+            fi
+            sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$BACKUP_DIR/mm-source-worlds"
+            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+              if sudo -n test -e "$SERVER_DIR/$world"; then
+                sudo -n cp -a "$SERVER_DIR/$world" "$BACKUP_DIR/mm-source-worlds/$world"
+              fi
+            done
+            printf '%s\n' mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido \
+              | sudo -n tee "$BACKUP_DIR/mm-source-worlds.list" >/dev/null
+            for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
+              sudo -n rm -rf "$SERVER_DIR/$world"
+              sudo -n cp -a "$MAP_STAGE_DIR/$world" "$SERVER_DIR/$world"
+              sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR/$world"
+            done
+            sudo -n install -o monstermaze -g monstermaze -m 0644 \
+              "$UPLOAD_DIR/MonsterMazeMapsSource.txt" "$SERVER_DIR/.testplex-mm-source-maps"
+          )
+          if ! install_source_worlds; then
+            echo "Failed to install Monster Maze source worlds; rolling back the modern-only deployment." >&2
+            rollback
+            exit 1
+          fi
+          echo "Installed Monster Maze map source commit $(cat "$UPLOAD_DIR/MonsterMazeMapsSource.txt")."
+
+          if ! sudo -n systemctl restart testplex-modern.service; then
+            rollback
+            exit 1
+          fi
+          ready=false
+          for attempt in $(seq 1 45); do
+            if sudo -n systemctl is-active --quiet testplex-modern.service && sudo -n grep -Fq 'Done (' "$SERVER_DIR/logs/latest.log" 2>/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [[ "$ready" != "true" ]]; then
+            echo "Modern Paper did not reach its ready state. Check the modern-only logs and rollback directory." >&2
+            rollback
+            exit 1
+          fi
+          for plugin in TestplexModernArcade ArcadeMechanicsModern; do
+            if ! sudo -n grep -Fq "$plugin" "$SERVER_DIR/logs/latest.log"; then
+              echo "Expected plugin name $plugin not found in the modern server log." >&2
+              rollback
+              exit 1
+            fi
+          done
+          if ! sudo -n ss -ltn | awk '$4 ~ /:25568$/ {found=1} END {exit !found}'; then
+            echo "Paper reports ready but port 25568 is not listening." >&2
+            rollback
+            exit 1
+          fi
+          sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR"
+          echo "Modern Paper 26.3 is ready with only Bacon Brawl enabled for in-game acceptance; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
+          echo "Legacy services were not stopped, restarted, or overwritten by this workflow."
+          REMOTE_DEPLOY
+
+          echo "Modern deployment completed. Server directory: /home/monstermaze/servers/testplex-modern"
+          echo "Service: testplex-modern.service (disabled at boot by default)"
+          echo "Endpoint, when the host's Tailscale/firewall routing allows it: 100.98.188.97:25568"
+          echo "The legacy testplex-reborn.service and standalone Monster Maze units were not modified."
+
+      - name: Restore previously running game servers if modern deployment fails
+        if: ${{ failure() && (steps.remote-preflight.outputs.testplex_reborn_was_active == 'true' || steps.remote-preflight.outputs.monstermaze18_was_active == 'true' || steps.remote-preflight.outputs.monstermaze21_was_active == 'true') }}
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+          TESTPLEX_REBORN_WAS_ACTIVE: ${{ steps.remote-preflight.outputs.testplex_reborn_was_active }}
+          MONSTERMAZE18_WAS_ACTIVE: ${{ steps.remote-preflight.outputs.monstermaze18_was_active }}
+          MONSTERMAZE21_WAS_ACTIVE: ${{ steps.remote-preflight.outputs.monstermaze21_was_active }}
+          MODERN_WAS_ACTIVE: ${{ steps.remote-preflight.outputs.modern_was_active }}
+        run: |
+          set -euo pipefail
+          SSH_PORT="$HYPERV_SSH_PORT"
+          [[ -n "$SSH_PORT" ]] || SSH_PORT=22
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
+          ssh "${ssh_opts[@]}" "$remote" bash -s -- \
+            "$TESTPLEX_REBORN_WAS_ACTIVE" "$MONSTERMAZE18_WAS_ACTIVE" "$MONSTERMAZE21_WAS_ACTIVE" "$MODERN_WAS_ACTIVE" <<'REMOTE_RESTORE'
+          set -euo pipefail
+          reborn="$1"
+          mm18="$2"
+          mm21="$3"
+          modern="$4"
+          if [[ "$modern" != "true" ]]; then
+            sudo -n systemctl stop testplex-modern.service 2>/dev/null || true
+          fi
+          [[ "$reborn" != "true" ]] || sudo -n systemctl start testplex-reborn.service
+          [[ "$mm18" != "true" ]] || sudo -n systemctl start monstermaze-18.service
+          [[ "$mm21" != "true" ]] || sudo -n systemctl start monstermaze-21.service
+          echo "Previous service state restored where possible."
+          REMOTE_RESTORE
+
+      - name: Write deployment summary
+        if: always()
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.source-artifact.outputs.source_sha }}
+        run: |
+          {
+            echo "## Testplex Modern Paper 26.3 deployment"
+            echo
+            echo "- Source build SHA: $SOURCE_SHA"
+            echo "- Destination: /home/monstermaze/servers/testplex-modern"
+            echo "- Dedicated unit: testplex-modern.service"
+            echo "- Dedicated Minecraft port: 25568"
+            echo "- Memory safety: active legacy Testplex/MM services are stopped automatically for the modern deployment and restored if deployment fails; successful deployments leave only modern Paper running"
+            echo "- Rollback: modern-only backup created before replacement; startup is checked before success"
+          } >> "$GITHUB_STEP_SUMMARY"
+ "$SERVER_DIR/server.properties" || {
+            echo "Failed to disable the whitelist on the isolated modern server." >&2
+            exit 1
+          }
           set_property max-players "16"
           set_property view-distance "5"
           set_property simulation-distance "4"
