@@ -6106,15 +6106,13 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
-        if (session.type == ArcadePortGame.BOMB_LOBBERS && item == Material.TNT
-                && !event.getAction().isLeftClick() && event.getAction() != org.bukkit.event.block.Action.PHYSICAL) {
-            event.setCancelled(true);
-            return;
-        }
         if ((session.type == ArcadePortGame.BOMB_LOBBERS || (session.type == ArcadePortGame.EVOLUTION
                 && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 3))
-                && item == Material.TNT && (session.type != ArcadePortGame.BOMB_LOBBERS
-                || event.getAction().isLeftClick())) {
+                && item == Material.TNT
+                && (session.type == ArcadePortGame.BOMB_LOBBERS
+                    ? ArcadePortRules.shouldThrowBombLobbersOnAction(
+                        event.getAction() == org.bukkit.event.block.Action.PHYSICAL)
+                    : event.getAction().isLeftClick())) {
             event.setCancelled(true);
             consumeHeld(player);
             Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.0D));
