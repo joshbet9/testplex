@@ -106,7 +106,7 @@ public final class MenuService implements Listener {
                 "game-auto-start", "game-timeout", "kick-idle-players"};
         String[] labels = {"Public Server", "Enforce Whitelist", "Force Team Balancing",
                 "Game Auto Start", "Game Timeout", "Kick Idle Players"};
-        Material[] materials = {Material.ENDER_EYE, Material.PAPER, Material.RAILS,
+        Material[] materials = {Material.ENDER_EYE, Material.PAPER, Material.COMPARATOR,
                 Material.SLIME_BALL, Material.COMPASS, Material.CLOCK};
         int[] slots = {11, 13, 15, 38, 40, 42};
         for (int i = 0; i < ids.length; i++) {
