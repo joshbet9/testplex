@@ -524,6 +524,20 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldAwardBaconPigsInBlankets(7));
     }
 
+    @Test void baconBlastThrownItemUsesSweptHitRadiusAndSafeExpiry() {
+        assertTrue(ArcadePortRules.isBaconBlastNearPlayer(0.0D));
+        assertTrue(ArcadePortRules.isBaconBlastNearPlayer(1.0D));
+        assertFalse(ArcadePortRules.isBaconBlastNearPlayer(1.01D));
+        assertFalse(ArcadePortRules.isBaconBlastNearPlayer(Double.NaN));
+        assertFalse(ArcadePortRules.isBaconBlastNearPlayer(-1.0D));
+
+        assertFalse(ArcadePortRules.shouldExpireBaconBlast(5_999L, 1_000L, false));
+        assertTrue(ArcadePortRules.shouldExpireBaconBlast(6_000L, 1_000L, false));
+        assertTrue(ArcadePortRules.shouldExpireBaconBlast(1_100L, 1_000L, true));
+        assertTrue(ArcadePortRules.shouldExpireBaconBlast(999L, 1_000L, false));
+        assertTrue(ArcadePortRules.shouldExpireBaconBlast(5_000L, 0L, false));
+    }
+
     @Test void baconBlastNeverBreaksSourceArenaBlocks() {
         assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.STONE, 0.0D));
         assertFalse(ArcadePortRules.baconBlastShouldBreakBlock(org.bukkit.Material.OAK_PLANKS, 0.0D));
