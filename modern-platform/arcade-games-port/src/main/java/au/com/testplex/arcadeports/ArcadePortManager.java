@@ -5696,6 +5696,7 @@ public final class ArcadePortManager implements Listener {
         }
         session.bombOwners.clear();
         session.bombLastThrowAt.clear();
+        session.bombLastPitchAdjustAt.clear();
         session.bombLastLocations.clear();
         session.bombCreatedAt.clear();
         session.bombPrimed.clear();
@@ -6913,6 +6914,44 @@ public final class ArcadePortManager implements Listener {
                 16, 0.35D, 0.4D, 0.35D, 0.05D);
         target.playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.7F, 1.4F);
         target.sendMessage(ChatColor.RED + "A dragon fireball knocked you back!");
+    }
+
+    /**
+     * Left-clicking an entity bypasses PlayerInteractEvent. This event path is deliberately
+     * cancellation-tolerant because bot hit listeners may cancel damage before we see it.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onBombLobbersEntityClick(EntityDamageByEntityEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.BOMB_LOBBERS
+                || event.getEntity().getWorld() != session.world
+                || !(event.getDamager() instanceof Player attacker)
+                || !session.alive.contains(attacker.getUniqueId())) return;
+
+        long now = System.currentTimeMillis();
+        long lastThrow = session.bombLastThrowAt.getOrDefault(attacker.getUniqueId(), 0L);
+        if (lastThrow > 0L && now - lastThrow < 180L) {
+            event.setCancelled(true);
+            return;
+        }
+        ItemStack held = attacker.getInventory().getItemInMainHand();
+        if (held != null && held.getType() == Material.TNT) {
+            event.setCancelled(true);
+            throwBombLobbersTnt(session, attacker);
+            return;
+        }
+        if ("pitcher".equals(session.bombLobbersKits.getOrDefault(attacker.getUniqueId(), "jumper"))
+                && held != null && held.getType() == Material.LEVER) {
+            event.setCancelled(true);
+            adjustBombLobbersPitch(session, attacker, false);
+        }
+    }
+
+    public boolean wasRecentBombLobbersThrow(Player player) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.BOMB_LOBBERS || player == null) return false;
+        long last = session.bombLastThrowAt.getOrDefault(player.getUniqueId(), 0L);
+        return last > 0L && System.currentTimeMillis() - last < 180L;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -8435,6 +8474,10 @@ public final class ArcadePortManager implements Listener {
 
     private void adjustBombLobbersPitch(Session session, Player player, boolean increase) {
         UUID id = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        long lastAdjust = session.bombLastPitchAdjustAt.getOrDefault(id, 0L);
+        if (lastAdjust > 0L && now - lastAdjust < 80L) return;
+        session.bombLastPitchAdjustAt.put(id, now);
         int current = session.bombPitchLevels.getOrDefault(id, 2);
         current = increase ? Math.min(3, current + 1) : Math.max(1, current - 1);
         session.bombPitchLevels.put(id, current);
@@ -8872,6 +8915,7 @@ public final class ArcadePortManager implements Listener {
         final Set<Entity> entities = new HashSet<>();
         final Map<UUID, UUID> bombOwners = new HashMap<>();
         final Map<UUID, Long> bombLastThrowAt = new HashMap<>();
+        final Map<UUID, Long> bombLastPitchAdjustAt = new HashMap<>();
         final Map<UUID, Integer> bombKillsByTnt = new HashMap<>();
         final Map<UUID, Location> bombLastLocations = new HashMap<>();
         final Map<UUID, Long> bombCreatedAt = new HashMap<>();
