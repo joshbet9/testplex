@@ -47,7 +47,9 @@ public final class ArcadePortRules {
     public static final int BACON_BRAWL_PIGS_IN_BLANKETS_KILLS = 6;
 
     public static long baconBrawlAbilityCooldownMillis(String requestedKit) {
-        return switch (normalizeBaconBrawlKit(requestedKit)) {
+        String kit = normalizeBaconBrawlKit(requestedKit);
+        if (kit == null) return 0L;
+        return switch (kit) {
             case "mama-piggles" -> BACON_BLAST_COOLDOWN_MILLIS;
             case "pig" -> BACON_SHEEP_CLOAK_COOLDOWN_MILLIS;
             case "el-muchacho-pigo" -> BACON_BODY_SLAM_COOLDOWN_MILLIS;
