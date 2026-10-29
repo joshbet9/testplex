@@ -30,6 +30,7 @@ import org.bukkit.entity.Fireball;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.Pig;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.Sheep;
 import org.bukkit.entity.Snowball;
@@ -182,6 +183,7 @@ public final class ArcadePortManager implements Listener {
                 && session.players.containsKey(player.getUniqueId()) && session.alive.contains(player.getUniqueId())) {
             clearBaconCloak(session, player.getUniqueId());
             session.baconSlams.remove(player.getUniqueId());
+            if (!"mama-piggles".equals(kit)) removeBaconBabyPig(session, player.getUniqueId());
             session.baconKits.put(player.getUniqueId(), kit);
             giveKit(session, player);
             player.sendMessage(ChatColor.GREEN + "Bacon Brawl kit changed to " + kit + ".");
@@ -2246,10 +2248,15 @@ public final class ArcadePortManager implements Listener {
     private void updateBaconBrawlAbilities(Session session, long now) {
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
-            PotionEffect speed = player.getPotionEffect(PotionEffectType.SPEED);
-            if ("mama-piggles".equals(session.baconKits.getOrDefault(id, "el-muchacho-pigo"))
-                    && (session.ticks % 20 == 0 || speed == null || speed.getDuration() < 20)) {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 1, false, false, false));
+            String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
+            if ("mama-piggles".equals(kit)) {
+                PotionEffect speed = player.getPotionEffect(PotionEffectType.SPEED);
+                if (session.ticks % 20 == 0 || speed == null || speed.getDuration() < 20) {
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 1, false, false, false));
+                }
+                updateBaconBabyPig(session, player);
+            } else {
+                removeBaconBabyPig(session, id);
             }
             Long cloakedUntil = session.baconCloakedUntil.get(id);
             if (cloakedUntil != null && now >= cloakedUntil) clearBaconCloak(session, id);
@@ -2271,6 +2278,56 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             if (active != session) return;
+        }
+    }
+
+    /**
+     * Mama Piggles' Baby Piggles companion is a client-visible baby pig. It is
+     * invulnerable and follows the owner; normal player hitboxes remain authoritative.
+     */
+    private void updateBaconBabyPig(Session session, Player owner) {
+        UUID ownerId = owner.getUniqueId();
+        UUID pigId = session.baconBabyPigs.get(ownerId);
+        Pig baby = null;
+        if (pigId != null) {
+            for (Entity entity : session.entities) {
+                if (entity instanceof Pig pig && pig.getUniqueId().equals(pigId) && pig.isValid()) {
+                    baby = pig;
+                    break;
+                }
+            }
+        }
+        if (baby == null) {
+            Location spawn = owner.getLocation().clone().add(0.8D, 0.0D, 0.8D);
+            baby = session.world.spawn(spawn, Pig.class);
+            baby.setBaby();
+            baby.setCustomName(ChatColor.LIGHT_PURPLE + "Baby Piggles");
+            baby.setCustomNameVisible(false);
+            baby.setInvulnerable(true);
+            baby.setSilent(true);
+            baby.setAI(false);
+            baby.setRemoveWhenFarAway(false);
+            session.entities.add(baby);
+            session.baconBabyPigs.put(ownerId, baby.getUniqueId());
+        }
+
+        Vector forward = owner.getLocation().getDirection().setY(0.0D);
+        if (forward.lengthSquared() < 1.0E-5D) forward = new Vector(0.0D, 0.0D, 1.0D);
+        Location desired = owner.getLocation().clone().subtract(forward.normalize().multiply(0.85D));
+        desired.setY(owner.getLocation().getY());
+        if (baby.getLocation().distanceSquared(desired) > 1.0D) baby.teleport(desired);
+        baby.setRotation(owner.getLocation().getYaw(), 0.0F);
+    }
+
+    private void removeBaconBabyPig(Session session, UUID ownerId) {
+        UUID pigId = session.baconBabyPigs.remove(ownerId);
+        if (pigId == null) return;
+        for (Entity entity : new ArrayList<>(session.entities)) {
+            if (entity.getUniqueId().equals(pigId)) {
+                entity.remove();
+                session.entities.remove(entity);
+                break;
+            }
         }
     }
 
@@ -3383,6 +3440,7 @@ public final class ArcadePortManager implements Listener {
                 && session.alive.contains(player.getUniqueId())) {
             UUID playerId = player.getUniqueId();
             clearBaconCloak(session, playerId);
+            removeBaconBabyPig(session, playerId);
             session.baconSlams.remove(playerId);
             session.baconAbilityReadyAt.remove(playerId);
             if (!session.alive.remove(playerId)) return;
@@ -4158,6 +4216,7 @@ public final class ArcadePortManager implements Listener {
         session.sheepOwners.clear();
         session.sheepCarriers.clear();
         session.entities.clear();
+        session.baconBabyPigs.clear();
         session.respawning.clear();
         session.alive.clear();
         session.players.clear();
@@ -5735,6 +5794,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> baconAbilityReadyAt = new HashMap<>();
         final Map<UUID, Long> baconSlams = new HashMap<>();
         final Map<UUID, Long> baconCloakedUntil = new HashMap<>();
+        final Map<UUID, UUID> baconBabyPigs = new HashMap<>();
         final Set<UUID> respawning = new HashSet<>();
         final Set<Sheep> sheep = new HashSet<>();
         final Map<Sheep, Integer> sheepOwners = new HashMap<>();
