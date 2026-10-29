@@ -1128,6 +1128,15 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldCheckBombLobbersDirectHit(true));
     }
 
+    @Test void bombLobbersEliminatesPlayersWhoCrossIntoAnotherTeamSide() {
+        assertFalse(ArcadePortRules.shouldEliminateBombLobbersForSide(0, 0));
+        assertFalse(ArcadePortRules.shouldEliminateBombLobbersForSide(1, 1));
+        assertTrue(ArcadePortRules.shouldEliminateBombLobbersForSide(0, 1));
+        assertTrue(ArcadePortRules.shouldEliminateBombLobbersForSide(1, 0));
+        assertFalse(ArcadePortRules.shouldEliminateBombLobbersForSide(-1, 0));
+        assertFalse(ArcadePortRules.shouldEliminateBombLobbersForSide(0, -1));
+    }
+
     @Test void bombLobbersDamageRespectsLegacyDamageDependentArmorReduction() {
         assertEquals(10.0D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 0.0D), 0.00001D);
         assertEquals(9.2D, ArcadePortRules.bombLobbersDamageAfterArmor(10.0D, 7.0D), 0.00001D);
