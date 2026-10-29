@@ -347,7 +347,7 @@ public final class ArcadePortRules {
 
     /** Pig's source passive is +250% knockback, i.e. 3.5 times the normal amount. */
     public static final double BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER = 2.5D;
-    /** PerkBodySlam applies the existing BACON_BODY_SLAM_EXTRA_KNOCKBACK value as a multiplier. */
+    /** PerkBodySlam applies its 2.0 knockback value as a multiplier to both damage events. */
     public static double baconBrawlKnockbackMultiplier(boolean backstab) {
         return backstab ? BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER : 1.0D;
     }
