@@ -2915,24 +2915,43 @@ public final class ArcadePortManager implements Listener {
                         0.05D, 0.05D, 0.05D, 0.005D);
             }
             UUID ownerId = session.baconBlastOwners.get(blastId);
+            double segmentLength = Math.sqrt(previous.distanceSquared(current));
+            double blockFraction = baconBlastFirstBlockFraction(session, previous, current);
             Player target = null;
             double bestDistanceSquared = Double.POSITIVE_INFINITY;
+            double bestTargetFraction = Double.POSITIVE_INFINITY;
             for (Player candidate : alivePlayers(session)) {
                 if (candidate.getUniqueId().equals(ownerId)) continue;
                 Location targetCenter = candidate.getLocation().clone().add(0.0D, 0.9D, 0.0D);
                 double distanceSquared = distanceSquaredToSegment(targetCenter, previous, current);
-                if (ArcadePortRules.isBaconBlastNearPlayer(distanceSquared)
-                        && distanceSquared < bestDistanceSquared) {
+                if (!ArcadePortRules.isBaconBlastNearPlayer(distanceSquared)) continue;
+                double targetFraction = baconBlastSegmentFraction(targetCenter, previous, current);
+                if (targetFraction < bestTargetFraction
+                        || (Math.abs(targetFraction - bestTargetFraction) < 1.0E-6D
+                            && distanceSquared < bestDistanceSquared)) {
                     target = candidate;
                     bestDistanceSquared = distanceSquared;
+                    bestTargetFraction = targetFraction;
                 }
             }
 
-            if (target != null) {
+            boolean playerFirst = target != null && ArcadePortRules.isBaconBlastPlayerBeforeBlock(
+                    bestTargetFraction, blockFraction, segmentLength);
+            if (blockFraction >= 0.0D && !playerFirst) {
+                Location blockImpact = previous.clone().add(
+                        current.toVector().subtract(previous.toVector()).multiply(blockFraction));
+                spawnBaconBlastImpact(session, blockImpact);
+                removeBaconBlastItem(session, blastId);
+                continue;
+            }
+
+            if (target != null && playerFirst) {
                 Player owner = ownerId == null ? null : session.players.get(ownerId);
-                // The Reborn projectile manager resolves its block/entity explosion first, then
-                // dispatches the custom PROJECTILE damage event for knockback/kill attribution.
-                spawnBaconBlastImpact(session, current);
+                Location playerImpact = previous.clone().add(
+                        current.toVector().subtract(previous.toVector()).multiply(bestTargetFraction));
+                // Reborn resolves the first swept collision, then dispatches custom projectile
+                // damage for the target's knockback and kill attribution.
+                spawnBaconBlastImpact(session, playerImpact);
                 if (owner != null && owner.isOnline() && session.alive.contains(ownerId)
                         && active == session && session.alive.contains(target.getUniqueId())) {
                     handleBaconBrawlHit(session, owner, target, "bacon-blast", 6.0D, null, blastPower);
@@ -6579,6 +6598,32 @@ public final class ArcadePortManager implements Listener {
         velocity.setY(power);
         player.setVelocity(velocity);
         player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.7F, 1.3F);
+    }
+
+    /** Finds the first non-passable/liquid block cell crossed by the projectile's previous-to-current path. */
+    private double baconBlastFirstBlockFraction(Session session, Location start, Location end) {
+        if (session == null || start == null || end == null
+                || start.getWorld() != session.world || end.getWorld() != session.world) return -1.0D;
+        Vector segment = end.toVector().subtract(start.toVector());
+        double length = segment.length();
+        if (!Double.isFinite(length) || length <= 1.0E-6D) return -1.0D;
+        int samples = Math.max(1, Math.min(512, (int) Math.ceil(length / 0.1D)));
+        for (int i = 1; i <= samples; i++) {
+            double fraction = i / (double) samples;
+            Location sample = start.clone().add(segment.clone().multiply(fraction));
+            Block block = sample.getBlock();
+            if (block.isLiquid() || !block.isPassable()) return fraction;
+        }
+        return -1.0D;
+    }
+
+    /** Projection of a point onto the swept projectile segment, clamped to the current tick. */
+    private double baconBlastSegmentFraction(Location point, Location start, Location end) {
+        Vector segment = end.toVector().subtract(start.toVector());
+        double lengthSquared = segment.lengthSquared();
+        if (!Double.isFinite(lengthSquared) || lengthSquared < 1.0E-9D) return 0.0D;
+        double fraction = point.toVector().subtract(start.toVector()).dot(segment) / lengthSquared;
+        return Math.max(0.0D, Math.min(1.0D, fraction));
     }
 
     private double distanceSquaredToSegment(Location point, Location start, Location end) {
