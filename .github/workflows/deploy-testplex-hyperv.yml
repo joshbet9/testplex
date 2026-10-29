@@ -158,7 +158,44 @@ jobs:
             "set -eu; test -f '$TESTPLEX_SERVER_DIR/.testplex-sandbox'; test -d '$TESTPLEX_SERVER_DIR/plugins'; printf 'Remote host: '; hostname; printf 'Test service state: '; timeout 8 systemctl is-active '$TESTPLEX_SYSTEMD_SERVICE' || true; echo 'Memory:'; free -h; echo 'Disk:'; df -h '$TESTPLEX_SERVER_DIR'; echo 'Disk-backed upload target:'; df -h /var/tmp"
 
           echo "Preparing the disk-backed artifact cache on the test VM."
-          ssh "${ssh_opts[@]}" "$remote" "install -d -m 0700 '$upload_dir'"
+          # Modern deployments used to retain one full map archive per build SHA. This legacy
+          # job shares the same VM and is serialized with modern deploys; remove only exact generated
+          # staging/partial files, retaining the canonical cached map ZIP and all server data.
+          ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" "$deploy_script" <<'REMOTE_DISK_CLEAN'
+          set -euo pipefail
+          build_sha="$1"
+          current_script="$2"
+          [[ "$build_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid build SHA for cache cleanup." >&2; exit 1; }
+          shopt -s nullglob
+          for existing in /var/tmp/testplex-modern-artifacts-*; do
+            [[ -d "$existing" && ! -L "$existing" ]] || continue
+            name="${existing##*/}"
+            [[ "$name" =~ ^testplex-modern-artifacts-[0-9a-f]{40}$ ]] || continue
+            size="$(du -sh -- "$existing" 2>/dev/null | cut -f1 || true)"
+            echo "Removing stale modern deployment staging cache: $existing (${size:-size unavailable})"
+            rm -rf -- "$existing"
+          done
+          for partial in /var/tmp/testplex-artifact-cache/testplex-map-assets.zip.partial-*; do
+            [[ -f "$partial" && ! -L "$partial" ]] || continue
+            name="${partial##*/}"
+            [[ "$name" =~ ^testplex-map-assets\.zip\.partial-[0-9a-f]{40}$ ]] || continue
+            partial_sha="${name##*.partial-}"
+            [[ "$partial_sha" == "$build_sha" ]] && continue
+            echo "Removing abandoned map-transfer partial: $partial"
+            rm -f -- "$partial"
+          done
+          for old_script in /tmp/testplex-deploy-script-*.sh; do
+            [[ -f "$old_script" && ! -L "$old_script" ]] || continue
+            name="${old_script##*/}"
+            [[ "$name" =~ ^testplex-deploy-script-[0-9a-f]{40}\.sh$ ]] || continue
+            [[ "$old_script" == "$current_script" ]] && continue
+            rm -f -- "$old_script"
+          done
+          echo "Disk usage after safe generated-cache cleanup:"
+          df -h /var/tmp
+          df -i /var/tmp
+          install -d -m 0700 -- /var/tmp/testplex-artifact-cache
+          REMOTE_DISK_CLEAN
 
           scp -p -P "$port" -i "$HOME/.ssh/testplex_hyperv" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes \
