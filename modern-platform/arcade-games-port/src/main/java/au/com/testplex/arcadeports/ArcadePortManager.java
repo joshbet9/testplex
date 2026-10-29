@@ -2510,7 +2510,7 @@ public final class ArcadePortManager implements Listener {
             Vector fromTargetToAttacker = attacker.getLocation().toVector().subtract(target.getLocation().toVector()).setY(0.0D);
             if (ArcadePortRules.isBaconBrawlBackstab(targetLook.getX(), targetLook.getZ(),
                     fromTargetToAttacker.getX(), fromTargetToAttacker.getZ())) {
-                hitKnockback *= 2.5D;
+                hitKnockback *= ArcadePortRules.baconBrawlKnockbackMultiplier(true);
                 target.playSound(target.getLocation(), Sound.ENTITY_PIG_DEATH, 1.0F, 2.0F);
             }
         }
