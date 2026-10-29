@@ -568,6 +568,11 @@ class ArcadePortGameTest {
         assertEquals(1.0D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_401L), 0.00001D);
     }
 
+    @Test void baconBrawlKitChangesAreDeferredUntilTheNextRound() {
+        assertFalse(ArcadePortRules.shouldDeferBaconBrawlKitChange(false));
+        assertTrue(ArcadePortRules.shouldDeferBaconBrawlKitChange(true));
+    }
+
     @Test void baconBrawlAchievementKeysAreStableAndNamespaced() {
         java.util.UUID playerId = java.util.UUID.fromString("a3e1b6f0-9950-4de4-a7aa-572e4bd8db12");
         assertEquals("test-achievements.bacon-brawl.a3e1b6f0-9950-4de4-a7aa-572e4bd8db12.flash-fried",
