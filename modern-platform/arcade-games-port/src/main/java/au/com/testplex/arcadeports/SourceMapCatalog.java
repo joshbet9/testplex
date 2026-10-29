@@ -19,6 +19,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+import java.util.jar.JarFile;
 
 /** Loads archived Reborn world maps into isolated modern Arcade test worlds. */
 public final class SourceMapCatalog {
@@ -44,12 +45,149 @@ public final class SourceMapCatalog {
         };
     }
 
-    /** Read the legacy map display name directly from its embedded archive, without loading a world. */
+    /** Supported map directories in the legacy 1.8 archive collection. */
+    static List<String> mapFoldersFor(ArcadePortGame game) {
+        if (game == null) return List.of();
+        return switch (game) {
+            case BACON_BRAWL -> List.of("Bacon Brawl");
+            case BOMB_LOBBERS -> List.of("Bomb Lobbers");
+            case DEATH_TAG -> List.of("Death Tag");
+            case DRAGON_ESCAPE -> List.of("Dragon Escape");
+            case DRAGONS -> List.of("Dragons");
+            case GLADIATORS -> List.of("Gladiators");
+            case MICRO_BATTLES -> List.of("Micro Battle");
+            case ONE_IN_THE_QUIVER -> List.of("One in the Quiver");
+            case PAINTBALL -> List.of("Paintball", "Super Paintball");
+            case RUNNER -> List.of("Runner");
+            case SHEEP_QUEST -> List.of("Sheep Quest");
+            case SPLEEF -> List.of("Speef", "Super Spleef");
+            case TURF_WARS -> List.of("Turf Wars");
+            default -> List.of();
+        };
+    }
+
+    /**
+     * Locate every legacy map ZIP bundled inside the plugin JAR. Maven packages the
+     * corresponding update/maps directories under source-maps/, so adding a map to
+     * the repository makes it available without another hand-written Java entry.
+     */
+    private static List<String> bundledMapResources(JavaPlugin plugin, ArcadePortGame game) {
+        List<String> prefixes = mapFoldersFor(game).stream()
+                .map(folder -> "source-maps/" + folder + "/")
+                .toList();
+        if (prefixes.isEmpty()) return List.of();
+        List<String> resources = new ArrayList<>();
+        try {
+            java.net.URL codeSource = plugin.getClass().getProtectionDomain().getCodeSource().getLocation();
+            Path location = Path.of(codeSource.toURI());
+            if (Files.isDirectory(location)) {
+                Path root = location.resolve("source-maps");
+                if (Files.isDirectory(root)) {
+                    try (Stream<Path> paths = Files.walk(root)) {
+                        paths.filter(Files::isRegularFile)
+                                .map(root::relativize)
+                                .map(Path::toString)
+                                .map(value -> "source-maps/" + value.replace('\\', '/'))
+                                .filter(value -> prefixes.stream().anyMatch(value::startsWith))
+                                .filter(value -> value.toLowerCase(java.util.Locale.ROOT).endsWith(".zip"))
+                                .forEach(resources::add);
+                    }
+                }
+            } else if (Files.isRegularFile(location)) {
+                try (JarFile jar = new JarFile(location.toFile())) {
+                    jar.stream().map(java.util.jar.JarEntry::getName)
+                            .filter(value -> prefixes.stream().anyMatch(value::startsWith))
+                            .filter(value -> value.toLowerCase(java.util.Locale.ROOT).endsWith(".zip"))
+                            .forEach(resources::add);
+                }
+            }
+        } catch (Exception exception) {
+            plugin.getLogger().warning("Could not enumerate bundled " + game.displayName()
+                    + " maps; using the embedded default map if available: " + exception.getMessage());
+        }
+        return resources.stream().distinct().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+    }
+
+    private static String mapNameFromResource(String resource) {
+        if (resource == null) return "Unknown Map";
+        String name = resource.substring(resource.lastIndexOf('/') + 1);
+        if (name.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) {
+            name = name.substring(0, name.length() - 4);
+        }
+        String[] prefixes = {
+                "BaconBrawl_", "Lobbers_", "DeathTag_", "DragonEscape_", "Dragons_",
+                "DR_", "Gladiators_", "Micro_", "OITQ_", "Quiver_", "Paintball_",
+                "Runner_", "Spleef_", "SP_", "TF_"
+        };
+        for (String prefix : prefixes) {
+            if (name.regionMatches(true, 0, prefix, 0, prefix.length())) {
+                name = name.substring(prefix.length());
+                break;
+            }
+        }
+        return name.replace('_', ' ').trim();
+    }
+
+    public record MapArchive(String resource, String displayName) {}
+
+    /** Return the selected map resource, preserving an existing legacy selection on upgrade. */
+    public static String selectedResource(JavaPlugin plugin, ArcadePortGame game) {
+        if (game == null) return null;
+        String configured = plugin.getConfig().getString("selected-maps." + game.id());
+        if (isResourceForGame(plugin, game, configured)) return configured;
+
+        String legacy = resourceFor(game);
+        String legacyName = displayName(plugin, legacy);
+        List<String> resources = bundledMapResources(plugin, game);
+        for (String resource : resources) {
+            if (mapNameFromResource(resource).equalsIgnoreCase(legacyName)) return resource;
+        }
+        if (legacy != null && plugin.getResource(legacy) != null) return legacy;
+        return resources.isEmpty() ? null : resources.get(0);
+    }
+
+    private static boolean isResourceForGame(JavaPlugin plugin, ArcadePortGame game, String resource) {
+        if (resource == null || plugin.getResource(resource) == null) return false;
+        if (resource.equals(resourceFor(game))) return true;
+        return mapFoldersFor(game).stream()
+                .map(folder -> "source-maps/" + folder + "/")
+                .anyMatch(resource::startsWith)
+                && resource.toLowerCase(java.util.Locale.ROOT).endsWith(".zip");
+    }
+
+    /** All usable maps for a game, ordered with the currently selected map first. */
+    public static List<MapArchive> mapsFor(JavaPlugin plugin, ArcadePortGame game) {
+        if (game == null) return List.of();
+        List<MapArchive> maps = new ArrayList<>();
+        for (String resource : bundledMapResources(plugin, game)) {
+            maps.add(new MapArchive(resource, mapNameFromResource(resource)));
+        }
+
+        String legacy = resourceFor(game);
+        if (legacy != null && plugin.getResource(legacy) != null) {
+            String legacyName = displayName(plugin, legacy);
+            boolean duplicate = maps.stream().anyMatch(map -> map.displayName().equalsIgnoreCase(legacyName));
+            if (!duplicate) maps.add(new MapArchive(legacy, legacyName));
+        }
+
+        String selected = selectedResource(plugin, game);
+        maps.sort((left, right) -> {
+            if (left.resource().equals(selected)) return right.resource().equals(selected) ? 0 : -1;
+            if (right.resource().equals(selected)) return 1;
+            return left.displayName().compareToIgnoreCase(right.displayName());
+        });
+        return List.copyOf(maps);
+    }
+
+    /** Read map metadata directly from an embedded archive, without loading a world. */
     public static String displayName(JavaPlugin plugin, ArcadePortGame game) {
-        String resource = resourceFor(game);
+        return displayName(plugin, selectedResource(plugin, game));
+    }
+
+    public static String displayName(JavaPlugin plugin, String resource) {
         if (resource == null) return null;
         InputStream raw = plugin.getResource(resource);
-        if (raw == null) return null;
+        if (raw == null) return mapNameFromResource(resource);
         try (ZipInputStream zip = new ZipInputStream(raw)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
@@ -66,9 +204,9 @@ public final class SourceMapCatalog {
                 zip.closeEntry();
             }
         } catch (IOException exception) {
-            plugin.getLogger().warning("Could not read map name for " + game.displayName() + ": " + exception.getMessage());
+            plugin.getLogger().warning("Could not read map name from " + resource + ": " + exception.getMessage());
         }
-        return game.displayName() + " Source Map";
+        return mapNameFromResource(resource);
     }
 
     public static boolean hasMap(ArcadePortGame game) {
@@ -220,7 +358,7 @@ public final class SourceMapCatalog {
 
     /** Extract only into this module's dedicated arcadeport_source_* test world. */
     public static boolean install(JavaPlugin plugin, ArcadePortGame game, String worldName) {
-        String resource = resourceFor(game);
+        String resource = selectedResource(plugin, game);
         if (resource == null) return false;
         Path container = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
         Path root = container.resolve(worldName).normalize();
