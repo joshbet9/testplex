@@ -14,6 +14,19 @@ class ArcadePortGameTest {
                 SourceMapCatalog.migratedDimensionFolder(primaryWorld, "arcadeport_source_bacon_brawl"));
         assertNull(SourceMapCatalog.migratedDimensionFolder(primaryWorld, "world"));
         assertNull(SourceMapCatalog.migratedDimensionFolder(primaryWorld, "../arcadeport_source_bacon_brawl"));
+        assertNull(SourceMapCatalog.migratedDimensionFolder(
+                Path.of("/srv/testplex/arcadeport_source_other"), "arcadeport_source_bacon_brawl"));
+    }
+
+    @Test void selectingBaconBrawlUsesItsOwnLobbyScoreboardAndLegacyStartCountdown() {
+        assertTrue(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("bacon-brawl"));
+        assertTrue(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("BACON_BRAWL"));
+        assertFalse(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("paintball"));
+        assertEquals("BACON BRAWL", org.bukkit.ChatColor.stripColor(
+                ModernLobbyScoreboard.scoreboardTitleForGame("bacon-brawl", "Testplex")));
+        assertEquals("Testplex",
+                ModernLobbyScoreboard.scoreboardTitleForGame("paintball", "Testplex"));
+        assertEquals(20, ArcadePortManager.MANUAL_START_COUNTDOWN_SECONDS);
     }
 
     @Test void modernLobbyScoreboardShowsSelectedGameAndKitAsReadableLabels() {
