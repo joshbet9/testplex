@@ -75,6 +75,7 @@ public final class ArcadeMapSelectionMenu implements Listener {
                 && resource.equals(SourceMapCatalog.resourceFor(game))) {
             plugin.getConfig().set("selected-maps." + game.id(), resource);
             plugin.saveConfig();
+            player.performCommand("arcadeport lobby " + game.id());
             player.sendMessage(ChatColor.GREEN + "Selected map " + SourceMapCatalog.displayName(plugin, game)
                     + " for " + game.displayName() + ".");
             player.performCommand("setgame");

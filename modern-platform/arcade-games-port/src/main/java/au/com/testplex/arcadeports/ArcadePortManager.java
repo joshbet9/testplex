@@ -132,6 +132,7 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey statsCategoryKey;
     private final NamespacedKey statsGameKey;
     private final ModernArcadeLobby lobby;
+    private final ModernArcadeLobbyRuntime lobbyRuntime;
 
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
@@ -142,10 +143,48 @@ public final class ArcadePortManager implements Listener {
         Bukkit.getPluginManager().registerEvents(this, plugin);
         Bukkit.getPluginManager().registerEvents(lobby, plugin);
         lobby.ensureWorld();
+        this.lobbyRuntime = new ModernArcadeLobbyRuntime(plugin, this, lobby);
+        Bukkit.getPluginManager().registerEvents(lobbyRuntime, plugin);
+        lobbyRuntime.setSelectedGame(ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", "bacon-brawl")));
         registerOptionalBaconPacketBridge();
     }
 
     /**
+    public void selectLobbyGame(ArcadePortGame type) {
+        if (type == null) return;
+        plugin.getConfig().set("lobby-selected-game", type.id());
+        plugin.saveConfig();
+        lobbyRuntime.setSelectedGame(type);
+    }
+
+    public int queuedCount(ArcadePortGame type) {
+        if (type == null) return 0;
+        Map<UUID, Player> queued = queues.get(type.id());
+        return queued == null ? 0 : (int) queued.values().stream().filter(p -> p != null && p.isOnline()).count();
+    }
+
+    public void removeFromQueues(Player player) {
+        if (player == null) return;
+        for (Map<UUID, Player> queued : queues.values()) queued.remove(player.getUniqueId());
+    }
+
+    public boolean isActiveGame(World world, ArcadePortGame type) {
+        return active != null && active.type == type && active.world == world;
+    }
+
+    public List<Player> botTargets(World world, ArcadePortGame type) {
+        if (!isActiveGame(world, type)) return List.of();
+        return alivePlayers(active);
+    }
+
+    public double baconBrawlKnockbackValue(World world) {
+        return isActiveGame(world, ArcadePortGame.BACON_BRAWL) ? active.baconKnockback : 1.5D;
+    }
+
+    public void handleBotCommand(org.bukkit.command.CommandSender sender, String[] args) {
+        lobbyRuntime.handleBotCommand(sender, args);
+    }
+
      * PacketEvents is optional: no PacketEvents class is loaded unless that plugin is installed.
      * Bare Paper keeps the previous server-side-avatar hit handling as a fallback.
      */
@@ -686,6 +725,7 @@ public final class ArcadePortManager implements Listener {
         }
         border.setDamageAmount(0.0D);
         List<Location> spawns = spawnLocations(type, participants.size());
+        lobbyRuntime.deployBots(type, spawns);
         for (int i = 0; i < participants.size(); i++) {
             Player player = participants.get(i);
             PlayerSnapshot pendingSnapshot = pendingRestore.remove(player.getUniqueId());
@@ -5200,6 +5240,8 @@ public final class ArcadePortManager implements Listener {
         session.alive.clear();
         session.players.clear();
         session.snapshots.clear();
+        lobbyRuntime.returnBotsToLobby();
+        lobbyRuntime.refreshDisplays();
     }
 
     /** Record local Bacon Brawl achievements in isolated test config, never production milestones. */
@@ -5565,6 +5607,7 @@ public final class ArcadePortManager implements Listener {
 
     public void shutdown() {
         stop("plugin shutdown");
+        lobbyRuntime.shutdown();
         unregisterOptionalBaconPacketBridge();
         baconAvatarOwnersByEntityId.clear();
         for (Map.Entry<UUID, PlayerSnapshot> entry : new ArrayList<>(pendingRestore.entrySet())) {

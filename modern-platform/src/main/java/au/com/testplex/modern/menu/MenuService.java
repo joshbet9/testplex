@@ -381,6 +381,7 @@ public final class MenuService implements Listener {
                 plugin.getConfig().set("game-panel.selected-game", game.getId());
                 plugin.saveConfig();
                 player.closeInventory();
+                player.performCommand("arcadeport lobby " + game.getId());
                 player.sendMessage(ChatColor.GREEN + "Selected " + game.getName()
                         + ". Right-click the game to choose a map, then use Start Game in the Game Panel.");
             }

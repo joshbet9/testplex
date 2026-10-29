@@ -87,6 +87,25 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
                 manager.queue(ArcadePortGame.fromId(args[1]), player, sub.equals("play"));
                 return true;
+            case "lobby":
+            case "selectgame":
+                if (args.length < 2) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport lobby <game-id>");
+                    return true;
+                }
+                ArcadePortGame selectedLobbyGame = ArcadePortGame.fromId(args[1]);
+                if (selectedLobbyGame == null) {
+                    sender.sendMessage(ChatColor.RED + "Unknown game id.");
+                    return true;
+                }
+                manager.selectLobbyGame(selectedLobbyGame);
+                sender.sendMessage(ChatColor.GREEN + selectedLobbyGame.displayName()
+                        + " selected. Kit and queue datapoints are ready in the lobby.");
+                return true;
+            case "bot":
+            case "bots":
+                manager.handleBotCommand(sender, java.util.Arrays.copyOfRange(args, 1, args.length));
+                return true;
             case "maps":
             case "map":
                 if (!(sender instanceof Player player)) {
