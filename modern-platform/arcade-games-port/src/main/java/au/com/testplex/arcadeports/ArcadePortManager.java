@@ -2376,6 +2376,9 @@ public final class ArcadePortManager implements Listener {
             if (invisible == null || invisible.getDuration() < 20) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 40, 0, false, false, false));
             }
+            Long cloakedUntil = session.baconCloakedUntil.get(id);
+            if (cloakedUntil != null && now >= cloakedUntil) clearBaconCloak(session, id);
+            updateBaconPlayerPig(session, player, now);
             if ("mama-piggles".equals(kit)) {
                 PotionEffect speed = player.getPotionEffect(PotionEffectType.SPEED);
                 if (session.ticks % 20 == 0 || speed == null || speed.getDuration() < 20) {
@@ -2385,9 +2388,6 @@ public final class ArcadePortManager implements Listener {
             } else {
                 removeBaconBabyPig(session, id);
             }
-            Long cloakedUntil = session.baconCloakedUntil.get(id);
-            if (cloakedUntil != null && now >= cloakedUntil) clearBaconCloak(session, id);
-            updateBaconPlayerPig(session, player, now);
             if (session.ticks % 20 == 0) {
                 String ability = switch (kit) {
                     case "mama-piggles" -> "Bacon Blast";
@@ -2450,13 +2450,13 @@ public final class ArcadePortManager implements Listener {
             session.baconPigOwners.put(baby.getUniqueId(), ownerId);
         }
 
-        Vector forward = owner.getLocation().getDirection().setY(0.0D);
-        if (forward.lengthSquared() < 1.0E-5D) forward = new Vector(0.0D, 0.0D, 1.0D);
-        Location desired = owner.getLocation().clone().subtract(forward.normalize().multiply(0.85D));
-        desired.setY(owner.getLocation().getY());
-        if (baby.getLocation().distanceSquared(desired) > 1.0D) baby.teleport(desired);
+        Pig avatar = baconPlayerPig(session, ownerId);
+        if (avatar != null && baby.getVehicle() != avatar) {
+            if (baby.getVehicle() != null) baby.leaveVehicle();
+            avatar.addPassenger(baby);
+        }
         baby.setRotation(owner.getLocation().getYaw(), 0.0F);
-        // Source Mama Piggles uses Baby Piggles as a companion/passenger visual; it does not attack players.
+        // Reborn mounts Baby Piggles on Mama Piggles' pig form; it is a transferred hitbox, not an attacker.
     }
 
     private void removeBaconBabyPig(Session session, UUID ownerId) {
