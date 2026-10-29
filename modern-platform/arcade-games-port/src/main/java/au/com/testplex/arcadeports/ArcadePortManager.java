@@ -130,6 +130,7 @@ public final class ArcadePortManager implements Listener {
     private ArcadePortGame manualStartType;
     private long lastDragonHazard;
     private long lastSheepSpawn;
+    private List<Location> baconSourceSpawnOverrides = List.of();
 
     private final NamespacedKey statsActionKey;
     private final NamespacedKey statsCategoryKey;
@@ -746,6 +747,7 @@ public final class ArcadePortManager implements Listener {
             worlds.remove(type.id());
             sourceMapWorlds.remove(type.id());
             sourceMapData.remove(type.id());
+            if (type == ArcadePortGame.BACON_BRAWL) baconSourceSpawnOverrides = List.of();
             try {
                 world = createWorld(type);
             } catch (RuntimeException firstFailure) {
@@ -769,27 +771,8 @@ public final class ArcadePortManager implements Listener {
                 }
 
                 if (world == null) {
-                    // A corrupt/incompatible archived map must not make Start Game
-                    // silently fail. Keep testing possible in the dedicated proto
-                    // world while preserving a complete log explaining the fallback.
-                    SourceMapCatalog.resetTestWorld(plugin, sourceWorldName);
-                    sourceMapWorlds.remove(type.id());
-                    sourceMapData.remove(type.id());
-                    worlds.remove(type.id());
-                    try {
-                        world = createWorld(type, false);
-                        if (world != null && type == ArcadePortGame.BACON_BRAWL) clearBaconFallbackArena(world);
-                        if (world != null) {
-                            sender.sendMessage(ChatColor.YELLOW + "The archived " + type.displayName()
-                                    + " map could not be loaded; starting in the isolated fallback arena.");
-                            plugin.getLogger().warning(type.displayName()
-                                    + " is running on its isolated fallback arena after source-map load failed.");
-                        }
-                    } catch (RuntimeException fallbackFailure) {
-                        plugin.getLogger().log(java.util.logging.Level.SEVERE,
-                                "Fallback world creation failed for " + type.displayName() + ".", fallbackFailure);
-                        world = null;
-                    }
+                    sender.sendMessage(ChatColor.RED + "Could not load the authentic " + type.displayName()
+                            + " map after a clean retry. No generated fallback arena was created; see server logs.");
                 }
             }
             if (world != null) worlds.put(type.id(), world);
@@ -800,15 +783,21 @@ public final class ArcadePortManager implements Listener {
             sender.sendMessage(ChatColor.RED + "The test world could not be loaded. Check the server log.");
             return;
         }
-        // Archived 1.8 region files are not safe to trust merely because their WorldConfig
-        // parsed. Validate the actual spawn blocks on the 26.3 runtime before releasing players.
-        if (type == ArcadePortGame.BACON_BRAWL && sourceMapWorlds.contains(type.id())
-                && !hasSafeBaconSourceSpawns(world, sourceMapData.get(type.id()), participants.size())) {
-            plugin.getLogger().warning("Bacon Brawl source arena failed spawn-safety validation; using the isolated modern fallback arena for this round.");
-            sourceMapWorlds.remove(type.id());
-            sourceMapData.remove(type.id());
-            clearBaconFallbackArena(world);
-            world.setSpawnLocation(0, 64, 0);
+        // A mapped game must remain on its authentic legacy terrain. Never overwrite
+        // an imported map with a synthetic platform if its metadata or starts are invalid.
+        if (SourceMapCatalog.hasMap(type)
+                && (!sourceMapWorlds.contains(type.id()) || sourceMapData.get(type.id()) == null)) {
+            sender.sendMessage(ChatColor.RED + "The authentic " + type.displayName()
+                    + " map or its WorldConfig metadata could not be loaded. No fallback arena was generated; see server logs.");
+            return;
+        }
+        if (type == ArcadePortGame.BACON_BRAWL
+                && !prepareBaconSourceSpawns(world, sourceMapData.get(type.id()), participants.size())) {
+            SourceMapCatalog.MapData mapData = sourceMapData.get(type.id());
+            String mapName = mapData == null ? "unknown map" : mapData.mapName();
+            sender.sendMessage(ChatColor.RED + "No safe authored spawn could be resolved on authentic map "
+                    + mapName + ". The map was preserved and no generated platform was added; check server logs.");
+            return;
         }
         if (!sourceMapWorlds.contains(type.id())) buildArena(type, world);
         Session session = new Session(type, world, participants);
@@ -1057,26 +1046,37 @@ public final class ArcadePortManager implements Listener {
     private World createWorld(ArcadePortGame type, boolean allowSourceMap) {
         String sourceWorldName = "arcadeport_source_" + type.id().replace('-', '_');
         World world = allowSourceMap ? Bukkit.getWorld(sourceWorldName) : null;
-        if (allowSourceMap && world == null && SourceMapCatalog.hasMap(type)
-                && SourceMapCatalog.install(plugin, type, sourceWorldName)) {
+        if (allowSourceMap && world == null && SourceMapCatalog.hasMap(type)) {
+            String selectedResource = SourceMapCatalog.selectedResource(plugin, type);
+            if (selectedResource == null || !SourceMapCatalog.install(plugin, type, sourceWorldName)) {
+                throw new IllegalStateException("Could not install selected authentic map resource '"
+                        + selectedResource + "' for " + type.displayName());
+            }
             WorldCreator creator = new WorldCreator(sourceWorldName)
                     .environment(World.Environment.NORMAL).generateStructures(false);
             world = creator.createWorld();
+            if (world == null) {
+                throw new IllegalStateException("Paper could not load the authentic source map world "
+                        + sourceWorldName);
+            }
         }
         if (allowSourceMap && world != null && SourceMapCatalog.hasMap(type)
                 && !sourceMapWorlds.contains(type.id())) {
             SourceMapCatalog.MapData mapData = SourceMapCatalog.read(world);
-            sourceMapWorlds.add(type.id());
-            if (mapData != null) {
-                sourceMapData.put(type.id(), mapData);
-                plugin.getLogger().info("Loaded original " + type.displayName() + " map: "
-                        + mapData.mapName() + " (" + mapData.spawnLocations().size() + " configured spawn locations).");
-            } else {
-                plugin.getLogger().warning("Loaded original terrain without parsed WorldConfig metadata for "
-                        + type.displayName() + "; using fallback spawn locations.");
+            if (mapData == null) {
+                throw new IllegalStateException("The selected authentic map has no readable WorldConfig.dat: "
+                        + SourceMapCatalog.selectedResource(plugin, type));
             }
+            sourceMapWorlds.add(type.id());
+            sourceMapData.put(type.id(), mapData);
+            plugin.getLogger().info("Loaded authentic " + type.displayName() + " map: "
+                    + mapData.mapName() + " (" + mapData.spawnLocations().size() + " configured spawn locations).");
         }
         if (world == null) {
+            if (allowSourceMap && SourceMapCatalog.hasMap(type)) {
+                throw new IllegalStateException("Refusing to create a generated world for mapped game "
+                        + type.displayName());
+            }
             String worldName = "arcadeport_proto_" + type.id().replace('-', '_');
             world = Bukkit.getWorld(worldName);
             if (world == null) {
@@ -1098,56 +1098,81 @@ public final class ArcadePortManager implements Listener {
     }
 
     /**
-     * Validate the actual source spawn blocks before using the legacy arena archive.
-     * WorldConfig.dat by itself is not proof that a converted 1.8 chunk is playable.
+     * Resolve each authored Bacon Brawl spawn on the imported map itself. If a 1.8
+     * spawn Y is slightly different after conversion, adjust only its vertical
+     * coordinate at the same X/Z. The source terrain is never erased or covered.
      */
-    private boolean hasSafeBaconSourceSpawns(World world, SourceMapCatalog.MapData sourceMap, int participantCount) {
+    private boolean prepareBaconSourceSpawns(
+            World world, SourceMapCatalog.MapData sourceMap, int participantCount) {
         if (world == null || sourceMap == null) return false;
         List<Location> sourceSpawns = sourceMap.teamSpawnLocationsForName("Green");
         if (sourceSpawns.isEmpty()) sourceSpawns = sourceMap.dataLocations("GREEN");
-        if (sourceSpawns.isEmpty()) return false;
-        int checkCount = Math.min(Math.max(1, participantCount), sourceSpawns.size());
-        for (int i = 0; i < checkCount; i++) {
-            Location spawn = sourceSpawns.get(i);
-            if (spawn == null || spawn.getWorld() != world
-                    || spawn.getY() < world.getMinHeight() + 2.0D
-                    || spawn.getY() >= world.getMaxHeight() - 2.0D) return false;
-            int x = spawn.getBlockX();
-            int y = spawn.getBlockY();
-            int z = spawn.getBlockZ();
-            world.getChunkAt(x >> 4, z >> 4).load();
-            Block floor = world.getBlockAt(x, y - 1, z);
-            Block feet = world.getBlockAt(x, y, z);
-            Block head = world.getBlockAt(x, y + 1, z);
-            Material floorType = floor.getType();
-            if (!floorType.isSolid()
-                    || floorType == Material.MAGMA_BLOCK
-                    || floorType == Material.CAMPFIRE
-                    || floorType == Material.SOUL_CAMPFIRE
-                    || !feet.isPassable()
-                    || !head.isPassable()
-                    || feet.getType() == Material.LAVA
-                    || feet.getType() == Material.WATER
-                    || head.getType() == Material.LAVA
-                    || head.getType() == Material.WATER) {
+        if (sourceSpawns.isEmpty()) sourceSpawns = sourceMap.spawnLocations();
+        if (sourceSpawns.isEmpty()) {
+            plugin.getLogger().warning("Authentic Bacon Brawl map " + sourceMap.mapName()
+                    + " has no authored player spawn locations in WorldConfig.dat.");
+            return false;
+        }
+
+        List<Location> resolved = new ArrayList<>();
+        for (Location source : sourceSpawns) {
+            Location safe = findSafeBaconSourceSpawn(world, source);
+            if (safe == null) {
+                int x = source == null ? 0 : source.getBlockX();
+                int y = source == null ? 0 : source.getBlockY();
+                int z = source == null ? 0 : source.getBlockZ();
+                String blockInfo = source == null ? "null location" : "floor="
+                        + world.getBlockAt(x, Math.max(world.getMinHeight(), y - 1), z).getType()
+                        + ", feet=" + world.getBlockAt(x, y, z).getType()
+                        + ", head=" + world.getBlockAt(x, y + 1, z).getType();
+                plugin.getLogger().warning("No safe floor found within 32 vertical blocks of authentic Bacon Brawl spawn "
+                        + x + "," + y + "," + z + " in " + sourceMap.mapName() + " (" + blockInfo + ").");
                 return false;
             }
+            if (Math.abs(safe.getY() - source.getY()) > 0.01D) {
+                plugin.getLogger().info("Adjusted converted spawn height on authentic map " + sourceMap.mapName()
+                        + " from Y=" + source.getY() + " to Y=" + safe.getY()
+                        + " at X/Z " + source.getBlockX() + "/" + source.getBlockZ() + ".");
+            }
+            resolved.add(safe);
         }
-        return true;
+        baconSourceSpawnOverrides = List.copyOf(resolved);
+        plugin.getLogger().info("Using " + resolved.size() + " safe authored spawn points on authentic Bacon Brawl map "
+                + sourceMap.mapName() + "; queued players=" + Math.max(1, participantCount) + ".");
+        return !baconSourceSpawnOverrides.isEmpty();
     }
 
-    /** Clear only the small centre volume used by the safe fallback arena. */
-    private void clearBaconFallbackArena(World world) {
-        int minY = Math.max(0, world.getMinHeight());
-        int maxY = Math.min(80, world.getMaxHeight() - 1);
-        for (int x = -HALF_SIZE - 2; x <= HALF_SIZE + 2; x++) {
-            for (int z = -HALF_SIZE - 2; z <= HALF_SIZE + 2; z++) {
-                for (int y = minY; y <= maxY; y++) {
-                    Block block = world.getBlockAt(x, y, z);
-                    if (!block.getType().isAir()) block.setType(Material.AIR, false);
-                }
+    private Location findSafeBaconSourceSpawn(World world, Location source) {
+        if (source == null || source.getWorld() != world) return null;
+        int x = source.getBlockX();
+        int baseY = source.getBlockY();
+        int z = source.getBlockZ();
+        world.getChunkAt(x >> 4, z >> 4).load();
+        for (int offset = 0; offset <= 32; offset++) {
+            int[] candidates = offset == 0 ? new int[]{baseY}
+                    : new int[]{baseY - offset, baseY + offset};
+            for (int y : candidates) {
+                if (y < world.getMinHeight() + 2 || y >= world.getMaxHeight() - 2) continue;
+                Block floor = world.getBlockAt(x, y - 1, z);
+                Block feet = world.getBlockAt(x, y, z);
+                Block head = world.getBlockAt(x, y + 1, z);
+                Material floorType = floor.getType();
+                if (!floorType.isSolid()
+                        || floorType == Material.MAGMA_BLOCK
+                        || floorType == Material.CAMPFIRE
+                        || floorType == Material.SOUL_CAMPFIRE
+                        || !feet.isPassable()
+                        || !head.isPassable()
+                        || feet.getType() == Material.LAVA
+                        || feet.getType() == Material.WATER
+                        || head.getType() == Material.LAVA
+                        || head.getType() == Material.WATER) continue;
+                Location safe = source.clone();
+                safe.setY(y);
+                return safe;
             }
         }
+        return null;
     }
 
     private void buildArena(ArcadePortGame type, World world) {
@@ -1212,6 +1237,13 @@ public final class ArcadePortManager implements Listener {
     }
 
     private List<Location> spawnLocations(ArcadePortGame type, int count) {
+        if (type == ArcadePortGame.BACON_BRAWL && !baconSourceSpawnOverrides.isEmpty()) {
+            List<Location> chosen = new ArrayList<>();
+            for (int i = 0; i < Math.max(1, count); i++) {
+                chosen.add(baconSourceSpawnOverrides.get(i % baconSourceSpawnOverrides.size()).clone());
+            }
+            return chosen;
+        }
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(type.id());
         if (sourceMap != null && type == ArcadePortGame.BACON_BRAWL) {
             // The archived Mighty Lava Arena stores the 16 free-for-all starts in TEAM_NAME:Green /
@@ -5424,6 +5456,7 @@ public final class ArcadePortManager implements Listener {
         session.players.clear();
         session.snapshots.clear();
         lobbyRuntime.returnBotsToLobby();
+        if (session.type == ArcadePortGame.BACON_BRAWL) baconSourceSpawnOverrides = List.of();
         lobbyRuntime.refreshDisplays();
     }
 
