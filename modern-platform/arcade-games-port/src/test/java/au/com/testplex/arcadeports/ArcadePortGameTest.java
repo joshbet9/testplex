@@ -374,6 +374,24 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isSpleefFloorMaterial(null));
     }
 
+    @Test void bombLobbersDirectHitUsesLegacyKnockbackAndGroundBoost() {
+        var airborne = ArcadePortRules.bombLobbersDirectHitVelocity(
+                new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D), false);
+        assertEquals(0.2D, airborne.getX(), 0.00001D);
+        assertEquals(0.2D, airborne.getY(), 0.00001D);
+        assertEquals(0.0D, airborne.getZ(), 0.00001D);
+
+        var grounded = ArcadePortRules.bombLobbersDirectHitVelocity(
+                new org.bukkit.util.Vector(0.0D, 0.0D, -2.0D), true);
+        assertEquals(0.0D, grounded.getX(), 0.00001D);
+        assertEquals(0.4D, grounded.getY(), 0.00001D);
+        assertEquals(-0.2D, grounded.getZ(), 0.00001D);
+
+        assertEquals(new org.bukkit.util.Vector(0.0D, 0.0D, 0.0D),
+                ArcadePortRules.bombLobbersDirectHitVelocity(
+                        new org.bukkit.util.Vector(0.0D, 0.0D, 0.0D), true));
+    }
+
     @Test void bombLobbersExplosionAddsLegacyImpulseInsteadOfReplacingVelocity() {
         var impulse = ArcadePortRules.bombLobbersExplosionVelocity(
                 new org.bukkit.util.Vector(0.25D, 0.4D, -0.1D),
