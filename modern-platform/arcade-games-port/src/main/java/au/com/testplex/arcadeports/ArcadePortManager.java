@@ -1370,7 +1370,7 @@ public final class ArcadePortManager implements Listener {
             }
             case BOMB_LOBBERS: {
                 String kit = session.bombLobbersKits.getOrDefault(player.getUniqueId(), "jumper");
-                player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Left-click to throw at enemy players.", 1));
+                player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Click to throw at enemy players.", 1));
                 switch (kit) {
                     case "armorer":
                         break;
@@ -6513,7 +6513,7 @@ public final class ArcadePortManager implements Listener {
             if (now >= nextGrant) {
                 if (inventoryCount(player, Material.TNT) < ArcadePortRules.BOMB_LOBBERS_MAX_CARRIED) {
                     player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT",
-                            "Left-click to throw at enemy players.", 1));
+                            "Click to throw at enemy players.", 1));
                 }
                 session.bombNextCraftAt.put(id,
                         now + ArcadePortRules.bombLobbersCraftmanIntervalMillis(elapsed));
