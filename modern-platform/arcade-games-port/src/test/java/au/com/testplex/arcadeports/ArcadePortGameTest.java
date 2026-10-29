@@ -561,9 +561,9 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.canUseBaconMeterAbility(10));
         assertEquals(0.55D, ArcadePortRules.baconBodySlamMeterMultiplier(10), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.baconBodySlamMeterMultiplier(100), 0.00001D);
-        assertEquals(0L, ArcadePortRules.baconPigInvincibilityDurationMillis(9));
-        assertTrue(ArcadePortRules.baconPigInvincibilityDurationMillis(10) > 0L);
-        assertEquals(5_000L, ArcadePortRules.baconPigInvincibilityDurationMillis(100));
+        assertEquals(0L, ArcadePortRules.baconSheepCloakDurationMillis(9));
+        assertEquals(725L, ArcadePortRules.baconSheepCloakDurationMillis(15));
+        assertEquals(5_000L, ArcadePortRules.baconSheepCloakDurationMillis(100));
         assertEquals(0.65D, ArcadePortRules.baconBlastPowerMultiplier(10), 0.00001D);
         assertEquals(2.0D, ArcadePortRules.baconBlastPowerMultiplier(100), 0.00001D);
     }
@@ -578,6 +578,13 @@ class ArcadePortGameTest {
         assertEquals(1.25D, ArcadePortRules.baconTimedHitKnockbackMultiplier(901L), 0.00001D);
         assertEquals(1.25D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_400L), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_401L), 0.00001D);
+    }
+
+    @Test void baconSheepPigGetsCloakRatherThanDamageInvincibility() {
+        assertEquals(500L, ArcadePortRules.BACON_SHEEP_CLOAK_MIN_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.BACON_SHEEP_CLOAK_MAX_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.baconSheepCloakDurationMillis(100));
+        assertEquals(10_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("sheep-pig"));
     }
 
     @Test void baconBrawlPacketAvatarHitsRequireReachLineOfSightAndLivingPlayers() {
