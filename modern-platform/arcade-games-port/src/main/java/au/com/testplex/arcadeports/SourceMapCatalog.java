@@ -631,45 +631,112 @@ public final class SourceMapCatalog {
         return Files.isRegularFile(legacyConfig) ? legacyConfig : local;
     }
 
+    /**
+     * Reads the map-specific Reborn metadata. Paper 26.1+ imports an API-created
+     * CraftBukkit world into the main world's dimensions folder and deletes the
+     * old standalone world directory. Paper migrates region/entities/poi, but it
+     * does not know about the extra Reborn WorldConfig.dat file. Therefore, after
+     * a successful terrain import, this metadata must be read from the exact
+     * selected archive instead of assuming the old file survived on disk.
+     */
+    public static MapData read(JavaPlugin plugin, ArcadePortGame game, World world) {
+        if (plugin == null || game == null || world == null) return null;
+        Path config = resolveWorldConfigPath(world.getWorldFolder().toPath(),
+                Bukkit.getWorldContainer().toPath(), world.getName());
+        if (config != null && Files.isRegularFile(config)) {
+            try {
+                return parseMapConfig(world, Files.readAllLines(config, StandardCharsets.UTF_8));
+            } catch (IOException exception) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        "Could not read on-disk WorldConfig.dat for " + game.displayName()
+                                + "; retrying from the selected embedded source archive " + selectedResource(plugin, game),
+                        exception);
+            }
+        }
+
+        String resource = selectedResource(plugin, game);
+        if (resource == null) {
+            plugin.getLogger().warning("Cannot read source map metadata for " + game.displayName()
+                    + ": no selected archive is configured.");
+            return null;
+        }
+        try (InputStream input = plugin.getResource(resource)) {
+            if (input == null) {
+                plugin.getLogger().warning("Cannot read source map metadata for " + game.displayName()
+                        + ": the selected embedded archive is missing: " + resource);
+                return null;
+            }
+            try (ZipInputStream zip = new ZipInputStream(input)) {
+                ZipEntry entry;
+                while ((entry = zip.getNextEntry()) != null) {
+                    if (entry.getName().replace('\\', '/').endsWith("/WorldConfig.dat")
+                            || entry.getName().equals("WorldConfig.dat")) {
+                        String contents = new String(zip.readAllBytes(), StandardCharsets.UTF_8);
+                        MapData parsed = parseMapConfig(world, java.util.Arrays.asList(contents.split("\\R", -1)));
+                        if (parsed != null) {
+                            plugin.getLogger().info("Loaded " + game.displayName()
+                                    + " WorldConfig.dat from the selected embedded archive " + resource
+                                    + " (Paper's custom-world migration does not retain this Reborn-only file).");
+                        }
+                        return parsed;
+                    }
+                    zip.closeEntry();
+                }
+            }
+            plugin.getLogger().warning("Selected map archive " + resource + " has no WorldConfig.dat entry.");
+            return null;
+        } catch (IOException exception) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING,
+                    "Could not read WorldConfig.dat from selected map archive " + resource, exception);
+            return null;
+        }
+    }
+
+    /** Read an already-extracted WorldConfig.dat or its UTF-8 contents into source map data. */
     public static MapData read(World world) {
         if (world == null) return null;
         Path config = resolveWorldConfigPath(world.getWorldFolder().toPath(),
                 Bukkit.getWorldContainer().toPath(), world.getName());
         if (config == null || !Files.isRegularFile(config)) return null;
+        try {
+            return parseMapConfig(world, Files.readAllLines(config, StandardCharsets.UTF_8));
+        } catch (IOException ex) {
+            return null;
+        }
+    }
+
+    static MapData parseMapConfig(World world, List<String> lines) {
+        if (lines == null) return null;
         MapData data = new MapData();
         String currentTeam = "Unassigned";
         String currentDataName = "Unassigned";
         String currentCustomName = "Unassigned";
-        try {
-            for (String line : Files.readAllLines(config, StandardCharsets.UTF_8)) {
-                int colon = line.indexOf(':');
-                if (colon <= 0) continue;
-                String key = line.substring(0, colon).trim().toUpperCase(java.util.Locale.ROOT);
-                String value = line.substring(colon + 1).trim();
-                switch (key) {
-                    case "MAP_NAME" -> data.mapName = value;
-                    case "MIN_X" -> { data.minX = parseInt(value, data.minX); data.hasMinX = true; }
-                    case "MAX_X" -> { data.maxX = parseInt(value, data.maxX); data.hasMaxX = true; }
-                    case "MIN_Z" -> { data.minZ = parseInt(value, data.minZ); data.hasMinZ = true; }
-                    case "MAX_Z" -> { data.maxZ = parseInt(value, data.maxZ); data.hasMaxZ = true; }
-                    case "MIN_Y" -> { data.minY = parseInt(value, data.minY); data.hasMinY = true; }
-                    case "MAX_Y" -> { data.maxY = parseInt(value, data.maxY); data.hasMaxY = true; }
-                    case "TEAM_NAME" -> {
-                        currentTeam = value.isEmpty() ? "Unassigned" : value;
-                        data.teamSpawns.computeIfAbsent(currentTeam, ignored -> new ArrayList<>());
-                    }
-                    case "TEAM_SPAWNS" -> data.addLocations(world, data.teamSpawns, currentTeam, value, true);
-                    case "DATA_NAME" -> currentDataName = value.isEmpty() ? "Unassigned" : value;
-                    case "DATA_LOCS" -> data.addLocations(world, data.dataLocations, currentDataName, value, false);
-                    case "CUSTOM_NAME" -> currentCustomName = value.isEmpty() ? "Unassigned" : value;
-                    case "CUSTOM_LOCS" -> data.addLocations(world, data.customLocations, currentCustomName, value, false);
-                    default -> { }
+        for (String line : lines) {
+            int colon = line.indexOf(':');
+            if (colon <= 0) continue;
+            String key = line.substring(0, colon).trim().toUpperCase(java.util.Locale.ROOT);
+            String value = line.substring(colon + 1).trim();
+            switch (key) {
+                case "MAP_NAME" -> data.mapName = value;
+                case "MIN_X" -> { data.minX = parseInt(value, data.minX); data.hasMinX = true; }
+                case "MAX_X" -> { data.maxX = parseInt(value, data.maxX); data.hasMaxX = true; }
+                case "MIN_Z" -> { data.minZ = parseInt(value, data.minZ); data.hasMinZ = true; }
+                case "MAX_Z" -> { data.maxZ = parseInt(value, data.maxZ); data.hasMaxZ = true; }
+                case "MIN_Y" -> { data.minY = parseInt(value, data.minY); data.hasMinY = true; }
+                case "MAX_Y" -> { data.maxY = parseInt(value, data.maxY); data.hasMaxY = true; }
+                case "TEAM_NAME" -> {
+                    currentTeam = value.isEmpty() ? "Unassigned" : value;
+                    data.teamSpawns.computeIfAbsent(currentTeam, ignored -> new ArrayList<>());
                 }
+                case "TEAM_SPAWNS" -> data.addLocations(world, data.teamSpawns, currentTeam, value, true);
+                case "DATA_NAME" -> currentDataName = value.isEmpty() ? "Unassigned" : value;
+                case "DATA_LOCS" -> data.addLocations(world, data.dataLocations, currentDataName, value, false);
+                case "CUSTOM_NAME" -> currentCustomName = value.isEmpty() ? "Unassigned" : value;
+                case "CUSTOM_LOCS" -> data.addLocations(world, data.customLocations, currentCustomName, value, false);
+                default -> { }
             }
-            return data;
-        } catch (IOException ex) {
-            return null;
         }
+        return data;
     }
 
     private static int parseInt(String value, int fallback) {
