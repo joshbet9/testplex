@@ -765,7 +765,7 @@ public final class ArcadePortManager implements Listener {
                     } catch (RuntimeException retryFailure) {
                         plugin.getLogger().log(java.util.logging.Level.SEVERE,
                                 "Archived map retry failed for " + type.displayName()
-                                        + "; will use the isolated fallback arena.", retryFailure);
+                                        + "; refusing to replace the authentic map with a generated arena.", retryFailure);
                         world = null;
                     }
                 }
