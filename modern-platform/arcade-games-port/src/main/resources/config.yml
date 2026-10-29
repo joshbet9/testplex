@@ -1,7 +1,8 @@
-# Only games that have passed their mechanical-parity acceptance gate are available to start.
-# Add the next game only after its source mechanics and unit/build checks are complete.
+# Isolated manual-acceptance candidates. Availability does not itself certify 100% in-game parity.
+# Dragon Escape stays gated until Bomb Lobbers has passed in-game acceptance.
 enabled-games:
   - bacon-brawl
+  - bomb-lobbers
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:

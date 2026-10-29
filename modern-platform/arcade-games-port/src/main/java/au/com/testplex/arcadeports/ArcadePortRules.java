@@ -566,7 +566,12 @@ public final class ArcadePortRules {
         return "armorer".equals(normalized) || "pitcher".equals(normalized);
     }
 
-    /** Bomb Lobbers TNT damages opponents only; this remains true if the thrower disconnects. */
+    /** Reborn's default DamagePvP flag is enabled for Bomb Lobbers; only live participants may damage another participant. */
+    public static boolean shouldProcessBombLobbersPlayerHit(boolean attackerAlive, boolean targetAlive) {
+        return attackerAlive && targetAlive;
+    }
+
+    /** Bomb Lobbers TNT direct hits are enemy-only; team damage is still possible from the blast. */
     public static boolean areBombLobbersEnemies(int ownerTeam, int targetTeam) {
         return ownerTeam >= 0 && targetTeam >= 0 && ownerTeam != targetTeam;
     }

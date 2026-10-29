@@ -6909,7 +6909,34 @@ public final class ArcadePortManager implements Listener {
                 event.setCancelled(true);
                 return;
             }
-            if (event instanceof EntityDamageByEntityEvent) return;
+            if (event instanceof EntityDamageByEntityEvent byEntity) {
+                // Native PvP is enabled in Reborn Bomb Lobbers. Cancel the native health
+                // mutation and resolve it here so kills, assists, elimination, and win checks
+                // stay in sync with TNT damage instead of leaving a dead player marked alive.
+                event.setCancelled(true);
+                if (!(byEntity.getDamager() instanceof Player attacker)
+                        || !session.players.containsKey(attacker.getUniqueId())
+                        || !ArcadePortRules.shouldProcessBombLobbersPlayerHit(
+                                session.alive.contains(attacker.getUniqueId()),
+                                session.alive.contains(bombTarget.getUniqueId()))) return;
+                double damage = event.getFinalDamage();
+                if (damage <= 0.0D) return;
+                UUID targetId = bombTarget.getUniqueId();
+                session.bombPlayersDamaged.add(targetId);
+                recordBombLobbersDamage(session, bombTarget, attacker.getUniqueId(), System.currentTimeMillis());
+                bombTarget.setNoDamageTicks(20);
+                Vector push = bombTarget.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0.0D);
+                if (push.lengthSquared() > 0.001D) {
+                    bombTarget.setVelocity(bombTarget.getVelocity().add(push.normalize().multiply(0.35D).setY(0.18D)));
+                }
+                if (bombTarget.getHealth() <= damage) {
+                    eliminate(session, bombTarget, attacker, "was defeated by " + attacker.getName());
+                } else {
+                    bombTarget.setHealth(bombTarget.getHealth() - damage);
+                    bombTarget.playSound(bombTarget.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
+                }
+                return;
+            }
 
             if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.BLOCK_EXPLOSION
                     || event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_EXPLOSION) {
@@ -8234,6 +8261,7 @@ public final class ArcadePortManager implements Listener {
             // fuse reaches its last second. It only actually detonates on contact
             // after 3s or unconditionally after 8s.
             if (bomb.getFuseTicks() <= 20) {
+                int killsAlreadyCreditedToThisTnt = session.bombKillsByTnt.getOrDefault(bombId, 0);
                 Vector velocity = bomb.getVelocity().clone();
                 TNTPrimed replacement = session.world.spawn(current, TNTPrimed.class);
                 replacement.setFuseTicks(ArcadePortRules.BOMB_LOBBERS_FUSE_TICKS);
@@ -8246,6 +8274,9 @@ public final class ArcadePortManager implements Listener {
                 session.bombOwners.put(replacementId, ownerId);
                 session.bombLastLocations.put(replacementId, current.clone());
                 session.bombCreatedAt.put(replacementId, createdAt);
+                if (killsAlreadyCreditedToThisTnt > 0) {
+                    session.bombKillsByTnt.put(replacementId, killsAlreadyCreditedToThisTnt);
+                }
             }
         }
     }
@@ -8584,6 +8615,7 @@ public final class ArcadePortManager implements Listener {
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
         session.alive.remove(id);
+        if (session.type == ArcadePortGame.BOMB_LOBBERS) updateBombLobbersMvpEligibility(session);
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             session.baconInvincibleUntil.remove(id);
             removeBaconBabyPig(session, id);

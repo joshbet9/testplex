@@ -1462,6 +1462,13 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldSuppressNativeBombLobbersTntDamage(false));
     }
 
+    @Test void bombLobbersMeleeDamageRequiresTwoLiveParticipants() {
+        assertTrue(ArcadePortRules.shouldProcessBombLobbersPlayerHit(true, true));
+        assertFalse(ArcadePortRules.shouldProcessBombLobbersPlayerHit(false, true));
+        assertFalse(ArcadePortRules.shouldProcessBombLobbersPlayerHit(true, false));
+        assertFalse(ArcadePortRules.shouldProcessBombLobbersPlayerHit(false, false));
+    }
+
     @Test void bombLobbersTwoBirdsCountsDirectHitAndBlastKillsTogether() {
         int kills = 0;
         kills = ArcadePortRules.nextBombLobbersTntKillCount(kills, true);

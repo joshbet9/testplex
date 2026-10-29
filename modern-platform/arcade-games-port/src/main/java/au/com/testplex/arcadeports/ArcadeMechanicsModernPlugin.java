@@ -20,8 +20,15 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         saveDefaultConfig();
         if (!getConfig().contains("enabled-games")) {
             getConfig().set("enabled-games", java.util.List.of("bacon-brawl"));
-            saveConfig();
         }
+        String acceptanceRevision = "bomb-lobbers-acceptance-candidate-v1";
+        if (!acceptanceRevision.equals(getConfig().getString("acceptance-games-revision", ""))) {
+            java.util.List<String> enabled = new java.util.ArrayList<>(getConfig().getStringList("enabled-games"));
+            if (!enabled.contains("bomb-lobbers")) enabled.add("bomb-lobbers");
+            getConfig().set("enabled-games", enabled);
+            getConfig().set("acceptance-games-revision", acceptanceRevision);
+        }
+        saveConfig();
         manager = new ArcadePortManager(this);
         mapMenu = new ArcadeMapSelectionMenu(this);
         getServer().getPluginManager().registerEvents(this, this);
