@@ -8,6 +8,10 @@ softdepend:
   - TestplexModernArcade
   - packetevents
 commands:
+  stats:
+    description: Open local Testplex Arcade statistics (optionally for an online player).
+    usage: /stats [player]
+    aliases: [arcadestats]
   arcadeport:
     description: Start and test a modern Arcade mechanics prototype
     usage: /arcadeport <play|join|start|kit|status|stop>

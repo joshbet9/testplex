@@ -45,6 +45,9 @@ public final class ModernArcadeLobby implements Listener {
     public static final int PLANE_MIN = -50;
     public static final int PLANE_MAX_EXCLUSIVE = 50;
     public static final int FLOOR_Y = 100;
+    public static final int HOTBAR_STATS_SLOT = 0;
+    public static final int HOTBAR_COSMETICS_SLOT = 4;
+    public static final int HOTBAR_GAME_PANEL_SLOT = 8;
 
     public static final double SPAWN_X = 0.0D;
     public static final double SPAWN_Y = 104.0D;
@@ -67,13 +70,15 @@ public final class ModernArcadeLobby implements Listener {
     private static final String LOBBY_MARKER = "TESTPLEX_LEGACY_LOBBY_V1";
     private final JavaPlugin plugin;
     private final NamespacedKey displayKey;
-    private final NamespacedKey panelItemKey;
+    private final NamespacedKey hotbarActionKey;
+    private final NamespacedKey legacyPanelItemKey;
     private World lobbyWorld;
 
     public ModernArcadeLobby(JavaPlugin plugin) {
         this.plugin = plugin;
         this.displayKey = new NamespacedKey(plugin, "legacy-lobby-datapoint");
-        this.panelItemKey = new NamespacedKey(plugin, "game-panel-item");
+        this.hotbarActionKey = new NamespacedKey(plugin, "lobby-hotbar-action");
+        this.legacyPanelItemKey = new NamespacedKey(plugin, "game-panel-item");
     }
 
     public World ensureWorld() {
@@ -149,36 +154,69 @@ public final class ModernArcadeLobby implements Listener {
         }
     }
 
+    /**
+     * Port the dedicated Testplex sandbox hotbar from the 1.8 GameHostManager:
+     * Stats, the normal cosmetic entry point, and the Game Panel are fixed to
+     * slots 1, 5 and 9 respectively (Bukkit slots 0, 4 and 8).
+     */
     public void ensurePanelItem(Player player) {
-        for (ItemStack stack : player.getInventory().getStorageContents()) {
-            if (isPanelItem(stack)) return;
+        org.bukkit.inventory.PlayerInventory inventory = player.getInventory();
+        for (int slot = 0; slot < inventory.getStorageContents().length; slot++) {
+            ItemStack item = inventory.getItem(slot);
+            if (isLobbyHotbarItem(item)) inventory.setItem(slot, null);
         }
-        int slot = player.getInventory().firstEmpty();
-        if (slot < 0) return;
-        ItemStack panel = new ItemStack(Material.COMPASS);
-        ItemMeta meta = panel.getItemMeta();
-        meta.setDisplayName(ChatColor.GOLD + "" + ChatColor.BOLD + "Game Panel");
-        meta.setLore(List.of(
-                ChatColor.GRAY + "Open the Testplex Arcade game selector.",
-                ChatColor.YELLOW + "Right-click to browse and launch a test game.",
-                ChatColor.DARK_GRAY + "Command alternative: /game"));
-        meta.getPersistentDataContainer().set(panelItemKey, PersistentDataType.BYTE, (byte) 1);
-        panel.setItemMeta(meta);
-        player.getInventory().setItem(slot, panel);
+        inventory.setItem(HOTBAR_STATS_SLOT, createHotbarItem(Material.BOOK,
+                ChatColor.AQUA + "" + ChatColor.BOLD + "Stats",
+                List.of(ChatColor.GRAY + "View your local Arcade test statistics.",
+                        ChatColor.YELLOW + "Right-click to open stats.",
+                        ChatColor.DARK_GRAY + "Command: /stats"), "stats"));
+        inventory.setItem(HOTBAR_COSMETICS_SLOT, createHotbarItem(Material.CHEST,
+                ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Cosmetics",
+                List.of(ChatColor.GRAY + "Browse Arcade cosmetics and win effects.",
+                        ChatColor.YELLOW + "Right-click to customise.",
+                        ChatColor.DARK_GRAY + "Command: /arcadecosmetics"), "arcadecosmetics"));
+        // Speckled Melon (1.8) became Glistering Melon Slice in modern Minecraft.
+        inventory.setItem(HOTBAR_GAME_PANEL_SLOT, createHotbarItem(Material.GLISTERING_MELON_SLICE,
+                ChatColor.GREEN + "" + ChatColor.BOLD + "Game Panel",
+                List.of(ChatColor.GRAY + "Open the Testplex Arcade game selector.",
+                        ChatColor.YELLOW + "Right-click to choose a game.",
+                        ChatColor.DARK_GRAY + "Command: /game"), "gamepanel"));
     }
 
-    private boolean isPanelItem(ItemStack item) {
-        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
-        return item.getItemMeta().getPersistentDataContainer().has(panelItemKey, PersistentDataType.BYTE);
+    private ItemStack createHotbarItem(Material type, String title, List<String> lore, String action) {
+        ItemStack item = new ItemStack(type);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(title);
+        meta.setLore(lore);
+        meta.getPersistentDataContainer().set(hotbarActionKey, PersistentDataType.STRING, action);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private boolean isLobbyHotbarItem(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        var pdc = item.getItemMeta().getPersistentDataContainer();
+        return pdc.has(hotbarActionKey, PersistentDataType.STRING)
+                || pdc.has(legacyPanelItemKey, PersistentDataType.BYTE);
     }
 
     @EventHandler
     public void onPanelItemUse(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) return;
         if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK) return;
-        if (!isPanelItem(event.getItem())) return;
+        ItemStack item = event.getItem();
+        if (item == null || !item.hasItemMeta()) return;
+        String action = item.getItemMeta().getPersistentDataContainer()
+                .get(hotbarActionKey, PersistentDataType.STRING);
+        if (action == null) {
+            if (item.getItemMeta().getPersistentDataContainer().has(legacyPanelItemKey, PersistentDataType.BYTE)) {
+                action = "gamepanel";
+            } else {
+                return;
+            }
+        }
         event.setCancelled(true);
-        Bukkit.dispatchCommand(event.getPlayer(), "gamepanel");
+        Bukkit.dispatchCommand(event.getPlayer(), action);
     }
 
     private void ensurePlane(World world) {

@@ -5061,6 +5061,7 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        recordLocalStats(session, winner, announceWinner);
         active = null;
         if (session.tickTask != null) session.tickTask.cancel();
         if (announceWinner && session.type == ArcadePortGame.BACON_BRAWL && winner != null) {
@@ -5186,6 +5187,116 @@ public final class ArcadePortManager implements Listener {
         plugin.getConfig().set(key, true);
         player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
         plugin.saveConfig();
+    }
+
+    private String localStatsPath(UUID playerId, String gameId) {
+        return "local-stats." + playerId + "." + gameId + ".";
+    }
+
+    /** Store completed local acceptance runs only; operator-aborted sessions aren't counted. */
+    private void recordLocalStats(Session session, Player winner, boolean completed) {
+        if (!completed) return;
+        UUID winnerId = winner == null ? null : winner.getUniqueId();
+        for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
+            UUID id = entry.getKey();
+            String path = localStatsPath(id, session.type.id());
+            plugin.getConfig().set(path + "games-played",
+                    plugin.getConfig().getInt(path + "games-played", 0) + 1);
+            int score = Math.max(0, session.scores.getOrDefault(id, 0));
+            plugin.getConfig().set(path + "score",
+                    plugin.getConfig().getInt(path + "score", 0) + score);
+            if (!session.alive.contains(id)) {
+                plugin.getConfig().set(path + "knockouts",
+                        plugin.getConfig().getInt(path + "knockouts", 0) + 1);
+            }
+            if (winnerId != null && winnerId.equals(id)) {
+                plugin.getConfig().set(path + "wins",
+                        plugin.getConfig().getInt(path + "wins", 0) + 1);
+            }
+        }
+        plugin.saveConfig();
+    }
+
+    public void openStats(Player viewer, String requestedPlayerName) {
+        Player target = viewer;
+        if (requestedPlayerName != null && !requestedPlayerName.isBlank()
+                && !requestedPlayerName.equalsIgnoreCase(viewer.getName())) {
+            target = Bukkit.getPlayerExact(requestedPlayerName);
+            if (target == null) {
+                for (Player online : Bukkit.getOnlinePlayers()) {
+                    if (online.getName().equalsIgnoreCase(requestedPlayerName)) {
+                        target = online;
+                        break;
+                    }
+                }
+            }
+            if (target == null) {
+                viewer.sendMessage(ChatColor.RED + "Player " + requestedPlayerName
+                        + " is not online. Testplex local stats are available for online players only.");
+                return;
+            }
+        }
+        UUID targetId = target.getUniqueId();
+        String title = ChatColor.BLUE + "Testplex Stats | " + target.getName();
+        org.bukkit.inventory.Inventory inventory = Bukkit.createInventory(null, 54, title);
+
+        int slot = 0;
+        for (ArcadePortGame game : ArcadePortGame.values()) {
+            String path = localStatsPath(targetId, game.id());
+            List<String> lore = new ArrayList<>();
+            lore.add(ChatColor.GRAY + "Completed games: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "games-played", 0));
+            lore.add(ChatColor.GRAY + "Wins: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "wins", 0));
+            lore.add(ChatColor.GRAY + "Cumulative score / kills: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "score", 0));
+            lore.add(ChatColor.GRAY + "Knockouts: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "knockouts", 0));
+            Session current = active;
+            if (current != null && current.type == game && current.players.containsKey(targetId)) {
+                lore.add("");
+                lore.add(ChatColor.GOLD + "Current test: "
+                        + (current.alive.contains(targetId) ? "Alive" : "Spectating"));
+                lore.add(ChatColor.GRAY + "Current score: "
+                        + current.scores.getOrDefault(targetId, 0));
+            }
+            ItemStack item = new ItemStack(game.floor());
+            ItemMeta meta = item.getItemMeta();
+            meta.setDisplayName(ChatColor.AQUA + game.displayName());
+            meta.setLore(lore);
+            item.setItemMeta(meta);
+            inventory.setItem(slot++, item);
+        }
+        addStatsSummaryItem(inventory, slot++, "Monster Maze", Material.MOSS_BLOCK, targetId, "monster-maze");
+        addStatsSummaryItem(inventory, slot++, "Snake", Material.SLIME_BLOCK, targetId, "snake");
+        ItemStack close = new ItemStack(Material.BARRIER);
+        ItemMeta closeMeta = close.getItemMeta();
+        closeMeta.setDisplayName(ChatColor.RED + "Close");
+        close.setItemMeta(closeMeta);
+        inventory.setItem(49, close);
+        viewer.openInventory(inventory);
+        viewer.sendMessage(ChatColor.GRAY + "Showing local Testplex acceptance stats for " + target.getName()
+                + ". These are isolated test-server results, not production Mineplex stats.");
+    }
+
+    private void addStatsSummaryItem(org.bukkit.inventory.Inventory inventory, int slot,
+            String name, Material icon, UUID targetId, String gameId) {
+        String path = localStatsPath(targetId, gameId);
+        ItemStack item = new ItemStack(icon);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(ChatColor.AQUA + name);
+        meta.setLore(List.of(
+                ChatColor.GRAY + "Completed games: " + ChatColor.WHITE
+                        + plugin.getConfig().getInt(path + "games-played", 0),
+                ChatColor.GRAY + "Wins: " + ChatColor.WHITE
+                        + plugin.getConfig().getInt(path + "wins", 0),
+                ChatColor.GRAY + "Cumulative score: " + ChatColor.WHITE
+                        + plugin.getConfig().getInt(path + "score", 0),
+                ChatColor.GRAY + "Knockouts: " + ChatColor.WHITE
+                        + plugin.getConfig().getInt(path + "knockouts", 0),
+                ChatColor.DARK_GRAY + "Stats recorded by this isolated test server."));
+        item.setItemMeta(meta);
+        inventory.setItem(slot, item);
     }
 
     private void announce(Session session, String text) {
@@ -6442,6 +6553,11 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
+        String title = ChatColor.stripColor(event.getView().getTitle());
+        if (title != null && title.startsWith("Testplex Stats |")) {
+            event.setCancelled(true);
+            return;
+        }
         Session session = active;
         if (session != null && event.getWhoClicked() instanceof Player player && session.players.containsKey(player.getUniqueId())) event.setCancelled(true);
     }

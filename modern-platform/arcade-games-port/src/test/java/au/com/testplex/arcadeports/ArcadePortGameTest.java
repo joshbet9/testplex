@@ -7,6 +7,12 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadePortGameTest {
+    @Test void modernArcadeLobbyHotbarMatchesLegacyTestplexSandboxItems() {
+        assertEquals(0, ModernArcadeLobby.HOTBAR_STATS_SLOT);
+        assertEquals(4, ModernArcadeLobby.HOTBAR_COSMETICS_SLOT);
+        assertEquals(8, ModernArcadeLobby.HOTBAR_GAME_PANEL_SLOT);
+    }
+
     @Test void modernArcadeLobbyMatchesTheLegacyTestplexPlaneAndDatapoints() {
         assertEquals("testplex_arcade_lobby_v1", ModernArcadeLobby.WORLD_NAME);
         assertEquals(-50, ModernArcadeLobby.PLANE_MIN);

@@ -8,11 +8,11 @@ commands:
   gamepanel:
     description: Open the modern Arcade Game Panel.
     usage: /gamepanel
-    aliases: [arcadepanel, game]
+    aliases: [arcadepanel, game, menu]
   arcadecosmetics:
     description: Browse per-game modern Arcade cosmetic lines and win effects.
     usage: /arcadecosmetics
-    aliases: [moderncosmetics]
+    aliases: [moderncosmetics, cosmetics]
   arcadetest:
     description: Inspect the modern Arcade port status.
     usage: /arcadetest status

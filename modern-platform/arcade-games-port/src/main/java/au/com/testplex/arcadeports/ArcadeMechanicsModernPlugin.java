@@ -24,6 +24,19 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             return;
         }
         getCommand("arcadeport").setExecutor(this);
+        if (getCommand("stats") == null) {
+            getLogger().severe("Missing /stats command metadata.");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        getCommand("stats").setExecutor((sender, command, label, args) -> {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("This command must be used in-game.");
+                return true;
+            }
+            manager.openStats(player, args.length == 0 ? null : args[0]);
+            return true;
+        });
         getLogger().info("ArcadeMechanicsModern loaded. Cleared in-game test games: " + manager.enabledGamesLabel()
                 + ". Other mechanics prototypes stay locked until they pass parity acceptance.");
     }
