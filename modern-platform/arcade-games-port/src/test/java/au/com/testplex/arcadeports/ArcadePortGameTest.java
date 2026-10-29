@@ -568,6 +568,19 @@ class ArcadePortGameTest {
         assertEquals(1.0D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_401L), 0.00001D);
     }
 
+    @Test void baconBrawlPacketAvatarHitsRequireReachLineOfSightAndLivingPlayers() {
+        assertTrue(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, 9.0D, true));
+        assertTrue(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, 16.0D, true));
+        assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, 16.01D, true));
+        assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, 4.0D, false));
+        assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, false, true, false, 4.0D, true));
+        assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, false, false, 4.0D, true));
+        assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, true, 4.0D, true));
+        assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(false, true, true, false, 4.0D, true));
+        assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, Double.NaN, true));
+        assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, Double.POSITIVE_INFINITY, true));
+    }
+
     @Test void baconBrawlKitChangesAreDeferredUntilTheNextRound() {
         assertFalse(ArcadePortRules.shouldDeferBaconBrawlKitChange(false));
         assertTrue(ArcadePortRules.shouldDeferBaconBrawlKitChange(true));
