@@ -5395,7 +5395,7 @@ public final class ArcadePortManager implements Listener {
             inventory.setItem(slot, item);
             slot += ((slot + 1) % 9 == 0) ? 1 : 2;
         }
-        inventory.setItem(4, statsItem(Material.BED, ChatColor.GRAY + "↩ Go Back", List.of(),
+        inventory.setItem(4, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back", List.of(),
                 "back-main", null, null));
         inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(),
                 "close", null, null));
@@ -5445,7 +5445,7 @@ public final class ArcadePortManager implements Listener {
             inventory.setItem(22, statsSummaryItem(materialOrChest(icon), ChatColor.BOLD + categoryName + " Stats",
                     List.of(ChatColor.GRAY + "No local stats source is configured for this category.")));
         }
-        inventory.setItem(4, statsItem(Material.BED, ChatColor.GRAY + "↩ Go Back", List.of(),
+        inventory.setItem(4, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back", List.of(),
                 "back-main", null, null));
         inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(),
                 "close", null, null));
@@ -5474,7 +5474,7 @@ public final class ArcadePortManager implements Listener {
         }
         inventory.setItem(22, statsSummaryItem(Material.BOOK, ChatColor.BOLD + displayName + " Stats",
                 gameStatsLore(targetId, gameId, false)));
-        inventory.setItem(4, statsItem(Material.BED, ChatColor.GRAY + "↩ Go Back", List.of(),
+        inventory.setItem(4, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back", List.of(),
                 "back-arcade", null, null));
         inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(),
                 "close", null, null));
