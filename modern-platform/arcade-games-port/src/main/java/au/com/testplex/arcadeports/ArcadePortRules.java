@@ -630,18 +630,19 @@ public final class ArcadePortRules {
     }
 
     /**
-     * Vanilla 1.8 size-4 TNT damage plus Reborn's EXPLOSION condition. The condition adds
-     * min(original event damage, 50); 50 is an additive-damage ceiling, not a total damage cap.
+     * Reborn's EXPLOSION condition cancels the original event damage and replaces it with
+     * min(original event damage, 50). The ceiling is therefore a final damage cap, not a bonus.
+     * Vanilla emits no explosion damage event when the exposure-scaled impact is zero.
      */
     public static double bombLobbersBlastDamage(double distanceToTarget, double exposure) {
         if (!Double.isFinite(distanceToTarget) || distanceToTarget < 0.0D
-                || distanceToTarget > BOMB_LOBBERS_EXPLOSION_RADIUS) return 0.0D;
+                || distanceToTarget >= BOMB_LOBBERS_EXPLOSION_RADIUS) return 0.0D;
         double visible = Double.isFinite(exposure) ? Math.max(0.0D, Math.min(1.0D, exposure)) : 0.0D;
         double impact = (1.0D - distanceToTarget / BOMB_LOBBERS_EXPLOSION_RADIUS) * visible;
+        if (impact <= 0.0D) return 0.0D;
         double vanillaDamage = ((impact * impact + impact) / 2.0D)
                 * (7.0D * BOMB_LOBBERS_EXPLOSION_RADIUS) + 1.0D;
-        double explosionConditionBonus = Math.min(vanillaDamage, BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE);
-        return vanillaDamage + explosionConditionBonus;
+        return Math.min(vanillaDamage, BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE);
     }
 
     public static Material bombLobbersBlockAfterExplosion(Material material) {
