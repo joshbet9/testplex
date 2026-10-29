@@ -476,6 +476,16 @@ public final class ArcadePortRules {
         return velocity;
     }
 
+    /** NMS explosion packets add their source-calculated impulse to current player velocity. */
+    public static org.bukkit.util.Vector bombLobbersExplosionVelocity(
+            org.bukkit.util.Vector currentVelocity, org.bukkit.util.Vector explosionToTarget, double impact) {
+        org.bukkit.util.Vector velocity = currentVelocity == null
+                ? new org.bukkit.util.Vector(0.0D, 0.0D, 0.0D) : currentVelocity.clone();
+        if (explosionToTarget == null || explosionToTarget.lengthSquared() <= 1.0E-12D
+                || !Double.isFinite(impact) || impact <= 0.0D) return velocity;
+        return velocity.add(explosionToTarget.clone().normalize().multiply(Math.min(1.0D, impact)));
+    }
+
     public static long bombLobbersCraftmanIntervalMillis(long liveMillis) {
         if (liveMillis <= 20_000L) return 8_000L;
         if (liveMillis <= 40_000L) return 7_000L;
