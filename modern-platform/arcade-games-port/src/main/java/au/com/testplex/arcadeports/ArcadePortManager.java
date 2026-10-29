@@ -5247,6 +5247,14 @@ public final class ArcadePortManager implements Listener {
                     handlePlayerHit(session, attacker, baconTarget, "melee");
                     return;
                 }
+                if (damager instanceof Projectile projectile
+                        && projectile.getShooter() instanceof Player) {
+                    // The projectile-hit handler applies Bacon Brawl's knockback-only combat
+                    // response. Cancel vanilla health damage here so it cannot be applied first.
+                    event.setCancelled(true);
+                    clearBaconCloak(session, baconTarget.getUniqueId());
+                    return;
+                }
             }
             if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FIRE_TICK) {
                 event.setCancelled(true);
