@@ -483,6 +483,16 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isBaconBrawlBackstab(Double.NaN, 1.0D, 0.0D, -1.0D));
     }
 
+    @Test void babyPigglesCompanionHitsOnlyWhenReadyAndCloseToAnOpponent() {
+        assertEquals(1_500L, ArcadePortRules.BACON_BABY_PIG_ATTACK_COOLDOWN_MILLIS);
+        assertTrue(ArcadePortRules.shouldBaconBabyPigAttack(5_000L, 5_000L, 0.0D));
+        assertTrue(ArcadePortRules.shouldBaconBabyPigAttack(5_001L, 5_000L, 2.25D));
+        assertFalse(ArcadePortRules.shouldBaconBabyPigAttack(4_999L, 5_000L, 1.0D));
+        assertFalse(ArcadePortRules.shouldBaconBabyPigAttack(5_000L, 5_000L, 2.26D));
+        assertFalse(ArcadePortRules.shouldBaconBabyPigAttack(5_000L, 5_000L, Double.NaN));
+        assertFalse(ArcadePortRules.shouldBaconBabyPigAttack(5_000L, 5_000L, -1.0D));
+    }
+
     @Test void baconBrawlAchievementThresholdsUseSelectedValues() {
         assertEquals(15, ArcadePortRules.BACON_BRAWL_KING_OF_BACON_WINS);
         assertFalse(ArcadePortRules.shouldAwardBaconKingOfBacon(14));
