@@ -81,6 +81,20 @@ public final class ArcadePortRules {
     public static final boolean BACON_BRAWL_HITS_DAMAGE_HEALTH = false;
     /** Body Slam applies a second knockback component in addition to the game-wide knockback. */
     public static final double BACON_BODY_SLAM_EXTRA_KNOCKBACK = 2.0D;
+
+    /** Bacon Blast is a thrown pork item that ends on impact or after five seconds in flight. */
+    public static final long BACON_BLAST_MAX_FLIGHT_MILLIS = 5_000L;
+    public static final double BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED = 1.0D;
+
+    public static boolean isBaconBlastNearPlayer(double distanceSquared) {
+        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
+                && distanceSquared <= BACON_BLAST_PLAYER_COLLISION_RADIUS_SQUARED;
+    }
+
+    public static boolean shouldExpireBaconBlast(long nowMillis, long createdAtMillis, boolean touchingBlock) {
+        return touchingBlock || createdAtMillis <= 0L || nowMillis < createdAtMillis
+                || nowMillis - createdAtMillis >= BACON_BLAST_MAX_FLIGHT_MILLIS;
+    }
     public static final long BACON_BODY_SLAM_COOLDOWN_MILLIS = 8_000L;
     public static final long BACON_BLAST_COOLDOWN_MILLIS = 3_000L;
     public static final long BACON_CLOAK_COOLDOWN_MILLIS = 10_000L;
