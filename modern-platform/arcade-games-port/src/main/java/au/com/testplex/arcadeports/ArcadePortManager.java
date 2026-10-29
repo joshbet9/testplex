@@ -7615,14 +7615,12 @@ public final class ArcadePortManager implements Listener {
                 away.setY(0.0D);
                 target.setFallDistance(0.0F);
                 target.setVelocity(ArcadePortRules.bombLobbersDirectHitVelocity(away, target.isOnGround()));
-                target.getWorld().spawnParticle(Particle.EXPLOSION,
-                        target.getLocation().add(0.0D, 1.0D, 0.0D), 1,
-                        0.1D, 0.1D, 0.1D, 0.0D);
+                // Source collision feedback is the normal hurt reaction plus the legacy
+                // pickup dings for target (1.7 pitch) and thrower (1.25 pitch). The TNT
+                // continues flying; a direct hit is not an explosion or a chat announcement.
                 target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0F, 0.9F);
                 target.playSound(target.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.7F);
-                target.playSound(target.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.2F, 1.65F);
                 owner.playSound(owner.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.25F);
-                owner.sendMessage(ChatColor.YELLOW + "Direct hit!");
                 double directHitDamage = bombLobbersDamageAfterArmor(target, 10.0D);
                 if (target.getHealth() <= directHitDamage) {
                     eliminate(session, target, session.alive.contains(ownerId) ? owner : null, "was directly hit by TNT");
