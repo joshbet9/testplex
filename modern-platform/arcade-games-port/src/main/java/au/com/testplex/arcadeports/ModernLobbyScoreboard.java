@@ -41,11 +41,11 @@ public final class ModernLobbyScoreboard {
         String website = plugin.getConfig().getString("lobby-scoreboard.website", "www.mineplex.com");
 
         List<String> owners = new ArrayList<>(plugin.getConfig().getStringList("owner-usernames"));
-        if (owners.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) owners.add("joshbet9");
+        if (owners.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) owners.add("jn_playzmc");
         boolean owner = owners.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
 
         List<String> configuredAdmins = new ArrayList<>(plugin.getConfig().getStringList("admin-usernames"));
-        if (configuredAdmins.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) configuredAdmins.add("joshbet9");
+        if (configuredAdmins.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) configuredAdmins.add("jn_playzmc");
         boolean configuredAdmin = configuredAdmins.stream()
                 .anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
         boolean admin = player.isOp() || configuredAdmin
