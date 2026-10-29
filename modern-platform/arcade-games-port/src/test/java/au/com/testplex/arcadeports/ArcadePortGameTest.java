@@ -409,22 +409,24 @@ class ArcadePortGameTest {
                 }
             }
             assertNotNull(worldConfig, "Source archive must include WorldConfig.dat");
-            String dataName = "";
+            String teamName = "";
             int greenSpawnCount = 0;
             for (String line : worldConfig.split("\\R")) {
                 int colon = line.indexOf(':');
                 if (colon <= 0) continue;
                 String key = line.substring(0, colon).trim();
                 String value = line.substring(colon + 1).trim();
-                if ("DATA_NAME".equalsIgnoreCase(key)) {
-                    dataName = value;
-                } else if ("DATA_LOCS".equalsIgnoreCase(key) && "GREEN".equalsIgnoreCase(dataName)
+                if ("TEAM_NAME".equalsIgnoreCase(key)) {
+                    teamName = value;
+                } else if ("TEAM_SPAWNS".equalsIgnoreCase(key) && "Green".equalsIgnoreCase(teamName)
                         && !value.isBlank()) {
-                    greenSpawnCount += value.split(":").length;
+                    greenSpawnCount += (int) java.util.Arrays.stream(value.split(":"))
+                            .filter(coordinate -> !coordinate.isBlank()).count();
                 }
             }
             assertTrue(greenSpawnCount >= 16,
-                    "Source Bacon Brawl map guidance requires at least 16 GREEN starts; got " + greenSpawnCount);
+                    "Source Bacon Brawl WorldConfig.dat requires at least 16 Green TEAM_SPAWNS; got "
+                            + greenSpawnCount);
         }
     }
 
