@@ -50,6 +50,7 @@ public final class ArcadePortRules {
         if (reason == null) return false;
         String value = reason.toLowerCase(java.util.Locale.ROOT).replace('_', ' ').trim();
         return value.equals("fell from the arena")
+                || value.equals("fall")
                 || value.equals("was lost to the water")
                 || value.equals("lava")
                 || value.equals("fire")
