@@ -114,9 +114,9 @@ public final class SourceMapCatalog {
             // not assume the first normal Bukkit World is that folder: plugins
             // may create their own NORMAL environments before the next reset.
             List<Path> migratedRoots = findMigratedDimensionFolders(container, worldName);
-            deleteTreeIfPresent(root);
+            deleteTreeIfPresent(root, container, worldName);
             for (Path migratedRoot : migratedRoots) {
-                deleteTreeIfPresent(migratedRoot);
+                deleteTreeIfPresent(migratedRoot, container, worldName);
                 plugin.getLogger().info("Removed Paper-migrated source-map folder " + migratedRoot);
             }
             plugin.getLogger().info("Reset source test map " + worldName
@@ -183,19 +183,33 @@ public final class SourceMapCatalog {
         return migrated;
     }
 
-    private static void deleteTreeIfPresent(Path root) throws IOException {
-        if (root == null) return;
-        Path safeRoot = root.toAbsolutePath().normalize();
-        if (!isReservedSourceWorldName(safeRoot.getFileName().toString())
-                && !isReservedSourceWorldName(safeRoot.getParent() == null ? "" : safeRoot.getParent().getFileName().toString())) {
-            // The legacy directory name is reserved; the migrated directory is
-            // nested under dimensions/minecraft, so validate it by its parent.
-            Path parent = safeRoot.getParent();
-            if (parent == null || !"minecraft".equals(parent.getFileName().toString())
-                    || !isReservedSourceWorldName(safeRoot.getFileName().toString())) {
-                throw new IOException("Refusing to delete non-reserved world path: " + safeRoot);
-            }
+    private static void deleteTreeIfPresent(Path root, Path container, String worldName) throws IOException {
+        if (root == null || container == null || !isReservedSourceWorldName(worldName)) {
+            throw new IOException("Refusing to delete an unvalidated source-map path.");
         }
+        Path safeContainer = container.toAbsolutePath().normalize();
+        Path safeRoot = root.toAbsolutePath().normalize();
+        Path legacyRoot = safeContainer.resolve(worldName).normalize();
+        boolean legacySourceRoot = safeRoot.equals(legacyRoot);
+
+        boolean migratedDimensionRoot = false;
+        Path minecraft = safeRoot.getParent();
+        Path dimensions = minecraft == null ? null : minecraft.getParent();
+        Path primaryRoot = dimensions == null ? null : dimensions.getParent();
+        if (safeRoot.getFileName() != null
+                && worldName.equals(safeRoot.getFileName().toString())
+                && minecraft != null && "minecraft".equals(minecraft.getFileName().toString())
+                && dimensions != null && "dimensions".equals(dimensions.getFileName().toString())
+                && primaryRoot != null && primaryRoot.startsWith(safeContainer)
+                && !primaryRoot.equals(safeContainer) && primaryRoot.getFileName() != null
+                && !isReservedSourceWorldName(primaryRoot.getFileName().toString())) {
+            migratedDimensionRoot = true;
+        }
+        if ((!legacySourceRoot && !migratedDimensionRoot)
+                || !safeRoot.startsWith(safeContainer) || safeRoot.equals(safeContainer)) {
+            throw new IOException("Refusing to delete non-reserved world path: " + safeRoot);
+        }
+
         if (!Files.exists(safeRoot)) return;
         try (Stream<Path> paths = Files.walk(safeRoot)) {
             for (Path item : paths.sorted(Comparator.reverseOrder()).toList()) {
