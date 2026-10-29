@@ -5390,8 +5390,9 @@ public final class ArcadePortManager implements Listener {
                     player.closeInventory();
                 }
                 snapshot.restore(player);
-                if (!lobby.isLobbyWorld(player.getWorld())) lobby.sendToLobby(player);
-                else lobby.ensurePanelItem(player);
+                // Ended rounds always return testers to the actual Arcade lobby spawn,
+                // even when their restored snapshot is already inside the lobby world.
+                lobby.sendToLobby(player);
             } else pendingRestore.put(entry.getKey(), snapshot);
         }
         session.sheep.clear();
@@ -5776,7 +5777,15 @@ public final class ArcadePortManager implements Listener {
             pendingStart = null;
             pendingType = null;
         }
-        if (active != null) finish(active, null, false);
+        Session stopping = active;
+        List<Player> participantsToReturn = stopping == null
+                ? List.of() : new ArrayList<>(stopping.players.values());
+        if (stopping != null) finish(stopping, null, false);
+        // Make the explicit Stop Game action authoritative: every participant from
+        // the stopped session is put at the lobby spawn after round state is cleaned.
+        for (Player player : participantsToReturn) {
+            if (player != null && player.isOnline()) lobby.sendToLobby(player);
+        }
         queues.clear();
         plugin.getLogger().info("Modern Arcade ports reset: " + reason);
     }
