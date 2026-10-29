@@ -6594,7 +6594,7 @@ public final class ArcadePortManager implements Listener {
 
             long createdAt = session.bombCreatedAt.getOrDefault(bombId, now);
             long age = Math.max(0L, now - createdAt);
-            boolean touchingSolid = isBombTouchingSolidBlock(bomb);
+            boolean touchingSolid = isBombTouchingAnyBlock(bomb);
             if (ArcadePortRules.shouldPrimeBombLobbersBomb(age, touchingSolid)) {
                 session.bombPrimed.add(bombId);
                 bomb.setFuseTicks(0);
@@ -6629,14 +6629,15 @@ public final class ArcadePortManager implements Listener {
         session.bombDirectHitResolved.remove(bombId);
     }
 
-    private boolean isBombTouchingSolidBlock(TNTPrimed bomb) {
+    private boolean isBombTouchingAnyBlock(TNTPrimed bomb) {
         Block center = bomb.getLocation().getBlock();
         for (int dx = -1; dx <= 1; dx++) {
             for (int dy = -1; dy <= 1; dy++) {
                 for (int dz = -1; dz <= 1; dz++) {
                     if (dx == 0 && dy == 0 && dz == 0) continue;
                     Block nearby = center.getRelative(dx, dy, dz);
-                    if (!nearby.isLiquid() && nearby.getType().isSolid()) return true;
+                    // Reborn primes on any non-air neighbour, including liquids and passable blocks.
+                    if (nearby.getType() != Material.AIR) return true;
                 }
             }
         }
