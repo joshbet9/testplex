@@ -35,7 +35,7 @@ public final class ArcadeMapSelectionMenu implements Listener {
             return;
         }
         Inventory inventory = Bukkit.createInventory(null, 54, TITLE);
-        ItemStack back = createItem(Material.BED, ChatColor.GRAY + "↩ Go Back",
+        ItemStack back = createItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
                 ChatColor.GRAY + "Return to the Set Game page.");
         mark(back, "back", game, null);
         inventory.setItem(4, back);
