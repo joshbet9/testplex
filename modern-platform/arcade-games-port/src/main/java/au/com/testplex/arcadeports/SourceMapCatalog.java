@@ -383,45 +383,152 @@ public final class SourceMapCatalog {
         }
     }
 
-    /** Extract only into this module's dedicated arcadeport_source_* test world. */
+    /**
+     * Resolve an archive's actual world root. Some archived maps are zipped
+     * with a single enclosing folder; Bukkit needs level.dat and WorldConfig.dat
+     * directly inside the world directory, not one directory deeper.
+     *
+     * Returns null when there is no unambiguous directory containing both files.
+     */
+    static Path locateMapRoot(Path extractedRoot) throws IOException {
+        if (extractedRoot == null || !Files.isDirectory(extractedRoot)) return null;
+        Path root = extractedRoot.toAbsolutePath().normalize();
+        if (hasWorldMetadata(root)) return root;
+
+        List<Path> candidates;
+        try (Stream<Path> paths = Files.walk(root, 6)) {
+            candidates = paths.filter(Files::isDirectory)
+                    .filter(path -> !path.equals(root))
+                    .filter(SourceMapCatalog::hasWorldMetadata)
+                    .sorted(Comparator.comparingInt(Path::getNameCount))
+                    .toList();
+        }
+        if (candidates.isEmpty()) return null;
+        int shallowest = candidates.get(0).getNameCount();
+        List<Path> nearest = candidates.stream()
+                .filter(path -> path.getNameCount() == shallowest)
+                .toList();
+        return nearest.size() == 1 ? nearest.get(0) : null;
+    }
+
+    private static boolean hasWorldMetadata(Path folder) {
+        return folder != null
+                && Files.isRegularFile(folder.resolve("level.dat"))
+                && Files.isRegularFile(folder.resolve("WorldConfig.dat"));
+    }
+
+    private static void deleteExtractionTree(Path target, Path container) throws IOException {
+        Path safeContainer = container.toAbsolutePath().normalize();
+        Path safeTarget = target.toAbsolutePath().normalize();
+        if (!safeTarget.startsWith(safeContainer) || safeTarget.equals(safeContainer)
+                || Files.isSymbolicLink(safeTarget)) {
+            throw new IOException("Refusing to remove an unsafe map extraction path: " + safeTarget);
+        }
+        if (!Files.exists(safeTarget)) return;
+        try (Stream<Path> paths = Files.walk(safeTarget)) {
+            for (Path item : paths.sorted(Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(item);
+            }
+        }
+    }
+
+    /** Extract the selected archived map into its dedicated, isolated test world. */
     public static boolean install(JavaPlugin plugin, ArcadePortGame game, String worldName) {
+        if (!isReservedSourceWorldName(worldName)) {
+            plugin.getLogger().severe("Refusing to install a source map into an unsafe world name: " + worldName);
+            return false;
+        }
         String resource = selectedResource(plugin, game);
-        if (resource == null) return false;
+        if (resource == null) {
+            plugin.getLogger().warning("No archived map resource is selected for " + (game == null ? "unknown game" : game.displayName()));
+            return false;
+        }
+
         Path container = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
         Path root = container.resolve(worldName).normalize();
-        if (!root.startsWith(container)) throw new IllegalArgumentException("World path escapes world container.");
-        if (Files.isRegularFile(root.resolve("level.dat"))
-                && Files.isRegularFile(root.resolve("WorldConfig.dat"))) return true;
-        try (InputStream input = plugin.getResource(resource)) {
-            if (input == null) {
-                plugin.getLogger().warning("Missing embedded original map resource: " + resource);
-                return false;
-            }
-            Files.createDirectories(root);
-            try (ZipInputStream zip = new ZipInputStream(input)) {
-                ZipEntry entry;
-                while ((entry = zip.getNextEntry()) != null) {
-                    Path output = root.resolve(entry.getName()).normalize();
-                    if (!output.startsWith(root)) throw new IOException("Unsafe archive entry: " + entry.getName());
-                    if (entry.isDirectory()) {
-                        Files.createDirectories(output);
-                    } else {
-                        Path parent = output.getParent();
-                        if (parent != null) Files.createDirectories(parent);
-                        try (OutputStream stream = Files.newOutputStream(output)) {
-                            zip.transferTo(stream);
+        Path staging = container.resolve(worldName + ".installing").normalize();
+        if (!root.startsWith(container) || root.equals(container)
+                || !staging.startsWith(container) || staging.equals(container)) {
+            throw new IllegalArgumentException("Map installation path escapes world container.");
+        }
+        if (Files.isSymbolicLink(root) || Files.isSymbolicLink(staging)) {
+            plugin.getLogger().severe("Refusing to follow a symbolic link while installing source map " + worldName);
+            return false;
+        }
+        if (hasWorldMetadata(root)) return true;
+
+        try {
+            deleteExtractionTree(staging, container);
+            Files.createDirectories(staging);
+            try (InputStream input = plugin.getResource(resource)) {
+                if (input == null) {
+                    plugin.getLogger().warning("Missing embedded original map resource: " + resource);
+                    return false;
+                }
+                try (ZipInputStream zip = new ZipInputStream(input)) {
+                    ZipEntry entry;
+                    while ((entry = zip.getNextEntry()) != null) {
+                        Path output = staging.resolve(entry.getName()).normalize();
+                        if (!output.startsWith(staging)) {
+                            throw new IOException("Unsafe archive entry: " + entry.getName());
                         }
+                        if (entry.isDirectory()) {
+                            Files.createDirectories(output);
+                        } else {
+                            Path parent = output.getParent();
+                            if (parent != null) Files.createDirectories(parent);
+                            try (OutputStream stream = Files.newOutputStream(output)) {
+                                zip.transferTo(stream);
+                            }
+                        }
+                        zip.closeEntry();
                     }
-                    zip.closeEntry();
                 }
             }
-            boolean valid = Files.isRegularFile(root.resolve("level.dat"))
-                    && Files.isRegularFile(root.resolve("WorldConfig.dat"));
-            if (!valid) plugin.getLogger().warning("Original map archive lacks world metadata: " + resource);
-            return valid;
-        } catch (IOException ex) {
-            plugin.getLogger().warning("Could not extract original " + game.displayName() + " map: " + ex.getMessage());
+
+            Path archiveRoot = locateMapRoot(staging);
+            if (archiveRoot == null) {
+                String entries;
+                try (Stream<Path> paths = Files.list(staging)) {
+                    entries = paths.map(path -> path.getFileName().toString()).sorted().limit(20)
+                            .collect(java.util.stream.Collectors.joining(", "));
+                }
+                plugin.getLogger().warning("Selected map archive " + resource
+                        + " did not contain an unambiguous level.dat and WorldConfig.dat world root. "
+                        + "Extraction root entries: [" + entries + "].");
+                return false;
+            }
+
+            // Replace only this reserved test-map directory. The caller unloads
+            // the world and clears Paper's migrated counterpart before reinstalling.
+            deleteExtractionTree(root, container);
+            if (archiveRoot.equals(staging)) {
+                Files.move(staging, root);
+            } else {
+                Files.move(archiveRoot, root);
+            }
+            if (!hasWorldMetadata(root)) {
+                plugin.getLogger().warning("Original map archive " + resource
+                        + " was extracted but its normalized world root is missing required metadata at " + root);
+                return false;
+            }
+            plugin.getLogger().info("Installed authentic map archive " + resource
+                    + " into " + root + " (metadata root normalized from " + archiveRoot + ").");
+            return true;
+        } catch (IOException exception) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING,
+                    "Could not install original " + game.displayName() + " map archive " + resource
+                            + " into " + root + ": " + exception.getMessage(), exception);
             return false;
+        } finally {
+            if (Files.exists(staging) && !Files.isSymbolicLink(staging)) {
+                try {
+                    deleteExtractionTree(staging, container);
+                } catch (IOException cleanupFailure) {
+                    plugin.getLogger().warning("Could not clean temporary map extraction " + staging
+                            + ": " + cleanupFailure.getMessage());
+                }
+            }
         }
     }
 

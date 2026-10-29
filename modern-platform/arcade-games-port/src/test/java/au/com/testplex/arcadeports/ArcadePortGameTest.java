@@ -58,7 +58,8 @@ class ArcadePortGameTest {
                 ModernLobbyScoreboard.scoreboardTitleForGame("bacon-brawl", "Testplex")));
         assertEquals("Testplex",
                 ModernLobbyScoreboard.scoreboardTitleForGame("paintball", "Testplex"));
-        assertEquals(20, ArcadePortManager.MANUAL_START_COUNTDOWN_SECONDS);
+        assertEquals(0, ArcadePortManager.MANUAL_START_COUNTDOWN_SECONDS,
+                "The modern lobby Start Game action should start immediately without a countdown.");
     }
 
     @Test void modernLobbyScoreboardShowsSelectedGameAndKitAsReadableLabels() {
@@ -288,6 +289,16 @@ class ArcadePortGameTest {
         assertFalse(SourceMapCatalog.isReservedSourceWorldName("world"));
         assertFalse(SourceMapCatalog.isReservedSourceWorldName("../world"));
         assertFalse(SourceMapCatalog.isReservedSourceWorldName("arcadeport_proto_evolution"));
+    }
+
+    @Test void sourceMapInstallerRecognizesAnArchiveWrappedInOneWorldFolder(
+            @org.junit.jupiter.api.io.TempDir Path temporaryDirectory) throws Exception {
+        Path nestedWorld = temporaryDirectory.resolve("Mighty Lava Arena");
+        java.nio.file.Files.createDirectories(nestedWorld);
+        java.nio.file.Files.write(nestedWorld.resolve("level.dat"), new byte[] {1, 2, 3});
+        java.nio.file.Files.writeString(nestedWorld.resolve("WorldConfig.dat"), "MAP_NAME:Mighty Lava Arena\\n");
+
+        assertEquals(nestedWorld, SourceMapCatalog.locateMapRoot(temporaryDirectory));
     }
 
     @Test void dragonEscapeMapMarkerQueriesAreNormalised() {

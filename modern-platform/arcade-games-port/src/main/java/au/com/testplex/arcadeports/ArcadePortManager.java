@@ -103,7 +103,7 @@ public final class ArcadePortManager implements Listener {
     private static final int HALF_SIZE = 20;
     private static final long ROUND_MS = 180_000L;
     private static final long JOIN_WINDOW_TICKS = 100L;
-    static final int MANUAL_START_COUNTDOWN_SECONDS = 20;
+    static final int MANUAL_START_COUNTDOWN_SECONDS = 0;
     private final ArcadeMechanicsModernPlugin plugin;
     private final Map<String, LinkedHashMap<UUID, Player>> queues = new HashMap<>();
     private final Map<String, World> worlds = new HashMap<>();
@@ -565,9 +565,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     /**
-     * The legacy 1.8 Start Game button called StateCountdown(game, 20, true),
-     * announcing the start before the round actually became live. Keep that
-     * visible 20-second countdown instead of teleporting everyone immediately.
+     * Start as soon as the lobby Start Game action is selected. The modern test
+     * harness should not impose the legacy 20-second countdown while mechanics
+     * are being tested.
      */
     public void startFromLobby(ArcadePortGame type, org.bukkit.command.CommandSender sender) {
         if (type == null) {
@@ -585,9 +585,10 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (manualStartCountdown != null) {
-            sender.sendMessage(ChatColor.YELLOW + manualStartType.displayName()
-                    + " already has a start countdown running. Please wait for it to finish.");
-            return;
+            manualStartCountdown.cancel();
+            manualStartCountdown = null;
+            manualStartType = null;
+            clearLobbyCountdownStatus();
         }
         if (SourceMapCatalog.hasMap(type)) {
             String selectedResource = plugin.getConfig().getString("selected-maps." + type.id(),
@@ -622,52 +623,26 @@ public final class ArcadePortManager implements Listener {
 
         Player requester = sender instanceof Player player && lobby.isLobbyWorld(player.getWorld())
                 ? player : null;
-        manualStartType = type;
-        final int[] secondsRemaining = {MANUAL_START_COUNTDOWN_SECONDS};
+        List<Player> notifyPlayers = onlineQueuedPlayers(type);
         String hostName = sender instanceof Player player ? player.getName() : "An operator";
-        sender.sendMessage(ChatColor.GREEN + type.displayName()
-                + " start countdown started: " + MANUAL_START_COUNTDOWN_SECONDS
-                + " seconds. Players will be moved when the countdown ends.");
-        for (Player player : onlineQueuedPlayers(type)) {
-            player.sendMessage(ChatColor.AQUA + "" + ChatColor.BOLD + hostName
-                    + ChatColor.AQUA + " has started the game.");
+        clearLobbyCountdownStatus();
+        try {
+            startQueued(type, requester, sender);
+        } catch (RuntimeException exception) {
+            plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                    "Unhandled error while starting " + type.displayName() + ".", exception);
+            sender.sendMessage(ChatColor.RED + "Could not start " + type.displayName()
+                    + ". The error was logged on the server; no successful round start was recorded.");
+            return;
         }
-        updateLobbyCountdownStatus(type, MANUAL_START_COUNTDOWN_SECONDS);
-
-        manualStartCountdown = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (active != null) {
-                cancelManualStartCountdown(type, ChatColor.RED + "The countdown was cancelled because "
-                        + active.type.displayName() + " is already running.");
-                return;
-            }
-            int remaining = secondsRemaining[0];
-            if (remaining <= 0) {
-                manualStartCountdown = null;
-                manualStartType = null;
-                clearLobbyCountdownStatus();
-                lobby.refreshLobbyScoreboards();
-                try {
-                    startQueued(type, requester, sender);
-                } catch (RuntimeException exception) {
-                    plugin.getLogger().log(java.util.logging.Level.SEVERE,
-                            "Unhandled error while starting " + type.displayName() + " after its countdown.", exception);
-                    sender.sendMessage(ChatColor.RED + "Could not start " + type.displayName()
-                            + ". The error was logged on the server; no successful round start was recorded.");
-                }
-                return;
-            }
-
-            updateLobbyCountdownStatus(type, remaining);
-            for (Player player : onlineQueuedPlayers(type)) {
-                player.sendActionBar(ChatColor.GOLD + type.displayName() + ChatColor.YELLOW
-                        + " starts in " + remaining + "s");
-                if (remaining == MANUAL_START_COUNTDOWN_SECONDS || remaining == 15 || remaining == 10 || remaining <= 5) {
-                    player.sendTitle(ChatColor.GOLD + type.displayName(),
-                            ChatColor.YELLOW + "Starting in " + remaining + "s", 0, 22, 0);
+        if (active != null && active.type == type) {
+            for (Player player : notifyPlayers) {
+                if (player != null && player.isOnline()) {
+                    player.sendMessage(ChatColor.AQUA + "" + ChatColor.BOLD + hostName
+                            + ChatColor.AQUA + " has started the game.");
                 }
             }
-            secondsRemaining[0]--;
-        }, 1L, 20L);
+        }
     }
 
     private List<Player> onlineQueuedPlayers(ArcadePortGame type) {
@@ -770,17 +745,18 @@ public final class ArcadePortManager implements Listener {
                     }
                 }
 
-                if (world == null) {
-                    sender.sendMessage(ChatColor.RED + "Could not load the authentic " + type.displayName()
-                            + " map after a clean retry. No generated fallback arena was created; see server logs.");
-                }
             }
             if (world != null) worlds.put(type.id(), world);
         } else {
             world = worlds.computeIfAbsent(type.id(), ignored -> createWorld(type));
         }
         if (world == null) {
-            sender.sendMessage(ChatColor.RED + "The test world could not be loaded. Check the server log.");
+            if (SourceMapCatalog.hasMap(type)) {
+                sender.sendMessage(ChatColor.RED + "Could not load the authentic " + type.displayName()
+                        + " map after a clean retry. Check the server log for the selected archive and load exception.");
+            } else {
+                sender.sendMessage(ChatColor.RED + "The test world could not be loaded. Check the server log.");
+            }
             return;
         }
         // A mapped game must remain on its authentic legacy terrain. Never overwrite
