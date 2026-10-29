@@ -482,6 +482,18 @@ class ArcadePortGameTest {
         assertEquals(1.8D, ArcadePortRules.nextBaconKnockback(1.5D), 0.00001D);
     }
 
+    @Test void baconBrawlAbilitiesKeepOriginalKitCooldownsAlongsideMeterCharge() {
+        assertEquals(8_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("el-muchacho-pigo"));
+        assertEquals(8_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("body slam"));
+        assertEquals(3_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("mama-piggles"));
+        assertEquals(3_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("mama-pig"));
+        assertEquals(10_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("pig"));
+        assertEquals(10_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("sheep-pig"));
+        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("chris-p-bacon"));
+        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("unknown"));
+        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis(null));
+    }
+
     @Test void baconBrawlAbilitiesRequireTheSourceIronAxeAndRightClick() {
         assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
                 org.bukkit.Material.IRON_AXE, false, "el-muchacho-pigo"));
