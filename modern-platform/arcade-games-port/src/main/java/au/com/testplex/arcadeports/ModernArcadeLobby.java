@@ -133,10 +133,22 @@ public final class ModernArcadeLobby implements Listener {
         }
         player.leaveVehicle();
         player.teleport(spawn);
+        // This is an Arcade test lobby, not a continuation of the generated
+        // survival world. Do not carry survival inventory, XP, potion effects,
+        // creative flight, or modified movement attributes into a test round.
         player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        player.setWalkSpeed(0.2F);
+        player.getInventory().clear();
+        player.getInventory().setArmorContents(new ItemStack[4]);
+        player.getInventory().setItemInOffHand(null);
+        player.setExp(0.0F);
+        player.setLevel(0);
         player.setHealth(player.getMaxHealth());
         player.setFoodLevel(20);
         player.setSaturation(20.0F);
+        player.setAbsorptionAmount(0.0D);
         player.setFireTicks(0);
         player.setFallDistance(0.0F);
         for (org.bukkit.potion.PotionEffect effect : player.getActivePotionEffects()) {
