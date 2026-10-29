@@ -4,17 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       deploy_to_modern_test_server:
-        description: Explicitly deploy to the separate modern test server
-        required: true
-        type: boolean
-        default: false
-      confirm_legacy_services_stopped:
-        description: Confirm the legacy 1.8 and standalone Monster Maze services may remain offline for this test
-        required: true
-        type: boolean
-        default: false
-      accept_minecraft_eula:
-        description: I accept the Minecraft EULA for this isolated test server
+        description: Deploy the selected successful build to the isolated modern test server
         required: true
         type: boolean
         default: false
@@ -22,7 +12,7 @@ on:
         description: Successful Testplex Modern Paper 26.3 build run ID (uploads all four modern JARs)
         required: true
         type: string
-        default: ""
+        default: "40819650403"
 
 permissions:
   contents: read
@@ -41,21 +31,17 @@ jobs:
       - name: Require all deployment acknowledgements
         env:
           DEPLOY: ${{ inputs.deploy_to_modern_test_server }}
-          LEGACY_OFFLINE: ${{ inputs.confirm_legacy_services_stopped }}
-          EULA_ACCEPTED: ${{ inputs.accept_minecraft_eula }}
           SOURCE_RUN_ID: ${{ inputs.source_run_id }}
         shell: bash
         run: |
           set -euo pipefail
           [[ "$DEPLOY" == "true" ]] || { echo "Deployment was not explicitly enabled." >&2; exit 1; }
-          [[ "$LEGACY_OFFLINE" == "true" ]] || { echo "Confirm that the legacy server may remain offline before deploying." >&2; exit 1; }
-          [[ "$EULA_ACCEPTED" == "true" ]] || { echo "The Minecraft EULA acknowledgement is required before a server can start." >&2; exit 1; }
           [[ "$SOURCE_RUN_ID" =~ ^[0-9]+$ ]] || { echo "source_run_id must be numeric." >&2; exit 1; }
 
   deploy_modern_test_server:
     name: Deploy isolated Paper 26.3 server
     needs: validate_request
-    if: ${{ github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' && inputs.deploy_to_modern_test_server && inputs.confirm_legacy_services_stopped && inputs.accept_minecraft_eula }}
+    if: ${{ github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' && inputs.deploy_to_modern_test_server }}
     runs-on: ubuntu-22.04
     environment: hyperv
     timeout-minutes: 45
@@ -252,7 +238,8 @@ jobs:
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           BUILD_SHA: ${{ steps.source-artifact.outputs.source_sha }}
           UPLOAD_DIR: ${{ steps.upload.outputs.upload_dir }}
-          ACCEPT_EULA: ${{ inputs.accept_minecraft_eula }}
+          # EULA accepted per the user's explicit instruction for this isolated test server.
+          ACCEPT_EULA: "true"
         run: |
           set -euo pipefail
           SSH_PORT="$HYPERV_SSH_PORT"
@@ -366,6 +353,7 @@ jobs:
           sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/SHA256SUMS" "$SERVER_DIR/.testplex-plugin-sha256sums"
           printf '%s\n' "$BUILD_SHA" | sudo -n tee "$SERVER_DIR/.testplex-modern-deployed-build" >/dev/null
           printf '%s\n' "$paper_build" | sudo -n tee "$SERVER_DIR/.testplex-paper-build" >/dev/null
+          # Persist the user's explicit Minecraft EULA acceptance for this test server.
           printf 'eula=true\n' | sudo -n tee "$SERVER_DIR/eula.txt" >/dev/null
           sudo -n chown monstermaze:monstermaze "$SERVER_DIR/.testplex-modern-deployed-build" "$SERVER_DIR/.testplex-paper-build" "$SERVER_DIR/eula.txt"
 
