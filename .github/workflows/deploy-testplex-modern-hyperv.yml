@@ -278,11 +278,16 @@ jobs:
             exit 1
           fi
           available_mb="$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)"
-          if [[ "$available_mb" -lt 2300 ]]; then
-            echo "Only $available_mb MB is available after stopping legacy services. The VM is too constrained for safe Paper deployment." >&2
+          # The modern JVM is capped at 1536 MiB. Require at least 2 GiB free
+          # after stopping the current server: this leaves roughly 512 MiB for
+          # JVM native memory and the OS above the maximum heap, while avoiding
+          # a needless refusal when the isolated 5 GiB VM has 2.1-2.3 GiB free.
+          echo "Available memory after service stops: $available_mb MiB; new JVM max heap: 1536 MiB."
+          if [[ "$available_mb" -lt 2000 ]]; then
+            echo "Only $available_mb MiB is available after stopping legacy services. Need at least 2000 MiB for the 1536 MiB Paper heap plus native/OS reserve." >&2
             exit 1
           fi
-          echo "Preflight passed: competing legacy services are inactive, target is isolated, and memory/port checks passed."
+          echo "Preflight passed: competing legacy services are inactive, target is isolated, port is free, and memory headroom is sufficient for a 1536 MiB heap."
           REMOTE_PREFLIGHT
 
       - name: Upload verified JARs to the isolated directory
@@ -504,7 +509,7 @@ jobs:
           Group=monstermaze
           WorkingDirectory=/home/monstermaze/servers/testplex-modern
           Environment=JAVA_HOME=/opt/testplex/java25
-          ExecStart=/opt/testplex/java25/bin/java -Xms512M -Xmx2G -jar paper.jar --nogui
+          ExecStart=/opt/testplex/java25/bin/java -Xms384M -Xmx1536M -jar paper.jar --nogui
           Restart=on-failure
           RestartSec=8
           TimeoutStopSec=45
