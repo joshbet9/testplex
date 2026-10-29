@@ -2318,7 +2318,7 @@ public final class ArcadePortManager implements Listener {
                 if (session.ticks % 20 == 0 || speed == null || speed.getDuration() < 20) {
                     player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 1, false, false, false));
                 }
-                updateBaconBabyPig(session, player);
+                updateBaconBabyPig(session, player, now);
             } else {
                 removeBaconBabyPig(session, id);
             }
@@ -2359,7 +2359,7 @@ public final class ArcadePortManager implements Listener {
      * Mama Piggles' Baby Piggles companion is a client-visible baby pig. It is
      * invulnerable and follows the owner; normal player hitboxes remain authoritative.
      */
-    private void updateBaconBabyPig(Session session, Player owner) {
+    private void updateBaconBabyPig(Session session, Player owner, long now) {
         UUID ownerId = owner.getUniqueId();
         UUID pigId = session.baconBabyPigs.get(ownerId);
         Pig baby = null;
@@ -2391,6 +2391,41 @@ public final class ArcadePortManager implements Listener {
         desired.setY(owner.getLocation().getY());
         if (baby.getLocation().distanceSquared(desired) > 1.0D) baby.teleport(desired);
         baby.setRotation(owner.getLocation().getYaw(), 0.0F);
+        if (active == session) tryBabyPigglesAttack(session, owner, baby, now);
+    }
+
+    private void tryBabyPigglesAttack(Session session, Player owner, Pig baby, long now) {
+        UUID ownerId = owner.getUniqueId();
+        long readyAt = session.baconBabyAttackReadyAt.getOrDefault(ownerId, 0L);
+        Player target = null;
+        double closestDistance = Double.POSITIVE_INFINITY;
+        for (Player candidate : alivePlayers(session)) {
+            if (candidate.getUniqueId().equals(ownerId)) continue;
+            double distance = candidate.getLocation().distanceSquared(baby.getLocation());
+            if (ArcadePortRules.shouldBaconBabyPigAttack(now, readyAt, distance) && distance < closestDistance) {
+                closestDistance = distance;
+                target = candidate;
+            }
+        }
+        if (target == null) return;
+        session.baconBabyAttackReadyAt.put(ownerId, now + ArcadePortRules.BACON_BABY_PIG_ATTACK_COOLDOWN_MILLIS);
+
+        Vector away = target.getLocation().toVector().subtract(baby.getLocation().toVector());
+        away.setY(0.0D);
+        if (away.lengthSquared() < 1.0E-5D) away = owner.getLocation().getDirection().setY(0.0D);
+        if (away.lengthSquared() < 1.0E-5D) away = new Vector(0.0D, 0.0D, 1.0D);
+        target.setVelocity(away.normalize().multiply(session.baconKnockback * 1.1D).setY(0.65D));
+        target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0.0D, 0.7D, 0.0D),
+                8, 0.25D, 0.3D, 0.25D, 0.03D);
+        target.playSound(target.getLocation(), Sound.ENTITY_PIG_AMBIENT, 0.8F, 1.4F);
+        owner.setFoodLevel(Math.min(20, owner.getFoodLevel() + 2));
+        owner.setSaturation(ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE);
+        if (target.getHealth() <= ArcadePortRules.BACON_STANDARD_HIT_DAMAGE) {
+            eliminate(session, target, owner, "was knocked back by Baby Piggles");
+        } else {
+            target.setHealth(target.getHealth() - ArcadePortRules.BACON_STANDARD_HIT_DAMAGE);
+            target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 0.9F);
+        }
     }
 
     private void removeBaconBabyPig(Session session, UUID ownerId) {
@@ -4312,6 +4347,7 @@ public final class ArcadePortManager implements Listener {
         session.sheepCarriers.clear();
         session.entities.clear();
         session.baconBabyPigs.clear();
+        session.baconBabyAttackReadyAt.clear();
         session.baconPlayerPigs.clear();
         session.baconPigOwners.clear();
         session.respawning.clear();
@@ -5968,6 +6004,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> baconSlams = new HashMap<>();
         final Map<UUID, Long> baconCloakedUntil = new HashMap<>();
         final Map<UUID, UUID> baconBabyPigs = new HashMap<>();
+        final Map<UUID, Long> baconBabyAttackReadyAt = new HashMap<>();
         final Map<UUID, UUID> baconPlayerPigs = new HashMap<>();
         final Map<UUID, UUID> baconPigOwners = new HashMap<>();
         final Set<UUID> baconPigsInBlanketsAwarded = new HashSet<>();
