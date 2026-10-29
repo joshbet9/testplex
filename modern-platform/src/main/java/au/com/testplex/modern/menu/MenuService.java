@@ -98,18 +98,23 @@ public final class MenuService implements Listener {
         player.openInventory(inventory);
     }
 
+    /** ArcadeCosmeticsMenu's original 1.8 54-slot game grid and fixed slots. */
     public void openCosmeticsHome(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 54, COSMETICS_TITLE);
-        int slot = 0;
+        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.BLACK + COSMETICS_TITLE);
+        int index = 0;
+        int[] legacySlots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
         for (GameDefinition game : catalog.getGames()) {
-            if (slot >= inventory.getSize()) break;
-            ItemStack item = makeItem(game.getIcon(), ChatColor.LIGHT_PURPLE + game.getName(), List.of(
-                    ChatColor.GRAY + String.valueOf(game.getCosmeticLines().size()) + " dedicated cosmetic lines",
-                    ChatColor.GRAY + String.valueOf(game.getWinEffects().size()) + " distinct win-scene choices",
-                    ChatColor.DARK_GRAY + "Preferences are scoped to this game."));
-            mark(item, "cosmetics-game", game, null, null);
-            inventory.setItem(slot++, item);
+            if (index >= legacySlots.length) break;
+            ItemStack item = makeItem(icon(game.getIcon()), ChatColor.YELLOW + game.getName(), List.of(
+                    ChatColor.GRAY + game.getCosmeticLines().size()
+                            + (game.getCosmeticLines().size() == 1 ? " cosmetic line" : " cosmetic lines"),
+                    ChatColor.GRAY + "Win effects are managed separately in Cosmetics.",
+                    ChatColor.GREEN + "Click to open"));
+            mark(item, "game", game, null, null);
+            inventory.setItem(legacySlots[index++], item);
         }
+        inventory.setItem(49, makeItem(Material.BARRIER, ChatColor.RED + "Close",
+                List.of(ChatColor.GRAY + "Close the Arcade Cosmetics menu.")));
         player.openInventory(inventory);
     }
 
