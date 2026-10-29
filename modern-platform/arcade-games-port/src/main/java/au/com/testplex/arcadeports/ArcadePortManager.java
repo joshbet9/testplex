@@ -2347,6 +2347,8 @@ public final class ArcadePortManager implements Listener {
             avatar.setRemoveWhenFarAway(false);
             avatar.setCollidable(false);
             avatar.setCustomNameVisible(false);
+            // The source disguise is visible to other players, not as a second animal in first person.
+            owner.hideEntity(plugin, avatar);
             session.entities.add(avatar);
             session.baconPlayerPigs.put(ownerId, avatar.getUniqueId());
             session.baconPigOwners.put(avatar.getUniqueId(), ownerId);
@@ -2462,6 +2464,8 @@ public final class ArcadePortManager implements Listener {
             baby.setBaby();
             baby.setCustomName(ChatColor.LIGHT_PURPLE + "Baby Piggles");
             baby.setCustomNameVisible(false);
+            // Source hides the passenger to Mama Piggles while other players see the companion.
+            owner.hideEntity(plugin, baby);
             // Reborn transfers damage dealt to Baby Piggles onto Mama Piggles' player.
             baby.setInvulnerable(false);
             baby.setSilent(true);
