@@ -48,6 +48,16 @@ public final class ArcadePortRules {
         return wins >= BACON_BRAWL_KING_OF_BACON_WINS;
     }
 
+    /** Recent hit credit keeps knock-off kills attached to the attacker who caused the fall. */
+    public static final long BACON_FALL_KILL_CREDIT_WINDOW_MILLIS = 5_000L;
+
+    public static boolean shouldCreditBaconFallKill(long nowMillis, long lastHitAtMillis,
+            boolean isArenaFallOrWaterKnockout) {
+        return isArenaFallOrWaterKnockout && lastHitAtMillis > 0L
+                && nowMillis >= lastHitAtMillis
+                && nowMillis - lastHitAtMillis <= BACON_FALL_KILL_CREDIT_WINDOW_MILLIS;
+    }
+
     /** Original Bacon Brawl is decided by kills at the two-minute mark. */
     public static final long BACON_BRAWL_ROUND_MILLIS = 120_000L;
     public static final long BACON_BRAWL_RESPAWN_DELAY_TICKS = 20L;
