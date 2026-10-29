@@ -8304,7 +8304,7 @@ public final class ArcadePortManager implements Listener {
             if (directBotTarget != null
                     && (directTarget == null || directBotHitDistanceSquared < directHitDistanceSquared)) {
                 session.bombDirectHitResolved.add(bombId);
-                lobbyRuntime.showBombLobbersBotDirectHit(directBotTarget, owner);
+                lobbyRuntime.showBombLobbersBotDirectHit(directBotTarget, owner, current);
                 continue;
             }
 
