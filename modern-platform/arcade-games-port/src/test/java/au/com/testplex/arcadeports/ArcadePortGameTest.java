@@ -450,6 +450,14 @@ class ArcadePortGameTest {
         assertEquals(4.0D, ArcadePortRules.BACON_STARVATION_DAMAGE, 0.00001D);
         assertEquals(6.0D, ArcadePortRules.BACON_STANDARD_HIT_DAMAGE, 0.00001D);
         assertEquals(2.0D, ArcadePortRules.BACON_BODY_SLAM_RECOIL_DAMAGE, 0.00001D);
+        assertEquals(8_000L, ArcadePortRules.BACON_BODY_SLAM_COOLDOWN_MILLIS);
+        assertEquals(3_000L, ArcadePortRules.BACON_BLAST_COOLDOWN_MILLIS);
+        assertEquals(10_000L, ArcadePortRules.BACON_CLOAK_COOLDOWN_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.BACON_CLOAK_DURATION_MILLIS);
+        assertEquals(1.8D, ArcadePortRules.initialBaconKnockback(2), 0.00001D,
+                "two-player rounds start with stronger knockback");
+        assertEquals(1.5D, ArcadePortRules.initialBaconKnockback(3), 0.00001D);
+        assertEquals(1.8D, ArcadePortRules.nextBaconKnockback(1.5D), 0.00001D);
     }
 
     @Test void sheepPigBackstabBonusOnlyAppliesFromBehind() {
