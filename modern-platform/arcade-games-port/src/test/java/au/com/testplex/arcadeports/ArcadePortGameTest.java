@@ -8,6 +8,19 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadePortGameTest {
+    @Test void legacyMapCatalogIncludesAllMovedMapFoldersForSupportedGames() {
+        assertEquals(java.util.List.of("Bacon Brawl"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.BACON_BRAWL));
+        assertEquals(java.util.List.of("Bomb Lobbers"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.BOMB_LOBBERS));
+        assertEquals(java.util.List.of("Dragon Escape"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.DRAGON_ESCAPE));
+        assertEquals(java.util.List.of("Paintball", "Super Paintball"),
+                SourceMapCatalog.mapFoldersFor(ArcadePortGame.PAINTBALL));
+        assertEquals(java.util.List.of("Speef", "Super Spleef"),
+                SourceMapCatalog.mapFoldersFor(ArcadePortGame.SPLEEF));
+        assertEquals(java.util.List.of("Turf Wars"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.TURF_WARS));
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.EVOLUTION).isEmpty(),
+                "Evolution has no legacy map archive folder and must not be given an invented one");
+    }
+
     @Test void sourceMapResetTargetsPaper263MigratedDimensionFolder() {
         Path primaryWorld = Path.of("/srv/testplex/world");
         assertEquals(primaryWorld.resolve("dimensions/minecraft/arcadeport_source_bacon_brawl"),
