@@ -45,6 +45,20 @@ public final class ArcadePortRules {
     /** Recent hit credit keeps knock-off kills attached to the attacker who caused the fall. */
     public static final long BACON_FALL_KILL_CREDIT_WINDOW_MILLIS = 5_000L;
 
+    /** Hazards that end a Bacon Brawl knock-off on the embedded arena, including its lava floor. */
+    public static boolean isBaconArenaKnockoutReason(String reason) {
+        if (reason == null) return false;
+        String value = reason.toLowerCase(java.util.Locale.ROOT).replace('_', ' ').trim();
+        return value.equals("fell from the arena")
+                || value.equals("was lost to the water")
+                || value.equals("lava")
+                || value.equals("fire")
+                || value.equals("hot floor")
+                || value.equals("magma block")
+                || value.equals("drowning")
+                || value.equals("void");
+    }
+
     public static boolean shouldCreditBaconFallKill(long nowMillis, long lastHitAtMillis,
             boolean isArenaFallOrWaterKnockout) {
         return isArenaFallOrWaterKnockout && lastHitAtMillis > 0L
