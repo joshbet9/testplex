@@ -584,6 +584,18 @@ class ArcadePortGameTest {
         assertEquals(1.0D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_401L), 0.00001D);
     }
 
+    @Test void baconSheepPigCloakEndsOnEveryDamageCauseIncludingSuppressedFireAndExplosion() {
+        assertTrue(ArcadePortRules.shouldEndBaconSheepCloakOnDamageCause(
+                org.bukkit.event.entity.EntityDamageEvent.DamageCause.FIRE_TICK));
+        assertTrue(ArcadePortRules.shouldEndBaconSheepCloakOnDamageCause(
+                org.bukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_EXPLOSION));
+        assertTrue(ArcadePortRules.shouldEndBaconSheepCloakOnDamageCause(
+                org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL));
+        assertTrue(ArcadePortRules.shouldEndBaconSheepCloakOnDamageCause(
+                org.bukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_ATTACK));
+        assertFalse(ArcadePortRules.shouldEndBaconSheepCloakOnDamageCause(null));
+    }
+
     @Test void baconSheepPigGetsCloakRatherThanDamageInvincibility() {
         assertEquals(500L, ArcadePortRules.BACON_SHEEP_CLOAK_MIN_MILLIS);
         assertEquals(5_000L, ArcadePortRules.BACON_SHEEP_CLOAK_MAX_MILLIS);
