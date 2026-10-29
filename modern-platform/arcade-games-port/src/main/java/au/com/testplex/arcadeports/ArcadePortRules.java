@@ -179,10 +179,6 @@ public final class ArcadePortRules {
         return touchingBlock || createdAtMillis <= 0L || nowMillis < createdAtMillis
                 || nowMillis - createdAtMillis >= BACON_BLAST_MAX_FLIGHT_MILLIS;
     }
-    public static final long BACON_BODY_SLAM_COOLDOWN_MILLIS = 8_000L;
-    public static final long BACON_BLAST_COOLDOWN_MILLIS = 3_000L;
-    public static final long BACON_CLOAK_COOLDOWN_MILLIS = 10_000L;
-    public static final long BACON_CLOAK_DURATION_MILLIS = 5_000L;
     public static final long BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS = 3_000L;
     public static final long BOMB_LOBBERS_MAX_FLIGHT_MILLIS = 8_000L;
     public static final int BOMB_LOBBERS_FUSE_TICKS = 60;
