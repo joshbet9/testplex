@@ -562,7 +562,7 @@ class ArcadePortGameTest {
         assertEquals(0.55D, ArcadePortRules.baconBodySlamMeterMultiplier(10), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.baconBodySlamMeterMultiplier(100), 0.00001D);
         assertEquals(0L, ArcadePortRules.baconSheepCloakDurationMillis(9));
-        assertEquals(725L, ArcadePortRules.baconSheepCloakDurationMillis(15));
+        assertEquals(1_175L, ArcadePortRules.baconSheepCloakDurationMillis(15));
         assertEquals(5_000L, ArcadePortRules.baconSheepCloakDurationMillis(100));
         assertEquals(0.65D, ArcadePortRules.baconBlastPowerMultiplier(10), 0.00001D);
         assertEquals(2.0D, ArcadePortRules.baconBlastPowerMultiplier(100), 0.00001D);
