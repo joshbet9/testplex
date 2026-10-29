@@ -2238,7 +2238,9 @@ public final class ArcadePortManager implements Listener {
                 || now - session.lastBaconEscalationAt < session.baconEscalationIntervalMillis) return;
         session.lastBaconEscalationAt = now;
         session.baconKnockback = ArcadePortRules.nextBaconKnockback(session.baconKnockback);
-        session.baconEscalationIntervalMillis = ArcadePortRules.nextBaconKnockbackInterval(session.baconEscalationIntervalMillis);
+        session.baconKnockbackEscalations++;
+        session.baconEscalationIntervalMillis = ArcadePortRules.nextBaconKnockbackInterval(
+                session.baconKnockbackEscalations, alivePlayers(session).size());
         String escalationMessage = ChatColor.GREEN
                 + "The ground begins to tremble... All pigs now take more knockback!";
         announce(session, escalationMessage);
@@ -5875,6 +5877,7 @@ public final class ArcadePortManager implements Listener {
         long lastWorldWaterDamageAt;
         long lastBaconEscalationAt;
         long baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
+        int baconKnockbackEscalations;
         long startedAt;
          boolean microBarrierActive;
         boolean turfCombat;
