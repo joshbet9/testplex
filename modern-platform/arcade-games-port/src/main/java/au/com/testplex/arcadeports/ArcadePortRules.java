@@ -621,6 +621,11 @@ public final class ArcadePortRules {
 
     /** Reborn kills runners once Douglas's route progress has overtaken theirs. */
     /** Keep route progress monotonic when a course crosses near one of its earlier waypoints. */
+    /** For source maps with vertical bounds, let players fall just below the mapped volume before elimination. */
+    public static double sourceMapVoidThresholdY(boolean hasVerticalBounds, int mapMinY) {
+        return hasVerticalBounds ? Math.max(0.0D, mapMinY - 1.0D) : 58.0D;
+    }
+
     /** Fall limits below the minimum authored play surface for known low-altitude Dragon Escape maps. */
     public static double dragonEscapeVoidThresholdY(String mapName) {
         String name = mapName == null ? "" : mapName.toLowerCase(java.util.Locale.ROOT);
