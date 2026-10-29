@@ -2276,8 +2276,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     /**
-     * Hide the invisible player nameplates while their synced Pig avatars are visible.
-     * Existing main-scoreboard team membership is remembered and restored after the round.
+     * Keep Bacon Brawl's disguise scoreboard and hidden real-player state confined to this match.
+     * Each player's original scoreboard is held in PlayerSnapshot and restored after the round.
      */
     private void setupBaconDisguiseNameTags(Session session, List<Player> participants) {
         if (Bukkit.getScoreboardManager() == null) return;
@@ -2487,8 +2487,10 @@ public final class ArcadePortManager implements Listener {
         UUID ownerId = owner.getUniqueId();
         Set<UUID> hiddenViewers = session.baconHiddenViewersByOwner
                 .computeIfAbsent(ownerId, ignored -> new HashSet<>());
-        for (Player viewer : Bukkit.getOnlinePlayers()) {
-            if (viewer.equals(owner) || !viewer.isOnline()) continue;
+        // Only match participants need to see the avatar instead of its real player.
+        // Hiding from all Bukkit online players also hides this player in unrelated worlds.
+        for (Player viewer : session.players.values()) {
+            if (viewer == null || viewer.equals(owner) || !viewer.isOnline()) continue;
             if (viewer.canSee(owner)) {
                 viewer.hidePlayer(plugin, owner);
                 hiddenViewers.add(viewer.getUniqueId());
