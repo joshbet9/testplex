@@ -33,12 +33,26 @@ public final class TestplexModernArcade extends JavaPlugin {
             }
             menus.openGamePanel(player);
         });
-        bind("arcadecosmetics", "Open per-game cosmetics.", (sender) -> {
+        bind("arcadecosmetics", "Open per-game Arcade cosmetics.", (sender) -> {
             if (!(sender instanceof Player player)) {
                 sender.sendMessage("This command must be used in-game.");
                 return;
             }
             menus.openCosmeticsHome(player);
+        });
+        bind("cosmetics", "Open the legacy-style Core Cosmetics menu.", (sender) -> {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("This command must be used in-game.");
+                return;
+            }
+            menus.openCoreCosmeticsHome(player);
+        });
+        bind("setgame", "Open the legacy Set Game screen.", (sender) -> {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("This command must be used in-game.");
+                return;
+            }
+            menus.openSetGamePage(player);
         });
         bind("arcadetest", "Inspect modern port readiness.", (sender) -> {
             if (!sender.hasPermission("testplex.modern.admin")) {

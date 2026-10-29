@@ -186,7 +186,7 @@ public final class ModernArcadeLobby implements Listener {
                 ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Cosmetics",
                 List.of(ChatColor.GRAY + "Browse Arcade cosmetics and win effects.",
                         ChatColor.YELLOW + "Right-click to customise.",
-                        ChatColor.DARK_GRAY + "Command: /arcadecosmetics"), "arcadecosmetics"));
+                        ChatColor.DARK_GRAY + "Command: /cosmetics"), "cosmetics"));
         // Speckled Melon (1.8) became Glistering Melon Slice in modern Minecraft.
         inventory.setItem(HOTBAR_GAME_PANEL_SLOT, createHotbarItem(Material.GLISTERING_MELON_SLICE,
                 ChatColor.GREEN + "" + ChatColor.BOLD + "Game Panel",

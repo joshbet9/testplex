@@ -81,22 +81,30 @@ public final class MenuService implements Listener {
         inventory.setItem(slot, item);
     }
 
+    public void openSetGamePage(Player player) {
+        openGameSelection(player, false);
+    }
+
     private void openGameSelection(Player player, boolean rotation) {
         Inventory inventory = Bukkit.createInventory(null, 54, rotation ? "Edit Game Rotation" : SET_GAME_TITLE);
-        int slot = 0;
+        int slot = 9;
         for (GameDefinition game : catalog.getGames()) {
-            if (slot >= LEGACY_GAME_SLOTS.length) break;
+            if (slot >= 45) break;
             boolean ready = "bacon-brawl".equals(game.getId())
                     && Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern");
-            ItemStack item = makeItem(ready ? icon(game.getIcon()) : Material.BARRIER,
-                    (ready ? ChatColor.GREEN : ChatColor.RED) + game.getName(),
-                    List.of(ChatColor.GRAY + game.getDescription(),
-                            ChatColor.YELLOW + (ready ? "Left-click to select this game." : "Not enabled for 26.3 acceptance yet.")));
+            ItemStack item = makeItem(icon(game.getIcon()),
+                    (ready ? ChatColor.GREEN : ChatColor.WHITE) + game.getName(),
+                    List.of(ChatColor.RESET + ChatColor.GRAY.toString() + "Select this as the next game.",
+                            "§1",
+                            ChatColor.YELLOW + "Left-Click " + ChatColor.GRAY + (ready
+                                    ? "to select this game."
+                                    : "to view the parity gate; this game is not enabled yet."),
+                            ChatColor.YELLOW + "Right-Click " + ChatColor.GRAY + "to choose an installed map.",
+                            ChatColor.DARK_GRAY + "Port status: " + game.getPortStatus().getDisplay()));
             mark(item, rotation ? "panel-rotation-select" : "panel-game-select", game, null, null);
-            inventory.setItem(LEGACY_GAME_SLOTS[slot++], item);
+            inventory.setItem(slot++, item);
         }
         inventory.setItem(4, backItem("Go Back", "back-panel", null));
-        inventory.setItem(49, makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of()));
         player.openInventory(inventory);
     }
 
@@ -165,7 +173,7 @@ public final class MenuService implements Listener {
         for (GameDefinition game : catalog.getGames()) {
             if (index >= LEGACY_GAME_SLOTS.length) break;
             ItemStack item = makeItem(icon(game.getIcon()), ChatColor.YELLOW + game.getName(),
-                    List.of(ChatColor.GRAY + game.getWinEffects().size() + " win-effect choices",
+                    List.of(ChatColor.GRAY.toString() + game.getWinEffects().size() + " win-effect choices",
                             ChatColor.GREEN + "Click to configure"));
             mark(item, "win-effects-game", game, null, null);
             inventory.setItem(LEGACY_GAME_SLOTS[index++], item);
@@ -181,7 +189,7 @@ public final class MenuService implements Listener {
         for (GameDefinition game : catalog.getGames()) {
             if (index >= legacySlots.length) break;
             ItemStack item = makeItem(icon(game.getIcon()), ChatColor.YELLOW + game.getName(), List.of(
-                    ChatColor.GRAY + game.getCosmeticLines().size()
+                    ChatColor.GRAY.toString() + game.getCosmeticLines().size()
                             + (game.getCosmeticLines().size() == 1 ? " cosmetic line" : " cosmetic lines"),
                     ChatColor.GRAY + "Win effects are managed separately in Cosmetics.",
                     ChatColor.GREEN + "Click to open"));
@@ -320,6 +328,18 @@ public final class MenuService implements Listener {
             if (game != null) openGameDetails(player, game);
             return;
         }
+        if (SET_GAME_TITLE.equals(title) && "panel-game-select".equals(action)
+                && game != null && event.getClick().isRightClick()) {
+            plugin.getConfig().set("game-panel.selected-game", game.getId());
+            plugin.saveConfig();
+            if (!Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern")) {
+                player.sendMessage(ChatColor.RED + "The modern map catalogue is not installed.");
+            } else {
+                player.closeInventory();
+                player.performCommand("arcadeport maps " + game.getId());
+            }
+            return;
+        }
         if (PANEL_TITLE.equals(title)) {
             if ("panel-set-game".equals(action)) openGameSelection(player, false);
             else if ("panel-rotation".equals(action)) openGameSelection(player, true);
@@ -349,14 +369,20 @@ public final class MenuService implements Listener {
             if (!"bacon-brawl".equals(game.getId())
                     || !Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern")) {
                 player.sendMessage(ChatColor.RED + game.getName() + " is not enabled for modern acceptance yet.");
+            } else if ("panel-rotation-select".equals(action)) {
+                plugin.getConfig().set("game-panel.selected-game", game.getId());
+                List<String> rotation = new ArrayList<>(plugin.getConfig().getStringList("game-panel.rotation"));
+                if (!rotation.contains(game.getId())) rotation.add(game.getId());
+                plugin.getConfig().set("game-panel.rotation", rotation);
+                plugin.saveConfig();
+                player.sendMessage(ChatColor.GREEN + game.getName() + " added to the local test rotation.");
+                openGameSelection(player, true);
             } else {
                 plugin.getConfig().set("game-panel.selected-game", game.getId());
                 plugin.saveConfig();
                 player.closeInventory();
-                boolean autoStart = plugin.getConfig().getBoolean("test-options.game-auto-start", false);
-                player.performCommand("arcadeport " + (autoStart ? "play " : "join ") + game.getId());
-                player.sendMessage(ChatColor.GREEN + "Selected " + game.getName() + "."
-                        + (autoStart ? " Quick test start requested." : " Use Start Game in /gamepanel when players are queued."));
+                player.sendMessage(ChatColor.GREEN + "Selected " + game.getName()
+                        + ". Right-click the game to choose a map, then use Start Game in the Game Panel.");
             }
         } else if ("back-panel".equals(action)) {
             openGamePanel(player);

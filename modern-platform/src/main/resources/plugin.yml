@@ -12,7 +12,13 @@ commands:
   arcadecosmetics:
     description: Browse per-game modern Arcade cosmetic lines and win effects.
     usage: /arcadecosmetics
-    aliases: [moderncosmetics, cosmetics]
+    aliases: [moderncosmetics]
+  cosmetics:
+    description: Open the legacy-style Core Cosmetics menu.
+    usage: /cosmetics
+  setgame:
+    description: Open the legacy Set Game screen after choosing a map.
+    usage: /setgame
   arcadetest:
     description: Inspect the modern Arcade port status.
     usage: /arcadetest status
