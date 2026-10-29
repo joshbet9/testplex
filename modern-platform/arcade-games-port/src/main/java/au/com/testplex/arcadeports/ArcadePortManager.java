@@ -2165,30 +2165,58 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void setBombLobbersArmor(Session session, Player player, String kit) {
-        Material boots;
-        Material leggings;
-        Material chestplate;
-        Material helmet;
+        UUID id = player.getUniqueId();
+        int team = session.teams.getOrDefault(id, 0);
+        Color teamColor = ArcadePortRules.bombLobbersTeamColor(team);
+        ChatColor chatColor = team == 1 ? ChatColor.AQUA : ChatColor.RED;
+        ItemStack[] armor;
+
         if ("armorer".equals(kit)) {
-            boots = Material.IRON_BOOTS;
-            leggings = Material.IRON_LEGGINGS;
-            chestplate = Material.IRON_CHESTPLATE;
-            helmet = Material.IRON_HELMET;
+            armor = new ItemStack[] {
+                    new ItemStack(Material.IRON_BOOTS), new ItemStack(Material.IRON_LEGGINGS),
+                    new ItemStack(Material.IRON_CHESTPLATE), new ItemStack(Material.IRON_HELMET)
+            };
         } else if ("pitcher".equals(kit)) {
-            boots = Material.CHAINMAIL_BOOTS;
-            leggings = Material.CHAINMAIL_LEGGINGS;
-            chestplate = Material.CHAINMAIL_CHESTPLATE;
-            helmet = Material.CHAINMAIL_HELMET;
+            armor = new ItemStack[] {
+                    new ItemStack(Material.CHAINMAIL_BOOTS), new ItemStack(Material.CHAINMAIL_LEGGINGS),
+                    new ItemStack(Material.CHAINMAIL_CHESTPLATE), new ItemStack(Material.CHAINMAIL_HELMET)
+            };
+        } else if (ArcadePortRules.bombLobbersKitUsesTeamArmor(kit)) {
+            // The source TeamArmorModule runs during PlayerKitGiveEvent for Jumper/Waller.
+            armor = new ItemStack[] {
+                    bombLobbersTeamArmorPiece(Material.LEATHER_BOOTS, teamColor, chatColor),
+                    bombLobbersTeamArmorPiece(Material.LEATHER_LEGGINGS, teamColor, chatColor),
+                    bombLobbersTeamArmorPiece(Material.LEATHER_CHESTPLATE, teamColor, chatColor),
+                    bombLobbersTeamArmorPiece(Material.LEATHER_HELMET, teamColor, chatColor)
+            };
         } else {
-            // Jumper and Waller inherit Kit.ApplyKit and do not equip armour in Reborn.
-            player.getInventory().setArmorContents(new ItemStack[4]);
-            return;
+            armor = new ItemStack[4];
         }
-        ItemStack[] armor = new ItemStack[] {
-                new ItemStack(boots), new ItemStack(leggings),
-                new ItemStack(chestplate), new ItemStack(helmet)
-        };
         player.getInventory().setArmorContents(armor);
+
+        // TeamArmorModule also supplies an unbreakable, coloured team chestplate in hotbar slot 9.
+        ItemStack teamBadge = new ItemStack(Material.LEATHER_CHESTPLATE);
+        LeatherArmorMeta badgeMeta = (LeatherArmorMeta) teamBadge.getItemMeta();
+        if (badgeMeta != null) {
+            badgeMeta.setColor(teamColor);
+            badgeMeta.setDisplayName(chatColor + "" + ChatColor.BOLD
+                    + (team == 1 ? "Aqua Team" : "Red Team"));
+            badgeMeta.setUnbreakable(true);
+            teamBadge.setItemMeta(badgeMeta);
+        }
+        player.getInventory().setItem(ArcadePortRules.BOMB_LOBBERS_TEAM_BADGE_SLOT, teamBadge);
+    }
+
+    private ItemStack bombLobbersTeamArmorPiece(Material material, Color teamColor, ChatColor chatColor) {
+        ItemStack item = new ItemStack(material);
+        LeatherArmorMeta meta = (LeatherArmorMeta) item.getItemMeta();
+        if (meta != null) {
+            meta.setColor(teamColor);
+            meta.setDisplayName(chatColor + "" + ChatColor.BOLD + "Team Armor");
+            meta.setUnbreakable(true);
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 
     private double bombLobbersDamageAfterArmor(Player target, double damage) {
@@ -7287,6 +7315,7 @@ public final class ArcadePortManager implements Listener {
             Location current = bomb.getLocation().clone();
             Location previous = session.bombLastLocations.put(bombId, current);
             if (previous == null) previous = current;
+            if (!bomb.isOnGround()) renderBombLobbersTrail(session, ownerId, previous, current);
 
             // Reborn ray-tests the moving TNT segment against expanded target boxes and
             // resolves the first collision along the flight, not whichever player is iterated first.
@@ -7362,6 +7391,28 @@ public final class ArcadePortManager implements Listener {
                 session.bombLastLocations.put(replacementId, current.clone());
                 session.bombCreatedAt.put(replacementId, createdAt);
             }
+        }
+    }
+
+    /** Mirrors BombLobbers.updateParticles: team-coloured red dust along each airborne TNT segment. */
+    private void renderBombLobbersTrail(Session session, UUID ownerId, Location previous, Location current) {
+        if (session == null || ownerId == null || previous == null || current == null
+                || previous.getWorld() != session.world || current.getWorld() != session.world) return;
+        Vector segment = current.toVector().subtract(previous.toVector());
+        double distance = segment.length();
+        if (!Double.isFinite(distance) || distance <= 1.0E-6D) return;
+        int samples = ArcadePortRules.bombLobbersTrailSampleCount(distance);
+        if (samples <= 0) return;
+
+        Color teamColor = ArcadePortRules.bombLobbersTeamColor(
+                session.teams.getOrDefault(ownerId, 0));
+        Particle.DustOptions dust = new Particle.DustOptions(teamColor, 1.0F);
+        Vector direction = segment.multiply(1.0D / distance);
+        for (int sample = 0; sample < samples; sample++) {
+            double offset = sample * ArcadePortRules.BOMB_LOBBERS_TRAIL_SAMPLE_SPACING;
+            if (offset > distance) break;
+            Location point = previous.clone().add(direction.clone().multiply(offset)).add(0.0D, 0.5D, 0.0D);
+            session.world.spawnParticle(Particle.DUST, point, 2, 0.0D, 0.0D, 0.0D, 0.0D, dust);
         }
     }
 

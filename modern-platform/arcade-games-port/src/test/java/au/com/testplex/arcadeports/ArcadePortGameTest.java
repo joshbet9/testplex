@@ -587,6 +587,26 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("unknown"));
     }
 
+    @Test void bombLobbersJumperAndWallerInheritTheLegacyTeamArmorModule() {
+        assertTrue(ArcadePortRules.bombLobbersKitUsesTeamArmor("jumper"));
+        assertTrue(ArcadePortRules.bombLobbersKitUsesTeamArmor("waller"));
+        assertFalse(ArcadePortRules.bombLobbersKitUsesTeamArmor("armorer"));
+        assertFalse(ArcadePortRules.bombLobbersKitUsesTeamArmor("pitcher"));
+        assertFalse(ArcadePortRules.bombLobbersKitUsesTeamArmor("unknown"));
+        assertEquals(8, ArcadePortRules.BOMB_LOBBERS_TEAM_BADGE_SLOT);
+        assertEquals(org.bukkit.Color.RED, ArcadePortRules.bombLobbersTeamColor(0));
+        assertEquals(org.bukkit.Color.AQUA, ArcadePortRules.bombLobbersTeamColor(1));
+        assertEquals(org.bukkit.Color.WHITE, ArcadePortRules.bombLobbersTeamColor(-1));
+    }
+
+    @Test void bombLobbersTntTrailUsesSourceTwoParticlePointSpacing() {
+        assertEquals(1, ArcadePortRules.bombLobbersTrailSampleCount(0.0D));
+        assertEquals(2, ArcadePortRules.bombLobbersTrailSampleCount(0.2D));
+        assertEquals(3, ArcadePortRules.bombLobbersTrailSampleCount(0.4D));
+        assertEquals(0, ArcadePortRules.bombLobbersTrailSampleCount(Double.NaN));
+        assertEquals(0, ArcadePortRules.bombLobbersTrailSampleCount(-0.2D));
+    }
+
     @Test void bombLobbersKitsPitchLevelsCraftmanAndBombPrimingMatchSourceTiming() {
         assertEquals("jumper", ArcadePortRules.normalizeBombLobbersKit("Jumper"));
         assertEquals("armorer", ArcadePortRules.normalizeBombLobbersKit("armourer"));

@@ -1,6 +1,7 @@
 package au.com.testplex.arcadeports;
 
 import org.bukkit.Material;
+import org.bukkit.Color;
 import java.util.Collection;
 
 /**
@@ -238,6 +239,9 @@ public final class ArcadePortRules {
     public static final int BOMB_LOBBERS_FUSE_TICKS = 60;
     public static final int BOMB_LOBBERS_MAX_CARRIED = 3;
     /** Vanilla 1.8 TNT size parameter; entity damage reaches twice this distance. */
+    /** Reborn renders two dust particles per 0.2-block segment while TNT is airborne. */
+    public static final double BOMB_LOBBERS_TRAIL_SAMPLE_SPACING = 0.2D;
+    public static final int BOMB_LOBBERS_TEAM_BADGE_SLOT = 8;
     public static final double BOMB_LOBBERS_EXPLOSION_SIZE = 4.0D;
     public static final double BOMB_LOBBERS_EXPLOSION_RADIUS = BOMB_LOBBERS_EXPLOSION_SIZE * 2.0D;
     public static final double BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE = 50.0D;
@@ -443,6 +447,27 @@ public final class ArcadePortRules {
             case "waller" -> "waller";
             default -> null;
         };
+    }
+
+    /** Jumper and Waller inherit TeamArmorModule's team-coloured leather set. */
+    public static boolean bombLobbersKitUsesTeamArmor(String kit) {
+        String normalized = normalizeBombLobbersKit(kit);
+        return "jumper".equals(normalized) || "waller".equals(normalized);
+    }
+
+    /** Reborn's two Bomb Lobbers sides use red and aqua team colours for their trails/gear. */
+    public static Color bombLobbersTeamColor(int teamId) {
+        return switch (teamId) {
+            case 0 -> Color.RED;
+            case 1 -> Color.AQUA;
+            default -> Color.WHITE;
+        };
+    }
+
+    /** Number of 0.2-block trail samples including the previous position. */
+    public static int bombLobbersTrailSampleCount(double segmentLength) {
+        if (!Double.isFinite(segmentLength) || segmentLength < 0.0D) return 0;
+        return (int) Math.floor(segmentLength / BOMB_LOBBERS_TRAIL_SAMPLE_SPACING) + 1;
     }
 
     /** Only the source Armorer (iron) and Pitcher (chainmail) kits equip armour. */
