@@ -568,7 +568,7 @@ class ArcadePortGameTest {
         assertEquals(1.0D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_401L), 0.00001D);
     }
 
-    @Test void baconBrawlUsesTheRequestedThreeAchievementsAndKeepsKingOfBaconRemoved() {
+    @Test void baconBrawlUsesTheRequestedThreeAchievements() {
         assertEquals(60_000L, ArcadePortRules.BACON_FLASH_FRIED_MAX_WIN_MILLIS);
         assertTrue(ArcadePortRules.shouldAwardBaconFlashFried(0L));
         assertTrue(ArcadePortRules.shouldAwardBaconFlashFried(60_000L));
