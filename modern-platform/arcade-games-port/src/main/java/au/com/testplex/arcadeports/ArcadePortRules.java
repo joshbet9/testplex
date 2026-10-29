@@ -90,6 +90,18 @@ public final class ArcadePortRules {
         return 1.0D;
     }
 
+    public static final double BACON_AVATAR_MAX_ATTACK_DISTANCE_SQUARED = 16.0D;
+
+    /** Packet-hit remapping must still respect the live round, target eligibility, reach and LOS. */
+    public static boolean shouldAcceptBaconAvatarPacketHit(boolean activeBaconRound,
+            boolean attackerAlive, boolean targetAlive, boolean selfHit,
+            double distanceSquared, boolean hasLineOfSight) {
+        return activeBaconRound && attackerAlive && targetAlive && !selfHit
+                && Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
+                && distanceSquared <= BACON_AVATAR_MAX_ATTACK_DISTANCE_SQUARED
+                && hasLineOfSight;
+    }
+
     /** Reborn kit selection is a pre-round choice; live Bacon Brawl changes apply next game. */
     public static boolean shouldDeferBaconBrawlKitChange(boolean activeBaconRound) {
         return activeBaconRound;
