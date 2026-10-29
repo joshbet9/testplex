@@ -509,6 +509,11 @@ public final class ArcadePortRules {
         return throwerTeam >= 0 && nearestSpawnTeam >= 0 && throwerTeam == nearestSpawnTeam;
     }
 
+    /** Reborn eliminates a Bomb Lobbers player once they cross into another team's side. */
+    public static boolean shouldEliminateBombLobbersForSide(int playerTeam, int nearestSpawnTeam) {
+        return playerTeam >= 0 && nearestSpawnTeam >= 0 && playerTeam != nearestSpawnTeam;
+    }
+
     /** Mirrors the projectile wrapper returning after its first direct-hit callback. */
     public static boolean shouldCheckBombLobbersDirectHit(boolean alreadyHitThisFlight) {
         return !alreadyHitThisFlight;
