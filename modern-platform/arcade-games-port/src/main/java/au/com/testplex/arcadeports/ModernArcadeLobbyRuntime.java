@@ -631,6 +631,16 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         Bot b=bots.get(key);
         if(b==null||!b.inGame||b.deployedGame==null
                 ||!manager.isActiveGame(entity.getWorld(),b.deployedGame))return;
+        if (b.deployedGame == ArcadePortGame.BOMB_LOBBERS
+                && be.getDamager() instanceof Player clicker) {
+            ItemStack held = clicker.getInventory().getItemInMainHand();
+            if (manager.wasRecentBombLobbersThrow(clicker)
+                    || (held != null && (held.getType() == Material.TNT || held.getType() == Material.LEVER))) {
+                // The click is a Bomb Lobbers control, not a melee hit. TNT feedback
+                // is rendered by the projectile sweep when it actually reaches the bot.
+                return;
+            }
+        }
         if(b.deployedGame==ArcadePortGame.BACON_BRAWL) {
             applyBotHit(b,actor,attacker,e.getDamage());
         } else {
