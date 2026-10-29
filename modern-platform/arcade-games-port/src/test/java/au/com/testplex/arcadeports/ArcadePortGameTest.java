@@ -593,8 +593,8 @@ class ArcadePortGameTest {
 
     @Test void baconBrawlPacketAvatarHitsRequireReachLineOfSightAndLivingPlayers() {
         assertTrue(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, 9.0D, true));
-        assertTrue(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, 16.0D, true));
-        assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, 16.01D, true));
+        assertTrue(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, 12.25D, true));
+        assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, 12.26D, true));
         assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, true, false, 4.0D, false));
         assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, false, true, false, 4.0D, true));
         assertFalse(ArcadePortRules.shouldAcceptBaconAvatarPacketHit(true, true, false, false, 4.0D, true));
