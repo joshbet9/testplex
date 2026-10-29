@@ -519,6 +519,35 @@ public final class ArcadePortRules {
         return !alreadyHitThisFlight;
     }
 
+    /** Reborn ray-tests the TNT path against the target bounding box expanded by one block. */
+    public static final double BOMB_LOBBERS_DIRECT_HIT_BOX_GROW = 1.0D;
+
+    /**
+     * Returns squared distance from the TNT segment start to its first intersection with the
+     * source-expanded target box, or positive infinity if that flight segment misses.
+     */
+    public static double bombLobbersDirectHitDistanceSquared(
+            org.bukkit.Location start, org.bukkit.Location end, org.bukkit.util.BoundingBox targetBox) {
+        if (start == null || end == null || targetBox == null || start.getWorld() != end.getWorld()) {
+            return Double.POSITIVE_INFINITY;
+        }
+        org.bukkit.util.Vector startVector = start.toVector();
+        org.bukkit.util.BoundingBox hitBox = targetBox.clone().expand(
+                BOMB_LOBBERS_DIRECT_HIT_BOX_GROW,
+                BOMB_LOBBERS_DIRECT_HIT_BOX_GROW,
+                BOMB_LOBBERS_DIRECT_HIT_BOX_GROW);
+        org.bukkit.util.Vector segment = end.toVector().subtract(startVector);
+        double length = segment.length();
+        if (!Double.isFinite(length)) return Double.POSITIVE_INFINITY;
+        if (length <= 1.0E-9D) {
+            return hitBox.contains(startVector) ? 0.0D : Double.POSITIVE_INFINITY;
+        }
+        org.bukkit.util.RayTraceResult hit = hitBox.rayTrace(startVector,
+                segment.multiply(1.0D / length), length);
+        return hit == null ? Double.POSITIVE_INFINITY
+                : startVector.distanceSquared(hit.getHitPosition());
+    }
+
     /** Pig's source passive is +250% knockback, i.e. 3.5 times the normal amount. */
     public static final double BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER = 2.5D;
     /** PerkBodySlam applies its 2.0 knockback value as a multiplier to both damage events. */
@@ -773,9 +802,7 @@ public final class ArcadePortRules {
         return 1 + (int) Math.floor(charge * 10.0D / 3.0D);
     }
 
-    public static boolean isBombDirectHit(double distanceSquared) {
-        return distanceSquared >= 0.0D && distanceSquared <= 1.0D;
-    }
+
 
     public static final long GLADIATOR_ROUND_COUNTDOWN_MILLIS = 5_000L;
     public static final long GLADIATOR_POISON_DELAY_MILLIS = 60_000L;
