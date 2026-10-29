@@ -2217,6 +2217,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateBaconBrawl(Session session, long now) {
+        // Advance thrown Bacon Blast items each tick; hunger/escalation stay on the slow cadence.
+        updateBaconBlastProjectiles(session, now);
+        if (active != session) return;
         // Source UpdateType.SLOW runs every 4 seconds. Keep ability contact/expiry checks
         // on every tick, but gate hunger and knockback escalation on that slower cadence.
         updateBaconBrawlAbilities(session, now);
@@ -2503,6 +2506,71 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void updateBaconBlastProjectiles(Session session, long now) {
+        for (UUID blastId : new ArrayList<>(session.baconBlastItems.keySet())) {
+            Item bacon = session.baconBlastItems.get(blastId);
+            if (bacon == null || !bacon.isValid() || bacon.getWorld() != session.world) {
+                removeBaconBlastItem(session, blastId);
+                continue;
+            }
+
+            Location current = bacon.getLocation().clone();
+            Location previous = session.baconBlastLastLocations.getOrDefault(blastId, current).clone();
+            UUID ownerId = session.baconBlastOwners.get(blastId);
+            Player target = null;
+            double bestDistanceSquared = Double.POSITIVE_INFINITY;
+            for (Player candidate : alivePlayers(session)) {
+                if (candidate.getUniqueId().equals(ownerId)) continue;
+                Vector targetCenter = candidate.getLocation().toVector().add(new Vector(0.0D, 0.9D, 0.0D));
+                double distanceSquared = distanceSquaredToSegment(
+                        targetCenter, previous.toVector().clone(), current.toVector().clone());
+                if (ArcadePortRules.isBaconBlastNearPlayer(distanceSquared)
+                        && distanceSquared < bestDistanceSquared) {
+                    target = candidate;
+                    bestDistanceSquared = distanceSquared;
+                }
+            }
+
+            if (target != null) {
+                Player owner = ownerId == null ? null : session.players.get(ownerId);
+                if (owner != null && owner.isOnline() && session.alive.contains(ownerId)) {
+                    handlePlayerHit(session, owner, target, "bacon-blast");
+                }
+                spawnBaconBlastImpact(session, current);
+                removeBaconBlastItem(session, blastId);
+                if (active != session) return;
+                continue;
+            }
+
+            Block currentBlock = current.getBlock();
+            boolean touchingBlock = bacon.isOnGround() || currentBlock.isLiquid() || currentBlock.getType().isSolid();
+            long createdAt = session.baconBlastCreatedAt.getOrDefault(blastId, 0L);
+            if (ArcadePortRules.shouldExpireBaconBlast(now, createdAt, touchingBlock)) {
+                spawnBaconBlastImpact(session, current);
+                removeBaconBlastItem(session, blastId);
+                continue;
+            }
+            session.baconBlastLastLocations.put(blastId, current);
+        }
+    }
+
+    private void spawnBaconBlastImpact(Session session, Location impact) {
+        session.world.spawnParticle(Particle.EXPLOSION, impact, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+        session.world.spawnParticle(Particle.CLOUD, impact, 14, 0.25D, 0.25D, 0.25D, 0.04D);
+        session.world.playSound(impact, Sound.ENTITY_GENERIC_EXPLODE, 0.5F, 1.6F);
+    }
+
+    private void removeBaconBlastItem(Session session, UUID blastId) {
+        Item bacon = session.baconBlastItems.remove(blastId);
+        if (bacon != null) {
+            session.entities.remove(bacon);
+            if (bacon.isValid()) bacon.remove();
+        }
+        session.baconBlastOwners.remove(blastId);
+        session.baconBlastLastLocations.remove(blastId);
+        session.baconBlastCreatedAt.remove(blastId);
+    }
+
     private void useBaconBrawlAbility(Session session, Player player, long now) {
         UUID id = player.getUniqueId();
         String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
@@ -2519,12 +2587,19 @@ public final class ArcadePortManager implements Listener {
         session.baconAbilityReadyAt.put(id, now + cooldown);
         switch (kit) {
             case "mama-piggles": {
-                Snowball bacon = player.launchProjectile(Snowball.class);
-                bacon.setItem(new ItemStack(Material.PORKCHOP, 16));
-                Vector velocity = player.getEyeLocation().getDirection().normalize().multiply(1.0D);
+                Vector direction = player.getEyeLocation().getDirection().normalize();
+                Location launchLocation = player.getEyeLocation().add(direction.clone().multiply(1.5D));
+                Item bacon = player.getWorld().dropItem(launchLocation, new ItemStack(Material.PORKCHOP, 16));
+                bacon.setPickupDelay(Short.MAX_VALUE);
+                Vector velocity = direction.clone().multiply(1.0D);
                 velocity.setY(velocity.getY() + 0.2D);
                 bacon.setVelocity(velocity);
+                UUID blastId = bacon.getUniqueId();
                 session.entities.add(bacon);
+                session.baconBlastItems.put(blastId, bacon);
+                session.baconBlastOwners.put(blastId, id);
+                session.baconBlastCreatedAt.put(blastId, now);
+                session.baconBlastLastLocations.put(blastId, bacon.getLocation().clone());
                 player.playSound(player.getLocation(), Sound.ENTITY_PIG_AMBIENT, 1.0F, 1.5F);
                 player.sendMessage(ChatColor.GREEN + "Bacon Blast!");
                 break;
@@ -4436,6 +4511,10 @@ public final class ArcadePortManager implements Listener {
         session.sheepCarriers.clear();
         session.entities.clear();
         session.baconBabyPigs.clear();
+        session.baconBlastItems.clear();
+        session.baconBlastOwners.clear();
+        session.baconBlastLastLocations.clear();
+        session.baconBlastCreatedAt.clear();
         session.baconLastDamager.clear();
         session.baconLastDamagedAt.clear();
         session.baconPlayerPigs.clear();
@@ -5128,29 +5207,6 @@ public final class ArcadePortManager implements Listener {
                 && event.getEntity() instanceof Arrow microArrow
                 && session.microFletchedArrows.remove(microArrow.getUniqueId())) {
             microArrow.remove();
-            return;
-        }
-
-        if (session.type == ArcadePortGame.BACON_BRAWL
-                && event.getEntity() instanceof Snowball bacon && session.entities.contains(bacon)) {
-            Location impact = bacon.getLocation().clone();
-            Player target = null;
-            if (event.getHitEntity() instanceof Player hitPlayer) {
-                target = hitPlayer;
-            } else if (event.getHitEntity() instanceof LivingEntity avatar) {
-                UUID ownerId = session.baconPigOwners.get(avatar.getUniqueId());
-                if (ownerId != null) target = session.players.get(ownerId);
-            }
-            if (target != null && bacon.getShooter() instanceof Player attacker
-                    && session.alive.contains(attacker.getUniqueId())
-                    && session.alive.contains(target.getUniqueId())) {
-                handlePlayerHit(session, attacker, target, "bacon-blast");
-            }
-            impact.getWorld().spawnParticle(Particle.CLOUD, impact, 14,
-                    0.25D, 0.25D, 0.25D, 0.04D);
-            impact.getWorld().playSound(impact, Sound.ENTITY_GENERIC_EXPLODE, 0.5F, 1.6F);
-            session.entities.remove(bacon);
-            bacon.remove();
             return;
         }
 
@@ -6087,6 +6143,10 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> baconSlams = new HashMap<>();
         final Map<UUID, Long> baconCloakedUntil = new HashMap<>();
         final Map<UUID, UUID> baconBabyPigs = new HashMap<>();
+        final Map<UUID, Item> baconBlastItems = new HashMap<>();
+        final Map<UUID, UUID> baconBlastOwners = new HashMap<>();
+        final Map<UUID, Location> baconBlastLastLocations = new HashMap<>();
+        final Map<UUID, Long> baconBlastCreatedAt = new HashMap<>();
         final Map<UUID, UUID> baconLastDamager = new HashMap<>();
         final Map<UUID, Long> baconLastDamagedAt = new HashMap<>();
         Scoreboard baconDisguiseScoreboard;
