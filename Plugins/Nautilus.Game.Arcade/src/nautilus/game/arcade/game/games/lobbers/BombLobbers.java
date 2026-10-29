@@ -13,6 +13,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Sound;
 import org.bukkit.block.Block;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.TNTPrimed;
@@ -666,18 +667,70 @@ public class BombLobbers extends TeamGame implements IThrown
 		if (!(data.getThrower() instanceof Player))
 			return;
 
+		Player thrower = (Player) data.getThrower();
+
+		// Test-bench bots are ArmorStand-backed disguises rather than Bukkit Players.
+		// Keep their target feedback functional even though they cannot join teams or
+		// receive normal player damage/stat credit.
+		if (isTestBot(target))
+		{
+			showTestBotDirectHit((ArmorStand) target, thrower);
+			return;
+		}
+
 		if (!(target instanceof Player))
 			return;
 
-		if (GetTeam((Player) target) == GetTeam((Player) data.getThrower()))
+		if (GetTeam((Player) target) == GetTeam(thrower))
 			return;
 
 		// Direct-hit confirmation ding, independent of the TNT explosion.
 		target.getWorld().playSound(target.getLocation(), Sound.NOTE_PLING, 1.2F, 1.65F);
 		UtilAction.velocity(target, UtilAlg.getTrajectory2d(data.getThrown().getLocation(), target.getLocation()), .2, false, 0, 0.2, .4, true);
-		Manager.GetDamage().NewDamageEvent(target, data.getThrower(), null, DamageCause.PROJECTILE, 10.0, false, false, false, "Throwing TNT", "Throwing TNT Direct Hit");
+		Manager.GetDamage().NewDamageEvent(target, thrower, null, DamageCause.PROJECTILE, 10.0, false, false, false, "Throwing TNT", "Throwing TNT Direct Hit");
 
-		AddGems((Player) data.getThrower(), 4.0, "Direct Hit", true, true);
+		AddGems(thrower, 4.0, "Direct Hit", true, true);
+	}
+
+	private boolean isTestBot(LivingEntity target)
+	{
+		if (!(target instanceof ArmorStand))
+			return false;
+
+		String name = ((ArmorStand) target).getCustomName();
+		String plain = name == null ? null : ChatColor.stripColor(name);
+		return plain != null && plain.startsWith("Test Bot #");
+	}
+
+	private void showTestBotDirectHit(ArmorStand bot, Player thrower)
+	{
+		Location point = bot.getLocation().clone().add(0.0D, 1.25D, 0.0D);
+		UtilParticle.PlayParticle(ParticleType.CRIT, point, 0.35F, 0.45F, 0.35F, 0.04F, 18, ViewDist.NORMAL);
+		UtilParticle.PlayParticle(ParticleType.LARGE_EXPLODE, point, 0.10F, 0.10F, 0.10F, 0.0F, 1, ViewDist.NORMAL);
+		bot.getWorld().playSound(point, Sound.HURT_FLESH, 0.9F, 1.15F);
+		bot.getWorld().playSound(point, Sound.NOTE_PLING, 1.0F, 1.65F);
+
+		final ArmorStand label = bot.getWorld().spawn(point.clone().add(0.0D, 0.7D, 0.0D), ArmorStand.class);
+		label.setVisible(false);
+		label.setSmall(true);
+		label.setGravity(false);
+		label.setBasePlate(false);
+		label.setArms(false);
+		label.setMarker(true);
+		label.setCanPickupItems(false);
+		label.setCustomName(C.cRed + C.Bold + "DIRECT HIT!");
+		label.setCustomNameVisible(true);
+		Manager.getPlugin().getServer().getScheduler().runTaskLater(Manager.getPlugin(), new Runnable()
+		{
+			@Override
+			public void run()
+			{
+				if (label.isValid() && !label.isDead())
+					label.remove();
+			}
+		}, 10L);
+
+		UtilPlayer.message(thrower, F.main("Game", "Direct hit on " + F.name("Test Bot") + "."));
 	}
 
 	@Override
