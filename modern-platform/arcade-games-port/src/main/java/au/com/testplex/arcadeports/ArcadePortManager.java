@@ -6511,22 +6511,29 @@ public final class ArcadePortManager implements Listener {
             Location previous = session.bombLastLocations.put(bombId, current);
             if (previous == null) previous = current;
 
-            // Direct-hit detection must run before wall/fuse handling so a TNT that
-            // hits a player on the same tick still receives its source-style hit ding.
-            boolean directHit = false;
-            for (Player target : alivePlayers(session)) {
-                if (!ArcadePortRules.shouldCheckBombLobbersDirectHit(
-                        session.bombDirectHitResolved.contains(bombId))) break;
-                UUID targetId = target.getUniqueId();
-                if (targetId.equals(ownerId)) continue;
-                if (!ArcadePortRules.areBombLobbersEnemies(
-                        session.teams.getOrDefault(ownerId, -1),
-                        session.teams.getOrDefault(targetId, -1))) continue;
-                double distanceSquared = distanceSquaredToSegment(target.getLocation(), previous, current);
-                if (!ArcadePortRules.isBombDirectHit(distanceSquared)) continue;
+            // Reborn ray-tests the moving TNT segment against expanded target boxes and
+            // resolves the first collision along the flight, not whichever player is iterated first.
+            Player directTarget = null;
+            double directHitDistanceSquared = Double.POSITIVE_INFINITY;
+            if (ArcadePortRules.shouldCheckBombLobbersDirectHit(
+                    session.bombDirectHitResolved.contains(bombId))) {
+                for (Player target : alivePlayers(session)) {
+                    UUID targetId = target.getUniqueId();
+                    if (targetId.equals(ownerId)) continue;
+                    if (!ArcadePortRules.areBombLobbersEnemies(
+                            session.teams.getOrDefault(ownerId, -1),
+                            session.teams.getOrDefault(targetId, -1))) continue;
+                    double hitDistanceSquared = ArcadePortRules.bombLobbersDirectHitDistanceSquared(
+                            previous, current, target.getBoundingBox());
+                    if (hitDistanceSquared < directHitDistanceSquared) {
+                        directTarget = target;
+                        directHitDistanceSquared = hitDistanceSquared;
+                    }
+                }
+            }
 
-                // Reborn's projectile engine invokes the direct-hit callback only once per tracking flight.
-                // The swept segment means modern high-velocity TNT cannot tunnel through targets.
+            if (directTarget != null) {
+                Player target = directTarget;
                 session.bombDirectHitResolved.add(bombId);
                 Vector away = target.getLocation().toVector().subtract(current.toVector());
                 away.setY(0.0D);
@@ -6547,13 +6554,10 @@ public final class ArcadePortManager implements Listener {
                     target.setHealth(target.getHealth() - directHitDamage);
                 }
                 checkRoundEnd(session);
-                directHit = true;
-                break;
-            }
-            if (directHit || active != session) {
                 if (active != session) return;
                 continue;
             }
+            if (active != session) return;
 
             long createdAt = session.bombCreatedAt.getOrDefault(bombId, now);
             long age = Math.max(0L, now - createdAt);
