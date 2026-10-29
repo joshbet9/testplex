@@ -46,6 +46,11 @@ public final class ArcadePortRules {
         return invincibleUntilMillis > 0L && nowMillis < invincibleUntilMillis;
     }
     public static final long BACON_FLASH_FRIED_MAX_WIN_MILLIS = 60_000L;
+    public static final long BOMB_LOBBERS_ASSIST_WINDOW_MILLIS = 10_000L;
+    public static final int BOMB_LOBBERS_ULTIMATE_KILLER_KILLS = 5;
+    public static final int BOMB_LOBBERS_TWO_BIRDS_KILLS = 2;
+    public static final int BOMB_LOBBERS_TEAM_PLAYER_ASSISTS = 5;
+    public static final int BOMB_LOBBERS_MASTER_BOMBER_WINS = 30;
     public static final int BACON_THREE_FOR_ONE_BODY_SLAM_KILLS = 3;
     /** Pigs In Blankets is earned by six kills in a single game. */
     public static final int BACON_BRAWL_PIGS_IN_BLANKETS_KILLS = 6;
@@ -141,6 +146,26 @@ public final class ArcadePortRules {
 
     public static boolean shouldAwardBaconThreeForOne(int bodySlamKills) {
         return bodySlamKills >= BACON_THREE_FOR_ONE_BODY_SLAM_KILLS;
+    }
+
+    public static boolean shouldAwardBombLobbersUltimateKiller(int killsThisGame) {
+        return killsThisGame >= BOMB_LOBBERS_ULTIMATE_KILLER_KILLS;
+    }
+    public static boolean shouldAwardBombLobbersTwoBirdsOneStone(int killsFromOneTnt) {
+        return killsFromOneTnt >= BOMB_LOBBERS_TWO_BIRDS_KILLS;
+    }
+    public static boolean shouldAwardBombLobbersTeamPlayer(int assistsThisGame) {
+        return assistsThisGame >= BOMB_LOBBERS_TEAM_PLAYER_ASSISTS;
+    }
+    public static boolean shouldAwardBombLobbersDoubleJump(boolean won, boolean aliveAtFinish, boolean usedDoubleJump) {
+        return won && aliveAtFinish && !usedDoubleJump;
+    }
+    public static boolean shouldAwardBombLobbersMasterBomber(int winsAfterCurrentGame) {
+        return winsAfterCurrentGame >= BOMB_LOBBERS_MASTER_BOMBER_WINS;
+    }
+    public static String bombLobbersAchievementConfigKey(java.util.UUID playerId, String achievementSlug) {
+        if (playerId == null || achievementSlug == null || !achievementSlug.matches("[a-z0-9-]+")) return "";
+        return "test-achievements.bomb-lobbers." + playerId + "." + achievementSlug;
     }
 
     /** Suppress vanilla health damage caused synchronously by our non-block-breaking Bacon Blast impact. */

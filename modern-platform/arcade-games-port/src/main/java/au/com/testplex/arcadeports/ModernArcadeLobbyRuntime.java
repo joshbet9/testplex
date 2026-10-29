@@ -22,6 +22,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -59,6 +60,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private final ModernArcadeLobby lobby;
     private final NamespacedKey actionKey, themeKey, botKey, formKey, displayKey, kitNpcKey, teamNpcKey;
     private final Map<String, Bot> bots = new LinkedHashMap<>();
+    private final Map<java.util.UUID, Long> lastBotHitAtByAttacker = new LinkedHashMap<>();
+    private final Map<java.util.UUID, Long> lastBotSwingAtByAttacker = new LinkedHashMap<>();
     private final List<Entity> showcase = new ArrayList<>();
     private final List<Entity> kitNpcs = new ArrayList<>();
     private Entity teamNpc;
@@ -510,10 +513,43 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         Entity entity=e.getEntity();String key=entity.getPersistentDataContainer().get(botKey,PersistentDataType.STRING);
         if(key==null){String tag=entity.getPersistentDataContainer().get(themeKey,PersistentDataType.STRING);if(entity.getPersistentDataContainer().has(kitNpcKey,PersistentDataType.STRING)||entity.getPersistentDataContainer().has(teamNpcKey,PersistentDataType.STRING)||(tag!=null&&tag.startsWith("showcase:")))e.setCancelled(true);return;}
         e.setCancelled(true);if(!(entity instanceof LivingEntity actor)||!(e instanceof EntityDamageByEntityEvent be)||!(be.getDamager() instanceof Player attacker)||!manager.isActiveGame(entity.getWorld(),ArcadePortGame.BACON_BRAWL))return;
-        Vector dir=entity.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0);if(dir.lengthSquared()<0.01)dir=new Vector(0,0,1);
-        actor.setVelocity(dir.normalize().multiply(Math.min(1.5,Math.max(0.65,manager.baconBrawlKnockbackValue(entity.getWorld())))).setY(0.4));Bot b=bots.get(key);
-        if(b!=null){attacker.sendActionBar(ChatColor.GREEN+"Hit bot "+b.name);entity.getWorld().spawnParticle(particle(b.theme),entity.getLocation().add(0,1,0),8,0.4,0.3,0.4,0.01);}
+        Bot b=bots.get(key);if(b==null)return;applyBotHit(b,actor,attacker,e.getDamage());
     }
+    /** Fallback for clients/plugins that suppress the normal entity-damage event for NPC targets. */
+    @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=false)
+    public void onBotAttackSwing(PlayerAnimationEvent event){
+        if(!"ARM_SWING".equals(event.getAnimationType().name()))return;
+        Player attacker=event.getPlayer();
+        if(!manager.isActiveGame(attacker.getWorld(),ArcadePortGame.BACON_BRAWL))return;
+        long now=System.currentTimeMillis();java.util.UUID id=attacker.getUniqueId();
+        if(now-lastBotSwingAtByAttacker.getOrDefault(id,0L)<120L)return;
+        lastBotSwingAtByAttacker.put(id,now);
+        if(now-lastBotHitAtByAttacker.getOrDefault(id,0L)<180L)return;
+        Location eye=attacker.getEyeLocation();Vector direction=eye.getDirection();
+        var result=attacker.getWorld().rayTraceEntities(eye,direction,3.8D,0.45D,
+                candidate->candidate instanceof LivingEntity && candidate.getPersistentDataContainer().has(botKey,PersistentDataType.STRING));
+        if(result==null||!(result.getHitEntity() instanceof LivingEntity actor)||!attacker.hasLineOfSight(actor))return;
+        String key=actor.getPersistentDataContainer().get(botKey,PersistentDataType.STRING);Bot b=key==null?null:bots.get(key);
+        if(b==null||!b.inGame||actor.getWorld()!=attacker.getWorld())return;
+        Bukkit.getScheduler().runTaskLater(plugin,()->{
+            if(!attacker.isOnline()||!actor.isValid()||!manager.isActiveGame(actor.getWorld(),ArcadePortGame.BACON_BRAWL))return;
+            if(System.currentTimeMillis()-lastBotHitAtByAttacker.getOrDefault(id,0L)<250L)return;
+            if(attacker.getLocation().distanceSquared(actor.getLocation())>16.0D||!attacker.hasLineOfSight(actor))return;
+            applyBotHit(b,actor,attacker,2.0D);
+        },1L);
+    }
+
+    private void applyBotHit(Bot bot,LivingEntity actor,Player attacker,double rawDamage){
+        actor.setNoDamageTicks(0);
+        Vector dir=actor.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0);
+        if(dir.lengthSquared()<0.01)dir=new Vector(0,0,1);
+        actor.setVelocity(dir.normalize().multiply(Math.min(1.5,Math.max(0.65,manager.baconBrawlKnockbackValue(actor.getWorld())))).setY(0.4));
+        int meter=manager.recordBaconBrawlBotHit(attacker,bot.name,rawDamage);
+        lastBotHitAtByAttacker.put(attacker.getUniqueId(),System.currentTimeMillis());
+        attacker.sendActionBar(ChatColor.GREEN+"Hit bot "+bot.name+(meter>=0?" | Meter "+meter+"%":""));
+        actor.getWorld().spawnParticle(particle(bot.theme),actor.getLocation().add(0,1,0),8,0.4,0.3,0.4,0.01);
+    }
+
     public void shutdown(){if(task!=null)task.cancel();returnBotsToLobby();for(Entity e:new ArrayList<>(showcase))if(e!=null&&e.isValid())e.remove();for(Entity e:new ArrayList<>(kitNpcs))if(e!=null&&e.isValid())e.remove();if(teamNpc!=null&&teamNpc.isValid())teamNpc.remove();}
 
     private final class Bot{

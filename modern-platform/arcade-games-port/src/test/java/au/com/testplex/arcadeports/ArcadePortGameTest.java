@@ -1447,6 +1447,26 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldSuppressNativeBombLobbersTntDamage(false));
     }
 
+    @Test void bombLobbersAchievementsUseTheRequestedThresholdsAndEligibility() {
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersUltimateKiller(4));
+        assertTrue(ArcadePortRules.shouldAwardBombLobbersUltimateKiller(5));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersTwoBirdsOneStone(1));
+        assertTrue(ArcadePortRules.shouldAwardBombLobbersTwoBirdsOneStone(2));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersTeamPlayer(4));
+        assertTrue(ArcadePortRules.shouldAwardBombLobbersTeamPlayer(5));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersDoubleJump(true, true, true));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersDoubleJump(true, false, false));
+        assertTrue(ArcadePortRules.shouldAwardBombLobbersDoubleJump(true, true, false));
+        assertFalse(ArcadePortRules.shouldAwardBombLobbersMasterBomber(29));
+        assertTrue(ArcadePortRules.shouldAwardBombLobbersMasterBomber(30));
+        assertEquals("test-achievements.bomb-lobbers.00000000-0000-0000-0000-000000000001.ultimate-killer",
+                ArcadePortRules.bombLobbersAchievementConfigKey(
+                        java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"), "ultimate-killer"));
+        assertEquals("", ArcadePortRules.bombLobbersAchievementConfigKey(null, "ultimate-killer"));
+        assertEquals("", ArcadePortRules.bombLobbersAchievementConfigKey(
+                java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"), "../unsafe"));
+    }
+
     @Test void bombLobbersTntIsCancelledForOfflineThrowerOrOwnSide() {
         assertTrue(ArcadePortRules.shouldCancelBombLobbersExplosion(false, 0, 1));
         assertTrue(ArcadePortRules.shouldCancelBombLobbersExplosion(true, 0, 0));
