@@ -454,6 +454,15 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldPrimeBombLobbersBomb(8_000L, false));
     }
 
+    @Test void bombLobbersWallerUsesLegacyCardinalFacing() {
+        assertEquals(2, ArcadePortRules.bombLobbersWallFacingIndex(0.0F));
+        assertEquals(3, ArcadePortRules.bombLobbersWallFacingIndex(90.0F));
+        assertEquals(0, ArcadePortRules.bombLobbersWallFacingIndex(180.0F));
+        assertEquals(1, ArcadePortRules.bombLobbersWallFacingIndex(270.0F));
+        assertEquals(2, ArcadePortRules.bombLobbersWallFacingIndex(Float.NaN));
+        assertEquals(2, ArcadePortRules.bombLobbersWallFacingIndex(360.0F));
+    }
+
     @Test void bombLobbersWallerRespectsSourceShortPlacementCooldown() {
         assertEquals(100L, ArcadePortRules.BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS);
         assertTrue(ArcadePortRules.isBombLobbersWallerReady(1_000L, 0L));
