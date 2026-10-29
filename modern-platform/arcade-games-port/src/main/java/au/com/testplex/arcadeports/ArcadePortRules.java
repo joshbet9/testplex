@@ -522,8 +522,14 @@ public final class ArcadePortRules {
         return pairCount > 0 && resolvedPairs >= pairCount;
     }
 
-    public static long nextBaconKnockbackInterval(long currentMillis) {
-        return Math.max(0L, currentMillis - 5_000L);
+    public static final int BACON_BRAWL_MAX_KNOCKBACK_ESCALATIONS = 2;
+    public static final long BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS = 20_000L;
+    /** At most two source escalations; make the remaining escalation faster in a two-player endgame. */
+    public static long nextBaconKnockbackInterval(int completedEscalations, int alivePlayers) {
+        if (completedEscalations <= 0) return BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
+        if (completedEscalations >= BACON_BRAWL_MAX_KNOCKBACK_ESCALATIONS) return 0L;
+        return alivePlayers <= 2 ? BACON_BRAWL_ENDGAME_ESCALATION_DELAY_MILLIS
+                : BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
     }
 
     /** Test a player against a world border whose centre may not be at world origin. */
