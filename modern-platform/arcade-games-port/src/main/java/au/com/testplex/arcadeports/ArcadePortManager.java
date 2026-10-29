@@ -4400,16 +4400,6 @@ public final class ArcadePortManager implements Listener {
      * modes, a personal high score must not announce a losing team as winner.
      */
     private Player timeoutWinner(Session session) {
-        if (session.type == ArcadePortGame.BACON_BRAWL) {
-            List<Player> eligible = session.players.values().stream()
-                    .filter(player -> player != null && player.isOnline())
-                    .toList();
-            List<Integer> kills = eligible.stream()
-                    .map(player -> session.scores.getOrDefault(player.getUniqueId(), 0))
-                    .toList();
-            int leader = ArcadePortRules.baconBrawlUniqueLeaderIndex(kills);
-            return leader < 0 ? null : eligible.get(leader);
-        }
         if (session.type == ArcadePortGame.DEATH_TAG) {
             List<Player> runners = alivePlayers(session).stream()
                     .filter(player -> !session.tagged.contains(player.getUniqueId()))
