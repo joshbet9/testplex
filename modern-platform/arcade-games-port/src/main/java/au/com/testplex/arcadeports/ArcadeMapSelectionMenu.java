@@ -80,7 +80,7 @@ public final class ArcadeMapSelectionMenu implements Listener {
 
         ItemStack pageInfo = createItem(Material.MAP,
                 ChatColor.AQUA + "Page " + (page + 1) + "/" + pageCount,
-                ChatColor.GRAY + maps.size() + " authentic maps available for " + game.displayName() + ".");
+                ChatColor.GRAY.toString() + maps.size() + " authentic maps available for " + game.displayName() + ".");
         inventory.setItem(49, pageInfo);
 
         if (page > 0) {
