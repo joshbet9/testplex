@@ -782,8 +782,10 @@ public final class ArcadePortManager implements Listener {
     private List<Location> spawnLocations(ArcadePortGame type, int count) {
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(type.id());
         if (sourceMap != null && type == ArcadePortGame.BACON_BRAWL) {
-            // Bacon Brawl's source maps define individual starts as GREEN data points.
-            List<Location> authoredSpawns = sourceMap.dataLocations("GREEN");
+            // The archived Mighty Lava Arena stores the 16 free-for-all starts in TEAM_NAME:Green /
+            // TEAM_SPAWNS, rather than under DATA_LOCS. Prefer that authored spawn group.
+            List<Location> authoredSpawns = sourceMap.teamSpawnLocationsForName("Green");
+            if (authoredSpawns.isEmpty()) authoredSpawns = sourceMap.dataLocations("GREEN");
             if (!authoredSpawns.isEmpty()) {
                 List<Location> chosen = new ArrayList<>();
                 for (int i = 0; i < Math.max(1, count); i++) {
