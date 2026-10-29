@@ -605,6 +605,12 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldKeepBombLobbersBombTracked(false));
     }
 
+    @Test void bombLobbersTeamBadgeUsesTheSourceTeamNameRatherThanTheParticleColour() {
+        assertEquals("Red", ArcadePortRules.bombLobbersTeamBadgeName(0));
+        assertEquals("Blue", ArcadePortRules.bombLobbersTeamBadgeName(1));
+        assertEquals("Red", ArcadePortRules.bombLobbersTeamBadgeName(-1));
+    }
+
     @Test void bombLobbersJumperAndWallerInheritTheLegacyTeamArmorModule() {
         assertTrue(ArcadePortRules.bombLobbersKitUsesTeamArmor("jumper"));
         assertTrue(ArcadePortRules.bombLobbersKitUsesTeamArmor("waller"));

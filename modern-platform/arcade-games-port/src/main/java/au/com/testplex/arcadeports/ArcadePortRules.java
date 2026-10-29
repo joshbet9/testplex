@@ -233,6 +233,11 @@ public final class ArcadePortRules {
                 || nowMillis - createdAtMillis >= BACON_BLAST_MAX_FLIGHT_MILLIS;
     }
     public static final long BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS = 3_000L;
+    /** GameTeam.GetFormattedName() colours the configured "Red"/"Blue" team name. */
+    public static String bombLobbersTeamBadgeName(int teamId) {
+        return teamId == 1 ? "Blue" : "Red";
+    }
+
     /** The source spectator-compass menu rate-limits direct teleports for three seconds. */
     public static final long BOMB_LOBBERS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS = 3_000L;
 

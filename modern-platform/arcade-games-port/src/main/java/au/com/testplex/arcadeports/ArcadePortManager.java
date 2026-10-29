@@ -2201,7 +2201,7 @@ public final class ArcadePortManager implements Listener {
         if (badgeMeta != null) {
             badgeMeta.setColor(teamColor);
             badgeMeta.setDisplayName(chatColor + "" + ChatColor.BOLD
-                    + (team == 1 ? "Aqua Team" : "Red Team"));
+                    + ArcadePortRules.bombLobbersTeamBadgeName(team));
             badgeMeta.setUnbreakable(true);
             teamBadge.setItemMeta(badgeMeta);
         }
@@ -2213,7 +2213,10 @@ public final class ArcadePortManager implements Listener {
         ItemMeta meta = item.getItemMeta();
         if (meta == null || !meta.hasDisplayName()) return false;
         String name = ChatColor.stripColor(meta.getDisplayName());
-        return "Team Armor".equals(name) || "Red Team".equals(name) || "Aqua Team".equals(name);
+        // The source badge's displayed name is the configured map team name (e.g. Red/Blue),
+        // whereas all four pieces of actual team armour are named Team Armor.
+        return "Team Armor".equals(name)
+                || (item.getType() == Material.LEATHER_CHESTPLATE && meta.isUnbreakable());
     }
 
     private ItemStack bombLobbersTeamArmorPiece(Material material, Color teamColor, ChatColor chatColor) {
@@ -6919,7 +6922,7 @@ public final class ArcadePortManager implements Listener {
             session.bombLastLocations.put(bomb.getUniqueId(), spawn.clone());
             session.bombCreatedAt.put(bomb.getUniqueId(), System.currentTimeMillis());
             session.bombPrimed.remove(bomb.getUniqueId());
-            player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.9F, 1.0F);
+            // The native TNTPrimed entity already plays the legacy fuse sound; do not add a second throw sound.
         } else if (session.type == ArcadePortGame.EVOLUTION
                 && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 1 && item == Material.FIRE_CHARGE) {
             event.setCancelled(true);
@@ -7793,7 +7796,7 @@ public final class ArcadePortManager implements Listener {
         player.setVelocity(velocity);
         session.bombDoubleJumpReadyAt.put(id,
                 ArcadePortRules.nextBombLobbersDoubleJumpReadyAt(System.currentTimeMillis()));
-        player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.7F, 1.3F);
+        player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.7F, 1.3F);
     }
 
     /** Finds the first non-passable/liquid block cell crossed by the projectile's previous-to-current path. */
