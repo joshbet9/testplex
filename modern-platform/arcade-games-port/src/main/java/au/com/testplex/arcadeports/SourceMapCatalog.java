@@ -278,6 +278,18 @@ public final class SourceMapCatalog {
             return result;
         }
 
+        /** Get source TEAM_SPAWNS locations for a named WorldConfig team, such as Bacon Brawl's Green starts. */
+        public List<Location> teamSpawnLocationsForName(String teamName) {
+            if (teamName == null) return new ArrayList<>();
+            List<Location> matches = new ArrayList<>();
+            for (Map.Entry<String, List<Location>> entry : teamSpawns.entrySet()) {
+                if (entry.getKey().equalsIgnoreCase(teamName)) {
+                    for (Location location : entry.getValue()) matches.add(location.clone());
+                }
+            }
+            return matches;
+        }
+
         /** Resolve familiar source group names while preserving source order as a fallback. */
         public static int teamIndexForGroup(String teamName, int groupIndex, int teamCount) {
             int teams = Math.max(1, teamCount);
