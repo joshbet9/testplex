@@ -1163,8 +1163,10 @@ class ArcadePortGameTest {
     @Test void bombLobbersExplosionAppliesOriginalStoneConversions() {
         assertEquals(Material.COBBLESTONE,
                 ArcadePortRules.bombLobbersBlockAfterExplosion(Material.STONE));
-        assertEquals(Material.COBBLESTONE,
+        assertEquals(Material.AIR,
                 ArcadePortRules.bombLobbersBlockAfterExplosion(Material.DIORITE));
+        assertEquals(Material.AIR,
+                ArcadePortRules.bombLobbersBlockAfterExplosion(Material.POLISHED_GRANITE));
         assertEquals(Material.CRACKED_STONE_BRICKS,
                 ArcadePortRules.bombLobbersBlockAfterExplosion(Material.STONE_BRICKS));
         assertEquals(Material.CRACKED_STONE_BRICKS,
