@@ -25,6 +25,10 @@ public final class ArcadePortRules {
     public static final int RUNNER_FROSTBALL_SLOW_TICKS = 40;
     public static final int RUNNER_FROSTBALL_SLOW_AMPLIFIER = 2;
     /** Meter charge comes from the source damage value recorded for each successful hit. */
+    /** Original Reborn kit cooldowns; meter charge adds power but does not bypass recharge. */
+    public static final long BACON_BODY_SLAM_COOLDOWN_MILLIS = 8_000L;
+    public static final long BACON_BLAST_COOLDOWN_MILLIS = 3_000L;
+    public static final long BACON_SHEEP_CLOAK_COOLDOWN_MILLIS = 10_000L;
     public static final int BACON_METER_MAX = 100;
     public static final int BACON_METER_MIN_ABILITY = 10;
     public static final double BACON_METER_GAIN_PER_DAMAGE = 5.0D;
@@ -41,6 +45,15 @@ public final class ArcadePortRules {
     public static final int BACON_THREE_FOR_ONE_BODY_SLAM_KILLS = 3;
     /** Pigs In Blankets is earned by six kills in a single game. */
     public static final int BACON_BRAWL_PIGS_IN_BLANKETS_KILLS = 6;
+
+    public static long baconBrawlAbilityCooldownMillis(String requestedKit) {
+        return switch (normalizeBaconBrawlKit(requestedKit)) {
+            case "mama-piggles" -> BACON_BLAST_COOLDOWN_MILLIS;
+            case "pig" -> BACON_SHEEP_CLOAK_COOLDOWN_MILLIS;
+            case "el-muchacho-pigo" -> BACON_BODY_SLAM_COOLDOWN_MILLIS;
+            default -> 0L;
+        };
+    }
 
     public static int baconMeterGainForDamage(double damage) {
         if (!Double.isFinite(damage) || damage <= 0.0D) return 0;
