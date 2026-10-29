@@ -486,13 +486,11 @@ class ArcadePortGameTest {
         assertEquals(16, ArcadePortRules.BACON_BLAST_PROJECTILE_STACK_SIZE);
     }
 
-    @Test void baconBrawlAbilitiesKeepOriginalKitCooldownsAlongsideMeterCharge() {
-        assertEquals(8_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("el-muchacho-pigo"));
-        assertEquals(8_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("body slam"));
-        assertEquals(3_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("mama-piggles"));
-        assertEquals(3_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("mama-pig"));
-        assertEquals(10_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("pig"));
-        assertEquals(10_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("sheep-pig"));
+    @Test void baconBrawlAbilitiesAreMeterGatedWithoutTimeCooldowns() {
+        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("el-muchacho-pigo"));
+        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("mama-piggles"));
+        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("pig"));
+        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("sheep-pig"));
         assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("chris-p-bacon"));
         assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("unknown"));
         assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis(null));
@@ -565,9 +563,9 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.canUseBaconMeterAbility(10));
         assertEquals(0.55D, ArcadePortRules.baconBodySlamMeterMultiplier(10), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.baconBodySlamMeterMultiplier(100), 0.00001D);
-        assertEquals(0L, ArcadePortRules.baconSheepCloakDurationMillis(9));
-        assertEquals(1_175L, ArcadePortRules.baconSheepCloakDurationMillis(15));
-        assertEquals(5_000L, ArcadePortRules.baconSheepCloakDurationMillis(100));
+        assertEquals(0L, ArcadePortRules.baconPigInvincibilityDurationMillis(9));
+        assertEquals(1_175L, ArcadePortRules.baconPigInvincibilityDurationMillis(15));
+        assertEquals(5_000L, ArcadePortRules.baconPigInvincibilityDurationMillis(100));
         assertEquals(0.65D, ArcadePortRules.baconBlastPowerMultiplier(10), 0.00001D);
         assertEquals(2.0D, ArcadePortRules.baconBlastPowerMultiplier(100), 0.00001D);
     }
@@ -584,23 +582,18 @@ class ArcadePortGameTest {
         assertEquals(1.0D, ArcadePortRules.baconTimedHitKnockbackMultiplier(1_401L), 0.00001D);
     }
 
-    @Test void baconSheepPigCloakEndsOnEveryDamageCauseIncludingSuppressedFireAndExplosion() {
-        assertTrue(ArcadePortRules.shouldEndBaconSheepCloakOnDamageCause(
-                org.bukkit.event.entity.EntityDamageEvent.DamageCause.FIRE_TICK));
-        assertTrue(ArcadePortRules.shouldEndBaconSheepCloakOnDamageCause(
-                org.bukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_EXPLOSION));
-        assertTrue(ArcadePortRules.shouldEndBaconSheepCloakOnDamageCause(
-                org.bukkit.event.entity.EntityDamageEvent.DamageCause.FALL));
-        assertTrue(ArcadePortRules.shouldEndBaconSheepCloakOnDamageCause(
-                org.bukkit.event.entity.EntityDamageEvent.DamageCause.ENTITY_ATTACK));
-        assertFalse(ArcadePortRules.shouldEndBaconSheepCloakOnDamageCause(null));
-    }
 
-    @Test void baconSheepPigGetsCloakRatherThanDamageInvincibility() {
-        assertEquals(500L, ArcadePortRules.BACON_SHEEP_CLOAK_MIN_MILLIS);
-        assertEquals(5_000L, ArcadePortRules.BACON_SHEEP_CLOAK_MAX_MILLIS);
-        assertEquals(5_000L, ArcadePortRules.baconSheepCloakDurationMillis(100));
-        assertEquals(10_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("sheep-pig"));
+    @Test void baconPigInvincibilityIsMeterScaledAndHasNoCooldown() {
+        assertEquals(500L, ArcadePortRules.BACON_PIG_INVINCIBILITY_MIN_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.BACON_PIG_INVINCIBILITY_MAX_MILLIS);
+        assertEquals(0L, ArcadePortRules.baconPigInvincibilityDurationMillis(9));
+        assertEquals(1_175L, ArcadePortRules.baconPigInvincibilityDurationMillis(15));
+        assertEquals(5_000L, ArcadePortRules.baconPigInvincibilityDurationMillis(100));
+        assertEquals(0L, ArcadePortRules.baconBrawlAbilityCooldownMillis("pig"));
+        assertTrue(ArcadePortRules.isBaconInvincibilityActive(1_000L, 1_001L));
+        assertFalse(ArcadePortRules.isBaconInvincibilityActive(1_001L, 1_001L));
+        assertFalse(ArcadePortRules.isBaconInvincibilityActive(1_002L, 1_001L));
+        assertFalse(ArcadePortRules.isBaconInvincibilityActive(1_000L, 0L));
     }
 
     @Test void baconBrawlPacketAvatarHitsRequireReachLineOfSightAndLivingPlayers() {
@@ -632,12 +625,8 @@ class ArcadePortGameTest {
         assertEquals("", ArcadePortRules.baconBrawlAchievementConfigKey(playerId, "../flash-fried"));
     }
 
-    @Test void baconBrawlWinMilestoneUnlocksOnTheFifteenthWin() {
-        assertEquals(15, ArcadePortRules.BACON_BRAWL_WINS_ACHIEVEMENT_REQUIRED);
-        assertFalse(ArcadePortRules.shouldAwardBaconBrawlWinsMilestone(0));
-        assertFalse(ArcadePortRules.shouldAwardBaconBrawlWinsMilestone(14));
-        assertTrue(ArcadePortRules.shouldAwardBaconBrawlWinsMilestone(15));
-        assertTrue(ArcadePortRules.shouldAwardBaconBrawlWinsMilestone(16));
+    @Test void baconBrawlFifteenWinsRemainAMilestoneNotAnAchievement() {
+        assertEquals(15, ArcadePortRules.BACON_BRAWL_WINS_MILESTONE_REQUIRED);
     }
 
     @Test void baconBrawlUsesTheRequestedThreeAchievements() {

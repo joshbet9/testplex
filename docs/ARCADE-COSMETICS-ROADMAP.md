@@ -35,9 +35,9 @@ The list is the planned scope recorded here; verify it against the actual rotati
 For every game, the **cosmetic** is the player-selectable appearance or effect used during normal play. The **win effect** is a short, staged gameplay-style sequence using the existing map and mechanics to celebrate the winner. These are separate features and should be tracked and tested separately.
 
 ### Bacon Brawl
-- **Cosmetics:** Accessories for pigs and sheep to wear.
+- **Cosmetic line:** Ability-linked visual effects rather than worn accessories: a Soul Fire Flame Bacon Blast trail, electric-spark Body Slam trail, and glowing/totem-particle signal while Pig invincibility is active.
 - **Win effect:** Torpedo/body-slam into four players, sending them flying off the edge.
-- **Implementation notes:** Reuse the game's existing pig/sheep entities and collision/knockback mechanics. Accessories must remain cosmetic and must not alter hitboxes or combat behaviour.
+- **Implementation notes:** Reuse the game's existing projectiles, ability timing and pig/sheep avatars. Visual effects must not change hitboxes, knockback, ability duration or match outcomes; selectable cosmetic variants can be layered on later.
 
 ### Bomb Lobbers
 - **Cosmetics:** TNT explosion/impact effects.

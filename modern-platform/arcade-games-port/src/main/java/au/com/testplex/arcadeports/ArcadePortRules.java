@@ -25,11 +25,7 @@ public final class ArcadePortRules {
     public static final int RUNNER_FROSTBALL_SLOW_TICKS = 40;
     public static final int RUNNER_FROSTBALL_SLOW_AMPLIFIER = 2;
     /** Meter charge comes from the source damage value recorded for each successful hit. */
-    /** Original Reborn kit cooldowns; meter charge adds power but does not bypass recharge. */
-    public static final long BACON_BODY_SLAM_COOLDOWN_MILLIS = 8_000L;
-    public static final long BACON_BLAST_COOLDOWN_MILLIS = 3_000L;
     public static final int BACON_BLAST_PROJECTILE_STACK_SIZE = 16;
-    public static final long BACON_SHEEP_CLOAK_COOLDOWN_MILLIS = 10_000L;
     public static final int BACON_METER_MAX = 100;
     public static final int BACON_METER_MIN_ABILITY = 10;
     public static final double BACON_METER_GAIN_PER_DAMAGE = 5.0D;
@@ -40,31 +36,23 @@ public final class ArcadePortRules {
     public static final long BACON_TIMED_HIT_OK_MAX_MILLIS = 499L;
     public static final long BACON_TIMED_HIT_LATE_MAX_MILLIS = 1_400L;
     public static final long BACON_HIT_FEEDBACK_MILLIS = 1_000L;
-    /** Reborn ends Sheep Pig Cloak on any accepted damage event, including fire ticks and explosions. */
-    public static boolean shouldEndBaconSheepCloakOnDamageCause(
-            org.bukkit.event.entity.EntityDamageEvent.DamageCause cause) {
-        return cause != null;
-    }
+    /** The Pig kit's damage meter controls its invincibility window, capped at five seconds. */
+    public static final long BACON_PIG_INVINCIBILITY_MIN_MILLIS = 500L;
+    public static final long BACON_PIG_INVINCIBILITY_MAX_MILLIS = 5_000L;
 
-    /** Source Sheep Pig Cloak lasts five seconds; the requested meter scales its duration below that cap. */
-    public static final long BACON_SHEEP_CLOAK_MIN_MILLIS = 500L;
-    public static final long BACON_SHEEP_CLOAK_MAX_MILLIS = 5_000L;
+    public static boolean isBaconInvincibilityActive(long nowMillis, long invincibleUntilMillis) {
+        return invincibleUntilMillis > 0L && nowMillis < invincibleUntilMillis;
+    }
     public static final long BACON_FLASH_FRIED_MAX_WIN_MILLIS = 60_000L;
     public static final int BACON_THREE_FOR_ONE_BODY_SLAM_KILLS = 3;
     /** Pigs In Blankets is earned by six kills in a single game. */
     public static final int BACON_BRAWL_PIGS_IN_BLANKETS_KILLS = 6;
-    /** User-selected milestone: award a persistent achievement at 15 Bacon Brawl wins. */
-    public static final int BACON_BRAWL_WINS_ACHIEVEMENT_REQUIRED = 15;
+    /** Existing progression milestone threshold; do not also award a separate game achievement. */
+    public static final int BACON_BRAWL_WINS_MILESTONE_REQUIRED = 15;
 
+    /** Supported Bacon Brawl abilities are gated by earned meter, not a wall-clock cooldown. */
     public static long baconBrawlAbilityCooldownMillis(String requestedKit) {
-        String kit = normalizeBaconBrawlKit(requestedKit);
-        if (kit == null) return 0L;
-        return switch (kit) {
-            case "mama-piggles" -> BACON_BLAST_COOLDOWN_MILLIS;
-            case "pig" -> BACON_SHEEP_CLOAK_COOLDOWN_MILLIS;
-            case "el-muchacho-pigo" -> BACON_BODY_SLAM_COOLDOWN_MILLIS;
-            default -> 0L;
-        };
+        return normalizeBaconBrawlKit(requestedKit) == null ? 0L : 0L;
     }
 
     public static int baconMeterGainForDamage(double damage) {
@@ -88,13 +76,13 @@ public final class ArcadePortRules {
         return 0.5D + charge / 200.0D;
     }
 
-    /** Sheep Pig spends meter on Cloak, with the Reborn five-second duration as the maximum. */
-    public static long baconSheepCloakDurationMillis(int percent) {
+    /** Pig spends meter on invincibility; higher charge gives a longer defensive window. */
+    public static long baconPigInvincibilityDurationMillis(int percent) {
         int charge = Math.max(0, Math.min(BACON_METER_MAX, percent));
         if (!canUseBaconMeterAbility(charge)) return 0L;
-        return BACON_SHEEP_CLOAK_MIN_MILLIS
-                + Math.round((BACON_SHEEP_CLOAK_MAX_MILLIS
-                        - BACON_SHEEP_CLOAK_MIN_MILLIS) * charge / (double) BACON_METER_MAX);
+        return BACON_PIG_INVINCIBILITY_MIN_MILLIS
+                + Math.round((BACON_PIG_INVINCIBILITY_MAX_MILLIS
+                        - BACON_PIG_INVINCIBILITY_MIN_MILLIS) * charge / (double) BACON_METER_MAX);
     }
 
     /** Mama Piggles spends meter to set Bacon Blast launch and impact power. */
@@ -141,10 +129,6 @@ public final class ArcadePortRules {
 
     public static boolean shouldAwardBaconPigsInBlankets(int killsThisGame) {
         return killsThisGame >= BACON_BRAWL_PIGS_IN_BLANKETS_KILLS;
-    }
-
-    public static boolean shouldAwardBaconBrawlWinsMilestone(int totalWins) {
-        return totalWins >= BACON_BRAWL_WINS_ACHIEVEMENT_REQUIRED;
     }
 
     public static boolean shouldAwardBaconFlashFried(long roundMillis) {

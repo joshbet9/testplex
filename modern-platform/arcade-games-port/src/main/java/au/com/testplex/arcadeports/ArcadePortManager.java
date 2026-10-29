@@ -2491,7 +2491,7 @@ public final class ArcadePortManager implements Listener {
         String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
         String ability = switch (kit) {
             case "mama-piggles" -> "Bacon Blast power";
-            case "pig" -> "Cloak duration";
+            case "pig" -> "Invincibility duration";
             default -> "Body Slam strength";
         };
         String displayName = ChatColor.GOLD + "Ability Meter: " + percent + "%";
@@ -2628,12 +2628,13 @@ public final class ArcadePortManager implements Listener {
             avatar.teleport(owner.getLocation());
         }
         avatar.setRotation(owner.getLocation().getYaw(), 0.0F);
-        Long cloakedUntil = session.baconCloakedUntil.get(ownerId);
-        if (cloakedUntil != null && now < cloakedUntil) {
-            int remainingTicks = (int) Math.max(1L, Math.min(Integer.MAX_VALUE, (cloakedUntil - now + 49L) / 50L));
-            avatar.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, remainingTicks, 0, false, false, false));
-        } else {
-            avatar.removePotionEffect(PotionEffectType.INVISIBILITY);
+        Long invincibleUntil = session.baconInvincibleUntil.get(ownerId);
+        boolean invincible = invincibleUntil != null
+                && ArcadePortRules.isBaconInvincibilityActive(now, invincibleUntil);
+        avatar.setGlowing(invincible);
+        if (invincible && session.ticks % 4 == 0) {
+            session.world.spawnParticle(Particle.TOTEM_OF_UNDYING,
+                    avatar.getLocation().add(0.0D, 0.5D, 0.0D), 2, 0.25D, 0.25D, 0.25D, 0.01D);
         }
     }
 
@@ -2671,8 +2672,13 @@ public final class ArcadePortManager implements Listener {
             if (invisible == null || invisible.getDuration() < 20) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 40, 0, false, false, false));
             }
-            Long cloakedUntil = session.baconCloakedUntil.get(id);
-            if (cloakedUntil != null && now >= cloakedUntil) clearBaconCloak(session, id);
+            Long invincibleUntil = session.baconInvincibleUntil.get(id);
+            if (invincibleUntil != null && now >= invincibleUntil) {
+                session.baconInvincibleUntil.remove(id);
+                player.removePotionEffect(PotionEffectType.RESISTANCE);
+                LivingEntity avatar = baconPlayerAvatar(session, id);
+                if (avatar != null) avatar.setGlowing(false);
+            }
             updateBaconPlayerPig(session, player, now);
             updateBaconMeterItem(session, player);
             if ("mama-piggles".equals(kit)) {
@@ -3012,16 +3018,7 @@ public final class ArcadePortManager implements Listener {
                     + ArcadePortRules.BACON_METER_MIN_ABILITY + "% charge.");
             return;
         }
-        long readyAt = session.baconAbilityReadyAt.getOrDefault(id, 0L);
-        if (now < readyAt) {
-            long secondsRemaining = Math.max(1L, (readyAt - now + 999L) / 1_000L);
-            player.sendMessage(ChatColor.YELLOW + "Ability recharges in " + secondsRemaining + "s.");
-            return;
-        }
-        long cooldown = ArcadePortRules.baconBrawlAbilityCooldownMillis(kit);
-        if (cooldown <= 0L) return;
-
-        session.baconAbilityReadyAt.put(id, now + cooldown);
+        // Abilities are gated only by earned damage meter, never by a wall-clock cooldown.
         session.baconAbilitiesUsed.add(id);
         session.baconMeters.put(id, 0);
         updateBaconMeterItem(session, player);
@@ -3052,16 +3049,18 @@ public final class ArcadePortManager implements Listener {
                 break;
             }
             case "pig": {
-                long duration = ArcadePortRules.baconSheepCloakDurationMillis(charge);
-                clearBaconCloak(session, id);
-                session.baconCloakedUntil.put(id, now + duration);
+                long duration = ArcadePortRules.baconPigInvincibilityDurationMillis(charge);
+                session.baconInvincibleUntil.put(id, now + duration);
+                int ticks = (int) Math.max(1L, (duration + 49L) / 50L);
+                player.addPotionEffect(new PotionEffect(
+                        PotionEffectType.RESISTANCE, ticks, 4, false, false, true));
                 LivingEntity avatar = baconPlayerAvatar(session, id);
-                if (avatar != null) {
-                    int ticks = (int) Math.max(1L, (duration + 49L) / 50L);
-                    avatar.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, ticks, 0, false, false, false));
-                }
-                player.getWorld().playSound(player.getLocation(), Sound.ENTITY_SHEEP_SHEAR, 1.0F, 0.5F);
-                player.sendMessage(ChatColor.GREEN + "Cloak activated for "
+                if (avatar != null) avatar.setGlowing(true);
+                player.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING,
+                        player.getLocation().add(0.0D, 1.0D, 0.0D),
+                        Math.max(8, charge / 3), 0.45D, 0.65D, 0.45D, 0.02D);
+                player.getWorld().playSound(player.getLocation(), Sound.ITEM_TOTEM_USE, 0.9F, 1.3F);
+                player.sendMessage(ChatColor.GREEN + "Invincibility active for "
                         + String.format(java.util.Locale.ROOT, "%.1f", duration / 1000.0D) + " seconds.");
                 break;
             }
@@ -3079,14 +3078,6 @@ public final class ArcadePortManager implements Listener {
                 player.sendMessage(ChatColor.GREEN + "Body Slam charged to " + charge + "%!");
                 break;
             }
-        }
-    }
-
-    private void clearBaconCloak(Session session, UUID playerId) {
-        boolean wasCloaked = session.baconCloakedUntil.remove(playerId) != null;
-        if (wasCloaked) {
-            LivingEntity avatar = baconPlayerAvatar(session, playerId);
-            if (avatar != null) avatar.removePotionEffect(PotionEffectType.INVISIBILITY);
         }
     }
 
@@ -3111,8 +3102,17 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         UUID attackerId = attacker.getUniqueId();
         UUID targetId = target.getUniqueId();
-        clearBaconCloak(session, attackerId);
-        clearBaconCloak(session, targetId);
+        long targetInvincibleUntil = session.baconInvincibleUntil.getOrDefault(targetId, 0L);
+        if (ArcadePortRules.isBaconInvincibilityActive(now, targetInvincibleUntil)) {
+            attacker.sendActionBar(ChatColor.RED + "BLOCKED " + ChatColor.GRAY + "| target is invincible");
+            target.sendActionBar(ChatColor.GOLD + "INVINCIBLE"
+                    + ChatColor.WHITE + " | " + ChatColor.GREEN
+                    + Math.max(0L, (targetInvincibleUntil - now + 999L) / 1_000L) + "s");
+            target.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING,
+                    target.getLocation().add(0.0D, 1.0D, 0.0D), 8, 0.35D, 0.45D, 0.35D, 0.01D);
+            target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.7F, 1.5F);
+            return;
+        }
         session.baconLastDamager.put(targetId, attackerId);
         session.baconLastDamagedAt.put(targetId, now);
         session.baconLastHitSource.put(targetId, source);
@@ -4260,12 +4260,11 @@ public final class ArcadePortManager implements Listener {
             session.baconLastDamager.remove(playerId);
             session.baconLastDamagedAt.remove(playerId);
             session.baconLastHitSource.remove(playerId);
-            clearBaconCloak(session, playerId);
             removeBaconBabyPig(session, playerId);
             removeBaconPlayerPig(session, playerId);
             session.baconSlams.remove(playerId);
             session.baconSlamPowerPercent.remove(playerId);
-            session.baconCloakedUntil.remove(playerId);
+            session.baconInvincibleUntil.remove(playerId);
             if (!session.alive.remove(playerId)) return;
             if (killer != null && session.scores.containsKey(killer.getUniqueId())) {
                 int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
@@ -4286,9 +4285,7 @@ public final class ArcadePortManager implements Listener {
             checkRoundEnd(session);
             return;
         }
-        if (session.type == ArcadePortGame.BACON_BRAWL) {
-            clearBaconCloak(session, player.getUniqueId());
-        }
+        
         if (session.type == ArcadePortGame.SHEEP_QUEST && session.alive.contains(player.getUniqueId())) {
             dropSheepFromCarrier(session, player, reason);
             if (!session.alive.remove(player.getUniqueId())) return;
@@ -5038,6 +5035,10 @@ public final class ArcadePortManager implements Listener {
             PlayerSnapshot snapshot = session.snapshots.get(entry.getKey());
             if (snapshot == null) continue;
             if (player != null && player.isOnline()) {
+                if (session.type == ArcadePortGame.BACON_BRAWL) {
+                    player.removePotionEffect(PotionEffectType.RESISTANCE);
+                    session.baconInvincibleUntil.remove(entry.getKey());
+                }
                 if (session.type == ArcadePortGame.BACON_BRAWL
                         && isBaconCompassMenuTitle(player.getOpenInventory().getTitle())) {
                     player.closeInventory();
@@ -5059,7 +5060,7 @@ public final class ArcadePortManager implements Listener {
         session.baconLastHitSource.clear();
         session.baconMeters.clear();
         session.baconAbilitiesUsed.clear();
-        session.baconAbilityReadyAt.clear();
+        session.baconInvincibleUntil.clear();
         session.baconSlamPowerPercent.clear();
         session.baconBodySlamKills.clear();
         session.baconThreeForOneAwarded.clear();
@@ -5082,11 +5083,6 @@ public final class ArcadePortManager implements Listener {
         int totalWins = Math.max(0, plugin.getConfig().getInt(winsKey, 0)) + 1;
         plugin.getConfig().set(winsKey, totalWins);
         plugin.saveConfig();
-        if (ArcadePortRules.shouldAwardBaconBrawlWinsMilestone(totalWins)) {
-            awardBaconAchievement(winner,
-                    ArcadePortRules.baconBrawlAchievementConfigKey(id, "15-wins"),
-                    "Bacon Brawl Veteran — won 15 games.");
-        }
         long elapsed = Math.max(0L, System.currentTimeMillis() - session.startedAt);
         if (ArcadePortRules.shouldAwardBaconFlashFried(elapsed)) {
             awardBaconAchievement(winner,
@@ -5615,8 +5611,18 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && event.getEntity() instanceof Player baconTarget
                 && session.players.containsKey(baconTarget.getUniqueId())) {
-            if (ArcadePortRules.shouldEndBaconSheepCloakOnDamageCause(event.getCause())) {
-                clearBaconCloak(session, baconTarget.getUniqueId());
+            long invincibleUntil = session.baconInvincibleUntil.getOrDefault(baconTarget.getUniqueId(), 0L);
+            if (ArcadePortRules.isBaconInvincibilityActive(System.currentTimeMillis(), invincibleUntil)) {
+                event.setCancelled(true);
+                baconTarget.sendActionBar(ChatColor.GOLD + "INVINCIBLE");
+                if (event instanceof EntityDamageByEntityEvent byEntity) {
+                    Entity damager = byEntity.getDamager();
+                    Player attacker = damager instanceof Player direct ? direct
+                            : damager instanceof Projectile projectile
+                                    && projectile.getShooter() instanceof Player shooter ? shooter : null;
+                    if (attacker != null) attacker.sendActionBar(ChatColor.RED + "BLOCKED");
+                }
+                return;
             }
             if (ArcadePortRules.shouldSuppressBaconBlastHealthDamage(
                     true, session.baconBlastExplosionDepth > 0, event.getCause())) {
@@ -5645,11 +5651,9 @@ public final class ArcadePortManager implements Listener {
                 // Fire ticks do not deal health damage in the round, but Reborn still ends Cloak
                 // on the incoming damage event, so the visual effect must not remain active.
                 event.setCancelled(true);
-                clearBaconCloak(session, baconTarget.getUniqueId());
-                return;
+                    return;
             }
             event.setCancelled(true);
-            clearBaconCloak(session, baconTarget.getUniqueId());
             double damage = event.getFinalDamage();
             if (damage > 0.0D) {
                 if (baconTarget.getHealth() <= damage) eliminate(session, baconTarget, null,
@@ -5964,11 +5968,6 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
-        if (session.type == ArcadePortGame.BACON_BRAWL && !event.getAction().isRightClick()
-                && "pig".equals(session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo"))) {
-            clearBaconCloak(session, player.getUniqueId());
-            return;
-        }
         if (session.type == ArcadePortGame.RUNNER) {
             String kit = session.runnerKits.getOrDefault(player.getUniqueId(), "leaper");
             if ("leaper".equals(kit) && item == Material.IRON_AXE && event.getAction().isRightClick()) {
@@ -6722,7 +6721,7 @@ public final class ArcadePortManager implements Listener {
         Player player = event.getPlayer();
         session.alive.remove(id);
         if (session.type == ArcadePortGame.BACON_BRAWL) {
-            clearBaconCloak(session, id);
+            session.baconInvincibleUntil.remove(id);
             removeBaconBabyPig(session, id);
             removeBaconPlayerPig(session, id);
             restoreBaconPlayerVisibilityForOwner(session, id, player);
@@ -6731,7 +6730,6 @@ public final class ArcadePortManager implements Listener {
             session.baconSlamPowerPercent.remove(id);
             session.baconMeters.remove(id);
             session.baconAbilitiesUsed.remove(id);
-            session.baconAbilityReadyAt.remove(id);
             session.baconLastSwingAt.remove(id);
             session.baconHitFeedbackUntil.remove(id);
             session.baconLastHitSource.remove(id);
@@ -6797,12 +6795,11 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> baconKits = new HashMap<>();
         final Map<UUID, Integer> baconMeters = new HashMap<>();
         final Set<UUID> baconAbilitiesUsed = new HashSet<>();
-        final Map<UUID, Long> baconAbilityReadyAt = new HashMap<>();
         final Map<UUID, Integer> baconSlamPowerPercent = new HashMap<>();
         final Map<UUID, Integer> baconBodySlamKills = new HashMap<>();
         final Set<UUID> baconThreeForOneAwarded = new HashSet<>();
         final Map<UUID, Long> baconSlams = new HashMap<>();
-        final Map<UUID, Long> baconCloakedUntil = new HashMap<>();
+        final Map<UUID, Long> baconInvincibleUntil = new HashMap<>();
         final Map<UUID, Long> baconLastSwingAt = new HashMap<>();
         final Map<UUID, Long> baconHitFeedbackUntil = new HashMap<>();
         final Map<UUID, String> baconLastHitSource = new HashMap<>();
