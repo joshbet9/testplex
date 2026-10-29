@@ -1040,7 +1040,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (allowSourceMap && world != null && SourceMapCatalog.hasMap(type)
                 && !sourceMapWorlds.contains(type.id())) {
-            SourceMapCatalog.MapData mapData = SourceMapCatalog.read(world);
+            SourceMapCatalog.MapData mapData = SourceMapCatalog.read(plugin, type, world);
             if (mapData == null) {
                 Path worldFolder = world.getWorldFolder().toPath();
                 Path legacyConfig = SourceMapCatalog.resolveWorldConfigPath(
@@ -1051,10 +1051,11 @@ public final class ArcadePortManager implements Listener {
             }
             Path worldConfig = SourceMapCatalog.resolveWorldConfigPath(world.getWorldFolder().toPath(),
                     Bukkit.getWorldContainer().toPath(), sourceWorldName);
-            if (worldConfig != null && !worldConfig.equals(
-                    world.getWorldFolder().toPath().toAbsolutePath().normalize().resolve("WorldConfig.dat"))) {
-                plugin.getLogger().info("Paper's migrated world folder is " + world.getWorldFolder()
-                        + "; loading authentic map metadata from legacy archive location " + worldConfig + ".");
+            if (worldConfig != null && Files.isRegularFile(worldConfig)) {
+                plugin.getLogger().info("Loaded " + type.displayName() + " map metadata from " + worldConfig + ".");
+            } else {
+                plugin.getLogger().fine("The source WorldConfig.dat is not present in the migrated world directory; "
+                        + "SourceMapCatalog read it from the embedded selected archive.");
             }
             sourceMapWorlds.add(type.id());
             sourceMapData.put(type.id(), mapData);
