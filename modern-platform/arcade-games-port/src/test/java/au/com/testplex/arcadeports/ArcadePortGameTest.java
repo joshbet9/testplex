@@ -460,8 +460,12 @@ class ArcadePortGameTest {
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("chris-p-bacon"));
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("unknown"));
         assertEquals(4_000L, ArcadePortRules.BACON_SLOW_UPDATE_INTERVAL_MILLIS);
-        assertEquals(120_000L, ArcadePortRules.BACON_BRAWL_ROUND_MILLIS);
-        assertEquals(20L, ArcadePortRules.BACON_BRAWL_RESPAWN_DELAY_TICKS);
+        assertFalse(ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER,
+                "Reborn Bacon Brawl ends when one pig remains, not at a fixed timer");
+        assertTrue(ArcadePortRules.shouldFinishBaconBrawl(1));
+        assertTrue(ArcadePortRules.shouldFinishBaconBrawl(0));
+        assertFalse(ArcadePortRules.shouldFinishBaconBrawl(2));
+        assertFalse(ArcadePortRules.shouldFinishBaconBrawl(16));
         assertEquals(4_000L, ArcadePortRules.BACON_HUNGER_INTERVAL_MILLIS);
         assertEquals(2, ArcadePortRules.BACON_HUNGER_DRAIN_PER_INTERVAL,
                 "the selected balance change doubles Bacon Brawl hunger drain");
@@ -598,24 +602,25 @@ class ArcadePortGameTest {
                 ArcadePortRules.isBaconArenaKnockoutReason("starved")));
     }
 
-    @Test void baconBrawlAwardsTheUniqueHighestKillCountAtTimeout() {
-        assertEquals(1, ArcadePortRules.baconBrawlUniqueLeaderIndex(java.util.List.of(2, 5, 3)));
-        assertEquals(0, ArcadePortRules.baconBrawlUniqueLeaderIndex(java.util.List.of(7, 2, 1)));
-        assertEquals(-1, ArcadePortRules.baconBrawlUniqueLeaderIndex(java.util.List.of(4, 4, 1)));
-        assertEquals(-1, ArcadePortRules.baconBrawlUniqueLeaderIndex(java.util.List.of(0, 0)));
-        assertEquals(-1, ArcadePortRules.baconBrawlUniqueLeaderIndex(java.util.List.of()));
-        assertEquals(-1, ArcadePortRules.baconBrawlUniqueLeaderIndex(null));
+    @Test void baconBrawlRoundUsesLastPigStandingInsteadOfKillScoreTimeout() {
+        assertFalse(ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER);
+        assertTrue(ArcadePortRules.shouldFinishBaconBrawl(1));
+        assertFalse(ArcadePortRules.shouldFinishBaconBrawl(2));
+        assertTrue(ArcadePortRules.shouldFinishBaconBrawl(0));
     }
 
-    @Test void baconBrawlEscalatesKnockbackTwiceAndSpeedsUpInATwoPlayerEndgame() {
+    @Test void baconBrawlKnockbackEscalatesOnShorteningSourceIntervals() {
         assertEquals(50_000L, ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS);
         assertEquals(50_000L, ArcadePortRules.nextBaconKnockbackInterval(0, 8));
-        assertEquals(50_000L, ArcadePortRules.nextBaconKnockbackInterval(1, 3));
+        assertEquals(45_000L, ArcadePortRules.nextBaconKnockbackInterval(1, 3));
         assertEquals(20_000L, ArcadePortRules.nextBaconKnockbackInterval(1, 2));
         assertEquals(20_000L, ArcadePortRules.nextBaconKnockbackInterval(1, 1));
-        assertEquals(0L, ArcadePortRules.nextBaconKnockbackInterval(2, 8));
-        assertEquals(2, ArcadePortRules.BACON_BRAWL_MAX_KNOCKBACK_ESCALATIONS);
+        assertEquals(40_000L, ArcadePortRules.nextBaconKnockbackInterval(2, 8));
+        assertEquals(5_000L, ArcadePortRules.nextBaconKnockbackInterval(9, 8));
+        assertEquals(0L, ArcadePortRules.nextBaconKnockbackInterval(10, 8));
+        assertEquals(10, ArcadePortRules.BACON_BRAWL_MAX_KNOCKBACK_ESCALATIONS);
         assertEquals(1.8D, ArcadePortRules.nextBaconKnockback(1.5D), 0.00001D);
+        assertEquals(2.16D, ArcadePortRules.nextBaconKnockback(1.8D), 0.00001D);
     }
 
     @Test void runnerSourceKitsHaveDistinctCooldownsAndFrostBallRules() {
