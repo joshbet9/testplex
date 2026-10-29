@@ -2537,6 +2537,17 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private boolean baconBlastTouchingAdjacentSolidBlock(Location location) {
+        Block center = location.getBlock();
+        for (BlockFace face : new BlockFace[] {
+                BlockFace.NORTH, BlockFace.SOUTH, BlockFace.EAST, BlockFace.WEST,
+                BlockFace.UP, BlockFace.DOWN }) {
+            Block adjacent = center.getRelative(face);
+            if (adjacent.getType().isSolid() && !adjacent.isLiquid()) return true;
+        }
+        return false;
+    }
+
     private void updateBaconBlastProjectiles(Session session, long now) {
         for (UUID blastId : new ArrayList<>(session.baconBlastItems.keySet())) {
             Item bacon = session.baconBlastItems.get(blastId);
@@ -2573,7 +2584,12 @@ public final class ArcadePortManager implements Listener {
             }
 
             Block currentBlock = current.getBlock();
-            boolean touchingBlock = bacon.isOnGround() || currentBlock.isLiquid() || currentBlock.getType().isSolid();
+            boolean stationary = current.distanceSquared(previous) <= 0.0025D
+                    && bacon.getVelocity().lengthSquared() <= 0.05D;
+            boolean stationaryAgainstBlock = stationary && baconBlastTouchingAdjacentSolidBlock(current);
+            boolean touchingBlock = ArcadePortRules.isBaconBlastBlockImpact(
+                    bacon.isOnGround(), currentBlock.isLiquid(), currentBlock.getType().isSolid(),
+                    stationaryAgainstBlock);
             long createdAt = session.baconBlastCreatedAt.getOrDefault(blastId, 0L);
             if (ArcadePortRules.shouldExpireBaconBlast(now, createdAt, touchingBlock)) {
                 spawnBaconBlastImpact(session, current);
