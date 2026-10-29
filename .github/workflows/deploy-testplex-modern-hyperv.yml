@@ -310,7 +310,34 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
-          ssh "${ssh_opts[@]}" "$remote" "rm -rf '$upload_dir' && install -d -m 0700 '$upload_dir'"
+          # Every modern deployment used to leave a full maps archive under a new commit-specific
+          # directory in /var/tmp. The legacy and modern deploy jobs share one Hyper-V disk and are
+          # serialized by testplex-isolated-hyperv-server, so only these generated staging directories
+          # are safe to prune here; never clean server worlds, plugin directories, databases or backups.
+          ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" <<'REMOTE_STAGE_PREP'
+          set -euo pipefail
+          build_sha="$1"
+          [[ "$build_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid build SHA for artifact staging." >&2; exit 1; }
+          upload_dir="/var/tmp/testplex-modern-artifacts-$build_sha"
+          echo "Disk usage before staging-cache cleanup:"
+          df -h /var/tmp
+          df -i /var/tmp
+          shopt -s nullglob
+          for existing in /var/tmp/testplex-modern-artifacts-*; do
+            [[ -d "$existing" && ! -L "$existing" ]] || continue
+            name="${existing##*/}"
+            [[ "$name" =~ ^testplex-modern-artifacts-[0-9a-f]{40}$ ]] || continue
+            [[ "$existing" == "$upload_dir" ]] && continue
+            size="$(du -sh -- "$existing" 2>/dev/null | cut -f1 || true)"
+            echo "Removing stale modern deployment staging cache: $existing (${size:-size unavailable})"
+            rm -rf -- "$existing"
+          done
+          rm -rf -- "$upload_dir"
+          echo "Disk usage after staging-cache cleanup:"
+          df -h /var/tmp
+          df -i /var/tmp
+          install -d -m 0700 -- "$upload_dir"
+          REMOTE_STAGE_PREP
           scp -p -P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv" \
             -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
             "$STAGE_DIR/TestplexModernArcade.jar" \
@@ -668,6 +695,41 @@ jobs:
           [[ "$mm21" != "true" ]] || sudo -n systemctl start monstermaze-21.service
           echo "Previous service state restored where possible."
           REMOTE_RESTORE
+
+      - name: Remove temporary modern deployment artifacts
+        if: always()
+        continue-on-error: true
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          [[ -f "$HOME/.ssh/testplex_hyperv" && -f "$HOME/.ssh/known_hosts" ]] || {
+            echo "SSH credentials were not prepared; pre-upload cleanup was not needed or could not run."
+            exit 0
+          }
+          SSH_PORT="${HYPERV_SSH_PORT:-22}"
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
+          ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_STAGE_CLEANUP'
+          set -euo pipefail
+          shopt -s nullglob
+          for existing in /var/tmp/testplex-modern-artifacts-*; do
+            [[ -d "$existing" && ! -L "$existing" ]] || continue
+            name="${existing##*/}"
+            [[ "$name" =~ ^testplex-modern-artifacts-[0-9a-f]{40}$ ]] || continue
+            echo "Removing completed/abandoned modern deployment staging cache: $existing"
+            rm -rf -- "$existing"
+          done
+          echo "Remaining temporary filesystem usage:"
+          df -h /var/tmp
+          df -i /var/tmp
+          REMOTE_STAGE_CLEANUP
 
       - name: Write deployment summary
         if: always()
