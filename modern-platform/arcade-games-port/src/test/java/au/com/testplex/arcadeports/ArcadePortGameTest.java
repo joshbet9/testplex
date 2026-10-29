@@ -822,6 +822,22 @@ class ArcadePortGameTest {
         assertEquals("", ArcadePortRules.baconBrawlAchievementConfigKey(playerId, "../flash-fried"));
     }
 
+    @Test void kingOfBaconAchievementUsesUpdatedFifteenWinThreshold() {
+        assertEquals(15, ArcadePortRules.BACON_BRAWL_KING_OF_BACON_WINS);
+        assertFalse(ArcadePortRules.shouldAwardBaconKingOfBacon(14));
+        assertTrue(ArcadePortRules.shouldAwardBaconKingOfBacon(15));
+        assertTrue(ArcadePortRules.shouldAwardBaconKingOfBacon(16));
+    }
+
+    @Test void baconBrawlStatsMenuHasEveryExpectedAchievementBottle() {
+        assertEquals(java.util.List.of("king-of-bacon", "pigs-in-blankets", "flash-fried",
+                        "raw-pork", "three-for-one"),
+                java.util.Arrays.stream(BaconBrawlAchievement.values())
+                        .map(BaconBrawlAchievement::slug).toList());
+        assertEquals("King of Bacon", BaconBrawlAchievement.KING_OF_BACON.displayName());
+        assertEquals("Win 15 games of Bacon Brawl.", BaconBrawlAchievement.KING_OF_BACON.requirement());
+    }
+
     @Test void baconBrawlUsesTheRequestedThreeAchievements() {
         assertEquals(60_000L, ArcadePortRules.BACON_FLASH_FRIED_MAX_WIN_MILLIS);
         assertTrue(ArcadePortRules.shouldAwardBaconFlashFried(0L));

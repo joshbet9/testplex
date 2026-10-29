@@ -5470,6 +5470,11 @@ public final class ArcadePortManager implements Listener {
     /** Record local Bacon Brawl achievements in isolated test config, never production milestones. */
     private void recordBaconBrawlAchievements(Session session, Player winner) {
         UUID id = winner.getUniqueId();
+        int totalWins = plugin.getConfig().getInt(localStatsPath(id, ArcadePortGame.BACON_BRAWL.id()) + "wins", 0);
+        if (ArcadePortRules.shouldAwardBaconKingOfBacon(totalWins)) {
+            awardBaconAchievement(winner, BaconBrawlAchievement.KING_OF_BACON.configKey(id),
+                    "King of Bacon — 15 Bacon Brawl wins.");
+        }
         long elapsed = Math.max(0L, System.currentTimeMillis() - session.startedAt);
         if (ArcadePortRules.shouldAwardBaconFlashFried(elapsed)) {
             awardBaconAchievement(winner,
@@ -5726,16 +5731,37 @@ public final class ArcadePortManager implements Listener {
         int score = plugin.getConfig().getInt(path + "score", 0);
         int knockouts = plugin.getConfig().getInt(path + "knockouts", 0);
         Inventory inventory = createStatsInventory(StatsPage.GAME, targetId, targetName, displayName, gameId);
-        int[] slots = {29, 30, 31, 32};
-        int[] values = {played, wins, score, knockouts};
-        String[] labels = {"Games Played", "Wins", "Score / Kills", "Knockouts"};
-        for (int i = 0; i < values.length; i++) {
-            int value = values[i];
-            List<String> lore = List.of(" ",
-                    ChatColor.GRAY + "Recorded by this local test server: " + ChatColor.WHITE + value,
-                    ChatColor.DARK_GRAY + "Not production Mineplex achievement data.");
-            inventory.setItem(slots[i], statsItem(value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                    (value > 0 ? ChatColor.GREEN : ChatColor.RED) + labels[i], lore, "noop", null, null));
+        if ("bacon-brawl".equals(gameId)) {
+            // Match the 1.8 achievement-bottle pattern: unlocked achievements use
+            // experience bottles, and unearned achievements use glass bottles.
+            int[] achievementSlots = {10, 11, 12, 13, 14};
+            BaconBrawlAchievement[] achievements = BaconBrawlAchievement.values();
+            for (int i = 0; i < achievements.length; i++) {
+                BaconBrawlAchievement achievement = achievements[i];
+                boolean unlocked = plugin.getConfig().getBoolean(achievement.configKey(targetId), false);
+                List<String> lore = List.of(" ",
+                        ChatColor.GRAY + achievement.requirement(),
+                        " ",
+                        unlocked ? ChatColor.GREEN + "Achievement unlocked"
+                                : ChatColor.RED + "Not yet unlocked");
+                inventory.setItem(achievementSlots[i],
+                        statsItem(unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                                (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ")
+                                        + achievement.displayName(),
+                                lore, "noop", null, null));
+            }
+        } else {
+            int[] slots = {29, 30, 31, 32};
+            int[] values = {played, wins, score, knockouts};
+            String[] labels = {"Games Played", "Wins", "Score / Kills", "Knockouts"};
+            for (int i = 0; i < values.length; i++) {
+                int value = values[i];
+                List<String> lore = List.of(" ",
+                        ChatColor.GRAY + "Recorded by this local test server: " + ChatColor.WHITE + value,
+                        ChatColor.DARK_GRAY + "Not production Mineplex achievement data.");
+                inventory.setItem(slots[i], statsItem(value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (value > 0 ? ChatColor.GREEN : ChatColor.RED) + labels[i], lore, "noop", null, null));
+            }
         }
         inventory.setItem(22, statsSummaryItem(Material.BOOK, ChatColor.BOLD + displayName + " Stats",
                 gameStatsLore(targetId, gameId, false)));
@@ -5754,6 +5780,13 @@ public final class ArcadePortManager implements Listener {
         lore.add(ChatColor.GRAY + "Wins: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "wins", 0));
         lore.add(ChatColor.GRAY + "Score / Kills: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "score", 0));
         lore.add(ChatColor.GRAY + "Knockouts: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "knockouts", 0));
+        if ("bacon-brawl".equals(gameId)) {
+            long unlocked = java.util.Arrays.stream(BaconBrawlAchievement.values())
+                    .filter(achievement -> plugin.getConfig().getBoolean(achievement.configKey(targetId), false))
+                    .count();
+            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked
+                    + "/" + BaconBrawlAchievement.values().length);
+        }
         if (!compact) lore.add(ChatColor.DARK_GRAY + "Stats recorded by the isolated test server.");
         else lore.add(ChatColor.RESET + "Click for more details!");
         Session current = active;

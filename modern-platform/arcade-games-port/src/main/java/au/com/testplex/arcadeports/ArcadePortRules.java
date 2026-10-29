@@ -48,6 +48,12 @@ public final class ArcadePortRules {
     public static final int BACON_THREE_FOR_ONE_BODY_SLAM_KILLS = 3;
     /** Pigs In Blankets is earned by six kills in a single game. */
     public static final int BACON_BRAWL_PIGS_IN_BLANKETS_KILLS = 6;
+    /** The updated King of Bacon achievement requires fifteen wins on the isolated test server. */
+    public static final int BACON_BRAWL_KING_OF_BACON_WINS = 15;
+
+    public static boolean shouldAwardBaconKingOfBacon(int totalWins) {
+        return totalWins >= BACON_BRAWL_KING_OF_BACON_WINS;
+    }
     public static int baconMeterGainForDamage(double damage) {
         if (!Double.isFinite(damage) || damage <= 0.0D) return 0;
         return (int) Math.min(BACON_METER_MAX,
