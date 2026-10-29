@@ -24,17 +24,6 @@ public final class ArcadePortRules {
     public static final int RUNNER_MAX_FROSTBALLS = 16;
     public static final int RUNNER_FROSTBALL_SLOW_TICKS = 40;
     public static final int RUNNER_FROSTBALL_SLOW_AMPLIFIER = 2;
-    /** First-pass companion cadence; tune against live Reborn gameplay before parity sign-off. */
-    public static final long BACON_BABY_PIG_ATTACK_COOLDOWN_MILLIS = 1_500L;
-    public static final double BACON_BABY_PIG_ATTACK_RANGE_SQUARED = 2.25D;
-
-    public static boolean shouldBaconBabyPigAttack(long nowMillis, long readyAtMillis,
-            double targetDistanceSquared) {
-        return nowMillis >= readyAtMillis && Double.isFinite(targetDistanceSquared)
-                && targetDistanceSquared >= 0.0D
-                && targetDistanceSquared <= BACON_BABY_PIG_ATTACK_RANGE_SQUARED;
-    }
-
     /** Selected community balance value for the King of Bacon win achievement. */
     public static final int BACON_BRAWL_KING_OF_BACON_WINS = 15;
     /** Pigs In Blankets is earned by six kills in a single game. */
@@ -48,25 +37,9 @@ public final class ArcadePortRules {
         return wins >= BACON_BRAWL_KING_OF_BACON_WINS;
     }
 
-    /** Approximate source Bacon Blast's destructible terrain impact radius; tune during live acceptance. */
-    public static final double BACON_BLAST_TERRAIN_RADIUS = 2.0D;
-
+    /** Bacon Blast calls the source explosion with block damage disabled. */
     public static boolean baconBlastShouldBreakBlock(org.bukkit.Material material, double distanceSquared) {
-        if (material == null || !Double.isFinite(distanceSquared) || distanceSquared < 0.0D
-                || distanceSquared > BACON_BLAST_TERRAIN_RADIUS * BACON_BLAST_TERRAIN_RADIUS) return false;
-        return material != org.bukkit.Material.AIR
-                && material != org.bukkit.Material.BEDROCK
-                && material != org.bukkit.Material.BARRIER
-                && material != org.bukkit.Material.WATER
-                && material != org.bukkit.Material.LAVA
-                && material != org.bukkit.Material.BUBBLE_COLUMN
-                && material != org.bukkit.Material.END_PORTAL
-                && material != org.bukkit.Material.END_PORTAL_FRAME
-                && material != org.bukkit.Material.COMMAND_BLOCK
-                && material != org.bukkit.Material.CHAIN_COMMAND_BLOCK
-                && material != org.bukkit.Material.REPEATING_COMMAND_BLOCK
-                && material != org.bukkit.Material.STRUCTURE_BLOCK
-                && material != org.bukkit.Material.JIGSAW;
+        return false;
     }
 
     /** Recent hit credit keeps knock-off kills attached to the attacker who caused the fall. */
@@ -89,8 +62,10 @@ public final class ArcadePortRules {
     public static final int BACON_HUNGER_DRAIN_PER_INTERVAL = 2;
     public static final float BACON_SATURATION_ON_FOOD_CHANGE = 5.0F;
     public static final double BACON_STARVATION_DAMAGE = 4.0D;
-    public static final double BACON_STANDARD_HIT_DAMAGE = 6.0D;
-    public static final double BACON_BODY_SLAM_RECOIL_DAMAGE = 2.0D;
+    /** Ordinary Bacon Brawl hits use knockback; health loss is reserved for arena/environment hazards. */
+    public static final boolean BACON_BRAWL_HITS_DAMAGE_HEALTH = false;
+    /** Body Slam applies a second knockback component in addition to the game-wide knockback. */
+    public static final double BACON_BODY_SLAM_EXTRA_KNOCKBACK = 2.0D;
     public static final long BACON_BODY_SLAM_COOLDOWN_MILLIS = 8_000L;
     public static final long BACON_BLAST_COOLDOWN_MILLIS = 3_000L;
     public static final long BACON_CLOAK_COOLDOWN_MILLIS = 10_000L;
