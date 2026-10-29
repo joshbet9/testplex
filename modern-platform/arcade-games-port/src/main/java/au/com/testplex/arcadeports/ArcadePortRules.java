@@ -536,6 +536,12 @@ public final class ArcadePortRules {
         return nowMillis + BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS;
     }
 
+    /** Reborn's Waller faces the adjacent block using getFace(playerYaw + 180F). */
+    public static int bombLobbersWallFacingIndex(float playerYaw) {
+        if (!Float.isFinite(playerYaw)) return 2;
+        return Math.round((playerYaw + 180.0F) / 90.0F) & 0x3;
+    }
+
     /** Reborn's vanilla size-4 explosion damage calculation, capped by its Explosion(50) condition. */
     public static double bombLobbersBlastDamage(double distanceToBoundingBox, double exposure) {
         if (!Double.isFinite(distanceToBoundingBox) || distanceToBoundingBox < 0.0D
