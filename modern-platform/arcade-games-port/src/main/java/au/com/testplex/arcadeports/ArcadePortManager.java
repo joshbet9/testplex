@@ -7683,7 +7683,7 @@ public final class ArcadePortManager implements Listener {
      * Some Bukkit right-click inputs target an entity and never raise PlayerInteractEvent.
      * Route those clicks through the exact same Bacon ability / Bomb Lobbers control paths.
      */
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onArcadeEntityInteract(PlayerInteractEntityEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
