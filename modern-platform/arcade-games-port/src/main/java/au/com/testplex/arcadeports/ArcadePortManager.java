@@ -2501,6 +2501,7 @@ public final class ArcadePortManager implements Listener {
             Location spawn = owner.getLocation().clone().add(0.8D, 0.0D, 0.8D);
             baby = session.world.spawn(spawn, Pig.class);
             baby.setBaby();
+            baby.setAgeLock(true);
             baby.setCustomName(ChatColor.LIGHT_PURPLE + "Baby Piggles");
             baby.setCustomNameVisible(false);
             // Source hides the passenger to Mama Piggles while other players see the companion.
@@ -2574,10 +2575,13 @@ public final class ArcadePortManager implements Listener {
 
             if (target != null) {
                 Player owner = ownerId == null ? null : session.players.get(ownerId);
-                if (owner != null && owner.isOnline() && session.alive.contains(ownerId)) {
+                // The Reborn projectile manager resolves its block/entity explosion first, then
+                // dispatches the custom PROJECTILE damage event for knockback/kill attribution.
+                spawnBaconBlastImpact(session, current);
+                if (owner != null && owner.isOnline() && session.alive.contains(ownerId)
+                        && active == session && session.alive.contains(target.getUniqueId())) {
                     handlePlayerHit(session, owner, target, "bacon-blast");
                 }
-                spawnBaconBlastImpact(session, current);
                 removeBaconBlastItem(session, blastId);
                 if (active != session) return;
                 continue;
