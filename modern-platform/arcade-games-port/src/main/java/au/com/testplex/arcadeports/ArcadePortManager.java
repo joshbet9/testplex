@@ -6816,7 +6816,9 @@ public final class ArcadePortManager implements Listener {
             Map<UUID, Double> blastExposure = new HashMap<>();
             if (bombLobbersBlast) {
                 for (Player target : alivePlayers(session)) {
-                    double distance = bombLobbersDistanceToBoundingBox(blast, target);
+                    // Vanilla 1.8 evaluates explosion intensity at the entity's head position;
+                    // block density is still sampled over the complete bounding box.
+                    double distance = target.getEyeLocation().distance(blast);
                     if (distance <= ArcadePortRules.BOMB_LOBBERS_EXPLOSION_RADIUS) {
                         blastExposure.put(target.getUniqueId(), bombLobbersBlastExposure(blast, target));
                     }
@@ -6841,7 +6843,7 @@ public final class ArcadePortManager implements Listener {
             for (Player target : alivePlayers(session)) {
                 // Reborn applies its nearby-player explosion condition without team filtering.
                 double distance = bombLobbersBlast
-                        ? bombLobbersDistanceToBoundingBox(blast, target)
+                        ? target.getEyeLocation().distance(blast)
                         : target.getLocation().distance(blast);
                 double radius = bombLobbersBlast ? ArcadePortRules.BOMB_LOBBERS_EXPLOSION_RADIUS : 8.0D;
                 if (distance > radius) continue;
