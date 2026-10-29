@@ -411,6 +411,68 @@ public final class SourceMapCatalog {
         return nearest.size() == 1 ? nearest.get(0) : null;
     }
 
+    /**
+     * Convert a legacy Reborn/CraftBukkit map archive to the directory layout Paper
+     * 26.1+ expects when importing a custom world. In this layout Bukkit imports
+     * the source world's Overworld from dimensions/minecraft/overworld and moves it
+     * under the primary world's dimensions/minecraft/<world-name> directory.
+     *
+     * This is a structural move only: the authored level.dat, region files and
+     * WorldConfig.dat contents are not rewritten. Never merge or overwrite existing
+     * region data; an ambiguous/partial installation must fail closed for a clean retry.
+     */
+    static void preparePaper26WorldStorage(Path worldRoot) throws IOException {
+        if (worldRoot == null) throw new IOException("Source world root is null.");
+        Path root = worldRoot.toAbsolutePath().normalize();
+        if (Files.isSymbolicLink(root) || !Files.isDirectory(root)) {
+            throw new IOException("Source world root is missing or is a symbolic link: " + root);
+        }
+
+        Path dimensions = root.resolve("dimensions").resolve("minecraft").resolve("overworld").normalize();
+        if (!dimensions.startsWith(root) || dimensions.equals(root)) {
+            throw new IOException("Unsafe Paper 26.3 Overworld path for source map: " + dimensions);
+        }
+
+        for (String directory : List.of("region", "entities", "poi")) {
+            Path legacy = root.resolve(directory).normalize();
+            Path modern = dimensions.resolve(directory).normalize();
+            if (!legacy.startsWith(root) || !modern.startsWith(dimensions)) {
+                throw new IOException("Unsafe source map data path: " + directory);
+            }
+            if (Files.isSymbolicLink(legacy) || Files.isSymbolicLink(modern)) {
+                throw new IOException("Refusing symbolic links in source-map data: " + directory);
+            }
+            boolean legacyExists = Files.exists(legacy);
+            boolean modernExists = Files.exists(modern);
+            if (legacyExists && !Files.isDirectory(legacy)) {
+                throw new IOException("Legacy " + directory + " path is not a directory: " + legacy);
+            }
+            if (modernExists && !Files.isDirectory(modern)) {
+                throw new IOException("Paper 26.3 " + directory + " path is not a directory: " + modern);
+            }
+            if (legacyExists && modernExists) {
+                throw new IOException("Both legacy and Paper 26.3 " + directory
+                        + " directories exist; refusing to merge or overwrite: " + legacy + " and " + modern);
+            }
+            if (legacyExists) {
+                Files.createDirectories(modern.getParent());
+                Files.move(legacy, modern);
+            }
+        }
+
+        Path region = dimensions.resolve("region");
+        if (!Files.isDirectory(region)) {
+            throw new IOException("Archived map has no region directory at " + region
+                    + " (expected legacy region/ to be moved into Paper 26.3 dimension layout).");
+        }
+        try (Stream<Path> files = Files.list(region)) {
+            if (files.noneMatch(path -> Files.isRegularFile(path)
+                    && path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".mca"))) {
+                throw new IOException("No .mca terrain region files found in " + region);
+            }
+        }
+    }
+
     private static boolean hasWorldMetadata(Path folder) {
         return folder != null
                 && Files.isRegularFile(folder.resolve("level.dat"))
@@ -455,7 +517,17 @@ public final class SourceMapCatalog {
             plugin.getLogger().severe("Refusing to follow a symbolic link while installing source map " + worldName);
             return false;
         }
-        if (hasWorldMetadata(root)) return true;
+        if (hasWorldMetadata(root)) {
+            try {
+                preparePaper26WorldStorage(root);
+                return true;
+            } catch (IOException exception) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        "Existing source map " + worldName + " has incompatible/incomplete Paper 26.3 "
+                                + "dimension storage: " + exception.getMessage(), exception);
+                return false;
+            }
+        }
 
         try {
             deleteExtractionTree(staging, container);
@@ -507,6 +579,15 @@ public final class SourceMapCatalog {
             } else {
                 Files.move(archiveRoot, root);
             }
+
+            // Minecraft/Paper 26.1+ expects a custom world's Overworld chunks in
+            // <world>/dimensions/minecraft/overworld/region before Bukkit imports
+            // that archived CraftBukkit world into the server world's dimensions.
+            // The 1.8 Reborn ZIPs have the pre-26.1 layout (<world>/region). If we
+            // leave that old layout in place, Paper's LegacyCraftBukkitWorldMigration
+            // fails while creating the world; retrying the same ZIP cannot help.
+            preparePaper26WorldStorage(root);
+
             if (!hasWorldMetadata(root)) {
                 plugin.getLogger().warning("Original map archive " + resource
                         + " was extracted but its normalized world root is missing required metadata at " + root);
