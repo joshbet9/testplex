@@ -450,6 +450,14 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldThrowBombLobbersOnAction(true)); // pressure-plate / physical
     }
 
+    @Test void bombLobbersOnlyArmorerAndPitcherEquipArmor() {
+        assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("jumper"));
+        assertTrue(ArcadePortRules.bombLobbersKitUsesArmor("armorer"));
+        assertTrue(ArcadePortRules.bombLobbersKitUsesArmor("pitcher"));
+        assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("waller"));
+        assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("unknown"));
+    }
+
     @Test void bombLobbersKitsPitchLevelsCraftmanAndBombPrimingMatchSourceTiming() {
         assertEquals("jumper", ArcadePortRules.normalizeBombLobbersKit("Jumper"));
         assertEquals("armorer", ArcadePortRules.normalizeBombLobbersKit("armourer"));
