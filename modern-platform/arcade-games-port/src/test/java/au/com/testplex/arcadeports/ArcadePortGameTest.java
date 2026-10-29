@@ -470,12 +470,14 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.baconBrawlUniqueLeaderIndex(null));
     }
 
-    @Test void baconBrawlEscalatesKnockbackWithShorterFiniteIntervals() {
+    @Test void baconBrawlEscalatesKnockbackTwiceAndSpeedsUpInATwoPlayerEndgame() {
         assertEquals(50_000L, ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS);
-        assertEquals(45_000L, ArcadePortRules.nextBaconKnockbackInterval(50_000L));
-        assertEquals(5_000L, ArcadePortRules.nextBaconKnockbackInterval(10_000L));
-        assertEquals(0L, ArcadePortRules.nextBaconKnockbackInterval(5_000L));
-        assertEquals(0L, ArcadePortRules.nextBaconKnockbackInterval(0L));
+        assertEquals(50_000L, ArcadePortRules.nextBaconKnockbackInterval(0, 8));
+        assertEquals(50_000L, ArcadePortRules.nextBaconKnockbackInterval(1, 3));
+        assertEquals(20_000L, ArcadePortRules.nextBaconKnockbackInterval(1, 2));
+        assertEquals(20_000L, ArcadePortRules.nextBaconKnockbackInterval(1, 1));
+        assertEquals(0L, ArcadePortRules.nextBaconKnockbackInterval(2, 8));
+        assertEquals(2, ArcadePortRules.BACON_BRAWL_MAX_KNOCKBACK_ESCALATIONS);
         assertEquals(1.8D, ArcadePortRules.nextBaconKnockback(1.5D), 0.00001D);
     }
 
