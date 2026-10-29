@@ -7415,11 +7415,15 @@ public final class ArcadePortManager implements Listener {
                     && event.getAction().isRightClick() && heldItem != null
                     && heldItem.getType() == Material.IRON_AXE
                     && session.alive.contains(player.getUniqueId());
-            boolean forceBombThrow = session.type == ArcadePortGame.BOMB_LOBBERS
-                    && heldItem != null && heldItem.getType() == Material.TNT
+            String bombKit = session.bombLobbersKits.getOrDefault(player.getUniqueId(), "jumper");
+            boolean forceBombControlClick = session.type == ArcadePortGame.BOMB_LOBBERS
+                    && heldItem != null
+                    && (heldItem.getType() == Material.TNT
+                        || ("pitcher".equals(bombKit) && heldItem.getType() == Material.LEVER)
+                        || ("waller".equals(bombKit) && heldItem.getType() == Material.STONE_SHOVEL))
                     && (event.getAction().isRightClick() || event.getAction().isLeftClick())
                     && session.alive.contains(player.getUniqueId());
-            if (!forceBaconAbility && !forceBombThrow) return;
+            if (!forceBaconAbility && !forceBombControlClick) return;
         }
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && !session.alive.contains(player.getUniqueId())
