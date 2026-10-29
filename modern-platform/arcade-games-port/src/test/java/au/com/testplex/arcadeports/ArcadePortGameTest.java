@@ -508,6 +508,27 @@ class ArcadePortGameTest {
         assertEquals(5.25D, 1.5D * ArcadePortRules.baconBrawlKnockbackMultiplier(true), 0.00001D);
     }
 
+    @Test void baconBrawlKnockbackMatchesDamageManagerLogAndMultiplierFormula() {
+        double onePointFive = ArcadePortRules.baconBrawlEffectiveKnockback(1.0D, 1.5D);
+        assertEquals(Math.log10(2.0D) * 1.5D, onePointFive, 0.00001D);
+        assertEquals(0.2D + 0.6D * onePointFive * 0.8D,
+                ArcadePortRules.baconBrawlVelocityStrength(1.0D, 1.5D, false), 0.00001D);
+        assertEquals(Math.min(0.2D * onePointFive, 0.4D + 0.04D * onePointFive) + 0.2D,
+                ArcadePortRules.baconBrawlVerticalVelocity(1.0D, 1.5D, false, true), 0.00001D);
+
+        double bodySlamTarget = ArcadePortRules.baconBrawlEffectiveKnockback(6.0D, 1.5D * 2.0D);
+        double bodySlamRecoil = ArcadePortRules.baconBrawlEffectiveKnockback(2.0D, 1.5D * 2.0D);
+        assertEquals(Math.log10(6.0D) * 3.0D, bodySlamTarget, 0.00001D);
+        assertEquals(Math.log10(2.0D) * 3.0D, bodySlamRecoil, 0.00001D);
+        assertEquals(0.2D + 0.6D * bodySlamTarget * 0.8D,
+                ArcadePortRules.baconBrawlVelocityStrength(6.0D, 3.0D, false), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.baconBrawlBodySlamLaunchY(0.5D, true), 0.00001D);
+        assertEquals(0.4D, ArcadePortRules.baconBrawlBodySlamLaunchY(0.0D, true), 0.00001D);
+        assertEquals(0.2D, ArcadePortRules.baconBrawlBodySlamLaunchY(0.0D, false), 0.00001D);
+        assertTrue(ArcadePortRules.baconBrawlVelocityStrength(1.0D, 1.5D, true)
+                < ArcadePortRules.baconBrawlVelocityStrength(1.0D, 1.5D, false));
+    }
+
     @Test void sheepPigBackstabBonusOnlyAppliesFromBehind() {
         assertTrue(ArcadePortRules.isBaconBrawlBackstab(0.0D, 1.0D, 0.0D, -1.0D));
         assertTrue(ArcadePortRules.isBaconBrawlBackstab(1.0D, 0.0D, -1.0D, 0.0D));
