@@ -226,6 +226,8 @@ public final class ArcadePortRules {
                 || nowMillis - createdAtMillis >= BACON_BLAST_MAX_FLIGHT_MILLIS;
     }
     public static final long BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS = 3_000L;
+    /** Reborn's Waller perk uses a 100 ms Recharge gate between wall placements. */
+    public static final long BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS = 100L;
     public static final long BOMB_LOBBERS_MAX_FLIGHT_MILLIS = 8_000L;
     public static final int BOMB_LOBBERS_FUSE_TICKS = 60;
     public static final int BOMB_LOBBERS_MAX_CARRIED = 3;
@@ -471,6 +473,17 @@ public final class ArcadePortRules {
     public static boolean shouldPrimeBombLobbersBomb(long ageMillis, boolean touchingSolidBlock) {
         return ageMillis >= BOMB_LOBBERS_MAX_FLIGHT_MILLIS
                 || (ageMillis >= BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS && touchingSolidBlock);
+    }
+
+    /** Whether a Waller can place a wall at this time, including the source's short Recharge gate. */
+    public static boolean isBombLobbersWallerReady(long nowMillis, long readyAtMillis) {
+        return nowMillis >= 0L && readyAtMillis >= 0L && nowMillis >= readyAtMillis;
+    }
+
+    public static long nextBombLobbersWallerReadyAt(long nowMillis) {
+        if (nowMillis < 0L) return BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS;
+        if (nowMillis > Long.MAX_VALUE - BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS) return Long.MAX_VALUE;
+        return nowMillis + BOMB_LOBBERS_WALLER_COOLDOWN_MILLIS;
     }
 
     /** Reborn's vanilla size-4 explosion damage calculation, capped by its Explosion(50) condition. */
