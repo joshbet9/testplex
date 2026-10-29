@@ -149,7 +149,6 @@ public final class ArcadePortManager implements Listener {
         registerOptionalBaconPacketBridge();
     }
 
-    /**
     public void selectLobbyGame(ArcadePortGame type) {
         if (type == null) return;
         plugin.getConfig().set("lobby-selected-game", type.id());
@@ -185,6 +184,7 @@ public final class ArcadePortManager implements Listener {
         lobbyRuntime.handleBotCommand(sender, args);
     }
 
+    /**
      * PacketEvents is optional: no PacketEvents class is loaded unless that plugin is installed.
      * Bare Paper keeps the previous server-side-avatar hit handling as a fallback.
      */
