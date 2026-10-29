@@ -590,16 +590,21 @@ jobs:
             rollback
             exit 1
           fi
+          # The old latest.log may still contain a previous startup's "Done (" line
+          # while systemd has already marked the new JVM active. Wait for the server
+          # to actually bind its dedicated port as well as showing Paper ready.
           ready=false
           for attempt in $(seq 1 45); do
-            if sudo -n systemctl is-active --quiet testplex-modern.service && sudo -n grep -Fq 'Done (' "$SERVER_DIR/logs/latest.log" 2>/dev/null; then
+            if sudo -n systemctl is-active --quiet testplex-modern.service &&
+               sudo -n grep -Fq 'Done (' "$SERVER_DIR/logs/latest.log" 2>/dev/null &&
+               sudo -n ss -ltn | awk '$4 ~ /:25568$/ {found=1} END {exit !found}'; then
               ready=true
               break
             fi
             sleep 2
           done
           if [[ "$ready" != "true" ]]; then
-            echo "Modern Paper did not reach its ready state. Check the modern-only logs and rollback directory." >&2
+            echo "Modern Paper did not reach a ready state with port 25568 listening. Check the modern-only logs and rollback directory." >&2
             rollback
             exit 1
           fi
@@ -610,11 +615,6 @@ jobs:
               exit 1
             fi
           done
-          if ! sudo -n ss -ltn | awk '$4 ~ /:25568$/ {found=1} END {exit !found}'; then
-            echo "Paper reports ready but port 25568 is not listening." >&2
-            rollback
-            exit 1
-          fi
           sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR"
           echo "Modern Paper 26.3 is ready with only Bacon Brawl enabled for in-game acceptance; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "Legacy services were not stopped, restarted, or overwritten by this workflow."
