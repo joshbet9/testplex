@@ -3071,6 +3071,10 @@ public final class ArcadePortManager implements Listener {
             session.baconLastHitSource.put(attackerId, "body-slam-recoil");
             target.setFoodLevel(Math.min(20, target.getFoodLevel() + 2));
             target.setSaturation(ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE);
+            int recoilMeter = ArcadePortRules.nextBaconMeter(
+                    session.baconMeters.getOrDefault(targetId, 0), 2.0D);
+            session.baconMeters.put(targetId, recoilMeter);
+            updateBaconMeterItem(session, target);
             attacker.setVelocity(baconBrawlKnockbackVelocity(target, attacker, 2.0D,
                     session.baconKnockback * ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER, null));
         }
@@ -5497,6 +5501,10 @@ public final class ArcadePortManager implements Listener {
                 }
                 UUID ownerId = session.baconPigOwners.get(avatar.getUniqueId());
                 Player target = ownerId == null ? null : session.players.get(ownerId);
+                if (ownerId != null && System.currentTimeMillis()
+                        < session.baconInvincibleUntil.getOrDefault(ownerId, 0L)) {
+                    return;
+                }
                 if (attacker != null && target != null && !attacker.getUniqueId().equals(ownerId)) {
                     if (byEntity.getDamager() instanceof Projectile projectile) {
                         handleBaconBrawlHit(session, attacker, target, source,
