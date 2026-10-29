@@ -24,6 +24,17 @@ public final class ArcadePortRules {
     public static final int RUNNER_MAX_FROSTBALLS = 16;
     public static final int RUNNER_FROSTBALL_SLOW_TICKS = 40;
     public static final int RUNNER_FROSTBALL_SLOW_AMPLIFIER = 2;
+    /** First-pass companion cadence; tune against live Reborn gameplay before parity sign-off. */
+    public static final long BACON_BABY_PIG_ATTACK_COOLDOWN_MILLIS = 1_500L;
+    public static final double BACON_BABY_PIG_ATTACK_RANGE_SQUARED = 2.25D;
+
+    public static boolean shouldBaconBabyPigAttack(long nowMillis, long readyAtMillis,
+            double targetDistanceSquared) {
+        return nowMillis >= readyAtMillis && Double.isFinite(targetDistanceSquared)
+                && targetDistanceSquared >= 0.0D
+                && targetDistanceSquared <= BACON_BABY_PIG_ATTACK_RANGE_SQUARED;
+    }
+
     /** Selected community balance value for the King of Bacon win achievement. */
     public static final int BACON_BRAWL_KING_OF_BACON_WINS = 15;
     /** Pigs In Blankets is earned by six kills in a single game. */
