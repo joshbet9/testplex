@@ -482,6 +482,10 @@ class ArcadePortGameTest {
         assertEquals(1.8D, ArcadePortRules.nextBaconKnockback(1.5D), 0.00001D);
     }
 
+    @Test void baconBlastUsesTheOriginalSixteenPorkProjectileStack() {
+        assertEquals(16, ArcadePortRules.BACON_BLAST_PROJECTILE_STACK_SIZE);
+    }
+
     @Test void baconBrawlAbilitiesKeepOriginalKitCooldownsAlongsideMeterCharge() {
         assertEquals(8_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("el-muchacho-pigo"));
         assertEquals(8_000L, ArcadePortRules.baconBrawlAbilityCooldownMillis("body slam"));
