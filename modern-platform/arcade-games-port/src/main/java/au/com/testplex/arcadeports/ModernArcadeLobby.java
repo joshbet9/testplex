@@ -68,6 +68,7 @@ public final class ModernArcadeLobby implements Listener {
 
     private static final String LOBBY_MARKER = "TESTPLEX_LEGACY_LOBBY_V1";
     private final JavaPlugin plugin;
+    private final ModernLobbyScoreboard lobbyScoreboard;
     private final NamespacedKey displayKey;
     private final NamespacedKey hotbarActionKey;
     private final NamespacedKey legacyPanelItemKey;
@@ -75,6 +76,7 @@ public final class ModernArcadeLobby implements Listener {
 
     public ModernArcadeLobby(JavaPlugin plugin) {
         this.plugin = plugin;
+        this.lobbyScoreboard = new ModernLobbyScoreboard(plugin);
         this.displayKey = new NamespacedKey(plugin, "legacy-lobby-datapoint");
         this.hotbarActionKey = new NamespacedKey(plugin, "lobby-hotbar-action");
         this.legacyPanelItemKey = new NamespacedKey(plugin, "game-panel-item");
@@ -189,6 +191,7 @@ public final class ModernArcadeLobby implements Listener {
                 List.of(ChatColor.GRAY + "Open the Testplex Arcade game selector.",
                         ChatColor.YELLOW + "Right-click to choose a game.",
                         ChatColor.DARK_GRAY + "Command: /game"), "gamepanel"));
+        lobbyScoreboard.apply(player);
     }
 
     private ItemStack createHotbarItem(Material type, String title, List<String> lore, String action) {
