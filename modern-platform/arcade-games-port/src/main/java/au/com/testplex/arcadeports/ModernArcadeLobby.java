@@ -45,7 +45,6 @@ public final class ModernArcadeLobby implements Listener {
     public static final int PLANE_MIN = -50;
     public static final int PLANE_MAX_EXCLUSIVE = 50;
     public static final int FLOOR_Y = 100;
-    public static final int HOTBAR_STATS_SLOT = 0;
     public static final int HOTBAR_COSMETICS_SLOT = 4;
     public static final int HOTBAR_GAME_PANEL_SLOT = 8;
 
@@ -177,15 +176,12 @@ public final class ModernArcadeLobby implements Listener {
             ItemStack item = inventory.getItem(slot);
             if (isLobbyHotbarItem(item)) inventory.setItem(slot, null);
         }
-        inventory.setItem(HOTBAR_STATS_SLOT, createHotbarItem(Material.BOOK,
-                ChatColor.AQUA + "" + ChatColor.BOLD + "Stats",
-                List.of(ChatColor.GRAY + "View your local Arcade test statistics.",
-                        ChatColor.YELLOW + "Right-click to open stats.",
-                        ChatColor.DARK_GRAY + "Command: /stats"), "stats"));
+        // Legacy Testplex sandbox hotbar: Mineplex Core supplied Cosmetics in slot 5;
+        // GameHostManager supplied Game Panel in slot 9. /stats remained a command, not a hotbar item.
         inventory.setItem(HOTBAR_COSMETICS_SLOT, createHotbarItem(Material.CHEST,
-                ChatColor.LIGHT_PURPLE + "" + ChatColor.BOLD + "Cosmetics",
-                List.of(ChatColor.GRAY + "Browse Arcade cosmetics and win effects.",
-                        ChatColor.YELLOW + "Right-click to customise.",
+                ChatColor.LIGHT_PURPLE + "Cosmetics",
+                List.of(ChatColor.GRAY + "Open the Mineplex-style Cosmetics menu.",
+                        ChatColor.YELLOW + "Right-click to browse.",
                         ChatColor.DARK_GRAY + "Command: /cosmetics"), "cosmetics"));
         // Speckled Melon (1.8) became Glistering Melon Slice in modern Minecraft.
         inventory.setItem(HOTBAR_GAME_PANEL_SLOT, createHotbarItem(Material.GLISTERING_MELON_SLICE,
@@ -266,8 +262,8 @@ public final class ModernArcadeLobby implements Listener {
 
     private void ensureDatapoints(World world) {
         // Preserve the original LegacyGameLobbyManager's kit/team display pads.
-        buildDisplayPad(world, (int) KIT_DISPLAY_X, 0, Material.RED_WOOL);
-        buildDisplayPad(world, (int) TEAM_DISPLAY_X, 0, Material.BLUE_WOOL);
+        // Kit and queue stations are built separately by ModernArcadeLobbyRuntime
+        // from the selected game's kit list, just as LegacyGameLobbyManager.createKits/createTeams did.
 
         // Port of LegacyGameLobbyManager.setPodium(new Location(world, 0, 101.5, -15), emerald).
         // The 4x4 emerald floor is surrounded by a 6x6 dark outline; the 2x2 top

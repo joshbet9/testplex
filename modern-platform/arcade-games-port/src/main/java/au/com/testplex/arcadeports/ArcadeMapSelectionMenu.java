@@ -48,7 +48,8 @@ public final class ArcadeMapSelectionMenu implements Listener {
             String mapName = SourceMapCatalog.displayName(plugin, game);
             ItemStack map = createItem(Material.PAPER, ChatColor.YELLOW + mapName,
                     ChatColor.GRAY + "Source: " + game.displayName(),
-                    ChatColor.YELLOW + "Left-click to select this map.");
+                    ChatColor.YELLOW + "Left-click to select this map.",
+                    ChatColor.DARK_GRAY + "The selected map is used when Start Game is pressed.");
             mark(map, "select-map", game, resource);
             inventory.setItem(9, map);
         }

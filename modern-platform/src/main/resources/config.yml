@@ -1,0 +1,4 @@
+# Owners/admins for the isolated Testplex Modern 26.3 server.
+# joshbet9 is also enforced in code so a pre-existing disk config cannot silently remove access.
+admin-usernames:
+  - joshbet9

