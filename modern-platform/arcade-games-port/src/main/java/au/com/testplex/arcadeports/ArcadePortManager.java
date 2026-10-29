@@ -526,16 +526,31 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "That game is already in progress. Use /arcadeport status or queue the next game.");
             return;
         }
+        if (manualStartCountdown != null && manualStartType != type) {
+            player.sendMessage(ChatColor.RED + manualStartType.displayName()
+                    + " is already counting down. Wait for that round to start before queueing another game.");
+            return;
+        }
         lobby.ensurePlayerInLobby(player);
         for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(player.getUniqueId());
         queues.computeIfAbsent(type.id(), ignored -> new LinkedHashMap<>()).put(player.getUniqueId(), player);
-        player.sendMessage(ChatColor.GREEN + "Queued for " + type.displayName() + ". " +
-                (quickStart ? "Starting after a short join window so friends can join too." : "An operator/player can use /arcadeport start " + type.id() + "."));
+        String nextAction = manualStartCountdown != null && manualStartType == type
+                ? "The existing start countdown is already running."
+                : quickStart ? "Starting after a short join window so friends can join too."
+                : "An operator/player can use /arcadeport start " + type.id() + ".";
+        player.sendMessage(ChatColor.GREEN + "Queued for " + type.displayName() + ". " + nextAction);
         if (quickStart) scheduleQuickStart(type);
     }
 
     private void scheduleQuickStart(ArcadePortGame type) {
         if (active != null) return;
+        if (manualStartCountdown != null) {
+            for (Player player : onlineQueuedPlayers(type)) {
+                player.sendMessage(ChatColor.YELLOW + manualStartType.displayName()
+                        + " already has a start countdown; the queued quick-start will not create a second timer.");
+            }
+            return;
+        }
         if (pendingStart != null) {
             if (pendingType == type) return;
             pendingStart.cancel();
