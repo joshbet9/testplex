@@ -394,6 +394,40 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldPrimeBombLobbersBomb(8_000L, false));
     }
 
+    @Test void baconBrawlSourceArchiveContainsTheRequiredGreenSpawnMarkers() throws Exception {
+        try (var input = getClass().getClassLoader().getResourceAsStream("maps/bacon-brawl.zip")) {
+            assertNotNull(input, "Bacon Brawl must use its embedded Reborn source map");
+            String worldConfig = null;
+            try (var zip = new java.util.zip.ZipInputStream(input)) {
+                java.util.zip.ZipEntry entry;
+                while ((entry = zip.getNextEntry()) != null) {
+                    if (entry.getName().endsWith("WorldConfig.dat")) {
+                        worldConfig = new String(zip.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                        break;
+                    }
+                    zip.closeEntry();
+                }
+            }
+            assertNotNull(worldConfig, "Source archive must include WorldConfig.dat");
+            String dataName = "";
+            int greenSpawnCount = 0;
+            for (String line : worldConfig.split("\\R")) {
+                int colon = line.indexOf(':');
+                if (colon <= 0) continue;
+                String key = line.substring(0, colon).trim();
+                String value = line.substring(colon + 1).trim();
+                if ("DATA_NAME".equalsIgnoreCase(key)) {
+                    dataName = value;
+                } else if ("DATA_LOCS".equalsIgnoreCase(key) && "GREEN".equalsIgnoreCase(dataName)
+                        && !value.isBlank()) {
+                    greenSpawnCount += value.split(":").length;
+                }
+            }
+            assertTrue(greenSpawnCount >= 16,
+                    "Source Bacon Brawl map guidance requires at least 16 GREEN starts; got " + greenSpawnCount);
+        }
+    }
+
     @Test void baconBrawlExposesTheThreeSourceKitsAndDoubleHungerRules() {
         assertEquals("pig", ArcadePortRules.normalizeBaconBrawlKit("Pig"));
         assertEquals("pig", ArcadePortRules.normalizeBaconBrawlKit("sheep-pig"));
