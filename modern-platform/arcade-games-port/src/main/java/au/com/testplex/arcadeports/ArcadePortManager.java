@@ -6386,6 +6386,34 @@ public final class ArcadePortManager implements Listener {
 
     private void cacheBombLobbersTeamSpawnCentres(Session session) {
         session.bombTeamSpawnCentres.clear();
+
+        // Reborn calculates each side from every configured team spawn, not just the
+        // subset of spawn markers occupied by the current lobby. Keep that boundary stable
+        // when the test server has a small party or only one player on either team.
+        SourceMapCatalog.MapData sourceMap = sourceMapData.get(session.type.id());
+        if (sourceMap != null) {
+            boolean hasAllTeamMarkers = true;
+            for (int team = 0; team < 2; team++) {
+                List<Location> markers = sourceMap.teamSpawnLocationsForTeam(team, 2);
+                if (markers.isEmpty()) {
+                    hasAllTeamMarkers = false;
+                    break;
+                }
+                double x = 0.0D, y = 0.0D, z = 0.0D;
+                for (Location marker : markers) {
+                    x += marker.getX();
+                    y += marker.getY();
+                    z += marker.getZ();
+                }
+                int count = markers.size();
+                session.bombTeamSpawnCentres.put(team, new Location(session.world,
+                        x / count, y / count, z / count));
+            }
+            if (hasAllTeamMarkers) return;
+            session.bombTeamSpawnCentres.clear();
+        }
+
+        // Fallback for a malformed or incomplete source map: derive centres from occupied spawns.
         Map<Integer, double[]> totals = new HashMap<>();
         Map<Integer, Integer> counts = new HashMap<>();
         for (UUID id : session.players.keySet()) {
