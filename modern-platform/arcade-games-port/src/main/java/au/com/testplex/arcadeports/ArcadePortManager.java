@@ -61,9 +61,11 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.projectiles.ProjectileSource;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
@@ -2525,6 +2527,77 @@ public final class ArcadePortManager implements Listener {
                 && ChatColor.stripColor(meta.getDisplayName()).equals("Tracking Compass");
     }
 
+    private void openBaconCompassMenu(Session session, Player spectator) {
+        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.DARK_GREEN + "Spectator Menu");
+        ItemStack header = namedItem(Material.COMPASS, "Tracking Compass", "Choose a surviving pig to follow.");
+        inventory.setItem(4, header);
+
+        int[] slots = {
+                19, 20, 21, 22, 23, 24, 25,
+                28, 29, 30, 31, 32, 33, 34,
+                37, 38, 39, 40, 41, 42, 43,
+                46, 47, 48, 49, 50, 51, 52
+        };
+        Map<Integer, UUID> targetsBySlot = new HashMap<>();
+        List<Player> targets = alivePlayers(session).stream()
+                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        for (int i = 0; i < targets.size() && i < slots.length; i++) {
+            Player target = targets.get(i);
+            int slot = slots[i];
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            if (head.getItemMeta() instanceof SkullMeta meta) {
+                meta.setOwningPlayer(target);
+                meta.setDisplayName(ChatColor.YELLOW + target.getName());
+                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                double height = target.getLocation().getY() - spectator.getLocation().getY();
+                String kit = session.baconKits.getOrDefault(target.getUniqueId(), "el-muchacho-pigo");
+                meta.setLore(List.of(
+                        ChatColor.GRAY + "Kit: " + kit,
+                        ChatColor.GRAY + "Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance),
+                        ChatColor.GRAY + "Height difference: " + String.format(java.util.Locale.ROOT, "%.1f", height),
+                        ChatColor.YELLOW + "Left-click: Teleport",
+                        ChatColor.YELLOW + "Right-click: Spectate"));
+                head.setItemMeta(meta);
+            }
+            inventory.setItem(slot, head);
+            targetsBySlot.put(slot, target.getUniqueId());
+        }
+        session.baconCompassMenuTargets.put(spectator.getUniqueId(), targetsBySlot);
+        spectator.openInventory(inventory);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onBaconCompassMenuClick(InventoryClickEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.BACON_BRAWL
+                || !isBaconCompassMenuTitle(event.getView().getTitle())) return;
+        event.setCancelled(true);
+        if (!(event.getWhoClicked() instanceof Player spectator)) return;
+        int slot = event.getRawSlot();
+        if (slot < 0 || slot >= event.getView().getTopInventory().getSize()) return;
+        Map<Integer, UUID> targets = session.baconCompassMenuTargets.get(spectator.getUniqueId());
+        UUID targetId = targets == null ? null : targets.get(slot);
+        if (targetId == null) return;
+        Player target = session.players.get(targetId);
+        session.baconCompassMenuTargets.remove(spectator.getUniqueId());
+        spectator.closeInventory();
+        if (target == null || !target.isOnline() || !session.alive.contains(targetId)) {
+            spectator.sendMessage(ChatColor.YELLOW + "That pig is no longer alive.");
+            return;
+        }
+        if (event.isRightClick()) {
+            spectator.setSpectatorTarget(target);
+        } else {
+            spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+        }
+        spectator.setCompassTarget(target.getLocation());
+    }
+
+    private boolean isBaconCompassMenuTitle(String title) {
+        return (ChatColor.DARK_GREEN + "Spectator Menu").equals(title);
+    }
+
     private Player nearestAliveBaconTarget(Session session, Player spectator) {
         return alivePlayers(session).stream()
                 .min(java.util.Comparator.comparingDouble(candidate ->
@@ -4620,6 +4693,7 @@ public final class ArcadePortManager implements Listener {
         session.baconLastDamagedAt.clear();
         session.baconPlayerPigs.clear();
         session.baconPigOwners.clear();
+        session.baconCompassMenuTargets.clear();
         session.respawning.clear();
         session.alive.clear();
         session.players.clear();
@@ -5445,8 +5519,25 @@ public final class ArcadePortManager implements Listener {
                 && !event.getAction().isRightClick();
         if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick && !baconNonRightClick) return;
         Player player = event.getPlayer();
-        if (!session.alive.contains(player.getUniqueId())) return;
         ItemStack heldItem = event.getItem();
+        if (session.type == ArcadePortGame.BACON_BRAWL
+                && !session.alive.contains(player.getUniqueId())
+                && isBaconTrackingCompass(heldItem)) {
+            event.setCancelled(true);
+            if (event.getAction().isRightClick()) {
+                openBaconCompassMenu(session, player);
+            } else if (event.getAction().isLeftClick()) {
+                Player target = nearestAliveBaconTarget(session, player);
+                if (target != null) {
+                    player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                    player.setCompassTarget(target.getLocation());
+                } else {
+                    player.sendMessage(ChatColor.YELLOW + "There are no living pigs to track.");
+                }
+            }
+            return;
+        }
+        if (!session.alive.contains(player.getUniqueId())) return;
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
         if (session.type == ArcadePortGame.BACON_BRAWL && !event.getAction().isRightClick()
                 && "pig".equals(session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo"))) {
@@ -6194,6 +6285,7 @@ public final class ArcadePortManager implements Listener {
             if (pair != null) session.gladiatorResolvedPairs.add(pair);
         }
         session.respawning.remove(id);
+        session.baconCompassMenuTargets.remove(id);
         session.players.remove(id);
         session.snapshots.remove(id);
         checkRoundEnd(session);
@@ -6259,6 +6351,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Team> baconPreviousNameTeams = new HashMap<>();
         final Map<UUID, String> baconNameEntries = new HashMap<>();
         final Map<UUID, Set<UUID>> baconHiddenViewersByOwner = new HashMap<>();
+        final Map<UUID, Map<Integer, UUID>> baconCompassMenuTargets = new HashMap<>();
         final Map<UUID, UUID> baconPlayerPigs = new HashMap<>();
         final Map<UUID, UUID> baconPigOwners = new HashMap<>();
         final Set<UUID> baconPigsInBlanketsAwarded = new HashSet<>();
