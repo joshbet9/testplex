@@ -118,64 +118,36 @@ public final class MenuService implements Listener {
         player.openInventory(inventory);
     }
 
+    /** Original ArcadeCosmeticsMenu game page: inset feature grid and back/close controls. */
     private void openGameDetails(Player player, GameDefinition game) {
-        Inventory inventory = Bukkit.createInventory(null, 27, GAME_TITLE + game.getId());
-        inventory.setItem(11, makeItem(icon(game.getIcon()), ChatColor.AQUA + game.getName(), List.of(
-                ChatColor.GRAY + game.getDescription(),
-                ChatColor.YELLOW + "Port status: " + game.getPortStatus().getDisplay())));
-        String enginePlugin = null;
-        String startCommand = null;
-        if ("monster-maze".equals(game.getId())) {
-            enginePlugin = "MonsterMazeModern";
-            startCommand = "mm start";
-        } else if ("snake".equals(game.getId())) {
-            enginePlugin = "SnakeModern";
-            startCommand = "snake start";
-        } else {
-            enginePlugin = "ArcadeMechanicsModern";
-            startCommand = "arcadeport play " + game.getId();
+        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.BLACK + GAME_TITLE + game.getId());
+        int[] slots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34};
+        int index = 0;
+        for (CosmeticLineDefinition line : game.getCosmeticLines()) {
+            if (index >= slots.length) break;
+            Set<String> selected = preferences.getSelected(player.getUniqueId(), game, line);
+            String equipped = selected.isEmpty() ? "Default" : selected.iterator().next();
+            ItemStack item = makeItem(icon(line.getIcon()), ChatColor.YELLOW + line.getTitle(), List.of(
+                    ChatColor.GRAY + line.getDescription(),
+                    ChatColor.GRAY + (line.getSelectionMode() == CosmeticLineDefinition.SelectionMode.MULTI
+                            ? "Enabled toggles: " + selected.size() : "Equipped: " + equipped),
+                    ChatColor.GREEN + "Click to view options",
+                    ChatColor.DARK_GRAY + "Feature: " + line.getId()));
+            mark(item, "cosmetic-line", game, line, null);
+            inventory.setItem(slots[index++], item);
         }
-        if (enginePlugin != null) {
-            boolean engineInstalled = Bukkit.getPluginManager().isPluginEnabled(enginePlugin);
-            ItemStack start = makeItem(engineInstalled ? Material.LIME_CONCRETE : Material.BARRIER,
-                    (engineInstalled ? ChatColor.GREEN : ChatColor.RED) + "Start / Test " + game.getName(),
-                    List.of(ChatColor.GRAY + (engineInstalled
-                            ? "Launch a mechanics test run."
-                            : "Install " + enginePlugin + ".jar alongside this plugin."),
-                            ChatColor.YELLOW + (engineInstalled ? "Click to run /" + startCommand + "." : "Engine module not detected.")));
-            mark(start, "launch-game", game, null, null);
-            inventory.setItem(4, start);
-        }
-        ItemStack cosmetics = makeItem(Material.CHEST, ChatColor.LIGHT_PURPLE + "Game-specific cosmetics", List.of(
-                ChatColor.GRAY + "Browse this game's own visual identity."));
-        mark(cosmetics, "open-lines", game, null, null);
-        inventory.setItem(13, cosmetics);
-        ItemStack wins = makeItem(Material.FIREWORK_ROCKET, ChatColor.GOLD + "Win Effects", List.of(
-                ChatColor.GRAY + "Distinct celebrations for " + game.getName() + "."));
-        mark(wins, "win-effects", game, null, null);
-        inventory.setItem(15, wins);
-        inventory.setItem(22, backItem("Back to Game Panel", "back-panel", null));
+        inventory.setItem(45, backItem("Back to Games", "back-arcade-cosmetics", null));
+        inventory.setItem(49, makeItem(Material.BARRIER, ChatColor.RED + "Close", List.of()));
+        ItemStack winItem = makeItem(Material.FIREWORK_ROCKET, ChatColor.GOLD + "Win Effects",
+                List.of(ChatColor.GRAY + "Configure " + game.getName() + " win effect."));
+        mark(winItem, "win-effects", game, null, null);
+        inventory.setItem(51, winItem);
         player.openInventory(inventory);
     }
 
     private void openLines(Player player, GameDefinition game) {
-        Inventory inventory = Bukkit.createInventory(null, 54, LINES_TITLE + game.getId());
-        int slot = 0;
-        for (CosmeticLineDefinition line : game.getCosmeticLines()) {
-            if (slot >= 45) break;
-            ItemStack item = makeItem(line.getIcon(), ChatColor.LIGHT_PURPLE + line.getTitle(), List.of(
-                    ChatColor.GRAY + line.getDescription(),
-                    ChatColor.YELLOW + "Selection: " + line.getSelectionMode().name(),
-                    ChatColor.GRAY + String.valueOf(line.getOptions().size()) + " options"));
-            mark(item, "cosmetic-line", game, line, null);
-            inventory.setItem(slot++, item);
-        }
-        ItemStack wins = makeItem(Material.FIREWORK_ROCKET, ChatColor.GOLD + "Win Effects", List.of(
-                ChatColor.GRAY + "Win effects are configured separately from cosmetic lines."));
-        mark(wins, "win-effects", game, null, null);
-        inventory.setItem(49, wins);
-        inventory.setItem(53, backItem("Back to Game", "back-game", game));
-        player.openInventory(inventory);
+        // The source Feature page is represented by the game's cosmetic-line grid.
+        openGameDetails(player, game);
     }
 
     private void openOptions(Player player, GameDefinition game, CosmeticLineDefinition line) {
