@@ -433,6 +433,12 @@ class ArcadePortGameTest {
                         new org.bukkit.util.Vector(0.0D, 0.0D, 0.0D), 1.2D));
     }
 
+    @Test void bombLobbersThrowsOnBothMouseButtonsButNotPhysicalActions() {
+        // Source listener rejects only Action.PHYSICAL before checking the held TNT.
+        assertTrue(ArcadePortRules.shouldThrowBombLobbersOnAction(false)); // left/right, air/block
+        assertFalse(ArcadePortRules.shouldThrowBombLobbersOnAction(true)); // pressure-plate / physical
+    }
+
     @Test void bombLobbersKitsPitchLevelsCraftmanAndBombPrimingMatchSourceTiming() {
         assertEquals("jumper", ArcadePortRules.normalizeBombLobbersKit("Jumper"));
         assertEquals("armorer", ArcadePortRules.normalizeBombLobbersKit("armourer"));
