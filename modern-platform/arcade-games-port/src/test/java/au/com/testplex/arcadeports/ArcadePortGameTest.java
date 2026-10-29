@@ -374,6 +374,17 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isSpleefFloorMaterial(null));
     }
 
+    @Test void bombLobbersExplosionExposureUsesVanillaBoundingBoxSampleGrid() {
+        double stepX = ArcadePortRules.bombLobbersExposureSampleStep(0.6D);
+        double stepY = ArcadePortRules.bombLobbersExposureSampleStep(1.8D);
+        assertEquals(1.0D / 2.2D, stepX, 0.000001D);
+        assertEquals(1.0D / 4.6D, stepY, 0.000001D);
+        assertEquals(0.5D * (1.0D - 2.0D * stepX),
+                ArcadePortRules.bombLobbersExposureSampleOffset(stepX), 0.000001D);
+        assertEquals(0.0D, ArcadePortRules.bombLobbersExposureSampleOffset(Double.NaN), 0.000001D);
+        assertTrue(Double.isNaN(ArcadePortRules.bombLobbersExposureSampleStep(-0.1D)));
+    }
+
     @Test void bombLobbersDirectHitUsesLegacyKnockbackAndGroundBoost() {
         var airborne = ArcadePortRules.bombLobbersDirectHitVelocity(
                 new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D), false);
