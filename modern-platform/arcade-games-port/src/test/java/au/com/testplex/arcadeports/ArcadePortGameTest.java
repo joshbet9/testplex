@@ -616,6 +616,14 @@ class ArcadePortGameTest {
         assertEquals("", ArcadePortRules.baconBrawlAchievementConfigKey(playerId, "../flash-fried"));
     }
 
+    @Test void baconBrawlWinMilestoneUnlocksOnTheFifteenthWin() {
+        assertEquals(15, ArcadePortRules.BACON_BRAWL_WINS_ACHIEVEMENT_REQUIRED);
+        assertFalse(ArcadePortRules.shouldAwardBaconBrawlWinsMilestone(0));
+        assertFalse(ArcadePortRules.shouldAwardBaconBrawlWinsMilestone(14));
+        assertTrue(ArcadePortRules.shouldAwardBaconBrawlWinsMilestone(15));
+        assertTrue(ArcadePortRules.shouldAwardBaconBrawlWinsMilestone(16));
+    }
+
     @Test void baconBrawlUsesTheRequestedThreeAchievements() {
         assertEquals(60_000L, ArcadePortRules.BACON_FLASH_FRIED_MAX_WIN_MILLIS);
         assertTrue(ArcadePortRules.shouldAwardBaconFlashFried(0L));
