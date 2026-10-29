@@ -5056,7 +5056,7 @@ public final class ArcadePortManager implements Listener {
         session.snapshots.clear();
     }
 
-    /** Record the three Bacon Brawl achievements in the isolated test config, never production milestones. */
+    /** Record local Bacon Brawl achievements in isolated test config, never production milestones. */
     private void recordBaconBrawlAchievements(Session session, Player winner) {
         UUID id = winner.getUniqueId();
         String winsKey = ArcadePortRules.baconBrawlAchievementConfigKey(id, "wins");
