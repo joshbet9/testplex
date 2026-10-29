@@ -526,8 +526,8 @@ class ArcadePortGameTest {
 
     @Test void baconBlastThrownItemUsesSweptHitRadiusAndSafeExpiry() {
         assertTrue(ArcadePortRules.isBaconBlastNearPlayer(0.0D));
-        assertTrue(ArcadePortRules.isBaconBlastNearPlayer(1.0D));
-        assertFalse(ArcadePortRules.isBaconBlastNearPlayer(1.01D));
+        assertTrue(ArcadePortRules.isBaconBlastNearPlayer(0.25D));
+        assertFalse(ArcadePortRules.isBaconBlastNearPlayer(0.26D));
         assertFalse(ArcadePortRules.isBaconBlastNearPlayer(Double.NaN));
         assertFalse(ArcadePortRules.isBaconBlastNearPlayer(-1.0D));
 
