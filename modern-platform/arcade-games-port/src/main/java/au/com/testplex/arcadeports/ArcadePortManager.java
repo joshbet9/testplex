@@ -7305,7 +7305,9 @@ public final class ArcadePortManager implements Listener {
             if (ownerId == null) continue;
             if (session.bombPrimed.contains(bombId)) continue;
             Player owner = session.players.get(ownerId);
-            if (owner == null || !owner.isOnline() || !session.alive.contains(ownerId)) {
+            // The legacy updater checks IsPlaying, not IsAlive: TNT remains a live projectile
+            // after its thrower is eliminated, as long as that player is still in the match.
+            if (!ArcadePortRules.shouldKeepBombLobbersBombTracked(owner != null && owner.isOnline())) {
                 removeBombTracking(session, bombId);
                 session.entities.remove(bomb);
                 bomb.remove();
@@ -7355,7 +7357,7 @@ public final class ArcadePortManager implements Listener {
                 owner.sendMessage(ChatColor.YELLOW + "Direct hit!");
                 double directHitDamage = bombLobbersDamageAfterArmor(target, 10.0D);
                 if (target.getHealth() <= directHitDamage) {
-                    eliminate(session, target, owner, "was directly hit by TNT");
+                    eliminate(session, target, session.alive.contains(ownerId) ? owner : null, "was directly hit by TNT");
                 } else {
                     target.setHealth(target.getHealth() - directHitDamage);
                 }
@@ -7674,7 +7676,7 @@ public final class ArcadePortManager implements Listener {
                 if (bombLobbersBlast) blastDamage = bombLobbersDamageAfterArmor(target, blastDamage);
                 if (blastDamage > 0.0D) {
                     if (target.getHealth() <= blastDamage) {
-                        eliminate(session, target, owner, "was caught in a TNT blast");
+                        eliminate(session, target, owner != null && session.alive.contains(ownerId) ? owner : null, "was caught in a TNT blast");
                         if (active != session) return;
                     } else {
                         target.setHealth(target.getHealth() - blastDamage);

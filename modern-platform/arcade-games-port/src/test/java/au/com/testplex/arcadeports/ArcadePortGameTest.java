@@ -587,6 +587,12 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.bombLobbersKitUsesArmor("unknown"));
     }
 
+    @Test void bombLobbersTntRemainsTrackedAfterThrowerElimination() {
+        // IsPlaying remains true for an eliminated spectator; only leaving the server removes tracking.
+        assertTrue(ArcadePortRules.shouldKeepBombLobbersBombTracked(true));
+        assertFalse(ArcadePortRules.shouldKeepBombLobbersBombTracked(false));
+    }
+
     @Test void bombLobbersJumperAndWallerInheritTheLegacyTeamArmorModule() {
         assertTrue(ArcadePortRules.bombLobbersKitUsesTeamArmor("jumper"));
         assertTrue(ArcadePortRules.bombLobbersKitUsesTeamArmor("waller"));

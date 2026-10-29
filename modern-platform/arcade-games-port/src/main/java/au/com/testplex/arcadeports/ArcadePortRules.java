@@ -238,10 +238,10 @@ public final class ArcadePortRules {
     public static final long BOMB_LOBBERS_MAX_FLIGHT_MILLIS = 8_000L;
     public static final int BOMB_LOBBERS_FUSE_TICKS = 60;
     public static final int BOMB_LOBBERS_MAX_CARRIED = 3;
-    /** Vanilla 1.8 TNT size parameter; entity damage reaches twice this distance. */
     /** Reborn renders two dust particles per 0.2-block segment while TNT is airborne. */
     public static final double BOMB_LOBBERS_TRAIL_SAMPLE_SPACING = 0.2D;
     public static final int BOMB_LOBBERS_TEAM_BADGE_SLOT = 8;
+    /** Vanilla 1.8 TNT size parameter; entity damage reaches twice this distance. */
     public static final double BOMB_LOBBERS_EXPLOSION_SIZE = 4.0D;
     public static final double BOMB_LOBBERS_EXPLOSION_RADIUS = BOMB_LOBBERS_EXPLOSION_SIZE * 2.0D;
     public static final double BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE = 50.0D;
@@ -470,7 +470,9 @@ public final class ArcadePortRules {
         return (int) Math.floor(segmentLength / BOMB_LOBBERS_TRAIL_SAMPLE_SPACING) + 1;
     }
 
-    /** Only the source Armorer (iron) and Pitcher (chainmail) kits equip armour. */
+    /** True for the metal armour supplied directly by the source Armorer/Pitcher kits.
+     * Jumper/Waller instead inherit the separate team-coloured leather armour module.
+     */
     public static boolean bombLobbersKitUsesArmor(String kit) {
         String normalized = normalizeBombLobbersKit(kit);
         return "armorer".equals(normalized) || "pitcher".equals(normalized);
@@ -498,6 +500,14 @@ public final class ArcadePortRules {
             case 3 -> 2.25D;
             default -> 2.0D;
         };
+    }
+
+    /**
+     * Reborn keeps a launched bomb tracked while its thrower remains an online participant,
+     * even after elimination; the source checks IsPlaying rather than IsAlive here.
+     */
+    public static boolean shouldKeepBombLobbersBombTracked(boolean throwerStillPlaying) {
+        return throwerStillPlaying;
     }
 
     /** Reborn throws on every live PlayerInteractEvent except a physical click. */
