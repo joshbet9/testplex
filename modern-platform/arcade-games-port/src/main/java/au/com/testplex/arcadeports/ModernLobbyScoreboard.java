@@ -42,7 +42,15 @@ public final class ModernLobbyScoreboard {
 
         String serverName = plugin.getConfig().getString("lobby-scoreboard.server-name", "Testplex Modern");
         String website = plugin.getConfig().getString("lobby-scoreboard.website", "www.mineplex.com");
-        String rank = player.isOp() || player.hasPermission("testplex.arcadeports.admin")
+        List<String> configuredAdmins = plugin.getConfig().getStringList("admin-usernames");
+        boolean configuredAdmin = configuredAdmins.stream()
+                .anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
+        // The lobby's join listener may run before the OP grant listener in the
+        // same tick, so resolve the configured sandbox owner here as well.
+        if (configuredAdmins.stream().noneMatch(name -> "joshbet9".equalsIgnoreCase(name))
+                && "joshbet9".equalsIgnoreCase(player.getName())) configuredAdmin = true;
+        String rank = player.isOp() || configuredAdmin
+                || player.hasPermission("testplex.arcadeports.admin")
                 || player.hasPermission("testplex.modern.admin") ? "Admin" : "No Rank";
         String gems = String.valueOf(plugin.getConfig().getInt("lobby-scoreboard.gems." + player.getUniqueId(), 0));
         String shards = String.valueOf(plugin.getConfig().getInt("lobby-scoreboard.shards." + player.getUniqueId(), 0));
