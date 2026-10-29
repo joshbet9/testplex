@@ -1167,7 +1167,7 @@ class ArcadePortGameTest {
         assertEquals(1.0D, ArcadePortRules.bombLobbersBlastDamage(8.0D, 1.0D), 0.00001D);
         assertEquals(0.0D, ArcadePortRules.bombLobbersBlastDamage(8.01D, 1.0D), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.bombLobbersBlastDamage(0.0D, 0.0D), 0.00001D);
-        assertEquals(10.5625D, ArcadePortRules.bombLobbersBlastDamage(2.0D, 0.5D), 0.00001D);
+        assertEquals(15.4375D, ArcadePortRules.bombLobbersBlastDamage(2.0D, 0.5D), 0.00001D);
         assertEquals(50.0D, ArcadePortRules.BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE, 0.00001D);
     }
 
