@@ -6660,7 +6660,11 @@ public final class ArcadePortManager implements Listener {
                 player.sendMessage(ChatColor.YELLOW + "There is not enough clear space to build that wall.");
                 return true;
             }
+            long now = System.currentTimeMillis();
+            long readyAt = session.bombWallerReadyAt.getOrDefault(id, 0L);
+            if (!ArcadePortRules.isBombLobbersWallerReady(now, readyAt)) return true;
             for (Block wall : wallBlocks) wall.setType(Material.STONE_BRICKS, false);
+            session.bombWallerReadyAt.put(id, ArcadePortRules.nextBombLobbersWallerReadyAt(now));
             consumeHeld(player);
             player.getWorld().playSound(clicked.getLocation(), Sound.BLOCK_STONE_PLACE, 0.8F, 0.9F);
             return true;
@@ -6979,6 +6983,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> bombLobbersKits = new HashMap<>();
         final Map<UUID, Integer> bombPitchLevels = new HashMap<>();
         final Set<UUID> bombDoubleJumpAvailable = new HashSet<>();
+        final Map<UUID, Long> bombWallerReadyAt = new HashMap<>();
         final Map<UUID, Long> bombNextCraftAt = new HashMap<>();
         final Map<UUID, String> spleefKits = new HashMap<>();
         final Map<UUID, Long> spleefLeapReadyAt = new HashMap<>();
