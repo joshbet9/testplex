@@ -5615,6 +5615,9 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && event.getEntity() instanceof Player baconTarget
                 && session.players.containsKey(baconTarget.getUniqueId())) {
+            if (ArcadePortRules.shouldEndBaconSheepCloakOnDamageCause(event.getCause())) {
+                clearBaconCloak(session, baconTarget.getUniqueId());
+            }
             if (ArcadePortRules.shouldSuppressBaconBlastHealthDamage(
                     true, session.baconBlastExplosionDepth > 0, event.getCause())) {
                 event.setCancelled(true);
@@ -5639,7 +5642,10 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             if (event.getCause() == org.bukkit.event.entity.EntityDamageEvent.DamageCause.FIRE_TICK) {
+                // Fire ticks do not deal health damage in the round, but Reborn still ends Cloak
+                // on the incoming damage event, so the visual effect must not remain active.
                 event.setCancelled(true);
+                clearBaconCloak(session, baconTarget.getUniqueId());
                 return;
             }
             event.setCancelled(true);
