@@ -7550,8 +7550,12 @@ public final class ArcadePortManager implements Listener {
             Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.0D));
             TNTPrimed bomb = session.world.spawn(spawn, TNTPrimed.class);
             bomb.setFuseTicks(ArcadePortRules.BOMB_LOBBERS_FUSE_TICKS);
-            bomb.setVelocity(player.getLocation().getDirection().normalize().multiply(2.0D).setY(
-                    player.getLocation().getDirection().getY() * 2.0D + 0.1D));
+            double pitchVelocity = "pitcher".equals(session.bombLobbersKits.get(player.getUniqueId()))
+                    ? ArcadePortRules.bombLobbersPitchVelocity(session.bombPitchLevels.getOrDefault(player.getUniqueId(), 2))
+                    : 2.0D;
+            Vector velocity = player.getLocation().getDirection().normalize().multiply(pitchVelocity);
+            velocity.setY(velocity.getY() + 0.1D);
+            bomb.setVelocity(velocity);
             session.entities.add(bomb);
             session.bombOwners.put(bomb.getUniqueId(), player.getUniqueId());
             session.bombLastLocations.put(bomb.getUniqueId(), spawn.clone());
@@ -8276,6 +8280,32 @@ public final class ArcadePortManager implements Listener {
                         directHitDistanceSquared = hitDistanceSquared;
                     }
                 }
+            }
+
+            // Test bots are proper target dummies in every game. In Bomb Lobbers a
+            // TNT direct hit should give the same visible confirmation but must not
+            // eliminate or award stats to an ArmorStand-backed NPC.
+            LivingEntity directBotTarget = null;
+            double directBotHitDistanceSquared = Double.POSITIVE_INFINITY;
+            if (ArcadePortRules.shouldCheckBombLobbersDirectHit(
+                    session.bombDirectHitResolved.contains(bombId))) {
+                for (LivingEntity candidate : lobbyRuntime.botTargets(session.world, ArcadePortGame.BOMB_LOBBERS)) {
+                    if (candidate == null || !candidate.isValid()) continue;
+                    double hitDistanceSquared = ArcadePortRules.bombLobbersDirectHitDistanceSquared(
+                            previous, entitySweepEnd, candidate.getBoundingBox());
+                    if (ArcadePortRules.shouldResolveBombLobbersDirectHitBeforeBlock(
+                            hitDistanceSquared, blockHitDistanceSquared)
+                            && hitDistanceSquared < directBotHitDistanceSquared) {
+                        directBotTarget = candidate;
+                        directBotHitDistanceSquared = hitDistanceSquared;
+                    }
+                }
+            }
+            if (directBotTarget != null
+                    && (directTarget == null || directBotHitDistanceSquared < directHitDistanceSquared)) {
+                session.bombDirectHitResolved.add(bombId);
+                lobbyRuntime.showBombLobbersBotDirectHit(directBotTarget, owner);
+                continue;
             }
 
             if (directTarget != null) {
