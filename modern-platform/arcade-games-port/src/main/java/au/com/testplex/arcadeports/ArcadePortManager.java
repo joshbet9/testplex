@@ -5428,6 +5428,7 @@ public final class ArcadePortManager implements Listener {
         session.bombCompassMenuTargets.clear();
         session.bombSpectateNextTeleportAt.clear();
         session.bombNextCompassUpdateAt = 0L;
+        session.bombNativeDamageSuppressed.clear();
         session.dragonContactCooldowns.clear();
         session.paintProjectileDamage.clear();
         session.paintballLastShotAt.clear();
@@ -6352,9 +6353,11 @@ public final class ArcadePortManager implements Listener {
             if (event instanceof EntityDamageByEntityEvent byEntity
                     && byEntity.getDamager() instanceof TNTPrimed tnt
                     && ArcadePortRules.shouldSuppressNativeBombLobbersTntDamage(
-                            session.bombOwners.containsKey(tnt.getUniqueId()))) {
-                // Managed TNT hits are resolved by updateBombLobbers() or onExplode().
-                // Suppress the vanilla entity-damage event so custom source damage is applied once.
+                            session.bombOwners.containsKey(tnt.getUniqueId())
+                                    || session.bombNativeDamageSuppressed.contains(tnt.getUniqueId()))) {
+                // Managed TNT direct-hit/blast damage is resolved by the source-compatible custom path.
+                // Preserve a one-tick marker because Spigot can dispatch the native explosion damage
+                // after EntityExplodeEvent, by which time the TNT's regular owner mapping is removed.
                 event.setCancelled(true);
                 return;
             }
@@ -7916,6 +7919,11 @@ public final class ArcadePortManager implements Listener {
                     block.setType(ArcadePortRules.bombLobbersBlockAfterExplosion(block.getType()), false);
                 }
             }
+            if (bombLobbersBlast) {
+                session.bombNativeDamageSuppressed.add(bombId);
+                Bukkit.getScheduler().runTaskLater(plugin,
+                        () -> session.bombNativeDamageSuppressed.remove(bombId), 1L);
+            }
             removeBombTracking(session, bombId);
             session.entities.remove(bomb);
             bomb.remove();
@@ -8095,6 +8103,8 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> bombDirectHitResolved = new HashSet<>();
         final Map<Integer, Location> bombTeamSpawnCentres = new HashMap<>();
         final Map<UUID, String> bombLobbersKits = new HashMap<>();
+        /** One-tick IDs for late native damage events emitted after EntityExplodeEvent. */
+        final Set<UUID> bombNativeDamageSuppressed = new HashSet<>();
         final Map<UUID, Integer> bombPitchLevels = new HashMap<>();
         final Set<UUID> bombDoubleJumpAvailable = new HashSet<>();
         final Map<UUID, Long> bombDoubleJumpReadyAt = new HashMap<>();
