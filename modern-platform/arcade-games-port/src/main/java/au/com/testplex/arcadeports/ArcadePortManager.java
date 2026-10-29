@@ -5697,6 +5697,7 @@ public final class ArcadePortManager implements Listener {
         session.bombOwners.clear();
         session.bombLastThrowAt.clear();
         session.bombLastPitchAdjustAt.clear();
+        session.bombLastWallerAt.clear();
         session.bombLastLocations.clear();
         session.bombCreatedAt.clear();
         session.bombPrimed.clear();
@@ -6931,6 +6932,13 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         long lastThrow = session.bombLastThrowAt.getOrDefault(attacker.getUniqueId(), 0L);
         if (lastThrow > 0L && now - lastThrow < 180L) {
+            event.setCancelled(true);
+            return;
+        }
+        long lastWaller = session.bombLastWallerAt.getOrDefault(attacker.getUniqueId(), 0L);
+        if (lastWaller > 0L && now - lastWaller < 180L) {
+            // The interact event already built/attempted the Waller ability; do not
+            // allow the same click to fall through as a melee attack.
             event.setCancelled(true);
             return;
         }
@@ -8549,6 +8557,8 @@ public final class ArcadePortManager implements Listener {
 
     private void useBombLobbersWaller(Session session, Player player, Block clicked) {
         if (session == null || player == null || clicked == null) return;
+        long clickAt = System.currentTimeMillis();
+        session.bombLastWallerAt.put(player.getUniqueId(), clickAt);
         if (clicked.isLiquid()) {
             player.sendMessage(ChatColor.YELLOW + "You may not place a wall in a liquid!");
             return;
@@ -8948,6 +8958,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, UUID> bombOwners = new HashMap<>();
         final Map<UUID, Long> bombLastThrowAt = new HashMap<>();
         final Map<UUID, Long> bombLastPitchAdjustAt = new HashMap<>();
+        final Map<UUID, Long> bombLastWallerAt = new HashMap<>();
         final Map<UUID, Integer> bombKillsByTnt = new HashMap<>();
         final Map<UUID, Location> bombLastLocations = new HashMap<>();
         final Map<UUID, Long> bombCreatedAt = new HashMap<>();
