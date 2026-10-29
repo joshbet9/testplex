@@ -411,22 +411,36 @@ class ArcadePortGameTest {
             assertNotNull(worldConfig, "Source archive must include WorldConfig.dat");
             String teamName = "";
             int greenSpawnCount = 0;
+            int mapMinY = Integer.MIN_VALUE;
+            boolean greenStartAtY13 = false;
             for (String line : worldConfig.split("\\R")) {
                 int colon = line.indexOf(':');
                 if (colon <= 0) continue;
                 String key = line.substring(0, colon).trim();
                 String value = line.substring(colon + 1).trim();
-                if ("TEAM_NAME".equalsIgnoreCase(key)) {
+                if ("MIN_Y".equalsIgnoreCase(key)) {
+                    mapMinY = Integer.parseInt(value);
+                } else if ("TEAM_NAME".equalsIgnoreCase(key)) {
                     teamName = value;
                 } else if ("TEAM_SPAWNS".equalsIgnoreCase(key) && "Green".equalsIgnoreCase(teamName)
                         && !value.isBlank()) {
-                    greenSpawnCount += (int) java.util.Arrays.stream(value.split(":"))
-                            .filter(coordinate -> !coordinate.isBlank()).count();
+                    for (String coordinate : value.split(":")) {
+                        if (coordinate.isBlank()) continue;
+                        greenSpawnCount++;
+                        String[] xyz = coordinate.split(",");
+                        if (xyz.length >= 2 && Double.parseDouble(xyz[1].trim()) == 13.0D) {
+                            greenStartAtY13 = true;
+                        }
+                    }
                 }
             }
             assertTrue(greenSpawnCount >= 16,
                     "Source Bacon Brawl WorldConfig.dat requires at least 16 Green TEAM_SPAWNS; got "
                             + greenSpawnCount);
+            assertEquals(4, mapMinY, "Mighty Lava Arena's source volume starts at Y=4");
+            assertTrue(greenStartAtY13, "Mighty Lava Arena includes valid Green starts at Y=13");
+            assertEquals(3.0D, ArcadePortRules.sourceMapVoidThresholdY(true, mapMinY), 0.00001D,
+                    "the arena fall guard must not eliminate players at the source spawn height");
         }
     }
 
