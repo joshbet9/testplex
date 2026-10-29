@@ -2610,7 +2610,14 @@ public final class ArcadePortManager implements Listener {
 
     private void spawnBaconBlastImpact(Session session, Location impact) {
         // Reborn creates a 0.5-power, non-incendiary, non-block-breaking explosion on impact.
-        session.world.createExplosion(impact.getX(), impact.getY(), impact.getZ(), 0.5F, false, false);
+        // Damage events are synchronous; suppress only its explosion health damage while keeping
+        // the native explosion impulse and the custom swept-hit knockback.
+        session.baconBlastExplosionDepth++;
+        try {
+            session.world.createExplosion(impact.getX(), impact.getY(), impact.getZ(), 0.5F, false, false);
+        } finally {
+            session.baconBlastExplosionDepth--;
+        }
         session.world.spawnParticle(Particle.CLOUD, impact, 14, 0.25D, 0.25D, 0.25D, 0.04D);
     }
 
@@ -5100,6 +5107,11 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && event.getEntity() instanceof Player baconTarget
                 && session.players.containsKey(baconTarget.getUniqueId())) {
+            if (ArcadePortRules.shouldSuppressBaconBlastHealthDamage(
+                    true, session.baconBlastExplosionDepth > 0, event.getCause())) {
+                event.setCancelled(true);
+                return;
+            }
             if (event instanceof EntityDamageByEntityEvent byEntity) {
                 Entity damager = byEntity.getDamager();
                 if (damager instanceof Player attacker) {
@@ -6269,6 +6281,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> runnerFallingBlockExpiresAt = new HashMap<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
         final int participantsAtStart;
+        int baconBlastExplosionDepth;
         double baconKnockback = 1.5D;
         long lastBaconHungerAt;
         long lastBaconSlowUpdateAt;
