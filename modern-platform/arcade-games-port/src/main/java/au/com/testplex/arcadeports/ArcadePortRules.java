@@ -90,6 +90,13 @@ public final class ArcadePortRules {
         return 1.0D;
     }
 
+    /** Stable test-server key; production achievement storage remains a separate integration. */
+    public static String baconBrawlAchievementConfigKey(java.util.UUID playerId, String achievementSlug) {
+        if (playerId == null || achievementSlug == null
+                || !achievementSlug.matches("[a-z0-9-]+")) return "";
+        return "test-achievements.bacon-brawl." + playerId + "." + achievementSlug;
+    }
+
     public static boolean shouldAwardBaconPigsInBlankets(int killsThisGame) {
         return killsThisGame >= BACON_BRAWL_PIGS_IN_BLANKETS_KILLS;
     }
