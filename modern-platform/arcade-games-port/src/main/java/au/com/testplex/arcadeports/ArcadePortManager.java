@@ -187,8 +187,9 @@ public final class ArcadePortManager implements Listener {
         }
         baconKitPreferences.put(player.getUniqueId(), kit);
         Session session = active;
-        boolean roundLocked = session != null && session.type == ArcadePortGame.BACON_BRAWL
+        boolean activeBaconRound = session != null && session.type == ArcadePortGame.BACON_BRAWL
                 && session.players.containsKey(player.getUniqueId()) && session.alive.contains(player.getUniqueId());
+        boolean roundLocked = ArcadePortRules.shouldDeferBaconBrawlKitChange(activeBaconRound);
         player.sendMessage(ChatColor.GREEN + "Bacon Brawl kit set to " + kit
                 + (roundLocked ? " for your next test. Kits are locked once a round starts."
                         : " for your next test."));
