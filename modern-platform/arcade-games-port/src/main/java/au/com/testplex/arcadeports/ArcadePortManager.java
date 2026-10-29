@@ -2555,9 +2555,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void spawnBaconBlastImpact(Session session, Location impact) {
-        session.world.spawnParticle(Particle.EXPLOSION, impact, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+        // Reborn creates a 0.5-power, non-incendiary, non-block-breaking explosion on impact.
+        session.world.createExplosion(impact.getX(), impact.getY(), impact.getZ(), 0.5F, false, false);
         session.world.spawnParticle(Particle.CLOUD, impact, 14, 0.25D, 0.25D, 0.25D, 0.04D);
-        session.world.playSound(impact, Sound.ENTITY_GENERIC_EXPLODE, 0.5F, 1.6F);
     }
 
     private void removeBaconBlastItem(Session session, UUID blastId) {
