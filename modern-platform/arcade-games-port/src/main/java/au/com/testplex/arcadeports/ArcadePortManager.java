@@ -187,19 +187,11 @@ public final class ArcadePortManager implements Listener {
         }
         baconKitPreferences.put(player.getUniqueId(), kit);
         Session session = active;
-        if (session != null && session.type == ArcadePortGame.BACON_BRAWL
-                && session.players.containsKey(player.getUniqueId()) && session.alive.contains(player.getUniqueId())) {
-            clearBaconCloak(session, player.getUniqueId());
-            session.baconSlams.remove(player.getUniqueId());
-            session.baconSlamPowerPercent.remove(player.getUniqueId());
-            session.baconInvincibleUntil.remove(player.getUniqueId());
-            session.baconCloakedUntil.remove(player.getUniqueId());
-            session.baconMeters.put(player.getUniqueId(), 0);
-            if (!"mama-piggles".equals(kit)) removeBaconBabyPig(session, player.getUniqueId());
-            session.baconKits.put(player.getUniqueId(), kit);
-            giveKit(session, player);
-            player.sendMessage(ChatColor.GREEN + "Bacon Brawl kit changed to " + kit + ".");
-        } else player.sendMessage(ChatColor.GREEN + "Bacon Brawl kit set to " + kit + " for your next test.");
+        boolean roundLocked = session != null && session.type == ArcadePortGame.BACON_BRAWL
+                && session.players.containsKey(player.getUniqueId()) && session.alive.contains(player.getUniqueId());
+        player.sendMessage(ChatColor.GREEN + "Bacon Brawl kit set to " + kit
+                + (roundLocked ? " for your next test. Kits are locked once a round starts."
+                        : " for your next test."));
     }
 
     public void selectSpleefKit(Player player, String requestedKit) {
