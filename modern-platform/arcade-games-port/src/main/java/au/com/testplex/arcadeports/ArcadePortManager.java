@@ -6462,6 +6462,17 @@ public final class ArcadePortManager implements Listener {
 
     private void updateBombLobbers(Session session) {
         long now = System.currentTimeMillis();
+        if (now >= session.bombNextBoundaryCheckAt) {
+            session.bombNextBoundaryCheckAt = now + 1_000L;
+            for (Player player : new ArrayList<>(alivePlayers(session))) {
+                int playerTeam = session.teams.getOrDefault(player.getUniqueId(), -1);
+                int playerSide = nearestBombLobbersSpawnTeam(session, player.getLocation());
+                if (ArcadePortRules.shouldEliminateBombLobbersForSide(playerTeam, playerSide)) {
+                    eliminate(session, player, null, "cheating");
+                    if (active != session) return;
+                }
+            }
+        }
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
             if (!player.isFlying() && player.isOnGround()) session.bombDoubleJumpAvailable.add(id);
@@ -6985,6 +6996,7 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> bombDoubleJumpAvailable = new HashSet<>();
         final Map<UUID, Long> bombWallerReadyAt = new HashMap<>();
         final Map<UUID, Long> bombNextCraftAt = new HashMap<>();
+        long bombNextBoundaryCheckAt;
         final Map<UUID, String> spleefKits = new HashMap<>();
         final Map<UUID, Long> spleefLeapReadyAt = new HashMap<>();
         final Map<UUID, Long> spleefSmasherReadyAt = new HashMap<>();
