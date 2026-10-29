@@ -2471,6 +2471,8 @@ public final class ArcadePortManager implements Listener {
         }
         if (target == null) return;
         session.baconBabyAttackReadyAt.put(ownerId, now + ArcadePortRules.BACON_BABY_PIG_ATTACK_COOLDOWN_MILLIS);
+        session.baconLastDamager.put(target.getUniqueId(), ownerId);
+        session.baconLastDamagedAt.put(target.getUniqueId(), now);
 
         Vector away = target.getLocation().toVector().subtract(baby.getLocation().toVector());
         away.setY(0.0D);
@@ -2562,6 +2564,8 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(target.getUniqueId())) return;
         clearBaconCloak(session, attacker.getUniqueId());
         clearBaconCloak(session, target.getUniqueId());
+        session.baconLastDamager.put(target.getUniqueId(), attacker.getUniqueId());
+        session.baconLastDamagedAt.put(target.getUniqueId(), System.currentTimeMillis());
         String kit = session.baconKits.getOrDefault(attacker.getUniqueId(), "el-muchacho-pigo");
         Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
         if (direction.lengthSquared() < 1.0E-5D) direction = attacker.getLocation().getDirection();
@@ -3613,6 +3617,22 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && session.alive.contains(player.getUniqueId())) {
             UUID playerId = player.getUniqueId();
+            if (killer == null && reason != null) {
+                boolean fallKnockout = "fell from the arena".equals(reason)
+                        || "was lost to the water".equals(reason);
+                long lastHitAt = session.baconLastDamagedAt.getOrDefault(playerId, 0L);
+                if (ArcadePortRules.shouldCreditBaconFallKill(
+                        System.currentTimeMillis(), lastHitAt, fallKnockout)) {
+                    UUID lastAttackerId = session.baconLastDamager.get(playerId);
+                    Player lastAttacker = lastAttackerId == null ? null : session.players.get(lastAttackerId);
+                    if (lastAttackerId != null && session.scores.containsKey(lastAttackerId)
+                            && !lastAttackerId.equals(playerId)) {
+                        killer = lastAttacker;
+                    }
+                }
+            }
+            session.baconLastDamager.remove(playerId);
+            session.baconLastDamagedAt.remove(playerId);
             clearBaconCloak(session, playerId);
             removeBaconBabyPig(session, playerId);
             removeBaconPlayerPig(session, playerId);
@@ -4411,6 +4431,8 @@ public final class ArcadePortManager implements Listener {
         session.entities.clear();
         session.baconBabyPigs.clear();
         session.baconBabyAttackReadyAt.clear();
+        session.baconLastDamager.clear();
+        session.baconLastDamagedAt.clear();
         session.baconPlayerPigs.clear();
         session.baconPigOwners.clear();
         session.respawning.clear();
@@ -6068,6 +6090,8 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> baconCloakedUntil = new HashMap<>();
         final Map<UUID, UUID> baconBabyPigs = new HashMap<>();
         final Map<UUID, Long> baconBabyAttackReadyAt = new HashMap<>();
+        final Map<UUID, UUID> baconLastDamager = new HashMap<>();
+        final Map<UUID, Long> baconLastDamagedAt = new HashMap<>();
         Scoreboard baconDisguiseScoreboard;
         Team baconDisguiseTeam;
         final Map<UUID, Team> baconPreviousNameTeams = new HashMap<>();
