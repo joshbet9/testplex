@@ -461,8 +461,9 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.BACON_BRAWL) setupBaconDisguiseNameTags(session, participants);
         long now = System.currentTimeMillis();
         session.startedAt = now;
-        session.endsAt = now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
-                : type == ArcadePortGame.BACON_BRAWL ? ArcadePortRules.BACON_BRAWL_ROUND_MILLIS
+        session.endsAt = type == ArcadePortGame.BACON_BRAWL
+                && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER
+                ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 600_000L : ROUND_MS);
         session.lastBaconHungerAt = now;
         session.lastBaconSlowUpdateAt = now;
@@ -2129,7 +2130,7 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         session.ticks++;
         updateSourceWaterDamage(session, now);
-        if (now >= session.endsAt) {
+        if (session.endsAt > 0L && now >= session.endsAt) {
             if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
                 // Apply any chaser promotions due on the final timer tick before choosing a winner.
                 updateDeathTagChasers(session, now);
@@ -3631,7 +3632,7 @@ public final class ArcadePortManager implements Listener {
             if (!p.isOnline()) continue;
             int score = session.scores.getOrDefault(id, 0);
             String specific = gameStatusText(session, p);
-            String timeText = seconds + "s";
+            String timeText = session.endsAt > 0L ? seconds + "s" : "survive";
             p.sendActionBar(ChatColor.GOLD + session.type.displayName() + ChatColor.GRAY + " | " + timeText
                     + ChatColor.DARK_GRAY + " | " + ChatColor.GREEN + "alive " + alive
                     + ChatColor.DARK_GRAY + " | " + ChatColor.YELLOW + "score " + score
@@ -3727,10 +3728,17 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.type == ArcadePortGame.BACON_BRAWL) {
+            if (session.participantsAtStart > 1
+                    && ArcadePortRules.shouldFinishBaconBrawl(session.alive.size())) {
+                finish(session, alivePlayers(session).stream().findFirst().orElse(null), true);
+            }
+            return;
+        }
         if (session.participantsAtStart <= 1) return;
-        if (session.type == ArcadePortGame.BACON_BRAWL || session.type == ArcadePortGame.PAINTBALL
-                || session.type == ArcadePortGame.TURF_WARS || session.type == ArcadePortGame.SHEEP_QUEST
-                || session.type == ArcadePortGame.EVOLUTION || session.type == ArcadePortGame.ONE_IN_THE_QUIVER) return;
+        if (session.type == ArcadePortGame.PAINTBALL || session.type == ArcadePortGame.TURF_WARS
+                || session.type == ArcadePortGame.SHEEP_QUEST || session.type == ArcadePortGame.EVOLUTION
+                || session.type == ArcadePortGame.ONE_IN_THE_QUIVER) return;
         if (session.type == ArcadePortGame.DEATH_TAG) {
             List<Player> runners = alivePlayers(session).stream()
                     .filter(p -> !session.tagged.contains(p.getUniqueId()))
@@ -3789,27 +3797,12 @@ public final class ArcadePortManager implements Listener {
                     killer.sendMessage(ChatColor.GOLD + "Achievement unlocked: Pigs In Blankets — 6 kills in one game!");
                 }
             }
-            session.respawning.add(playerId);
             if (player.isOnline()) {
                 player.setGameMode(GameMode.SPECTATOR);
-                player.sendMessage(ChatColor.RED + "Knocked out! Respawning in 1 second.");
+                player.sendMessage(ChatColor.RED + "Knocked out! You are out of Bacon Brawl.");
             }
-            Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                if (active != session || !player.isOnline()
-                        || !session.players.containsKey(playerId) || !session.respawning.remove(playerId)) return;
-                Location spawn = spawnFor(session, player);
-                player.teleport(spawn);
-                player.setGameMode(GameMode.ADVENTURE);
-                player.setHealth(player.getMaxHealth());
-                player.setFoodLevel(20);
-                player.setSaturation(20.0F);
-                player.setFireTicks(0);
-                player.setFallDistance(0.0F);
-                player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
-                session.alive.add(playerId);
-                session.lastLocations.put(playerId, spawn.clone());
-                giveKit(session, player);
-            }, ArcadePortRules.BACON_BRAWL_RESPAWN_DELAY_TICKS);
+            // Bacon Brawl is Reborn's last-pig-standing SoloGame: eliminated players do not respawn.
+            checkRoundEnd(session);
             return;
         }
         if (session.type == ArcadePortGame.BACON_BRAWL) {
@@ -4527,11 +4520,9 @@ public final class ArcadePortManager implements Listener {
                 if (winner != null) {
                     int kills = session.scores.getOrDefault(winner.getUniqueId(), 0);
                     announce(session, ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName()
-                            + " won Bacon Brawl with " + kills + (kills == 1 ? " kill!" : " kills!"));
+                            + " is the last pig standing!");
                 } else {
-                    int topKills = session.scores.values().stream().mapToInt(Integer::intValue).max().orElse(0);
-                    announce(session, ChatColor.YELLOW + "Bacon Brawl ended in a tie at " + topKills
-                            + (topKills == 1 ? " kill." : " kills."));
+                    announce(session, ChatColor.YELLOW + "Bacon Brawl ended with no pig left standing.");
                 }
             } else {
                 announce(session, winner == null ? ChatColor.YELLOW + "Round ended." : ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won " + session.type.displayName() + "!");
