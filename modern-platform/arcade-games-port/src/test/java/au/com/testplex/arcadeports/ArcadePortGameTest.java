@@ -461,6 +461,17 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isBaconBrawlBackstab(Double.NaN, 1.0D, 0.0D, -1.0D));
     }
 
+    @Test void baconBrawlAchievementThresholdsUseSelectedValues() {
+        assertEquals(15, ArcadePortRules.BACON_BRAWL_KING_OF_BACON_WINS);
+        assertFalse(ArcadePortRules.shouldAwardBaconKingOfBacon(14));
+        assertTrue(ArcadePortRules.shouldAwardBaconKingOfBacon(15));
+        assertTrue(ArcadePortRules.shouldAwardBaconKingOfBacon(30));
+        assertEquals(6, ArcadePortRules.BACON_BRAWL_PIGS_IN_BLANKETS_KILLS);
+        assertFalse(ArcadePortRules.shouldAwardBaconPigsInBlankets(5));
+        assertTrue(ArcadePortRules.shouldAwardBaconPigsInBlankets(6));
+        assertTrue(ArcadePortRules.shouldAwardBaconPigsInBlankets(7));
+    }
+
     @Test void baconBrawlAwardsTheUniqueHighestKillCountAtTimeout() {
         assertEquals(1, ArcadePortRules.baconBrawlUniqueLeaderIndex(java.util.List.of(2, 5, 3)));
         assertEquals(0, ArcadePortRules.baconBrawlUniqueLeaderIndex(java.util.List.of(7, 2, 1)));
