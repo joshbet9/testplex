@@ -24,6 +24,34 @@
     </dependencies>
     <build>
         <finalName>ArcadeMechanicsModern</finalName>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+            </resource>
+            <resource>
+                <directory>${project.basedir}/../../update/maps</directory>
+                <targetPath>source-maps</targetPath>
+                <filtering>false</filtering>
+                <includes>
+                    <include>Bacon Brawl/**/*.zip</include>
+                    <include>Bomb Lobbers/**/*.zip</include>
+                    <include>Death Tag/**/*.zip</include>
+                    <include>Dragon Escape/**/*.zip</include>
+                    <include>Dragons/**/*.zip</include>
+                    <include>Gladiators/**/*.zip</include>
+                    <include>Micro Battle/**/*.zip</include>
+                    <include>One in the Quiver/**/*.zip</include>
+                    <include>Paintball/**/*.zip</include>
+                    <include>Super Paintball/**/*.zip</include>
+                    <include>Runner/**/*.zip</include>
+                    <include>Sheep Quest/**/*.zip</include>
+                    <include>Speef/**/*.zip</include>
+                    <include>Super Spleef/**/*.zip</include>
+                    <include>Turf Wars/**/*.zip</include>
+                </includes>
+            </resource>
+        </resources>
         <plugins>
             <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.1</version><configuration><release>25</release></configuration></plugin>
             <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-resources-plugin</artifactId><version>3.3.1</version></plugin>
