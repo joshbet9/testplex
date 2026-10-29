@@ -3654,7 +3654,7 @@ public final class ArcadePortManager implements Listener {
                         || !session.players.containsKey(playerId) || !session.respawning.remove(playerId)) return;
                 Location spawn = spawnFor(session, player);
                 player.teleport(spawn);
-                player.setGameMode(GameMode.SURVIVAL);
+                player.setGameMode(GameMode.ADVENTURE);
                 player.setHealth(player.getMaxHealth());
                 player.setFoodLevel(20);
                 player.setSaturation(20.0F);
