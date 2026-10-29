@@ -358,15 +358,21 @@ jobs:
           chunk_dir="$RUNNER_TEMP/testplex-modern-arcade-chunks"
           mkdir -p "$chunk_dir"
           split -b 16M -d -a 3 "$STAGE_DIR/ArcadeMechanicsModern.jar" "$chunk_dir/ArcadeMechanicsModern.jar.part."
+          # The prior retry stalled while writing the 15 MiB map bundle itself. Keep
+          # the bundled map world data in small pieces too, so no single remote write
+          # can leave the SCP receiver silent for minutes.
+          split -b 1M -d -a 3 "$STAGE_DIR/MonsterMazeMaps.tar.gz" "$chunk_dir/MonsterMazeMaps.tar.gz.part."
           mapfile -t arcade_chunks < <(printf '%s\n' "$chunk_dir"/ArcadeMechanicsModern.jar.part.* | sort)
+          mapfile -t world_chunks < <(printf '%s\n' "$chunk_dir"/MonsterMazeMaps.tar.gz.part.* | sort)
           test "${#arcade_chunks[@]}" -gt 0
-          echo "Uploading verified modern artifacts and ${#arcade_chunks[@]} resumable-sized Arcade JAR parts."
+          test "${#world_chunks[@]}" -gt 0
+          echo "Uploading verified modern artifacts, ${#arcade_chunks[@]} Arcade JAR parts and ${#world_chunks[@]} small world-map parts."
           timeout --foreground --signal=TERM 12m scp "${scp_opts[@]}" \
             "$STAGE_DIR/TestplexModernArcade.jar" \
             "$STAGE_DIR/MonsterMazeModern.jar" \
             "$STAGE_DIR/SnakeModern.jar" \
-            "$STAGE_DIR/MonsterMazeMaps.tar.gz" \
             "$STAGE_DIR/MonsterMazeMapsSource.txt" \
+            "${world_chunks[@]}" \
             "${arcade_chunks[@]}" \
             "$remote:$upload_dir/"
           ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" <<'REMOTE_ASSEMBLE_ARCADE'
@@ -374,11 +380,17 @@ jobs:
           upload_dir="$1"
           cd "$upload_dir"
           shopt -s nullglob
-          parts=(ArcadeMechanicsModern.jar.part.*)
-          [[ ${#parts[@]} -gt 0 ]] || { echo "No Arcade JAR parts arrived." >&2; exit 1; }
-          cat "${parts[@]}" > ArcadeMechanicsModern.jar.tmp
+          map_parts=(MonsterMazeMaps.tar.gz.part.*)
+          arcade_parts=(ArcadeMechanicsModern.jar.part.*)
+          [[ ${#map_parts[@]} -gt 0 ]] || { echo "No map archive parts arrived." >&2; exit 1; }
+          [[ ${#arcade_parts[@]} -gt 0 ]] || { echo "No Arcade JAR parts arrived." >&2; exit 1; }
+          cat "${map_parts[@]}" > MonsterMazeMaps.tar.gz.tmp
+          mv MonsterMazeMaps.tar.gz.tmp MonsterMazeMaps.tar.gz
+          rm -f -- "${map_parts[@]}"
+          cat "${arcade_parts[@]}" > ArcadeMechanicsModern.jar.tmp
           mv ArcadeMechanicsModern.jar.tmp ArcadeMechanicsModern.jar
-          rm -f -- "${parts[@]}"
+          rm -f -- "${arcade_parts[@]}"
+          echo "Assembled MonsterMazeMaps.tar.gz ($(stat -c %s MonsterMazeMaps.tar.gz) bytes)."
           echo "Assembled ArcadeMechanicsModern.jar ($(stat -c %s ArcadeMechanicsModern.jar) bytes)."
           REMOTE_ASSEMBLE_ARCADE
           timeout --foreground --signal=TERM 3m scp "${scp_opts[@]}" \
