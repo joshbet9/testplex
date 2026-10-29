@@ -33,10 +33,9 @@ public final class ModernLobbyScoreboard {
         Scoreboard scoreboard = manager.getNewScoreboard();
         String selectedGameId = plugin.getConfig().getString("lobby-selected-game", "bacon-brawl");
         if (selectedGameId == null || selectedGameId.isBlank()) selectedGameId = "bacon-brawl";
-        boolean baconBrawlSelected = "bacon-brawl".equalsIgnoreCase(selectedGameId);
-        String title = baconBrawlSelected
-                ? ChatColor.GOLD + "" + ChatColor.BOLD + "BACON BRAWL"
-                : plugin.getConfig().getString("lobby-scoreboard.title", "Testplex");
+        boolean baconBrawlSelected = usesBaconBrawlLobbySidebar(selectedGameId);
+        String title = scoreboardTitleForGame(
+                selectedGameId, plugin.getConfig().getString("lobby-scoreboard.title", "Testplex"));
         Objective sidebar = scoreboard.registerNewObjective(
                 "testplex_lobby", Criteria.DUMMY,
                 org.bukkit.ChatColor.WHITE.toString() + ChatColor.BOLD + title);
@@ -110,6 +109,16 @@ public final class ModernLobbyScoreboard {
             sidebar.getScore(line).setScore(score--);
         }
         player.setScoreboard(scoreboard);
+    }
+
+    static boolean usesBaconBrawlLobbySidebar(String gameId) {
+        return gameId != null && "bacon-brawl".equalsIgnoreCase(gameId.trim().replace('_', '-'));
+    }
+
+    static String scoreboardTitleForGame(String gameId, String defaultTitle) {
+        return usesBaconBrawlLobbySidebar(gameId)
+                ? ChatColor.GOLD + "" + ChatColor.BOLD + "BACON BRAWL"
+                : defaultTitle;
     }
 
     static String formatGameName(String gameId) {
