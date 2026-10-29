@@ -6751,8 +6751,9 @@ public final class ArcadePortManager implements Listener {
         if (!session.bombDoubleJumpAvailable.remove(id)) return;
         String kit = session.bombLobbersKits.getOrDefault(id, "jumper");
         double power = "jumper".equals(kit) || "waller".equals(kit) ? 1.2D : 0.9D;
-        Vector velocity = player.getLocation().getDirection().normalize().multiply(power);
-        velocity.setY(power);
+        Vector velocity = ArcadePortRules.bombLobbersDoubleJumpVelocity(
+                player.getLocation().getDirection(), power);
+        player.setFallDistance(0.0F);
         player.setVelocity(velocity);
         player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.7F, 1.3F);
     }
