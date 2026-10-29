@@ -6001,7 +6001,7 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onExplode(EntityExplodeEvent event) {
         Session session = active;
-        if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session == null || event.getEntity() == null || event.getEntity().getWorld() != session.world) return;
         if (session.type == ArcadePortGame.DRAGON_ESCAPE && event.getEntity() instanceof TNTPrimed mine
                 && session.dragonEscapeMineOwners.containsKey(mine.getUniqueId())) {
             detonateDragonEscapeMine(session, event, mine);
