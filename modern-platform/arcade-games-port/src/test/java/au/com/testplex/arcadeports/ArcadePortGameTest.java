@@ -452,6 +452,10 @@ class ArcadePortGameTest {
         assertEquals("mama-piggles", ArcadePortRules.normalizeBaconBrawlKit("Mama Piggles"));
         assertEquals("el-muchacho-pigo", ArcadePortRules.normalizeBaconBrawlKit("El Muchacho Pigo"));
         assertEquals("el-muchacho-pigo", ArcadePortRules.normalizeBaconBrawlKit("body slam"));
+        assertTrue(ArcadePortRules.baconBrawlUsesSheepAvatar("pig"));
+        assertTrue(ArcadePortRules.baconBrawlUsesSheepAvatar("sheep-pig"));
+        assertFalse(ArcadePortRules.baconBrawlUsesSheepAvatar("mama-piggles"));
+        assertFalse(ArcadePortRules.baconBrawlUsesSheepAvatar("el-muchacho-pigo"));
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("chris-p-bacon"));
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("unknown"));
         assertEquals(4_000L, ArcadePortRules.BACON_SLOW_UPDATE_INTERVAL_MILLIS);
