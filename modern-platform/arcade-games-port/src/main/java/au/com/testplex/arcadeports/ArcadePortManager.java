@@ -4815,7 +4815,11 @@ public final class ArcadePortManager implements Listener {
                 Entity damager = byEntity.getDamager();
                 Player attacker = null;
                 String source = "melee";
-                if (damager instanceof Player directAttacker) {
+                if (damager instanceof Snowball bacon && session.entities.contains(bacon)
+                        && bacon.getShooter() instanceof Player) {
+                    // Bacon Blast is resolved in ProjectileHitEvent for both player and Pig avatar targets.
+                    return;
+                } else if (damager instanceof Player directAttacker) {
                     attacker = directAttacker;
                 } else if (damager instanceof Projectile projectile
                         && projectile.getShooter() instanceof Player projectileShooter) {
@@ -4997,8 +5001,14 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && event.getEntity() instanceof Snowball bacon && session.entities.contains(bacon)) {
             Location impact = bacon.getLocation().clone();
-            if (event.getHitEntity() instanceof Player target
-                    && bacon.getShooter() instanceof Player attacker
+            Player target = null;
+            if (event.getHitEntity() instanceof Player hitPlayer) {
+                target = hitPlayer;
+            } else if (event.getHitEntity() instanceof Pig avatar) {
+                UUID ownerId = session.baconPigOwners.get(avatar.getUniqueId());
+                if (ownerId != null) target = session.players.get(ownerId);
+            }
+            if (target != null && bacon.getShooter() instanceof Player attacker
                     && session.alive.contains(attacker.getUniqueId())
                     && session.alive.contains(target.getUniqueId())) {
                 handlePlayerHit(session, attacker, target, "bacon-blast");
