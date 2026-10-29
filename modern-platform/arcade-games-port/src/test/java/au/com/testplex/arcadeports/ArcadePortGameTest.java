@@ -1462,6 +1462,10 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldSuppressNativeBombLobbersTntDamage(false));
     }
 
+    @Test void bombLobbersUsesLegacyTwentyMinuteTimeout() {
+        assertEquals(1_200_000L, ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS);
+    }
+
     @Test void bombLobbersMeleeDamageRequiresTwoLiveParticipants() {
         assertTrue(ArcadePortRules.shouldProcessBombLobbersPlayerHit(true, true));
         assertFalse(ArcadePortRules.shouldProcessBombLobbersPlayerHit(false, true));

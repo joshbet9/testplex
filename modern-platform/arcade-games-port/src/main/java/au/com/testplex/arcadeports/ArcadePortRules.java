@@ -284,6 +284,8 @@ public final class ArcadePortRules {
         return touchingBlock || createdAtMillis <= 0L || nowMillis < createdAtMillis
                 || nowMillis - createdAtMillis >= BACON_BLAST_MAX_FLIGHT_MILLIS;
     }
+    /** Reborn's inherited Game.GameTimeout is 20 minutes. */
+    public static final long BOMB_LOBBERS_ROUND_MILLIS = 1_200_000L;
     public static final long BOMB_LOBBERS_WALL_CONTACT_DELAY_MILLIS = 3_000L;
     /** GameTeam.GetFormattedName() colours the configured "Red"/"Blue" team name. */
     public static String bombLobbersTeamBadgeName(int teamId) {

@@ -802,7 +802,9 @@ public final class ArcadePortManager implements Listener {
         session.endsAt = type == ArcadePortGame.BACON_BRAWL
                 && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
-                : type == ArcadePortGame.GLADIATORS ? 600_000L : ROUND_MS);
+                : type == ArcadePortGame.GLADIATORS ? 600_000L
+                : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
+                : ROUND_MS);
         session.lastBaconHungerAt = now;
         session.lastBaconSlowUpdateAt = now;
         session.lastWorldWaterDamageAt = now;
@@ -8220,6 +8222,7 @@ public final class ArcadePortManager implements Listener {
                 // Source collision feedback is the normal hurt reaction plus the legacy
                 // pickup dings for target (1.7 pitch) and thrower (1.25 pitch). The TNT
                 // continues flying; a direct hit is not an explosion or a chat announcement.
+                target.playSound(target.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.2F, 1.65F);
                 target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 1.0F, 0.9F);
                 target.playSound(target.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.7F);
                 owner.playSound(owner.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.25F);
