@@ -6466,9 +6466,9 @@ public final class ArcadePortManager implements Listener {
         if (blast == null || target == null || blast.getWorld() == null
                 || target.getWorld() != blast.getWorld()) return 0.0D;
         org.bukkit.util.BoundingBox box = target.getBoundingBox();
-        double xStep = ArcadePortRules.bombLobbersExposureSampleStep(box.getWidth());
+        double xStep = ArcadePortRules.bombLobbersExposureSampleStep((box.getMaxX() - box.getMinX()));
         double yStep = ArcadePortRules.bombLobbersExposureSampleStep(box.getHeight());
-        double zStep = ArcadePortRules.bombLobbersExposureSampleStep(box.getDepth());
+        double zStep = ArcadePortRules.bombLobbersExposureSampleStep((box.getMaxZ() - box.getMinZ()));
         if (!Double.isFinite(xStep) || !Double.isFinite(yStep) || !Double.isFinite(zStep)) return 0.0D;
         double xOffset = ArcadePortRules.bombLobbersExposureSampleOffset(xStep);
         double zOffset = ArcadePortRules.bombLobbersExposureSampleOffset(zStep);
@@ -6478,9 +6478,9 @@ public final class ArcadePortManager implements Listener {
             for (float fy = 0.0F; fy <= 1.0F; fy = (float) (fy + yStep)) {
                 for (float fz = 0.0F; fz <= 1.0F; fz = (float) (fz + zStep)) {
                     Location sample = new Location(blast.getWorld(),
-                            box.getMinX() + box.getWidth() * fx + xOffset,
+                            box.getMinX() + (box.getMaxX() - box.getMinX()) * fx + xOffset,
                             box.getMinY() + box.getHeight() * fy,
-                            box.getMinZ() + box.getDepth() * fz + zOffset);
+                            box.getMinZ() + (box.getMaxZ() - box.getMinZ()) * fz + zOffset);
                     Vector ray = sample.toVector().subtract(blast.toVector());
                     double distance = ray.length();
                     total++;
