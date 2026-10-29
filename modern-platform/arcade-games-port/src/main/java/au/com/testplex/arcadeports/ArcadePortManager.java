@@ -187,20 +187,38 @@ public final class ArcadePortManager implements Listener {
         return isActiveGame(world, ArcadePortGame.BACON_BRAWL) ? active.baconKnockback : 1.5D;
     }
 
-    /** Register a real test-bot hit so Bacon Brawl's meter abilities can be verified without a second human. */
-    public int recordBaconBrawlBotHit(Player attacker, String botName, double rawDamage) {
+    /** Record a test-bot hit using the same meter and timed-hit window as player hits. */
+    public BaconBrawlBotHitResult recordBaconBrawlBotHit(Player attacker, String botName, double rawDamage) {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.BACON_BRAWL || attacker == null
                 || !attacker.isOnline() || attacker.getWorld() != session.world
                 || !session.players.containsKey(attacker.getUniqueId())
-                || !session.alive.contains(attacker.getUniqueId())) return -1;
+                || !session.alive.contains(attacker.getUniqueId())) return new BaconBrawlBotHitResult(-1, 1.0D);
         UUID id = attacker.getUniqueId();
+        long now = System.currentTimeMillis();
+        long previousHit = session.baconLastSwingAt.getOrDefault(id, 0L);
+        double timingMultiplier = previousHit > 0L
+                ? ArcadePortRules.baconTimedHitKnockbackMultiplier(now - previousHit) : 1.0D;
+        session.baconLastSwingAt.put(id, now);
         int meter = ArcadePortRules.nextBaconMeter(session.baconMeters.getOrDefault(id, 0), rawDamage);
         session.baconMeters.put(id, meter);
         updateBaconMeterItem(session, attacker);
         updateBaconMeterScoreboard(session);
         attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.8F, 1.1F);
-        return meter;
+        return new BaconBrawlBotHitResult(meter, timingMultiplier);
+    }
+
+    public static final class BaconBrawlBotHitResult {
+        private final int meter;
+        private final double timingMultiplier;
+
+        public BaconBrawlBotHitResult(int meter, double timingMultiplier) {
+            this.meter = meter;
+            this.timingMultiplier = timingMultiplier;
+        }
+
+        public int meter() { return meter; }
+        public double timingMultiplier() { return timingMultiplier; }
     }
 
     public void handleBotCommand(org.bukkit.command.CommandSender sender, String[] args) {
@@ -2780,6 +2798,9 @@ public final class ArcadePortManager implements Listener {
         try {
             Team disguiseTeam = scoreboard.registerNewTeam(teamName);
             disguiseTeam.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.NEVER);
+            // Bacon avatars replace the players visually; prevent the hidden player bodies
+            // from pushing against each other while preserving normal hit targeting.
+            disguiseTeam.setOption(Team.Option.COLLISION_RULE, Team.OptionStatus.NEVER);
             session.baconDisguiseScoreboard = scoreboard;
             session.baconDisguiseTeam = disguiseTeam;
             for (Player player : participants) {
