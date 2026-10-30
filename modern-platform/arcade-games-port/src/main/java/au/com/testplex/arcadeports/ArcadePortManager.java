@@ -5727,9 +5727,9 @@ public final class ArcadePortManager implements Listener {
                 UUID killerId = killer.getUniqueId();
                 session.scores.merge(killerId, 1, Integer::sum);
                 int lifeKills = session.evolutionLifeKills.merge(killerId, 1, Integer::sum);
-                session.evolutionKillsSinceEvolution.put(killerId,
-                        ArcadePortRules.nextEvolutionOverkillKillCount(
-                                session.evolutionKillsSinceEvolution.getOrDefault(killerId, 0)));
+                int killsSinceEvolution = ArcadePortRules.nextEvolutionOverkillKillCount(
+                        session.evolutionKillsSinceEvolution.getOrDefault(killerId, 0));
+                session.evolutionKillsSinceEvolution.put(killerId, killsSinceEvolution);
                 session.evolutionAvailable.add(killerId);
                 session.evolutionCharge.remove(killerId);
                 reduceEvolutionPity(session, killerId,
@@ -5739,7 +5739,8 @@ public final class ArcadePortManager implements Listener {
                 killer.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 60, 0, false, false, true));
                 killer.setHealth(Math.min(killer.getMaxHealth(), killer.getHealth() + killer.getMaxHealth() / 2.0D));
                 killer.sendMessage(ChatColor.GREEN + "Kill registered (" + lifeKills
-                        + " this life). Hold sneak while grounded to evolve.");
+                        + " this life; " + killsSinceEvolution + "/2 Overkill kills before your next evolution). "
+                        + "Hold sneak while grounded to evolve.");
                 killer.playSound(killer.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8F, 1.1F);
             }
             int victimLevel = session.evolutionLevels.getOrDefault(victimId, 0);
@@ -10021,6 +10022,9 @@ public final class ArcadePortManager implements Listener {
             }
             int killsFromThisTnt = priorTntKills;
             for (Player target : alivePlayers(session)) {
+                // Evolution's crouch transformation suppresses incoming combat hits; preserve
+                // that protection for custom Creeper blast damage as well.
+                if (evolutionBlast && session.evolving.contains(target.getUniqueId())) continue;
                 // Reborn applies its nearby-player explosion condition without team filtering.
                 double distance = target.getLocation().distance(blast);
                 double radius = bombLobbersBlast ? bombBlastRadius : 8.0D;
