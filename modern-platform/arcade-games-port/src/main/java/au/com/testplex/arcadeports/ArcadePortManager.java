@@ -1093,6 +1093,17 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.SKY_WARS) {
             SourceMapCatalog.MapData skyWarsMap = sourceMapData.get(type.id());
+            boolean validBounds = skyWarsMap != null && skyWarsMap.hasBounds()
+                    && skyWarsMap.maxX() > skyWarsMap.minX()
+                    && skyWarsMap.maxZ() > skyWarsMap.minZ();
+            boolean hasTntGenerator = skyWarsMap != null && !skyWarsMap.dataLocations("LIME").isEmpty();
+            if (!validBounds || !hasTntGenerator) {
+                sender.sendMessage(ChatColor.RED + "This SkyWars map is missing its required WorldConfig bounds or LIME TNT generator marker. Choose another archived map.");
+                return;
+            }
+        }
+        if (type == ArcadePortGame.SKY_WARS) {
+            SourceMapCatalog.MapData skyWarsMap = sourceMapData.get(type.id());
             List<Location> skyWarsStarts = skyWarsMap == null ? List.of() : skyWarsMap.spawnLocations();
             if (skyWarsStarts.isEmpty() && skyWarsMap != null) skyWarsStarts = skyWarsMap.dataLocations("GREEN");
             if (skyWarsStarts.isEmpty()) {
