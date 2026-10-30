@@ -6482,7 +6482,8 @@ public final class ArcadePortManager implements Listener {
                     }
                 } else {
                     String kit = session.deathTagRunnerKits.getOrDefault(attacker.getUniqueId(), "basher");
-                    if ("null".equals(kit) && !"projectile hit".equals(source)) {
+                    if (!"basher".equals(kit) && !"traitor".equals(kit)
+                            && !"projectile hit".equals(source)) {
                         applyDeathTagDefaultMeleeKnockback(attacker, target,
                                 session.alphaChasers.contains(target.getUniqueId()));
                     }

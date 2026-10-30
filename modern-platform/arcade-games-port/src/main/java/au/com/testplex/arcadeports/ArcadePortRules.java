@@ -1583,8 +1583,8 @@ public final class ArcadePortRules {
     public static double deathTagRunnerDamage(String runnerKit, boolean projectile) {
         String kit = runnerKit == null ? "basher" : runnerKit.toLowerCase(java.util.Locale.ROOT);
         if (projectile) return "archer".equals(kit) ? 4.0D : 0.0D;
-        if ("null".equals(kit)) return 1.0D; // NullKit has no weapon or perks, but an unarmed hit still lands.
-        return "basher".equals(kit) || "traitor".equals(kit) ? 6.0D : 0.0D;
+        // Only Basher and Traitor replace the default unarmed hit with weapon damage.
+        return "basher".equals(kit) || "traitor".equals(kit) ? 6.0D : 1.0D;
     }
 
     /** Iron Skin in Reborn subtracts a flat 2 or 4 damage from attacks greater than 1. */
