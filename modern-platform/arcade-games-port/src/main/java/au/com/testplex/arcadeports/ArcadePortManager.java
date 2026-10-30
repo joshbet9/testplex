@@ -4827,8 +4827,10 @@ public final class ArcadePortManager implements Listener {
         }
         resetDrawCanvas(session);session.drawCurrentDrawer=null;session.drawWord=null;
         session.drawRoundEndsAt=0L;
-        session.drawNextRoundAt=session.drawTurnIndex>=session.drawTurnOrder.size()
-                ?now:now+ArcadePortRules.DRAW_MY_THING_INTERMISSION_MILLIS;
+        boolean hasRemainingDrawer = session.drawTurnOrder.subList(session.drawTurnIndex, session.drawTurnOrder.size())
+                .stream().map(session.players::get).anyMatch(p -> p != null && p.isOnline());
+        session.drawNextRoundAt = hasRemainingDrawer
+                ? now + ArcadePortRules.DRAW_MY_THING_INTERMISSION_MILLIS : now;
     }
 
     private void updateDrawMyThing(Session session,long now) {

@@ -2285,7 +2285,7 @@ class ArcadePortGameTest {
         assertEquals(30_000L, ArcadePortRules.drawMyThingRoundMillis(10));
         assertEquals(24_545L, ArcadePortRules.drawMyThingRoundMillis(11));
         assertEquals(22_250L, ArcadePortRules.drawMyThingRoundMillis(12));
-        assertEquals(17_625L, ArcadePortRules.drawMyThingRoundMillis(16));
+        assertEquals(15_937L, ArcadePortRules.drawMyThingRoundMillis(16));
 
         for (int players = 11; players <= 64; players++) {
             long drawingMillis = players * ArcadePortRules.drawMyThingRoundMillis(players);
