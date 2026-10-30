@@ -108,6 +108,8 @@ final class SneakyAssassinsMechanics {
     private Scoreboard scoreboard;
     private Objective scoreboardObjective;
     private final Map<UUID, Team> playerScoreboardTeams = new HashMap<>();
+    private final Map<UUID, Scoreboard> previousScoreboards = new HashMap<>();
+    private Location lastPowerUpLocation;
     private int tick;
 
     SneakyAssassinsMechanics(ArcadeMechanicsModernPlugin plugin) {
@@ -341,7 +343,10 @@ final class SneakyAssassinsMechanics {
         scoreboardObjective = scoreboard.registerNewObjective("sneaky", "dummy", ChatColor.GOLD + "Sneaky Assassins");
         scoreboardObjective.setDisplaySlot(DisplaySlot.SIDEBAR);
         for (Player player : players.values()) {
-            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
+            if (player != null && player.isOnline()) {
+                previousScoreboards.put(player.getUniqueId(), player.getScoreboard());
+                player.setScoreboard(scoreboard);
+            }
         }
     }
 
@@ -697,7 +702,7 @@ final class SneakyAssassinsMechanics {
             }
             if (powerUp.item == null) {
                 long age = now - powerUp.spawnedAt;
-                double y = Math.max(65.0D, 250.0D - age / 50.0D);
+                double y = Math.max(65.0D, 250.0D - age / 25.0D);
                 Location effect = powerUp.location.clone();
                 effect.setY(y);
                 if (tick % 2 == 0) {
@@ -779,8 +784,12 @@ final class SneakyAssassinsMechanics {
             boolean used = powerUps.stream().anyMatch(p -> p.location.distanceSquared(point) < 1.0D);
             if (!used) available.add(point);
         }
+        if (available.size() > 1 && lastPowerUpLocation != null) {
+            available.removeIf(point -> point.distanceSquared(lastPowerUpLocation) < 1.0D);
+        }
         if (available.isEmpty()) available = List.of(points[ThreadLocalRandom.current().nextInt(points.length)]);
         Location location = available.get(ThreadLocalRandom.current().nextInt(available.size()));
+        lastPowerUpLocation = location.clone();
         PowerUp powerUp = new PowerUp(location, now);
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
@@ -1064,6 +1073,7 @@ final class SneakyAssassinsMechanics {
             cloakUntil.remove(id);
             masterAssassins.remove(id);
             masterCompassUpdateAt.remove(id);
+            previousScoreboards.remove(id);
             if (scoreboard != null) {
                 Team team = playerScoreboardTeams.remove(id);
                 if (team != null) {
@@ -1079,7 +1089,11 @@ final class SneakyAssassinsMechanics {
         for (UUID id : new ArrayList<>(disguises.keySet())) removeDisguise(id);
         for (UUID id : new ArrayList<>(players.keySet())) {
             Player player = players.get(id);
-            if (player != null) player.removePotionEffect(PotionEffectType.WITHER);
+            if (player != null) {
+                player.removePotionEffect(PotionEffectType.WITHER);
+                Scoreboard previous = previousScoreboards.get(id);
+                if (player.isOnline() && previous != null) player.setScoreboard(previous);
+            }
         }
         for (PowerUp powerUp : new ArrayList<>(powerUps)) removePowerUp(powerUp);
         for (UUID id : new ArrayList<>(npcIds)) {
@@ -1102,6 +1116,8 @@ final class SneakyAssassinsMechanics {
         scoreboard = null;
         scoreboardObjective = null;
         playerScoreboardTeams.clear();
+        previousScoreboards.clear();
+        lastPowerUpLocation = null;
         world = null;
         isAlive = ignored -> false;
         eliminator = (victim, killer, reason) -> { };
