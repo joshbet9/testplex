@@ -3,7 +3,6 @@ package au.com.testplex.arcadeports;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
-import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.player.GameMode;
 import com.github.retrooper.packetevents.protocol.player.TextureProperty;
 import com.github.retrooper.packetevents.protocol.player.User;
@@ -15,7 +14,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEn
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerEntityTeleport;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoRemove;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerPlayerInfoUpdate;
-import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnEntity;
+import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSpawnPlayer;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
@@ -26,12 +25,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scoreboard.Team;
 
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -48,11 +45,10 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
     private static final byte SPRINTING_FLAG = 0x08;
     private static final int PLAYER_SKIN_PARTS_METADATA_INDEX = 17;
 
-    private final JavaPlugin plugin;
     private final Map<UUID, GhostState> ghosts = new HashMap<>();
 
     public DragonEscapePacketGhostBridge(JavaPlugin plugin) {
-        this.plugin = plugin;
+        if (plugin == null) throw new IllegalArgumentException("plugin");
     }
 
     @Override
@@ -133,12 +129,11 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
                 new WrapperPlayServerTeams(teamName, WrapperPlayServerTeams.TeamMode.CREATE,
                         teamInfo, List.of(viewer.getName(), profileName)));
 
+        // Player entities use the dedicated Add Player packet, not Add Entity.
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
-                new WrapperPlayServerSpawnEntity(entityId, Optional.of(ghostUuid),
-                        EntityTypes.PLAYER,
+                new WrapperPlayServerSpawnPlayer(entityId, ghostUuid,
                         new Vector3d(location.getX(), location.getY(), location.getZ()),
-                        location.getPitch(), location.getYaw(), location.getYaw(), 0,
-                        Optional.of(Vector3d.zero())));
+                        location.getYaw(), location.getPitch(), List.of()));
 
         byte flags = INVISIBLE_FLAG;
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
@@ -146,8 +141,7 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
                         new EntityData<>(0, EntityDataTypes.BYTE, flags),
                         new EntityData<>(PLAYER_SKIN_PARTS_METADATA_INDEX, EntityDataTypes.BYTE, (byte) 0x7f))));
 
-        Team originalTeam = viewer.getScoreboard().getEntryTeam(viewer.getName());
-        return new GhostState(entityId, ghostUuid, teamName, originalTeam == null ? null : originalTeam.getName(), flags);
+        return new GhostState(entityId, ghostUuid, teamName, flags);
     }
 
     @Override
@@ -178,6 +172,6 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
 
     private record GhostState(
             int entityId, UUID profileUuid, String teamName,
-            String originalTeamName, byte entityFlags) {
+            byte entityFlags) {
     }
 }
