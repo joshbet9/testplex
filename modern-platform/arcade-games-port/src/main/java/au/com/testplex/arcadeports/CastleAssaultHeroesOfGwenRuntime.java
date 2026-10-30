@@ -34,6 +34,8 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -112,6 +114,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, Integer> castleKillStreaks = new HashMap<>();
     private final Map<UUID, String> castleAssaultPlayerKits = new HashMap<>();
     private final Map<UUID, Long> castleArcherNextArrowAt = new HashMap<>();
+    private final Map<UUID, Long> castleDemolitionistNextTntAt = new HashMap<>();
     private final Map<UUID, String> selectedHeroesOfGwen = new HashMap<>();
     private final List<StoreEntry> storeEntries = new ArrayList<>();
     private final Map<UUID, StoreHolder> openStores = new HashMap<>();
@@ -728,6 +731,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         ItemStack item = new ItemStack(material);
         ItemMeta meta = item.getItemMeta();
         if (enchantment != null && level > 0) meta.addEnchant(enchantment, level, true);
+        meta.setUnbreakable(true);
+        meta.setLore(List.of(ChatColor.GRAY + "Castle Assault kit item"));
         item.setItemMeta(meta);
         return item;
     }
@@ -775,6 +780,48 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             activeObjectiveSpawn = null;
         }
         announce(ChatColor.GOLD + player.getName() + " picked up Objective TNT! Get to the enemy sentries.");
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onCastleKitTntDrop(PlayerDropItemEvent event) {
+        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT) return;
+        Player player = event.getPlayer();
+        String kit = castleAssaultPlayerKits.get(player.getUniqueId());
+        if (!"demolitionist".equals(kit)) return;
+        ItemStack dropped = event.getItemDrop().getItemStack();
+        if (dropped.getType() != Material.TNT) return;
+        event.setCancelled(true);
+        player.sendMessage(ChatColor.RED + "You cannot drop your Throwing TNT.");
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onCastleKitInventoryClick(InventoryClickEvent event) {
+        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT
+                || !(event.getWhoClicked() instanceof Player player)
+                || !"demolitionist".equals(castleAssaultPlayerKits.get(player.getUniqueId()))) return;
+        ItemStack current = event.getCurrentItem();
+        ItemStack cursor = event.getCursor();
+        boolean movesTnt = (current != null && current.getType() == Material.TNT)
+                || (cursor != null && cursor.getType() == Material.TNT);
+        if (!movesTnt && event.getHotbarButton() >= 0) {
+            ItemStack hotbar = player.getInventory().getItem(event.getHotbarButton());
+            movesTnt = hotbar != null && hotbar.getType() == Material.TNT;
+        }
+        if (movesTnt) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onCastleKitDeath(PlayerDeathEvent event) {
+        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT) return;
+        Player player = event.getEntity();
+        String kit = castleAssaultPlayerKits.get(player.getUniqueId());
+        if ("demolitionist".equals(kit)) {
+            event.getDrops().removeIf(item -> item != null && item.getType() == Material.TNT);
+        } else if ("archer".equals(kit)) {
+            event.getDrops().removeIf(item -> item != null && item.getType() == Material.ARROW
+                    && item.hasItemMeta() && item.getItemMeta().hasDisplayName()
+                    && item.getItemMeta().getDisplayName().contains("Fletched Arrow"));
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -846,6 +893,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void refillCastleArcherArrows(long now) {
+        refillCastleDemolitionistTnt(now);
         for (UUID id : new ArrayList<>(activePlayers)) {
             if (!"archer".equals(castleAssaultPlayerKits.get(id))) continue;
             Player player = players.get(id);
@@ -864,6 +912,27 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.updateInventory();
             }
             castleArcherNextArrowAt.put(id, now + ArcadePortRules.CASTLE_ASSAULT_ARCHER_REFILL_MILLIS);
+        }
+    }
+
+    private void refillCastleDemolitionistTnt(long now) {
+        for (UUID id : new ArrayList<>(activePlayers)) {
+            if (!"demolitionist".equals(castleAssaultPlayerKits.get(id))) continue;
+            Player player = players.get(id);
+            if (player == null || !player.isOnline()) continue;
+            long next = castleDemolitionistNextTntAt.getOrDefault(id, now);
+            if (now < next) continue;
+            int current = 0;
+            for (ItemStack item : player.getInventory().getContents()) {
+                if (item != null && item.getType() == Material.TNT) current += item.getAmount();
+            }
+            if (current < 2) {
+                player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT",
+                        "Replenished by the Demolitionist kit."));
+                player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0F, 1.0F);
+                player.updateInventory();
+            }
+            castleDemolitionistNextTntAt.put(id, now + 10_000L);
         }
     }
 
@@ -1407,6 +1476,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (game == ArcadePortGame.CASTLE_ASSAULT) {
             castleKillStreaks.remove(id);
             castleArcherNextArrowAt.remove(id);
+            castleDemolitionistNextTntAt.remove(id);
         }
         activePlayers.remove(id);
         StoreHolder store = openStores.remove(id);
@@ -1522,11 +1592,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String kit = ArcadePortRules.normalizeCastleAssaultKit(requestedKit);
         if (kit == null) kit = "fighter";
         castleAssaultPlayerKits.put(player.getUniqueId(), kit);
+        long kitAppliedAt = System.currentTimeMillis();
         if ("archer".equals(kit)) {
             castleArcherNextArrowAt.put(player.getUniqueId(),
-                    System.currentTimeMillis() + ArcadePortRules.CASTLE_ASSAULT_ARCHER_REFILL_MILLIS);
+                    kitAppliedAt + ArcadePortRules.CASTLE_ASSAULT_ARCHER_REFILL_MILLIS);
         } else {
             castleArcherNextArrowAt.remove(player.getUniqueId());
+        }
+        if ("demolitionist".equals(kit)) {
+            castleDemolitionistNextTntAt.put(player.getUniqueId(), kitAppliedAt + 10_000L);
+        } else {
+            castleDemolitionistNextTntAt.remove(player.getUniqueId());
         }
         for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) {
             player.removePotionEffect(effect.getType());
@@ -1614,6 +1690,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         castleKillStreaks.clear();
         castleAssaultPlayerKits.clear();
         castleArcherNextArrowAt.clear();
+        castleDemolitionistNextTntAt.clear();
         selectedHeroesOfGwen.clear();
     }
 
