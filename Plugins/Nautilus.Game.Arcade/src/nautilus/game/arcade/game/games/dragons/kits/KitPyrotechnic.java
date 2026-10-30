@@ -18,6 +18,7 @@ public class KitPyrotechnic extends Kit
 	private static final Perk[] PERKS =
 			{
 					new PerkSparkler(25, 2),
+					new PerkFlare(1),
 			};
 
 
