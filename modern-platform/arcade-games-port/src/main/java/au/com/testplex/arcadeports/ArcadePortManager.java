@@ -9451,6 +9451,26 @@ public final class ArcadePortManager implements Listener {
         return "local-stats." + playerId + "." + gameId + ".";
     }
 
+    /** Receives completed rounds from the standalone SnakeModern game so /stats stays unified. */
+    public void recordStandaloneGameResult(String gameId, UUID playerId, boolean won,
+                                           int score, boolean knockedOut) {
+        if (!"snake".equalsIgnoreCase(gameId) || playerId == null) return;
+        String path = localStatsPath(playerId, "snake");
+        plugin.getConfig().set(path + "games-played",
+                plugin.getConfig().getInt(path + "games-played", 0) + 1);
+        if (won) {
+            plugin.getConfig().set(path + "wins",
+                    plugin.getConfig().getInt(path + "wins", 0) + 1);
+        }
+        plugin.getConfig().set(path + "score",
+                plugin.getConfig().getInt(path + "score", 0) + Math.max(0, score));
+        if (knockedOut) {
+            plugin.getConfig().set(path + "knockouts",
+                    plugin.getConfig().getInt(path + "knockouts", 0) + 1);
+        }
+        plugin.saveConfig();
+    }
+
     /**
      * The isolated Testplex server does not connect to Mineplex's production gem economy.
      * Keep the source Death Tag payout schedule in a clearly labelled local test ledger.
