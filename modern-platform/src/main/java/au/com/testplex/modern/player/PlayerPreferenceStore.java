@@ -2,6 +2,7 @@ package au.com.testplex.modern.player;
 
 import au.com.testplex.modern.model.CosmeticLineDefinition;
 import au.com.testplex.modern.model.GameDefinition;
+import au.com.testplex.modern.model.CosmeticOption;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -33,6 +34,18 @@ public final class PlayerPreferenceStore {
             return Set.of(data.getString(path, line.getDefaultOptionId()));
         }
         if (!data.contains(path)) {
+            // A grouped MULTI line starts with the first option in each group equipped.
+            // This lets a single menu line provide independent weapon/pellet selections.
+            if (line.getOptions().stream().anyMatch(option -> option.getSelectionGroup() != null)) {
+                Set<String> defaults = new LinkedHashSet<>();
+                Set<String> groups = new LinkedHashSet<>();
+                for (var option : line.getOptions()) {
+                    String group = option.getSelectionGroup();
+                    if (group == null) continue;
+                    if (groups.add(group)) defaults.add(option.getId());
+                }
+                if (!defaults.isEmpty()) return defaults;
+            }
             return Set.of(line.getDefaultOptionId());
         }
         return new LinkedHashSet<>(data.getStringList(path));
@@ -51,7 +64,19 @@ public final class PlayerPreferenceStore {
             data.set(path, optionId);
         } else {
             Set<String> selected = new LinkedHashSet<>(getSelected(player, game, line));
-            if (!selected.add(optionId)) selected.remove(optionId);
+            CosmeticOption selectedOption = line.getOptions().stream()
+                    .filter(option -> option.getId().equals(optionId)).findFirst().orElseThrow();
+            String group = selectedOption.getSelectionGroup();
+            if (group != null) {
+                // Equip exactly one choice within this group without disturbing
+                // the user's selections in the other groups on this same line.
+                selected.removeIf(existingId -> line.getOptions().stream()
+                        .anyMatch(option -> option.getId().equals(existingId)
+                                && group.equals(option.getSelectionGroup())));
+                selected.add(optionId);
+            } else if (!selected.add(optionId)) {
+                selected.remove(optionId);
+            }
             data.set(path, new ArrayList<>(selected));
         }
         save();
