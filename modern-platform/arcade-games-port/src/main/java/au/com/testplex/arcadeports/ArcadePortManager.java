@@ -1205,6 +1205,9 @@ public final class ArcadePortManager implements Listener {
         } else {
             lobbyRuntime.deployBots(type, spawns, -1);
         }
+        if (type == ArcadePortGame.DRAGONS) {
+            setupDragonsScoreboard(session);
+        }
         if (type == ArcadePortGame.BACON_BRAWL) {
             // Player snapshots already hold their pre-match scoreboards at this point.
             // The meter and disguise teams now live only on this match's scoreboard.
@@ -1909,6 +1912,73 @@ public final class ArcadePortManager implements Listener {
         ItemMeta meta = item.getItemMeta();
         return meta != null && meta.hasDisplayName()
                 && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+    }
+
+    private void setupDragonsScoreboard(Session session) {
+        if (session == null || Bukkit.getScoreboardManager() == null) return;
+        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+        Objective objective = scoreboard.registerNewObjective("dragons", "dummy",
+                ChatColor.GOLD + "DRAGONS");
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        session.dragonScoreboard = scoreboard;
+        session.dragonScoreboardObjective = objective;
+        session.dragonAliveScoreboardTeam = scoreboard.registerNewTeam("drgalive");
+        session.dragonAliveScoreboardTeam.setPrefix(ChatColor.GREEN.toString());
+        session.dragonDeadScoreboardTeam = scoreboard.registerNewTeam("drgdead");
+        session.dragonDeadScoreboardTeam.setPrefix(ChatColor.GRAY.toString());
+        for (Player player : session.players.values()) {
+            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
+        }
+        updateDragonsScoreboard(session, System.currentTimeMillis());
+    }
+
+    private void updateDragonsScoreboard(Session session, long now) {
+        if (session == null || session.type != ArcadePortGame.DRAGONS
+                || session.dragonScoreboard == null || session.dragonScoreboardObjective == null
+                || now < session.dragonNextScoreboardUpdateAt) return;
+        session.dragonNextScoreboardUpdateAt = now + 500L; // SoloGame.ScoreboardUpdate uses UpdateType.FAST.
+        Scoreboard scoreboard = session.dragonScoreboard;
+        Objective objective = session.dragonScoreboardObjective;
+        for (String entry : new ArrayList<>(scoreboard.getEntries())) {
+            scoreboard.resetScores(entry);
+            if (session.dragonAliveScoreboardTeam.hasEntry(entry)) session.dragonAliveScoreboardTeam.removeEntry(entry);
+            if (session.dragonDeadScoreboardTeam.hasEntry(entry)) session.dragonDeadScoreboardTeam.removeEntry(entry);
+        }
+
+        List<Player> roster = new ArrayList<>(session.players.values());
+        int total = roster.size();
+        int alive = session.alive.size();
+        if (total < 15) {
+            int score = total;
+            for (Player player : roster) {
+                if (player == null) continue;
+                String entry = player.getName();
+                if (session.alive.contains(player.getUniqueId())) {
+                    session.dragonAliveScoreboardTeam.addEntry(entry);
+                } else {
+                    session.dragonDeadScoreboardTeam.addEntry(entry);
+                }
+                objective.getScore(entry).setScore(score--);
+            }
+        } else if (alive < 16) {
+            int score = alive;
+            for (Player player : roster) {
+                if (player == null || !session.alive.contains(player.getUniqueId())) continue;
+                String entry = player.getName();
+                session.dragonAliveScoreboardTeam.addEntry(entry);
+                objective.getScore(entry).setScore(score--);
+            }
+        } else {
+            objective.getScore(ChatColor.GREEN + "Players Alive").setScore(4);
+            objective.getScore(ChatColor.WHITE + Integer.toString(alive)).setScore(3);
+            objective.getScore(ChatColor.RED + "Players Dead").setScore(2);
+            objective.getScore(ChatColor.WHITE + Integer.toString(Math.max(0, total - alive))).setScore(1);
+        }
+        for (Player player : roster) {
+            if (player != null && player.isOnline() && player.getScoreboard() != scoreboard) {
+                player.setScoreboard(scoreboard);
+            }
+        }
     }
 
     private void setupDeathTagScoreboard(Session session) {
@@ -6395,6 +6465,7 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         long seconds = Math.max(0L, (session.endsAt - now) / 1000L);
         if (session.type == ArcadePortGame.BACON_BRAWL) updateBaconMeterScoreboard(session);
+        if (session.type == ArcadePortGame.DRAGONS) updateDragonsScoreboard(session, now);
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) updateDragonEscapeRaceUi(session, now);
         for (UUID id : session.players.keySet()) {
             Player p = session.players.get(id);
@@ -6727,7 +6798,12 @@ public final class ArcadePortManager implements Listener {
             checkRoundEnd(session);
             return;
         }
-        if (!session.alive.remove(player.getUniqueId())) return;
+        UUID eliminatedId = player.getUniqueId();
+        if (!session.alive.remove(eliminatedId)) return;
+        if (session.type == ArcadePortGame.DRAGONS) {
+            session.dragonEliminationOrder.add(eliminatedId);
+            awardDragonSurvivalGems(session, eliminatedId, System.currentTimeMillis());
+        }
         player.leaveVehicle();
         if (session.type == ArcadePortGame.PAINTBALL && player.isOnline()) {
             spawnPaintballSaveMeMarker(session, player);
@@ -7481,7 +7557,6 @@ public final class ArcadePortManager implements Listener {
         session.bombPlayersDamaged.clear();
         session.dragonContactCooldowns.clear();
         session.dragonFlareZones.clear();
-        session.dragonSparklezThrows.clear();
         session.dragonWaterDamageNextAt.clear();
         session.paintProjectileDamage.clear();
         session.paintballLastShotAt.clear();
@@ -7700,8 +7775,49 @@ public final class ArcadePortManager implements Listener {
     }
 
     /** Store completed local acceptance runs only; operator-aborted sessions aren't counted. */
+    private void awardDragonSurvivalGems(Session session, UUID playerId, long outAt) {
+        if (session.type != ArcadePortGame.DRAGONS || playerId == null
+                || !session.dragonSurvivalGemsPaid.add(playerId)) return;
+        double amount = Math.max(0L, outAt - session.startedAt) / 10_000.0D;
+        if (amount <= 0.0D) return;
+        String path = localStatsPath(playerId, "dragons");
+        plugin.getConfig().set(path + "survival-gems",
+                plugin.getConfig().getDouble(path + "survival-gems", 0.0D) + amount);
+    }
+
+    private void awardDragonTestGems(UUID playerId, double amount) {
+        if (playerId == null || amount <= 0.0D) return;
+        String path = localStatsPath(playerId, "dragons");
+        plugin.getConfig().set(path + "test-gems",
+                plugin.getConfig().getDouble(path + "test-gems", 0.0D) + amount);
+    }
+
+    private void awardDragonEndGems(Session session, Player winner) {
+        if (session.type != ArcadePortGame.DRAGONS || session.dragonEndGemsPaid) return;
+        session.dragonEndGemsPaid = true;
+        if (winner != null) awardDragonSurvivalGems(session, winner.getUniqueId(), System.currentTimeMillis());
+
+        List<UUID> placements = new ArrayList<>();
+        if (winner != null) placements.add(winner.getUniqueId());
+        for (int i = session.dragonEliminationOrder.size() - 1; i >= 0; i--) {
+            UUID id = session.dragonEliminationOrder.get(i);
+            if (!placements.contains(id)) placements.add(id);
+        }
+        // SoloGame.EndCheck: 20 / 15 / 10 placement gems and 10 participation gems.
+        // These are explicitly local Testplex values, not Mineplex account currency.
+        double[] placementRewards = {20.0D, 15.0D, 10.0D};
+        for (int i = 0; i < placements.size() && i < placementRewards.length; i++) {
+            awardDragonTestGems(placements.get(i), placementRewards[i]);
+        }
+        for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
+            Player participant = entry.getValue();
+            if (participant != null && participant.isOnline()) awardDragonTestGems(entry.getKey(), 10.0D);
+        }
+    }
+
     private void recordLocalStats(Session session, Player winner, boolean completed) {
         if (!completed) return;
+        if (session.type == ArcadePortGame.DRAGONS) awardDragonEndGems(session, winner);
         UUID winnerId = winner == null ? null : winner.getUniqueId();
         int winningTeam = winnerId == null ? -1 : session.teams.getOrDefault(winnerId, -1);
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
@@ -8047,6 +8163,13 @@ public final class ArcadePortManager implements Listener {
             }
         } else if ("dragons".equals(gameId)) {
             int sparklez = plugin.getConfig().getInt(path + "sparklez", 0);
+            double testGems = plugin.getConfig().getDouble(path + "test-gems", 0.0D);
+            inventory.setItem(31, statsItem(testGems > 0.0D ? Material.EMERALD : Material.COAL,
+                    ChatColor.GOLD + "Testplex Gems",
+                    List.of(" ", ChatColor.GRAY + "Survival and placement rewards: "
+                                    + ChatColor.WHITE + String.format(java.util.Locale.ROOT, "%.2f", testGems),
+                            ChatColor.DARK_GRAY + "Local ledger; not Mineplex account currency."),
+                    "noop", null, null));
             inventory.setItem(33, statsItem(sparklez > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
                     (sparklez > 0 ? ChatColor.GREEN : ChatColor.RED) + "Sparklez",
                     List.of(" ", ChatColor.GRAY + "Pyro sparklers thrown: " + ChatColor.WHITE + sparklez,
@@ -9378,6 +9501,15 @@ public final class ArcadePortManager implements Listener {
         if (isBaconMeterItem(event.getCurrentItem()) || isBaconMeterItem(event.getCursor())) {
             event.setCancelled(true);
         }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onDragonsFoodLevelChange(FoodLevelChangeEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.DRAGONS
+                || !(event.getEntity() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())) return;
+        event.setFoodLevel(20); // Dragons sets HungerSet=20.
     }
 
     @EventHandler
@@ -11265,7 +11397,11 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
-        session.alive.remove(id);
+        boolean wasAlive = session.alive.remove(id);
+        if (session.type == ArcadePortGame.DRAGONS && wasAlive) {
+            session.dragonEliminationOrder.add(id);
+            awardDragonSurvivalGems(session, id, System.currentTimeMillis());
+        }
         if (session.type == ArcadePortGame.DRAGONS) {
             session.dragonMarksmanCharge.remove(id);
             session.dragonMarksmanNextChargeAt.remove(id);
@@ -11466,6 +11602,9 @@ public final class ArcadePortManager implements Listener {
         final Set<Block> microBarrierBlocks = new HashSet<>();
         final Map<String, Long> dragonContactCooldowns = new HashMap<>();
         final List<DragonFlareZone> dragonFlareZones = new ArrayList<>();
+        final Set<UUID> dragonSurvivalGemsPaid = new HashSet<>();
+        final List<UUID> dragonEliminationOrder = new ArrayList<>();
+        boolean dragonEndGemsPaid;
         final Map<UUID, Long> dragonWaterDamageNextAt = new HashMap<>();
         long dragonNextTargetUpdateAt;
         long dragonNextPerkUpdateAt;
@@ -11480,7 +11619,6 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> dragonMarksmanFiring = new HashSet<>();
         final Set<UUID> dragonTrackedArrows = new HashSet<>();
         final Set<UUID> dragonSparklerItems = new HashSet<>();
-        final Map<UUID, Integer> dragonSparklezThrows = new HashMap<>();
         final Map<UUID, Long> dragonCompassNextUseAt = new HashMap<>();
         final Map<UUID, Location> dragonTargetLocations = new HashMap<>();
         final Map<UUID, UUID> dragonTargetPlayers = new HashMap<>();
