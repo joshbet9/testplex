@@ -1411,9 +1411,9 @@ public final class ArcadePortManager implements Listener {
                 || type == ArcadePortGame.DRAGONS
                 || type == ArcadePortGame.DRAW_MY_THING
                 || type == ArcadePortGame.MASTER_BUILDERS
-                || (type == ArcadePortGame.GLADIATORS && participants.size() < 2)
+                || type == ArcadePortGame.GLADIATORS
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
-                : type == ArcadePortGame.GLADIATORS ? 600_000L
+                : type == ArcadePortGame.GLADIATORS ? 0L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
                 : type == ArcadePortGame.DEATH_TAG ? ArcadePortRules.DEATH_TAG_GAME_TIMEOUT_MILLIS
                 : type == ArcadePortGame.TURF_WARS ? ArcadePortRules.TURF_WARS_GAME_TIMEOUT_MILLIS
@@ -2133,11 +2133,17 @@ public final class ArcadePortManager implements Listener {
 
     private static final class GladiatorMenuHolder implements InventoryHolder {
         private final GladiatorMenuType type;
+        private final boolean lobbyVote;
         private int selectedHotbarSlot = -1;
         private Inventory inventory;
 
         private GladiatorMenuHolder(GladiatorMenuType type) {
+            this(type, false);
+        }
+
+        private GladiatorMenuHolder(GladiatorMenuType type, boolean lobbyVote) {
             this.type = type;
+            this.lobbyVote = lobbyVote;
         }
 
         @Override
@@ -2175,7 +2181,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void openGladiatorVoteMenu(Player player, Map<UUID, String> votes, String title) {
-        GladiatorMenuHolder holder = new GladiatorMenuHolder(GladiatorMenuType.VOTE);
+        GladiatorMenuHolder holder = new GladiatorMenuHolder(
+                GladiatorMenuType.VOTE, votes == gladiatorLobbyVotes);
         Inventory inventory = Bukkit.createInventory(holder, 27, title);
         holder.inventory = inventory;
         Material[] icons = {Material.BOW, Material.FISHING_ROD, Material.SHIELD, Material.SPLASH_POTION};
@@ -2323,6 +2330,34 @@ public final class ArcadePortManager implements Listener {
                 used[next] = true;
             }
         }
+        boolean editorPresent = false;
+        for (ItemStack item : ordered) {
+            if (item != null && !item.getType().isAir() && item.hasItemMeta()
+                    && item.getItemMeta().getPersistentDataContainer()
+                            .has(gladiatorHotbarKey, PersistentDataType.BYTE)) {
+                editorPresent = true;
+                break;
+            }
+        }
+        if (!editorPresent) {
+            ItemStack editor = null;
+            for (ItemStack item : source) {
+                if (item != null && item.hasItemMeta()
+                        && item.getItemMeta().getPersistentDataContainer()
+                                .has(gladiatorHotbarKey, PersistentDataType.BYTE)) {
+                    editor = item;
+                    break;
+                }
+            }
+            if (editor != null) {
+                for (int slot = 8; slot >= 0; slot--) {
+                    if (ordered[slot] == null || ordered[slot].getType().isAir()) {
+                        ordered[slot] = editor;
+                        break;
+                    }
+                }
+            }
+        }
         for (int i = 0; i < 9; i++) player.getInventory().setItem(i, ordered[i]);
     }
 
@@ -2333,28 +2368,30 @@ public final class ArcadePortManager implements Listener {
         plugin.saveConfig();
         Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
         if (cosmeticsPlugin == null) return;
-        Path preferences = cosmeticsPlugin.getDataFolder().toPath().resolve("player-preferences.yml");
-        YamlConfiguration data = Files.isRegularFile(preferences)
-                ? YamlConfiguration.loadConfiguration(preferences.toFile()) : new YamlConfiguration();
-        data.set("players." + player.getUniqueId()
-                + ".games.gladiators.cosmetics.kill-message.selected", value);
         try {
-            Files.createDirectories(preferences.getParent());
-            data.save(preferences.toFile());
-        } catch (java.io.IOException exception) {
-            plugin.getLogger().warning("Could not save Gladiators kill-message preference: " + exception.getMessage());
+            Object result = cosmeticsPlugin.getClass()
+                    .getMethod("chooseCosmeticOption", UUID.class, String.class, String.class, String.class)
+                    .invoke(cosmeticsPlugin, player.getUniqueId(), "gladiators", "kill-message", value);
+            if (!Boolean.TRUE.equals(result)) {
+                plugin.getLogger().warning("TestplexModernArcade rejected the Gladiators kill-message preference for "
+                        + player.getUniqueId() + ".");
+            }
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().warning("Could not save Gladiators kill-message preference through the live preference store: "
+                    + exception.getMessage());
         }
     }
 
     private String gladiatorKillMessageStyle(Player killer) {
         Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
         if (cosmeticsPlugin != null) {
-            Path preferences = cosmeticsPlugin.getDataFolder().toPath().resolve("player-preferences.yml");
-            if (Files.isRegularFile(preferences)) {
-                YamlConfiguration data = YamlConfiguration.loadConfiguration(preferences.toFile());
-                String selected = data.getString("players." + killer.getUniqueId()
-                        + ".games.gladiators.cosmetics.kill-message.selected");
-                if (selected != null && !selected.isBlank()) return selected;
+            try {
+                Object selected = cosmeticsPlugin.getClass()
+                        .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
+                        .invoke(cosmeticsPlugin, killer.getUniqueId(), "gladiators", "kill-message");
+                if (selected instanceof String value && !value.isBlank()) return value;
+            } catch (ReflectiveOperationException | LinkageError exception) {
+                plugin.getLogger().fine("Gladiators cosmetic preference bridge unavailable: " + exception.getMessage());
             }
         }
         String fallback = plugin.getConfig().getString(
@@ -2567,8 +2604,8 @@ public final class ArcadePortManager implements Listener {
 
         // Advance the winners' bracket only when every duel in its current stage is resolved.
         // The loser's bracket is deliberately independent and continues pairing players in parallel.
-        if (!hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_WINNERS)
-                && session.gladiatorWinnerQueue.size() >= 2) {
+        boolean winnersStageReady = !hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_WINNERS);
+        if (winnersStageReady && session.gladiatorWinnerQueue.size() >= 2) {
             if (session.gladiatorWinnerBracketStarted) {
                 session.gladiatorRound = ArcadePortRules.gladiatorsTierForRound(session.gladiatorRound + 1);
                 // Lower-bracket loadouts follow the current tournament tier, but only
@@ -2585,11 +2622,12 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
-        // Loser matches do not wait for winners' bracket matches to finish.
-        // Gear tier follows the current tournament stage, avoiding timer/order-dependent
-        // upgrades when losses arrive while an earlier lower-bracket duel is still running.
-        if (!hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_LOSERS)
-                && session.gladiatorLoserQueue.size() >= 2) {
+        // Start each lower-bracket batch after the current winners' stage and any previous
+        // lower stage resolve; those matches then run in parallel with the next winners' round.
+        // New lower-bracket loadouts follow the current tournament tier.
+        if (ArcadePortRules.canStartGladiatorsLoserStage(winnersStageReady,
+                hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_LOSERS),
+                session.gladiatorLoserQueue.size())) {
             session.gladiatorLoserArenaCursor = 0;
             while (session.gladiatorLoserQueue.size() >= 2) {
                 UUID first = session.gladiatorLoserQueue.remove(0);
@@ -13365,7 +13403,10 @@ public final class ArcadePortManager implements Listener {
                 ItemMeta meta = clicked.getItemMeta();
                 String action = meta.getPersistentDataContainer().get(gladiatorMenuActionKey, PersistentDataType.STRING);
                 String value = meta.getPersistentDataContainer().get(gladiatorMenuValueKey, PersistentDataType.STRING);
-                if ("vote".equals(action)) voteGladiators(active, player, GladiatorsMode.fromId(value));
+                if ("vote".equals(action)) {
+                    Session voting = holder.lobbyVote ? null : active;
+                    voteGladiators(voting, player, GladiatorsMode.fromId(value));
+                }
                 return;
             }
             if (holder.type == GladiatorMenuType.HOTBAR) {

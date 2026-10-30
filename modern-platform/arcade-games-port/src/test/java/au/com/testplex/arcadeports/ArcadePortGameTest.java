@@ -1693,6 +1693,14 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldEliminateGladiatorAfterLoss(3));
     }
 
+    @Test void gladiatorsLowerBracketStartsOnlyAtAStageBoundaryAndPairsAllWaitingPlayers() {
+        assertFalse(ArcadePortRules.canStartGladiatorsLoserStage(false, false, 4));
+        assertFalse(ArcadePortRules.canStartGladiatorsLoserStage(true, true, 4));
+        assertFalse(ArcadePortRules.canStartGladiatorsLoserStage(true, false, 1));
+        assertTrue(ArcadePortRules.canStartGladiatorsLoserStage(true, false, 2));
+        assertTrue(ArcadePortRules.canStartGladiatorsLoserStage(true, false, 6));
+    }
+
     @Test void gladiatorsLoserArenaContainsTheDuelFootprint() {
         assertFalse(ArcadePortRules.isOutsideGladiatorsLoserArena(0.5D, 0.5D, 0.5D, 0.5D));
         assertFalse(ArcadePortRules.isOutsideGladiatorsLoserArena(4.1D, -3.1D, 0.5D, 0.5D));
