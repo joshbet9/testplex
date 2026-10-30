@@ -1548,8 +1548,6 @@ public final class ArcadePortManager implements Listener {
         session.microBarrierActive = type == ArcadePortGame.MICRO_BATTLES;
         YamlConfiguration microCosmeticPreferences = type == ArcadePortGame.MICRO_BATTLES
                 ? loadMicroBattlesCosmeticPreferences() : null;
-        YamlConfiguration microCosmeticPreferences = type == ArcadePortGame.MICRO_BATTLES
-                ? loadMicroBattlesCosmeticPreferences() : null;
         SourceMapCatalog.MapData microSourceMap = sourceMapData.get(type.id());
         if (type == ArcadePortGame.MICRO_BATTLES) {
             session.microCrumbleMinX = microSourceMap == null ? -HALF_SIZE : microSourceMap.minX();
@@ -15833,7 +15831,6 @@ public final class ArcadePortManager implements Listener {
                         wall.getLocation().add(0.5D, 0.5D, 0.5D), 5,
                         0.25D, 0.25D, 0.25D, 0.05D, wall.getBlockData());
             }
-            spectator.setCompassTarget(target.getLocation());
         }
         session.bombWallerReadyAt.put(id, ArcadePortRules.nextBombLobbersWallerReadyAt(now));
         consumeHeld(player);
@@ -16090,36 +16087,6 @@ public final class ArcadePortManager implements Listener {
                             ArcadePortRules.bombLobbersTntIgnites(bombPowerupType));
                 }
             }
-        } else if ("micro-battles".equals(gameId)) {
-            MicroBattlesAchievement[] achievements = MicroBattlesAchievement.values();
-            int[] achievementSlots = {12, 13};
-            String microStatsPath = localStatsPath(targetId, ArcadePortGame.MICRO_BATTLES.id());
-            for (int i = 0; i < achievements.length; i++) {
-                MicroBattlesAchievement achievement = achievements[i];
-                boolean unlocked = plugin.getConfig().getBoolean(achievement.configKey(targetId), false);
-                String progressKey = achievement == MicroBattlesAchievement.ANNIHILATION
-                        ? "annihilation-count" : "last-two-mission-progress";
-                int progress = plugin.getConfig().getInt(microStatsPath + progressKey, 0);
-                List<String> lore = List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
-                        ChatColor.GRAY + "Recorded progress: " + progress,
-                        unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked");
-                inventory.setItem(achievementSlots[i], statsItem(
-                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
-                        lore, "noop", null, null));
-            }
-            int kills = plugin.getConfig().getInt(microStatsPath + "kills", 0);
-            int assists = plugin.getConfig().getInt(microStatsPath + "assists", 0);
-            double damageTaken = plugin.getConfig().getDouble(microStatsPath + "damage-taken", 0.0D);
-            double damageDealt = plugin.getConfig().getDouble(microStatsPath + "damage-dealt", 0.0D);
-            inventory.setItem(29, statsItem(Material.IRON_SWORD, ChatColor.YELLOW + "Kills",
-                    List.of(" ", ChatColor.WHITE + Integer.toString(kills)), "noop", null, null));
-            inventory.setItem(30, statsItem(Material.GOLDEN_SWORD, ChatColor.YELLOW + "Assists",
-                    List.of(" ", ChatColor.WHITE + Integer.toString(assists)), "noop", null, null));
-            inventory.setItem(31, statsItem(Material.SHIELD, ChatColor.YELLOW + "Damage Taken",
-                    List.of(" ", ChatColor.WHITE + String.format(java.util.Locale.ROOT, "%.1f", damageTaken)), "noop", null, null));
-            inventory.setItem(32, statsItem(Material.BOW, ChatColor.YELLOW + "Damage Dealt",
-                    List.of(" ", ChatColor.WHITE + String.format(java.util.Locale.ROOT, "%.1f", damageDealt)), "noop", null, null));
         }
         event.blockList().clear();
         event.setCancelled(true);
