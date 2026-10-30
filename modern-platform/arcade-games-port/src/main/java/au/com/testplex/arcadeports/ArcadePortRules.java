@@ -1551,11 +1551,16 @@ public final class ArcadePortRules {
     public static final long QUIVER_RESPAWN_DELAY_TICKS = 20L;
     public static final long QUIVER_GROUND_POUND_COOLDOWN_MILLIS = 10_000L;
     public static final long QUIVER_NINJA_VANISH_MILLIS = 1_200L;
+    public static final long QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS = 3_000L;
+    public static final int QUIVER_SWORD_SLOT = 0;
+    public static final int QUIVER_BOW_SLOT = 1;
+    public static final int QUIVER_ARROW_SLOT = 2;
+    /** Original Quiver checks that a chain-arrow impact is within one block of a player. */
+    public static final double QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED = 1.0D;
+    /** The requested modern Enchanter change is two rebounds, instead of the source's one. */
+    public static final int QUIVER_MAX_ARROW_BOUNCES = 2;
     /** Original Quiver labels 20 consecutive kills without dying as a Perfect Run. */
     public static final int QUIVER_PERFECT_RUN_KILL_STREAK = 20;
-    /** Practical multi-block target-search range for the source's "nearby enemies" chain arrow. */
-    public static final double QUIVER_REBOUND_MAX_DISTANCE_SQUARED = 64.0D;
-    public static final int QUIVER_MAX_ARROW_BOUNCES = 2;
 
     public static boolean isQuiverPerfectRun(int killStreak) {
         return killStreak >= QUIVER_PERFECT_RUN_KILL_STREAK;
@@ -1592,9 +1597,12 @@ public final class ArcadePortRules {
         };
     }
 
-    public static boolean isQuiverReboundTargetInRange(double distanceSquared) {
-        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
-                && distanceSquared <= QUIVER_REBOUND_MAX_DISTANCE_SQUARED;
+    public static boolean isQuiverReboundImpactInRange(double bodyDistanceSquared, double eyeDistanceSquared) {
+        boolean bodyNear = Double.isFinite(bodyDistanceSquared) && bodyDistanceSquared >= 0.0D
+                && bodyDistanceSquared <= QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED;
+        boolean eyesNear = Double.isFinite(eyeDistanceSquared) && eyeDistanceSquared >= 0.0D
+                && eyeDistanceSquared <= QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED;
+        return bodyNear || eyesNear;
     }
 
     public static boolean shouldQuiverArrowBounce(int remainingBounces) {
@@ -1619,9 +1627,17 @@ public final class ArcadePortRules {
         };
     }
 
-    /** One in the Quiver refunds its single arrow only when the hit secures a kill. */
-    public static boolean quiverRegrantsArrowAfterHit(boolean targetEliminated) {
-        return targetEliminated;
+    /** Reborn grants a fresh single Super Arrow for every kill, including melee kills. */
+    public static boolean quiverRegrantsArrowAfterKill() {
+        return true;
+    }
+
+    public static boolean isQuiverSpectatorTeleportReady(long now, long readyAt) {
+        return now >= readyAt;
+    }
+
+    public static long nextQuiverSpectatorTeleportAt(long now) {
+        return now + QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS;
     }
 
     /** Reborn's Ground Pound scales horizontal knockback from 0 at range to 0.8 at point-blank. */
