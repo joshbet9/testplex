@@ -6,11 +6,11 @@ This dedicated gameplay module adapts the **1.21/MonsterMazeStandalone** impleme
 - Original, legacy Speed, Modern and Classic modes; three authored maze patterns; timed stages and Safe Pad progression. Speed keeps the 1.8 QOL kit rules and a modern Speed II replacement for the 1.8 ground-level speeding dash, while retaining the original 60s-minus-2s stage timer and 150/15 monster cadence. Only Modern uses the accelerated timer and 225/30 monster cadence; Classic opts out of the speed boost.
 - Jumper, Slowball, Body Builder, Repulsor, and mode-gated Maverick kit behavior from the 1.21 source.
 - Monster routing, bumps, launch/freeze interactions, stage progression, spectator/elimination paths and cleanup.
-- Dedicated arena/lobby handling, maze generation and admin control.
+- Testplex-owned lifecycle: players enter through the shared Arcade queue and return to the shared Arcade lobby. This module owns only Monster Maze gameplay and its active arena; it does not register a player-join flow, private lobby, NPC selector or separate Bukkit plugin entrypoint.
 - Optional ProtocolLib disguise path retained from the 1.21 source. Without ProtocolLib, the existing source fallback remains available.
 
 ## Commands
-Use `/gamepanel`, choose Monster Maze, then select **Start / Test Monster Maze** (available once `MonsterMazeModern.jar` is installed). Direct commands: `/mm start [1|2|3]`, `/mm status`, `/mm stop`, `/mm kit <jumper|slowball|body builder|repulsor>`, `/mm gui`.
+Monster Maze gameplay is compiled into `ArcadeMechanicsModern.jar`; do **not** install `MonsterMazeStandalone.jar` or `MonsterMazeModern.jar` on the Testplex 26.3 server. Once Monster Maze is enabled for tester acceptance, start it through Testplex's shared `/gamepanel` or `/arcadeport play monster-maze` queue. `/mm gui` only prints instructions for the shared Testplex kit selector; it does not open a separate Monster Maze GUI. Other direct commands include `/mm status`, `/mm stop`, `/mm kit <jumper|slowball|body builder|repulsor>`, and the admin map/mode/pattern controls.
 
 ## Test isolation and maps
 Default config uses `test-mode: true` and `record-runs: false`. Test mode suppresses backend API writes and status heartbeats even if production environment variables exist. Leave test mode enabled on the test platform.
