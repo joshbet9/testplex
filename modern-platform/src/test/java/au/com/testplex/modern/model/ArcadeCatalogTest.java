@@ -59,6 +59,20 @@ class ArcadeCatalogTest {
     }
 
     @Test
+    void paintballUsesOneCombinedLineWithIndependentWeaponAndPelletChoices() {
+        GameDefinition paintball = new ArcadeCatalog().getGame("paintball");
+        assertEquals(1, paintball.getCosmeticLines().size());
+        CosmeticLineDefinition line = paintball.getCosmeticLines().get(0);
+        assertEquals("weapon-and-pellet-identity", line.getId());
+        assertEquals(CosmeticLineDefinition.SelectionMode.MULTI, line.getSelectionMode());
+        assertEquals(3, line.getOptions().stream()
+                .filter(option -> "weapon".equals(option.getSelectionGroup())).count());
+        assertEquals(3, line.getOptions().stream()
+                .filter(option -> "pellet".equals(option.getSelectionGroup())).count());
+        assertTrue(line.getOptions().stream().allMatch(option -> option.getSelectionGroup() != null));
+    }
+
+    @Test
     void allGameLookupsAreCaseInsensitive() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         assertNotNull(catalog.getGame("SNAKE"));
