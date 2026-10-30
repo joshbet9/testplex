@@ -179,12 +179,14 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRearmQuiverLeap(true, true, Double.NaN));
     }
 
-    @Test void quiverOnlyRegrantsArrowAfterElimination() {
-        assertFalse(ArcadePortRules.quiverRegrantsArrowAfterHit(false));
-        assertTrue(ArcadePortRules.quiverRegrantsArrowAfterHit(true));
+    @Test void quiverRegrantsTheSuperArrowForEveryKillSource() {
+        assertTrue(ArcadePortRules.quiverRegrantsArrowAfterKill());
+        assertEquals(0, ArcadePortRules.QUIVER_SWORD_SLOT);
+        assertEquals(1, ArcadePortRules.QUIVER_BOW_SLOT);
+        assertEquals(2, ArcadePortRules.QUIVER_ARROW_SLOT);
     }
 
-    @Test void quiverEnchanterChainsTwiceAndFallsBackWhenNoEnemyIsNearby() {
+    @Test void quiverEnchanterChainsTwiceUsingTheSourceImpactAndIgnoreRules() {
         assertEquals(2, ArcadePortRules.QUIVER_MAX_ARROW_BOUNCES);
         assertTrue(ArcadePortRules.shouldQuiverArrowBounce(2));
         assertTrue(ArcadePortRules.shouldQuiverArrowBounce(1));
@@ -193,11 +195,18 @@ class ArcadePortGameTest {
         assertEquals(0, ArcadePortRules.quiverArrowBouncesAfterBounce(1));
         assertEquals(0, ArcadePortRules.quiverArrowBouncesAfterBounce(0));
 
-        assertTrue(ArcadePortRules.isQuiverReboundTargetInRange(0.0D));
-        assertTrue(ArcadePortRules.isQuiverReboundTargetInRange(64.0D));
-        assertFalse(ArcadePortRules.isQuiverReboundTargetInRange(64.01D));
-        assertFalse(ArcadePortRules.isQuiverReboundTargetInRange(Double.NaN));
-        assertEquals(64.0D, ArcadePortRules.QUIVER_REBOUND_MAX_DISTANCE_SQUARED, 0.00001D);
+        assertTrue(ArcadePortRules.isQuiverReboundImpactInRange(0.0D, 4.0D));
+        assertTrue(ArcadePortRules.isQuiverReboundImpactInRange(4.0D, 0.9D));
+        assertFalse(ArcadePortRules.isQuiverReboundImpactInRange(1.01D, 1.01D));
+        assertFalse(ArcadePortRules.isQuiverReboundImpactInRange(Double.NaN, 2.0D));
+        assertEquals(1.0D, ArcadePortRules.QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED, 0.00001D);
+    }
+
+    @Test void quiverSpectatorCompassUsesCooldownOnlyForTeleport() {
+        assertTrue(ArcadePortRules.isQuiverSpectatorTeleportReady(1_000L, 1_000L));
+        assertFalse(ArcadePortRules.isQuiverSpectatorTeleportReady(999L, 1_000L));
+        assertEquals(4_000L, ArcadePortRules.nextQuiverSpectatorTeleportAt(1_000L));
+        assertEquals(3_000L, ArcadePortRules.QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
     }
 
     @Test void quiverGroundPoundUsesSourceRadialImpulse() {
