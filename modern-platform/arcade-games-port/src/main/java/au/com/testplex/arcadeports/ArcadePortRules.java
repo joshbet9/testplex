@@ -1644,10 +1644,6 @@ public final class ArcadePortRules {
         return runnersRemaining > 0;
     }
 
-    public static boolean deathTagChasersWinRound(int runnersRemaining) {
-        return false; // Chasers are the losing side; an empty Runner team has no winner.
-    }
-
     public static boolean shouldDeathTagRunnerWinTimeout(int runnersRemaining) {
         return deathTagHasRunnerWinner(runnersRemaining);
     }
