@@ -140,6 +140,10 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
         if (game == null) return null;
         String group = selectionGroup.toLowerCase(java.util.Locale.ROOT);
         for (var line : game.getCosmeticLines()) {
+            if (group.equals(line.getId())) {
+                var selected = preferences.getSelected(playerId, game, line);
+                return selected.isEmpty() ? line.getDefaultOptionId() : selected.iterator().next();
+            }
             for (var option : line.getOptions()) {
                 if (group.equals(option.getSelectionGroup())
                         && preferences.isSelected(playerId, game, line, option.getId())) {
@@ -148,6 +152,24 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
             }
         }
         return null;
+    }
+
+    /** Persist a game-port selection through the same in-memory store used by the cosmetics menu. */
+    public boolean chooseCosmeticOption(UUID playerId, String gameId, String lineId, String optionId) {
+        if (playerId == null || gameId == null || lineId == null || optionId == null
+                || catalog == null || preferences == null) return false;
+        GameDefinition game = catalog.getGame(gameId);
+        if (game == null) return false;
+        for (var line : game.getCosmeticLines()) {
+            if (!lineId.equals(line.getId())) continue;
+            try {
+                preferences.chooseOption(playerId, game, line, optionId);
+                return true;
+            } catch (IllegalArgumentException exception) {
+                return false;
+            }
+        }
+        return false;
     }
 
     public ArcadeCatalog getCatalog() { return catalog; }
