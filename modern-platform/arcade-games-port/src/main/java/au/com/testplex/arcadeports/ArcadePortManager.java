@@ -155,6 +155,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> gladiatorLobbyVotes = new HashMap<>();
     private final Map<UUID, String> dragonsKitPreferences = new HashMap<>();
     private final Map<UUID, String> dragonEscapeKitPreferences = new HashMap<>();
+    private final Map<UUID, String> turfWarsKitPreferences = new HashMap<>();
     /** Packet-thread-safe entity-ID lookup for the optional Bacon client hit bridge. */
     private final Map<Integer, UUID> baconAvatarOwnersByEntityId = new ConcurrentHashMap<>();
     private Object baconAvatarPacketBridge;
@@ -490,6 +491,7 @@ public final class ArcadePortManager implements Listener {
                 case PAINTBALL -> { selectPaintballKit(player, value); return; }
                 case DEATH_TAG -> { selectDeathTagRunnerKit(player, value); return; }
                 case RUNNER -> { selectRunnerKit(player, value); return; }
+                case TURF_WARS -> { selectTurfWarsKit(player, value); return; }
                 default -> { }
             }
         }
@@ -505,6 +507,7 @@ public final class ArcadePortManager implements Listener {
         else if (ArcadePortRules.normalizeDragonsKit(value) != null) selectDragonsKit(player, value);
         else if (ArcadePortRules.normalizeDragonEscapeKit(value) != null) selectDragonEscapeKit(player, value);
         else if (value.startsWith("runnerkit-")) selectRunnerKit(player, value);
+        else if (ArcadePortRules.normalizeTurfWarsKit(value) != null) selectTurfWarsKit(player, value);
         else selectDeathTagRunnerKit(player, value);
     }
 
@@ -699,6 +702,31 @@ public final class ArcadePortManager implements Listener {
         } else {
             deathTagRunnerKitPreferences.put(player.getUniqueId(), kit);
             player.sendMessage(ChatColor.GREEN + "Death Tag runner kit set to " + kit + " for your next test.");
+        }
+    }
+
+    public void selectTurfWarsKit(Player player, String requestedKit) {
+        if (player == null) return;
+        String kit = ArcadePortRules.normalizeTurfWarsKit(requestedKit);
+        if (kit == null) {
+            player.sendMessage(ChatColor.YELLOW + "Turf Wars kits: marksman, infiltrator, shredder.");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        turfWarsKitPreferences.put(id, kit);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.TURF_WARS
+                && session.players.containsKey(id) && session.alive.contains(id)) {
+            session.turfWarsKits.put(id, kit);
+            session.turfConstructorNextAt.put(id,
+                    System.currentTimeMillis() + ArcadePortRules.TURF_WARS_CONSTRUCTOR_INTERVAL_MILLIS);
+            session.turfArrowNextAt.put(id, System.currentTimeMillis());
+            session.turfBarrageCharges.remove(id);
+            session.turfBarrageFiring.remove(id);
+            giveKit(session, player);
+            player.sendMessage(ChatColor.GREEN + "Turf Wars kit changed to " + kit + ".");
+        } else {
+            player.sendMessage(ChatColor.GREEN + "Turf Wars kit set to " + kit + " for your next game.");
         }
     }
 
@@ -1069,6 +1097,7 @@ public final class ArcadePortManager implements Listener {
                 : type == ArcadePortGame.GLADIATORS ? 600_000L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
                 : type == ArcadePortGame.DEATH_TAG ? ArcadePortRules.DEATH_TAG_GAME_TIMEOUT_MILLIS
+                : type == ArcadePortGame.TURF_WARS ? ArcadePortRules.TURF_WARS_GAME_TIMEOUT_MILLIS
                 : ROUND_MS);
         session.lastBaconHungerAt = now;
         session.lastBaconSlowUpdateAt = now;
@@ -1133,6 +1162,17 @@ public final class ArcadePortManager implements Listener {
         session.turfInitialFrontlineX = ArcadePortRules.turfWarsInitialFrontline(
                 session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive);
         session.turfFrontlineX = session.turfInitialFrontlineX;
+        if (type == ArcadePortGame.TURF_WARS) {
+            initializeTurfWarsMap(session, turfSourceMap);
+            for (Player player : participants) {
+                UUID playerId = player.getUniqueId();
+                session.turfWarsKits.put(playerId,
+                        turfWarsKitPreferences.getOrDefault(playerId, "marksman"));
+                session.turfConstructorNextAt.put(playerId,
+                        now + ArcadePortRules.TURF_WARS_CONSTRUCTOR_INTERVAL_MILLIS);
+                session.turfArrowNextAt.put(playerId, now);
+            }
+        }
         lastDragonHazard = now + 8_000L;
         lastSheepSpawn = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
         if (type == ArcadePortGame.DRAGON_ESCAPE) spawnDragonEscapeDragon(session);
@@ -1202,6 +1242,10 @@ public final class ArcadePortManager implements Listener {
                     ? selectedMap.teamIndexForSpawn(i, teamCount)
                     : teamMode ? i % teamCount : i % 2;
             session.teams.put(player.getUniqueId(), teamId);
+            if (type == ArcadePortGame.TURF_WARS) {
+                session.turfWarsKits.put(player.getUniqueId(),
+                        turfWarsKitPreferences.getOrDefault(player.getUniqueId(), "marksman"));
+            }
             if (type == ArcadePortGame.BACON_BRAWL) {
                 UUID baconId = player.getUniqueId();
                 session.baconKits.put(baconId, baconKitPreferences.getOrDefault(baconId, "el-muchacho-pigo"));
@@ -3153,7 +3197,14 @@ public final class ArcadePortManager implements Listener {
         int team = session.teams.getOrDefault(player.getUniqueId(), -1);
         if (team < 0) return;
         Material wool = team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL;
-        player.getInventory().addItem(new ItemStack(wool, 24));
+        player.getInventory().addItem(new ItemStack(wool, ArcadePortRules.TURF_WARS_BUILD_PHASE_WOOL));
+    }
+
+    private void giveTurfWarsStartingWool(Session session, Player player) {
+        int team = session.teams.getOrDefault(player.getUniqueId(), -1);
+        if (team < 0) return;
+        Material wool = team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL;
+        player.getInventory().addItem(new ItemStack(wool, ArcadePortRules.TURF_WARS_STARTING_WOOL));
     }
 
     private void giveKit(Session session, Player player) {
@@ -3371,11 +3422,15 @@ public final class ArcadePortManager implements Listener {
                 }
                 break;
             }
-            case TURF_WARS:
+            case TURF_WARS: {
+                String kit = session.turfWarsKits.getOrDefault(player.getUniqueId(), "marksman");
                 player.getInventory().addItem(new ItemStack(Material.BOW));
-                player.getInventory().addItem(new ItemStack(Material.ARROW, 32));
-                giveTurfWarsWool(session, player);
+                if ("infiltrator".equals(kit)) {
+                    player.getInventory().addItem(new ItemStack(Material.IRON_SWORD));
+                }
+                giveTurfWarsStartingWool(session, player);
                 break;
+            }
         }
         player.updateInventory();
     }
