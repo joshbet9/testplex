@@ -272,6 +272,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     new KitChoice("runnerkit-leaper", "Leaper", Material.RABBIT_FOOT),
                     new KitChoice("runnerkit-archer", "Archer", Material.BOW),
                     new KitChoice("runnerkit-frosty", "Frosty", Material.SNOWBALL));
+            case SHEEP_QUEST -> List.of(
+                    new KitChoice("sheep-beserker", "Beserker", Material.FEATHER),
+                    new KitChoice("sheep-archer", "Archer", Material.BOW),
+                    new KitChoice("sheep-brute", "Brute", Material.IRON_SWORD));
             case SPLEEF -> List.of(
                     new KitChoice("spleef-snowballer", "Snowballer", Material.SNOWBALL),
                     new KitChoice("spleef-brawler", "Brawler", Material.IRON_SWORD),

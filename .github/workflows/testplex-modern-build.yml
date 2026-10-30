@@ -86,11 +86,11 @@ jobs:
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
           jar tf "$arcade_jar" | grep -Fxq "source-maps/Draw My Thing/Draw_Stadium.zip"
           arcade_config="$(unzip -p "$arcade_jar" config.yml)"
-          for candidate in bacon-brawl bomb-lobbers dragon-escape dragons gladiators paintball runner spleef draw-my-thing master-builders; do
+          for candidate in bacon-brawl bomb-lobbers dragon-escape dragons gladiators paintball runner sheep-quest spleef draw-my-thing master-builders; do
             grep -Fxq "  - $candidate" <<< "$arcade_config"
           done
-          ! grep -Eq "^  - (death-tag|evolution|micro-battles|one-in-the-quiver|sheep-quest|turf-wars)$" <<< "$arcade_config"
-          echo "All four modern Paper 26.3 plugin artifacts verified; Draw My Thing includes its no-resource-pack Stadium map, and all ten enabled Arcade candidates are present."
+          ! grep -Eq "^  - (death-tag|evolution|micro-battles|one-in-the-quiver|turf-wars)$" <<< "$arcade_config"
+          echo "All four modern Paper 26.3 plugin artifacts verified; Draw My Thing includes its no-resource-pack Stadium map, and all eleven enabled Arcade candidates are present."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
@@ -118,7 +118,7 @@ jobs:
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
             echo "- Gameplay ports: Monster Maze and Snake plus 16 mechanics-first prototypes, including Draw My Thing and Master Builders; in-game validation still required"
-            echo "- Deployment acceptance: eight Arcade candidates remain explicitly approved for acceptance; Draw My Thing and Master Builders are added as gameplay-in-progress test variants; Snake remains gated"
+            echo "- Deployment acceptance: Sheep Quest joins the enabled acceptance candidates; Draw My Thing and Master Builders remain gameplay-in-progress test variants; Snake remains gated"
             echo "- Server deploy: successful pushes to feat/testplex-modern-26.3-platform automatically invoke the isolated Hyper-V deploy job; pull requests and manual build-only runs do not deploy"
           } >> "$GITHUB_STEP_SUMMARY"
 
