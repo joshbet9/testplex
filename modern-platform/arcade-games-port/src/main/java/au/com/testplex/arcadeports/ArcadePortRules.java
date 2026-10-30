@@ -1666,6 +1666,13 @@ public final class ArcadePortRules {
         return alreadyUnlocked || deathTagRunnersReceiveSpeed(chasers, totalPlayers);
     }
 
+    /** Chat stats show kills divided by deaths; with no deaths, the kill count is the K/D display value. */
+    public static double deathTagKillDeathRatio(int kills, int deaths) {
+        int safeKills = Math.max(0, kills);
+        int safeDeaths = Math.max(0, deaths);
+        return safeDeaths == 0 ? safeKills : (double) safeKills / (double) safeDeaths;
+    }
+
     /** Chasers retain their opening Speed I only until the runners earn their own Speed I. */
     public static boolean deathTagChasersReceiveSpeed(int chasers, int totalPlayers) {
         return chasers > 0 && !deathTagRunnersReceiveSpeed(chasers, totalPlayers);
