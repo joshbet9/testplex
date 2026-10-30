@@ -10418,8 +10418,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.spleefLeapReadyAt.put(id, now + ArcadePortRules.SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS);
-        Vector launch = player.getLocation().getDirection().clone().normalize().multiply(1.2D);
-        launch.setY(Math.min(1.2D, launch.getY() + 0.2D + (player.isOnGround() ? 0.2D : 0.0D)));
+        Vector launch = ArcadePortRules.spleefLeapVelocity(
+                player.getLocation().getDirection(), player.isOnGround());
         player.setVelocity(launch);
         player.setFallDistance(0.0F);
         player.getWorld().spawnParticle(Particle.FLAME, player.getLocation(), 8, 0.25D, 0.15D, 0.25D, 0.02D);
