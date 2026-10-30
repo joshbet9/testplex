@@ -45,7 +45,7 @@ public class LobbyGUI implements Listener {
         this.plugin = plugin;
         this.game = game;
         this.kits = kits;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
     }
 
     public void open(Player player) { openHome(player); }
