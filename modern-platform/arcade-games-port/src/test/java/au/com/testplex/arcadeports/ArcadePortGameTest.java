@@ -2322,6 +2322,14 @@ class ArcadePortGameTest {
                 ArcadePortRules.microBattlesKnockbackStrength(2.5D), 0.00001D);
         assertEquals(Math.log10(2.0D) * 1.6D,
                 ArcadePortRules.microBattlesKnockbackStrength(1.0D), 0.00001D);
+
+        assertEquals(3, ArcadePortRules.microBattlesChatStatDamage(3.9D));
+        assertEquals(0, ArcadePortRules.microBattlesChatStatDamage(Double.NaN));
+        assertTrue(ArcadePortRules.shouldCreditMicroBattlesAssist(20_000L, 5_000L));
+        assertTrue(ArcadePortRules.shouldCreditMicroBattlesAssist(20_000L, 20_000L));
+        assertFalse(ArcadePortRules.shouldCreditMicroBattlesAssist(20_001L, 5_000L));
+        assertFalse(ArcadePortRules.shouldCreditMicroBattlesAssist(20_000L, 0L));
+        assertFalse(ArcadePortRules.shouldCreditMicroBattlesAssist(4_999L, 5_000L));
     }
 
     @Test void microBattlesUsesMinimumHunger() {
