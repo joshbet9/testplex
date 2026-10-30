@@ -9699,6 +9699,60 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
+        if (session.type == ArcadePortGame.MILK_THE_COW) {
+            if (event.getEntity() instanceof Cow cow && session.entities.contains(cow)) {
+                event.setCancelled(true);
+                return;
+            }
+            if (event.getEntity() instanceof Player milkTarget
+                    && session.players.containsKey(milkTarget.getUniqueId())) {
+                event.setCancelled(true);
+                if (!session.alive.contains(milkTarget.getUniqueId())
+                        || session.teams.getOrDefault(milkTarget.getUniqueId(), 0) == 1) return;
+                Player milkAttacker = null;
+                if (event instanceof EntityDamageByEntityEvent byEntity) {
+                    Entity damager = byEntity.getDamager();
+                    if (damager instanceof Player playerAttacker) milkAttacker = playerAttacker;
+                    else if (damager instanceof Projectile projectile
+                            && projectile.getShooter() instanceof Player projectileAttacker) milkAttacker = projectileAttacker;
+                    if (milkAttacker != null
+                            && session.teams.getOrDefault(milkAttacker.getUniqueId(), -1) == 0) return;
+                }
+                damageMilkCowFarmer(session, milkTarget, milkAttacker, event.getFinalDamage());
+                return;
+            }
+        }
+        if (session.type == ArcadePortGame.WITHER_ASSAULT
+                && event.getEntity() instanceof Player witherTarget
+                && session.players.containsKey(witherTarget.getUniqueId())) {
+            event.setCancelled(true);
+            if (!session.alive.contains(witherTarget.getUniqueId())) return;
+            int targetTeam = session.teams.getOrDefault(witherTarget.getUniqueId(), 0);
+            if (targetTeam == 1) return;
+            Player witherAttacker = null;
+            if (event instanceof EntityDamageByEntityEvent byEntity) {
+                Entity damager = byEntity.getDamager();
+                if (damager instanceof Projectile projectile
+                        && projectile.getShooter() instanceof Player shooter
+                        && session.players.containsKey(shooter.getUniqueId())
+                        && session.teams.getOrDefault(shooter.getUniqueId(), 0) == 1) {
+                    witherAttacker = shooter;
+                } else if (damager instanceof Player playerAttacker
+                        && session.teams.getOrDefault(playerAttacker.getUniqueId(), -1) == 0) {
+                    return;
+                } else if (damager instanceof Player playerAttacker) {
+                    witherAttacker = playerAttacker;
+                } else {
+                    return;
+                }
+            }
+            double damage = event.getFinalDamage();
+            if (damage > 0.0D) {
+                if (witherTarget.getHealth() <= damage) eliminate(session, witherTarget, witherAttacker, "was struck by a Wither");
+                else witherTarget.setHealth(witherTarget.getHealth() - damage);
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.BOMB_LOBBERS
                 && event.getEntity() instanceof Player bombTarget
                 && session.players.containsKey(bombTarget.getUniqueId())) {
@@ -10325,8 +10379,10 @@ public final class ArcadePortManager implements Listener {
                 && event.getAction() == Action.LEFT_CLICK_AIR;
         boolean dragonsSparklerLeftClick = session.type == ArcadePortGame.DRAGONS
                 && event.getAction() == Action.LEFT_CLICK_AIR;
+        boolean witherLeftClick = session.type == ArcadePortGame.WITHER_ASSAULT && event.getAction().isLeftClick();
         if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick
-                && !baconNonRightClick && !dragonEscapeDisruptorLeftClick && !dragonsSparklerLeftClick) return;
+                && !baconNonRightClick && !dragonEscapeDisruptorLeftClick && !dragonsSparklerLeftClick
+                && !witherLeftClick) return;
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
         if (event.isCancelled()) {
@@ -10335,6 +10391,11 @@ public final class ArcadePortManager implements Listener {
                     && heldItem.getType() == Material.IRON_AXE
                     && session.alive.contains(player.getUniqueId());
             String bombKit = session.bombLobbersKits.getOrDefault(player.getUniqueId(), "jumper");
+            boolean forceWitherBlast = session.type == ArcadePortGame.WITHER_ASSAULT
+                    && event.getAction().isLeftClick() && heldItem != null
+                    && heldItem.getType() == Material.GOLDEN_SWORD
+                    && session.teams.getOrDefault(player.getUniqueId(), 0) == 1
+                    && session.alive.contains(player.getUniqueId());
             boolean forceBombControlClick = session.type == ArcadePortGame.BOMB_LOBBERS
                     && heldItem != null
                     && (heldItem.getType() == Material.TNT
@@ -10343,7 +10404,30 @@ public final class ArcadePortManager implements Listener {
                         || ("waller".equals(bombKit) && heldItem.getType() == Material.STONE_SHOVEL))
                     && (event.getAction().isRightClick() || event.getAction().isLeftClick())
                     && session.alive.contains(player.getUniqueId());
-            if (!forceBaconAbility && !forceBombControlClick) return;
+            if (!forceBaconAbility && !forceBombControlClick && !forceWitherBlast) return;
+        }
+        if (session.type == ArcadePortGame.WITHER_ASSAULT && witherLeftClick
+                && session.alive.contains(player.getUniqueId())
+                && session.teams.getOrDefault(player.getUniqueId(), 0) == 1
+                && heldItem != null && heldItem.getType() == Material.GOLDEN_SWORD) {
+            event.setCancelled(true);
+            launchWitherAssaultSkull(session, player, System.currentTimeMillis());
+            return;
+        }
+        if (session.type == ArcadePortGame.MILK_THE_COW && event.getAction().isRightClick()
+                && session.alive.contains(player.getUniqueId())
+                && session.teams.getOrDefault(player.getUniqueId(), 0) == 1) {
+            boolean usableBlock = event.getClickedBlock() != null && event.getClickedBlock().getType().isInteractable();
+            if (!usableBlock && heldItem != null && heldItem.getType() == Material.IRON_AXE) {
+                event.setCancelled(true);
+                launchMilkCowBomb(session, player, System.currentTimeMillis());
+                return;
+            }
+            if (!usableBlock && heldItem != null && heldItem.getType() == Material.IRON_SHOVEL) {
+                event.setCancelled(true);
+                startMilkCowBodySlam(session, player, System.currentTimeMillis());
+                return;
+            }
         }
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && !session.alive.contains(player.getUniqueId())
@@ -10679,6 +10763,21 @@ public final class ArcadePortManager implements Listener {
         ItemStack held = player.getInventory().getItemInMainHand();
         Material item = held == null ? Material.AIR : held.getType();
 
+        if (session.type == ArcadePortGame.MILK_THE_COW && item == Material.BUCKET
+                && session.teams.getOrDefault(player.getUniqueId(), 0) == 0) {
+            if (event.getRightClicked() instanceof Player cowPlayer
+                    && session.teams.getOrDefault(cowPlayer.getUniqueId(), 0) == 1) {
+                event.setCancelled(true);
+                player.getInventory().setItemInMainHand(new ItemStack(Material.MILK_BUCKET));
+                player.playSound(player.getLocation(), Sound.ENTITY_COW_AMBIENT, 0.7F, 1.4F);
+                return;
+            }
+            if (event.getRightClicked() instanceof Cow npcCow && session.milkCowHerd.contains(npcCow)) {
+                event.setCancelled(true);
+                player.getInventory().setItemInMainHand(new ItemStack(Material.MILK_BUCKET));
+                return;
+            }
+        }
         if (session.type == ArcadePortGame.BACON_BRAWL && item == Material.IRON_AXE) {
             String kit = session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo");
             if (ArcadePortRules.shouldActivateBaconBrawlAbility(true, item, false, kit)) {
@@ -10766,6 +10865,27 @@ public final class ArcadePortManager implements Listener {
         sheep.setColor(sheepTeamDyeColor(team));
         player.playSound(player.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 2.0F);
         player.sendMessage(ChatColor.GREEN + "Sheep picked up. Carry it to your team's pen!");
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMilkCowBucketFill(PlayerBucketFillEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.MILK_THE_COW
+                && event.getPlayer().getWorld() == session.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onMilkCowDrink(PlayerItemConsumeEvent event) {
+        Session session = active;
+        Player player = event.getPlayer();
+        if (session == null || session.type != ArcadePortGame.MILK_THE_COW
+                || event.getItem().getType() != Material.MILK_BUCKET
+                || !session.alive.contains(player.getUniqueId())
+                || session.teams.getOrDefault(player.getUniqueId(), 0) != 0) return;
+        incrementMilkCowScore(session, player, MilkCowRules.SCORE_PER_MILK, "Milk drunk");
+        if (active != session) return;
+        player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + 2.0D));
+        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_BURP, 1.0F, 1.0F);
     }
 
     private Set<Integer> randomPlayerSlots(int playerCount, int selectedCount) {
@@ -11086,6 +11206,17 @@ public final class ArcadePortManager implements Listener {
     public void onBlockBreak(BlockBreakEvent event) {
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.WITHER_ASSAULT) {
+            Player player = event.getPlayer();
+            boolean editor = session.alive.contains(player.getUniqueId())
+                    && session.teams.getOrDefault(player.getUniqueId(), 0) == 0
+                    && "editor".equals(session.witherAssaultKits.getOrDefault(player.getUniqueId(), "archer"));
+            if (editor && session.witherEditorBlocks.remove(event.getBlock())) {
+                event.setDropItems(false);
+                event.setExpToDrop(0);
+            } else event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
                 && session.alive.contains(event.getPlayer().getUniqueId())
                 && isQuiverBreakableGlass(event.getBlock().getType())) {
@@ -11143,6 +11274,28 @@ public final class ArcadePortManager implements Listener {
     public void onBlockPlace(BlockPlaceEvent event) {
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.WITHER_ASSAULT) {
+            Player player = event.getPlayer();
+            Block placed = event.getBlockPlaced();
+            boolean allowed = session.alive.contains(player.getUniqueId())
+                    && session.teams.getOrDefault(player.getUniqueId(), 0) == 0
+                    && "editor".equals(session.witherAssaultKits.getOrDefault(player.getUniqueId(), "archer"))
+                    && placed.getY() >= session.witherAssaultSpawnY - 3.0D;
+            if (!allowed) {
+                event.setCancelled(true);
+            } else {
+                session.witherEditorBlocks.add(placed);
+                BlockData placedData = placed.getBlockData().clone();
+                BlockData replacedData = event.getBlockReplacedState().getBlockData().clone();
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (placed.getWorld() == session.world && placed.getBlockData().equals(placedData)) {
+                        placed.setBlockData(replacedData, false);
+                        session.witherEditorBlocks.remove(placed);
+                    }
+                }, 40L);
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             Player player = event.getPlayer();
             Block placed = event.getBlockPlaced();
@@ -12291,6 +12444,39 @@ public final class ArcadePortManager implements Listener {
             return true;
         }
         return false;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMilkCowDoubleJump(org.bukkit.event.player.PlayerToggleFlightEvent event) {
+        Player player = event.getPlayer();
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.MILK_THE_COW
+                || !session.alive.contains(player.getUniqueId())
+                || session.teams.getOrDefault(player.getUniqueId(), 0) != 0) return;
+        event.setCancelled(true);
+        UUID id = player.getUniqueId();
+        if (!session.milkDoubleJumpUsed.add(id)) {
+            player.setFlying(false);
+            player.setAllowFlight(false);
+            return;
+        }
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        Vector velocity = player.getLocation().getDirection().normalize().multiply(0.8D);
+        velocity.setY(Math.max(0.7D, Math.min(0.9D, velocity.getY() + 0.45D)));
+        player.setVelocity(velocity);
+        player.setFallDistance(0.0F);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onWitherAssaultFlightLock(org.bukkit.event.player.PlayerToggleFlightEvent event) {
+        Player player = event.getPlayer();
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.WITHER_ASSAULT
+                || !session.alive.contains(player.getUniqueId())
+                || session.teams.getOrDefault(player.getUniqueId(), 0) != 1) return;
+        event.setCancelled(true);
+        player.setFlying(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
