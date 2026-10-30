@@ -579,7 +579,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         actor.getPersistentDataContainer().set(botKey,PersistentDataType.STRING,b.key);actor.getPersistentDataContainer().set(themeKey,PersistentDataType.STRING,b.theme);actor.getPersistentDataContainer().set(formKey,PersistentDataType.STRING,b.form);
         if(actor instanceof Mob mob)mob.setAI(false);b.actor=actor;b.actorLocation=at.clone();b.inGame=inGame;b.arenaSpawn=at.clone();refreshBotAppearance(b);
     }
-    private void refreshBotAppearance(Bot b){if(b.actor==null||!b.actor.isValid())return;if(b.actor instanceof Sheep s)s.setColor(DyeColor.PINK);b.actor.setCustomName(ChatColor.GOLD+b.name+ChatColor.GRAY+" ["+pretty(b.theme)+"]");b.actor.setCustomNameVisible(true);b.actor.getPersistentDataContainer().set(themeKey,PersistentDataType.STRING,b.theme);b.actor.getPersistentDataContainer().set(formKey,PersistentDataType.STRING,b.form);b.actor.getPersistentDataContainer().set(botKey,PersistentDataType.STRING,b.key);}
+    private void refreshBotAppearance(Bot b){if(b.actor==null||!b.actor.isValid())return;if(b.actor instanceof Sheep s)s.setColor(DyeColor.PINK);b.actor.setCollidable(false);b.actor.setInvulnerable(false);b.actor.setCustomName(ChatColor.GOLD+b.name+ChatColor.GRAY+" ["+pretty(b.theme)+"]");b.actor.setCustomNameVisible(true);b.actor.getPersistentDataContainer().set(themeKey,PersistentDataType.STRING,b.theme);b.actor.getPersistentDataContainer().set(formKey,PersistentDataType.STRING,b.form);b.actor.getPersistentDataContainer().set(botKey,PersistentDataType.STRING,b.key);}
     private void openBotCosmetics(Player p,Bot b){
         Inventory inv=Bukkit.createInventory(null,27,BOT_MENU_PREFIX+b.key);int[] slots={10,11,12,13,14,15};
         for(int i=0;i<THEMES.length;i++){String theme=THEMES[i];ItemStack it=item(themeMaterial(theme),(b.theme.equals(theme)?ChatColor.GREEN+"✓ ":ChatColor.WHITE)+pretty(theme),ChatColor.GRAY+"Theme particle preview",b.theme.equals(theme)?ChatColor.GREEN+"Selected":ChatColor.YELLOW+"Click to equip");mark(it,"theme:"+theme,b.key);inv.setItem(slots[i],it);}
@@ -800,7 +800,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         actor.setCollidable(false);
         actor.playEffect(EntityEffect.HURT);
         Location impact = actor.getLocation().clone().add(0, 1, 0);
-        actor.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR, impact, 5, 0.28, 0.35, 0.28, 0.01);
+        actor.getWorld().spawnParticle(Particle.CRIT, impact, 8, 0.28, 0.35, 0.28, 0.04);
         actor.getWorld().spawnParticle(particle(bot.theme), impact, 12, 0.4, 0.4, 0.4, 0.02);
         Sound hurt = actor instanceof Pig ? Sound.ENTITY_PIG_HURT : Sound.ENTITY_SHEEP_HURT;
         actor.getWorld().playSound(actor.getLocation(), hurt, 1.0F, 1.0F);
