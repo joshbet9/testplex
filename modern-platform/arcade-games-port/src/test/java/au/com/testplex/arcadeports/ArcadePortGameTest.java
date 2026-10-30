@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
 import org.bukkit.Material;
+import org.bukkit.util.Vector;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
@@ -525,11 +526,18 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldReplenishDragonSparkler(25_000L, 25_000L, 1));
         assertFalse(ArcadePortRules.shouldReplenishDragonSparkler(25_000L, 25_000L, 2));
         assertTrue(ArcadePortRules.shouldExpireDragonSparkler(101, 64.0D, false));
-        assertTrue(ArcadePortRules.shouldExpireDragonSparkler(20, 3.9D, false));
-        assertTrue(ArcadePortRules.shouldExpireDragonSparkler(20, 64.0D, true));
+        assertFalse(ArcadePortRules.shouldExpireDragonSparkler(20, 3.9D, false));
+        assertFalse(ArcadePortRules.shouldExpireDragonSparkler(20, 64.0D, true));
+        assertFalse(ArcadePortRules.shouldDragonSparklerAttract(3.9D, false));
+        assertFalse(ArcadePortRules.shouldDragonSparklerAttract(64.0D, true));
+        assertTrue(ArcadePortRules.shouldDragonSparklerAttract(64.0D, false));
         assertEquals(3.0D, ArcadePortRules.dragonFallDamageAfterReduction(4.0D), 0.00001D);
         assertEquals(0.0D, ArcadePortRules.dragonFallDamageAfterReduction(0.5D), 0.00001D);
-        assertEquals(500L, ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS);
+        assertEquals(125L, ArcadePortRules.DRAGONS_TARGET_INTERVAL_MILLIS);
+        assertEquals(500L, ArcadePortRules.DRAGONS_PERK_UPDATE_INTERVAL_MILLIS);
+        assertEquals(500L, ArcadePortRules.DRAGONS_WATER_DAMAGE_INTERVAL_MILLIS);
+        assertEquals(50L, ArcadePortRules.DRAGONS_BARRAGE_FIRE_INTERVAL_MILLIS);
         assertEquals(6, ArcadePortRules.DRAGONS_BARRAGE_MAX_ARROWS);
     }
 
@@ -1638,6 +1646,35 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldApplyDragonContactHit(10_000L, 0L));
         assertFalse(ArcadePortRules.shouldApplyDragonContactHit(10_000L, 11_500L));
         assertTrue(ArcadePortRules.shouldApplyDragonContactHit(11_500L, 11_500L));
+    }
+
+    @Test void dragonsLeapMatchesSourceVectorAndGroundBoost() {
+        Vector grounded = ArcadePortRules.dragonsLeapVelocity(new Vector(0.0D, 0.0D, 1.0D), true);
+        assertEquals(0.0D, grounded.getX(), 0.00001D);
+        assertEquals(0.4D, grounded.getY(), 0.00001D);
+        assertEquals(1.2D, grounded.getZ(), 0.00001D);
+        Vector airborne = ArcadePortRules.dragonsLeapVelocity(new Vector(0.0D, 0.0D, 1.0D), false);
+        assertEquals(0.2D, airborne.getY(), 0.00001D);
+        Vector lookingUp = ArcadePortRules.dragonsLeapVelocity(new Vector(0.0D, 1.0D, 0.0D), true);
+        assertEquals(1.2D, lookingUp.getY(), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.dragonsLeapVelocity(new Vector(), true).length(), 0.00001D);
+    }
+
+    @Test void dragonsContactKnockbackMatchesSourceTrajectoryAndGroundBoost() {
+        Vector grounded = ArcadePortRules.dragonsContactKnockback(new Vector(0.0D, 0.0D, 1.0D), true);
+        assertEquals(0.8D, grounded.getY(), 0.00001D);
+        assertEquals(1.0D, grounded.getZ(), 0.00001D);
+        Vector airborne = ArcadePortRules.dragonsContactKnockback(new Vector(0.0D, 0.0D, 1.0D), false);
+        assertEquals(0.6D, airborne.getY(), 0.00001D);
+    }
+
+    @Test void dragonsDisableDirectAndProjectilePvpAndOnlyAllowEmeraldWorldItems() {
+        assertTrue(ArcadePortRules.shouldCancelDragonsPvp(true, false));
+        assertTrue(ArcadePortRules.shouldCancelDragonsPvp(false, true));
+        assertFalse(ArcadePortRules.shouldCancelDragonsPvp(false, false));
+        assertTrue(ArcadePortRules.shouldAllowDragonWorldItem(Material.EMERALD));
+        assertFalse(ArcadePortRules.shouldAllowDragonWorldItem(Material.ARROW));
+        assertFalse(ArcadePortRules.shouldAllowDragonWorldItem(Material.FIREWORK_ROCKET));
     }
 
     @Test void dragonsFlareChargesAndLegacyAbilityRefreshValuesAreExplicit() {
