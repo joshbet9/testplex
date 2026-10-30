@@ -37,7 +37,7 @@ public final class MonsterDisguiseListener {
         this.plugin = plugin;
         protocolManager = ProtocolLibrary.getProtocolManager();
         adapter = new PacketAdapter(
-                plugin,
+                plugin.getHostPlugin(),
                 ListenerPriority.NORMAL,
                 PacketType.Play.Server.SPAWN_ENTITY,
                 PacketType.Play.Server.ENTITY_METADATA) {
