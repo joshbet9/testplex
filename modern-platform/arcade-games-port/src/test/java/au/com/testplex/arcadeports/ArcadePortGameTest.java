@@ -596,6 +596,9 @@ class ArcadePortGameTest {
         assertEquals(2, ArcadePortRules.SPLEEF_ARCHER_MAX_ARROWS);
         assertEquals(16, ArcadePortRules.SPLEEF_SNOWBALLER_MAX_SNOWBALLS);
         assertEquals(30_000L, ArcadePortRules.SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS);
+        assertEquals(400L, ArcadePortRules.SPLEEF_KNOCKBACK_COOLDOWN_MILLIS);
+        assertEquals(0.3D, ArcadePortRules.SPLEEF_DEFAULT_KNOCKBACK, 0.00001D);
+        assertEquals(0.6D, ArcadePortRules.SPLEEF_BRAWLER_KNOCKBACK, 0.00001D);
         assertEquals(250L, ArcadePortRules.SPLEEF_SMASHER_COOLDOWN_MILLIS);
         assertEquals(4, ArcadePortRules.nextSpleefSlowDamageData(5));
         assertEquals(4, ArcadePortRules.nextSpleefSlowDamageData(13));
