@@ -79,12 +79,15 @@ public final class ArcadeCatalog {
                 win("phoenix-rise", "Phoenix Rise", "The winner rises through a phoenix-shaped flame arc."),
                 win("last-platform", "Last Platform", "The remaining platform is spotlighted as the arena fades")));
 
-        register(game("evolution", "Evolution", "DRAGON_EGG", "Fly upward as a chicken and evolve at the summit.",
+        register(game("evolution", "Evolution", "DRAGON_EGG",
+                "Earn evolutions through kills or the 90-second pity clock; progress through five forms.",
                 GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
-                List.of(line("metamorphosis", "Metamorphosis", "A layered evolution sequence, not an egg recolour.", "DRAGON_EGG",
-                        single("shell-fragments", "Shell Fragments", "Egg-shell fragments burst outward."),
-                        single("nature-bloom", "Nature Bloom", "Leaves and pollen unfold from the player."),
-                        single("void-unfold", "Void Unfold", "A dark geometric shell folds open."))),
+                List.of(line("metamorphosis", "Dragon Egg Variants",
+                        "Choose the dragon egg and its evolving particle sequence; effects are visible to everyone in the game.",
+                        "DRAGON_EGG",
+                        single("shell-fragments", "Charged Dragon Egg", "Electric sparks and luminous energy spiral around the egg."),
+                        single("void-unfold", "Void Dragon Egg", "Portal and dragon-breath particles spiral around the egg."),
+                        single("nature-bloom", "Nature Dragon Egg", "Green motes and pollen bloom around the egg."))),
                 win("summit-nest", "Summit Nest", "The winner is framed by a nest at the summit."),
                 win("evolution-tree", "Evolution Tree", "A branching evolutionary tree grows behind the winner."),
                 win("gene-helix", "Gene Helix", "A double helix spirals into the sky")));
@@ -164,11 +167,17 @@ public final class ArcadeCatalog {
                 win("safe-pad-coronation", "Safe Pad Coronation", "The Safe Pad raises into a compact victory dais")));
 
         register(game("one-in-the-quiver", "One in the Quiver", "ARROW", "Land the decisive bow shot with one arrow at a time.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("arrow-flight", "Arrow Flight Signature", "A distinct arrow-flight trail and hit confirm.", "SPECTRAL_ARROW",
                         single("bullseye-dash", "Bullseye Dash", "A short target line follows the arrow."),
                         single("fletching-sparks", "Fletching Sparks", "Feather-shaped sparks mark the trajectory."),
-                        single("ricochet-rune", "Ricochet Rune", "A rune marks the impact point."))),
+                        single("ricochet-rune", "Ricochet Rune", "A rune marks the impact point.")),
+                     line("death-streak", "Streak Taunts & Effects",
+                        "A public killstreak announcement and visible effect at each defeated opponent; everyone in the arena sees it.", "FIREWORK_ROCKET",
+                        single("subtle", "Subtle", "A compact critical-hit sparkle at the elimination point."),
+                        single("burst", "Burst", "A larger firework-spark burst at the elimination point."),
+                        single("bullseye", "Bullseye", "A red target ring appears around the elimination point."),
+                        single("grand-finale", "Grand Finale", "An explosion flash, note burst and level-up sound."))),
                 win("bullseye-stage", "Bullseye Stage", "A target board grows behind the winner."),
                 win("quiverless", "Quiverless", "A single arrow hangs above the last archer."),
                 win("archer-halo", "Archer Halo", "An archer's halo draws around the winner")));

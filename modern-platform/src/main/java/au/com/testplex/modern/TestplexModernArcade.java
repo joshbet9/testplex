@@ -3,6 +3,7 @@ package au.com.testplex.modern;
 import au.com.testplex.modern.menu.MenuService;
 import au.com.testplex.modern.model.ArcadeCatalog;
 import au.com.testplex.modern.model.GameDefinition;
+import au.com.testplex.modern.model.GameDefinition;
 import au.com.testplex.modern.player.PlayerPreferenceStore;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;

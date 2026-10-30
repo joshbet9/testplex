@@ -82,7 +82,7 @@ public final class ArcadePortRules {
     public static final int DEATH_TAG_ARCHER_MAX_ARROWS = 2;
     public static final double DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER = 3.0D;
     public static final long DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS = 400L;
-    public static final int EVOLUTION_WIN_LEVEL = 6;
+    public static final int EVOLUTION_WIN_LEVEL = 5;
     public static final double DRAGON_ESCAPE_FINISH_X = 0.5D;
     public static final double DRAGON_ESCAPE_FINISH_Y = 64.0D;
     public static final double DRAGON_ESCAPE_FINISH_Z = 77.5D;
@@ -1476,6 +1476,28 @@ public final class ArcadePortRules {
     public static final long EVOLUTION_RESPAWN_TICKS = 80L;
     public static final long EVOLUTION_FORM_CHANGE_TICKS = 44L;
     public static final long EVOLUTION_TOTAL_ANIMATION_TICKS = 140L;
+    public static final int EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION = 2;
+    public static final long EVOLUTION_PITY_CLOCK_MILLIS = 90_000L;
+    public static final long EVOLUTION_PITY_KILL_REDUCTION_MILLIS = 15_000L;
+    public static final long EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS = 7_500L;
+    public static final long EVOLUTION_ASSIST_WINDOW_MILLIS = 10_000L;
+    public static final long EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS = 7_000L;
+    public static final double EVOLUTION_GOLEM_SLAM_RADIUS = 6.0D;
+    public static final double EVOLUTION_GOLEM_SLAM_DAMAGE = 16.0D;
+    public static final long EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS = 5_000L;
+    public static final long EVOLUTION_BLAZE_FLAMETHROWER_DURATION_MILLIS = 1_000L;
+    public static final long EVOLUTION_BLAZE_FLAMETHROWER_TICK_MILLIS = 50L;
+    public static final double EVOLUTION_BLAZE_FLAME_SPEED = 1.6D;
+    public static final long EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS = 7_000L;
+    public static final double EVOLUTION_SLIME_SLAM_RADIUS = 2.0D;
+    public static final double EVOLUTION_SLIME_SLAM_DAMAGE = 8.0D;
+    public static final double EVOLUTION_CHICKEN_DOUBLE_JUMP_HORIZONTAL = 0.6D;
+    public static final double EVOLUTION_CHICKEN_DOUBLE_JUMP_VERTICAL = 0.6D;
+    public static final double EVOLUTION_EGG_DAMAGE = 2.0D;
+    public static final long EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS = 3_000L;
+    public static final double EVOLUTION_SULPHUR_BOMB_SPEED = 1.2D;
+    public static final double EVOLUTION_SULPHUR_BOMB_RADIUS = 2.5D;
+    public static final double EVOLUTION_SULPHUR_BOMB_DAMAGE = 4.0D;
 
     public static int nextEvolutionLevel(int currentLevel, boolean wonEvolve) {
         int safeLevel = Math.max(0, Math.min(EVOLUTION_WIN_LEVEL, currentLevel));
@@ -1483,21 +1505,59 @@ public final class ArcadePortRules {
     }
 
     public static double evolutionMaxHealth(int level) {
-        return switch (Math.max(0, Math.min(5, level))) {
-            case 0 -> 40.0D; case 1 -> 36.0D; case 2 -> 32.0D;
-            case 3 -> 28.0D; case 4 -> 22.0D; default -> 16.0D;
+        return switch (Math.max(0, Math.min(4, level))) {
+            case 0 -> 40.0D; case 1 -> 36.0D; case 2 -> 28.0D;
+            case 3 -> 22.0D; default -> 16.0D;
         };
     }
 
     public static double evolutionMeleeDamage(int level) {
-        return switch (Math.max(0, Math.min(5, level))) {
-            case 0 -> 6.0D; case 1, 2 -> 5.0D; case 3, 4 -> 4.0D; default -> 3.0D;
+        return switch (Math.max(0, Math.min(4, level))) {
+            case 0 -> 6.0D; case 1 -> 5.0D; case 2, 3 -> 4.0D; default -> 3.0D;
         };
     }
 
     public static double evolutionChargePerTick(int killsThisLife) {
         int extraKills = Math.max(0, killsThisLife - 1);
         return Math.min(0.022D, 0.012D + 0.003D * extraKills);
+    }
+
+    public static long evolutionPityRemainingMillis(long pityDeadline, long now) {
+        return Math.max(0L, pityDeadline - now);
+    }
+
+    public static long reduceEvolutionPityDeadline(long pityDeadline, long now, long reductionMillis) {
+        return Math.max(now, pityDeadline - Math.max(0L, reductionMillis));
+    }
+
+    public static String formatEvolutionPityRemaining(long remainingMillis) {
+        long totalSeconds = (Math.max(0L, remainingMillis) + 999L) / 1_000L;
+        return String.format(java.util.Locale.ROOT, "%d:%02d", totalSeconds / 60L, totalSeconds % 60L);
+    }
+
+    public static int nextEvolutionOverkillKillCount(int killsSinceLastEvolution) {
+        return Math.min(EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION,
+                Math.max(0, killsSinceLastEvolution) + 1);
+    }
+
+    public static boolean canUseEvolutionSulphurBomb(int stage, boolean rightClick, boolean holdingCoal) {
+        return stage == 2 && rightClick && holdingCoal;
+    }
+
+    public static boolean isEvolutionSulphurBombReady(long now, long readyAt) {
+        return now >= readyAt;
+    }
+
+    public static long nextEvolutionSulphurBombReadyAt(long now) {
+        return now + EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS;
+    }
+
+    public static boolean isEvolutionSulphurBombInRange(double distance) {
+        return Double.isFinite(distance) && distance >= 0.0D && distance <= EVOLUTION_SULPHUR_BOMB_RADIUS;
+    }
+
+    public static boolean evolutionOverkillRequirementMet(int killsBeforeEvolution) {
+        return killsBeforeEvolution >= EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION;
     }
 
     public static boolean isEvolutionWinnerLevel(int level) {
@@ -2083,13 +2143,58 @@ public final class ArcadePortRules {
     public static final long QUIVER_RESPAWN_DELAY_TICKS = 20L;
     public static final long QUIVER_GROUND_POUND_COOLDOWN_MILLIS = 10_000L;
     public static final long QUIVER_NINJA_VANISH_MILLIS = 1_200L;
-    /** Practical multi-block target-search range for the source's "nearby enemies" chain arrow. */
-    public static final double QUIVER_REBOUND_MAX_DISTANCE_SQUARED = 64.0D;
+    public static final long QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS = 3_000L;
+    public static final int QUIVER_SWORD_SLOT = 0;
+    public static final int QUIVER_BOW_SLOT = 1;
+    public static final int QUIVER_ARROW_SLOT = 2;
+    /** Original Quiver checks that a chain-arrow impact is within one block of a player. */
+    public static final double QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED = 1.0D;
+    /** The requested modern Enchanter change is two rebounds, instead of the source's one. */
     public static final int QUIVER_MAX_ARROW_BOUNCES = 2;
+    /** Original Quiver labels 20 consecutive kills without dying as a Perfect Run. */
+    public static final int QUIVER_PERFECT_RUN_KILL_STREAK = 20;
 
-    public static boolean isQuiverReboundTargetInRange(double distanceSquared) {
-        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
-                && distanceSquared <= QUIVER_REBOUND_MAX_DISTANCE_SQUARED;
+    public static boolean isQuiverPerfectRun(int killStreak) {
+        return killStreak >= QUIVER_PERFECT_RUN_KILL_STREAK;
+    }
+
+    public static boolean isQuiverSpeedrunnerWin(long elapsedMillis) {
+        return elapsedMillis >= 0L && elapsedMillis < 90_000L;
+    }
+
+    public static boolean shouldAwardQuiverFistPunchKills(int kills) {
+        return kills >= 3;
+    }
+
+    public static double quiverBrawlerHealthAfterKill(double health, double maxHealth) {
+        if (!Double.isFinite(health) || !Double.isFinite(maxHealth) || maxHealth <= 0.0D) return 0.0D;
+        return Math.min(maxHealth, Math.max(0.0D, health) + 2.0D);
+    }
+
+    public static boolean isQuiverKillstreakAnnouncement(int killStreak) {
+        return killStreak == 3 || killStreak == 5 || killStreak == 7 || killStreak == 9
+                || killStreak == 11 || killStreak == 13 || killStreak == QUIVER_PERFECT_RUN_KILL_STREAK;
+    }
+
+    public static String quiverKillstreakTitle(int killStreak) {
+        return switch (killStreak) {
+            case 3 -> "TRIPLE KILL";
+            case 5 -> "MEGA KILL";
+            case 7 -> "MONSTER KILL";
+            case 9 -> "ULTRA KILL";
+            case 11 -> "UNSTOPPABLE";
+            case 13 -> "GODLIKE";
+            case QUIVER_PERFECT_RUN_KILL_STREAK -> "PERFECT RUN";
+            default -> null;
+        };
+    }
+
+    public static boolean isQuiverReboundImpactInRange(double bodyDistanceSquared, double eyeDistanceSquared) {
+        boolean bodyNear = Double.isFinite(bodyDistanceSquared) && bodyDistanceSquared >= 0.0D
+                && bodyDistanceSquared <= QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED;
+        boolean eyesNear = Double.isFinite(eyeDistanceSquared) && eyeDistanceSquared >= 0.0D
+                && eyeDistanceSquared <= QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED;
+        return bodyNear || eyesNear;
     }
 
     public static boolean shouldQuiverArrowBounce(int remainingBounces) {
@@ -2114,9 +2219,30 @@ public final class ArcadePortRules {
         };
     }
 
-    /** One in the Quiver refunds its single arrow only when the hit secures a kill. */
-    public static boolean quiverRegrantsArrowAfterHit(boolean targetEliminated) {
-        return targetEliminated;
+    /** Reborn grants a fresh single Super Arrow for every kill, including melee kills. */
+    public static boolean quiverRegrantsArrowAfterKill() {
+        return true;
+    }
+
+    public static boolean isQuiverSpectatorTeleportReady(long now, long readyAt) {
+        return now >= readyAt;
+    }
+
+    public static long nextQuiverSpectatorTeleportAt(long now) {
+        return now + QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS;
+    }
+
+    /** Only the old stained-glass materials are breakable in the source Quiver maps. */
+    public static boolean isQuiverBreakableGlassMaterial(String materialName) {
+        if (materialName == null) return false;
+        return materialName.endsWith("_STAINED_GLASS")
+                || materialName.endsWith("_STAINED_GLASS_PANE");
+    }
+
+    /** Reborn checks for a sole remaining live player immediately after awarding a kill. */
+    public static boolean shouldFinishQuiverLastPlayer(int alivePlayers, int respawningPlayers,
+                                                        int participantsAtStart) {
+        return participantsAtStart > 1 && alivePlayers == 1;
     }
 
     /** Reborn's Ground Pound scales horizontal knockback from 0 at range to 0.8 at point-blank. */
@@ -2126,13 +2252,41 @@ public final class ArcadePortRules {
     }
 
     public static double quiverMeleeDamage(String kit) {
+        return quiverMeleeDamage(kit, true);
+    }
+
+    /** Kit weapon damage applies only while its own weapon is held; punching uses base damage. */
+    public static double quiverMeleeDamage(String kit, boolean holdingKitWeapon) {
         String value = normalizeQuiverKit(kit);
         if (value == null) value = "leaper";
+        if (!holdingKitWeapon) return "brawler".equals(value) ? 2.0D : 1.0D;
         return switch (value) {
             case "brawler" -> 7.0D;
             case "slam-shot" -> 5.5D;
             case "ninja" -> 4.0D;
             default -> 5.0D;
+        };
+    }
+
+    /** Reborn's Chain Arrows gain speed with travel distance, capped at 1.2. */
+    public static double quiverReboundPower(double targetDistance) {
+        if (!Double.isFinite(targetDistance)) return 0.8D;
+        return Math.min(1.2D, 0.8D + Math.max(0.0D, targetDistance) / 30.0D);
+    }
+
+    /** Reborn adds a small upward arc proportional to the distance between rebound targets. */
+    public static double quiverReboundVerticalArc(double targetDistance) {
+        if (!Double.isFinite(targetDistance)) return 0.0D;
+        return Math.max(0.0D, targetDistance) / 100.0D;
+    }
+
+    /** Resolve a saved Quiver arrow-flight cosmetic, including the catalogue's default. */
+    public static String normalizeQuiverArrowFlightCosmetic(String requested) {
+        if (requested == null) return "bullseye-dash";
+        return switch (requested.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "fletching-sparks", "ricochet-rune", "bullseye-dash" ->
+                    requested.trim().toLowerCase(java.util.Locale.ROOT);
+            default -> "bullseye-dash";
         };
     }
 

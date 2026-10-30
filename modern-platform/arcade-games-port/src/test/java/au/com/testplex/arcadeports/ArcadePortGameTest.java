@@ -258,12 +258,14 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRearmQuiverLeap(true, true, Double.NaN));
     }
 
-    @Test void quiverOnlyRegrantsArrowAfterElimination() {
-        assertFalse(ArcadePortRules.quiverRegrantsArrowAfterHit(false));
-        assertTrue(ArcadePortRules.quiverRegrantsArrowAfterHit(true));
+    @Test void quiverRegrantsTheSuperArrowForEveryKillSource() {
+        assertTrue(ArcadePortRules.quiverRegrantsArrowAfterKill());
+        assertEquals(0, ArcadePortRules.QUIVER_SWORD_SLOT);
+        assertEquals(1, ArcadePortRules.QUIVER_BOW_SLOT);
+        assertEquals(2, ArcadePortRules.QUIVER_ARROW_SLOT);
     }
 
-    @Test void quiverEnchanterChainsTwiceAndFallsBackWhenNoEnemyIsNearby() {
+    @Test void quiverEnchanterChainsTwiceUsingTheSourceImpactAndIgnoreRules() {
         assertEquals(2, ArcadePortRules.QUIVER_MAX_ARROW_BOUNCES);
         assertTrue(ArcadePortRules.shouldQuiverArrowBounce(2));
         assertTrue(ArcadePortRules.shouldQuiverArrowBounce(1));
@@ -272,11 +274,35 @@ class ArcadePortGameTest {
         assertEquals(0, ArcadePortRules.quiverArrowBouncesAfterBounce(1));
         assertEquals(0, ArcadePortRules.quiverArrowBouncesAfterBounce(0));
 
-        assertTrue(ArcadePortRules.isQuiverReboundTargetInRange(0.0D));
-        assertTrue(ArcadePortRules.isQuiverReboundTargetInRange(64.0D));
-        assertFalse(ArcadePortRules.isQuiverReboundTargetInRange(64.01D));
-        assertFalse(ArcadePortRules.isQuiverReboundTargetInRange(Double.NaN));
-        assertEquals(64.0D, ArcadePortRules.QUIVER_REBOUND_MAX_DISTANCE_SQUARED, 0.00001D);
+        assertTrue(ArcadePortRules.isQuiverReboundImpactInRange(0.0D, 4.0D));
+        assertTrue(ArcadePortRules.isQuiverReboundImpactInRange(4.0D, 0.9D));
+        assertFalse(ArcadePortRules.isQuiverReboundImpactInRange(1.01D, 1.01D));
+        assertFalse(ArcadePortRules.isQuiverReboundImpactInRange(Double.NaN, 2.0D));
+        assertEquals(1.0D, ArcadePortRules.QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED, 0.00001D);
+    }
+
+    @Test void quiverSpectatorCompassUsesCooldownOnlyForTeleport() {
+        assertTrue(ArcadePortRules.isQuiverSpectatorTeleportReady(1_000L, 1_000L));
+        assertFalse(ArcadePortRules.isQuiverSpectatorTeleportReady(999L, 1_000L));
+        assertEquals(4_000L, ArcadePortRules.nextQuiverSpectatorTeleportAt(1_000L));
+        assertEquals(3_000L, ArcadePortRules.QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
+    }
+
+    @Test void quiverOnlyAllowsLegacyStainedGlassAndPanesToBreak() {
+        assertTrue(ArcadePortRules.isQuiverBreakableGlassMaterial("WHITE_STAINED_GLASS"));
+        assertTrue(ArcadePortRules.isQuiverBreakableGlassMaterial("RED_STAINED_GLASS_PANE"));
+        assertTrue(ArcadePortRules.isQuiverBreakableGlassMaterial("BLUE_STAINED_GLASS"));
+        assertFalse(ArcadePortRules.isQuiverBreakableGlassMaterial("GLASS"));
+        assertFalse(ArcadePortRules.isQuiverBreakableGlassMaterial("GLASS_PANE"));
+        assertFalse(ArcadePortRules.isQuiverBreakableGlassMaterial("STONE"));
+        assertFalse(ArcadePortRules.isQuiverBreakableGlassMaterial(null));
+    }
+
+    @Test void quiverFinishesOnLastLivePlayerImmediatelyAfterKill() {
+        assertTrue(ArcadePortRules.shouldFinishQuiverLastPlayer(1, 0, 2));
+        assertTrue(ArcadePortRules.shouldFinishQuiverLastPlayer(1, 1, 4));
+        assertFalse(ArcadePortRules.shouldFinishQuiverLastPlayer(2, 0, 2));
+        assertFalse(ArcadePortRules.shouldFinishQuiverLastPlayer(1, 0, 1));
     }
 
     @Test void quiverGroundPoundUsesSourceRadialImpulse() {
@@ -604,10 +630,47 @@ class ArcadePortGameTest {
         assertEquals(5.0D, ArcadePortRules.quiverMeleeDamage("enchanter"), 0.00001D);
         assertEquals(5.5D, ArcadePortRules.quiverMeleeDamage("slam-shot"), 0.00001D);
         assertEquals(4.0D, ArcadePortRules.quiverMeleeDamage("ninja"), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.quiverMeleeDamage("leaper", false), 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.quiverMeleeDamage("brawler", false), 0.00001D);
+        assertEquals(0.8D, ArcadePortRules.quiverReboundPower(0.0D), 0.00001D);
+        assertEquals(0.9D, ArcadePortRules.quiverReboundPower(3.0D), 0.00001D);
+        assertEquals(1.2D, ArcadePortRules.quiverReboundPower(30.0D), 0.00001D);
+        assertEquals(0.03D, ArcadePortRules.quiverReboundVerticalArc(3.0D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.quiverReboundVerticalArc(Double.NaN), 0.00001D);
+        assertEquals("bullseye-dash", ArcadePortRules.normalizeQuiverArrowFlightCosmetic(null));
+        assertEquals("ricochet-rune", ArcadePortRules.normalizeQuiverArrowFlightCosmetic("RICOCHET-RUNE"));
+        assertEquals("bullseye-dash", ArcadePortRules.normalizeQuiverArrowFlightCosmetic("unknown"));
         assertTrue(ArcadePortRules.shouldRemoveQuiverInvisibilityOnHit(true, true));
         assertFalse(ArcadePortRules.shouldRemoveQuiverInvisibilityOnHit(false, true));
         assertEquals(10_000L, ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS);
         assertEquals(1_200L, ArcadePortRules.QUIVER_NINJA_VANISH_MILLIS);
+        assertEquals(20, ArcadePortRules.QUIVER_PERFECT_RUN_KILL_STREAK);
+        assertFalse(ArcadePortRules.isQuiverPerfectRun(19));
+        assertTrue(ArcadePortRules.isQuiverPerfectRun(20));
+        assertEquals("TRIPLE KILL", ArcadePortRules.quiverKillstreakTitle(3));
+        assertEquals("PERFECT RUN", ArcadePortRules.quiverKillstreakTitle(20));
+        assertNull(ArcadePortRules.quiverKillstreakTitle(4));
+        assertTrue(ArcadePortRules.isQuiverKillstreakAnnouncement(13));
+        assertFalse(ArcadePortRules.isQuiverKillstreakAnnouncement(14));
+        assertFalse(ArcadePortRules.isQuiverSpeedrunnerWin(-1L));
+        assertTrue(ArcadePortRules.isQuiverSpeedrunnerWin(89_999L));
+        assertFalse(ArcadePortRules.isQuiverSpeedrunnerWin(90_000L));
+        assertFalse(ArcadePortRules.shouldAwardQuiverFistPunchKills(2));
+        assertTrue(ArcadePortRules.shouldAwardQuiverFistPunchKills(3));
+        assertEquals(12.0D, ArcadePortRules.quiverBrawlerHealthAfterKill(10.0D, 20.0D), 0.00001D);
+        assertEquals(20.0D, ArcadePortRules.quiverBrawlerHealthAfterKill(19.0D, 20.0D), 0.00001D);
+    }
+
+    @Test void quiverAchievementSetMatchesTheUpdatedRequirements() {
+        assertEquals(4, QuiverAchievement.values().length);
+        assertEquals("The Perfect Game", QuiverAchievement.THE_PERFECT_GAME.displayName());
+        assertEquals("Achieve a Perfect Run killstreak in a game.",
+                QuiverAchievement.THE_PERFECT_GAME.requirement());
+        assertEquals("Win a game by getting 20 kills without using archery.",
+                QuiverAchievement.WHATS_A_BOW.requirement());
+        assertEquals("Win a game in under 1:30.", QuiverAchievement.SPEEDRUNNER.requirement());
+        assertEquals("Get 3 kills with fist/bow punch.",
+                QuiverAchievement.THATS_NOT_A_SWORD.requirement());
     }
 
     @Test void dragonsSourceKitsSpawnLoopSparklerAndFallRulesAreExplicit() {
@@ -1658,33 +1721,87 @@ class ArcadePortGameTest {
         assertEquals(3, ArcadePortRules.spleefProjectileClearRadius(true, 100.0D));
     }
 
-    @Test void evolutionStagesAdvanceOnlyAfterACompletedCrouchEvolutionAndPersistOnDeath() {
+    @Test void evolutionStagesAdvanceThroughFiveFormsAndPersistOnDeath() {
+        assertEquals(5, ArcadePortRules.EVOLUTION_WIN_LEVEL);
         assertEquals(1, ArcadePortRules.nextEvolutionLevel(0, true));
-        assertEquals(6, ArcadePortRules.nextEvolutionLevel(5, true));
-        assertEquals(6, ArcadePortRules.nextEvolutionLevel(6, true));
+        assertEquals(5, ArcadePortRules.nextEvolutionLevel(4, true));
+        assertEquals(5, ArcadePortRules.nextEvolutionLevel(5, true));
         assertEquals(2, ArcadePortRules.nextEvolutionLevel(2, false));
         assertEquals(0, ArcadePortRules.nextEvolutionLevel(0, false));
         assertEquals(0, ArcadePortRules.nextEvolutionLevel(-1, false));
-        assertFalse(ArcadePortRules.isEvolutionWinnerLevel(5));
-        assertTrue(ArcadePortRules.isEvolutionWinnerLevel(6));
+        assertFalse(ArcadePortRules.isEvolutionWinnerLevel(4));
+        assertTrue(ArcadePortRules.isEvolutionWinnerLevel(5));
         assertEquals(80L, ArcadePortRules.EVOLUTION_RESPAWN_TICKS);
         assertEquals(44L, ArcadePortRules.EVOLUTION_FORM_CHANGE_TICKS);
         assertEquals(140L, ArcadePortRules.EVOLUTION_TOTAL_ANIMATION_TICKS);
     }
 
-    @Test void evolutionUsesSourceFormHealthAndMeleeDamage() {
+    @Test void evolutionUsesFiveSourceFormsAndTheirMeleeDamage() {
         assertEquals(40.0D, ArcadePortRules.evolutionMaxHealth(0));
         assertEquals(36.0D, ArcadePortRules.evolutionMaxHealth(1));
-        assertEquals(32.0D, ArcadePortRules.evolutionMaxHealth(2));
-        assertEquals(28.0D, ArcadePortRules.evolutionMaxHealth(3));
-        assertEquals(22.0D, ArcadePortRules.evolutionMaxHealth(4));
+        assertEquals(28.0D, ArcadePortRules.evolutionMaxHealth(2));
+        assertEquals(22.0D, ArcadePortRules.evolutionMaxHealth(3));
+        assertEquals(16.0D, ArcadePortRules.evolutionMaxHealth(4));
         assertEquals(16.0D, ArcadePortRules.evolutionMaxHealth(5));
         assertEquals(6.0D, ArcadePortRules.evolutionMeleeDamage(0));
         assertEquals(5.0D, ArcadePortRules.evolutionMeleeDamage(1));
-        assertEquals(5.0D, ArcadePortRules.evolutionMeleeDamage(2));
+        assertEquals(4.0D, ArcadePortRules.evolutionMeleeDamage(2));
         assertEquals(4.0D, ArcadePortRules.evolutionMeleeDamage(3));
-        assertEquals(4.0D, ArcadePortRules.evolutionMeleeDamage(4));
+        assertEquals(3.0D, ArcadePortRules.evolutionMeleeDamage(4));
         assertEquals(3.0D, ArcadePortRules.evolutionMeleeDamage(5));
+    }
+
+    @Test void evolutionPityClockDecreasesForKillsAndAssistsAndOverkillRequiresTwoKills() {
+        assertEquals(90_000L, ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS);
+        assertEquals(15_000L, ArcadePortRules.EVOLUTION_PITY_KILL_REDUCTION_MILLIS);
+        assertEquals(7_500L, ArcadePortRules.EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS);
+        assertEquals(10_000L, ArcadePortRules.EVOLUTION_ASSIST_WINDOW_MILLIS);
+        assertEquals(7_000L, ArcadePortRules.EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS);
+        assertEquals(6.0D, ArcadePortRules.EVOLUTION_GOLEM_SLAM_RADIUS);
+        assertEquals(16.0D, ArcadePortRules.EVOLUTION_GOLEM_SLAM_DAMAGE);
+        assertEquals(5_000L, ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS);
+        assertEquals(1_000L, ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_DURATION_MILLIS);
+        assertEquals(50L, ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_TICK_MILLIS);
+        assertEquals(1.6D, ArcadePortRules.EVOLUTION_BLAZE_FLAME_SPEED);
+        assertEquals(7_000L, ArcadePortRules.EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS);
+        assertEquals(2.0D, ArcadePortRules.EVOLUTION_SLIME_SLAM_RADIUS);
+        assertEquals(8.0D, ArcadePortRules.EVOLUTION_SLIME_SLAM_DAMAGE);
+        assertEquals(0.6D, ArcadePortRules.EVOLUTION_CHICKEN_DOUBLE_JUMP_HORIZONTAL);
+        assertEquals(0.6D, ArcadePortRules.EVOLUTION_CHICKEN_DOUBLE_JUMP_VERTICAL);
+        assertEquals(2.0D, ArcadePortRules.EVOLUTION_EGG_DAMAGE);
+        assertEquals(75_000L, ArcadePortRules.reduceEvolutionPityDeadline(90_000L, 0L, 15_000L));
+        assertEquals(82_500L, ArcadePortRules.reduceEvolutionPityDeadline(90_000L, 0L, 7_500L));
+        assertEquals(0L, ArcadePortRules.reduceEvolutionPityDeadline(90_000L, 0L, 100_000L));
+        assertEquals(30_000L, ArcadePortRules.evolutionPityRemainingMillis(30_000L, 0L));
+        assertEquals(0L, ArcadePortRules.evolutionPityRemainingMillis(0L, 30_000L));
+        assertEquals("1:30", ArcadePortRules.formatEvolutionPityRemaining(90_000L));
+        assertEquals("0:01", ArcadePortRules.formatEvolutionPityRemaining(1L));
+        assertEquals(3_000L, ArcadePortRules.EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS);
+        assertEquals(1.2D, ArcadePortRules.EVOLUTION_SULPHUR_BOMB_SPEED);
+        assertEquals(2.5D, ArcadePortRules.EVOLUTION_SULPHUR_BOMB_RADIUS);
+        assertEquals(4.0D, ArcadePortRules.EVOLUTION_SULPHUR_BOMB_DAMAGE);
+        assertTrue(ArcadePortRules.canUseEvolutionSulphurBomb(2, true, true));
+        assertFalse(ArcadePortRules.canUseEvolutionSulphurBomb(1, true, true));
+        assertFalse(ArcadePortRules.canUseEvolutionSulphurBomb(3, true, true));
+        assertFalse(ArcadePortRules.canUseEvolutionSulphurBomb(2, false, true));
+        assertFalse(ArcadePortRules.canUseEvolutionSulphurBomb(2, true, false));
+        assertTrue(ArcadePortRules.isEvolutionSulphurBombReady(3_000L, 3_000L));
+        assertFalse(ArcadePortRules.isEvolutionSulphurBombReady(2_999L, 3_000L));
+        assertEquals(6_000L, ArcadePortRules.nextEvolutionSulphurBombReadyAt(3_000L));
+        assertTrue(ArcadePortRules.isEvolutionSulphurBombInRange(2.5D));
+        assertFalse(ArcadePortRules.isEvolutionSulphurBombInRange(2.51D));
+        assertEquals(1, ArcadePortRules.nextEvolutionOverkillKillCount(0));
+        assertEquals(2, ArcadePortRules.nextEvolutionOverkillKillCount(1));
+        assertEquals(2, ArcadePortRules.nextEvolutionOverkillKillCount(2));
+        assertEquals(1, ArcadePortRules.nextEvolutionOverkillKillCount(-1));
+        assertFalse(ArcadePortRules.evolutionOverkillRequirementMet(1));
+        assertTrue(ArcadePortRules.evolutionOverkillRequirementMet(2));
+    }
+
+    @Test void evolutionOnlyRetainsTheOverkillAchievement() {
+        assertEquals(1, EvolutionAchievement.values().length);
+        assertEquals("Overkill", EvolutionAchievement.OVERKILL.displayName());
+        assertEquals("Get 2 kills before each evolution.", EvolutionAchievement.OVERKILL.requirement());
     }
 
     @Test void evolutionChargeAcceleratesWithKillsAndCapsAtTheSourceRate() {
