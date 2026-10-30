@@ -48,6 +48,7 @@
                     <include>Sheep Quest/**/*.zip</include>
                     <include>Speef/**/*.zip</include>
                     <include>Super Spleef/**/*.zip</include>
+                    <include>Skywars/**/*.zip</include>
                     <include>Turf Wars/**/*.zip</include>
                 </includes>
             </resource>
