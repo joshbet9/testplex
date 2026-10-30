@@ -11,6 +11,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: testplex-modern-26-game-integration
+  cancel-in-progress: true
+
 jobs:
   integrate:
     name: Integrate and validate all available game progress
