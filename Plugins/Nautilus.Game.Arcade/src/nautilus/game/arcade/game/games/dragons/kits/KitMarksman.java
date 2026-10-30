@@ -20,6 +20,7 @@ public class KitMarksman extends Kit
 			{
 					new PerkFletcher(4, 4, true),
 					new PerkBarrage(6, 200, true, false),
+					new PerkFlare(1),
 			};
 
 	private static final ItemStack[] PLAYER_ITEMS =
