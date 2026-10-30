@@ -8820,6 +8820,40 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
+                && event.getEntity() instanceof Player quiverTarget
+                && session.players.containsKey(quiverTarget.getUniqueId())
+                && session.alive.contains(quiverTarget.getUniqueId())) {
+            event.setCancelled(true);
+            if (event instanceof EntityDamageByEntityEvent quiverHit) {
+                Entity damager = quiverHit.getDamager();
+                if (damager instanceof Player attacker) {
+                    // Native weapon damage is replaced with Quiver's instant-kill arrow
+                    // and kit-specific melee damage handlers.
+                    handlePlayerHit(session, attacker, quiverTarget, "melee");
+                    return;
+                }
+                if (damager instanceof Projectile) {
+                    // Arrows are resolved by ProjectileHitEvent so they are counted once.
+                    return;
+                }
+                if (damager == quiverTarget) return; // DamageSelf=false in the source game.
+            }
+            // The source SoloGame leaves environmental damage enabled (including fall
+            // damage). The shared modern handler cancels Bukkit damage for all games,
+            // so apply OITQ environmental damage explicitly before returning.
+            double damage = event.getFinalDamage();
+            if (damage > 0.0D) {
+                String reason = event.getCause().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+                if (quiverTarget.getHealth() <= damage) {
+                    eliminate(session, quiverTarget, null, reason);
+                } else {
+                    quiverTarget.setHealth(quiverTarget.getHealth() - damage);
+                    quiverTarget.playSound(quiverTarget.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
+                }
+            }
+            return;
+        }
         if (event.getEntity() instanceof Player target && session.players.containsKey(target.getUniqueId())) {
             double incomingDamage = event.getFinalDamage();
             event.setCancelled(true);
