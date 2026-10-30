@@ -107,8 +107,7 @@ final class SneakyAssassinsMechanics {
     private int globalRevealWarning = -1;
     private Scoreboard scoreboard;
     private Objective scoreboardObjective;
-    private Team aliveScoreboardTeam;
-    private Team deadScoreboardTeam;
+    private final Map<UUID, Team> playerScoreboardTeams = new HashMap<>();
     private int tick;
 
     SneakyAssassinsMechanics(ArcadeMechanicsModernPlugin plugin) {
@@ -332,10 +331,6 @@ final class SneakyAssassinsMechanics {
         scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
         scoreboardObjective = scoreboard.registerNewObjective("sneaky", "dummy", ChatColor.GOLD + "Sneaky Assassins");
         scoreboardObjective.setDisplaySlot(DisplaySlot.SIDEBAR);
-        aliveScoreboardTeam = scoreboard.registerNewTeam("sneakyAlive");
-        aliveScoreboardTeam.setPrefix(ChatColor.GREEN.toString());
-        deadScoreboardTeam = scoreboard.registerNewTeam("sneakyDead");
-        deadScoreboardTeam.setPrefix(ChatColor.GRAY.toString());
         for (Player player : players.values()) {
             if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
         }
@@ -343,8 +338,11 @@ final class SneakyAssassinsMechanics {
 
     private void updateScoreboard(int revealSeconds) {
         if (scoreboard == null || scoreboardObjective == null) return;
-        for (String entry : new HashSet<>(aliveScoreboardTeam.getEntries())) aliveScoreboardTeam.removeEntry(entry);
-        for (String entry : new HashSet<>(deadScoreboardTeam.getEntries())) deadScoreboardTeam.removeEntry(entry);
+        for (Team team : new ArrayList<>(playerScoreboardTeams.values())) {
+            for (String entry : new HashSet<>(team.getEntries())) team.removeEntry(entry);
+            team.unregister();
+        }
+        playerScoreboardTeams.clear();
         for (String entry : new HashSet<>(scoreboard.getEntries())) scoreboard.resetScores(entry);
         List<Player> all = players.values().stream().filter(p -> p != null && p.isOnline()).toList();
         List<Player> alive = all.stream().filter(p -> isAlive.test(p.getUniqueId())).toList();
@@ -352,12 +350,15 @@ final class SneakyAssassinsMechanics {
         int line = 15;
         if (all.size() < 13 || (alive.size() < 13 && alive.size() > 0)) {
             List<Player> shown = all.size() < 13 ? all : alive;
+            int teamIndex = 0;
             for (Player player : shown) {
                 UUID id = player.getUniqueId();
                 String name = player.getName();
-                Team team = isAlive.test(id) ? aliveScoreboardTeam : deadScoreboardTeam;
+                Team team = scoreboard.registerNewTeam("sa" + teamIndex++);
+                team.setPrefix(isAlive.test(id) ? ChatColor.GREEN.toString() : ChatColor.GRAY.toString());
                 team.setSuffix(ChatColor.WHITE + "  " + powerUpCounts.getOrDefault(id, 0));
                 team.addEntry(name);
+                playerScoreboardTeams.put(id, team);
                 scoreboardObjective.getScore(name).setScore(line--);
             }
         } else {
@@ -1047,8 +1048,11 @@ final class SneakyAssassinsMechanics {
             masterAssassins.remove(id);
             masterCompassUpdateAt.remove(id);
             if (scoreboard != null) {
-                aliveScoreboardTeam.removeEntry(player.getName());
-                deadScoreboardTeam.removeEntry(player.getName());
+                Team team = playerScoreboardTeams.remove(id);
+                if (team != null) {
+                    team.removeEntry(player.getName());
+                    team.unregister();
+                }
                 scoreboard.resetScores(player.getName());
             }
         }
@@ -1080,8 +1084,7 @@ final class SneakyAssassinsMechanics {
         masterCompassUpdateAt.clear();
         scoreboard = null;
         scoreboardObjective = null;
-        aliveScoreboardTeam = null;
-        deadScoreboardTeam = null;
+        playerScoreboardTeams.clear();
         world = null;
         isAlive = ignored -> false;
         eliminator = (victim, killer, reason) -> { };
