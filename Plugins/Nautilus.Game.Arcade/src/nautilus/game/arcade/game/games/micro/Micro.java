@@ -8,6 +8,8 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import org.bukkit.ChatColor;
+import org.bukkit.Color;
+import org.bukkit.DyeColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
@@ -19,6 +21,7 @@ import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockGrowEvent;
 import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 
 import mineplex.core.common.util.C;
@@ -35,6 +38,7 @@ import mineplex.minecraft.game.core.damage.CustomDamageEvent;
 
 import nautilus.game.arcade.ArcadeManager;
 import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
+import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.GameType;
 import nautilus.game.arcade.game.GameTeam;
 import nautilus.game.arcade.game.TeamGame;
@@ -251,28 +255,39 @@ public class Micro extends TeamGame
 			return;
 		}
 
-		int colour = ArcadeCosmeticsMenu.getEquippedColourData(playerId, "microbattles");
-		if (colour < 0)
+		int glassColour = ArcadeCosmeticsMenu.getEquippedColourData(playerId, "microbattles");
+		if (glassColour < 0)
 		{
-			colour = 3;
+			glassColour = 3;
 		}
 
-		ParticleType particle = "spark".equalsIgnoreCase(style) ? ParticleType.FIREWORKS_SPARK
-				: "soft".equalsIgnoreCase(style) ? ParticleType.CLOUD : ParticleType.BLOCK_DUST;
+		int selectedBorderColour = ArcadeCosmeticsMenu.colourData(
+				ArcadeCosmeticsMenu.getEquippedChoice(playerId, "microbattles", "border-colour"));
+		if (selectedBorderColour < 0)
+		{
+			selectedBorderColour = glassColour;
+		}
+		DyeColor dyeColour = DyeColor.getByData((byte) selectedBorderColour);
+		Color borderColour = dyeColour == null ? Color.AQUA : dyeColour.getColor();
 
 		Location playerLocation = player.getLocation();
 		for (double height = 0.25; height <= 2.25; height += 0.5)
 		{
 			Location particleLocation = getBorderParticleLocation(playerLocation, nearestSide, playerLocation.getY() + height);
 
-			if (particle == ParticleType.BLOCK_DUST)
+			// The coloured dust column carries the player's chosen border colour.
+			// Accent styles add a second, uncoloured particle without changing gameplay.
+			UtilParticle.playColoredParticle(borderColour, ParticleType.RED_DUST,
+					particleLocation, 1, ViewDist.NORMAL, player);
+
+			if ("spark".equalsIgnoreCase(style))
 			{
-				UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) colour),
-						particleLocation, 0.025F, 0.025F, 0.025F, 0.005F, 1, ViewDist.NORMAL, player);
+				UtilParticle.PlayParticle(ParticleType.FIREWORKS_SPARK, particleLocation,
+						0.025F, 0.025F, 0.025F, 0.005F, 1, ViewDist.NORMAL, player);
 			}
-			else
+			else if ("soft".equalsIgnoreCase(style))
 			{
-				UtilParticle.PlayParticle(particle, particleLocation,
+				UtilParticle.PlayParticle(ParticleType.CLOUD, particleLocation,
 						0.025F, 0.025F, 0.025F, 0.005F, 1, ViewDist.NORMAL, player);
 			}
 		}
@@ -380,6 +395,23 @@ public class Micro extends TeamGame
 			removeBorderIndicator(playerId);
 		}
 		_glassColoursSent.clear();
+	}
+
+	@EventHandler
+	public void playerQuit(PlayerQuitEvent event)
+	{
+		UUID playerId = event.getPlayer().getUniqueId();
+		removeBorderIndicator(playerId);
+		_glassColoursSent.remove(playerId);
+	}
+
+	@EventHandler
+	public void gameStateChange(GameStateChangeEvent event)
+	{
+		if (event.GetGame() == this && event.GetState() != Game.GameState.Live)
+		{
+			clearPlayerVisuals();
+		}
 	}
 
 	@EventHandler
