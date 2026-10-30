@@ -32,6 +32,31 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesOfGwenMiddleTowerFilterRecognisesOnlyExplicitMiddleMarkers() {
+        assertTrue(CastleAssaultHeroesOfGwenRuntime.isMiddleTowerMarker("TOWER RED MIDDLE"));
+        assertTrue(CastleAssaultHeroesOfGwenRuntime.isMiddleTowerMarker("TOWER_BLUE_MID"));
+        assertTrue(CastleAssaultHeroesOfGwenRuntime.isMiddleTowerMarker("TOWER CENTRE LANE"));
+        assertFalse(CastleAssaultHeroesOfGwenRuntime.isMiddleTowerMarker("TOWER RED 1"));
+        assertFalse(CastleAssaultHeroesOfGwenRuntime.isMiddleTowerMarker("TOWER BLUE 2"));
+    }
+
+    @Test
+    void sourceMapDataExposesAuthoredTowerMarkerGroupsWithoutSharingMutableLists() {
+        SourceMapCatalog.MapData data = SourceMapCatalog.parseMapConfig(null, List.of(
+                "MAP_NAME: Heroes of GWEN",
+                "CUSTOM_NAME: TOWER RED 1",
+                "CUSTOM_LOCS: 10,64,20",
+                "CUSTOM_NAME: TOWER RED MIDDLE",
+                "CUSTOM_LOCS: 12,64,24"
+        ));
+        assertNotNull(data);
+        assertEquals(1, data.customLocationGroups().get("TOWER RED 1").size());
+        assertEquals(1, data.customLocationGroups().get("TOWER RED MIDDLE").size());
+        data.customLocationGroups().get("TOWER RED 1").clear();
+        assertEquals(1, data.customLocations("TOWER RED 1").size());
+    }
+
+    @Test
     void bothGamesResolveTheirOriginalSourceMapFoldersAndIds() {
         assertEquals(ArcadePortGame.CASTLE_ASSAULT, ArcadePortGame.fromId("castle-assault"));
         assertEquals(ArcadePortGame.HEROES_OF_GWEN, ArcadePortGame.fromId("Heroes of Gwen"));
