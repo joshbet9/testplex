@@ -135,6 +135,7 @@ public final class ArcadePortManager implements Listener {
     private static final long JOIN_WINDOW_TICKS = 100L;
     static final int MANUAL_START_COUNTDOWN_SECONDS = 0;
     private final ArcadeMechanicsModernPlugin plugin;
+    private final SneakyAssassinsMechanics sneakyAssassins;
     private final Map<String, LinkedHashMap<UUID, Player>> queues = new HashMap<>();
     private final Map<String, World> worlds = new HashMap<>();
     private final Set<String> sourceMapWorlds = new HashSet<>();
@@ -174,6 +175,7 @@ public final class ArcadePortManager implements Listener {
 
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
+        this.sneakyAssassins = new SneakyAssassinsMechanics(plugin);
         this.statsActionKey = new NamespacedKey(plugin, "stats-action");
         this.statsCategoryKey = new NamespacedKey(plugin, "stats-category");
         this.statsGameKey = new NamespacedKey(plugin, "stats-game");
@@ -476,6 +478,7 @@ public final class ArcadePortManager implements Listener {
                 case PAINTBALL -> { selectPaintballKit(player, value); return; }
                 case DEATH_TAG -> { selectDeathTagRunnerKit(player, value); return; }
                 case RUNNER -> { selectRunnerKit(player, value); return; }
+                case SNEAKY_ASSASSINS -> { sneakyAssassins.selectKit(player, value); return; }
                 default -> { }
             }
         }
@@ -491,6 +494,7 @@ public final class ArcadePortManager implements Listener {
         else if (ArcadePortRules.normalizeDragonsKit(value) != null) selectDragonsKit(player, value);
         else if (ArcadePortRules.normalizeDragonEscapeKit(value) != null) selectDragonEscapeKit(player, value);
         else if (value.startsWith("runnerkit-")) selectRunnerKit(player, value);
+        else if (SneakyAssassinsMechanics.normalizeKit(value) != null) sneakyAssassins.selectKit(player, value);
         else selectDeathTagRunnerKit(player, value);
     }
 
@@ -1242,7 +1246,8 @@ public final class ArcadePortManager implements Listener {
             player.closeInventory();
             player.leaveVehicle();
             player.teleport(spawn);
-            player.setGameMode(type == ArcadePortGame.BACON_BRAWL || type == ArcadePortGame.DEATH_TAG || type == ArcadePortGame.DRAGONS
+            player.setGameMode(type == ArcadePortGame.BACON_BRAWL || type == ArcadePortGame.DEATH_TAG
+                    || type == ArcadePortGame.DRAGONS || type == ArcadePortGame.SNEAKY_ASSASSINS
                     ? GameMode.ADVENTURE : GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
@@ -1336,6 +1341,10 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.DRAGONS) spawnTestDragons(session);
         if (type == ArcadePortGame.GLADIATORS && participants.size() > 1) {
             startGladiatorsRound(session, alivePlayers(session), true);
+        }
+        if (type == ArcadePortGame.SNEAKY_ASSASSINS) {
+            sneakyAssassins.start(session.world, participants, session.alive::contains,
+                    (victim, killer, reason) -> eliminate(session, victim, killer, reason));
         }
         if (type == ArcadePortGame.MICRO_BATTLES) announce(session, ChatColor.AQUA + "Micro Battles: gather blocks; glass barriers drop after 10 seconds.");
         else announce(session, ChatColor.GOLD + type.displayName() + " started! This is a first-pass mechanics test.");
@@ -1552,6 +1561,10 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (type == ArcadePortGame.SNEAKY_ASSASSINS) {
+            sneakyAssassins.buildArena(world);
+            return;
+        }
         boolean walls = type == ArcadePortGame.BOMB_LOBBERS || type == ArcadePortGame.DEATH_TAG
                 || type == ArcadePortGame.DRAGONS || type == ArcadePortGame.GLADIATORS
                 || type == ArcadePortGame.PAINTBALL || type == ArcadePortGame.SHEEP_QUEST
@@ -1614,6 +1627,7 @@ public final class ArcadePortManager implements Listener {
             for (int i = 0; i < Math.max(1, count); i++) locations.add(new Location(worlds.get(type.id()), (i % 5) - 2.0D, 64.0D, -22.0D + (i / 5) * 2, 0.0F, 0.0F));
             return locations;
         }
+        if (type == ArcadePortGame.SNEAKY_ASSASSINS) return sneakyAssassins.spawnLocations(worlds.get(type.id()), count);
         World world = worlds.get(type.id());
         for (int i = 0; i < Math.max(1, count); i++) {
             double angle = 2.0D * Math.PI * i / Math.max(1, count);
@@ -2537,6 +2551,9 @@ public final class ArcadePortManager implements Listener {
     private void giveKit(Session session, Player player) {
         player.getInventory().clear();
         switch (session.type) {
+            case SNEAKY_ASSASSINS:
+                sneakyAssassins.giveKit(player);
+                break;
             case BACON_BRAWL: {
                 for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) player.removePotionEffect(effect.getType());
                 String kit = session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo");
@@ -3538,6 +3555,7 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         session.ticks++;
         updateSourceWaterDamage(session, now);
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) sneakyAssassins.tick();
         if (session.endsAt > 0L && now >= session.endsAt) {
             if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
                 // Apply any chaser promotions due on the final timer tick before checking placements.
@@ -7230,6 +7248,7 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "Eliminated: " + reason + ".");
         }
         if (killer != null && session.scores.containsKey(killer.getUniqueId())) session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS && killer != null) sneakyAssassins.onKill(killer);
         if (session.type == ArcadePortGame.GLADIATORS) {
             Integer pair = session.gladiatorPairs.get(player.getUniqueId());
             if (pair != null) {
@@ -7847,6 +7866,7 @@ public final class ArcadePortManager implements Listener {
         if (announceWinner && session.type == ArcadePortGame.RUNNER) {
             recordRunnerAchievements(session, winner);
         }
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) sneakyAssassins.stop();
         active = null;
         if (session.tickTask != null) session.tickTask.cancel();
         if (announceWinner && session.type == ArcadePortGame.BACON_BRAWL && winner != null) {
@@ -9590,6 +9610,10 @@ public final class ArcadePortManager implements Listener {
     public void onDamage(EntityDamageEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
+            sneakyAssassins.handleDamage(event);
+            return;
+        }
         if (session.type == ArcadePortGame.BOMB_LOBBERS
                 && event instanceof EntityDamageByEntityEvent byEntity
                 && byEntity.getDamager() instanceof Player attacker) {
@@ -9981,6 +10005,16 @@ public final class ArcadePortManager implements Listener {
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
+            if (event.getEntity() instanceof Projectile projectile
+                    && projectile.getShooter() instanceof Player shooter) {
+                Entity hit = event.getHitEntity();
+                Player target = hit instanceof Player hitPlayer ? hitPlayer : sneakyAssassins.disguiseOwner(hit);
+                if (target != null) sneakyAssassins.handleProjectileHit(projectile, shooter, target);
+                else sneakyAssassins.projectileMissed(projectile);
+            }
+            return;
+        }
 
         if (session.type == ArcadePortGame.DEATH_TAG
                 && event.getEntity() instanceof Arrow deathTagArrow
@@ -10179,7 +10213,12 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBaconTrackingCompassDrop(org.bukkit.event.player.PlayerDropItemEvent event) {
         Session session = active;
-        if (session == null || session.type != ArcadePortGame.BACON_BRAWL) return;
+        if (session == null) return;
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
+            sneakyAssassins.onDrop(event);
+            return;
+        }
+        if (session.type != ArcadePortGame.BACON_BRAWL) return;
         ItemStack dropped = event.getItemDrop().getItemStack();
         if (!isBaconTrackingCompass(dropped) && !isBaconMeterItem(dropped)) return;
         event.setCancelled(true);
@@ -10219,6 +10258,10 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
+            sneakyAssassins.handlePlayerInteract(event);
+            return;
+        }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE
                 && event.getAction() != Action.PHYSICAL
                 && isDragonEscapeUsableBlock(event.getClickedBlock())) {
@@ -10577,6 +10620,10 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
+            sneakyAssassins.handleEntityInteract(event);
+            return;
+        }
         if (session.type == ArcadePortGame.DEATH_TAG
                 && event.getRightClicked() instanceof ItemFrame) {
             event.setCancelled(true);
@@ -12134,6 +12181,7 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) sneakyAssassins.onQuit(player);
         boolean wasAlive = session.alive.remove(id);
         if (session.type == ArcadePortGame.DRAGONS && wasAlive) {
             session.dragonEliminationOrder.add(id);
