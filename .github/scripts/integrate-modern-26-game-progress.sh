@@ -97,6 +97,15 @@ import subprocess
 
 path = Path("modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortManager.java")
 source = path.read_text()
+# Keep the newer Testplex queue/session manager, but take the complete v6
+# source-mechanics runtime for Castle Assault and Heroes of Gwen. The v6
+# runtime keeps the existing Hooks contract and adds the requested hero skills.
+castle_runtime_path = Path("modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/CastleAssaultHeroesOfGwenRuntime.java")
+castle_runtime = subprocess.check_output([
+    "git", "show",
+    "origin/feat/castle-assault-gwen-mixed-arcade-variants-20261030-v6:modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/CastleAssaultHeroesOfGwenRuntime.java"
+], text=True)
+castle_runtime_path.write_text(castle_runtime)
 sky = subprocess.check_output([
     "git", "show",
     "origin/feat/skywars-mixed-arcade-26.3-20261030:modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortManager.java"
