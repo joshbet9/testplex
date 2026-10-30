@@ -61,6 +61,25 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void castleAssaultSourcePerksUseTheOriginalRefillCadencesAndCaps() {
+        assertEquals(6_000L, ArcadePortRules.CASTLE_ASSAULT_ARCHER_REFILL_MILLIS);
+        assertEquals(10, ArcadePortRules.CASTLE_ASSAULT_ARCHER_MAX_ARROWS);
+        assertEquals(10_000L, ArcadePortRules.CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS);
+        assertEquals(2, ArcadePortRules.CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT);
+    }
+
+    @Test
+    void heroesOfGwenWitherUsesSourceMovementRatesAndEarthquakeFalloff() {
+        assertEquals(0.2D, ArcadePortRules.heroesOfGwenWitherStepPerTick(
+                ArcadePortRules.HEROES_OF_GWEN_WITHER_TARGET_SPEED), 0.0001D);
+        assertEquals(0.3D, ArcadePortRules.heroesOfGwenWitherStepPerTick(
+                ArcadePortRules.HEROES_OF_GWEN_WITHER_HOME_SPEED), 0.0001D);
+        assertEquals(6.0D, ArcadePortRules.heroesOfGwenWitherEarthquakeDamage(0.0D), 0.0001D);
+        assertEquals(4.0D, ArcadePortRules.heroesOfGwenWitherEarthquakeDamage(4.0D), 0.0001D);
+        assertEquals(2.0D, ArcadePortRules.heroesOfGwenWitherEarthquakeDamage(8.0D), 0.0001D);
+    }
+
+    @Test
     void castleAssaultAppliesSourceBlastProtectionCapsAndKnockbackReduction() {
         assertEquals(1.0D, ArcadePortRules.castleAssaultBlastDamageMultiplier(0), 0.0001D);
         assertEquals(0.2D, ArcadePortRules.castleAssaultBlastDamageMultiplier(20), 0.0001D);
