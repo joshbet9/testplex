@@ -9452,9 +9452,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     /** Receives completed rounds from the standalone SnakeModern game so /stats stays unified. */
-    public void recordStandaloneGameResult(String gameId, UUID playerId, boolean won,
-                                           int score, boolean knockedOut) {
-        if (!"snake".equalsIgnoreCase(gameId) || playerId == null) return;
+    public void recordSnakeStats(UUID playerId, boolean won, int kills, boolean knockedOut,
+                                 int lifetimeKills, int lifetimeSlimes, int bestTailLength,
+                                 Set<String> achievements) {
+        if (playerId == null) return;
         String path = localStatsPath(playerId, "snake");
         plugin.getConfig().set(path + "games-played",
                 plugin.getConfig().getInt(path + "games-played", 0) + 1);
@@ -9463,10 +9464,17 @@ public final class ArcadePortManager implements Listener {
                     plugin.getConfig().getInt(path + "wins", 0) + 1);
         }
         plugin.getConfig().set(path + "score",
-                plugin.getConfig().getInt(path + "score", 0) + Math.max(0, score));
+                plugin.getConfig().getInt(path + "score", 0) + Math.max(0, kills));
         if (knockedOut) {
             plugin.getConfig().set(path + "knockouts",
                     plugin.getConfig().getInt(path + "knockouts", 0) + 1);
+        }
+        plugin.getConfig().set(path + "lifetime-kills", Math.max(0, lifetimeKills));
+        plugin.getConfig().set(path + "lifetime-slimes", Math.max(0, lifetimeSlimes));
+        plugin.getConfig().set(path + "best-tail-length", Math.max(0, bestTailLength));
+        for (String achievement : List.of("Cannibal", "ChooChoo", "SlimySheep")) {
+            plugin.getConfig().set(path + "achievements." + achievement,
+                    achievements != null && achievements.contains(achievement));
         }
         plugin.saveConfig();
     }
