@@ -780,7 +780,8 @@ public final class ArcadePortRules {
 
     /** Reborn protects only bedrock and lava; every other non-air block can be punched away. */
     public static boolean isSpleefProtectedMaterial(Material material) {
-        return material == null || material.isAir()
+        return material == null
+                || material == Material.AIR || material == Material.CAVE_AIR || material == Material.VOID_AIR
                 || material == Material.BEDROCK || material == Material.LAVA;
     }
 
