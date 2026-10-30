@@ -2786,7 +2786,32 @@ public final class ArcadePortManager implements Listener {
             if (player == null || !player.isOnline() || session.alive.contains(player.getUniqueId())) continue;
             giveMicroTrackingCompass(player);
             Player target = nearestMicroSpectateTarget(session, player);
-            if (target != null) player.setCompassTarget(target.getLocation());
+            if (target != null) {
+                player.setCompassTarget(target.getLocation());
+                if (isMicroTrackingCompass(player.getInventory().getItemInMainHand())) {
+                    double distance = Math.sqrt(player.getLocation().distanceSquared(target.getLocation()));
+                    double height = target.getLocation().getY() - player.getLocation().getY();
+                    player.sendActionBar(ChatColor.WHITE + "Nearest Target: "
+                            + microTeamChatColor(session.teams.getOrDefault(target.getUniqueId(), -1))
+                            + target.getName() + ChatColor.WHITE + " | Distance: "
+                            + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                            + " | Height: " + String.format(java.util.Locale.ROOT, "%+.1f", height));
+                }
+            }
+        }
+    }
+
+    /** Local mirror of Reborn Last2Tracker; the live Mineplex mission service is not connected here. */
+    private void updateMicroLastTwoMission(Session session) {
+        if (active != session || session.microLastTwoAwarded) return;
+        Set<Integer> aliveTeams = new HashSet<>();
+        for (UUID id : session.alive) aliveTeams.add(session.teams.getOrDefault(id, -1));
+        if (!ArcadePortRules.shouldAwardMicroBattlesLastTwo(aliveTeams.size())) return;
+        session.microLastTwoAwarded = true;
+        for (UUID id : session.alive) {
+            Player player = session.players.get(id);
+            awardMicroBattlesAchievement(player, MicroBattlesAchievement.LAST_TWO.configKey(id),
+                    "Last Two — you survived until only two teams remained.");
         }
     }
 
@@ -3165,6 +3190,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             updateMicroBattlesBorderParticles(session);
             updateMicroSpectatorCompass(session);
+            if (session.ticks % 20 == 0) updateMicroLastTwoMission(session);
             enforceMicroBattlesHunger(session);
             updateMicroBattlesArrows(session, now);
             updateMicroCrumble(session, now);
@@ -7547,15 +7573,19 @@ public final class ArcadePortManager implements Listener {
                         lore, "noop", null, null));
             }
         } else if ("micro-battles".equals(gameId)) {
-            MicroBattlesAchievement achievement = MicroBattlesAchievement.ANNIHILATION;
-            boolean unlocked = plugin.getConfig().getBoolean(achievement.configKey(targetId), false);
-            List<String> lore = List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
-                    unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked",
-                    ChatColor.DARK_GRAY + "Local test-server achievement; not production Mineplex data.");
-            inventory.setItem(13, statsItem(
-                    unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
-                    (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
-                    lore, "noop", null, null));
+            MicroBattlesAchievement[] achievements = MicroBattlesAchievement.values();
+            int[] achievementSlots = {12, 13};
+            for (int i = 0; i < achievements.length; i++) {
+                MicroBattlesAchievement achievement = achievements[i];
+                boolean unlocked = plugin.getConfig().getBoolean(achievement.configKey(targetId), false);
+                List<String> lore = List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
+                        unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked",
+                        ChatColor.DARK_GRAY + "Local test-server equivalent; not production Mineplex data.");
+                inventory.setItem(achievementSlots[i], statsItem(
+                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
+                        lore, "noop", null, null));
+            }
         } else {
             int[] slots = {29, 30, 31, 32};
             int[] values = {played, wins, score, knockouts};
@@ -10815,6 +10845,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> microGlassColours = new HashMap<>();
         final Map<UUID, String> microBorderColours = new HashMap<>();
         final Map<UUID, Set<Block>> microPersonalGlassBlocks = new HashMap<>();
+        boolean microLastTwoAwarded;
         final Map<UUID, Map<Integer, UUID>> microCompassMenuTargets = new HashMap<>();
         final Map<UUID, Long> microSpectateNextTeleportAt = new HashMap<>();
         final Map<UUID, Long> microNextArrowAt = new HashMap<>();
