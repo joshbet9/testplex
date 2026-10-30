@@ -1,5 +1,7 @@
 package au.com.testplex.arcadeports;
 
+import me.monstermaze.MonsterMazePlugin;
+
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -200,6 +202,7 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey gladiatorHotbarKey;
     private final ModernArcadeLobby lobby;
     private final ModernArcadeLobbyRuntime lobbyRuntime;
+    private MonsterMazePlugin monsterMazeModule;
 
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
@@ -220,6 +223,18 @@ public final class ArcadePortManager implements Listener {
         lobbyRuntime.setSelectedGame(ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", "bacon-brawl")));
         registerOptionalBaconPacketBridge();
         registerOptionalDragonEscapeGhostBridge();
+    }
+
+    public void setMonsterMazeModule(MonsterMazePlugin module) {
+        this.monsterMazeModule = module;
+    }
+
+    public void returnPlayerToLobby(Player player) {
+        if (player != null && player.isOnline()) lobby.sendToLobby(player);
+    }
+
+    private boolean monsterMazeRunning() {
+        return monsterMazeModule != null && monsterMazeModule.isGameRunning();
     }
 
     public void selectLobbyGame(ArcadePortGame type) {
@@ -1070,6 +1085,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void queue(ArcadePortGame type, Player player, boolean quickStart, boolean mixedArcadeVariant) {
+        if (monsterMazeRunning()) {
+            player.sendMessage(ChatColor.RED + "Monster Maze is already running. Wait for the current Testplex game to finish.");
+            return;
+        }
         if (type == null) {
             player.sendMessage(ChatColor.RED + "Unknown game id. Use /arcadeport help for the available IDs.");
             return;
@@ -1305,6 +1324,27 @@ public final class ArcadePortManager implements Listener {
             String requestedId = mixedArcadeVariant ? "turf-wars-mixed" : type.id();
             sender.sendMessage(ChatColor.YELLOW + "No online players queued. Use /arcadeport join "
                     + requestedId + " or /arcadeport play " + requestedId + ".");
+            return;
+        }
+        if (type == ArcadePortGame.MONSTER_MAZE) {
+            if (monsterMazeModule == null) {
+                sender.sendMessage(ChatColor.RED + "Monster Maze module is not loaded by Testplex Arcade.");
+                return;
+            }
+            if (!monsterMazeModule.startTestplexGame(participants)) {
+                sender.sendMessage(ChatColor.RED + "Monster Maze could not start. Check its map and game status in the server log.");
+                return;
+            }
+            if (queue != null) queues.remove(selectedQueueKey);
+            if (pendingStart != null && pendingType == type) {
+                pendingStart.cancel();
+                pendingStart = null;
+                pendingType = null;
+                pendingMixedArcadeVariant = false;
+            }
+            for (Player player : participants) {
+                if (player.isOnline()) player.sendMessage(ChatColor.AQUA + "Testplex has started Monster Maze.");
+            }
             return;
         }
         if (type == ArcadePortGame.MASTER_BUILDERS && participants.size() > 16) {
@@ -10834,6 +10874,10 @@ public final class ArcadePortManager implements Listener {
         List<Player> participantsToReturn = stopping == null
                 ? List.of() : new ArrayList<>(stopping.players.values());
         if (stopping != null) finish(stopping, null, false);
+        if (monsterMazeRunning() && monsterMazeModule != null
+                && monsterMazeModule.getGameManager() != null) {
+            monsterMazeModule.getGameManager().forceStop();
+        }
         // Make the explicit Stop Game action authoritative: every participant from
         // the stopped session is put at the lobby spawn after round state is cleaned.
         for (Player player : participantsToReturn) {
@@ -10846,7 +10890,9 @@ public final class ArcadePortManager implements Listener {
 
     public String status() {
         String variant = active != null && active.mixedArcadeVariant ? " (Mixed Arcade)" : "";
-        String game = active == null ? "idle" : active.type.displayName() + variant
+        String game = active == null
+                ? (monsterMazeRunning() ? "Monster Maze (" + monsterMazeModule.getGameManager().getStage() + " stages reached)" : "idle")
+                : active.type.displayName() + variant
                 + " (" + active.alive.size() + "/" + active.participantsAtStart + " alive)";
         int queued = queues.values().stream().mapToInt(Map::size).sum();
         return game + "; queued=" + queued + "; cleared-games=" + enabledGamesLabel();
