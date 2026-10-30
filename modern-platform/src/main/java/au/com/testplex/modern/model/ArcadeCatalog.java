@@ -214,6 +214,18 @@ public final class ArcadeCatalog {
                 win("last-snowflake", "Last Snowflake", "A single snowflake floats above the winner."),
                 win("shovel-salute", "Shovel Salute", "A ceremonial row of shovels rises from the floor")));
 
+        register(game("draw-my-thing", "Draw My Thing", "PAINTING",
+                "Take one 30-second drawing turn, reveal timed hints, and guess using a limited number of attempts.",
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                List.of(),
+                win("whiteboard-reveal", "Whiteboard Reveal", "The final drawing is framed above the winning guesser.")));
+
+        register(game("master-builders", "Master Builders", "GRASS_BLOCK",
+                "Build your theme in three minutes, then review and rate the other plots.",
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                List.of(),
+                win("builders-podium", "Builder's Podium", "The top-rated build rises above the winning builder.")));
+
         register(game("turf-wars", "Turf Wars", "BOW", "Win ranged combat and control the central turf.",
                 GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("arrow-mark", "Arrow Mark", "A block-impact mark that follows the player's team palette.", "TARGET",
