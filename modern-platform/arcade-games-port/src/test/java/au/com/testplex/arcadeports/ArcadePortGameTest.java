@@ -620,17 +620,17 @@ class ArcadePortGameTest {
         assertNull(ArcadePortRules.nextSpleefSlowDamageMaterial(org.bukkit.Material.ORANGE_TERRACOTTA));
     }
 
-    @Test void spleefOnlyAcceptsSourceFloorMaterialsAsBreakable() {
-        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.SNOW_BLOCK));
-        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.LIGHT_BLUE_WOOL));
-        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.RED_TERRACOTTA));
-        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.STONE));
-        assertTrue(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.CRACKED_STONE_BRICKS));
-        assertFalse(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.AIR));
-        assertFalse(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.BEDROCK));
-        assertFalse(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.GLASS));
-        assertFalse(ArcadePortRules.isSpleefFloorMaterial(org.bukkit.Material.OBSIDIAN));
-        assertFalse(ArcadePortRules.isSpleefFloorMaterial(null));
+    @Test void spleefProtectsOnlyBedrockAndLavaLikeReborn() {
+        assertFalse(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.SNOW_BLOCK));
+        assertFalse(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.LIGHT_BLUE_WOOL));
+        assertFalse(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.RED_TERRACOTTA));
+        assertFalse(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.STONE));
+        assertFalse(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.GLASS));
+        assertFalse(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.OBSIDIAN));
+        assertTrue(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.AIR));
+        assertTrue(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.BEDROCK));
+        assertTrue(ArcadePortRules.isSpleefProtectedMaterial(org.bukkit.Material.LAVA));
+        assertTrue(ArcadePortRules.isSpleefProtectedMaterial(null));
     }
 
     @Test void bombLobbersExplosionExposureUsesVanillaBoundingBoxSampleGrid() {
