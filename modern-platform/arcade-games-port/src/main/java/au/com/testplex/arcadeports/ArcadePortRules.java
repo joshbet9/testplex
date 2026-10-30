@@ -1663,6 +1663,24 @@ public final class ArcadePortRules {
         return totalLosses >= 2;
     }
 
+    public static final double GLADIATORS_LOSER_ARENA_HALF_WIDTH = 3.65D;
+
+    public static boolean isOutsideGladiatorsLoserArena(
+            double x, double z, double centerX, double centerZ) {
+        return !Double.isFinite(x) || !Double.isFinite(z)
+                || !Double.isFinite(centerX) || !Double.isFinite(centerZ)
+                || Math.abs(x - centerX) > GLADIATORS_LOSER_ARENA_HALF_WIDTH
+                || Math.abs(z - centerZ) > GLADIATORS_LOSER_ARENA_HALF_WIDTH;
+    }
+
+    /** WorldConfig min/max coordinates are inclusive block coordinates. */
+    public static boolean isOutsideGladiatorsSourceMap(
+            double x, double z, int minX, int maxX, int minZ, int maxZ) {
+        return !Double.isFinite(x) || !Double.isFinite(z)
+                || x <= minX || x >= maxX + 1.0D
+                || z <= minZ || z >= maxZ + 1.0D;
+    }
+
     public static String gladiatorsAchievementConfigKey(java.util.UUID playerId, String achievementId) {
         String safeId = achievementId == null ? "" : achievementId.toLowerCase(java.util.Locale.ROOT)
                 .replaceAll("[^a-z0-9-]+", "-").replaceAll("^-+|-+$", "");
