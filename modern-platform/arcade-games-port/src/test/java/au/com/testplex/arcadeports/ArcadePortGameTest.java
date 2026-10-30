@@ -534,6 +534,13 @@ class ArcadePortGameTest {
         assertEquals(5.0D, ArcadePortRules.quiverMeleeDamage("enchanter"), 0.00001D);
         assertEquals(5.5D, ArcadePortRules.quiverMeleeDamage("slam-shot"), 0.00001D);
         assertEquals(4.0D, ArcadePortRules.quiverMeleeDamage("ninja"), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.quiverMeleeDamage("leaper", false), 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.quiverMeleeDamage("brawler", false), 0.00001D);
+        assertEquals(0.8D, ArcadePortRules.quiverReboundPower(0.0D), 0.00001D);
+        assertEquals(0.9D, ArcadePortRules.quiverReboundPower(3.0D), 0.00001D);
+        assertEquals(1.2D, ArcadePortRules.quiverReboundPower(30.0D), 0.00001D);
+        assertEquals(0.03D, ArcadePortRules.quiverReboundVerticalArc(3.0D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.quiverReboundVerticalArc(Double.NaN), 0.00001D);
         assertTrue(ArcadePortRules.shouldRemoveQuiverInvisibilityOnHit(true, true));
         assertFalse(ArcadePortRules.shouldRemoveQuiverInvisibilityOnHit(false, true));
         assertEquals(10_000L, ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS);
