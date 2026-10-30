@@ -44,7 +44,6 @@ import org.bukkit.inventory.meta.SkullMeta;
 import net.kyori.adventure.text.Component;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
@@ -230,10 +229,6 @@ public final class SnakeGameManager implements Listener {
             state.segments.add(head);
             state.path.addFirst(spawn.clone());
             head.addPassenger(player);
-            // Reborn renders the mounted rider as a sheep disguise. Paper has no native player-disguise API;
-            // hide the rider while keeping the server-side sheep head and tail visible to everyone.
-            player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,
-                    Integer.MAX_VALUE, 0, false, false, false));
             snakes.put(player.getUniqueId(), state);
             grantKit(player, kit);
         }
@@ -923,7 +918,6 @@ public final class SnakeGameManager implements Listener {
         removeSegments(state);
         if (state.player.isOnline()) {
             state.player.leaveVehicle();
-            state.player.removePotionEffect(PotionEffectType.INVISIBILITY);
             state.player.setGameMode(GameMode.ADVENTURE);
             state.player.getInventory().clear();
             state.player.getInventory().setItem(0, trackingCompass());
