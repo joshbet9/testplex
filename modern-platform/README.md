@@ -17,10 +17,11 @@ The build uses Paper's official Maven repository and a version range for the cur
 - /arcadecosmetics — game-specific cosmetic lines and a separate win-effect selector.
 - /arcadetest status — administrative port-status summary.
 - player-preferences.yml — per-player, per-game, per-line preferences; separate from the legacy profile format.
-- All 18 Arcade games are catalogued with optional future concepts for cosmetic lines and win scenes; these are not current parity acceptance criteria.
+- All 18 Arcade games are catalogued with optional future concepts for cosmetic lines and win scenes; Wizards is a separate survival title, not a nineteenth Arcade entry.
 - `monster-maze-port/` builds `MonsterMazeModern.jar`, based on the 1.21 implementation in the separate MonsterMaze repository.
 - `snake-port/` builds `SnakeModern.jar`, a Paper-native mechanics-first port with an isolated arena.
 - `arcade-games-port/` builds `ArcadeMechanicsModern.jar`, first-pass game loops and dedicated test arenas for the other 16 games, including Draw My Thing and Master Builders.
+- `wizards-port/` builds `WizardsModern.jar`, a resource-pack-independent survival port with an isolated arena, four original kits and all 21 historic spell effects implemented.
 - Game Details now routes to the correct module's Start / Test command when the associated module is installed.
 
 **Important:** the 16 prototype loops are intentionally rough starting points, not a claim of original Mineplex parity. All 18 games remain in progress until their mechanics have passed in-game acceptance. CI confirms compile/unit-level checks only. Cosmetic renderers, progression milestones, and win scenes are out of scope during this parity pass for every game except Monster Maze, where customisation is a core pillar and remains part of acceptance.
@@ -34,5 +35,6 @@ Modern server provisioning and deployment should be a separate, explicit step wi
 ## Next porting order
 
 1. Run Monster Maze and Snake on Paper 26.3 and fix runtime/gameplay discrepancies against the original 1.8 and adapted 1.21 source.
-2. Compare each of the other 14 rough game loops to the existing Reborn source and resolve mechanics/API/lifecycle issues game by game.
+2. Complete Wizards' original ten-minute warning/endgame sequence, meteor or lightning pressure and twenty-minute sudden-death rule; then validate map, kit, gear and multiplayer parity.
+3. Compare each of the other 16 rough game loops to the existing Reborn source and resolve mechanics/API/lifecycle issues game by game.
 3. Keep cosmetic lines, progression milestones and win scenes parked for all games during the mechanics pass. Exception: Monster Maze customisation remains a core pillar and is tested alongside its mechanics.
