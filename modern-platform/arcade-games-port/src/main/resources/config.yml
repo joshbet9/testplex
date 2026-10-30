@@ -1,5 +1,6 @@
 # Isolated manual-acceptance candidates. Availability does not itself certify 100% in-game parity.
-# Bomb Lobbers, Dragon Escape, Dragons, Paintball and Runner are available as live-acceptance candidates.
+# Bomb Lobbers, Dragon Escape, Dragons, Paintball and Runner have existing live-acceptance coverage.
+# SkyWars is a new manual-acceptance candidate; enabling it does not certify parity.
 # Candidate availability is not a claim of complete live parity certification.
 enabled-games:
   - bacon-brawl
