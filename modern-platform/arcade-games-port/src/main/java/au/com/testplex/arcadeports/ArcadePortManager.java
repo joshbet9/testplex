@@ -11718,6 +11718,7 @@ public final class ArcadePortManager implements Listener {
         boolean spleefLeapClickedUsableBlock = event.getClickedBlock() != null
                 && event.getClickedBlock().getType().isInteractable();
         if (session.type == ArcadePortGame.SPLEEF
+                && session.alive.contains(player.getUniqueId())
                 && "brawler".equals(session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer"))
                 && item == Material.IRON_AXE && event.getAction().isRightClick()
                 && !spleefLeapClickedUsableBlock) {
