@@ -1,10 +1,14 @@
 package nautilus.game.arcade.game.games.dragons;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.bukkit.ChatColor;
+import org.bukkit.Color;
 import org.bukkit.EntityEffect;
+import org.bukkit.FireworkEffect.Type;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -26,6 +30,7 @@ import mineplex.core.Managers;
 import mineplex.core.common.util.UtilAction;
 import mineplex.core.common.util.UtilAlg;
 import mineplex.core.common.util.UtilEnt;
+import mineplex.core.common.util.UtilFirework;
 import mineplex.core.common.util.UtilTime;
 import mineplex.core.recharge.Recharge;
 import mineplex.core.updater.UpdateType;
@@ -56,12 +61,29 @@ public class Dragons extends SoloGame
 					"Last player alive wins!"
 			};
 	private static final int MAX_DRAGONS = 5;
+	private static final double FLARE_EXCLUSION_RADIUS = 24.0D;
+	private static final double FLARE_EXCLUSION_RADIUS_SQUARED = FLARE_EXCLUSION_RADIUS * FLARE_EXCLUSION_RADIUS;
+	private static final double FLARE_EXCLUSION_VERTICAL_RANGE = 24.0D;
+	private static final long FLARE_EXCLUSION_DURATION_MS = 6000L;
 
 	private final Set<MineplexDragon> _dragons;
+	private final List<FlareZone> _flareZones = new ArrayList<>();
 
 	private List<Location> _dragonSpawns;
 	private PerkSparkler _sparkler;
 	private int _pyroCosmeticTick;
+
+	private static final class FlareZone
+	{
+		private final Location _center;
+		private final long _expiresAt;
+
+		private FlareZone(Location center, long expiresAt)
+		{
+			_center = center.clone();
+			_expiresAt = expiresAt;
+		}
+	}
 
 	public Dragons(ArcadeManager manager)
 	{
@@ -142,6 +164,124 @@ public class Dragons extends SoloGame
 		}
 	}
 
+	/**
+	 * A flare temporarily makes its launch point an unattractive destination to every dragon.
+	 * This is deliberately the inverse of the Pyrotechnic sparkler: it diverts target selection
+	 * away from the player and the surrounding area instead of attracting dragons to a point.
+	 */
+	public void activateFlare(Player player)
+	{
+		if (player == null || !IsLive() || !IsAlive(player))
+		{
+			return;
+		}
+
+		Location center = player.getLocation().clone();
+		_flareZones.add(new FlareZone(center, System.currentTimeMillis() + FLARE_EXCLUSION_DURATION_MS));
+
+		// Recalculate existing dragon targets immediately, not just on their next normal pass.
+		for (MineplexDragon dragon : _dragons)
+		{
+			dragon.retargetIfInsideFlare();
+		}
+
+		String choice = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "dragons", "flare-effects");
+		playFlareEffect(center, choice);
+		player.sendMessage(ChatColor.GREEN + "You launched a flare! Dragons are diverted from this area.");
+	}
+
+	/**
+	 * Returns whether a player, target point, or Pyrotechnic sparkler is inside an active
+	 * flare exclusion area. The exclusion is horizontal so a dragon's flight height does
+	 * not bypass the flare.
+	 */
+	boolean isInFlareArea(Location location)
+	{
+		if (location == null || location.getWorld() == null)
+		{
+			return false;
+		}
+
+		long now = System.currentTimeMillis();
+		_flareZones.removeIf(zone -> zone._expiresAt <= now);
+
+		for (FlareZone zone : _flareZones)
+		{
+			if (zone._center.getWorld() != location.getWorld())
+			{
+				continue;
+			}
+
+			double dx = location.getX() - zone._center.getX();
+			double dz = location.getZ() - zone._center.getZ();
+			double dy = Math.abs(location.getY() - zone._center.getY());
+
+			if (dx * dx + dz * dz <= FLARE_EXCLUSION_RADIUS_SQUARED
+					&& dy <= FLARE_EXCLUSION_VERTICAL_RANGE)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	List<Player> getDragonTargetCandidates()
+	{
+		List<Player> candidates = new ArrayList<>();
+
+		for (Player candidate : GetPlayers(true))
+		{
+			if (!isInFlareArea(candidate.getLocation()))
+			{
+				candidates.add(candidate);
+			}
+		}
+
+		return candidates;
+	}
+
+	private void playFlareEffect(Location location, String choice)
+	{
+		String style = choice == null || choice.isEmpty()
+				? "classic"
+				: choice.toLowerCase(java.util.Locale.ROOT);
+		Type type = Type.BURST;
+		Color color = Color.YELLOW;
+
+		switch (style)
+		{
+			case "ember":
+				type = Type.BALL_LARGE;
+				color = Color.ORANGE;
+				break;
+			case "frost":
+				type = Type.STAR;
+				color = Color.AQUA;
+				break;
+			case "ender":
+				type = Type.CREEPER;
+				color = Color.PURPLE;
+				break;
+			case "solar":
+				type = Type.BALL_LARGE;
+				color = Color.YELLOW;
+				break;
+			case "aurora":
+				type = Type.STAR;
+				color = Color.LIME;
+				break;
+			default:
+				break;
+		}
+
+		// Firework entities are server spawned, so nearby players see the same equipped effect.
+		Location effectLocation = location.clone().add(0, 1, 0);
+		UtilFirework.playFirework(effectLocation, type, color, true, true);
+		UtilParticle.PlayParticle(ParticleType.FIREWORKS_SPARK, effectLocation,
+				0.45F, 0.35F, 0.45F, 0.04F, 16, ViewDist.NORMAL);
+	}
+
 	@EventHandler
 	public void dragonSpawn(UpdateEvent event)
 	{
@@ -179,8 +319,14 @@ public class Dragons extends SoloGame
 	@EventHandler
 	public void dragonTarget(UpdateEvent event)
 	{
-		if (event.getType() != UpdateType.FASTEST || !IsLive())
+		if (event.getType() != UpdateType.FASTEST)
 		{
+			return;
+		}
+
+		if (!IsLive())
+		{
+			_flareZones.clear();
 			return;
 		}
 
