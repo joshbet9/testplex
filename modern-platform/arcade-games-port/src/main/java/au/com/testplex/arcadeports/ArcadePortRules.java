@@ -1117,6 +1117,19 @@ public final class ArcadePortRules {
     public static final long EVOLUTION_PITY_KILL_REDUCTION_MILLIS = 15_000L;
     public static final long EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS = 7_500L;
     public static final long EVOLUTION_ASSIST_WINDOW_MILLIS = 10_000L;
+    public static final long EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS = 7_000L;
+    public static final double EVOLUTION_GOLEM_SLAM_RADIUS = 6.0D;
+    public static final double EVOLUTION_GOLEM_SLAM_DAMAGE = 16.0D;
+    public static final long EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS = 5_000L;
+    public static final long EVOLUTION_BLAZE_FLAMETHROWER_DURATION_MILLIS = 1_000L;
+    public static final long EVOLUTION_BLAZE_FLAMETHROWER_TICK_MILLIS = 50L;
+    public static final double EVOLUTION_BLAZE_FLAME_SPEED = 1.6D;
+    public static final long EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS = 7_000L;
+    public static final double EVOLUTION_SLIME_SLAM_RADIUS = 2.0D;
+    public static final double EVOLUTION_SLIME_SLAM_DAMAGE = 8.0D;
+    public static final double EVOLUTION_CHICKEN_DOUBLE_JUMP_HORIZONTAL = 0.6D;
+    public static final double EVOLUTION_CHICKEN_DOUBLE_JUMP_VERTICAL = 0.6D;
+    public static final double EVOLUTION_EGG_DAMAGE = 2.0D;
     public static final long EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS = 3_000L;
     public static final double EVOLUTION_SULPHUR_BOMB_SPEED = 1.2D;
     public static final double EVOLUTION_SULPHUR_BOMB_RADIUS = 2.5D;
@@ -1538,9 +1551,46 @@ public final class ArcadePortRules {
     public static final long QUIVER_RESPAWN_DELAY_TICKS = 20L;
     public static final long QUIVER_GROUND_POUND_COOLDOWN_MILLIS = 10_000L;
     public static final long QUIVER_NINJA_VANISH_MILLIS = 1_200L;
+    /** Original Quiver labels 20 consecutive kills without dying as a Perfect Run. */
+    public static final int QUIVER_PERFECT_RUN_KILL_STREAK = 20;
     /** Practical multi-block target-search range for the source's "nearby enemies" chain arrow. */
     public static final double QUIVER_REBOUND_MAX_DISTANCE_SQUARED = 64.0D;
     public static final int QUIVER_MAX_ARROW_BOUNCES = 2;
+
+    public static boolean isQuiverPerfectRun(int killStreak) {
+        return killStreak >= QUIVER_PERFECT_RUN_KILL_STREAK;
+    }
+
+    public static boolean isQuiverSpeedrunnerWin(long elapsedMillis) {
+        return elapsedMillis >= 0L && elapsedMillis < 90_000L;
+    }
+
+    public static boolean shouldAwardQuiverFistPunchKills(int kills) {
+        return kills >= 3;
+    }
+
+    public static double quiverBrawlerHealthAfterKill(double health, double maxHealth) {
+        if (!Double.isFinite(health) || !Double.isFinite(maxHealth) || maxHealth <= 0.0D) return 0.0D;
+        return Math.min(maxHealth, Math.max(0.0D, health) + 2.0D);
+    }
+
+    public static boolean isQuiverKillstreakAnnouncement(int killStreak) {
+        return killStreak == 3 || killStreak == 5 || killStreak == 7 || killStreak == 9
+                || killStreak == 11 || killStreak == 13 || killStreak == QUIVER_PERFECT_RUN_KILL_STREAK;
+    }
+
+    public static String quiverKillstreakTitle(int killStreak) {
+        return switch (killStreak) {
+            case 3 -> "TRIPLE KILL";
+            case 5 -> "MEGA KILL";
+            case 7 -> "MONSTER KILL";
+            case 9 -> "ULTRA KILL";
+            case 11 -> "UNSTOPPABLE";
+            case 13 -> "GODLIKE";
+            case QUIVER_PERFECT_RUN_KILL_STREAK -> "PERFECT RUN";
+            default -> null;
+        };
+    }
 
     public static boolean isQuiverReboundTargetInRange(double distanceSquared) {
         return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
