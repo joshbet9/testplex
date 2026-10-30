@@ -2108,7 +2108,9 @@ class ArcadePortGameTest {
         assertEquals(1.8D, ArcadePortRules.microBattlesDamageAfterArmor(2.5D, 7.0D), 0.00001D);
         assertEquals(2.0D, ArcadePortRules.microBattlesDamageAfterArmor(2.0D, 0.0D), 0.00001D);
         assertEquals(Math.log10(3.0D) * 1.6D,
-                ArcadePortRules.microBattlesArrowKnockback(3.0D), 0.00001D);
+                ArcadePortRules.microBattlesKnockback(3.0D, true), 0.00001D);
+        assertEquals(Math.log10(3.0D),
+                ArcadePortRules.microBattlesKnockback(3.0D, false), 0.00001D);
         assertEquals(2, ArcadePortRules.microBattlesMinimumFoodLevel(0));
         assertEquals(2, ArcadePortRules.microBattlesMinimumFoodLevel(2));
         assertEquals(7, ArcadePortRules.microBattlesMinimumFoodLevel(7));
