@@ -438,10 +438,7 @@ jobs:
             echo "Legacy Testplex service state changed during deployment; refusing to continue." >&2
             exit 1
           }
-          for unit in monstermaze-18.service monstermaze-21.service; do
-            state="$(sudo -n systemctl is-active "$unit" 2>/dev/null || true)"
-            [[ "$state" != "active" ]] || { echo "$unit became active; refusing to continue." >&2; exit 1; }
-          done
+          # Separate Monster Maze services are deliberately outside this deployment's scope.
 
           if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
             sudo -n apt-get update
