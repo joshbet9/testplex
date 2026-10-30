@@ -718,11 +718,6 @@ public final class ArcadePortManager implements Listener {
         if (session != null && session.type == ArcadePortGame.TURF_WARS
                 && session.players.containsKey(id) && session.alive.contains(id)) {
             session.turfWarsKits.put(id, kit);
-            session.turfConstructorNextAt.put(id,
-                    System.currentTimeMillis() + ArcadePortRules.TURF_WARS_CONSTRUCTOR_INTERVAL_MILLIS);
-            session.turfArrowNextAt.put(id, System.currentTimeMillis());
-            session.turfBarrageCharges.remove(id);
-            session.turfBarrageFiring.remove(id);
             giveKit(session, player);
             player.sendMessage(ChatColor.GREEN + "Turf Wars kit changed to " + kit + ".");
         } else {
@@ -1163,14 +1158,10 @@ public final class ArcadePortManager implements Listener {
                 session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive);
         session.turfFrontlineX = session.turfInitialFrontlineX;
         if (type == ArcadePortGame.TURF_WARS) {
-            initializeTurfWarsMap(session, turfSourceMap);
             for (Player player : participants) {
                 UUID playerId = player.getUniqueId();
                 session.turfWarsKits.put(playerId,
                         turfWarsKitPreferences.getOrDefault(playerId, "marksman"));
-                session.turfConstructorNextAt.put(playerId,
-                        now + ArcadePortRules.TURF_WARS_CONSTRUCTOR_INTERVAL_MILLIS);
-                session.turfArrowNextAt.put(playerId, now);
             }
         }
         lastDragonHazard = now + 8_000L;
@@ -10399,7 +10390,7 @@ public final class ArcadePortManager implements Listener {
                 19, 20, 21, 22, 23, 24, 25,
                 28, 29, 30, 31, 32, 33, 34,
                 37, 38, 39, 40, 41, 42, 43,
-                46, 47, 48, 49, 50, 51, 52
+                46, 47, 48, 50, 51, 52
         };
         for (int i = 0; i < Math.min(slots.length, targets.size()); i++) {
             Player target = targets.get(i);
@@ -10412,7 +10403,8 @@ public final class ArcadePortManager implements Listener {
             holder.inventory.setItem(22, namedItem(Material.BARRIER, ChatColor.RED + "No living players",
                     "There are no Spleef players left to track."));
         }
-        holder.inventory.setItem(49, namedItem(Material.BARRIER, ChatColor.RED + "Close"));
+        holder.inventory.setItem(53, namedItem(Material.BARRIER, ChatColor.RED + "Close",
+                "Close the spectator menu."));
         return !targets.isEmpty();
     }
 
@@ -12305,7 +12297,7 @@ public final class ArcadePortManager implements Listener {
                 spectator.closeInventory();
                 return;
             }
-            if (event.getSlot() == 49 || event.getSlot() == 4) {
+            if (event.getSlot() == 53 || event.getSlot() == 4) {
                 spectator.closeInventory();
                 return;
             }
@@ -13732,6 +13724,7 @@ public final class ArcadePortManager implements Listener {
         long spleefNextCompassUpdateAt;
         final Map<UUID, Long> spleefLastHungerGainAt = new HashMap<>();
         final Map<UUID, Long> spleefNextArrowAt = new HashMap<>();
+        final Map<UUID, String> turfWarsKits = new HashMap<>();
         final Map<UUID, String> microKits = new HashMap<>();
         final Map<UUID, Long> microNextArrowAt = new HashMap<>();
         final Set<UUID> microFletchedArrows = new HashSet<>();
