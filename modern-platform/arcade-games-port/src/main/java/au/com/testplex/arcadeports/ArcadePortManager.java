@@ -1050,6 +1050,7 @@ public final class ArcadePortManager implements Listener {
             if (type == ArcadePortGame.DRAGON_ESCAPE) {
                 UUID playerId = player.getUniqueId();
                 session.dragonEscapeRunSplitMillis.put(playerId, new HashMap<>(Map.of(0, 0L)));
+                session.dragonEscapeRunSplitLocations.put(playerId, new HashMap<>());
                 String kit = dragonEscapeKitPreferences.getOrDefault(playerId, "jumper");
                 session.dragonEscapeKits.put(playerId, kit);
                 session.dragonEscapeLeapUsesRemaining.put(playerId, ArcadePortRules.dragonEscapeLeapUses(kit));
@@ -1098,7 +1099,10 @@ public final class ArcadePortManager implements Listener {
             }
             Location spawn = spawns.get(i % spawns.size()).clone();
             if (type == ArcadePortGame.DRAGON_ESCAPE) {
-                session.dragonEscapeStartLocations.put(player.getUniqueId(), spawn.clone());
+                UUID dragonPlayerId = player.getUniqueId();
+                session.dragonEscapeStartLocations.put(dragonPlayerId, spawn.clone());
+                session.dragonEscapeRunSplitLocations.computeIfAbsent(
+                        dragonPlayerId, ignored -> new HashMap<>()).putIfAbsent(0, spawn.clone());
             }
             if (type == ArcadePortGame.MICRO_BATTLES && !sourceMapWorlds.contains(type.id())) {
                 spawn = microTeamSpawn(teamId, i / 4, (participants.size() + 3) / 4);
@@ -4314,10 +4318,15 @@ public final class ArcadePortManager implements Listener {
                 previousProgress, candidate, session.dragonEscapeWaypoints.size());
         session.dragonEscapePlayerProgress.put(id, progress);
         Map<Integer, Long> runSplits = session.dragonEscapeRunSplitMillis.computeIfAbsent(id, ignored -> new HashMap<>());
+        Map<Integer, Location> runSplitLocations = session.dragonEscapeRunSplitLocations.computeIfAbsent(
+                id, ignored -> new HashMap<>());
         runSplits.putIfAbsent(0, 0L);
+        Location runStart = session.dragonEscapeStartLocations.get(id);
+        if (runStart != null) runSplitLocations.putIfAbsent(0, runStart.clone());
         long elapsed = Math.max(0L, now - session.startedAt);
         for (int passed = previousProgress; passed < progress; passed++) {
             runSplits.putIfAbsent(passed + 1, elapsed);
+            runSplitLocations.putIfAbsent(passed + 1, player.getLocation().clone());
         }
         return progress;
     }
@@ -4786,12 +4795,26 @@ public final class ArcadePortManager implements Listener {
             plugin.getConfig().set(path + "start.y", runStart.getY());
             plugin.getConfig().set(path + "start.z", runStart.getZ());
         }
-        plugin.getConfig().set(path + "finish.x", player.getLocation().getX());
-        plugin.getConfig().set(path + "finish.y", player.getLocation().getY());
-        plugin.getConfig().set(path + "finish.z", player.getLocation().getZ());
+        Location finishLocation = player.getLocation().clone();
+        plugin.getConfig().set(path + "finish.x", finishLocation.getX());
+        plugin.getConfig().set(path + "finish.y", finishLocation.getY());
+        plugin.getConfig().set(path + "finish.z", finishLocation.getZ());
+        Map<Integer, Location> splitLocations = session.dragonEscapeRunSplitLocations.computeIfAbsent(
+                id, ignored -> new HashMap<>());
+        if (runStart != null) splitLocations.putIfAbsent(0, runStart.clone());
+        splitLocations.put(session.dragonEscapeWaypoints.size(), finishLocation);
         plugin.getConfig().set(path + "splits", null);
         for (Map.Entry<Integer, Long> split : splits.entrySet()) {
             plugin.getConfig().set(path + "splits." + split.getKey(), split.getValue());
+        }
+        plugin.getConfig().set(path + "split-locations", null);
+        for (Map.Entry<Integer, Location> split : splitLocations.entrySet()) {
+            Location location = split.getValue();
+            if (location == null) continue;
+            String splitPath = path + "split-locations." + split.getKey();
+            plugin.getConfig().set(splitPath + ".x", location.getX());
+            plugin.getConfig().set(splitPath + ".y", location.getY());
+            plugin.getConfig().set(splitPath + ".z", location.getZ());
         }
         plugin.saveConfig();
         player.sendMessage(ChatColor.GOLD + "New Dragon Escape PB on " + session.dragonEscapeMapName + ": "
@@ -4843,10 +4866,29 @@ public final class ArcadePortManager implements Listener {
         return new Location(session.world, x, y, z);
     }
 
+    private Location dragonEscapePersonalBestSplitLocation(
+            Session session, UUID playerId, String mapResource,
+            int splitIndex, Location fallback) {
+        String path = dragonEscapePbPath(playerId, mapResource)
+                + "split-locations." + splitIndex;
+        if (!plugin.getConfig().contains(path + ".x")
+                || !plugin.getConfig().contains(path + ".y")
+                || !plugin.getConfig().contains(path + ".z")) {
+            return fallback == null ? null : fallback.clone();
+        }
+        double x = plugin.getConfig().getDouble(path + ".x");
+        double y = plugin.getConfig().getDouble(path + ".y");
+        double z = plugin.getConfig().getDouble(path + ".z");
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
+            return fallback == null ? null : fallback.clone();
+        }
+        return new Location(session.world, x, y, z);
+    }
+
     /**
-     * Split keys mark nearest-waypoint transitions: key 0 is the start marker,
-     * keys 1..N-1 are midpoints between adjacent authored markers, and key N
-     * is the recorded finish position (or the last marker for an older PB).
+     * Split keys mark nearest-waypoint transitions: key 0 is the player's
+     * GREEN start, keys 1..N-1 are checkpoint transitions, and key N is finish.
+     * New PBs store the exact split positions; older PBs fall back to route midpoints.
      */
     private Location dragonEscapeSplitBoundaryLocation(
             Session session, int splitIndex, Location startLocation, Location finishLocation) {
@@ -4873,16 +4915,23 @@ public final class ArcadePortManager implements Listener {
         int count = route.size();
         int progress = Math.max(0, Math.min(count - 1,
                 dragonEscapePlayerProgress(session, player)));
-        Location runStart = session.dragonEscapeStartLocations.get(player.getUniqueId());
+        UUID playerId = player.getUniqueId();
+        Location runStart = session.dragonEscapeStartLocations.get(playerId);
         if (runStart == null) runStart = session.dragonEscapeStartLocation;
+        Map<Integer, Location> liveSplitLocations =
+                session.dragonEscapeRunSplitLocations.getOrDefault(playerId, Map.of());
         double distance = 0.0D;
         for (int split = 0; split < progress; split++) {
-            Location from = dragonEscapeSplitBoundaryLocation(session, split, runStart, null);
-            Location to = dragonEscapeSplitBoundaryLocation(session, split + 1, runStart, null);
+            Location fallbackFrom = dragonEscapeSplitBoundaryLocation(session, split, runStart, null);
+            Location fallbackTo = dragonEscapeSplitBoundaryLocation(session, split + 1, runStart, null);
+            Location from = liveSplitLocations.getOrDefault(split, fallbackFrom);
+            Location to = liveSplitLocations.getOrDefault(split + 1, fallbackTo);
             distance += from.distance(to);
         }
-        Location from = dragonEscapeSplitBoundaryLocation(session, progress, runStart, null);
-        Location to = dragonEscapeSplitBoundaryLocation(session, progress + 1, runStart, null);
+        Location fallbackFrom = dragonEscapeSplitBoundaryLocation(session, progress, runStart, null);
+        Location fallbackTo = dragonEscapeSplitBoundaryLocation(session, progress + 1, runStart, null);
+        Location from = liveSplitLocations.getOrDefault(progress, fallbackFrom);
+        Location to = liveSplitLocations.getOrDefault(progress + 1, fallbackTo);
         double segmentLength = from.distance(to);
         if (segmentLength > 0.001D) {
             double fraction = Math.max(0.0D, Math.min(1.0D,
@@ -4912,8 +4961,12 @@ public final class ArcadePortManager implements Listener {
                 session, player.getUniqueId(), session.dragonEscapeMapResource);
         Location finish = dragonEscapePersonalBestFinishLocation(
                 session, player.getUniqueId(), session.dragonEscapeMapResource);
-        Location from = dragonEscapeSplitBoundaryLocation(session, segment, start, finish);
-        Location to = dragonEscapeSplitBoundaryLocation(session, segment + 1, start, finish);
+        Location from = dragonEscapePersonalBestSplitLocation(
+                session, player.getUniqueId(), session.dragonEscapeMapResource, segment,
+                dragonEscapeSplitBoundaryLocation(session, segment, start, finish));
+        Location to = dragonEscapePersonalBestSplitLocation(
+                session, player.getUniqueId(), session.dragonEscapeMapResource, segment + 1,
+                dragonEscapeSplitBoundaryLocation(session, segment + 1, start, finish));
         double segmentLength = from.distance(to);
         double fraction = segmentLength < 0.001D ? 0.0D
                 : 1.0D - player.getLocation().distance(to) / segmentLength;
@@ -4937,8 +4990,12 @@ public final class ArcadePortManager implements Listener {
             if (elapsed > toTime) continue;
             double fraction = Math.max(0.0D, Math.min(1.0D,
                     (elapsed - fromTime) / (double) (toTime - fromTime)));
-            Location from = dragonEscapeSplitBoundaryLocation(session, segment, start, finish);
-            Location to = dragonEscapeSplitBoundaryLocation(session, segment + 1, start, finish);
+            Location from = dragonEscapePersonalBestSplitLocation(
+                    session, playerId, session.dragonEscapeMapResource, segment,
+                    dragonEscapeSplitBoundaryLocation(session, segment, start, finish));
+            Location to = dragonEscapePersonalBestSplitLocation(
+                    session, playerId, session.dragonEscapeMapResource, segment + 1,
+                    dragonEscapeSplitBoundaryLocation(session, segment + 1, start, finish));
             return from.clone().add((to.getX() - from.getX()) * fraction,
                     (to.getY() - from.getY()) * fraction,
                     (to.getZ() - from.getZ()) * fraction);
@@ -10224,6 +10281,7 @@ public final class ArcadePortManager implements Listener {
         Location dragonEscapeLastDestructionLocation;
         final List<Location> dragonEscapeWaypoints = new ArrayList<>();
         final Map<UUID, Location> dragonEscapeStartLocations = new HashMap<>();
+        final Map<UUID, Map<Integer, Location>> dragonEscapeRunSplitLocations = new HashMap<>();
         final Map<UUID, String> dragonEscapeKits = new HashMap<>();
         final Map<UUID, Integer> dragonEscapeLeapUsesRemaining = new HashMap<>();
         final Map<UUID, Long> dragonEscapeLeapReadyAt = new HashMap<>();
@@ -10254,6 +10312,7 @@ public final class ArcadePortManager implements Listener {
         final List<Team> dragonEscapeScoreboardTeams = new ArrayList<>();
         final List<String> dragonEscapeScoreboardEntries = new ArrayList<>();
         final Map<UUID, Map<Integer, Long>> dragonEscapeRunSplitMillis = new HashMap<>();
+        final Map<UUID, Map<Integer, Location>> dragonEscapeRunSplitLocations = new HashMap<>();
         final Map<Block, Long> runnerBlocks = new HashMap<>();
         final Map<Block, Material> runnerBlockMaterials = new HashMap<>();
         final Map<UUID, String> runnerKits = new HashMap<>();
