@@ -39,7 +39,7 @@ public final class ArcadeCatalog {
                 win("perfect-throw", "Perfect Throw", "A target reticle locks in before a clean TNT burst")));
 
         register(game("death-tag", "Death Tag", "SKELETON_SKULL", "Outrun the undead through the village-tree course.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("runner-trail", "Runner Trail Identity", "A recognisable trail silhouette, not just a particle recolour.", "SOUL_LANTERN",
                         single("bark-footprints", "Bark Footprints", "Leaf and bark footprints fade behind the runner."),
                         single("soul-ribbons", "Soul Ribbons", "Two curved soul ribbons trail behind."),
