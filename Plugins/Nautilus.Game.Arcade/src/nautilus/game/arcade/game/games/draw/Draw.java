@@ -421,7 +421,7 @@ public class Draw extends SoloGame
 			for (Player player : _drawers.GetPlayers(false))
 			{
 				_drawers.RemovePlayer(player);
-				if (!player.isOnline())
+				if (isArcadeVariant() && !player.isOnline())
 					continue;
 
 				_guessers.AddPlayer(player, true);
@@ -554,7 +554,7 @@ public class Draw extends SoloGame
 					score = 3;
 
 					// Points for Drawer
-					if (_round.Drawer.isOnline())
+					if (!isArcadeVariant() || _round.Drawer.isOnline())
 					{
 						AddScore(_round.Drawer, 2);
 						this.AddGems(_round.Drawer, 2, "Drawings Guessed", true, true);
