@@ -279,7 +279,6 @@ public class MazeGenerator {
         generateMaze();
     }
 
-    public Location getCenter() { return center == null ? null : center.clone(); }
 
     // -------------------- Build path row --------------------
 
