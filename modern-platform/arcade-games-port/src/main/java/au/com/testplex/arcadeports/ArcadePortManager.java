@@ -3232,13 +3232,12 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(target.getUniqueId())) return;
         boolean projectile = !"melee".equals(source);
         double baseDamage;
+        Vector velocity = projectileVelocity == null ? null : projectileVelocity.clone();
         if (projectile) {
-            Vector velocity = projectileVelocity == null ? null : projectileVelocity.clone();
             if (velocity == null || !Double.isFinite(velocity.length())) {
                 velocity = new Vector(0.0D, 0.0D, 0.0D);
             }
             baseDamage = ArcadePortRules.microBattlesArrowDamage(velocity.length());
-            applyMicroBattlesArrowKnockback(target, attacker, baseDamage, velocity);
         } else {
             baseDamage = ArcadePortRules.microBattlesMeleeDamage(
                     attacker.getInventory().getItemInMainHand().getType().name());
@@ -3246,6 +3245,9 @@ public final class ArcadePortManager implements Listener {
 
         boolean fighter = "fighter".equals(session.microKits.getOrDefault(target.getUniqueId(), "archer"));
         double afterPerk = ArcadePortRules.microBattlesDamageAfterIronSkin(baseDamage, fighter);
+        // Reborn applies armour to health damage after perk modifiers, but knockback is calculated
+        // from the perk-adjusted custom damage before armour reduction.
+        applyMicroBattlesKnockback(target, attacker, afterPerk, velocity, projectile);
         var armourAttribute = target.getAttribute(Attribute.ARMOR);
         double armourPoints = armourAttribute == null ? 0.0D : armourAttribute.getValue();
         double damage = ArcadePortRules.microBattlesDamageAfterArmor(afterPerk, armourPoints);
@@ -3260,25 +3262,33 @@ public final class ArcadePortManager implements Listener {
                 5, 0.25D, 0.35D, 0.25D, 0.05D);
     }
 
-    /** Mirrors DamageManager's projectile velocity calculation and Micro's 1.6 knockback modifier. */
-    private void applyMicroBattlesArrowKnockback(Player target, Player attacker, double damage, Vector arrowVelocity) {
-        double knockback = ArcadePortRules.microBattlesArrowKnockback(damage);
-        Vector trajectory = arrowVelocity == null ? new Vector(0.0D, 0.0D, 0.0D) : arrowVelocity.clone();
-        trajectory.setY(0.0D);
-        double horizontalLength = trajectory.length();
-        if (horizontalLength < 1.0E-6D) {
+    /** Mirrors DamageManager plus Micro's extra 1.6 multiplier for every projectile hit. */
+    private void applyMicroBattlesKnockback(Player target, Player attacker, double damage,
+            Vector arrowVelocity, boolean projectile) {
+        double knockback = ArcadePortRules.microBattlesKnockback(damage, projectile);
+        Vector trajectory;
+        if (projectile) {
+            trajectory = arrowVelocity == null ? new Vector(0.0D, 0.0D, 0.0D) : arrowVelocity.clone();
+            trajectory.setY(0.0D);
+            double horizontalLength = trajectory.length();
+            if (horizontalLength < 1.0E-6D) {
+                trajectory = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+                trajectory.setY(0.0D);
+                horizontalLength = trajectory.length();
+            }
+            if (horizontalLength < 1.0E-6D) return;
+            trajectory.multiply(0.37D * knockback / horizontalLength);
+            trajectory.setY(0.06D);
+        } else {
+            // UtilAlg.getTrajectory2d(attacker, target): horizontal unit vector, attacker to target.
             trajectory = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
             trajectory.setY(0.0D);
-            horizontalLength = trajectory.length();
+            if (trajectory.lengthSquared() < 1.0E-12D) return;
+            trajectory.normalize().multiply(0.6D * knockback);
+            trajectory.setY(Math.abs(trajectory.getY()));
         }
-        if (horizontalLength < 1.0E-6D) {
-            trajectory = attacker.getLocation().getDirection().setY(0.0D);
-            horizontalLength = trajectory.length();
-        }
-        if (horizontalLength < 1.0E-6D) return;
 
-        trajectory.multiply(0.37D * knockback / horizontalLength);
-        trajectory.setY(0.06D);
+        // UtilAction.velocity: normalize, apply strength/y-add, cap vertical speed, then ground boost.
         double strength = 0.2D + trajectory.length() * 0.8D;
         Vector velocity = trajectory.normalize().multiply(strength);
         velocity.setY(velocity.getY() + Math.abs(0.2D * knockback));
