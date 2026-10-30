@@ -533,7 +533,7 @@ jobs:
           for jar in TestplexModernArcade.jar MonsterMazeModern.jar ArcadeMechanicsModern.jar; do
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
           done
-          sudo -n rm -f "$SERVER_DIR/plugins/SnakeModern.jar"
+
           # This isolated acceptance instance must run Modern mode so QOL kit abilities (including Cryo Blitz) are available.
           MM_CONFIG="$SERVER_DIR/plugins/MonsterMazeModern/config.yml"
           sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$SERVER_DIR/plugins/MonsterMazeModern"
@@ -710,7 +710,7 @@ jobs:
             rollback
             exit 1
           fi
-          for plugin in TestplexModernArcade MonsterMazeModern ArcadeMechanicsModern; do
+          for plugin in TestplexModernArcade MonsterMazeModern SnakeModern ArcadeMechanicsModern; do
             if ! sudo -n grep -Fq "$plugin" "$SERVER_DIR/logs/latest.log"; then
               echo "Expected plugin name $plugin not found in the modern server log." >&2
               rollback
@@ -722,8 +722,13 @@ jobs:
             rollback
             exit 1
           fi
+          if ! sudo -n grep -Fq 'SnakeModern loaded in isolated test mode' "$SERVER_DIR/logs/latest.log"; then
+            echo "SnakeModern did not complete loading an original Snake map; rolling back the modern-only deployment." >&2
+            rollback
+            exit 1
+          fi
           sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR"
-          echo "Modern Paper 26.3 is ready with Monster Maze, Bacon Brawl, Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball, Runner and Spleef available for in-game acceptance; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
+          echo "Modern Paper 26.3 is ready with Monster Maze, Snake, and the eight approved Arcade candidates available for in-game acceptance; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "Legacy services were not stopped, restarted, or overwritten by this workflow."
           REMOTE_DEPLOY
 
