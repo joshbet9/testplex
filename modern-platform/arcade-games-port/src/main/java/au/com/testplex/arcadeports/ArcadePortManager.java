@@ -3370,6 +3370,8 @@ public final class ArcadePortManager implements Listener {
             target.setSaturation(20.0F);
             session.paintPiecesRemaining.put(targetId, 4);
             setPaintballArmor(session, target);
+            target.getInventory().remove(Material.COMPASS);
+            target.getInventory().remove(Material.CLOCK);
             session.paintballRevives.merge(throwerId, 1, Integer::sum);
             target.sendMessage(ChatColor.GREEN + "You were revived by " + thrower.getName() + "!");
             thrower.sendMessage(ChatColor.GREEN + "Revived " + target.getName() + "!");
@@ -3510,6 +3512,11 @@ public final class ArcadePortManager implements Listener {
             processRunnerBlocks(session, now);
             updateRunnerKits(session, now);
             updateRunnerDistance(session, now);
+            for (Player runner : alivePlayers(session)) {
+                if (!runner.hasPotionEffect(PotionEffectType.NIGHT_VISION)) {
+                    runner.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, 72_000, 0, false, false, true), true);
+                }
+            }
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             updateDragonEscapeSafeLocations(session);
@@ -6737,6 +6744,7 @@ public final class ArcadePortManager implements Listener {
             if (killer != null && session.players.containsKey(killer.getUniqueId())) recordPaintballKill(session, killer, player);
             else session.paintballDeaths.merge(player.getUniqueId(), 1, Integer::sum);
             spawnPaintballSaveMeMarker(session, player, killer);
+            player.setHealth(20.0D);
             player.setGameMode(GameMode.SPECTATOR);
             player.setAllowFlight(true);
             player.setFlying(true);
@@ -9567,19 +9575,11 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.PAINTBALL
                 && event.getEntity() instanceof Projectile paintProjectile
                 && session.paintProjectileDamage.containsKey(paintProjectile.getUniqueId())) {
-            if (event.getHitBlock() != null) {
-                paintPaintballBlockImpact(session, paintProjectile);
+            paintPaintballBlockImpact(session, paintProjectile);
+            session.paintballProjectileCosmetics.remove(paintProjectile.getUniqueId());
+            if (event.getHitBlock() != null || !(event.getHitEntity() instanceof Player)) {
                 session.paintProjectileDamage.remove(paintProjectile.getUniqueId());
                 session.paintProjectileTeams.remove(paintProjectile.getUniqueId());
-                session.paintballProjectileCosmetics.remove(paintProjectile.getUniqueId());
-                session.entities.remove(paintProjectile);
-                paintProjectile.remove();
-                return;
-            }
-            if (!(event.getHitEntity() instanceof Player)) {
-                session.paintProjectileDamage.remove(paintProjectile.getUniqueId());
-                session.paintProjectileTeams.remove(paintProjectile.getUniqueId());
-                session.paintballProjectileCosmetics.remove(paintProjectile.getUniqueId());
                 session.entities.remove(paintProjectile);
                 paintProjectile.remove();
                 return;
