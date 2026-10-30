@@ -1113,7 +1113,15 @@ public final class SnakeGameManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND
                 || !SnakeRules.isAbilityItemInteraction(event.getAction().name())) return;
         SnakeState state = snakes.get(event.getPlayer().getUniqueId());
-        if (!running || !live || state == null) return;
+        if (!running || state == null) return;
+        if (!live) {
+            if (state.alive && SnakeRules.isKitAbilityItem(state.kit,
+                    event.getItem() == null ? null : event.getItem().getType().name())) {
+                // Cookies would otherwise be eaten during the source PrepareFreeze phase.
+                event.setCancelled(true);
+            }
+            return;
+        }
         if (!state.alive) {
             if (event.getPlayer().getGameMode() == GameMode.SPECTATOR || !isTrackingCompass(event.getItem())) return;
             event.setCancelled(true);
