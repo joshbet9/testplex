@@ -19,6 +19,7 @@ public final class SnakeRules {
 
     public static final int SPEED_REFERENCE_LENGTH = 180;
     public static final long IDLE_TIMEOUT_MILLIS = 2_000L;
+    public static final long PREPARE_COUNTDOWN_MILLIS = 9_000L;
     public static final int CANNIBAL_KILLS_REQUIRED = 6;
     public static final int CHOO_CHOO_LENGTH_REQUIRED = 60;
     public static final int SLIMY_SHEEP_REQUIRED = 20;
@@ -73,6 +74,10 @@ public final class SnakeRules {
 
     public static boolean isAbilityItemInteraction(String actionName) {
         return actionName != null && !"PHYSICAL".equalsIgnoreCase(actionName);
+    }
+
+    public static boolean isPreparing(long nowMillis, long liveAtMillis) {
+        return nowMillis < liveAtMillis;
     }
 
     public static boolean shouldEliminateForIdle(double distanceSquared, long idleMillis) {
