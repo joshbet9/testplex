@@ -2621,9 +2621,9 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
-        // Loser matches do not wait for winners' bracket matches to finish.
-        // Gear tier follows the current tournament stage, avoiding timer/order-dependent
-        // upgrades when losses arrive while an earlier lower-bracket duel is still running.
+        // Start each lower-bracket batch after the current winners' stage and any previous
+        // lower stage resolve; those matches then run in parallel with the next winners' round.
+        // New lower-bracket loadouts follow the current tournament tier.
         if (ArcadePortRules.canStartGladiatorsLoserStage(winnersStageReady,
                 hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_LOSERS),
                 session.gladiatorLoserQueue.size())) {
