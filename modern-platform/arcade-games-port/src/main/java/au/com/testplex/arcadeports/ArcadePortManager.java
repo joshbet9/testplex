@@ -8808,7 +8808,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void applyGladiatorEnvironmentalDamage(Session session, Player target, double damage, String reason) {
-        if (active != session || target == null || !Double.isFinite(damage) || damage <= 0.0D) return;
+        if (active != session || target == null || !session.alive.contains(target.getUniqueId())
+                || !Double.isFinite(damage) || damage <= 0.0D) return;
         Integer pair = session.gladiatorPairs.get(target.getUniqueId());
         if (pair == null || session.gladiatorResolvedPairs.contains(pair)) return;
         long fightStartsAt = session.gladiatorFightStartsAtByPair.getOrDefault(pair, Long.MAX_VALUE);
@@ -11883,16 +11884,24 @@ public final class ArcadePortManager implements Listener {
                 && session.players.containsKey(gladiatorTarget.getUniqueId())) {
             double finalDamage = event.getFinalDamage();
             event.setCancelled(true);
+            String damageReason = event.getCause().name().toLowerCase(java.util.Locale.ROOT)
+                    .replace('_', ' ');
             if (event instanceof EntityDamageByEntityEvent gladiatorDamage) {
                 Entity damager = gladiatorDamage.getDamager();
                 Player attacker = damager instanceof Player direct ? direct
                         : damager instanceof Projectile projectile
                             && projectile.getShooter() instanceof Player shooter ? shooter : null;
-                if (attacker != null && session.alive.contains(attacker.getUniqueId())
-                        && session.alive.contains(gladiatorTarget.getUniqueId())) {
-                    applyGladiatorDamage(session, attacker, gladiatorTarget,
-                            finalDamage, damager instanceof Projectile);
+                if (attacker != null) {
+                    if (session.alive.contains(attacker.getUniqueId())
+                            && session.alive.contains(gladiatorTarget.getUniqueId())) {
+                        applyGladiatorDamage(session, attacker, gladiatorTarget,
+                                finalDamage, damager instanceof Projectile);
+                    }
+                } else {
+                    applyGladiatorEnvironmentalDamage(session, gladiatorTarget, finalDamage, damageReason);
                 }
+            } else {
+                applyGladiatorEnvironmentalDamage(session, gladiatorTarget, finalDamage, damageReason);
             }
             return;
         }
