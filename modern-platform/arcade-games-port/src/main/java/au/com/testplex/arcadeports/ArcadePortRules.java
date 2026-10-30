@@ -1438,20 +1438,19 @@ public final class ArcadePortRules {
     }
 
     /**
-     * A split is recorded when the racer reaches that authored waypoint. Segment N therefore
-     * runs from waypoint N to N+1; the final waypoint has no following route segment.
+     * Split zero is the race start at waypoint zero. Split N is the finish after
+     * the final authored waypoint, so a runner at progress N-1 is still on segment N-1.
      */
     public static int dragonEscapePbSegmentStartIndex(int waypointIndex, int waypointCount) {
-        if (waypointCount <= 1 || waypointIndex < 0) return -1;
-        // While approaching the finish radius, keep measuring along the final route segment.
-        return Math.min(waypointCount - 2, waypointIndex);
+        if (waypointCount <= 0 || waypointIndex < 0) return -1;
+        return Math.min(waypointCount - 1, waypointIndex);
     }
 
-    /** Evenly distribute a legacy PB across authored waypoints when split data is unavailable. */
+    /** Evenly distribute a legacy PB over N route legs, including the final finish leg. */
     public static long dragonEscapeDefaultSplitMillis(long totalMillis, int splitIndex, int waypointCount) {
-        if (totalMillis <= 0L || waypointCount <= 1) return 0L;
-        int boundedIndex = Math.max(0, Math.min(waypointCount - 1, splitIndex));
-        return Math.round(totalMillis * (boundedIndex / (double) (waypointCount - 1)));
+        if (totalMillis <= 0L || waypointCount <= 0) return 0L;
+        int boundedIndex = Math.max(0, Math.min(waypointCount, splitIndex));
+        return Math.round(totalMillis * (boundedIndex / (double) waypointCount));
     }
 
     /** Interpolate a PB timestamp along one route segment, clamping invalid fractions safely. */
