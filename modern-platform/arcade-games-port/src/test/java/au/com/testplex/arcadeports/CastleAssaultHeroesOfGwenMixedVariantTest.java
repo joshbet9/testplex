@@ -61,6 +61,16 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void castleAssaultAppliesSourceBlastProtectionCapsAndKnockbackReduction() {
+        assertEquals(1.0D, ArcadePortRules.castleAssaultBlastDamageMultiplier(0), 0.0001D);
+        assertEquals(0.2D, ArcadePortRules.castleAssaultBlastDamageMultiplier(20), 0.0001D);
+        assertEquals(0.2D, ArcadePortRules.castleAssaultBlastDamageMultiplier(50), 0.0001D);
+        assertEquals(1.0D, ArcadePortRules.castleAssaultBlastDamageMultiplier(-5), 0.0001D);
+        assertEquals(1.0D, ArcadePortRules.castleAssaultBlastKnockbackMultiplier(0), 0.0001D);
+        assertEquals(0.4D, ArcadePortRules.castleAssaultBlastKnockbackMultiplier(4), 0.0001D);
+    }
+
+    @Test
     void castleAssaultNormalisesAllFiveSourceKitsAndAliases() {
         assertEquals("alchemist", ArcadePortRules.normalizeCastleAssaultKit("Alchemist"));
         assertEquals("archer", ArcadePortRules.normalizeCastleAssaultKit("archer"));
