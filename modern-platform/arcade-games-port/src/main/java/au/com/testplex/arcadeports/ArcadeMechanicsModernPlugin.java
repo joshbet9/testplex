@@ -154,6 +154,15 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 || game == ArcadePortGame.HEROES_OF_GWEN ? game : null;
     }
 
+    private boolean isMixedSkyWarsId(String requestedId) {
+        if (requestedId == null) return false;
+        String normalized = requestedId.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return normalized.equals("skywars") || normalized.equals("sky-wars")
+                || normalized.equals("skywars-mixed") || normalized.equals("sky-wars-mixed")
+                || normalized.equals("mixed-skywars") || normalized.equals("mixed-sky-wars");
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);

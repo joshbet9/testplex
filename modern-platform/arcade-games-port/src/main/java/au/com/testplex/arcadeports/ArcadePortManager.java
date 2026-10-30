@@ -83,6 +83,7 @@ import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.EntityTargetEvent;
+import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
@@ -100,9 +101,12 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
+import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -141,6 +145,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -615,6 +620,34 @@ public final class ArcadePortManager implements Listener {
         else if (SneakyAssassinsMechanics.normalizeKit(value) != null) sneakyAssassins.selectKit(player, value);
         else if (ArcadePortRules.normalizeTurfWarsKit(value) != null) selectTurfWarsKit(player, value);
         else selectDeathTagRunnerKit(player, value);
+    }
+
+    public void selectSkyWarsKit(Player player, String requestedKit) {
+        if (player == null || requestedKit == null) return;
+        String kit = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (!Set.of("ice", "fire", "air", "metal", "earth").contains(kit)) {
+            player.sendMessage(ChatColor.YELLOW + "SkyWars kits: ice, fire, air, metal, earth.");
+            return;
+        }
+        skyWarsKitPreferences.put(player.getUniqueId(), kit);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.SKY_WARS
+                && session.players.containsKey(player.getUniqueId())
+                && session.alive.contains(player.getUniqueId())) {
+            String previousKit = session.skyWarsKits.getOrDefault(player.getUniqueId(), "ice");
+            if ("metal".equals(previousKit) && !"metal".equals(kit)) {
+                PlayerSnapshot snapshot = session.snapshots.get(player.getUniqueId());
+                var maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
+                double baseHealth = snapshot == null ? 20.0D : snapshot.maxHealthBase;
+                if (maxHealth != null) maxHealth.setBaseValue(baseHealth);
+                if (player.getHealth() > baseHealth) player.setHealth(baseHealth);
+            }
+            session.skyWarsKits.put(player.getUniqueId(), kit);
+            session.skyWarsKitReadyAt.remove(player.getUniqueId());
+            session.skyWarsIceBridgePaths.remove(player.getUniqueId());
+            giveKit(session, player);
+        }
+        player.sendMessage(ChatColor.GREEN + "SkyWars kit set to " + kit + ".");
     }
 
     public void selectBombLobbersKit(Player player, String requestedKit) {
@@ -1183,6 +1216,16 @@ public final class ArcadePortManager implements Listener {
                     + " is already counting down. Wait for that round to start before queueing another game.");
             return;
         }
+        String key = queueKey(type, mixedArcadeVariant);
+        LinkedHashMap<UUID, Player> targetQueue = queues.computeIfAbsent(key, ignored -> new LinkedHashMap<>());
+        int queuedPlayers = (int) targetQueue.values().stream()
+                .filter(queued -> queued != null && queued.isOnline()
+                        && !queued.getUniqueId().equals(player.getUniqueId())).count();
+        if (type == ArcadePortGame.SKY_WARS && mixedArcadeVariant
+                && !SkyWarsMixedArcadeRules.hasRoom(queuedPlayers)) {
+            player.sendMessage(ChatColor.RED + "SkyWars Mixed Arcade is full (16/16 players).");
+            return;
+        }
         lobby.ensurePlayerInLobby(player);
         for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(player.getUniqueId());
         if (type != ArcadePortGame.GLADIATORS) gladiatorLobbyVotes.remove(player.getUniqueId());
@@ -1276,8 +1319,14 @@ public final class ArcadePortManager implements Listener {
                 for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
                     existingQueue.remove(player.getUniqueId());
                 }
-                queues.computeIfAbsent(queueKey(type, mixedArcadeVariant), ignored -> new LinkedHashMap<>())
-                        .put(player.getUniqueId(), player);
+                LinkedHashMap<UUID, Player> targetQueue = queues.computeIfAbsent(
+                        queueKey(type, mixedArcadeVariant), ignored -> new LinkedHashMap<>());
+                if (type == ArcadePortGame.SKY_WARS && mixedArcadeVariant
+                        && targetQueue.size() >= SkyWarsMixedArcadeRules.MAX_PLAYERS) {
+                    player.sendMessage(ChatColor.YELLOW + "SkyWars Mixed Arcade is full (16 players); you were left in the lobby.");
+                    continue;
+                }
+                targetQueue.put(player.getUniqueId(), player);
             }
         }
         LinkedHashMap<UUID, Player> queue = queues.get(queueKey(type, mixedArcadeVariant));
@@ -1487,6 +1536,33 @@ public final class ArcadePortManager implements Listener {
             sender.sendMessage(ChatColor.RED + "The authentic " + type.displayName()
                     + " map or its WorldConfig metadata could not be loaded. No fallback arena was generated; see server logs.");
             return;
+        }
+        if (type == ArcadePortGame.SKY_WARS) {
+            SourceMapCatalog.MapData skyWarsMap = sourceMapData.get(type.id());
+            boolean validBounds = skyWarsMap != null && skyWarsMap.hasBounds()
+                    && skyWarsMap.maxX() > skyWarsMap.minX()
+                    && skyWarsMap.maxZ() > skyWarsMap.minZ();
+            boolean hasTntGenerator = skyWarsMap != null && !skyWarsMap.dataLocations("LIME").isEmpty();
+            if (!validBounds || !hasTntGenerator) {
+                sender.sendMessage(ChatColor.RED + "This SkyWars map is missing its required WorldConfig bounds or LIME TNT generator marker. Choose another archived map.");
+                return;
+            }
+        }
+        if (type == ArcadePortGame.SKY_WARS) {
+            SourceMapCatalog.MapData skyWarsMap = sourceMapData.get(type.id());
+            List<Location> skyWarsStarts = skyWarsMap == null ? List.of() : skyWarsMap.spawnLocations();
+            if (skyWarsStarts.isEmpty() && skyWarsMap != null) skyWarsStarts = skyWarsMap.dataLocations("GREEN");
+            if (skyWarsStarts.isEmpty()) {
+                sender.sendMessage(ChatColor.RED + "The selected SkyWars map has no authored player-island spawns. Choose a different map.");
+                return;
+            }
+            if (participants.size() > skyWarsStarts.size()) {
+                for (Player overflow : participants.subList(skyWarsStarts.size(), participants.size())) {
+                    overflow.sendMessage(ChatColor.YELLOW + "This SkyWars map has only "
+                            + skyWarsStarts.size() + " player spawns; you were left in the lobby.");
+                }
+                participants = new ArrayList<>(participants.subList(0, skyWarsStarts.size()));
+            }
         }
         if (type == ArcadePortGame.BACON_BRAWL
                 && !prepareBaconSourceSpawns(world, sourceMapData.get(type.id()), participants.size())) {
@@ -1714,6 +1790,13 @@ public final class ArcadePortManager implements Listener {
             if (type == ArcadePortGame.ONE_IN_THE_QUIVER) {
                 session.quiverKits.put(player.getUniqueId(), quiverKitPreferences.getOrDefault(player.getUniqueId(), "leaper"));
             }
+            if (type == ArcadePortGame.SKY_WARS) {
+                String selectedKit = skyWarsKitPreferences.getOrDefault(player.getUniqueId(), "ice");
+                session.skyWarsKits.put(player.getUniqueId(), selectedKit);
+                session.skyWarsKitReadyAt.put(player.getUniqueId(), 0L);
+                if ("air".equals(selectedKit)) session.skyWarsSafeLocations.put(player.getUniqueId(), spawn.clone());
+                if ("earth".equals(selectedKit)) session.skyWarsNextDirtAt.put(player.getUniqueId(), now + 1_000L);
+            }
             if (type == ArcadePortGame.RUNNER) {
                 UUID playerId = player.getUniqueId();
                 session.runnerKits.put(playerId, runnerKitPreferences.getOrDefault(playerId, "leaper"));
@@ -1765,6 +1848,10 @@ public final class ArcadePortManager implements Listener {
             player.setLevel(0);
             player.getInventory().clear();
             giveKit(session, player);
+            if (type == ArcadePortGame.SKY_WARS) {
+                player.setInvulnerable(true);
+                player.setWalkSpeed(0.0F);
+            }
             session.lastLocations.put(player.getUniqueId(), spawn.clone());
             if (type == ArcadePortGame.MICRO_BATTLES) {
                 UUID microId = player.getUniqueId();
@@ -9646,9 +9733,23 @@ public final class ArcadePortManager implements Listener {
                 session.dragonMarksmanFiring.remove(player.getUniqueId());
                 session.dragonWaterDamageNextAt.remove(player.getUniqueId());
                 player.getInventory().clear();
-                player.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
-                        "Points to the nearest survivor. Left-click to spectate them."));
-                updateDragonsSpectatorCompasses(session);
+                player.getInventory().addItem(skyWarsKitItem(Material.COMPASS, "Tracking Compass",
+                        "Points to the nearest survivor. Left-click to teleport; right-click for the spectator menu.", false));
+                updateSkyWarsCompass(session);
+            } else {
+                player.setGameMode(GameMode.SPECTATOR);
+                if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+                    player.teleport(dragonEscapeSpectatorLocation(session));
+                } else if (session.type == ArcadePortGame.DRAGONS) {
+                    session.dragonMarksmanCharge.remove(player.getUniqueId());
+                    session.dragonMarksmanNextChargeAt.remove(player.getUniqueId());
+                    session.dragonMarksmanFiring.remove(player.getUniqueId());
+                    session.dragonWaterDamageNextAt.remove(player.getUniqueId());
+                    player.getInventory().clear();
+                    player.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
+                            "Points to the nearest survivor. Left-click to spectate them."));
+                    updateDragonsSpectatorCompasses(session);
+                }
             }
             player.sendMessage(ChatColor.RED + "Eliminated: " + reason + ".");
         }
@@ -10561,6 +10662,15 @@ public final class ArcadePortManager implements Listener {
             if (block != null && block.getWorld() == session.world) block.setBlockData(entry.getValue(), false);
         }
         session.deathTagOriginalLightBlocks.clear();
+        for (Map.Entry<Block, BlockData> entry : session.skyWarsIceBridgeOriginals.entrySet()) {
+            Block block = entry.getKey();
+            if (block != null && block.getType() == Material.ICE) block.setBlockData(entry.getValue(), false);
+        }
+        session.skyWarsIceBridgeOriginals.clear();
+        session.skyWarsIceBridgeExpiresAt.clear();
+        session.skyWarsIceBridgePaths.clear();
+        session.skyWarsDirtProjectiles.clear();
+        session.skyWarsGuardianHomes.clear();
         for (UUID playerId : new ArrayList<>(session.deathTagDisguises.keySet())) {
             removeDeathTagDisguise(session, playerId);
         }
@@ -11121,6 +11231,21 @@ public final class ArcadePortManager implements Listener {
     }
 
     private enum StatsPage { ROOT, ARCADE, CATEGORY, GAME, DRAGON_ESCAPE_MAPS, DRAGON_ESCAPE_COLOURS }
+
+    private static final class SkyWarsCompassMenuHolder implements InventoryHolder {
+        private final UUID ownerId;
+        private final Map<Integer, UUID> targetsBySlot = new HashMap<>();
+        private Inventory inventory;
+
+        private SkyWarsCompassMenuHolder(UUID ownerId) {
+            this.ownerId = ownerId;
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return inventory;
+        }
+    }
 
     private static final class DragonCompassMenuHolder implements InventoryHolder {
         private final UUID ownerId;
@@ -15954,6 +16079,17 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
+        if (session.type == ArcadePortGame.SKY_WARS) {
+            UUID skyWarsTntId = bomb.getUniqueId();
+            // Keep map chests and anvils intact; other terrain remains destructible.
+            event.blockList().removeIf(block -> block.getType() == Material.CHEST
+                    || block.getType() == Material.TRAPPED_CHEST
+                    || block.getType() == Material.ENDER_CHEST
+                    || block.getType() == Material.ANVIL);
+            Bukkit.getScheduler().runTaskLater(plugin,
+                    () -> session.skyWarsTntOwners.remove(skyWarsTntId), 20L);
+            return;
+        }
         UUID bombId = bomb.getUniqueId();
         UUID ownerId = session.bombOwners.get(bombId);
         int priorTntKills = session.bombKillsByTnt.getOrDefault(bombId, 0);
@@ -16517,6 +16653,47 @@ public final class ArcadePortManager implements Listener {
         final Map<String, Integer> runnerMapPaletteCounts = new HashMap<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
         final int participantsAtStart;
+        final Map<UUID, String> skyWarsKits = new HashMap<>();
+        final Map<UUID, Long> skyWarsKitReadyAt = new HashMap<>();
+        final Map<UUID, Long> skyWarsNextDirtAt = new HashMap<>();
+        final Map<UUID, Location> skyWarsSafeLocations = new HashMap<>();
+        final Map<UUID, Long> skyWarsSpectatorTeleportAt = new HashMap<>();
+        final Map<Block, Long> skyWarsIceBridgeExpiresAt = new HashMap<>();
+        final Map<Block, BlockData> skyWarsIceBridgeOriginals = new HashMap<>();
+        final Map<UUID, List<List<Block>>> skyWarsIceBridgePaths = new HashMap<>();
+        final Map<UUID, UUID> skyWarsDirtProjectiles = new HashMap<>();
+        final Map<UUID, UUID> skyWarsLastDamager = new HashMap<>();
+        final Map<UUID, Long> skyWarsLastDamagedAt = new HashMap<>();
+        final Map<UUID, Long> skyWarsLastTntThrowAt = new HashMap<>();
+        final Map<UUID, UUID> skyWarsTntOwners = new HashMap<>();
+        final Map<UUID, Location> skyWarsGuardianHomes = new HashMap<>();
+        ArmorStand skyWarsGeneratorHolder;
+        UUID skyWarsGeneratorHolderId;
+        Block skyWarsGeneratorBase;
+        final Map<Block, Long> skyWarsCrumbleQueued = new HashMap<>();
+        final PriorityQueue<SkyWarsCrumbleCandidate> skyWarsCrumbleQueue = new PriorityQueue<>(
+                (left, right) -> {
+                    int distanceOrder = Double.compare(right.distanceSquared(), left.distanceSquared());
+                    return distanceOrder != 0 ? distanceOrder : Long.compare(left.sequence(), right.sequence());
+                });
+        int skyWarsCrumbleMinX;
+        int skyWarsCrumbleMaxX;
+        int skyWarsCrumbleMinZ;
+        int skyWarsCrumbleMaxZ;
+        int skyWarsCrumbleMinY;
+        int skyWarsCrumbleMaxY;
+        int skyWarsCrumbleScanY;
+        double skyWarsCrumbleCenterX;
+        double skyWarsCrumbleCenterZ;
+        long skyWarsCrumbleSequence;
+        boolean skyWarsCrumbleBoundsValid;
+        boolean skyWarsCrumbleScanComplete;
+        long skyWarsLiveAt;
+        long skyWarsCrumbleAt;
+        long skyWarsNextTntAt;
+        Location skyWarsTntGenerator;
+        boolean skyWarsLive;
+        boolean skyWarsCrumbleStarted;
         int baconBlastExplosionDepth;
         double baconKnockback = 1.5D;
         long lastBaconHungerAt;
@@ -16575,6 +16752,7 @@ public final class ArcadePortManager implements Listener {
         final float saturation;
         final float walkSpeed;
         final boolean collidable;
+        final boolean invulnerable;
         final Scoreboard scoreboard;
         final String playerListName;
         PlayerSnapshot(Player p) {
@@ -16596,6 +16774,7 @@ public final class ArcadePortManager implements Listener {
             saturation = p.getSaturation();
             walkSpeed = p.getWalkSpeed();
             collidable = p.isCollidable();
+            invulnerable = p.isInvulnerable();
             scoreboard = p.getScoreboard();
             playerListName = p.getPlayerListName();
         }
@@ -16616,6 +16795,7 @@ public final class ArcadePortManager implements Listener {
             p.setSaturation(saturation);
             p.setWalkSpeed(walkSpeed);
             p.setCollidable(collidable);
+            p.setInvulnerable(invulnerable);
             p.setScoreboard(scoreboard);
             p.setPlayerListName(playerListName);
             p.setAllowFlight(allowFlight);
