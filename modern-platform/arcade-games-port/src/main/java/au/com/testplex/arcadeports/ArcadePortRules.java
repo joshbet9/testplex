@@ -444,7 +444,8 @@ public final class ArcadePortRules {
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
     public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
     public static final long TURF_WARS_CONSTRUCTOR_INTERVAL_MILLIS = 4_000L;
-    public static final long TURF_WARS_MARKSMAN_ARROW_INTERVAL_MILLIS = 8_000L;
+    public static final long TURF_WARS_MARKSMAN_ARROW_INTERVAL_MILLIS = 2_000L;
+    public static final long TURF_WARS_INFILTRATOR_ARROW_INTERVAL_MILLIS = 8_000L;
     public static final long TURF_WARS_SHREDDER_ARROW_INTERVAL_MILLIS = 4_000L;
     public static final long TURF_WARS_BARRAGE_FIRST_CHARGE_MILLIS = 1_000L;
     public static final long TURF_WARS_BARRAGE_CHARGE_INTERVAL_MILLIS = 250L;
@@ -1976,8 +1977,11 @@ public final class ArcadePortRules {
     }
 
     public static long turfWarsArrowIntervalMillis(String kit) {
-        return "shredder".equals(normalizeTurfWarsKit(kit))
-                ? TURF_WARS_SHREDDER_ARROW_INTERVAL_MILLIS : TURF_WARS_MARKSMAN_ARROW_INTERVAL_MILLIS;
+        return switch (normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit)) {
+            case "infiltrator" -> TURF_WARS_INFILTRATOR_ARROW_INTERVAL_MILLIS;
+            case "shredder" -> TURF_WARS_SHREDDER_ARROW_INTERVAL_MILLIS;
+            default -> TURF_WARS_MARKSMAN_ARROW_INTERVAL_MILLIS;
+        };
     }
 
     /** Reborn advances one line for the first combat round, two for the second, etc. */
