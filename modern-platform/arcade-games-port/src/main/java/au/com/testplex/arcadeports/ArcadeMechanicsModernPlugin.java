@@ -114,11 +114,22 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         }
     }
 
-    private boolean isMixedTurfWarsId(String requestedId) {
-        if (requestedId == null) return false;
+    /** Resolve the two accepted Mixed Arcade ID spellings without changing the base game ID. */
+    private ArcadePortGame mixedArcadeGameFromId(String requestedId) {
+        if (requestedId == null) return null;
         String normalized = requestedId.toLowerCase(java.util.Locale.ROOT)
                 .replace('_', '-').replace(' ', '-');
-        return normalized.equals("turf-wars-mixed") || normalized.equals("mixed-turf-wars");
+        String baseId = null;
+        if (normalized.endsWith("-mixed")) {
+            baseId = normalized.substring(0, normalized.length() - "-mixed".length());
+        } else if (normalized.startsWith("mixed-")) {
+            baseId = normalized.substring("mixed-".length());
+        }
+        if (baseId == null) return null;
+        ArcadePortGame game = ArcadePortGame.fromId(baseId);
+        return game == ArcadePortGame.TURF_WARS
+                || game == ArcadePortGame.CASTLE_ASSAULT
+                || game == ArcadePortGame.HEROES_OF_GWEN ? game : null;
     }
 
     @Override
@@ -135,10 +146,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport " + sub + " <game-id>");
                     return true;
                 }
-                boolean mixedTurfWars = isMixedTurfWarsId(args[1]);
-                ArcadePortGame requestedGame = mixedTurfWars ? ArcadePortGame.TURF_WARS
-                        : ArcadePortGame.fromId(args[1]);
-                manager.queue(requestedGame, player, sub.equals("play"), mixedTurfWars);
+                ArcadePortGame mixedJoinGame = mixedArcadeGameFromId(args[1]);
+                boolean mixedArcadeVariant = mixedJoinGame != null;
+                ArcadePortGame requestedGame = mixedArcadeVariant ? mixedJoinGame : ArcadePortGame.fromId(args[1]);
+                manager.queue(requestedGame, player, sub.equals("play"), mixedArcadeVariant);
                 return true;
             case "lobby":
             case "selectgame":
@@ -176,10 +187,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport start <game-id>");
                     return true;
                 }
-                boolean mixedTurfWarsStart = isMixedTurfWarsId(args[1]);
-                ArcadePortGame requestedStartGame = mixedTurfWarsStart ? ArcadePortGame.TURF_WARS
-                        : ArcadePortGame.fromId(args[1]);
-                manager.startFromLobby(requestedStartGame, sender, mixedTurfWarsStart);
+                ArcadePortGame mixedStartGame = mixedArcadeGameFromId(args[1]);
+                boolean mixedArcadeStart = mixedStartGame != null;
+                ArcadePortGame requestedStartGame = mixedArcadeStart ? mixedStartGame : ArcadePortGame.fromId(args[1]);
+                manager.startFromLobby(requestedStartGame, sender, mixedArcadeStart);
                 return true;
             case "kit":
                 if (!(sender instanceof Player player)) {
@@ -225,8 +236,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>" + ChatColor.GRAY + " — quick solo test; starts after a short join window");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join <game-id>" + ChatColor.GRAY + " — queue to join a multiplayer test");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport play turf-wars-mixed" + ChatColor.GRAY
-                        + " — dedicated Mixed Arcade Turf Wars (20s / 10s build, 45s combat; 2-column turf shifts)");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>-mixed" + ChatColor.GRAY
+                        + " — Mixed Arcade variants: Turf Wars, Castle Assault (30s objective TNT), Heroes of Gwen (middle towers removed and store prices halved)");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a Bomb Lobbers, Bacon Brawl, Dragons, Micro Battles, One in the Quiver, Paintball, Runner, Spleef or Death Tag kit; use runnerkit-<kit> for Runner");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport ghost <on|off|toggle>" + ChatColor.GRAY + " — show or hide your Dragon Escape PB ghost");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport dragoncolor <colour>" + ChatColor.GRAY + " — set your Dragon Escape leader beacon colour");
