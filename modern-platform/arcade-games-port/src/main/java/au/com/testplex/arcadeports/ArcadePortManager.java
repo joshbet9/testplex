@@ -568,21 +568,15 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         UUID id = player.getUniqueId();
-        dragonEscapeKitPreferences.put(id, kit);
         Session session = active;
         if (session != null && session.type == ArcadePortGame.DRAGON_ESCAPE
-                && session.players.containsKey(id) && session.alive.contains(id)) {
-            session.dragonEscapeKits.put(id, kit);
-            session.dragonEscapeLeapUsesRemaining.put(id, ArcadePortRules.dragonEscapeLeapUses(kit));
-            session.dragonEscapeDiggerUsesRemaining.put(id, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
-            session.dragonEscapeNextTntAt.put(id,
-                    System.currentTimeMillis() + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
-            session.dragonEscapeWarperUsed.remove(id);
-            giveKit(session, player);
-            player.sendMessage(ChatColor.GREEN + "Dragon Escape kit changed to " + kit + ".");
-        } else {
-            player.sendMessage(ChatColor.GREEN + "Dragon Escape kit set to " + kit + " for your next test.");
+                && session.players.containsKey(id)) {
+            player.sendMessage(ChatColor.YELLOW
+                    + "Dragon Escape kits are locked once the race starts. Your current kit stays unchanged.");
+            return;
         }
+        dragonEscapeKitPreferences.put(id, kit);
+        player.sendMessage(ChatColor.GREEN + "Dragon Escape kit set to " + kit + " for your next test.");
     }
 
     public void selectRunnerKit(Player player, String requestedKit) {
@@ -4032,6 +4026,24 @@ public final class ArcadePortManager implements Listener {
         return session.world.getSpawnLocation().clone().add(0.0D, 30.0D, 0.0D);
     }
 
+    /**
+     * Reborn's Dragon Escape spectator spawn is the mean live-racer position,
+     * raised by ten blocks and centred by half a block.
+     */
+    private Location dragonEscapeSpectatorLocation(Session session) {
+        List<Player> racers = alivePlayers(session);
+        if (racers.isEmpty()) return new Location(session.world, 0.5D, 10.0D, 0.5D);
+        double x = 0.0D, y = 0.0D, z = 0.0D;
+        for (Player racer : racers) {
+            Location location = racer.getLocation();
+            x += location.getX();
+            y += location.getY();
+            z += location.getZ();
+        }
+        double count = racers.size();
+        return new Location(session.world, x / count + 0.5D, y / count + 10.0D, z / count + 0.5D);
+    }
+
     private Location randomDragonSkyTarget(Session session) {
         Location center = session.dragonSpectatorLocation == null
                 ? session.world.getSpawnLocation() : session.dragonSpectatorLocation;
@@ -5553,6 +5565,9 @@ public final class ArcadePortManager implements Listener {
         }
         if (player.isOnline()) {
             player.setGameMode(GameMode.SPECTATOR);
+            if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+                player.teleport(dragonEscapeSpectatorLocation(session));
+            }
             player.sendMessage(ChatColor.RED + "Eliminated: " + reason + ".");
         }
         if (killer != null && session.scores.containsKey(killer.getUniqueId())) session.scores.merge(killer.getUniqueId(), 1, Integer::sum);

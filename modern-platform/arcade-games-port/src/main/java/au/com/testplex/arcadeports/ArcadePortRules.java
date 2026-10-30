@@ -462,6 +462,10 @@ public final class ArcadePortRules {
     public static final long DRAGON_ESCAPE_SCORE_UPDATE_MILLIS = 500L;
     public static final int DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS = 40;
 
+    public static boolean shouldAllowDragonEscapeKitChange(boolean activeRaceParticipant) {
+        return !activeRaceParticipant;
+    }
+
     public static boolean shouldRunDragonEscapeScoreUpdate(long nowMillis, long nextUpdateAtMillis) {
         return nowMillis >= nextUpdateAtMillis;
     }

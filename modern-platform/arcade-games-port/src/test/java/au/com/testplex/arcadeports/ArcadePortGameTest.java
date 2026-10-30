@@ -1336,6 +1336,11 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isDragonEscapeWarpGraceActive(2_000L, 1_000L));
     }
 
+    @Test void dragonEscapeKitsCannotBeChangedMidRace() {
+        assertFalse(ArcadePortRules.shouldAllowDragonEscapeKitChange(true));
+        assertTrue(ArcadePortRules.shouldAllowDragonEscapeKitChange(false));
+    }
+
     @Test void dragonEscapeRacerScoresUseTheSourceFiveHundredMillisecondCadence() {
         assertTrue(ArcadePortRules.shouldRunDragonEscapeScoreUpdate(1_000L, 0L));
         assertFalse(ArcadePortRules.shouldRunDragonEscapeScoreUpdate(1_499L, 1_500L));
