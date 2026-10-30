@@ -23,11 +23,6 @@ public class MazeGenerator {
     private static final int HALF = MAZE_SIZE / 2;
     private static final int BOX_PADDING = 4;
     private static final int BOX_HALF = HALF + BOX_PADDING;
-    private static final int LOBBY_R = 4;
-    /** Pre/post-match lobby platform sits this many blocks above the maze (well clear of
-     *  the shell-clear region cy-30..cy+80) so maze teardown never removes the lobby. */
-    private static final int LOBBY_Y_OFFSET = 100;
-
     // The arena world may contain a leftover quartz shell (floor + ceiling) from an
     // earlier build. Its ceiling sits above the maze track and blocks the safe-pad
     // beacon beams. Each generation we carve out this vertical band back to open air.
@@ -72,11 +67,7 @@ public class MazeGenerator {
 
     // -------------------- Lobby + cached shell --------------------
 
-    /**
-     * Empty lobby glass box. Also ensures the permanent quartz shell exists
-     * (built once, kept forever in this world).
-     */
-    /** Set the arena origin without constructing a private lobby or NPC platform. */
+    /** Set the arena origin only. Testplex owns the sole lobby and player entry flow. */
     public void setArenaCenter(Location origin) {
         if (origin == null || origin.getWorld() == null) {
             throw new IllegalArgumentException("Monster Maze arena origin must have a world.");
@@ -86,42 +77,6 @@ public class MazeGenerator {
         clearRuntimeLists();
         mazeBlocks.clear();
         mazeLive = false;
-    }
-
-    /**
-     * Legacy isolated-module fixture. Testplex Modern never calls this method;
-     * its only lobby is the shared Arcade lobby.
-     */
-    public void buildLobby(Location origin) {
-        setArenaCenter(origin);
-        this.center = origin.clone().getBlock().getLocation().add(0.5, 0, 0.5);
-        clearRuntimeLists();
-
-        World world = center.getWorld();
-        int cx = center.getBlockX();
-        int cy = center.getBlockY();
-        int cz = center.getBlockZ();
-        int ly = cy + LOBBY_Y_OFFSET; // lobby floor Y (players stand here)
-
-        // Small lobby platform + glass, lifted well above the maze so teardown never removes it
-        for (int x = -LOBBY_R; x <= LOBBY_R; x++) {
-            for (int z = -LOBBY_R; z <= LOBBY_R; z++) {
-                world.getBlockAt(cx + x, ly - 1, cz + z).setType(Material.QUARTZ_BLOCK);
-            }
-        }
-        world.getBlockAt(cx, ly - 1, cz).setType(Material.EMERALD_BLOCK);
-
-        for (int x = -LOBBY_R; x <= LOBBY_R; x++) {
-            for (int z = -LOBBY_R; z <= LOBBY_R; z++) {
-                if (Math.abs(x) != LOBBY_R && Math.abs(z) != LOBBY_R) continue;
-                for (int y = 0; y <= 2; y++) {
-                    world.getBlockAt(cx + x, ly + y, cz + z).setType(Material.WHITE_STAINED_GLASS);
-                }
-            }
-        }
-
-        mazeLive = false;
-        plugin.getLogger().info("Lobby ready (no shell - void only)");
     }
 
     // -------------------- Maze pattern only --------------------
@@ -266,10 +221,25 @@ public class MazeGenerator {
     }
 
     /** Remove the active maze geometry without creating a Monster Maze lobby. */
-    public void returnToLobby() {
+    /** Remove the active maze geometry without constructing any lobby blocks. */
+    public void clearArena() {
         if (center == null) return;
         teardownMazePatternOnly();
         mazeLive = false;
+    }
+
+    public void prepareRound() { }
+
+    public void endRound() { clearArena(); }
+
+    public void cleanup() { clearArena(); }
+
+    public void dropContainment() {
+        for (Location loc : containmentGlass) {
+            Block block = loc.getBlock();
+            if (block.getType() == Material.CYAN_STAINED_GLASS) block.setType(Material.AIR);
+        }
+        containmentGlass.clear();
     }
 
     private void teardownMazePatternOnly() {
@@ -299,26 +269,6 @@ public class MazeGenerator {
             containmentGlass.clear();
             clearRuntimeLists();
             mazeLive = false;
-        }
-    }
-
-    private void clearLobbyGlassOnly() {
-        if (center == null) return;
-        World world = center.getWorld();
-        int cx = center.getBlockX();
-        int cy = center.getBlockY();
-        int cz = center.getBlockZ();
-        for (int x = -LOBBY_R; x <= LOBBY_R; x++) {
-            for (int z = -LOBBY_R; z <= LOBBY_R; z++) {
-                for (int y = -1; y <= 2; y++) {
-                    Block b = world.getBlockAt(cx + x, cy + y, cz + z);
-                    if (b.getType() == Material.WHITE_STAINED_GLASS
-                            || b.getType() == Material.EMERALD_BLOCK
-                            || (y == -1 && b.getType() == Material.QUARTZ_BLOCK)) {
-                        b.setType(Material.AIR);
-                    }
-                }
-            }
         }
     }
 
@@ -587,11 +537,6 @@ public class MazeGenerator {
     public List<Location> getPathPoints() { return pathPoints; }
     public List<Location> getSpawnPoints() { return spawnPoints; }
     public Location getCenter() { return center == null ? null : center.clone(); }
-
-    public Location getLobbyCenter() {
-        if (center == null) return null;
-        return center.clone().add(0, LOBBY_Y_OFFSET, 0);
-    }
 
     public int getPlatformRadius() { return BOX_HALF; }
 
