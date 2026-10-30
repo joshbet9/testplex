@@ -233,6 +233,26 @@ public final class ArcadePortManager implements Listener {
         if (player != null && player.isOnline()) lobby.sendToLobby(player);
     }
 
+    /** Start an explicit participant set through the same Testplex Arcade queue/manager path. */
+    public boolean startMonsterMazeTournamentRound(List<Player> requestedParticipants) {
+        if (requestedParticipants == null || requestedParticipants.isEmpty()
+                || monsterMazeModule == null || active != null || monsterMazeRunning()
+                || !isGameEnabled(ArcadePortGame.MONSTER_MAZE)) return false;
+        LinkedHashMap<UUID, Player> selected = new LinkedHashMap<>();
+        for (Player player : requestedParticipants) {
+            if (player == null || !player.isOnline()) continue;
+            for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(player.getUniqueId());
+            lobby.ensurePlayerInLobby(player);
+            selected.put(player.getUniqueId(), player);
+        }
+        if (selected.isEmpty()) return false;
+        // Tournament matches have a fixed bracket participant list, not a public join window.
+        queues.remove(ArcadePortGame.MONSTER_MAZE.id());
+        queues.put(ArcadePortGame.MONSTER_MAZE.id(), selected);
+        startQueued(ArcadePortGame.MONSTER_MAZE, null, Bukkit.getConsoleSender(), false);
+        return monsterMazeRunning();
+    }
+
     public void restoreMonsterMazeKitPreference(Player player) {
         if (player == null || monsterMazeModule == null || monsterMazeModule.getGameManager() == null) return;
         String selected = plugin.getConfig().getString(
