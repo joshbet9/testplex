@@ -34,6 +34,10 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.BACON_BRAWL, "source-maps/Bacon Brawl/BaconBrawl_Castle.zip"));
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.MILK_THE_COW, "source-maps/Milk the Cow/Milk_BobsFarm.zip"));
+        assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.WITHER_ASSAULT, "source-maps/Milk the Cow/Milk_BobsFarm.zip"));
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.PAINTBALL, "source-maps/Super Paintball/SP_Arena.zip"));
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.SKY_WARS, "source-maps/Skywars/Skywars_Aquarius.zip"));
@@ -604,7 +608,7 @@ class ArcadePortGameTest {
         assertEquals(1, SourceMapCatalog.MapData.orderedRouteMarkers(start, null, 0.75D).size());
     }
 
-    @Test void originalMapCatalogEmbedsThirteenSourceWorldsAndLeavesEvolutionExplicitlyUnmapped() {
+    @Test void originalMapCatalogEmbedsFourteenSourceWorldsAndLeavesUnmappedGamesExplicitlyUnmapped() {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BACON_BRAWL));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BOMB_LOBBERS));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DEATH_TAG));
@@ -619,7 +623,10 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SHEEP_QUEST));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SPLEEF));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.TURF_WARS));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MILK_THE_COW));
+        assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.WITHER_ASSAULT));
         assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.EVOLUTION));
+        assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.WITHER_ASSAULT));
     }
 
     @Test void oneInTheQuiverSourceKitsAndMeleeDamageAreExplicit() {

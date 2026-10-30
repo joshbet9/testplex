@@ -54,6 +54,7 @@
                     <include>Super Spleef/**/*.zip</include>
                     <include>Skywars/**/*.zip</include>
                     <include>Turf Wars/**/*.zip</include>
+                    <include>Milk the Cow/**/*.zip</include>
                 </includes>
             </resource>
             <resource>
