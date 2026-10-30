@@ -52,6 +52,17 @@ class ArcadeCatalogTest {
     }
 
     @Test
+    void gladiatorsIncludesPlayerSelectableKillMessages() {
+        GameDefinition game = new ArcadeCatalog().getGame("gladiators");
+        CosmeticLineDefinition line = game.getCosmeticLines().stream()
+                .filter(candidate -> candidate.getId().equals("kill-message"))
+                .findFirst().orElseThrow();
+        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, line.getSelectionMode());
+        assertEquals(Set.of("classic", "sent-to-sand", "broken-oath", "outclassed"),
+                new HashSet<>(line.getOptions().stream().map(CosmeticOption::getId).toList()));
+    }
+
+    @Test
     void deathTagIsReadyForInGameAcceptanceWhileOtherPortsRemainInProgress() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         GameDefinition deathTag = catalog.getGame("death-tag");
