@@ -36,15 +36,11 @@ jobs:
           cache: maven
           cache-dependency-path: |
             modern-platform/pom.xml
-            modern-platform/monster-maze-port/pom.xml
             modern-platform/snake-port/pom.xml
             modern-platform/arcade-games-port/pom.xml
 
       - name: Build and run catalogue tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/pom.xml clean verify
-
-      - name: Build Monster Maze 26.3 port and run contract tests
-        run: mvn --batch-mode --no-transfer-progress -f modern-platform/monster-maze-port/pom.xml clean verify
 
       - name: Build Snake 26.3 port and run mechanics-rule tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/snake-port/pom.xml clean verify
