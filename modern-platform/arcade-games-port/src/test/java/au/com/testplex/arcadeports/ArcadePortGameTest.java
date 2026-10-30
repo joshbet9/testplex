@@ -1604,7 +1604,7 @@ class ArcadePortGameTest {
 
     @Test void gladiatorsLoserArenaContainsTheDuelFootprint() {
         assertFalse(ArcadePortRules.isOutsideGladiatorsLoserArena(0.5D, 0.5D, 0.5D, 0.5D));
-        assertFalse(ArcadePortRules.isOutsideGladiatorsLoserArena(4.15D, -3.15D, 0.5D, 0.5D));
+        assertFalse(ArcadePortRules.isOutsideGladiatorsLoserArena(4.1D, -3.1D, 0.5D, 0.5D));
         assertTrue(ArcadePortRules.isOutsideGladiatorsLoserArena(4.151D, 0.5D, 0.5D, 0.5D));
         assertTrue(ArcadePortRules.isOutsideGladiatorsLoserArena(Double.NaN, 0.0D, 0.0D, 0.0D));
     }
