@@ -346,6 +346,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void updateMobaWithers(long now) {
         for (int team = 0; team < 2; team++) {
+            final int ownerTeam = team;
             Wither wither = withers.get(team);
             Location home = witherHomes.get(team);
             if (wither == null || !wither.isValid() || home == null) continue;
@@ -353,7 +354,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             Player target = witherTargets.containsKey(team) ? players.get(witherTargets.get(team)) : null;
             if (!isValidWitherTarget(team, target)) {
                 target = activeMatchPlayers().stream()
-                        .filter(player -> isValidWitherTarget(team, player))
+                        .filter(player -> isValidWitherTarget(ownerTeam, player))
                         .min(java.util.Comparator.comparingDouble(player ->
                                 player.getLocation().distanceSquared(home)))
                         .orElse(null);
@@ -962,20 +963,25 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String kit = castleAssaultPlayerKits.get(player.getUniqueId());
         boolean demolitionist = "demolitionist".equals(kit);
         boolean archer = "archer".equals(kit);
-        if (!demolitionist && !archer) return;
         ItemStack current = event.getCurrentItem();
         ItemStack cursor = event.getCursor();
+        ItemStack hotbarItem = event.getHotbarButton() >= 0
+                ? player.getInventory().getItem(event.getHotbarButton()) : null;
+        boolean kitItemInChest = event.getView().getTopInventory().getType()
+                == org.bukkit.event.inventory.InventoryType.CHEST
+                && (isCastleKitItem(current) || isCastleKitItem(cursor) || isCastleKitItem(hotbarItem));
+        if (kitItemInChest) {
+            event.setCancelled(true);
+            return;
+        }
+        if (!demolitionist && !archer) return;
         boolean movesLockedItem = demolitionist
                 && ((current != null && current.getType() == Material.TNT)
                     || (cursor != null && cursor.getType() == Material.TNT));
         movesLockedItem |= archer && (isCastleFletchedArrow(current) || isCastleFletchedArrow(cursor));
-        boolean kitItemInChest = event.getView().getTopInventory().getType() == org.bukkit.event.inventory.InventoryType.CHEST
-                && (isCastleKitItem(current) || isCastleKitItem(cursor));
-        movesLockedItem |= kitItemInChest;
-        if (!movesLockedItem && event.getHotbarButton() >= 0) {
-            ItemStack hotbar = player.getInventory().getItem(event.getHotbarButton());
-            movesLockedItem = demolitionist && hotbar != null && hotbar.getType() == Material.TNT
-                    || archer && isCastleFletchedArrow(hotbar);
+        if (!movesLockedItem && hotbarItem != null) {
+            movesLockedItem = demolitionist && hotbarItem.getType() == Material.TNT
+                    || archer && isCastleFletchedArrow(hotbarItem);
         }
         if (movesLockedItem) event.setCancelled(true);
     }
