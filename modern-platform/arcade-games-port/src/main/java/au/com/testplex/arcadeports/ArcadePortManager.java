@@ -8288,7 +8288,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (player.isOnline()) {
-            player.setGameMode(GameMode.SPECTATOR);
+            // Reborn's CompassModule expects Arcade spectators (Adventure), not vanilla free-camera Spectator mode.
+            player.setGameMode(session.type == ArcadePortGame.SPLEEF ? GameMode.ADVENTURE : GameMode.SPECTATOR);
             if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
                 player.teleport(dragonEscapeSpectatorLocation(session));
             } else if (session.type == ArcadePortGame.DRAGONS) {
@@ -9230,9 +9231,12 @@ public final class ArcadePortManager implements Listener {
                         && isBaconCompassMenuTitle(player.getOpenInventory().getTitle()))
                         || (session.type == ArcadePortGame.BOMB_LOBBERS
                         && isBombLobbersCompassMenuTitle(player.getOpenInventory().getTitle()))
+                        || (session.type == ArcadePortGame.SPLEEF
+                        && player.getOpenInventory().getTopInventory().getHolder() instanceof SpleefCompassMenuHolder)
                         || player.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder) {
                     player.closeInventory();
                 }
+                if (session.type == ArcadePortGame.SPLEEF) player.setCompassTarget(null);
                 snapshot.restore(player);
                 // Ended rounds always return testers to the actual Arcade lobby spawn,
                 // even when their restored snapshot is already inside the lobby world.
@@ -10808,8 +10812,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.spleefLeapReadyAt.put(id, now + ArcadePortRules.SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS);
-        Vector launch = player.getLocation().getDirection().clone().normalize().multiply(1.2D);
-        launch.setY(Math.min(1.2D, launch.getY() + 0.2D + (player.isOnGround() ? 0.2D : 0.0D)));
+        Vector launch = ArcadePortRules.spleefLeapVelocity(
+                player.getLocation().getDirection(), player.isOnGround());
         player.setVelocity(launch);
         player.setFallDistance(0.0F);
         player.getWorld().spawnParticle(Particle.FLAME, player.getLocation(), 8, 0.25D, 0.15D, 0.25D, 0.02D);
@@ -12117,6 +12121,7 @@ public final class ArcadePortManager implements Listener {
         boolean spleefLeapClickedUsableBlock = event.getClickedBlock() != null
                 && event.getClickedBlock().getType().isInteractable();
         if (session.type == ArcadePortGame.SPLEEF
+                && session.alive.contains(player.getUniqueId())
                 && "brawler".equals(session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer"))
                 && item == Material.IRON_AXE && event.getAction().isRightClick()
                 && !spleefLeapClickedUsableBlock) {
