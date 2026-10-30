@@ -6,13 +6,40 @@ on:
       - stable
     paths:
       - .github/workflows/integrate-modern-26-game-progress.yml
+      - .github/scripts/integrate-modern-26-game-progress.sh
 
 permissions:
   contents: write
 
 jobs:
-  smoke_test:
+  integrate:
+    name: Integrate and validate all available game progress
     runs-on: ubuntu-latest
+    timeout-minutes: 50
     steps:
-      - name: Confirm workflow syntax and runner
-        run: echo 'Integration workflow is executing.'
+      - name: Check out the modern platform branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/testplex-modern-26.3-platform
+          fetch-depth: 0
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: |
+            modern-platform/pom.xml
+            modern-platform/snake-port/pom.xml
+            modern-platform/arcade-games-port/pom.xml
+            modern-platform/wizards-port/pom.xml
+
+      - name: Run the guarded integration, build and checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin stable
+          git show origin/stable:.github/scripts/integrate-modern-26-game-progress.sh > /tmp/integrate-modern-26-game-progress.sh
+          chmod +x /tmp/integrate-modern-26-game-progress.sh
+          /tmp/integrate-modern-26-game-progress.sh
