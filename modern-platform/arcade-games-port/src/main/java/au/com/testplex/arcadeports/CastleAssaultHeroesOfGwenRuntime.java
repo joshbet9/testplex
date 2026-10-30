@@ -800,7 +800,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             meta.setDisplayName(ChatColor.GREEN + role + " Upgrades");
             long count = storeEntries.stream().filter(entry -> entry.role.equals(role)).count();
             meta.setLore(List.of(ChatColor.GRAY + "Browse the legacy " + role + " store.",
-                    ChatColor.WHITE + count + " source items",
+                    ChatColor.WHITE + String.valueOf(count) + " source items",
                     ChatColor.YELLOW + "Mixed Arcade prices are half cost."));
             meta.getPersistentDataContainer().set(shopRoleKey, PersistentDataType.STRING, role);
             option.setItemMeta(meta);
