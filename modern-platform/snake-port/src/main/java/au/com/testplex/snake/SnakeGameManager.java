@@ -890,9 +890,7 @@ public final class SnakeGameManager implements Listener {
     }
 
     private DyeColor colorFor(int index) {
-        // DyeColor.values() follows the legacy dye-data order on both APIs.
-        DyeColor[] values = DyeColor.values();
-        return values[SnakeRules.colorIndexForParticipant(index, values.length)];
+        return SnakeRules.colorForLegacyDyeData(index);
     }
 
     private boolean isKnownKit(String kit) {
