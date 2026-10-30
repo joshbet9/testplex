@@ -53,6 +53,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityKnockbackEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
@@ -66,6 +67,7 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -2936,6 +2938,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.SPLEEF) updateSpleef(session, now);
         if (session.type == ArcadePortGame.EVOLUTION) {
             updateEvolutionProgress(session, now);
+            updateEvolutionAbilities(session, now);
         }
         if (session.type == ArcadePortGame.RUNNER) {
             // Reborn marks the whole standing footprint on every game tick, not only on movement events.
@@ -5977,6 +5980,13 @@ public final class ArcadePortManager implements Listener {
             session.evolutionLockedLocations.remove(victimId);
             session.evolutionWaterMessageAt.remove(victimId);
             session.evolutionKillsAtAttempt.remove(victimId);
+            session.evolutionGolemSlamStartedAt.remove(victimId);
+            session.evolutionBlazeActiveUntil.remove(victimId);
+            session.evolutionBlazeNextShotAt.remove(victimId);
+            session.evolutionSlimeSlamActive.remove(victimId);
+            session.evolutionSlimeSlamStartedAt.remove(victimId);
+            session.evolutionChickenJumpUsed.remove(victimId);
+            session.evolutionWaterDamageReadyAt.remove(victimId);
             cleanupEvolutionEggEffect(session, victimId);
             player.setExp(0.0F);
             player.removePotionEffect(PotionEffectType.SLOWNESS);
@@ -6040,36 +6050,35 @@ public final class ArcadePortManager implements Listener {
     private void giveEvolutionKit(Session session, Player player) {
         player.getInventory().clear();
         for (PotionEffect effect : player.getActivePotionEffects()) player.removePotionEffect(effect.getType());
-        int level = Math.max(0, Math.min(4, session.evolutionLevels.getOrDefault(player.getUniqueId(), 0)));
+        UUID id = player.getUniqueId();
+        int level = Math.max(0, Math.min(4, session.evolutionLevels.getOrDefault(id, 0)));
         var maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
         if (maxHealth != null) maxHealth.setBaseValue(ArcadePortRules.evolutionMaxHealth(level));
         player.setHealth(player.getMaxHealth());
+        session.evolutionChickenJumpUsed.remove(id);
+        player.setAllowFlight(false);
         switch (level) {
             case 0:
-                player.getInventory().addItem(new ItemStack(Material.IRON_SWORD), new ItemStack(Material.SHIELD));
-                player.getInventory().setChestplate(new ItemStack(Material.IRON_CHESTPLATE));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 1_200, 0, false, false, true));
+                player.getInventory().setItem(0, namedItem(Material.IRON_INGOT, "Seismic Slam",
+                        "Right-click to leap; impact within 6 blocks. 7-second cooldown.", 1));
                 break;
             case 1:
-                player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
-                        namedItem(Material.FIRE_CHARGE, "Blaze Fireball", "Right-click to launch a fireball.", 3));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 1_200, 0, false, false, true));
+                player.getInventory().setItem(0, namedItem(Material.BLAZE_ROD, "Flamethrower",
+                        "Right-click to breathe flames for 1 second. 5-second cooldown.", 1));
                 break;
             case 2:
-                player.getInventory().addItem(new ItemStack(Material.IRON_SWORD),
-                        namedItem(Material.COAL, "Sulphur Bomb",
-                                "Right-click to throw a coal bomb. 3-second cooldown.", 1));
+                player.getInventory().setItem(0, namedItem(Material.COAL, "Sulphur Bomb",
+                        "Right-click to throw a coal bomb. 3-second cooldown.", 1));
                 break;
             case 3:
-                player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
-                        namedItem(Material.SLIME_BALL, "Slime Bounce", "Right-click to leap forward.", 3));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 1_200, 1, false, false, true));
+                player.getInventory().setItem(0, namedItem(Material.SLIME_BALL, "Slime Slam",
+                        "Right-click to leap and slam nearby enemies. 7-second cooldown.", 1));
                 break;
             default:
-                player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD),
-                        namedItem(Material.FEATHER, "Egg Launch", "Right-click to throw an egg; three eggs are carried.", 1),
-                        new ItemStack(Material.EGG, 3));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 1_200, 1, false, false, true));
+                player.getInventory().setItem(0, namedItem(Material.FEATHER, "Egg Launch",
+                        "Right-click to throw an egg; three eggs are carried. Double-jump with Space.", 1));
+                player.getInventory().setItem(1, new ItemStack(Material.EGG, 3));
+                player.setAllowFlight(player.isOnGround());
                 break;
         }
         player.sendMessage(ChatColor.GREEN + "Evolution stage restored: " + (level + 1) + "/5.");
@@ -6077,19 +6086,16 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void refreshEvolutionFormPerks(Session session, Player player) {
-        int level = Math.max(0, Math.min(4, session.evolutionLevels.getOrDefault(player.getUniqueId(), 0)));
-        PotionEffectType type;
-        int amplifier;
-        switch (level) {
-            case 0 -> { type = PotionEffectType.RESISTANCE; amplifier = 0; }
-            case 1 -> { type = PotionEffectType.FIRE_RESISTANCE; amplifier = 0; }
-            case 3 -> { type = PotionEffectType.JUMP_BOOST; amplifier = 1; }
-            case 4 -> { type = PotionEffectType.SPEED; amplifier = 1; }
-            default -> { return; }
-        }
-        PotionEffect current = player.getPotionEffect(type);
-        if (current == null || current.getDuration() <= 20 || current.getAmplifier() != amplifier) {
-            player.addPotionEffect(new PotionEffect(type, 60, amplifier, false, false, true));
+        UUID id = player.getUniqueId();
+        int level = Math.max(0, Math.min(4, session.evolutionLevels.getOrDefault(id, 0)));
+        // The source kit gives Chicken a single mid-air double jump; re-arm only after landing.
+        if (level == 4) {
+            boolean landed = player.isOnGround() && player.getVelocity().getY() <= 0.01D;
+            if (landed) session.evolutionChickenJumpUsed.remove(id);
+            player.setAllowFlight(!session.evolutionChickenJumpUsed.contains(id));
+        } else {
+            session.evolutionChickenJumpUsed.remove(id);
+            if (player.getAllowFlight()) player.setAllowFlight(false);
         }
     }
 
@@ -6162,6 +6168,184 @@ public final class ArcadePortManager implements Listener {
                     + Math.min(100, (int) (progress * 100.0F)) + "%");
             if (progress >= 0.9999F) beginEvolution(session, player);
         }
+    }
+
+    private void updateEvolutionAbilities(Session session, long now) {
+        if (active != session || session.type != ArcadePortGame.EVOLUTION) return;
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            int level = session.evolutionLevels.getOrDefault(id, 0);
+            if (level == 1 && player.getLocation().getBlock().isLiquid()) {
+                long nextDamageAt = session.evolutionWaterDamageReadyAt.getOrDefault(id, 0L);
+                if (now >= nextDamageAt) {
+                    session.evolutionWaterDamageReadyAt.put(id, now + 250L);
+                    if (player.getHealth() <= 1.0D) {
+                        eliminate(session, player, null, "was burned by water");
+                        if (active != session) return;
+                    } else {
+                        player.setHealth(player.getHealth() - 1.0D);
+                        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.5F, 0.8F);
+                    }
+                }
+            } else {
+                session.evolutionWaterDamageReadyAt.remove(id);
+            }
+
+            Long flameUntil = session.evolutionBlazeActiveUntil.get(id);
+            if (flameUntil != null) {
+                if (now >= flameUntil) {
+                    session.evolutionBlazeActiveUntil.remove(id);
+                    session.evolutionBlazeNextShotAt.remove(id);
+                } else if (now >= session.evolutionBlazeNextShotAt.getOrDefault(id, 0L)) {
+                    launchEvolutionFlame(session, player);
+                    session.evolutionBlazeNextShotAt.put(id, now + ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_TICK_MILLIS);
+                }
+            }
+
+            Long slamStartedAt = session.evolutionGolemSlamStartedAt.get(id);
+            if (slamStartedAt != null && now - slamStartedAt >= 1_000L && player.isOnGround()) {
+                session.evolutionGolemSlamStartedAt.remove(id);
+                resolveEvolutionGolemSlam(session, player);
+                if (active != session) return;
+            }
+
+            Long slimeStartedAt = session.evolutionSlimeSlamStartedAt.get(id);
+            if (slimeStartedAt != null) {
+                if (now - slimeStartedAt > 1_000L || (now - slimeStartedAt > 100L && player.isOnGround())) {
+                    session.evolutionSlimeSlamStartedAt.remove(id);
+                    session.evolutionSlimeSlamActive.remove(id);
+                    continue;
+                }
+                Player target = alivePlayers(session).stream()
+                        .filter(other -> !other.getUniqueId().equals(id))
+                        .filter(other -> other.getLocation().distanceSquared(player.getLocation())
+                                <= ArcadePortRules.EVOLUTION_SLIME_SLAM_RADIUS * ArcadePortRules.EVOLUTION_SLIME_SLAM_RADIUS)
+                        .findFirst().orElse(null);
+                if (target != null && session.evolutionSlimeSlamActive.remove(id)) {
+                    session.evolutionSlimeSlamStartedAt.remove(id);
+                    hitEvolutionAbilityTarget(session, player, target,
+                            ArcadePortRules.EVOLUTION_SLIME_SLAM_DAMAGE, 2.0D, "Slime Slam");
+                    session.world.spawnParticle(Particle.ITEM_SLIME, player.getLocation(), 18, 0.5D, 0.5D, 0.5D, 0.1D);
+                    session.world.playSound(player.getLocation(), Sound.ENTITY_SLIME_ATTACK, 1.0F, 1.0F);
+                }
+            }
+        }
+    }
+
+    private void launchEvolutionFlame(Session session, Player player) {
+        Vector direction = player.getEyeLocation().getDirection().normalize();
+        Vector spread = direction.clone().add(new Vector(
+                ThreadLocalRandom.current().nextDouble(-0.07D, 0.07D),
+                ThreadLocalRandom.current().nextDouble(-0.07D, 0.07D),
+                ThreadLocalRandom.current().nextDouble(-0.07D, 0.07D))).normalize();
+        Snowball flame = player.launchProjectile(Snowball.class);
+        flame.setItem(new ItemStack(Material.BLAZE_POWDER));
+        flame.setVelocity(spread.multiply(ArcadePortRules.EVOLUTION_BLAZE_FLAME_SPEED));
+        session.entities.add(flame);
+        session.evolutionFlameProjectiles.add(flame.getUniqueId());
+        session.world.spawnParticle(Particle.FLAME, player.getEyeLocation(), 3, 0.08D, 0.08D, 0.08D, 0.02D);
+        session.world.spawnParticle(Particle.SMOKE, player.getEyeLocation(), 1, 0.05D, 0.05D, 0.05D, 0.01D);
+    }
+
+    private void resolveEvolutionGolemSlam(Session session, Player player) {
+        if (active != session || !session.alive.contains(player.getUniqueId())) return;
+        Location centre = player.getLocation().clone();
+        session.world.spawnParticle(Particle.EXPLOSION, centre, 1, 0.1D, 0.1D, 0.1D, 0.0D);
+        session.world.spawnParticle(Particle.CLOUD, centre, 32, 2.0D, 0.2D, 2.0D, 0.1D);
+        session.world.playSound(centre, Sound.ENTITY_GENERIC_EXPLODE, 1.2F, 0.65F);
+        for (Player target : alivePlayers(session)) {
+            if (target.equals(player)) continue;
+            double distance = target.getLocation().distance(centre);
+            if (distance > ArcadePortRules.EVOLUTION_GOLEM_SLAM_RADIUS) continue;
+            double damage = ArcadePortRules.EVOLUTION_GOLEM_SLAM_DAMAGE
+                    * (1.0D - distance / ArcadePortRules.EVOLUTION_GOLEM_SLAM_RADIUS) + 0.5D;
+            hitEvolutionAbilityTarget(session, player, target, damage, 2.4D, "Seismic Slam");
+            if (active != session) return;
+        }
+    }
+
+    private void hitEvolutionAbilityTarget(Session session, Player attacker, Player target,
+            double damage, double knockback, String ability) {
+        if (active != session || attacker == null || target == null || attacker.equals(target)
+                || !session.alive.contains(attacker.getUniqueId())
+                || !session.alive.contains(target.getUniqueId())) return;
+        if (session.evolving.contains(attacker.getUniqueId())) return;
+        if (session.evolving.contains(target.getUniqueId())) interruptEvolutionForHit(session, target);
+        recordEvolutionDamage(session, target, attacker, System.currentTimeMillis());
+        cancelEvolutionCharge(session, target);
+        Vector away = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+        if (away.lengthSquared() < 0.001D) away = attacker.getLocation().getDirection().multiply(-1.0D);
+        target.setVelocity(away.normalize().multiply(knockback).setY(Math.max(0.35D, knockback * 0.35D)));
+        target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0.0D, 1.0D, 0.0D),
+                8, 0.25D, 0.35D, 0.25D, 0.08D);
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 0.85F);
+        if (target.getHealth() <= damage) {
+            eliminate(session, target, attacker, "was hit by " + attacker.getName() + "'s " + ability);
+        } else {
+            target.setHealth(target.getHealth() - damage);
+        }
+    }
+
+    private void startEvolutionGolemSlam(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        long readyAt = session.evolutionGolemSlamReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            player.sendActionBar(ChatColor.YELLOW + "Seismic Slam ready in "
+                    + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s.");
+            return;
+        }
+        session.evolutionGolemSlamReadyAt.put(id, now + ArcadePortRules.EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS);
+        Vector direction = player.getLocation().getDirection();
+        if (direction.getY() < 0.0D) direction.setY(-direction.getY());
+        if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.5D, 1.0D);
+        player.setVelocity(direction.normalize().multiply(1.0D));
+        session.evolutionGolemSlamStartedAt.put(id, now);
+        player.sendMessage(ChatColor.GREEN + "Seismic Slam!");
+        player.playSound(player.getLocation(), Sound.ENTITY_IRON_GOLEM_ATTACK, 0.9F, 0.8F);
+    }
+
+    private void startEvolutionFlamethrower(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        long readyAt = session.evolutionBlazeReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            player.sendActionBar(ChatColor.YELLOW + "Flamethrower ready in "
+                    + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s.");
+            return;
+        }
+        session.evolutionBlazeReadyAt.put(id, now + ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS);
+        session.evolutionBlazeActiveUntil.put(id, now + ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_DURATION_MILLIS);
+        session.evolutionBlazeNextShotAt.put(id, now);
+        player.playSound(player.getLocation(), Sound.ENTITY_GHAST_SHOOT, 0.8F, 1.25F);
+        player.sendMessage(ChatColor.GREEN + "Flamethrower!");
+    }
+
+    private void startEvolutionSlimeSlam(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        long readyAt = session.evolutionSlimeSlamReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            player.sendActionBar(ChatColor.YELLOW + "Slime Slam ready in "
+                    + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s.");
+            return;
+        }
+        session.evolutionSlimeSlamReadyAt.put(id, now + ArcadePortRules.EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS);
+        session.evolutionSlimeSlamStartedAt.put(id, now);
+        session.evolutionSlimeSlamActive.add(id);
+        Vector velocity = player.getLocation().getDirection().multiply(1.6D);
+        velocity.setY(0.4D);
+        player.setVelocity(velocity);
+        player.getWorld().spawnParticle(Particle.ITEM_SLIME, player.getLocation(), 8, 0.4D, 0.4D, 0.4D, 0.1D);
+        player.playSound(player.getLocation(), Sound.ENTITY_SLIME_JUMP, 1.0F, 1.0F);
+    }
+
+    private void startEvolutionChickenEgg(Player player) {
+        if (inventoryCount(player, Material.EGG) <= 0) {
+            player.sendMessage(ChatColor.YELLOW + "You need an egg to use Egg Launch.");
+            return;
+        }
+        consumeOne(player, Material.EGG);
+        Egg egg = player.launchProjectile(Egg.class);
+        egg.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.35D));
+        player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.9F, 1.0F);
     }
 
     private void reduceEvolutionPity(Session session, UUID playerId, long reductionMillis, long now) {
@@ -8166,6 +8350,25 @@ public final class ArcadePortManager implements Listener {
     public void onDamage(EntityDamageEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.EVOLUTION && event.getEntity() instanceof Player evolutionPlayer
+                && session.alive.contains(evolutionPlayer.getUniqueId())) {
+            int level = session.evolutionLevels.getOrDefault(evolutionPlayer.getUniqueId(), 0);
+            if (event.getCause() == EntityDamageEvent.DamageCause.FALL) {
+                if (level == 1 || level == 4) {
+                    event.setCancelled(true);
+                    evolutionPlayer.setFallDistance(0.0F);
+                    return;
+                }
+                if (level == 3) event.setDamage(event.getDamage() * 0.5D);
+            }
+        }
+        if (session.type == ArcadePortGame.EVOLUTION
+                && event instanceof EntityDamageByEntityEvent flameHit
+                && flameHit.getDamager() instanceof Snowball flame
+                && session.evolutionFlameProjectiles.contains(flame.getUniqueId())) {
+            event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.BOMB_LOBBERS
                 && event instanceof EntityDamageByEntityEvent byEntity
                 && byEntity.getDamager() instanceof Player attacker) {
@@ -8438,12 +8641,49 @@ public final class ArcadePortManager implements Listener {
     }
 
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onEvolutionChickenDoubleJump(PlayerToggleFlightEvent event) {
+        Session session = active;
+        Player player = event.getPlayer();
+        if (session == null || session.type != ArcadePortGame.EVOLUTION
+                || player.getWorld() != session.world
+                || !session.alive.contains(player.getUniqueId())
+                || session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) != 4
+                || session.evolving.contains(player.getUniqueId())) return;
+        event.setCancelled(true);
+        player.setFlying(false);
+        UUID id = player.getUniqueId();
+        if (!session.evolutionChickenJumpUsed.add(id)) {
+            player.setAllowFlight(false);
+            return;
+        }
+        player.setAllowFlight(false);
+        Vector direction = player.getLocation().getDirection().normalize().multiply(
+                ArcadePortRules.EVOLUTION_CHICKEN_DOUBLE_JUMP_HORIZONTAL);
+        direction.setY(ArcadePortRules.EVOLUTION_CHICKEN_DOUBLE_JUMP_VERTICAL);
+        player.setVelocity(direction);
+        player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 12,
+                0.25D, 0.2D, 0.25D, 0.05D);
+        player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.8F, 1.5F);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onEvolutionGolemKnockback(EntityKnockbackEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.EVOLUTION
+                || !(event.getEntity() instanceof Player player)
+                || player.getWorld() != session.world
+                || session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) != 0) return;
+        event.setKnockback(event.getKnockback().multiply(0.5D));
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onQuiverBowShoot(EntityShootBowEvent event) {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
-                || !(event.getEntity() instanceof Player player)
-                || !"enchanter".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))
+                || !(event.getEntity() instanceof Player player)) return;
+        session.quiverUsedBow.add(player.getUniqueId());
+        if (!"enchanter".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))
                 || !(event.getProjectile() instanceof Arrow arrow)) return;
         session.quiverArrowBounces.put(arrow.getUniqueId(), ArcadePortRules.QUIVER_MAX_ARROW_BOUNCES);
     }
@@ -8483,6 +8723,34 @@ public final class ArcadePortManager implements Listener {
             session.entities.remove(sulphurBomb);
             sulphurBomb.remove();
             resolveEvolutionSulphurBomb(session, shooter, impact);
+            return;
+        }
+        if (session.type == ArcadePortGame.EVOLUTION
+                && event.getEntity() instanceof Snowball flame
+                && session.evolutionFlameProjectiles.remove(flame.getUniqueId())) {
+            Player shooter = flame.getShooter() instanceof Player player ? player : null;
+            session.entities.remove(flame);
+            flame.remove();
+            if (shooter != null && event.getHitEntity() instanceof Player target
+                    && !shooter.equals(target) && session.alive.contains(shooter.getUniqueId())
+                    && session.alive.contains(target.getUniqueId())) {
+                hitEvolutionAbilityTarget(session, shooter, target, 1.0D, 0.45D, "Flamethrower");
+                if (target.isOnline() && session.alive.contains(target.getUniqueId())) {
+                    target.setFireTicks(Math.max(target.getFireTicks(), 30));
+                }
+            }
+            return;
+        }
+        if (session.type == ArcadePortGame.EVOLUTION
+                && event.getEntity() instanceof Egg egg
+                && egg.getShooter() instanceof Player shooter
+                && session.evolutionLevels.getOrDefault(shooter.getUniqueId(), 0) == 4) {
+            session.entities.remove(egg);
+            if (event.getHitEntity() instanceof Player target && !shooter.equals(target)) {
+                hitEvolutionAbilityTarget(session, shooter, target,
+                        ArcadePortRules.EVOLUTION_EGG_DAMAGE, 0.3D, "Egg Launch");
+            }
+            egg.remove();
             return;
         }
 
@@ -8930,43 +9198,35 @@ public final class ArcadePortManager implements Listener {
             throwBombLobbersTnt(session, player);
             return;
         }
-        if (session.type == ArcadePortGame.EVOLUTION
-                && ArcadePortRules.canUseEvolutionSulphurBomb(
-                        session.evolutionLevels.getOrDefault(player.getUniqueId(), 0),
-                        event.getAction().isRightClick(), item == Material.COAL)) {
-            event.setCancelled(true);
-            throwEvolutionSulphurBomb(session, player);
-        } else if (session.type == ArcadePortGame.EVOLUTION
-                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 1 && item == Material.FIRE_CHARGE) {
-            event.setCancelled(true);
-            consumeHeld(player);
-            Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.0D));
-            Fireball fireball = session.world.spawn(spawn, Fireball.class);
-            fireball.setShooter(player);
-            fireball.setYield(0.0F);
-            fireball.setIsIncendiary(false);
-            fireball.setVelocity(player.getLocation().getDirection().multiply(0.75D));
-            session.entities.add(fireball);
-        } else if (session.type == ArcadePortGame.EVOLUTION
-                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 3 && item == Material.SLIME_BALL) {
-            event.setCancelled(true);
-            consumeHeld(player);
-            player.setVelocity(player.getLocation().getDirection().multiply(1.15D).setY(0.85D));
-            player.getWorld().spawnParticle(Particle.ITEM_SLIME, player.getLocation(), 12, 0.35D, 0.25D, 0.35D, 0.08D);
-            player.playSound(player.getLocation(), Sound.ENTITY_SLIME_JUMP, 1.0F, 1.25F);
-        } else if (session.type == ArcadePortGame.EVOLUTION
-                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 4 && item == Material.FEATHER) {
-            event.setCancelled(true);
-            if (inventoryCount(player, Material.EGG) <= 0) {
-                player.sendMessage(ChatColor.YELLOW + "You need an egg to use Egg Launch.");
+        if (session.type == ArcadePortGame.EVOLUTION && event.getAction().isRightClick()) {
+            int level = session.evolutionLevels.getOrDefault(player.getUniqueId(), 0);
+            if (level == 0 && item == Material.IRON_INGOT) {
+                event.setCancelled(true);
+                startEvolutionGolemSlam(session, player, System.currentTimeMillis());
                 return;
             }
-            consumeOne(player, Material.EGG);
-            Egg egg = player.launchProjectile(Egg.class);
-            egg.setVelocity(player.getEyeLocation().getDirection().multiply(1.35D));
-            session.entities.add(egg);
-            player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.9F, 1.0F);
-        } else if (session.type == ArcadePortGame.RUNNER && item == Material.FEATHER) {
+            if (level == 1 && item == Material.BLAZE_ROD) {
+                event.setCancelled(true);
+                startEvolutionFlamethrower(session, player, System.currentTimeMillis());
+                return;
+            }
+            if (level == 2 && item == Material.COAL) {
+                event.setCancelled(true);
+                throwEvolutionSulphurBomb(session, player);
+                return;
+            }
+            if (level == 3 && item == Material.SLIME_BALL) {
+                event.setCancelled(true);
+                startEvolutionSlimeSlam(session, player, System.currentTimeMillis());
+                return;
+            }
+            if (level == 4 && item == Material.FEATHER) {
+                event.setCancelled(true);
+                startEvolutionChickenEgg(player);
+                return;
+            }
+        }
+        if (session.type == ArcadePortGame.RUNNER && item == Material.FEATHER) {
             event.setCancelled(true);
             consumeHeld(player);
             player.setVelocity(player.getLocation().getDirection().multiply(1.0D).setY(0.45D));
@@ -10503,6 +10763,16 @@ public final class ArcadePortManager implements Listener {
             session.evolutionKillsAtAttempt.remove(id);
             session.evolutionOverkillEligible.remove(id);
             session.evolutionSulphurBombReadyAt.remove(id);
+            session.evolutionGolemSlamReadyAt.remove(id);
+            session.evolutionGolemSlamStartedAt.remove(id);
+            session.evolutionBlazeReadyAt.remove(id);
+            session.evolutionBlazeActiveUntil.remove(id);
+            session.evolutionBlazeNextShotAt.remove(id);
+            session.evolutionSlimeSlamReadyAt.remove(id);
+            session.evolutionSlimeSlamStartedAt.remove(id);
+            session.evolutionSlimeSlamActive.remove(id);
+            session.evolutionChickenJumpUsed.remove(id);
+            session.evolutionWaterDamageReadyAt.remove(id);
             session.evolutionDamageContributors.remove(id);
             for (Map<UUID, Long> contributors : session.evolutionDamageContributors.values()) {
                 contributors.remove(id);
@@ -10583,6 +10853,17 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> evolutionEggNextParticleAt = new HashMap<>();
         final Set<UUID> evolutionSulphurBombs = new HashSet<>();
         final Map<UUID, Long> evolutionSulphurBombReadyAt = new HashMap<>();
+        final Map<UUID, Long> evolutionGolemSlamReadyAt = new HashMap<>();
+        final Map<UUID, Long> evolutionGolemSlamStartedAt = new HashMap<>();
+        final Map<UUID, Long> evolutionBlazeReadyAt = new HashMap<>();
+        final Map<UUID, Long> evolutionBlazeActiveUntil = new HashMap<>();
+        final Map<UUID, Long> evolutionBlazeNextShotAt = new HashMap<>();
+        final Set<UUID> evolutionFlameProjectiles = new HashSet<>();
+        final Map<UUID, Long> evolutionSlimeSlamReadyAt = new HashMap<>();
+        final Map<UUID, Long> evolutionSlimeSlamStartedAt = new HashMap<>();
+        final Set<UUID> evolutionSlimeSlamActive = new HashSet<>();
+        final Set<UUID> evolutionChickenJumpUsed = new HashSet<>();
+        final Map<UUID, Long> evolutionWaterDamageReadyAt = new HashMap<>();
         final Map<UUID, Integer> gladiatorPairs = new HashMap<>();
         final Set<Integer> gladiatorResolvedPairs = new HashSet<>();
         int gladiatorRound = -1;
@@ -10686,6 +10967,9 @@ public final class ArcadePortManager implements Listener {
         boolean microCrumbleScanComplete;
         final Map<UUID, String> quiverKits = new HashMap<>();
         final Map<UUID, Integer> quiverArrowBounces = new HashMap<>();
+        final Map<UUID, Integer> quiverKillStreaks = new HashMap<>();
+        final Map<UUID, Integer> quiverFistKills = new HashMap<>();
+        final Set<UUID> quiverUsedBow = new HashSet<>();
         final Set<UUID> quiverLeapAwaitingLanding = new HashSet<>();
         final Map<UUID, Long> quiverCloakedUntil = new HashMap<>();
         final Map<UUID, Long> quiverGroundPoundReadyAt = new HashMap<>();
