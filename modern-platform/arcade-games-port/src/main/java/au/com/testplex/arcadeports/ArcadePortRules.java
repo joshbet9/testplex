@@ -1677,7 +1677,7 @@ public final class ArcadePortRules {
 
     /** Reborn DamageManager.WeaponDamage defaults to one point for non-weapons. */
     public static double microBattlesMeleeDamage(Material weapon) {
-        if (weapon == null || weapon.isAir()) return 1.0D;
+        if (weapon == null || weapon == Material.AIR) return 1.0D;
         String name = weapon.name();
         if (!name.endsWith("_SWORD") && !name.endsWith("_AXE")) return 1.0D;
         int damage = 6;
