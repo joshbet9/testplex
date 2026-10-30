@@ -1948,6 +1948,12 @@ public final class ArcadePortManager implements Listener {
             session.gladiatorRoundStartedAtByPair.clear();
             session.gladiatorNextPoisonAtByPair.clear();
             session.gladiatorWinnerBracketStarted = false;
+            session.gladiatorLoserBracketStarted = false;
+            session.gladiatorWinnerArenaCursor = 0;
+            session.gladiatorLoserArenaCursor = 0;
+            session.gladiatorPairCount = 0;
+            session.gladiatorUsedBow.clear();
+            session.gladiatorUsedRod.clear();
             session.gladiatorNextPairId = 0;
             for (Player player : advancing) {
                 if (player != null && player.isOnline()) {
@@ -6503,8 +6509,14 @@ public final class ArcadePortManager implements Listener {
                 if (opponent != null && session.alive.contains(opponentId)) {
                     opponent.setGameMode(GameMode.SPECTATOR);
                     opponent.getInventory().clear();
-                    if (bracket == GLADIATOR_BRACKET_LOSERS) session.gladiatorLoserQueue.add(opponentId);
-                    else session.gladiatorWinnerQueue.add(opponentId);
+                    if (bracket == GLADIATOR_BRACKET_LOSERS) {
+                        session.gladiatorLoserQueue.add(opponentId);
+                        recordGladiatorsLoserBracketWin(opponent);
+                        opponent.sendMessage(ChatColor.GREEN + "Your opponent forfeited. Loser's bracket win recorded.");
+                    } else {
+                        session.gladiatorWinnerQueue.add(opponentId);
+                        opponent.sendMessage(ChatColor.GREEN + "Your opponent forfeited. You advanced in the winners' bracket.");
+                    }
                 }
             }
         }
