@@ -6339,18 +6339,8 @@ public final class ArcadePortManager implements Listener {
                     .filter(p -> !session.tagged.contains(p.getUniqueId()))
                     .toList();
             if (ArcadePortRules.shouldFinishDeathTagRound(runners.size(), session.participantsAtStart)) {
-                Player winner;
-                if (runners.size() == 1) {
-                    winner = runners.get(0);
-                } else if (ArcadePortRules.deathTagChasersWinRound(runners.size())) {
-                    winner = alivePlayers(session).stream()
-                            .filter(player -> session.tagged.contains(player.getUniqueId()))
-                            .max(java.util.Comparator.comparingInt(player ->
-                                    session.scores.getOrDefault(player.getUniqueId(), 0)))
-                            .orElse(null);
-                } else {
-                    winner = null;
-                }
+                // Source getWinners() only returns the Runners' placements.
+                Player winner = runners.size() == 1 ? runners.get(0) : null;
                 finish(session, winner, true);
             }
             return;
@@ -7058,22 +7048,11 @@ public final class ArcadePortManager implements Listener {
             List<Player> runners = alivePlayers(session).stream()
                     .filter(player -> !session.tagged.contains(player.getUniqueId()))
                     .toList();
-            if (ArcadePortRules.shouldDeathTagRunnerWinTimeout(runners.size())) {
-                return runners.stream()
-                        .max(java.util.Comparator.comparingInt(player ->
-                                session.scores.getOrDefault(player.getUniqueId(), 0)))
-                        .orElse(null);
-            }
-            List<Player> chasers = alivePlayers(session).stream()
-                    .filter(player -> session.tagged.contains(player.getUniqueId()))
-                    .toList();
-            if (!chasers.isEmpty()) {
-                return chasers.stream()
-                        .max(java.util.Comparator.comparingInt(player ->
-                                session.scores.getOrDefault(player.getUniqueId(), 0)))
-                        .orElse(null);
-            }
-            return null;
+            if (!ArcadePortRules.deathTagHasRunnerWinner(runners.size())) return null;
+            return runners.stream()
+                    .max(java.util.Comparator.comparingInt(player ->
+                            session.scores.getOrDefault(player.getUniqueId(), 0)))
+                    .orElse(null);
         }
         int team = -1;
         if (session.type == ArcadePortGame.TURF_WARS) {
