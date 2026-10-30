@@ -19,6 +19,7 @@ import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.BlockState;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Arrow;
@@ -2832,6 +2833,7 @@ public final class ArcadePortManager implements Listener {
             updateRunnerKits(session, now);
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+            updateDragonEscapeSafeLocations(session);
             updateDragonEscapeResources(session, now);
             updateDragonEscapeMines(session);
             updateDragonEscapeChase(session);
@@ -4187,46 +4189,101 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Your Warper pearl has already been used.");
             return;
         }
-        int progress = dragonEscapePlayerProgress(session, player);
-        Player ahead = alivePlayers(session).stream()
-                .filter(candidate -> !candidate.getUniqueId().equals(id))
-                .filter(candidate -> dragonEscapePlayerProgress(session, candidate) > progress)
-                .min(java.util.Comparator.comparingInt(candidate -> dragonEscapePlayerProgress(session, candidate)))
-                .orElse(null);
+        Player ahead = dragonEscapeNextRankedPlayerAhead(session, player);
         if (ahead == null) {
             player.sendMessage(ChatColor.YELLOW + "There is no player ahead of you to warp to.");
             return;
         }
-        Location destination = ahead.getLocation().clone().add(0.0D, 0.15D, 0.0D);
+        Location safeLocation = session.dragonEscapeSafeLocations.get(ahead.getUniqueId());
+        if (safeLocation == null || safeLocation.getWorld() != session.world) {
+            safeLocation = ahead.getLocation();
+        }
+        Location destination = safeLocation.clone().add(0.0D, 0.5D, 0.0D);
         if (!player.teleport(destination)) {
             player.sendMessage(ChatColor.RED + "The warp failed; your pearl has been kept.");
             return;
         }
         consumeHeld(player);
         session.dragonEscapeWarperUsed.add(id);
+        session.dragonEscapeWarpedAt.put(id, System.currentTimeMillis());
         session.lastLocations.put(id, destination.clone());
+        player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+        player.setFallDistance(0.0F);
         player.playSound(destination, Sound.ENTITY_ENDERMAN_TELEPORT, 0.9F, 1.2F);
         player.getWorld().spawnParticle(Particle.PORTAL, destination, 24, 0.3D, 0.5D, 0.3D, 0.2D);
         player.sendMessage(ChatColor.LIGHT_PURPLE + "Warped to " + ahead.getName() + "!");
+    }
+
+    /** Reborn ranks by checkpoint score and distance, then warps to the next higher-ranked live racer. */
+    private Player dragonEscapeNextRankedPlayerAhead(Session session, Player player) {
+        List<Player> ranked = new ArrayList<>(alivePlayers(session));
+        Map<UUID, Double> scores = new HashMap<>();
+        for (Player racer : ranked) {
+            int progress = dragonEscapePlayerProgress(session, racer);
+            double distance = 0.0D;
+            if (!session.dragonEscapeWaypoints.isEmpty()) {
+                int next = Math.min(session.dragonEscapeWaypoints.size() - 1,
+                        Math.max(0, progress + 1));
+                distance = racer.getLocation().distance(session.dragonEscapeWaypoints.get(next));
+            }
+            scores.put(racer.getUniqueId(), progress * 10_000.0D - distance);
+        }
+        ranked.sort((left, right) -> {
+            int byScore = Double.compare(scores.get(right.getUniqueId()), scores.get(left.getUniqueId()));
+            return byScore != 0 ? byScore : left.getName().compareToIgnoreCase(right.getName());
+        });
+        int ownRank = ranked.indexOf(player);
+        return ownRank > 0 ? ranked.get(ownRank - 1) : null;
     }
 
     private int dragonEscapePlayerProgress(Session session, Player player) {
         if (!session.dragonEscapeWaypoints.isEmpty()) {
             UUID id = player.getUniqueId();
             int previousProgress = session.dragonEscapePlayerProgress.getOrDefault(id, 0);
+            int observedIndex = getClosestDragonEscapeWaypointIndex(session, player.getLocation());
+            int previousObserved = session.dragonEscapeObservedWaypoint.getOrDefault(id, previousProgress);
+            int nextExpected = Math.min(session.dragonEscapeWaypoints.size() - 1,
+                    Math.max(0, previousObserved + 1));
+            double distanceToNext = player.getLocation().distance(session.dragonEscapeWaypoints.get(nextExpected));
+            double distanceToObserved = player.getLocation().distance(session.dragonEscapeWaypoints.get(observedIndex));
+            long now = System.currentTimeMillis();
+            long warpedAt = session.dragonEscapeWarpedAt.getOrDefault(id, -1L);
+            if (ArcadePortRules.shouldRejectDragonEscapeShortcut(previousObserved, observedIndex,
+                    distanceToNext, distanceToObserved, now, warpedAt)) {
+                eliminate(session, player, null, "cheating");
+                return previousProgress;
+            }
+            session.dragonEscapeObservedWaypoint.put(id, Math.max(previousObserved, observedIndex));
             int candidate = getDragonEscapeWaypointIndex(session, player.getLocation(), previousProgress);
+            if (ArcadePortRules.isDragonEscapeWarpGraceActive(now, warpedAt)) {
+                candidate = Math.max(candidate, observedIndex);
+            }
             int progress = ArcadePortRules.monotonicDragonEscapeProgress(
                     previousProgress, candidate, session.dragonEscapeWaypoints.size());
             session.dragonEscapePlayerProgress.put(id, progress);
             Map<Integer, Long> runSplits = session.dragonEscapeRunSplitMillis.computeIfAbsent(id, ignored -> new HashMap<>());
             runSplits.putIfAbsent(0, 0L);
-            long elapsed = Math.max(0L, System.currentTimeMillis() - session.startedAt);
+            long elapsed = Math.max(0L, now - session.startedAt);
             for (int passed = previousProgress; passed < progress; passed++) {
                 runSplits.putIfAbsent(passed + 1, elapsed);
             }
             return progress;
         }
         return player.getLocation().getBlockZ();
+    }
+
+    private int getClosestDragonEscapeWaypointIndex(Session session, Location location) {
+        int bestIndex = 0;
+        double bestDistanceSquared = Double.POSITIVE_INFINITY;
+        if (location == null || location.getWorld() != session.world) return bestIndex;
+        for (int i = 0; i < session.dragonEscapeWaypoints.size(); i++) {
+            double distanceSquared = location.distanceSquared(session.dragonEscapeWaypoints.get(i));
+            if (distanceSquared < bestDistanceSquared) {
+                bestDistanceSquared = distanceSquared;
+                bestIndex = i;
+            }
+        }
+        return bestIndex;
     }
 
     private void throwDragonEscapeMine(Session session, Player player) {
@@ -4246,6 +4303,14 @@ public final class ArcadePortManager implements Listener {
         session.entities.add(mine);
         session.dragonEscapeMineOwners.put(mine.getUniqueId(), player.getUniqueId());
         player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.15F);
+    }
+
+    private void updateDragonEscapeSafeLocations(Session session) {
+        for (Player player : alivePlayers(session)) {
+            if (player.isOnGround()) {
+                session.dragonEscapeSafeLocations.put(player.getUniqueId(), player.getLocation().clone());
+            }
+        }
     }
 
     private void updateDragonEscapeResources(Session session, long now) {
@@ -4323,12 +4388,32 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Your Digger pickaxe has no uses remaining.");
             return;
         }
+        long elapsed = Math.max(0L, System.currentTimeMillis() - session.startedAt);
+        if (ArcadePortRules.isDragonEscapeDiggerOpeningLocked(elapsed)) {
+            long seconds = (ArcadePortRules.DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS - elapsed + 999L) / 1_000L;
+            player.sendMessage(ChatColor.YELLOW + "You cannot dig for another " + seconds + " seconds.");
+            return;
+        }
         if (!isDragonEscapeDiggerBlockAllowed(block.getType())
                 || !isDragonEscapeDiggerBuildLocationAllowed(session, block)
                 || block.getState() instanceof org.bukkit.block.Container) return;
+
+        Location center = block.getLocation().add(0.5D, 0.5D, 0.5D);
+        Location above = block.getLocation().add(0.5D, 1.0D, 0.5D);
+        for (Player other : alivePlayers(session)) {
+            if (other.getUniqueId().equals(id)) continue;
+            if (ArcadePortRules.shouldPreventDragonEscapeDigger(
+                    center.distance(other.getLocation()), above.distance(other.getLocation()))) {
+                player.sendMessage(ChatColor.YELLOW + "You cannot dig while another racer is that close to the block.");
+                return;
+            }
+        }
+
+        BlockState originalState = block.getState();
         Material mined = block.getType();
         Location dropLocation = block.getLocation().add(0.5D, 0.5D, 0.5D);
         block.setType(Material.AIR, false);
+        scheduleDragonEscapeBlockRestore(session, originalState, block.getBlockData().clone());
         Map<Integer, ItemStack> overflow = player.getInventory().addItem(new ItemStack(mined, 1));
         for (ItemStack leftover : overflow.values()) player.getWorld().dropItemNaturally(dropLocation, leftover);
         remaining--;
@@ -4340,6 +4425,21 @@ public final class ArcadePortManager implements Listener {
                     "Left-click course blocks to recover and place as shortcuts (" + remaining + " digs left)."));
         }
         player.playSound(dropLocation, Sound.BLOCK_STONE_BREAK, 0.75F, 1.2F);
+    }
+
+    private void scheduleDragonEscapeBlockRestore(Session session, BlockState previousState, BlockData expectedCurrent) {
+        Block block = previousState.getBlock();
+        String key = block.getWorld().getUID() + ":" + block.getX() + ":" + block.getY() + ":" + block.getZ();
+        long token = ++session.dragonEscapeBlockRestoreSequence;
+        session.dragonEscapeBlockRestoreTokens.put(key, token);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!session.dragonEscapeBlockRestoreTokens.remove(key, token)) return;
+            World world = block.getWorld();
+            if (!world.isChunkLoaded(block.getX() >> 4, block.getZ() >> 4)) return;
+            Block current = world.getBlockAt(block.getX(), block.getY(), block.getZ());
+            if (!current.getBlockData().matches(expectedCurrent)) return;
+            previousState.update(true, false);
+        }, ArcadePortRules.DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS);
     }
 
     private float dragonEscapePitch(Vector vector) {
@@ -8211,7 +8311,13 @@ public final class ArcadePortManager implements Listener {
                     && "digger".equals(session.dragonEscapeKits.getOrDefault(player.getUniqueId(), "jumper"))
                     && isDragonEscapeDiggerBlockAllowed(placed.getType())
                     && isDragonEscapeDiggerBuildLocationAllowed(session, placed);
-            if (!allowed) event.setCancelled(true);
+            if (!allowed) {
+                event.setCancelled(true);
+            } else {
+                BlockState replacedState = event.getBlockReplacedState();
+                BlockData placedData = placed.getBlockData().clone();
+                scheduleDragonEscapeBlockRestore(session, replacedState, placedData);
+            }
             return;
         }
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
@@ -9684,6 +9790,11 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> dragonEscapeDiggerUsesRemaining = new HashMap<>();
         final Map<UUID, Long> dragonEscapeNextTntAt = new HashMap<>();
         final Set<UUID> dragonEscapeWarperUsed = new HashSet<>();
+        final Map<UUID, Location> dragonEscapeSafeLocations = new HashMap<>();
+        final Map<UUID, Long> dragonEscapeWarpedAt = new HashMap<>();
+        final Map<UUID, Integer> dragonEscapeObservedWaypoint = new HashMap<>();
+        final Map<String, Long> dragonEscapeBlockRestoreTokens = new HashMap<>();
+        long dragonEscapeBlockRestoreSequence;
         final Map<UUID, UUID> dragonEscapeMineOwners = new HashMap<>();
         String dragonEscapeMapName = "";
         String dragonEscapeMapResource;

@@ -1308,6 +1308,25 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(Double.NaN, 0.0D, 1.0D));
     }
 
+    @Test void dragonEscapeDiggerHonoursOpeningLockoutProximityAndSourceRestoreWindow() {
+        assertTrue(ArcadePortRules.isDragonEscapeDiggerOpeningLocked(0L));
+        assertTrue(ArcadePortRules.isDragonEscapeDiggerOpeningLocked(9_999L));
+        assertFalse(ArcadePortRules.isDragonEscapeDiggerOpeningLocked(10_000L));
+        assertTrue(ArcadePortRules.shouldPreventDragonEscapeDigger(1.49D, 20.0D));
+        assertTrue(ArcadePortRules.shouldPreventDragonEscapeDigger(20.0D, 1.49D));
+        assertFalse(ArcadePortRules.shouldPreventDragonEscapeDigger(1.5D, 20.0D));
+        assertEquals(2_400, ArcadePortRules.DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS);
+    }
+
+    @Test void dragonEscapeWarperUsesOneSecondShortcutGraceWithoutPunishingCloseSwitchbacks() {
+        assertFalse(ArcadePortRules.shouldRejectDragonEscapeShortcut(2, 5, 2.0D, 0.0D, 2_000L, -1L));
+        assertFalse(ArcadePortRules.shouldRejectDragonEscapeShortcut(2, 5, 10.0D, 0.0D, 1_999L, 1_000L));
+        assertTrue(ArcadePortRules.shouldRejectDragonEscapeShortcut(2, 5, 10.0D, 0.0D, 2_000L, 1_000L));
+        assertFalse(ArcadePortRules.shouldRejectDragonEscapeShortcut(2, 4, 10.0D, 0.0D, 2_000L, -1L));
+        assertTrue(ArcadePortRules.isDragonEscapeWarpGraceActive(1_999L, 1_000L));
+        assertFalse(ArcadePortRules.isDragonEscapeWarpGraceActive(2_000L, 1_000L));
+    }
+
     @Test void dragonEscapeDisruptorRechargesAtTheSourceEightSecondRate() {
         assertEquals(8_000L, ArcadePortRules.dragonEscapeNextTntChargeAt(0L));
         assertEquals(23_000L, ArcadePortRules.dragonEscapeNextTntChargeAt(15_000L));

@@ -394,6 +394,37 @@ public final class ArcadePortRules {
         return thrownAtMillis + DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS;
     }
 
+    public static boolean isDragonEscapeDiggerOpeningLocked(long elapsedMillis) {
+        return elapsedMillis < DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS;
+    }
+
+    public static boolean shouldPreventDragonEscapeDigger(double distanceToBlockCenter, double distanceAboveBlock) {
+        return (Double.isFinite(distanceToBlockCenter)
+                && distanceToBlockCenter >= 0.0D
+                && distanceToBlockCenter < DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS)
+                || (Double.isFinite(distanceAboveBlock)
+                && distanceAboveBlock >= 0.0D
+                && distanceAboveBlock < DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS);
+    }
+
+    public static boolean isDragonEscapeWarpGraceActive(long nowMillis, long warpedAtMillis) {
+        return warpedAtMillis >= 0L && nowMillis >= warpedAtMillis
+                && nowMillis - warpedAtMillis < DRAGON_ESCAPE_WARPER_GRACE_MILLIS;
+    }
+
+    /**
+     * Detect a real three-checkpoint skip but do not punish players near a tight
+     * authored switchback where the next sequential checkpoint is also reachable.
+     */
+    public static boolean shouldRejectDragonEscapeShortcut(int previousNode, int observedNode,
+            double distanceToNextWaypoint, double distanceToObservedWaypoint, long nowMillis, long warpedAtMillis) {
+        if (observedNode - previousNode < 3
+                || !Double.isFinite(distanceToNextWaypoint) || distanceToNextWaypoint < 0.0D
+                || !Double.isFinite(distanceToObservedWaypoint) || distanceToObservedWaypoint < 0.0D) return false;
+        if (distanceToNextWaypoint <= 3.0D || distanceToObservedWaypoint > 3.0D) return false;
+        return !isDragonEscapeWarpGraceActive(nowMillis, warpedAtMillis);
+    }
+
     public static double dragonEscapeSpeedMultiplier(double greenMarkerX) {
         return Double.isFinite(greenMarkerX) ? greenMarkerX / 100.0D : 1.0D;
     }
@@ -415,6 +446,10 @@ public final class ArcadePortRules {
     }
 
     public static final int DRAGON_ESCAPE_DIGGER_MAX_USES = 6;
+    public static final long DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS = 10_000L;
+    public static final int DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS = 2_400;
+    public static final double DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS = 1.5D;
+    public static final long DRAGON_ESCAPE_WARPER_GRACE_MILLIS = 1_000L;
     public static final int DRAGON_ESCAPE_DISRUPTOR_MAX_TNT = 2;
     public static final long DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS = 8_000L;
     public static final long DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS = 8_000L;
