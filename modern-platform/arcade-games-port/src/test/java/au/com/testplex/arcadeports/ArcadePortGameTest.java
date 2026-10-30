@@ -1264,6 +1264,22 @@ class ArcadePortGameTest {
         assertEquals(0.5D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y, 0.00001D);
     }
 
+    @Test void dragonEscapeSourceMapBoundsUseInclusiveWorldDataLimits() {
+        int minX = -100, maxX = 100, minZ = -80, maxZ = 80, minY = 20, maxY = 130;
+        assertTrue(ArcadePortRules.isOutsideDragonEscapeMapBounds(-100.0D, 64.0D, 0.0D,
+                minX, maxX, minZ, maxZ, true, minY, maxY));
+        assertTrue(ArcadePortRules.isOutsideDragonEscapeMapBounds(101.0D, 64.0D, 0.0D,
+                minX, maxX, minZ, maxZ, true, minY, maxY));
+        assertTrue(ArcadePortRules.isOutsideDragonEscapeMapBounds(0.0D, 64.0D, -80.0D,
+                minX, maxX, minZ, maxZ, true, minY, maxY));
+        assertTrue(ArcadePortRules.isOutsideDragonEscapeMapBounds(0.0D, 131.0D, 0.0D,
+                minX, maxX, minZ, maxZ, true, minY, maxY));
+        assertFalse(ArcadePortRules.isOutsideDragonEscapeMapBounds(-99.999D, 64.0D, 80.999D,
+                minX, maxX, minZ, maxZ, true, minY, maxY));
+        assertFalse(ArcadePortRules.isOutsideDragonEscapeMapBounds(0.0D, -500.0D, 0.0D,
+                minX, maxX, minZ, maxZ, false, minY, maxY));
+    }
+
     @Test void sourceMapFallThresholdUsesVerticalBoundsInsteadOfFixedY58() {
         assertEquals(3.0D, ArcadePortRules.sourceMapVoidThresholdY(true, 4), 0.00001D);
         assertEquals(13.0D, ArcadePortRules.sourceMapVoidThresholdY(true, 14), 0.00001D);

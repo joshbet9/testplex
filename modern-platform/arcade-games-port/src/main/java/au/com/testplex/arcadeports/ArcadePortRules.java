@@ -1363,6 +1363,19 @@ public final class ArcadePortRules {
         return hasVerticalBounds ? Math.max(0.0D, mapMinY - 1.0D) : 58.0D;
     }
 
+    /**
+     * Reborn WorldData bounds are inclusive block coordinates: locations at/below
+     * MinX/MinZ/MinY or at/above MaxX+1/MaxZ+1/MaxY+1 are outside the map.
+     */
+    public static boolean isOutsideDragonEscapeMapBounds(
+            double x, double y, double z, int minX, int maxX, int minZ, int maxZ,
+            boolean hasVerticalBounds, int minY, int maxY) {
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)
+                || x <= minX || x >= maxX + 1.0D
+                || z <= minZ || z >= maxZ + 1.0D) return true;
+        return hasVerticalBounds && (y <= minY || y >= maxY + 1.0D);
+    }
+
     /** Fall limits below the minimum authored play surface for known low-altitude Dragon Escape maps. */
     public static double dragonEscapeVoidThresholdY(String mapName) {
         String name = mapName == null ? "" : mapName.toLowerCase(java.util.Locale.ROOT);

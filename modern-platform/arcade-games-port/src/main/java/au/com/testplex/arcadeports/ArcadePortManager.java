@@ -4600,6 +4600,11 @@ public final class ArcadePortManager implements Listener {
     private void updateDragonEscapeChase(Session session) {
         EnderDragon dragon = session.dragonEscapeDragon;
         if (active != session || dragon == null || !dragon.isValid() || dragon.isDead()) return;
+        // Reborn enforces WorldBoundary on its FAST update even when a player is not moving.
+        for (Player racer : new ArrayList<>(alivePlayers(session))) {
+            checkPlayerArena(session, racer);
+            if (active != session) return;
+        }
         Location location = dragon.getLocation();
         if (!session.dragonEscapeWaypoints.isEmpty()) {
             int dragonCandidate = getDragonEscapeWaypointIndex(
@@ -7154,6 +7159,15 @@ public final class ArcadePortManager implements Listener {
             voidThresholdY = ArcadePortRules.sourceMapVoidThresholdY(true, sourceMap.minY());
         } else {
             voidThresholdY = ArcadePortRules.sourceMapVoidThresholdY(false, 0);
+        }
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE && sourceMap != null
+                && sourceMap.hasBounds()
+                && ArcadePortRules.isOutsideDragonEscapeMapBounds(
+                        location.getX(), location.getY(), location.getZ(),
+                        sourceMap.minX(), sourceMap.maxX(), sourceMap.minZ(), sourceMap.maxZ(),
+                        sourceMap.hasVerticalBounds(), sourceMap.minY(), sourceMap.maxY())) {
+            eliminate(session, player, null, "left the playable map area");
+            return;
         }
         if (location.getY() < voidThresholdY) {
             eliminate(session, player, null, "fell from the arena");
