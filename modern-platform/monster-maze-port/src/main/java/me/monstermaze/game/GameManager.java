@@ -64,7 +64,6 @@ public class GameManager implements Listener {
     private final KitManager kitManager;
     private final StatTracker stats;
     private final GameScoreboard scoreboard = new GameScoreboard();
-    private final LeaderboardBoard leaderboardBoard;
     private final PlayerFeedback feedback;
 
     private GameState state = GameState.IDLE;
@@ -113,7 +112,6 @@ public class GameManager implements Listener {
         this.monsterManager = new MonsterManager(plugin, this);
         this.kitManager = new KitManager(plugin, this, scoreboard);
         this.stats = new StatTracker(this, plugin);
-        this.leaderboardBoard = new LeaderboardBoard(plugin);
         this.feedback = new PlayerFeedback(plugin, this);
         Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
         new ArenaListener(plugin, this);
@@ -129,8 +127,6 @@ public class GameManager implements Listener {
         this.center = loc.clone();
         // Testplex owns the only lobby. Store only the arena origin here.
         mazeGenerator.setArenaCenter(center);
-        kitManager.clearSelectors();
-        leaderboardBoard.clear(List.of());
     }
 
     /** Call on enable: void spawn becomes lobby center. */
@@ -138,8 +134,6 @@ public class GameManager implements Listener {
         if (voidSpawn == null) return;
         this.center = voidSpawn.clone();
         mazeGenerator.setArenaCenter(center);
-        kitManager.clearSelectors();
-        leaderboardBoard.clear(List.of());
     }
 
     public Location getLobbySpawn() {
@@ -388,8 +382,6 @@ public void startGame(Location preferCenter, int requestedPattern) {
         if (startingTask != null) { startingTask.cancel(); startingTask = null; }
         liveStartMs = System.currentTimeMillis();
         mazeGenerator.dropContainment();
-        kitManager.clearSelectors();
-        leaderboardBoard.clear();
         for (Player p : getAlivePlayers()) p.closeInventory();
 
         titleArenaPlayers("", ChatColor.YELLOW + "" + ChatColor.BOLD + "Get to the Safe Pad!", 5, 40, 5);
@@ -451,7 +443,6 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
         monsterManager.stop();
         feedback.clear();
-        kitManager.clearSelectors();
         safePadNavigation.clear();
         padLockIns.clear();
         lastCompassTargets.clear();
