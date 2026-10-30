@@ -4110,6 +4110,44 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private boolean isSkyWarsTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta.hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+    }
+
+    private Player nearestSkyWarsTarget(Session session, Player player) {
+        return alivePlayers(session).stream()
+                .filter(target -> !target.getUniqueId().equals(player.getUniqueId()))
+                .min(java.util.Comparator.comparingDouble(target ->
+                        target.getLocation().distanceSquared(player.getLocation())))
+                .orElse(null);
+    }
+
+    private void updateSkyWarsCompass(Session session) {
+        if (session.ticks % 5 != 0) return;
+        for (Player player : session.players.values()) {
+            if (player == null || !player.isOnline() || player.getWorld() != session.world) continue;
+            Player target = nearestSkyWarsTarget(session, player);
+            if (target == null) continue;
+            if (!player.getInventory().contains(Material.COMPASS)) {
+                player.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
+                        "Tracks the nearest living player. Left-click to spectate when eliminated."));
+            }
+            player.setCompassTarget(target.getLocation());
+            if (isSkyWarsTrackingCompass(player.getInventory().getItemInMainHand())) {
+                double distance = Math.sqrt(player.getLocation().distanceSquared(target.getLocation()));
+                double height = target.getLocation().getY() - player.getLocation().getY();
+                player.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.YELLOW + target.getName()
+                        + ChatColor.WHITE + " | Distance: " + ChatColor.YELLOW
+                        + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                        + ChatColor.WHITE + " | Height: " + ChatColor.YELLOW
+                        + String.format(java.util.Locale.ROOT, "%.1f", height));
+            }
+        }
+    }
+
     private int skyWarsMetalArmorPieces(Player player) {
         int pieces = 0;
         for (ItemStack armor : player.getInventory().getArmorContents()) {
@@ -4502,7 +4540,7 @@ public final class ArcadePortManager implements Listener {
     private void dropSkyWarsInventory(Player player) {
         Location location = player.getLocation();
         for (ItemStack item : player.getInventory().getContents()) {
-            if (item != null && !item.getType().isAir()) {
+            if (item != null && !item.getType().isAir() && !isSkyWarsTrackingCompass(item)) {
                 location.getWorld().dropItemNaturally(location, item.clone());
             }
         }
@@ -4547,6 +4585,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.SKY_WARS) {
             updateSkyWarsGuardians(session);
             updateSkyWarsKits(session, now);
+            updateSkyWarsCompass(session);
             updateSkyWars(session, now);
         }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
@@ -11335,6 +11374,25 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.type == ArcadePortGame.SKY_WARS
+                && !session.alive.contains(player.getUniqueId())
+                && isSkyWarsTrackingCompass(heldItem)) {
+            event.setCancelled(true);
+            if (event.getAction().isLeftClick()) {
+                long now = System.currentTimeMillis();
+                long readyAt = session.skyWarsSpectatorTeleportAt.getOrDefault(player.getUniqueId(), 0L);
+                if (now < readyAt) return;
+                Player target = nearestSkyWarsTarget(session, player);
+                if (target != null) {
+                    player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                    player.setCompassTarget(target.getLocation());
+                    session.skyWarsSpectatorTeleportAt.put(player.getUniqueId(), now + 3_000L);
+                }
+            } else if (event.getAction().isRightClick()) {
+                player.sendMessage(ChatColor.YELLOW + "The SkyWars spectator compass tracks living players.");
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE
                 && !session.alive.contains(player.getUniqueId())
                 && isDragonEscapeTrackingCompass(heldItem)) {
@@ -11991,8 +12049,11 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDrop(PlayerDropItemEvent event) {
         Session session = active;
-        if (session != null && session.type != ArcadePortGame.SKY_WARS
-                && session.players.containsKey(event.getPlayer().getUniqueId())) event.setCancelled(true);
+        if (session == null || !session.players.containsKey(event.getPlayer().getUniqueId())) return;
+        if (session.type != ArcadePortGame.SKY_WARS
+                || isSkyWarsTrackingCompass(event.getItemDrop().getItemStack())) {
+            event.setCancelled(true);
+        }
     }
 
     private boolean isDragonProtectedKitItem(ItemStack item) {
@@ -13563,6 +13624,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> skyWarsKitReadyAt = new HashMap<>();
         final Map<UUID, Long> skyWarsNextDirtAt = new HashMap<>();
         final Map<UUID, Location> skyWarsSafeLocations = new HashMap<>();
+        final Map<UUID, Long> skyWarsSpectatorTeleportAt = new HashMap<>();
         final Map<Block, Long> skyWarsIceBridgeExpiresAt = new HashMap<>();
         final Map<Block, BlockData> skyWarsIceBridgeOriginals = new HashMap<>();
         final Map<UUID, UUID> skyWarsDirtProjectiles = new HashMap<>();
