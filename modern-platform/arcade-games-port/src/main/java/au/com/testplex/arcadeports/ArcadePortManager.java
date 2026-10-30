@@ -12295,6 +12295,7 @@ public final class ArcadePortManager implements Listener {
                 && !dragonsSparklerLeftClick && !spleefCompassLeftClick) return;
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
+        Material item = heldItem == null ? Material.AIR : heldItem.getType();
         if (event.isCancelled()) {
             boolean forceGladiatorHotbar = session.type == ArcadePortGame.GLADIATORS
                     && event.getAction().isRightClick() && heldItem != null && heldItem.hasItemMeta()
