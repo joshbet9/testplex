@@ -1116,8 +1116,9 @@ public final class ArcadePortManager implements Listener {
                         sheepQuestKitPreferences.getOrDefault(playerId,
                                 ArcadePortRules.normalizeSheepQuestKit(savedKit) == null
                                         ? "beserker" : ArcadePortRules.normalizeSheepQuestKit(savedKit)));
-                session.sheepFletcherNextArrowAt.put(playerId,
-                        now + ArcadePortRules.SHEEP_QUEST_ARCHER_FLETCHER_INTERVAL_MILLIS);
+                // Fletcher is instant on acquisition in the legacy kit; subsequent arrows
+                // recharge every two seconds, up to five held Fletched Arrows.
+                session.sheepFletcherNextArrowAt.put(playerId, now);
                 session.sheepBerserkerReadyAt.put(playerId, now);
             }
             if (type == ArcadePortGame.PAINTBALL) {
@@ -2675,7 +2676,8 @@ public final class ArcadePortManager implements Listener {
             case "brute" -> player.getInventory().setItem(0, new ItemStack(Material.IRON_SWORD));
             default -> player.getInventory().setItem(0, new ItemStack(Material.IRON_AXE));
         }
-        player.getInventory().setItem(2, namedItem(Material.SADDLE, "Hold This",
+        int saddleSlot = "archer".equals(kit) ? 2 : 1;
+        player.getInventory().setItem(saddleSlot, namedItem(Material.SADDLE, "Hold This",
                 "Hold to automatically pick up and carry up to three sheep."));
         player.setExp(0.0F);
         player.setAllowFlight(false);
@@ -6295,7 +6297,8 @@ public final class ArcadePortManager implements Listener {
             if (item != null && item.getType().name().endsWith("_WOOL")) carrier.getInventory().setItem(slot, null);
         }
         long cooldown = reason != null && reason.toLowerCase(java.util.Locale.ROOT).contains("hit")
-                ? 1_000L : ArcadePortRules.SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS;
+                ? 1_000L : reason != null && reason.toLowerCase(java.util.Locale.ROOT).contains("held item")
+                        ? 0L : ArcadePortRules.SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS;
         session.sheepNextPickupAt.put(carrierId, System.currentTimeMillis() + cooldown);
         carrier.sendMessage(ChatColor.RED + "You dropped your sheep!");
         carrier.playSound(carrier.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.0F);
@@ -6337,6 +6340,7 @@ public final class ArcadePortManager implements Listener {
         Entity top = sheepQuestTopPassenger(player);
         if (top == null || !top.addPassenger(sheep)) return false;
         session.sheepCarriers.put(sheep, id);
+        session.sheepHolders.put(sheep, id);
         sheep.setAI(false);
         sheep.setColor(owner >= 0 ? sheepTeamDyeColor(owner) : DyeColor.WHITE);
         session.sheepNextPickupAt.put(id,
@@ -6373,6 +6377,29 @@ public final class ArcadePortManager implements Listener {
         if (pen.isEmpty()) return sheepQuestPenCenter(session, team);
         Location marker = pen.get(ThreadLocalRandom.current().nextInt(pen.size())).clone();
         return marker.add(0.5D, 0.0D, 0.5D);
+    }
+
+    private void captureSheepQuestForTeam(Session session, Sheep sheep, int team) {
+        if (session == null || sheep == null || team < 0 || team > 3) return;
+        int previousOwner = session.sheepOwners.getOrDefault(sheep, -1);
+        if (previousOwner == team) return;
+        UUID holderId = session.sheepHolders.remove(sheep);
+        Player holder = holderId == null ? null : session.players.get(holderId);
+        session.sheepOwners.put(sheep, team);
+        sheep.setColor(sheepTeamDyeColor(team));
+        sheep.setAI(true);
+        sheep.teleport(randomSheepQuestPenLocation(session, team));
+        sheep.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+        if (holder != null && holder.isOnline()) {
+            session.scores.merge(holderId, 1, Integer::sum);
+            holder.playSound(holder.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.5F);
+            holder.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, holder.getLocation().add(0, 1, 0),
+                    12, 0.35D, 0.4D, 0.35D, 0.04D);
+            holder.sendMessage(ChatColor.GREEN + "You captured a sheep for " + sheepTeamName(team) + "!");
+        }
+        announce(session, (previousOwner < 0 ? ChatColor.GREEN + "Sheep captured for " :
+                ChatColor.YELLOW + "Sheep stolen for ") + sheepTeamChatColor(team) + sheepTeamName(team)
+                + ChatColor.WHITE + "!");
     }
 
     private void updateSheepQuestThrownEntities(Session session, long now) {
@@ -6439,25 +6466,9 @@ public final class ArcadePortManager implements Listener {
             int team = session.teams.getOrDefault(carrierId, -1);
             if (team < 0 || team > 3 || !isInsideSheepPen(session, sheep.getLocation(), team)) continue;
 
-            int previousOwner = session.sheepOwners.getOrDefault(sheep, -1);
             sheep.leaveVehicle();
             session.sheepCarriers.remove(sheep);
-            session.sheepOwners.put(sheep, team);
-            sheep.setColor(sheepTeamDyeColor(team));
-            sheep.setAI(true);
-            sheep.teleport(randomSheepQuestPenLocation(session, team));
-            sheep.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
-            if (previousOwner != team) {
-                session.scores.merge(carrierId, 1, Integer::sum);
-                carrier.playSound(carrier.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.5F);
-                carrier.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, carrier.getLocation().add(0, 1, 0),
-                        12, 0.35D, 0.4D, 0.35D, 0.04D);
-                announce(session, (previousOwner < 0 ? ChatColor.GREEN + "Sheep captured by " :
-                        ChatColor.YELLOW + "Sheep stolen by ") + carrier.getName() + " for "
-                        + sheepTeamChatColor(team) + sheepTeamName(team) + ChatColor.WHITE + "!");
-            } else {
-                carrier.sendMessage(ChatColor.GREEN + "Sheep returned to your team's pen.");
-            }
+            captureSheepQuestForTeam(session, sheep, team);
             updateSheepQuestCarryUi(session, carrier);
         }
 
@@ -6465,7 +6476,31 @@ public final class ArcadePortManager implements Listener {
             if (!sheep.isValid() || sheep.isInsideVehicle()
                     || session.sheepThrownBy.containsKey(sheep.getUniqueId())) continue;
             int owner = session.sheepOwners.getOrDefault(sheep, -1);
-            if (owner >= 0 && !isInsideSheepPen(session, sheep.getLocation(), owner)) {
+            if (owner < 0) {
+                // SheepData.Update calls GetTeamPen for every unheld sheep, so a loose
+                // sheep that physically reaches any pen is assigned to that team.
+                for (int team = 0; team < 4; team++) {
+                    if (isInsideSheepPen(session, sheep.getLocation(), team)) {
+                        captureSheepQuestForTeam(session, sheep, team);
+                        owner = team;
+                        break;
+                    }
+                }
+                if (owner < 0) {
+                    Location home = session.sheepHomes.get(sheep);
+                    if (home != null && sheep.getLocation().distanceSquared(home) > 196.0D) {
+                        Vector direction = home.toVector().subtract(sheep.getLocation().toVector());
+                        if (direction.lengthSquared() > 0.25D) {
+                            sheep.setAI(false);
+                            sheep.setVelocity(direction.normalize().multiply(0.28D).setY(0.12D));
+                        }
+                    } else {
+                        sheep.setAI(true);
+                    }
+                    continue;
+                }
+            }
+            if (!isInsideSheepPen(session, sheep.getLocation(), owner)) {
                 Location target = sheepQuestPenCenter(session, owner);
                 Vector direction = target.toVector().subtract(sheep.getLocation().toVector());
                 if (direction.lengthSquared() > 0.25D) {
@@ -6696,6 +6731,8 @@ public final class ArcadePortManager implements Listener {
         sheep.setRemoveWhenFarAway(false);
         session.sheep.add(sheep);
         session.sheepOwners.put(sheep, -1);
+        session.sheepHomes.put(sheep, sheep.getLocation().clone());
+        sheep.setCollidable(false);
         session.entities.add(sheep);
     }
 
@@ -7838,6 +7875,8 @@ public final class ArcadePortManager implements Listener {
         session.sheep.clear();
         session.sheepOwners.clear();
         session.sheepCarriers.clear();
+        session.sheepHolders.clear();
+        session.sheepHomes.clear();
         session.sheepThrownBy.clear();
         session.sheepThrownAt.clear();
         session.sheepArcherTrackedArrows.clear();
@@ -12003,6 +12042,8 @@ public final class ArcadePortManager implements Listener {
         final Set<Sheep> sheep = new HashSet<>();
         final Map<Sheep, Integer> sheepOwners = new HashMap<>();
         final Map<Sheep, UUID> sheepCarriers = new LinkedHashMap<>();
+        final Map<Sheep, UUID> sheepHolders = new HashMap<>();
+        final Map<Sheep, Location> sheepHomes = new HashMap<>();
         final Map<UUID, String> sheepQuestKits = new HashMap<>();
         final Map<UUID, Long> sheepNextPickupAt = new HashMap<>();
         final Map<UUID, Long> sheepBerserkerReadyAt = new HashMap<>();
