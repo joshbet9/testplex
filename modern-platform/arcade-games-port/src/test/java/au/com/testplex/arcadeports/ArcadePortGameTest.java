@@ -1602,6 +1602,20 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldEliminateGladiatorAfterLoss(3));
     }
 
+    @Test void gladiatorsLoserArenaContainsTheDuelFootprint() {
+        assertFalse(ArcadePortRules.isOutsideGladiatorsLoserArena(0.5D, 0.5D, 0.5D, 0.5D));
+        assertFalse(ArcadePortRules.isOutsideGladiatorsLoserArena(4.15D, -3.15D, 0.5D, 0.5D));
+        assertTrue(ArcadePortRules.isOutsideGladiatorsLoserArena(4.151D, 0.5D, 0.5D, 0.5D));
+        assertTrue(ArcadePortRules.isOutsideGladiatorsLoserArena(Double.NaN, 0.0D, 0.0D, 0.0D));
+    }
+
+    @Test void gladiatorsSourceMapBoundsUseInclusiveWorldConfigBlockCoordinates() {
+        assertFalse(ArcadePortRules.isOutsideGladiatorsSourceMap(-0.5D, 10.5D, -1, 20, 0, 30));
+        assertFalse(ArcadePortRules.isOutsideGladiatorsSourceMap(20.999D, 30.999D, -1, 20, 0, 30));
+        assertTrue(ArcadePortRules.isOutsideGladiatorsSourceMap(-1.0D, 10.5D, -1, 20, 0, 30));
+        assertTrue(ArcadePortRules.isOutsideGladiatorsSourceMap(21.0D, 10.5D, -1, 20, 0, 30));
+    }
+
     @Test void gladiatorsHalfHeartAchievementUsesOneHealthPoint() {
         assertTrue(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(1.0D));
         assertTrue(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(0.5D));
