@@ -35,9 +35,15 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void everyGameHasAnInitialMechanicsPortButNoneIsDeclaredReadyBeforeLiveValidation() {
+    void oneInTheQuiverIsReadyForManualAcceptanceWhileOtherUnvalidatedGamesRemainInProgress() {
         ArcadeCatalog catalog = new ArcadeCatalog();
+        GameDefinition quiver = catalog.getGame("one-in-the-quiver");
+        assertNotNull(quiver);
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, quiver.getPortStatus());
+        assertTrue(quiver.isReadyForTest());
+
         for (GameDefinition game : catalog.getGames()) {
+            if (game.getId().equals("one-in-the-quiver")) continue;
             assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus(),
                     game.getId() + " must remain in progress until its modern gameplay is validated");
             assertFalse(game.isReadyForTest());
@@ -45,7 +51,7 @@ class ArcadeCatalogTest {
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS)
                 .count();
-        assertEquals(16, inProgress);
+        assertEquals(15, inProgress);
     }
 
     @Test
