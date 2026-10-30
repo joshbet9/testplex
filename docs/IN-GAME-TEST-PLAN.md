@@ -48,6 +48,15 @@ This is the manual runtime checklist for the isolated Mineplex Reborn test serve
 - At the start of the round, confirm the indicator says the timed knockback boost is inactive; after the timed knockback escalation starts, confirm the indicator reports the active multiplier on each hit.
 - Hit a summoned Bacon Brawl test dummy and confirm the hit impact and action-bar feedback appear. Dummies are test targets, not real Players, so don't count them as proof of player-only stats/team mechanics.
 
+### Dragons
+- Start Coward, Marksman and Pyrotechnic separately. Confirm the flare stack is issued with the kit: Coward = 2, Marksman = 1, Pyrotechnic = 1.
+- With at least two real clients alive, let multiple dragons acquire the flare user or nearby targets. Use one flare and confirm every dragon whose current target is inside the 24-block horizontal exclusion area immediately retargets to an eligible player outside it, or returns to sky when no eligible target exists.
+- During the six-second exclusion window, confirm the flared player and every living player inside the same area are excluded from new dragon target selection. Confirm Pyrotechnic sparklers dropped inside the exclusion area do not attract dragons; sparklers outside the area still work normally.
+- Use a flare while a dragon is already pursuing the player. Confirm the existing target is recalculated immediately rather than waiting for the dragon to reach its previous target point. Use a second flare and confirm the exclusion window is refreshed.
+- After six seconds, confirm players and sparkler locations can be selected again. Confirm exclusion zones are cleared when the round ends and do not leak into a subsequent round.
+- Equip Classic, Ember, Frost, Ender, Solar and Aurora flare effects in turn. Activate each with a second client watching; the other client must see the selected effect. Confirm the effect does not deal damage, apply knockback, or change the dragon target rules beyond the flare's temporary exclusion.
+- Confirm flares cannot be dropped or moved out of the kit inventory, are consumed one at a time, and are not dropped on elimination. Confirm the existing Pyro Sparkler item, spawn interval and lure behaviour are unchanged outside flare areas.
+
 ### Dragon Escape
 - Equip different trail colours on two runners.
 - Confirm the stained-glass dust follows the correct runner while they are moving and remains visible despite Dragon Escape's normal invisibility effect.
