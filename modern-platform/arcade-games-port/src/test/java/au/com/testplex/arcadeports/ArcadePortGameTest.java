@@ -1765,6 +1765,8 @@ class ArcadePortGameTest {
         assertEquals(1_200_000L, ArcadePortRules.DEATH_TAG_GAME_TIMEOUT_MILLIS);
         assertEquals(10, ArcadePortRules.DEATH_TAG_FORCED_CHASER_REWARD_GEMS);
         assertEquals(4, ArcadePortRules.DEATH_TAG_RUNNER_KILL_REWARD_GEMS);
+        assertEquals(4, ArcadePortRules.deathTagKillRewardGems(true));
+        assertEquals(0, ArcadePortRules.deathTagKillRewardGems(false));
         assertEquals(15, ArcadePortRules.DEATH_TAG_FIRST_PLACE_REWARD_GEMS);
         assertEquals(10, ArcadePortRules.DEATH_TAG_SECOND_PLACE_REWARD_GEMS);
         assertEquals(5, ArcadePortRules.DEATH_TAG_THIRD_PLACE_REWARD_GEMS);
