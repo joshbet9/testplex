@@ -37,14 +37,14 @@ public final class BackendClient {
         if (!isEnabled()) return;
         final String payload = buildPayload(submissionId, uuid, name, mode, pattern, kit, stage, elapsedMs, platform, pluginVersion, configHash, submittedAt);
         final File pending = new File(pendingDir, "backend-" + safeFileName(submissionId) + ".json");
-        new BukkitRunnable() { @Override public void run() { if (!queuePayload(pending, payload)) return; trySubmitPending(pending); } }.runTaskAsynchronously(plugin);
+        new BukkitRunnable() { @Override public void run() { if (!queuePayload(pending, payload)) return; trySubmitPending(pending); } }.runTaskAsynchronously(plugin.getHostPlugin());
     }
     /** Submit an immutable completed multiplayer game. */
     public void submitMatch(final String matchId, final String platform, final String mode, final int pattern, final List<Map<String,Object>> players, final long startedAt, final long endedAt) {
         if (!isEnabled()) return;
         final String payload = buildMatchPayload(matchId, platform, mode, pattern, "mixed", players, startedAt, endedAt);
         final File pending = new File(pendingDir, "match-" + safeFileName(matchId) + ".json");
-        new BukkitRunnable() { @Override public void run() { if (!queuePayload(pending, payload)) return; trySubmitPending(pending); } }.runTaskAsynchronously(plugin);
+        new BukkitRunnable() { @Override public void run() { if (!queuePayload(pending, payload)) return; trySubmitPending(pending); } }.runTaskAsynchronously(plugin.getHostPlugin());
     }
     public String get(String path) throws Exception {
         if (!isEnabled()) return null;
@@ -56,7 +56,7 @@ public final class BackendClient {
         c.setRequestProperty("Authorization", "Bearer " + token); c.setRequestProperty("Accept", "application/json"); c.setRequestProperty("User-Agent", "MonsterMaze-Server/1.0");
         try { int status=c.getResponseCode(); InputStream stream=status>=200&&status<300?c.getInputStream():c.getErrorStream(); StringBuilder body=new StringBuilder(); if(stream!=null){BufferedReader r=new BufferedReader(new InputStreamReader(stream,StandardCharsets.UTF_8)); try{String line;while((line=r.readLine())!=null)body.append(line);}finally{r.close();}} if(status<200||status>=300)throw new IllegalStateException("HTTP "+status+(body.length()>0?" "+body:"")); return body.toString(); } finally { c.disconnect(); }
     }
-    private void flushPending(){if(!isEnabled()||!pendingDir.exists())return;new BukkitRunnable(){@Override public void run(){File[] files=pendingDir.listFiles();if(files==null)return;for(File f:files)if(f.isFile()&&(f.getName().startsWith("backend-")||f.getName().startsWith("match-"))&&f.getName().endsWith(".json"))trySubmitPending(f);}}.runTaskAsynchronously(plugin);}
+    private void flushPending(){if(!isEnabled()||!pendingDir.exists())return;new BukkitRunnable(){@Override public void run(){File[] files=pendingDir.listFiles();if(files==null)return;for(File f:files)if(f.isFile()&&(f.getName().startsWith("backend-")||f.getName().startsWith("match-"))&&f.getName().endsWith(".json"))trySubmitPending(f);}}.runTaskAsynchronously(plugin.getHostPlugin());}
     private boolean queuePayload(File pending,String payload){if(pending.exists())return true;if(!pendingDir.exists()&&!pendingDir.mkdirs()){plugin.getLogger().warning("Could not create backend retry directory: "+pendingDir);return false;}FileOutputStream out=null;try{out=new FileOutputStream(pending);out.write(payload.getBytes(StandardCharsets.UTF_8));out.flush();return true;}catch(IOException e){plugin.getLogger().warning("Could not queue backend payload: "+e.getMessage());return false;}finally{if(out!=null)try{out.close();}catch(IOException ignored){}}}
     private void trySubmitPending(File pending){String payload;try{payload=readFile(pending);}catch(IOException e){plugin.getLogger().warning("Could not read backend queue file "+pending.getName()+": "+e.getMessage());return;}int attempts=0;long delay=1000L;while(attempts<4){attempts++;try{post(pending.getName().startsWith("match-")?"/api/v1/matches":"/api/v1/runs",payload);if(!pending.delete()&&pending.exists())plugin.getLogger().warning("Backend accepted "+pending.getName()+" but it could not be deleted.");plugin.getLogger().info("Monster Maze backend accepted "+pending.getName());if(plugin.getLeaderboards()!=null)plugin.getLeaderboards().refreshFromBackend();if(plugin.getChallengeManager()!=null)plugin.getChallengeManager().refresh();return;}catch(Exception e){if(attempts>=4){plugin.getLogger().warning("Backend submission failed for "+pending.getName()+" after "+attempts+" attempts: "+e.getMessage());return;}try{Thread.sleep(delay);}catch(InterruptedException x){Thread.currentThread().interrupt();return;}delay*=2L;}}}
     private String readFile(File f)throws IOException{FileInputStream in=new FileInputStream(f);try{byte[] d=new byte[(int)Math.min(Integer.MAX_VALUE,f.length())];int o=0,r;while(o<d.length&&(r=in.read(d,o,d.length-o))>=0)o+=r;return new String(d,0,o,StandardCharsets.UTF_8);}finally{in.close();}}
