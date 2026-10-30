@@ -1,10 +1,11 @@
 # Isolated manual-acceptance candidates. Availability does not itself certify 100% in-game parity.
-# Bomb Lobbers, Dragon Escape, Paintball and Runner are open for in-game acceptance after their feature builds passed CI.
+# Bomb Lobbers, Dragon Escape, Dragons, Paintball and Runner are available as live-acceptance candidates.
 # Candidate availability is not a claim of complete live parity certification.
 enabled-games:
   - bacon-brawl
   - bomb-lobbers
   - dragon-escape
+  - dragons
   - paintball
   - runner
 

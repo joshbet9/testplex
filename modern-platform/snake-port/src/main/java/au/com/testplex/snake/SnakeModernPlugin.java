@@ -14,6 +14,11 @@ public final class SnakeModernPlugin extends JavaPlugin implements CommandExecut
     public void onEnable() {
         saveDefaultConfig();
         game = new SnakeGameManager(this);
+        if (!game.isAvailable()) {
+            getLogger().severe("SnakeModern could not load an original Snake map with valid TEAM_SPAWNS. Disabling the plugin.");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
         if (getCommand("snake") == null) {
             getLogger().severe("Command 'snake' is missing from plugin.yml; disabling SnakeModern.");
             getServer().getPluginManager().disablePlugin(this);

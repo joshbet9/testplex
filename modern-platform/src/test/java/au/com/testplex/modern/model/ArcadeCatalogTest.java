@@ -35,17 +35,39 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void everyGameHasAnInitialMechanicsPortButNoneIsDeclaredReadyBeforeLiveValidation() {
+    void deathTagIsReadyForInGameAcceptanceWhileOtherPortsRemainInProgress() {
         ArcadeCatalog catalog = new ArcadeCatalog();
+        GameDefinition deathTag = catalog.getGame("death-tag");
+        assertNotNull(deathTag);
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, deathTag.getPortStatus());
+        assertTrue(deathTag.isReadyForTest());
+
         for (GameDefinition game : catalog.getGames()) {
+            if (game.getId().equals("death-tag")) continue;
             assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus(),
-                    game.getId() + " must remain in progress until its modern gameplay is validated");
+                    game.getId() + " must remain in progress until its gameplay parity is validated");
             assertFalse(game.isReadyForTest());
         }
+        long readyForTest = catalog.getGames().stream()
+                .filter(GameDefinition::isReadyForTest)
+                .count();
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS)
                 .count();
-        assertEquals(16, inProgress);
+        assertEquals(1, readyForTest);
+        assertEquals(15, inProgress);
+    }
+
+    @Test
+    void dragonsExposeServerVisibleFlareEffectChoices() {
+        GameDefinition dragons = new ArcadeCatalog().getGame("dragons");
+        CosmeticLineDefinition flares = dragons.getCosmeticLines().stream()
+                .filter(line -> line.getId().equals("flare-effects"))
+                .findFirst().orElseThrow();
+        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, flares.getSelectionMode());
+        assertEquals("classic", flares.getDefaultOptionId());
+        assertEquals(Set.of("classic", "ember", "frost", "ender", "solar", "aurora"),
+                new HashSet<>(flares.getOptions().stream().map(CosmeticOption::getId).toList()));
     }
 
     @Test
@@ -70,6 +92,20 @@ class ArcadeCatalogTest {
         assertEquals(3, line.getOptions().stream()
                 .filter(option -> "pellet".equals(option.getSelectionGroup())).count());
         assertTrue(line.getOptions().stream().allMatch(option -> option.getSelectionGroup() != null));
+    }
+
+    @Test
+    void spleefHasOneSelectableBlockBreakSignatureLine() {
+        GameDefinition spleef = new ArcadeCatalog().getGame("spleef");
+        assertEquals(1, spleef.getCosmeticLines().size());
+        CosmeticLineDefinition line = spleef.getCosmeticLines().get(0);
+        assertEquals("break-signature", line.getId());
+        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, line.getSelectionMode());
+        assertEquals(Set.of("snowburst", "ice-shards", "chalk-grid"),
+                line.getOptions().stream().map(CosmeticOption::getId)
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertTrue(line.getOptions().stream()
+                .allMatch(option -> "signature".equals(option.getSelectionGroup())));
     }
 
     @Test

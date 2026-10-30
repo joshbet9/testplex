@@ -27,6 +27,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityTargetEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
@@ -238,6 +239,10 @@ public final class SnakeGameManager implements Listener {
         plugin.getConfig().set("kits." + player.getUniqueId(), kit);
         plugin.saveConfig();
         player.sendMessage(ChatColor.GREEN + "Snake kit saved: " + ChatColor.WHITE + kit + ChatColor.GREEN + ".");
+    }
+
+    public boolean isAvailable() {
+        return arena != null && mapData != null && mapData.hasSpawnLocations();
     }
 
     public String status() {
@@ -827,9 +832,10 @@ public final class SnakeGameManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onAbilityInteract(PlayerInteractEvent event) {
-        if (event.getHand() != EquipmentSlot.HAND || !event.getAction().isRightClick()) return;
+        if (event.getHand() != EquipmentSlot.HAND) return;
         SnakeState state = snakes.get(event.getPlayer().getUniqueId());
         if (!running || state == null || !state.alive) return;
+        if (!event.getAction().isRightClick()) return;
         if (state.rouletteActive) {
             event.setCancelled(true);
             return;
@@ -931,12 +937,17 @@ public final class SnakeGameManager implements Listener {
     }
 
     @EventHandler
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (SPECTATE_MENU_TITLE.equals(event.getView().getTitle())) event.setCancelled(true);
+    }
+
+    @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         queue.remove(player.getUniqueId());
-        SnakeState state = snakes.get(player.getUniqueId());
-        if (state != null && state.alive) {
-            eliminate(state, null, "disconnected");
+        SnakeState state = snakes.remove(player.getUniqueId());
+        if (state != null) {
+            if (state.alive) eliminate(state, null, "disconnected");
             pendingRestore.put(player.getUniqueId(), state.snapshot);
             checkEndCondition();
         }

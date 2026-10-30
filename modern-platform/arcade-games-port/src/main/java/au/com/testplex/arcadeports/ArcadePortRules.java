@@ -2,7 +2,10 @@ package au.com.testplex.arcadeports;
 
 import org.bukkit.Material;
 import org.bukkit.Color;
+import org.bukkit.util.Vector;
 import java.util.Collection;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Small deterministic rules used by the mechanics-first Arcade prototypes.
@@ -11,6 +14,14 @@ import java.util.Collection;
  */
 public final class ArcadePortRules {
     public static final long DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS = 30_000L;
+    /** DeathTag inherits the 20-minute timeout from the legacy Arcade Game base class. */
+    public static final long DEATH_TAG_GAME_TIMEOUT_MILLIS = 1_200_000L;
+    public static final int DEATH_TAG_FORCED_CHASER_REWARD_GEMS = 10;
+    public static final int DEATH_TAG_RUNNER_KILL_REWARD_GEMS = 4;
+    public static final int DEATH_TAG_FIRST_PLACE_REWARD_GEMS = 15;
+    public static final int DEATH_TAG_SECOND_PLACE_REWARD_GEMS = 10;
+    public static final int DEATH_TAG_THIRD_PLACE_REWARD_GEMS = 5;
+    public static final int DEATH_TAG_PARTICIPATION_REWARD_GEMS = 10;
     public static final long DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS = 2_000L;
     public static final int DEATH_TAG_ARCHER_MAX_ARROWS = 2;
     public static final double DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER = 3.0D;
@@ -412,17 +423,37 @@ public final class ArcadePortRules {
     public static final long SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS = 2_000L;
     public static final int SPLEEF_ARCHER_MAX_ARROWS = 2;
     public static final int SPLEEF_SNOWBALLER_MAX_SNOWBALLS = 16;
-    public static final long SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS = 6_000L;
+    public static final long SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS = 30_000L;
     public static final long SPLEEF_SMASHER_COOLDOWN_MILLIS = 250L;
     public static final long TURF_WARS_INITIAL_BUILD_PHASE_MILLIS = 40_000L;
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
     public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
+    public static final long TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS = 20_000L;
+    public static final long TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS = 10_000L;
+    public static final long TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS = 45_000L;
+    public static final int TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS = 2;
     public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
     public static final long MICRO_BATTLES_BARRIER_DURATION_MILLIS = 10_000L;
     public static final int MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK = 3;
     public static final int MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS = 2;
     public static final int DRAGONS_MAX_DRAGONS = 5;
-    public static final long DRAGONS_SPAWN_INTERVAL_MILLIS = 500L;
+    /** UpdateType.SEC_05: Reborn adds one dragon every five seconds. */
+    public static final long DRAGONS_SPAWN_INTERVAL_MILLIS = 5_000L;
+    /** UpdateType.FASTEST is the source dragon-target/contact update cadence. */
+    public static final long DRAGONS_TARGET_INTERVAL_MILLIS = 125L;
+    /** PerkSparkler and PerkFletcher replenish on UpdateType.FAST. */
+    public static final long DRAGONS_PERK_UPDATE_INTERVAL_MILLIS = 500L;
+    /** GameFlagManager checks FASTER; the per-player water Recharge is 500 ms. */
+    public static final long DRAGONS_WATER_DAMAGE_INTERVAL_MILLIS = 500L;
+    /** PerkBarrage fires queued arrows once per TICK (approximately 20 per second). */
+    public static final long DRAGONS_BARRAGE_FIRE_INTERVAL_MILLIS = 50L;
+    public static final double DRAGONS_PARTICIPATION_GEMS = 10.0D;
+    public static final double DRAGONS_FLARE_RADIUS = 24.0D;
+    public static final double DRAGONS_FLARE_RADIUS_SQUARED = DRAGONS_FLARE_RADIUS * DRAGONS_FLARE_RADIUS;
+    public static final double DRAGONS_FLARE_VERTICAL_RANGE = 24.0D;
+    public static final long DRAGONS_FLARE_DURATION_MILLIS = 6_000L;
+    public static final long DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS = 3_000L;
+    public static final int DRAGONS_MARKSMAN_START_ARROWS = 1;
     public static final long DRAGONS_CONTACT_COOLDOWN_MILLIS = 2_000L;
     public static final long DRAGONS_SPARKLER_INTERVAL_MILLIS = 25_000L;
     public static final int DRAGONS_MAX_SPARKLERS = 2;
@@ -570,6 +601,92 @@ public final class ArcadePortRules {
         };
     }
 
+    public static int dragonsFlareCharges(String requestedKit) {
+        return switch (normalizeDragonsKit(requestedKit) == null ? "" : normalizeDragonsKit(requestedKit)) {
+            case "marksman" -> 3;
+            case "pyrotechnic" -> 2;
+            case "coward" -> 1;
+            default -> 0;
+        };
+    }
+
+    public static boolean isDragonFlareActive(long nowMillis, long expiresAtMillis) {
+        return expiresAtMillis > nowMillis;
+    }
+
+    public static boolean shouldCancelDragonsPvp(boolean directPlayerDamager, boolean playerProjectileShooter) {
+        return directPlayerDamager || playerProjectileShooter;
+    }
+
+    public static boolean shouldAllowDragonWorldItem(Material material) {
+        return material == Material.EMERALD;
+    }
+
+    /** SoloGame awards one survival gem per ten seconds alive. */
+    public static double dragonSurvivalGems(long survivedMillis) {
+        return Math.max(0L, survivedMillis) / 10_000.0D;
+    }
+
+    /** SoloGame end-of-round placement rewards, one-based. */
+    public static double dragonPlacementGemReward(int place) {
+        return switch (place) {
+            case 1 -> 20.0D;
+            case 2 -> 15.0D;
+            case 3 -> 10.0D;
+            default -> 0.0D;
+        };
+    }
+
+    /** SoloGame sidebar: 0=all alive/dead names, 1=alive names, 2=alive/dead counts. */
+    public static int dragonsSoloScoreboardMode(int totalPlayers, int alivePlayers) {
+        if (totalPlayers < 15) return 0;
+        if (alivePlayers < 16) return 1;
+        return 2;
+    }
+
+    /** Mirrors UtilAction.velocity(entity, facing, 1.2, false, 0, 0.2, 1.0, true). */
+    public static Vector dragonsLeapVelocity(Vector facing, boolean grounded) {
+        if (facing == null || !Double.isFinite(facing.getX()) || !Double.isFinite(facing.getY())
+                || !Double.isFinite(facing.getZ()) || facing.lengthSquared() <= 1.0E-12D) {
+            return new Vector();
+        }
+        Vector velocity = facing.clone().normalize().multiply(1.2D);
+        velocity.setY(velocity.getY() + 0.2D);
+        if (velocity.getY() > 1.0D) velocity.setY(1.0D);
+        if (grounded) velocity.setY(velocity.getY() + 0.2D);
+        return velocity;
+    }
+
+    /** Mirrors UtilAction.velocity(entity, trajectory, 1.0, false, 0, 0.6, 2.0, true). */
+    public static Vector dragonsContactKnockback(Vector trajectory, boolean grounded) {
+        if (trajectory == null || !Double.isFinite(trajectory.getX()) || !Double.isFinite(trajectory.getY())
+                || !Double.isFinite(trajectory.getZ()) || trajectory.lengthSquared() <= 1.0E-12D) {
+            return new Vector();
+        }
+        Vector velocity = trajectory.clone().normalize();
+        velocity.setY(velocity.getY() + 0.6D);
+        if (velocity.getY() > 2.0D) velocity.setY(2.0D);
+        if (grounded) velocity.setY(velocity.getY() + 0.2D);
+        return velocity;
+    }
+
+    public static boolean shouldDragonSparklerAttract(double y, boolean inLiquid) {
+        return y >= 4.0D && !inLiquid;
+    }
+
+    public static boolean canUseDragonSpectatorTeleport(long nowMillis, long nextAllowedMillis) {
+        return nowMillis >= nextAllowedMillis;
+    }
+
+    /** Horizontal radius is circular; the vertical limit prevents one flare protecting an entire tower. */
+    public static boolean isDragonFlareLocationProtected(
+            double horizontalDistanceSquared, double verticalDistance) {
+        return Double.isFinite(horizontalDistanceSquared) && horizontalDistanceSquared >= 0.0D
+                && horizontalDistanceSquared <= DRAGONS_FLARE_RADIUS_SQUARED
+                && Double.isFinite(verticalDistance)
+                && Math.abs(verticalDistance) <= DRAGONS_FLARE_VERTICAL_RANGE;
+    }
+
     public static boolean shouldSpawnTestDragon(int currentCount, long now, long nextSpawnAt) {
         return currentCount < DRAGONS_MAX_DRAGONS && now >= nextSpawnAt;
     }
@@ -579,7 +696,9 @@ public final class ArcadePortRules {
     }
 
     public static boolean shouldExpireDragonSparkler(int livedTicks, double y, boolean inLiquid) {
-        return livedTicks > DRAGONS_SPARKLER_LIFETIME_TICKS || y < 4.0D || inLiquid;
+        // PerkSparkler removes at >100 ticks. Dragons skips a low/submerged lure for targeting
+        // but it remains alive until the perk's lifetime cleanup.
+        return livedTicks > DRAGONS_SPARKLER_LIFETIME_TICKS;
     }
 
     public static double dragonFallDamageAfterReduction(double damage) {
@@ -1744,6 +1863,31 @@ public final class ArcadePortRules {
         return lastUseMillis <= 0L || nowMillis - lastUseMillis >= DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS;
     }
 
+    /**
+     * Select the authored Chaser respawn spawn with the greatest distance to its nearest
+     * active player, matching the legacy team-spawn preference to stay away from players.
+     * Positive infinity is valid when the arena currently has no active players.
+     */
+    public static int deathTagSafestRespawnSpawnIndex(java.util.List<Double> nearestPlayerDistances) {
+        if (nearestPlayerDistances == null || nearestPlayerDistances.isEmpty()) return -1;
+        int bestIndex = -1;
+        double bestClearance = -1.0D;
+        for (int i = 0; i < nearestPlayerDistances.size(); i++) {
+            Double clearance = nearestPlayerDistances.get(i);
+            if (clearance == null || Double.isNaN(clearance) || clearance < 0.0D) continue;
+            if (bestIndex < 0 || clearance > bestClearance) {
+                bestIndex = i;
+                bestClearance = clearance;
+            }
+        }
+        return bestIndex;
+    }
+
+    /** Source DeathTag.GetKillsGems pays for a Runner kill, never for a Chaser kill. */
+    public static int deathTagKillRewardGems(boolean killedRunner) {
+        return killedRunner ? DEATH_TAG_RUNNER_KILL_REWARD_GEMS : 0;
+    }
+
     /** The source Death Tag game only awards winning placement to surviving Runners. */
     public static boolean deathTagHasRunnerWinner(int runnersRemaining) {
         return runnersRemaining > 0;
@@ -1753,8 +1897,9 @@ public final class ArcadePortRules {
         return deathTagHasRunnerWinner(runnersRemaining);
     }
 
+    /** The legacy DeathTag EndCheck finishes at one or fewer live Runners for every lobby size. */
     public static boolean shouldFinishDeathTagRound(int runnersRemaining, int initialPlayers) {
-        return initialPlayers > 2 ? runnersRemaining <= 1 : runnersRemaining <= 0;
+        return runnersRemaining <= 1;
     }
 
     /** Generated island-ring removal must never run against an archived source map. */
@@ -1778,10 +1923,54 @@ public final class ArcadePortRules {
         return ironSword ? 12.0D : 6.0D;
     }
 
+    public static long turfWarsInitialBuildPhaseMillis(boolean mixedArcadeVariant) {
+        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS
+                : TURF_WARS_INITIAL_BUILD_PHASE_MILLIS;
+    }
+
+    public static long turfWarsBuildPhaseMillis(boolean mixedArcadeVariant) {
+        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS
+                : TURF_WARS_BUILD_PHASE_MILLIS;
+    }
+
+    public static long turfWarsCombatPhaseMillis(boolean mixedArcadeVariant) {
+        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS
+                : TURF_WARS_COMBAT_PHASE_MILLIS;
+    }
+
     public static int advanceTurfFrontline(int currentFrontline, int teamId) {
-        if (teamId == 0) return currentFrontline + 1;
-        if (teamId == 1) return currentFrontline - 1;
+        return advanceTurfFrontline(currentFrontline, teamId, 1);
+    }
+
+    public static int advanceTurfFrontline(int currentFrontline, int teamId, boolean mixedArcadeVariant) {
+        return advanceTurfFrontline(currentFrontline, teamId, mixedArcadeVariant
+                ? TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS : 1);
+    }
+
+    public static int advanceTurfFrontline(int currentFrontline, int teamId, int blocks) {
+        int distance = Math.max(0, blocks);
+        if (teamId == 0) return currentFrontline + distance;
+        if (teamId == 1) return currentFrontline - distance;
         return currentFrontline;
+    }
+
+    /**
+     * Every newly captured column must be repainted when a kill advances the line.
+     * The maximum X coordinate is exclusive, matching the source map bounds.
+     */
+    public static List<Integer> turfWarsCapturedColumns(int oldFrontline, int newFrontline,
+            int teamId, int minX, int maxXExclusive) {
+        if ((teamId != 0 && teamId != 1) || maxXExclusive <= minX || oldFrontline == newFrontline) {
+            return List.of();
+        }
+        int first = teamId == 0 ? oldFrontline + 1 : newFrontline + 1;
+        int last = teamId == 0 ? newFrontline : oldFrontline;
+        first = Math.max(first, minX);
+        last = Math.min(last, maxXExclusive - 1);
+        if (first > last) return List.of();
+        List<Integer> columns = new ArrayList<>(last - first + 1);
+        for (int x = first; x <= last; x++) columns.add(x);
+        return List.copyOf(columns);
     }
 
     /**

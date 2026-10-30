@@ -19,7 +19,7 @@ The build uses Paper's official Maven repository and a version range for the cur
 - player-preferences.yml — per-player, per-game, per-line preferences; separate from the legacy profile format.
 - All 16 Arcade games are catalogued with optional future concepts for cosmetic lines and win scenes; these are not current parity acceptance criteria.
 - `monster-maze-port/` builds `MonsterMazeModern.jar`, based on the 1.21 implementation in the separate MonsterMaze repository.
-- `snake-port/` builds `SnakeModern.jar`, a Paper-native mechanics-first port with an isolated arena.
+- `snake-port/` builds `SnakeModern.jar`, packages the three original Reborn Snake maps, and carries a source-parity checklist for mechanics, kits, achievements and spectator behaviour.
 - `arcade-games-port/` builds `ArcadeMechanicsModern.jar`, first-pass game loops and dedicated test arenas for the other 14 games.
 - Game Details now routes to the correct module's Start / Test command when the associated module is installed.
 
@@ -33,6 +33,6 @@ Modern server provisioning and deployment should be a separate, explicit step wi
 
 ## Next porting order
 
-1. Run Monster Maze and Snake on Paper 26.3 and fix runtime/gameplay discrepancies against the original 1.8 and adapted 1.21 source.
+1. Complete multiplayer acceptance for Monster Maze and Snake on Paper 26.3 against their original 1.8 source implementations and maps.
 2. Compare each of the other 14 rough game loops to the existing Reborn source and resolve mechanics/API/lifecycle issues game by game.
 3. Keep cosmetic lines, progression milestones and win scenes parked for all games during the mechanics pass. Exception: Monster Maze customisation remains a core pillar and is tested alongside its mechanics.
