@@ -520,9 +520,11 @@ public final class ArcadePortManager implements Listener {
     public void selectKit(Player player, String requestedKit) {
         if (player == null || requestedKit == null) return;
         String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        boolean explicitMonsterMazeKit = value.startsWith("monster-maze-");
+        if (explicitMonsterMazeKit) value = value.substring("monster-maze-".length());
         boolean monsterMazeLobby = "monster-maze".equals(
                 plugin.getConfig().getString("lobby-selected-game", "bacon-brawl"));
-        if (monsterMazeLobby || monsterMazeRunning()) {
+        if (explicitMonsterMazeKit || monsterMazeLobby || monsterMazeRunning()) {
             me.monstermaze.kit.KitType mazeKit = me.monstermaze.kit.KitType.byName(value);
             if (mazeKit != null) {
                 if (monsterMazeRunning()) {
