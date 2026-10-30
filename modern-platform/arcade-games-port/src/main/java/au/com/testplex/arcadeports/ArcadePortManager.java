@@ -982,6 +982,7 @@ public final class ArcadePortManager implements Listener {
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 600_000L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
+                : type == ArcadePortGame.DEATH_TAG ? ArcadePortRules.DEATH_TAG_GAME_TIMEOUT_MILLIS
                 : ROUND_MS);
         session.lastBaconHungerAt = now;
         session.lastBaconSlowUpdateAt = now;
@@ -2174,8 +2175,15 @@ public final class ArcadePortManager implements Listener {
         }
 
         boolean forcedAlpha = reason != null && reason.contains("forced by the time limit");
-        if (!forcedAlpha) session.deathTagDeathsByPlayer.merge(player.getUniqueId(), 1, Integer::sum);
-        session.tagged.add(player.getUniqueId());
+        UUID convertedPlayerId = player.getUniqueId();
+        if (!forcedAlpha) session.deathTagDeathsByPlayer.merge(convertedPlayerId, 1, Integer::sum);
+        // GameTeam.SetPlacement(OUT) inserts each newly eliminated Runner at the front.
+        session.deathTagRunnerPlacementOrder.add(convertedPlayerId);
+        session.tagged.add(convertedPlayerId);
+        if (forcedAlpha) {
+            awardDeathTagTestGems(session, convertedPlayerId,
+                    ArcadePortRules.DEATH_TAG_FORCED_CHASER_REWARD_GEMS, "Forced Chaser");
+        }
         if (forcedAlpha) session.alphaChasers.add(player.getUniqueId());
         else session.alphaChasers.remove(player.getUniqueId());
         awardDeathTagKill(session, killer);
@@ -2228,8 +2236,23 @@ public final class ArcadePortManager implements Listener {
     private Location deathTagChaserRespawnSpawn(Session session, Player player) {
         SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
         if (mapData != null && !mapData.spawnLocations().isEmpty()) {
-            List<Location> spawns = mapData.spawnLocations();
-            return spawns.get(ThreadLocalRandom.current().nextInt(spawns.size())).clone();
+            // Legacy GameTeam.GetSpawn() chooses a team spawn away from active players.
+            // Maximise the nearest-player clearance rather than choosing a random spawn.
+            List<Player> activePlayers = alivePlayers(session);
+            Location safest = null;
+            double greatestClearance = Double.NEGATIVE_INFINITY;
+            for (Location candidate : mapData.spawnLocations()) {
+                double nearestPlayerDistance = activePlayers.isEmpty()
+                        ? Double.POSITIVE_INFINITY
+                        : activePlayers.stream()
+                                .mapToDouble(other -> candidate.distanceSquared(other.getLocation()))
+                                .min().orElse(Double.POSITIVE_INFINITY);
+                if (safest == null || nearestPlayerDistance > greatestClearance) {
+                    safest = candidate;
+                    greatestClearance = nearestPlayerDistance;
+                }
+            }
+            if (safest != null) return safest.clone();
         }
         return spawnFor(session, player);
     }
@@ -3353,8 +3376,10 @@ public final class ArcadePortManager implements Listener {
         updateSourceWaterDamage(session, now);
         if (session.endsAt > 0L && now >= session.endsAt) {
             if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
-                // Apply any chaser promotions due on the final timer tick before choosing a winner.
+                // Apply any chaser promotions due on the final timer tick before checking placements.
                 updateDeathTagChasers(session, now);
+                if (active != session) return;
+                checkRoundEnd(session);
                 if (active != session) return;
             }
             if (session.type == ArcadePortGame.SHEEP_QUEST) {
@@ -3376,8 +3401,16 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) updateQuiverKit(session, now);
         if (session.type == ArcadePortGame.DRAGONS) updateTestDragons(session, now);
         if (session.type == ArcadePortGame.DEATH_TAG) {
-            if (session.participantsAtStart > 1) updateDeathTagChasers(session, now);
-            else updateDeathTagConditions(session, now);
+            if (session.participantsAtStart > 1) {
+                updateDeathTagChasers(session, now);
+                if (active != session) return;
+                // The original DeathTag.EndCheck() runs throughout the live game,
+                // including immediately after a timed Alpha Chaser promotion.
+                checkRoundEnd(session);
+                if (active != session) return;
+            } else {
+                updateDeathTagConditions(session, now);
+            }
             updateDeathTagLights(session, now);
         }
         if (session.type == ArcadePortGame.BACON_BRAWL) updateBaconBrawl(session, now);
@@ -7183,11 +7216,8 @@ public final class ArcadePortManager implements Listener {
             List<Player> runners = alivePlayers(session).stream()
                     .filter(player -> !session.tagged.contains(player.getUniqueId()))
                     .toList();
-            if (!ArcadePortRules.deathTagHasRunnerWinner(runners.size())) return null;
-            return runners.stream()
-                    .max(java.util.Comparator.comparingInt(player ->
-                            session.scores.getOrDefault(player.getUniqueId(), 0)))
-                    .orElse(null);
+            // Legacy getWinners() returns the first surviving Runner, not the highest scorer.
+            return ArcadePortRules.deathTagHasRunnerWinner(runners.size()) ? runners.get(0) : null;
         }
         int team = -1;
         if (session.type == ArcadePortGame.TURF_WARS) {
@@ -7264,6 +7294,9 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        if (announceWinner && session.type == ArcadePortGame.DEATH_TAG) {
+            recordDeathTagRewards(session);
+        }
         recordLocalStats(session, winner, announceWinner);
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
@@ -7584,6 +7617,58 @@ public final class ArcadePortManager implements Listener {
 
     private String localStatsPath(UUID playerId, String gameId) {
         return "local-stats." + playerId + "." + gameId + ".";
+    }
+
+    /**
+     * The isolated Testplex server does not connect to Mineplex's production gem economy.
+     * Keep the source Death Tag payout schedule in a clearly labelled local test ledger.
+     */
+    private void awardDeathTagTestGems(Session session, UUID playerId, int amount, String reason) {
+        if (playerId == null || amount <= 0) return;
+        String path = localStatsPath(playerId, session.type.id());
+        int balance = plugin.getConfig().getInt(path + "test-gems-earned", 0) + amount;
+        plugin.getConfig().set(path + "test-gems-earned", balance);
+        Player player = session.players.get(playerId);
+        if (player != null && player.isOnline()) {
+            player.sendMessage(ChatColor.GOLD + "+" + amount + " test gems"
+                    + ChatColor.GRAY + " (" + reason + ")"
+                    + ChatColor.DARK_GRAY + " | local balance: " + balance);
+        }
+        plugin.saveConfig();
+    }
+
+    /** Mirror GameTeam.GetPlacements(true): live Runners first, then OUT Runners newest-first. */
+    private void recordDeathTagRewards(Session session) {
+        if (session.deathTagRewardsAwarded) return;
+        session.deathTagRewardsAwarded = true;
+
+        List<UUID> placements = new ArrayList<>();
+        for (Player runner : alivePlayers(session)) {
+            UUID id = runner.getUniqueId();
+            if (!session.tagged.contains(id)) placements.add(id);
+        }
+        for (int i = session.deathTagRunnerPlacementOrder.size() - 1; i >= 0; i--) {
+            UUID id = session.deathTagRunnerPlacementOrder.get(i);
+            if (!placements.contains(id)) placements.add(id);
+        }
+
+        int[] placementRewards = {
+                ArcadePortRules.DEATH_TAG_FIRST_PLACE_REWARD_GEMS,
+                ArcadePortRules.DEATH_TAG_SECOND_PLACE_REWARD_GEMS,
+                ArcadePortRules.DEATH_TAG_THIRD_PLACE_REWARD_GEMS
+        };
+        String[] placementNames = {"1st Place", "2nd Place", "3rd Place"};
+        for (int i = 0; i < Math.min(placements.size(), placementRewards.length); i++) {
+            awardDeathTagTestGems(session, placements.get(i), placementRewards[i], placementNames[i]);
+        }
+        for (Map.Entry<UUID, Player> participant : session.players.entrySet()) {
+            Player player = participant.getValue();
+            if (player != null && player.isOnline()) {
+                awardDeathTagTestGems(session, participant.getKey(),
+                        ArcadePortRules.DEATH_TAG_PARTICIPATION_REWARD_GEMS, "Participation");
+            }
+        }
+        plugin.saveConfig();
     }
 
     /** Store completed local acceptance runs only; operator-aborted sessions aren't counted. */
@@ -11321,6 +11406,9 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> deathTagRunnerTrailStyles = new HashMap<>();
         final Map<UUID, Integer> deathTagChaserKillsByPlayer = new HashMap<>();
         final Map<UUID, Integer> deathTagComeAtMeBroAwards = new HashMap<>();
+        /** Runner conversions in order; the legacy team prepends each OUT player. */
+        final List<UUID> deathTagRunnerPlacementOrder = new ArrayList<>();
+        boolean deathTagRewardsAwarded;
         final Map<UUID, Integer> deathTagDeathsByPlayer = new HashMap<>();
         final Map<UUID, Long> deathTagLastArrowAt = new HashMap<>();
         final Map<UUID, Long> deathTagSoloChaserHitReadyAt = new HashMap<>();
