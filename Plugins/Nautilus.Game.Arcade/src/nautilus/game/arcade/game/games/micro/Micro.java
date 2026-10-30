@@ -40,6 +40,7 @@ import nautilus.game.arcade.ArcadeManager;
 import nautilus.game.arcade.cosmetics.ArcadeCosmeticsMenu;
 import nautilus.game.arcade.events.GameStateChangeEvent;
 import nautilus.game.arcade.GameType;
+import nautilus.game.arcade.game.Game.GameState;
 import nautilus.game.arcade.game.GameTeam;
 import nautilus.game.arcade.game.TeamGame;
 import nautilus.game.arcade.game.games.micro.kits.KitArcher;
@@ -408,7 +409,7 @@ public class Micro extends TeamGame
 	@EventHandler
 	public void gameStateChange(GameStateChangeEvent event)
 	{
-		if (event.GetGame() == this && event.GetState() != Game.GameState.Live)
+		if (event.GetState() != GameState.Live)
 		{
 			clearPlayerVisuals();
 		}
