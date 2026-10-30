@@ -32,11 +32,15 @@ enum_additions = [
 ]
 missing = [entry for entry in enum_additions if entry.split("(", 1)[0] + "(" not in enum]
 if missing:
-    end = enum.rfind(";")
-    prefix = enum[:end].rstrip()
-    if end < 0 or not prefix.endswith(")"):
-        raise SystemExit("Unexpected ArcadePortGame enum terminator; refusing to edit it.")
-    enum = prefix[:-1] + "),\n    " + ",\n    ".join(missing) + ";" + enum[end + 1:]
+    enum_start = enum.index("public enum ArcadePortGame {")
+    field_start = enum.index("private final String id;")
+    enum_block = enum[enum_start:field_start]
+    enum_end = enum_block.rfind(";")
+    prefix = enum_block[:enum_end].rstrip()
+    if enum_end < 0 or not prefix.endswith(")"):
+        raise SystemExit("Unexpected ArcadePortGame enum block; refusing to add IDs.")
+    replacement = prefix[:-1] + "),\n    " + ",\n    ".join(missing) + ";"
+    enum = enum[:enum_start] + replacement + enum[enum_start + enum_end + 1:]
     enum_path.write_text(enum)
 
 catalog_path = Path("modern-platform/src/main/java/au/com/testplex/modern/model/ArcadeCatalog.java")
