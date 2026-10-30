@@ -1184,6 +1184,9 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.TURF_WARS) {
             announce(session, ChatColor.GREEN + "Opening build phase: place your team's wool on your own turf for 40 seconds.");
         }
+        if (type == ArcadePortGame.DRAGON_ESCAPE) {
+            setupDragonEscapeRaceScoreboard(session);
+        }
         if (participants.size() == 1) announce(session, ChatColor.GRAY + "Solo test mode: the run will remain available for practice until the timer ends or you reset it.");
         session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
         sender.sendMessage(ChatColor.GREEN + "Started " + type.displayName() + " with " + participants.size() + (participants.size() == 1 ? " player." : " players."));
@@ -4795,7 +4798,80 @@ public final class ArcadePortManager implements Listener {
         return Math.max(0L, Math.round(distance / 5.0D * 1_000.0D));
     }
 
+    private void setupDragonEscapeRaceScoreboard(Session session) {
+        if (session.type != ArcadePortGame.DRAGON_ESCAPE || Bukkit.getScoreboardManager() == null) return;
+        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+        Objective objective = scoreboard.registerNewObjective("dragonrace", "dummy",
+                ChatColor.GOLD + "DRAGON ESCAPE");
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        session.dragonEscapeScoreboard = scoreboard;
+        session.dragonEscapeScoreboardObjective = objective;
+        for (int i = 0; i < 14; i++) {
+            Team line = scoreboard.registerNewTeam("derank" + i);
+            String entry = ChatColor.values()[i].toString();
+            line.addEntry(entry);
+            session.dragonEscapeScoreboardTeams.add(line);
+            session.dragonEscapeScoreboardEntries.add(entry);
+        }
+        for (Player player : session.players.values()) {
+            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
+        }
+        updateDragonEscapeRaceScoreboard(session);
+    }
+
+    /** Reborn shows the top 14 ranked racers, green while alive and red after elimination. */
+    private void updateDragonEscapeRaceScoreboard(Session session) {
+        Scoreboard scoreboard = session.dragonEscapeScoreboard;
+        Objective objective = session.dragonEscapeScoreboardObjective;
+        if (scoreboard == null || objective == null || session.type != ArcadePortGame.DRAGON_ESCAPE) return;
+        List<Player> ranked = new ArrayList<>();
+        for (Player player : session.players.values()) {
+            if (player != null && session.dragonEscapePlayerRankScores.containsKey(player.getUniqueId())) {
+                ranked.add(player);
+            }
+        }
+        ranked.sort((left, right) -> Double.compare(
+                session.dragonEscapePlayerRankScores.get(right.getUniqueId()),
+                session.dragonEscapePlayerRankScores.get(left.getUniqueId())));
+        for (int i = 0; i < session.dragonEscapeScoreboardTeams.size(); i++) {
+            Team line = session.dragonEscapeScoreboardTeams.get(i);
+            String entry = session.dragonEscapeScoreboardEntries.get(i);
+            if (i < ranked.size()) {
+                Player racer = ranked.get(i);
+                ChatColor colour = session.alive.contains(racer.getUniqueId()) ? ChatColor.GREEN : ChatColor.RED;
+                line.setPrefix(colour + racer.getName());
+                line.setSuffix("");
+                objective.getScore(entry).setScore(14 - i);
+            } else {
+                line.setPrefix("");
+                line.setSuffix("");
+                scoreboard.resetScores(entry);
+            }
+        }
+    }
+
+    private void cleanupDragonEscapeRaceScoreboard(Session session) {
+        Scoreboard scoreboard = session.dragonEscapeScoreboard;
+        Objective objective = session.dragonEscapeScoreboardObjective;
+        if (scoreboard == null) return;
+        try {
+            for (Team team : new ArrayList<>(session.dragonEscapeScoreboardTeams)) {
+                if (scoreboard.getTeam(team.getName()) != null) team.unregister();
+            }
+            if (objective != null && scoreboard.getObjective(objective.getName()) != null) {
+                objective.unregister();
+            }
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            plugin.getLogger().fine("Dragon Escape scoreboard was already removed: " + exception.getMessage());
+        }
+        session.dragonEscapeScoreboardTeams.clear();
+        session.dragonEscapeScoreboardEntries.clear();
+        session.dragonEscapeScoreboardObjective = null;
+        session.dragonEscapeScoreboard = null;
+    }
+
     private void updateDragonEscapeRaceUi(Session session, long now) {
+        if (session.ticks % 10 == 0) updateDragonEscapeRaceScoreboard(session);
         List<Player> order = dragonEscapeRaceOrder(session);
         if (order.isEmpty()) return;
         Player leader = order.get(0);
@@ -6237,6 +6313,8 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             cleanupBaconPlayerVisibility(session);
             cleanupBaconMeterScoreboard(session);
+        } else if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+            cleanupDragonEscapeRaceScoreboard(session);
         }
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             Player player = entry.getValue();
@@ -9912,6 +9990,10 @@ public final class ArcadePortManager implements Listener {
         long dragonEscapeNextScoreUpdateAt;
         final Map<UUID, Integer> dragonEscapePlayerProgress = new HashMap<>();
         final Map<UUID, Double> dragonEscapePlayerRankScores = new HashMap<>();
+        Scoreboard dragonEscapeScoreboard;
+        Objective dragonEscapeScoreboardObjective;
+        final List<Team> dragonEscapeScoreboardTeams = new ArrayList<>();
+        final List<String> dragonEscapeScoreboardEntries = new ArrayList<>();
         final Map<UUID, Map<Integer, Long>> dragonEscapeRunSplitMillis = new HashMap<>();
         final Map<Block, Long> runnerBlocks = new HashMap<>();
         final Map<Block, Material> runnerBlockMaterials = new HashMap<>();
