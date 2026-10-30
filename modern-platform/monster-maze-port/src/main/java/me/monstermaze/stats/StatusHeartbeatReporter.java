@@ -35,7 +35,7 @@ public final class StatusHeartbeatReporter {
             plugin.getLogger().info("Status heartbeat disabled (MM_STATUS_HEARTBEAT_URL/TOKEN not configured).");
             return;
         }
-        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, new Runnable() {
+        Bukkit.getScheduler().runTaskTimerAsynchronously(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() { send(); }
         }, 20L, 300L);
         plugin.getLogger().info("Status heartbeat enabled: " + serverName + " -> " + url);
