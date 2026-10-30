@@ -950,7 +950,7 @@ public final class ArcadePortManager implements Listener {
             if (now < nextDamage) continue;
             session.turfSpawnDamageNextAt.put(id,
                     now + ArcadePortRules.TURF_WARS_SPAWN_DAMAGE_COOLDOWN_MILLIS);
-            double damage = session.turfCombat ? 2.0D : 500.0D;
+            double damage = ArcadePortRules.turfWarsSpawnBoundaryDamage(session.turfCombat);
             if (player.getHealth() <= damage) {
                 respawnTurfWarsPlayer(session, player, null, "was lost outside their team's turf", false);
                 if (active != session) return;
@@ -12351,13 +12351,6 @@ public final class ArcadePortManager implements Listener {
         if (projectileTarget != null && event.getEntity() instanceof Projectile projectile) {
             ProjectileSource source = projectile.getShooter();
             if (source instanceof Player shooter) hitProjectile(session, projectile, shooter, projectileTarget);
-        } else if (session.type == ArcadePortGame.TURF_WARS && session.turfCombat && event.getHitBlock() != null
-                && event.getEntity() instanceof Projectile projectile && projectile.getShooter() instanceof Player shooter) {
-            Block block = event.getHitBlock();
-            if (block.getType() == Material.RED_WOOL || block.getType() == Material.BLUE_WOOL) {
-                block.setType(Material.AIR, false);
-                shooter.playSound(shooter.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 0.7F, 1.5F);
-            }
         }
     }
 
@@ -12397,6 +12390,46 @@ public final class ArcadePortManager implements Listener {
                 || !session.players.containsKey(player.getUniqueId())) return;
         // Match the shared legacy Game listener: food updates reset saturation to five.
         player.setSaturation(ArcadePortRules.BACON_SATURATION_ON_FOOD_CHANGE);
+    }
+
+    private boolean isTurfWarsProtectedKitItem(ItemStack item) {
+        if (item == null || item.getType().isAir()) return false;
+        return item.getType() == Material.RED_WOOL || item.getType() == Material.BLUE_WOOL
+                || isTurfWarsFletchedArrow(item);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onTurfWarsProtectedItemClick(InventoryClickEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.TURF_WARS
+                || !(event.getWhoClicked() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())) return;
+        ItemStack hotbarSwap = null;
+        if (event.getHotbarButton() >= 0) {
+            hotbarSwap = player.getInventory().getItem(event.getHotbarButton());
+        }
+        if (isTurfWarsProtectedKitItem(event.getCurrentItem())
+                || isTurfWarsProtectedKitItem(event.getCursor())
+                || isTurfWarsProtectedKitItem(hotbarSwap)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onTurfWarsProtectedItemDrag(InventoryDragEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.TURF_WARS
+                || !session.players.containsKey(event.getWhoClicked().getUniqueId())) return;
+        if (isTurfWarsProtectedKitItem(event.getOldCursor())) {
+            event.setCancelled(true);
+            return;
+        }
+        for (ItemStack item : event.getNewItems().values()) {
+            if (isTurfWarsProtectedKitItem(item)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
