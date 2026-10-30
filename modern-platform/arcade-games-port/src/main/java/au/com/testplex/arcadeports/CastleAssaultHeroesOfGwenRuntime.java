@@ -111,6 +111,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private long nextGoldAt;
     private long nextStructureUpdateAt;
     private long nextCapturePointUpdateAt;
+    private long nextKingCageUpdateAt;
     private int objectiveKillsEnabled;
     private int castleKillCountRed;
     private int castleKillCountBlue;
@@ -201,6 +202,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         List<EnderCrystal> result = new ArrayList<>(CASTLE_CRYSTAL_COUNT);
         for (int i = 0; i < CASTLE_CRYSTAL_COUNT; i++) {
             EnderCrystal crystal = world.spawn(locations.get(i), EnderCrystal.class);
+            Block beaconBase = locations.get(i).getBlock().getRelative(0, -2, 0);
+            rememberBlock(beaconBase);
+            beaconBase.setType(Material.BEACON, false);
             crystal.setCustomName(teamColour(team) + (team == 0 ? "Red" : "Blue") + " Sentry Crystal");
             crystal.setCustomNameVisible(true);
             crystal.setInvulnerable(true);
@@ -512,7 +516,61 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         + " ❤ " + Math.max(0, king.health));
             }
         }
+        if (now >= nextKingCageUpdateAt) {
+            for (KingState king : kings.values()) updateKingCage(king, king.activeCrystals() > 0);
+            nextKingCageUpdateAt = now + 1_000L;
+        }
+        // Reborn keeps the objective item at its pad and recreates it if another mechanic removes it.
+        if (objectiveItem != null && (!objectiveItem.isValid() || objectiveItem.isDead())
+                && objectiveCarrier == null && activeObjectiveSpawn != null) {
+            spawnObjectiveItem(activeObjectiveSpawn);
+        }
         checkTeamDeparture();
+    }
+
+    private void spawnObjectiveItem(Location spawn) {
+        if (objectiveItem != null && objectiveItem.isValid()) objectiveItem.remove();
+        objectiveItem = world.dropItem(spawn.clone(), new ItemStack(Material.TNT));
+        objectiveItem.setPickupDelay(0);
+        objectiveItem.setGravity(false);
+        objectiveItem.setVelocity(new Vector());
+        objectiveItem.setUnlimitedLifetime(true);
+        objectiveItem.setCustomName(ChatColor.RED + "Objective TNT");
+        objectiveItem.setCustomNameVisible(true);
+        objectiveItem.getPersistentDataContainer().set(objectiveTntKey, PersistentDataType.BYTE, (byte) 1);
+    }
+
+    /** Match Reborn's 9x9x5 iron cage around each King while at least one crystal survives. */
+    private void updateKingCage(KingState king, boolean beaconsAlive) {
+        for (int y = 0; y <= 4; y++) {
+            for (int x = -4; x <= 4; x++) {
+                for (int z = -4; z <= 4; z++) {
+                    Block block = king.location.clone().add(x, y, z).getBlock();
+                    Material type = block.getType();
+                    if (!beaconsAlive) {
+                        if (type == Material.IRON_BARS || type == Material.IRON_BLOCK) {
+                            rememberBlock(block);
+                            block.setType(Material.AIR, false);
+                        }
+                        continue;
+                    }
+                    if (y == 4) {
+                        if (type != Material.IRON_BLOCK) {
+                            rememberBlock(block);
+                            block.setType(Material.IRON_BLOCK, false);
+                        }
+                    } else if (Math.abs(x) == 4 || Math.abs(z) == 4) {
+                        if (type != Material.IRON_BARS) {
+                            rememberBlock(block);
+                            block.setType(Material.IRON_BARS, false);
+                        }
+                    } else if (type != Material.AIR && type != Material.IRON_BLOCK && type != Material.IRON_BARS) {
+                        rememberBlock(block);
+                        block.setType(Material.AIR, false);
+                    }
+                }
+            }
+        }
     }
 
     private void tickHeroesOfGwen(long now) {
@@ -546,14 +604,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         rememberBlock(platform);
         platform.setType(Material.REDSTONE_BLOCK, false);
         activeObjectiveSpawn = spawn.clone();
-        objectiveItem = world.dropItem(spawn, new ItemStack(Material.TNT));
-        objectiveItem.setPickupDelay(0);
-        objectiveItem.setGravity(false);
-        objectiveItem.setVelocity(new Vector());
-        objectiveItem.setUnlimitedLifetime(true);
-        objectiveItem.setCustomName(ChatColor.RED + "Objective TNT");
-        objectiveItem.setCustomNameVisible(true);
-        objectiveItem.getPersistentDataContainer().set(objectiveTntKey, PersistentDataType.BYTE, (byte) 1);
+        activeObjectiveSpawn = spawn.clone();
+        spawnObjectiveItem(spawn);
         world.spawnParticle(Particle.FIREWORK, spawn, 24, 0.3D, 0.3D, 0.3D, 0.03D);
         world.playSound(spawn, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 1.0F, 0.8F);
         objectiveKillsEnabled = 1;
@@ -685,6 +737,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         entities.remove(crystal);
         crystal.remove();
         attacker.sendMessage(ChatColor.GREEN + "Sentry crystal destroyed!");
+        Block beaconBase = crystal.getLocation().getBlock().getRelative(0, -2, 0);
+        rememberBlock(beaconBase);
+        beaconBase.setType(Material.STONE_BRICKS, false);
         world.playSound(king.location, Sound.ENTITY_ENDER_DRAGON_HURT, 1.0F, 0.8F);
         announce(ChatColor.GOLD + teamName(king.team) + " sentry crystal destroyed. "
                 + (king.activeCrystals() == 0 ? "Their King is now vulnerable!" : king.activeCrystals() + " crystal(s) remain."));
@@ -1182,6 +1237,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (player == null) return;
         UUID id = player.getUniqueId();
         activePlayers.remove(id);
+        StoreHolder store = openStores.remove(id);
+        if (store != null && player.isOnline()
+                && player.getOpenInventory().getTopInventory().getHolder() == store) {
+            player.closeInventory();
+        }
         if (game == ArcadePortGame.CASTLE_ASSAULT && id.equals(objectiveCarrier)) {
             restoreCarrierHelmet(player);
             objectiveCarrier = null;
