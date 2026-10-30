@@ -1208,6 +1208,7 @@ public final class ArcadePortManager implements Listener {
                 && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER)
                 || (type == ArcadePortGame.DRAGON_ESCAPE && !ArcadePortRules.DRAGON_ESCAPE_HAS_ROUND_TIMER)
                 || type == ArcadePortGame.DRAGONS
+                || type == ArcadePortGame.SNEAKY_ASSASSINS
                 || type == ArcadePortGame.DRAW_MY_THING
                 || type == ArcadePortGame.MASTER_BUILDERS
                 || (type == ArcadePortGame.GLADIATORS && participants.size() < 2)
@@ -12091,6 +12092,15 @@ public final class ArcadePortManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
+    public void onSneakyAssassinsFoodLevelChange(FoodLevelChangeEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SNEAKY_ASSASSINS
+                || !(event.getEntity() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())) return;
+        event.setFoodLevel(20);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onDragonsFoodLevelChange(FoodLevelChangeEvent event) {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.DRAGONS
@@ -12648,6 +12658,10 @@ public final class ArcadePortManager implements Listener {
     public void onBlockBreak(BlockBreakEvent event) {
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
+            event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.DRAW_MY_THING) {
             event.setCancelled(true);
             return;
@@ -12721,6 +12735,10 @@ public final class ArcadePortManager implements Listener {
     public void onBlockPlace(BlockPlaceEvent event) {
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
+            event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.DRAW_MY_THING) {
             event.setCancelled(true);
             return;
