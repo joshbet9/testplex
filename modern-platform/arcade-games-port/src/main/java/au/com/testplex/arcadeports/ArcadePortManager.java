@@ -2477,8 +2477,8 @@ public final class ArcadePortManager implements Listener {
                         player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
                         player.getInventory().addItem(new ItemStack(Material.BOW));
                         player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
-                                "Automatically replenishes up to 3 arrows every 20 seconds.",
-                                ArcadePortRules.MICRO_BATTLES_FLETCHER_MAX_ARROWS));
+                                "Receive 1 arrow every 20 seconds, up to 3.",
+                                ArcadePortRules.MICRO_BATTLES_FLETCHER_STARTING_ARROWS));
                         player.getInventory().addItem(new ItemStack(Material.APPLE, 3));
                         break;
                 }
@@ -2808,7 +2808,7 @@ public final class ArcadePortManager implements Listener {
             if (ArcadePortRules.shouldReplenishMicroArrow(now, next, count,
                     ArcadePortRules.MICRO_BATTLES_FLETCHER_MAX_ARROWS)) {
                 player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
-                        "Automatically replenishes up to 3 arrows every 20 seconds.", 1));
+                        "Receive 1 arrow every 20 seconds, up to 3.", 1));
                 player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8F, 1.0F);
             }
             session.microNextArrowAt.put(id, now + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
@@ -3104,6 +3104,12 @@ public final class ArcadePortManager implements Listener {
                 session.world.spawnParticle(Particle.DUST, cue, 2, 0.015D, 0.025D, 0.015D, 0.0D, dust);
             }
         }
+    }
+
+    private boolean isMicroFletchedArrow(ItemStack item) {
+        return item != null && item.getType() == Material.ARROW && item.hasItemMeta()
+                && item.getItemMeta().hasDisplayName()
+                && item.getItemMeta().getDisplayName().contains("Fletched Arrow");
     }
 
     private boolean isMicroTrackingCompass(ItemStack item) {
@@ -10267,7 +10273,8 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             ItemStack dropped = event.getItemDrop().getItemStack();
             boolean sword = dropped != null && dropped.getType().name().endsWith("_SWORD");
-            if (sword || isMicroTeamLockedItem(dropped) || isMicroTrackingCompass(dropped)) {
+            if (sword || isMicroTeamLockedItem(dropped) || isMicroTrackingCompass(dropped)
+                    || isMicroFletchedArrow(dropped)) {
                 event.setCancelled(true);
             }
             return;
@@ -10286,7 +10293,10 @@ public final class ArcadePortManager implements Listener {
         }
         if (isMicroTeamLockedItem(event.getCurrentItem())
                 || isMicroTeamLockedItem(event.getCursor())
-                || isMicroTeamLockedItem(hotbarSwap)) event.setCancelled(true);
+                || isMicroTeamLockedItem(hotbarSwap)
+                || isMicroFletchedArrow(event.getCurrentItem())
+                || isMicroFletchedArrow(event.getCursor())
+                || isMicroFletchedArrow(hotbarSwap)) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
