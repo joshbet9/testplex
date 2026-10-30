@@ -602,7 +602,7 @@ class ArcadePortGameTest {
 
         org.bukkit.util.Vector lookingDown = ArcadePortRules.spleefLeapVelocity(
                 new org.bukkit.util.Vector(0.0D, -1.0D, 0.0D), false);
-        assertEquals(-0.8D, lookingDown.getY(), 0.00001D);
+        assertEquals(-1.0D, lookingDown.getY(), 0.00001D);
         org.bukkit.util.Vector lookingUp = ArcadePortRules.spleefLeapVelocity(
                 new org.bukkit.util.Vector(0.0D, 1.0D, 0.0D), true);
         assertEquals(1.2D, lookingUp.getY(), 0.00001D);
