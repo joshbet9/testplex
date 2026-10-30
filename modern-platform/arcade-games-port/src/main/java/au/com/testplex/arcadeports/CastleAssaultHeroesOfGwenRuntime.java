@@ -382,7 +382,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private boolean isInsideWitherBoundary(int team, Location location) {
         List<Location> points = witherBoundaries.getOrDefault(team, List.of());
-        if (points.size() < 3) return true;
+        if (points.size() < 3) return false;
         double x = location.getX();
         double z = location.getZ();
         boolean inside = false;
