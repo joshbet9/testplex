@@ -36,8 +36,12 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertTrue(CastleAssaultHeroesOfGwenRuntime.isMiddleTowerMarker("TOWER RED MIDDLE"));
         assertTrue(CastleAssaultHeroesOfGwenRuntime.isMiddleTowerMarker("TOWER_BLUE_MID"));
         assertTrue(CastleAssaultHeroesOfGwenRuntime.isMiddleTowerMarker("TOWER CENTRE LANE"));
-        assertFalse(CastleAssaultHeroesOfGwenRuntime.isMiddleTowerMarker("TOWER RED 1"));
+        // In the archived Heros Valley map, marker 1 is the central tower beside the beacons;
+        // marker 2 is the base-side tower and remains in the Mixed Arcade variant.
+        assertTrue(CastleAssaultHeroesOfGwenRuntime.isMiddleTowerMarker("TOWER RED 1"));
+        assertTrue(CastleAssaultHeroesOfGwenRuntime.isMiddleTowerMarker("TOWER BLUE 1"));
         assertFalse(CastleAssaultHeroesOfGwenRuntime.isMiddleTowerMarker("TOWER BLUE 2"));
+        assertFalse(CastleAssaultHeroesOfGwenRuntime.isMiddleTowerMarker("TOWER RED 2"));
     }
 
     @Test
