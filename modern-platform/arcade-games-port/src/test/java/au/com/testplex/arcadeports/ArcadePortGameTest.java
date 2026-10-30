@@ -1698,6 +1698,13 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.deathTagChasersReceiveSpeed(0, 4));
     }
 
+    @Test void deathTagRunnerSpeedIsAnIrreversibleUnlockAfterTheFirstThresholdCrossing() {
+        assertFalse(ArcadePortRules.deathTagRunnerSpeedUnlocked(false, 1, 4));
+        assertTrue(ArcadePortRules.deathTagRunnerSpeedUnlocked(false, 2, 6));
+        assertTrue(ArcadePortRules.deathTagRunnerSpeedUnlocked(true, 1, 5));
+        assertTrue(ArcadePortRules.deathTagRunnerSpeedUnlocked(true, 0, 4));
+    }
+
     @Test void deathTagArcherUsesThreeTimesKnockbackAndAlphaHalvesIt() {
         assertEquals(3.0D, ArcadePortRules.deathTagArcherArrowKnockbackMultiplier(false), 0.00001D);
         assertEquals(1.5D, ArcadePortRules.deathTagArcherArrowKnockbackMultiplier(true), 0.00001D);
