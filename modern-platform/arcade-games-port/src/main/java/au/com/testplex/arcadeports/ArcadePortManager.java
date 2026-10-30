@@ -4398,6 +4398,42 @@ public final class ArcadePortManager implements Listener {
             session.dragonEscapeNextTntAt.put(id,
                     ArcadePortRules.dragonEscapeNextTntChargeAt(now));
         }
+        updateDragonEscapeSpectatorCompasses(session);
+    }
+
+    /** Reborn's CompassModule points every eliminated racer at the nearest living opponent. */
+    private void updateDragonEscapeSpectatorCompasses(Session session) {
+        List<Player> alive = alivePlayers(session);
+        if (alive.isEmpty()) return;
+        for (Player spectator : session.players.values()) {
+            if (spectator == null || !spectator.isOnline()
+                    || session.alive.contains(spectator.getUniqueId())) continue;
+            if (inventoryCount(spectator, Material.COMPASS) == 0) {
+                spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
+                        "Points toward the nearest living Dragon Escape racer."));
+            }
+            Player target = alive.stream().min(java.util.Comparator.comparingDouble(
+                    candidate -> candidate.getLocation().distanceSquared(spectator.getLocation()))).orElse(null);
+            if (target == null) continue;
+            spectator.setCompassTarget(target.getLocation());
+            ItemStack held = spectator.getInventory().getItemInMainHand();
+            if (isDragonEscapeTrackingCompass(held)) {
+                double distance = spectator.getLocation().distance(target.getLocation());
+                double height = target.getLocation().getY() - spectator.getLocation().getY();
+                spectator.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.GREEN + target.getName()
+                        + ChatColor.WHITE + " | Distance: " + ChatColor.GREEN
+                        + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                        + ChatColor.WHITE + " | Height: " + ChatColor.GREEN
+                        + String.format(java.util.Locale.ROOT, "%.1f", height));
+            }
+        }
+    }
+
+    private boolean isDragonEscapeTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta.hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
     }
 
     /** Remove owner tracking when the source-style dropped TNT item despawns or is removed. */
@@ -7189,6 +7225,16 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onDragonEscapeTrackingCompassDrop(PlayerDropItemEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.DRAGON_ESCAPE
+                && !session.alive.contains(event.getPlayer().getUniqueId())
+                && isDragonEscapeTrackingCompass(event.getItemDrop().getItemStack())) {
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
         Session session = active;
@@ -8149,6 +8195,14 @@ public final class ArcadePortManager implements Listener {
                     player.sendMessage(ChatColor.YELLOW + "There are no living pigs to track.");
                 }
             }
+            return;
+        }
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && !session.alive.contains(player.getUniqueId())
+                && isDragonEscapeTrackingCompass(heldItem)) {
+            // Keep the tracker in the spectator inventory. Vanilla spectator controls
+            // remain available; the compass itself continuously points at the nearest racer.
+            event.setCancelled(true);
             return;
         }
         if (session.type == ArcadePortGame.BOMB_LOBBERS
