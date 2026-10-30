@@ -76,6 +76,16 @@ public final class SnakeRules {
         return actionName != null && !"PHYSICAL".equalsIgnoreCase(actionName);
     }
 
+    public static boolean isKitAbilityItem(String kit, String materialName) {
+        if (kit == null || materialName == null) return false;
+        return switch (kit.toLowerCase(java.util.Locale.ROOT)) {
+            case "speed" -> "FEATHER".equalsIgnoreCase(materialName);
+            case "reverse" -> "COOKIE".equalsIgnoreCase(materialName);
+            case "invulnerable" -> "NETHER_STAR".equalsIgnoreCase(materialName);
+            default -> false;
+        };
+    }
+
     public static boolean isPreparing(long nowMillis, long liveAtMillis) {
         return nowMillis < liveAtMillis;
     }
