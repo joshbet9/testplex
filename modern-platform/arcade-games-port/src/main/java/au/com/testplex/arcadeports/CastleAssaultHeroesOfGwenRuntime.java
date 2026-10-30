@@ -872,7 +872,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     @EventHandler
     public void onStoreClose(InventoryCloseEvent event) {
-        if (event.getPlayer() instanceof Player player) openStores.remove(player.getUniqueId());
+        if (!(event.getPlayer() instanceof Player player)
+                || !(event.getView().getTopInventory().getHolder() instanceof StoreHolder closing)) return;
+        // Opening a different store page closes the previous view; do not remove the new holder.
+        if (closing.equals(openStores.get(player.getUniqueId()))) openStores.remove(player.getUniqueId());
     }
 
     private void purchaseStoreItem(Player player, StoreEntry entry) {
