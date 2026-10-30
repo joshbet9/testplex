@@ -211,6 +211,15 @@ class ArcadePortGameTest {
                 MicroBattlesAchievement.LAST_TWO.configKey(playerId));
     }
 
+    @Test void microBattlesCombatLogCreditsOnlyOtherPlayerAttackersWithinFifteenSeconds() {
+        long now = 50_000L;
+        assertTrue(ArcadePortRules.shouldCreditMicroBattlesAssist(true, false, now, 35_001L));
+        assertFalse(ArcadePortRules.shouldCreditMicroBattlesAssist(true, false, now, 35_000L));
+        assertFalse(ArcadePortRules.shouldCreditMicroBattlesAssist(true, false, now, 50_001L));
+        assertFalse(ArcadePortRules.shouldCreditMicroBattlesAssist(false, false, now, 49_000L));
+        assertFalse(ArcadePortRules.shouldCreditMicroBattlesAssist(true, true, now, 49_000L));
+    }
+
     @Test void microBattlesVerticalMapScanUsesExclusiveMaximum() {
         assertFalse(ArcadePortRules.isMicroCrumbleScanComplete(95, 96));
         assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(96, 96));
