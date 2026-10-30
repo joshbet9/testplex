@@ -1580,6 +1580,223 @@ public final class ArcadePortManager implements Listener {
         player.updateInventory();
     }
 
+    private enum GladiatorMenuType { VOTE, HOTBAR, KILL_MESSAGES }
+
+    private static final class GladiatorMenuHolder implements InventoryHolder {
+        private final GladiatorMenuType type;
+        private int selectedHotbarSlot = -1;
+        private Inventory inventory;
+
+        private GladiatorMenuHolder(GladiatorMenuType type) {
+            this.type = type;
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return inventory;
+        }
+    }
+
+    private ItemStack gladiatorMenuItem(Material material, String title, String lore,
+            String action, String value) {
+        ItemStack item = namedItem(material, title, lore);
+        ItemMeta meta = item.getItemMeta();
+        if (action != null) meta.getPersistentDataContainer().set(
+                gladiatorMenuActionKey, PersistentDataType.STRING, action);
+        if (value != null) meta.getPersistentDataContainer().set(
+                gladiatorMenuValueKey, PersistentDataType.STRING, value);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private void openGladiatorVoteMenu(Player player) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.GLADIATORS
+                || session.gladiatorVotingEndsAt <= System.currentTimeMillis()) return;
+        GladiatorMenuHolder holder = new GladiatorMenuHolder(GladiatorMenuType.VOTE);
+        Inventory inventory = Bukkit.createInventory(holder, 27, "Gladiators — PvP Vote");
+        holder.inventory = inventory;
+        Material[] icons = {Material.FISHING_ROD, Material.BOW, Material.SHIELD, Material.SPLASH_POTION};
+        GladiatorsMode[] modes = GladiatorsMode.values();
+        int[] slots = {10, 12, 14, 16};
+        for (int i = 0; i < modes.length; i++) {
+            GladiatorsMode mode = modes[i];
+            int votes = (int) session.gladiatorVotes.values().stream()
+                    .filter(mode.id()::equals).count();
+            String details = switch (mode) {
+                case RODLESS -> "Bow available; fishing rod disabled.";
+                case BOWLESS -> "Fishing rod available; bow disabled.";
+                case MODERN -> "Sword, axe and shield. No bow or rod.";
+                case POT -> "Sword and healing potions. No bow or rod.";
+            };
+            ItemStack option = gladiatorMenuItem(icons[i], mode.displayName(),
+                    details + " Current votes: " + votes, "vote", mode.id());
+            inventory.setItem(slots[i], option);
+        }
+        inventory.setItem(22, gladiatorMenuItem(Material.CHEST, "Hotbar Editor",
+                "Rearrange your hotbar during the tournament.", "hotbar", null));
+        inventory.setItem(26, gladiatorMenuItem(Material.CLOCK, "Voting closes soon",
+                "Choose one combat ruleset. You may change your vote until the menu closes.", null, null));
+        player.openInventory(inventory);
+    }
+
+    private void openGladiatorHotbarMenu(Player player) {
+        GladiatorMenuHolder holder = new GladiatorMenuHolder(GladiatorMenuType.HOTBAR);
+        Inventory inventory = Bukkit.createInventory(holder, 27, "Gladiators — Hotbar Editor");
+        holder.inventory = inventory;
+        inventory.setItem(4, gladiatorMenuItem(Material.WRITABLE_BOOK, "Hotbar Editor",
+                "Click one hotbar slot, then another to swap them.", null, null));
+        for (int i = 0; i < 9; i++) {
+            ItemStack current = player.getInventory().getItem(i);
+            ItemStack display = current == null || current.getType().isAir()
+                    ? new ItemStack(Material.GRAY_STAINED_GLASS_PANE) : current.clone();
+            ItemMeta meta = display.getItemMeta();
+            if (meta != null) {
+                String oldName = meta.hasDisplayName() ? meta.getDisplayName() : display.getType().name();
+                meta.setDisplayName(ChatColor.YELLOW + "Slot " + (i + 1) + ": " + ChatColor.WHITE + oldName);
+                List<String> lore = new ArrayList<>();
+                lore.add(ChatColor.GRAY + (holder.selectedHotbarSlot == i
+                        ? "Selected — choose another slot." : "Click to select this slot."));
+                lore.add(ChatColor.DARK_GRAY + "Hotbar slot " + (i + 1));
+                meta.setLore(lore);
+                display.setItemMeta(meta);
+            }
+            inventory.setItem(9 + i, display);
+        }
+        inventory.setItem(22, gladiatorMenuItem(Material.BARRIER, "Close",
+                "Return to the duel.", "close", null));
+        player.openInventory(inventory);
+    }
+
+    private void openGladiatorKillMessageMenu(Player player) {
+        GladiatorMenuHolder holder = new GladiatorMenuHolder(GladiatorMenuType.KILL_MESSAGES);
+        Inventory inventory = Bukkit.createInventory(holder, 27, "Gladiators — Kill Messages");
+        holder.inventory = inventory;
+        String current = plugin.getConfig().getString(
+                "players." + player.getUniqueId() + ".games.gladiators.kill-message", "classic");
+        String[][] options = {
+                {"classic", "Classic", "was defeated by"},
+                {"sand", "Sent to the Sand", "was sent to the sand by"},
+                {"oath", "Broken Oath", "'s challenge was ended by"},
+                {"outclassed", "Outclassed", "was no match for"}
+        };
+        Material[] icons = {Material.IRON_SWORD, Material.SAND, Material.SHIELD, Material.CROSSHAIR};
+        for (int i = 0; i < options.length; i++) {
+            String id = options[i][0];
+            String selected = current.equals(id) ? "Selected" : "Click to equip";
+            inventory.setItem(10 + i * 2, gladiatorMenuItem(icons[i], options[i][1],
+                    selected + " — " + options[i][2], "kill-message", id));
+        }
+        inventory.setItem(22, gladiatorMenuItem(Material.BARRIER, "Close", "Return to the game.", "close", null));
+        player.openInventory(inventory);
+    }
+
+    private String gladiatorHotbarItemKey(ItemStack item) {
+        if (item == null || item.getType().isAir()) return "";
+        ItemMeta meta = item.getItemMeta();
+        return item.getType().name() + ":" + (meta != null && meta.hasDisplayName()
+                ? ChatColor.stripColor(meta.getDisplayName()) : "");
+    }
+
+    private void saveGladiatorHotbarLayout(Player player) {
+        List<String> layout = new ArrayList<>();
+        for (int i = 0; i < 9; i++) layout.add(gladiatorHotbarItemKey(player.getInventory().getItem(i)));
+        plugin.getConfig().set("players." + player.getUniqueId()
+                + ".games.gladiators.hotbar-layout", layout);
+        plugin.saveConfig();
+    }
+
+    private void applyGladiatorHotbarLayout(Player player) {
+        List<String> layout = plugin.getConfig().getStringList("players." + player.getUniqueId()
+                + ".games.gladiators.hotbar-layout");
+        if (layout.size() != 9) return;
+        ItemStack[] source = new ItemStack[9];
+        boolean[] used = new boolean[9];
+        ItemStack[] ordered = new ItemStack[9];
+        boolean[] assigned = new boolean[9];
+        for (int i = 0; i < 9; i++) {
+            ItemStack item = player.getInventory().getItem(i);
+            source[i] = item == null ? null : item.clone();
+        }
+        for (int target = 0; target < 9; target++) {
+            String wanted = layout.get(target);
+            if (wanted == null || wanted.isEmpty()) {
+                assigned[target] = true;
+                continue;
+            }
+            for (int sourceSlot = 0; sourceSlot < 9; sourceSlot++) {
+                if (!used[sourceSlot] && wanted.equals(gladiatorHotbarItemKey(source[sourceSlot]))) {
+                    ordered[target] = source[sourceSlot];
+                    used[sourceSlot] = true;
+                    assigned[target] = true;
+                    break;
+                }
+            }
+        }
+        int next = 0;
+        for (int target = 0; target < 9; target++) {
+            if (assigned[target]) continue;
+            while (next < 9 && used[next]) next++;
+            if (next < 9) {
+                ordered[target] = source[next];
+                used[next] = true;
+            }
+        }
+        for (int i = 0; i < 9; i++) player.getInventory().setItem(i, ordered[i]);
+    }
+
+    private void useGladiatorHealingPotion(Player player, ItemStack item) {
+        if (item == null || player == null || !player.isOnline()) return;
+        double before = player.getHealth();
+        player.setHealth(Math.min(player.getMaxHealth(), before + 4.0D));
+        item.setAmount(item.getAmount() - 1);
+        player.getWorld().spawnParticle(Particle.HEART,
+                player.getLocation().clone().add(0.0D, 1.0D, 0.0D), 8, 0.35D, 0.45D, 0.35D, 0.02D);
+        player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_DRINK, 0.9F, 1.2F);
+        player.sendActionBar(ChatColor.LIGHT_PURPLE + "Potion used — +" + (int) (player.getHealth() - before) + " health");
+        player.updateInventory();
+    }
+
+    private void announceGladiatorKill(Session session, Player killer, Player victim) {
+        String style = plugin.getConfig().getString(
+                "players." + killer.getUniqueId() + ".games.gladiators.kill-message", "classic");
+        String message = switch (style == null ? "classic" : style) {
+            case "sand" -> ChatColor.GRAY + victim.getName() + " was sent to the sand by " + ChatColor.GOLD + killer.getName();
+            case "oath" -> ChatColor.GRAY + victim.getName() + "'s challenge was ended by " + ChatColor.GOLD + killer.getName();
+            case "outclassed" -> ChatColor.GRAY + victim.getName() + " was no match for " + ChatColor.GOLD + killer.getName();
+            default -> ChatColor.GRAY + victim.getName() + " was defeated by " + ChatColor.GOLD + killer.getName();
+        };
+        announce(session, ChatColor.DARK_GRAY + "[Gladiators] " + message + ChatColor.GRAY + ".");
+    }
+
+    private void awardGladiatorsAchievement(Player player, String achievementId, String displayName) {
+        if (player == null) return;
+        String path = ArcadePortRules.gladiatorsAchievementConfigKey(player.getUniqueId(), achievementId);
+        if (plugin.getConfig().getBoolean(path, false)) return;
+        plugin.getConfig().set(path, true);
+        plugin.saveConfig();
+        player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + ChatColor.YELLOW + displayName);
+        player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.15F);
+    }
+
+    private void recordGladiatorsLoserBracketWin(Player player) {
+        if (player == null) return;
+        String path = ArcadePortRules.gladiatorsMilestoneConfigKey(player.getUniqueId());
+        int wins = plugin.getConfig().getInt(path, 0) + 1;
+        plugin.getConfig().set(path, wins);
+        plugin.saveConfig();
+        player.sendMessage(ChatColor.LIGHT_PURPLE + "Silky Seconds — Loser Bracket Wins: " + wins);
+    }
+
+    private void recordGladiatorsWinnerAchievements(Session session, Player winner) {
+        GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
+        UUID id = winner.getUniqueId();
+        if (ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(mode != null && mode.hasClassicRangedTools(),
+                session.gladiatorUsedBow.contains(id), session.gladiatorUsedRod.contains(id))) {
+            awardGladiatorsAchievement(winner, "are-you-not-entertained", "Are you not entertained?");
+        }
+    }
+
     private static final int GLADIATOR_BRACKET_WINNERS = 0;
     private static final int GLADIATOR_BRACKET_LOSERS = 1;
     private static final int GLADIATOR_BRACKET_FINAL = 2;
@@ -1590,7 +1807,11 @@ public final class ArcadePortManager implements Listener {
         session.gladiatorVotingEndsAt = System.currentTimeMillis() + 15_000L;
         announce(session, ChatColor.GOLD + "Gladiators vote: choose the PvP rules for this tournament.");
         for (Player player : session.players.values()) {
-            if (player != null && player.isOnline()) openGladiatorVoteMenu(player);
+            if (player == null || !player.isOnline()) continue;
+            player.closeInventory();
+            player.getInventory().clear();
+            player.setGameMode(GameMode.ADVENTURE);
+            openGladiatorVoteMenu(player);
         }
     }
 
