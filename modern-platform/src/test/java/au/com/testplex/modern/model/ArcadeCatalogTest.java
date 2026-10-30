@@ -73,6 +73,20 @@ class ArcadeCatalogTest {
     }
 
     @Test
+    void spleefHasOneSelectableBlockBreakSignatureLine() {
+        GameDefinition spleef = new ArcadeCatalog().getGame("spleef");
+        assertEquals(1, spleef.getCosmeticLines().size());
+        CosmeticLineDefinition line = spleef.getCosmeticLines().get(0);
+        assertEquals("break-signature", line.getId());
+        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, line.getSelectionMode());
+        assertEquals(Set.of("snowburst", "ice-shards", "chalk-grid"),
+                line.getOptions().stream().map(CosmeticOption::getId)
+                        .collect(java.util.stream.Collectors.toSet()));
+        assertTrue(line.getOptions().stream()
+                .allMatch(option -> "signature".equals(option.getSelectionGroup())));
+    }
+
+    @Test
     void allGameLookupsAreCaseInsensitive() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         assertNotNull(catalog.getGame("SNAKE"));
