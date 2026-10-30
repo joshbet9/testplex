@@ -1562,6 +1562,7 @@ public final class ArcadePortRules {
             case BOMB_LOBBERS -> mapName != null && mapName.equalsIgnoreCase("Intergalactic")
                     ? 18_000L : 6_000L;
             case SHEEP_QUEST -> 2_000L;
+            case SKY_WARS -> 0L;
             case DRAGON_ESCAPE -> mapName != null
                     && mapName.toLowerCase(java.util.Locale.ROOT).contains("hell") ? 16_000L : 12_000L;
             default -> 12_000L;
