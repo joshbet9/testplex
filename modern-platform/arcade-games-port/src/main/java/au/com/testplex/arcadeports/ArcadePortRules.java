@@ -1599,7 +1599,8 @@ public final class ArcadePortRules {
 
     /** Original Death Tag lights switch between gold blocks and white wool each second. */
     public static Material deathTagNextLightMaterial(Material current) {
-        return current == Material.GOLD_BLOCK ? Material.WHITE_WOOL : Material.GOLD_BLOCK;
+        // Original 1.8 marker uses wool data value 15, which maps to BLACK_WOOL.
+        return current == Material.GOLD_BLOCK ? Material.BLACK_WOOL : Material.GOLD_BLOCK;
     }
 
     /** Reborn's runner speed threshold is strictly greater than 25% chasers. */
