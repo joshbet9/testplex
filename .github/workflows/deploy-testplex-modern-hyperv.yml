@@ -529,7 +529,7 @@ jobs:
 
           sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
           # Install the platform catalogue, Monster Maze (whose core feedback/nameplate features are in this port),
-          # and the Arcade mechanics module. Only Bacon Brawl, Bomb Lobbers, Dragon Escape, Paintball and Runner are enabled for live acceptance; all other games remain gated.
+          # and the Arcade mechanics module. Only Bacon Brawl, Bomb Lobbers, Dragon Escape, Gladiators, Paintball and Runner are enabled for live acceptance; all other games remain gated.
           for jar in TestplexModernArcade.jar MonsterMazeModern.jar ArcadeMechanicsModern.jar; do
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
           done
