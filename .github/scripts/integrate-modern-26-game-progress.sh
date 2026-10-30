@@ -438,6 +438,25 @@ if "boolean sheepQuestUpdatedBeforeTimeout = false;" not in source:
     source = source.replace(tick_anchor,
                             tick_anchor + "\n        boolean sheepQuestUpdatedBeforeTimeout = false;", 1)
 
+# Keep the shared status switch exhaustive as the new port IDs are registered.
+status_start = source.find("    private String gameStatusText(Session session, Player player) {")
+status_end = source.find("\n    private ", status_start + 20)
+if status_start < 0 or status_end < 0:
+    raise SystemExit("Could not find the game status switch for the expanded game enum.")
+status_method = source[status_start:status_end]
+status_cases = [
+    ('case SKY_WARS ->', '            case SKY_WARS -> (session.skyWarsLive ? "alive " : "starting ")\n                    + session.alive.size() + " | TNT " + inventoryCount(player, Material.TNT);\n'),
+    ('case MILK_THE_COW ->', '            case MILK_THE_COW -> "milk " + scoreFor(session, id) + "/" + MilkCowRules.SCORE_TO_WIN\n                    + (session.teams.getOrDefault(id, 0) == 1 ? " | COW" : " | FARMER");\n'),
+    ('case WITHER_ASSAULT ->', '            case WITHER_ASSAULT -> (session.teams.getOrDefault(id, 0) == 1 ? "WITHER" : "HUMAN")\n                    + " | " + Math.max(0, (int) ((session.endsAt - System.currentTimeMillis()) / 1_000L)) + "s";\n'),
+]
+for case_marker, case_text in status_cases:
+    if case_marker not in status_method:
+        turf_anchor = "            case TURF_WARS ->"
+        if turf_anchor not in status_method:
+            raise SystemExit(f"Could not find status switch insertion anchor for {case_marker}.")
+        status_method = status_method.replace(turf_anchor, case_text + turf_anchor, 1)
+source = source[:status_start] + status_method + source[status_end:]
+
 path.write_text(source)
 print("Reconciled SkyWars helper declarations, spawn placement, shared queue, and Sheep Quest holder cleanup.")
 PY
