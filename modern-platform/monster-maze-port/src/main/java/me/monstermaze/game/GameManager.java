@@ -244,11 +244,9 @@ public void startGame(Location preferCenter, int requestedPattern) {
         roundParticipants.clear();
         for (Player player : startingPlayers) {
             if (player != null && player.isOnline() && player.getGameMode() != GameMode.SPECTATOR) {
+                // Keep players in Testplex's shared lobby while the maze is generated.
+                // They enter the arena only when the game is ready to start.
                 roundParticipants.add(player.getUniqueId());
-                if (testplexManagedRound) {
-                    player.closeInventory();
-                    player.teleport(center.clone().add(0.5D, 1.0D, 0.5D));
-                }
             }
         }
 
@@ -273,9 +271,15 @@ public void startGame(Location preferCenter, int requestedPattern) {
                         continue;
                     }
                     UUID playerId = p.getUniqueId();
-                    if (!roundParticipants.contains(playerId)
-                            || !isInArenaWorld(center == null ? null : center.getWorld(), p.getWorld())
-                            || p.getGameMode() == GameMode.SPECTATOR) {
+                    if (!roundParticipants.contains(playerId) || p.getGameMode() == GameMode.SPECTATOR) {
+                        roundParticipants.remove(playerId);
+                        continue;
+                    }
+                    if (testplexManagedRound) {
+                        p.closeInventory();
+                        p.teleport(center.clone().add(0.5D, 1.0D, 0.5D));
+                    }
+                    if (!isInArenaWorld(center == null ? null : center.getWorld(), p.getWorld())) {
                         roundParticipants.remove(playerId);
                         continue;
                     }
@@ -995,7 +999,9 @@ public void startGame(Location preferCenter, int requestedPattern) {
         for (UUID id : new HashSet<UUID>(roundParticipants)) {
             Player player = Bukkit.getPlayer(id);
             if (player == null) continue;
-            if (!shouldIncludeRoundAudience(true, player.isOnline(), liveAudience,
+            boolean requireArenaWorld = liveAudience
+                    && !(testplexManagedRound && state == GameState.STARTING);
+            if (!shouldIncludeRoundAudience(true, player.isOnline(), requireArenaWorld,
                     arenaWorld, player.getWorld())) continue;
             players.add(player);
         }
@@ -1031,6 +1037,11 @@ public void startGame(Location preferCenter, int requestedPattern) {
         UUID id = player.getUniqueId();
         if (center == null) return;
         World arenaWorld = center.getWorld();
+        if (testplexManagedRound && state == GameState.STARTING && roundParticipants.contains(id)) {
+            // Testplex participants intentionally remain in the shared Arcade lobby
+            // while the arena is generated; do not treat that as leaving the game.
+            return;
+        }
         if (shouldRedirectUnregisteredPlayer(state, roundParticipants.contains(id),
                 arenaWorld, player.getWorld())) {
             if (testplexReturnToLobby != null) testplexReturnToLobby.accept(player);
