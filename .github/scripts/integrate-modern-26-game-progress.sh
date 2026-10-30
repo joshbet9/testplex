@@ -1018,6 +1018,14 @@ mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom
 mvn --batch-mode --no-transfer-progress -f modern-platform/wizards-port/pom.xml clean verify
 
 git diff --check
+# GITHUB_TOKEN intentionally lacks GitHub App "workflows" permission. Leave
+# workflow-file updates for the connected GitHub repository integration to
+# apply after the game-code merge; do not try to push workflow changes here.
+git restore --source=HEAD -- .github/workflows
+if git diff --name-only -- .github/workflows | grep -q .; then
+  echo "Workflow files must be updated through the repository integration, not this GITHUB_TOKEN." >&2
+  exit 1
+fi
 git add -A
 if ! git diff --cached --quiet; then
   git commit -m "Integrate reconciled 26-game modern Arcade progress"
