@@ -5715,17 +5715,8 @@ public final class ArcadePortManager implements Listener {
             if (!tabName.equals(racer.getPlayerListName())) racer.setPlayerListName(tabName);
         }
         if (session.ticks % 4 != 0) return;
-        Particle.DustOptions whiteGhost = new Particle.DustOptions(Color.fromRGB(200, 250, 255), 1.2F);
-        for (Player racer : order) {
-            if (!isDragonEscapeGhostEnabled(racer.getUniqueId())) continue;
-            Location ghost = dragonEscapeGhostLocation(session, racer.getUniqueId(), elapsed);
-            if (ghost != null && ghost.getWorld() == racer.getWorld()) {
-                racer.spawnParticle(Particle.DUST, ghost.clone().add(0.0D, 0.9D, 0.0D), 8,
-                        0.22D, 0.35D, 0.22D, 0.0D, whiteGhost);
-                racer.spawnParticle(Particle.END_ROD, ghost.clone().add(0.0D, 1.0D, 0.0D), 2,
-                        0.12D, 0.2D, 0.12D, 0.0D);
-            }
-        }
+        // The PB itself is rendered by the packet-only translucent player model.
+        // Keep these particles exclusively for the race-leader beacon.
         Color beaconRgb = dragonEscapeBeaconRgb(session.dragonEscapeBeaconColor);
         Particle.DustOptions beaconDust = new Particle.DustOptions(beaconRgb, 1.7F);
         Location beacon = leader.getLocation().clone().add(0.0D, 1.4D, 0.0D);
