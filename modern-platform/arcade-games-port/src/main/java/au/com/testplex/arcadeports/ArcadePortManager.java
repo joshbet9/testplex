@@ -11103,6 +11103,27 @@ public final class ArcadePortManager implements Listener {
         disguise.teleport(player.getLocation());
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onWitherCopyCombust(org.bukkit.event.entity.EntityCombustEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.WITHER_ASSAULT
+                && event.getEntity() instanceof Skeleton skeleton
+                && session.witherOutCopies.containsValue(skeleton)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onWitherMinionFallDamage(EntityDamageEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.WITHER_ASSAULT
+                && event.getCause() == EntityDamageEvent.DamageCause.FALL
+                && event.getEntity() instanceof Skeleton skeleton
+                && session.witherMinionOwners.containsKey(skeleton.getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
     private void playerOutWitherAssault(Session session, Player player) {
         if (active != session || player == null || !session.alive.remove(player.getUniqueId())) return;
         UUID id = player.getUniqueId();
@@ -11174,6 +11195,7 @@ public final class ArcadePortManager implements Listener {
             if (!(entity instanceof Arrow arrow) || !arrow.isValid() || arrow.isOnGround()
                     || arrow.getTicksLived() > 60 || arrow.getLocation().getY() < 0) {
                 session.witherFireArrows.remove(arrowId);
+                if (entity != null) entity.getWorld().spawnParticle(Particle.LAVA, entity.getLocation(), 1);
                 session.entities.remove(entity);
                 if (entity != null && entity.isValid()) entity.remove();
             } else if (arrow.getTicksLived() > 1) {
@@ -11213,7 +11235,13 @@ public final class ArcadePortManager implements Listener {
             minion.setCustomName(ChatColor.DARK_GRAY + "Skeletal Minion");
             minion.setCustomNameVisible(false);
             minion.getEquipment().setHelmet(new ItemStack(Material.WITHER_SKELETON_SKULL));
-            minion.getEquipment().setChestplate(new ItemStack(Material.LEATHER_CHESTPLATE));
+            ItemStack minionChestplate = new ItemStack(Material.LEATHER_CHESTPLATE);
+            LeatherArmorMeta minionArmor = (LeatherArmorMeta) minionChestplate.getItemMeta();
+            if (minionArmor != null) {
+                minionArmor.setColor(Color.BLACK);
+                minionChestplate.setItemMeta(minionArmor);
+            }
+            minion.getEquipment().setChestplate(minionChestplate);
             minion.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 300, 0, false, false, false));
             minion.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 300, 0, false, false, false));
             Vector direction = player.getLocation().getDirection().clone();
