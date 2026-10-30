@@ -7,7 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Modern catalogue for all 16 Arcade games. Each game owns its own cosmetic
+ * Modern catalogue for all 17 Arcade games. Each game owns its own cosmetic
  * lines and win-scene choices; actual render/gameplay handlers are added with
  * each port rather than pretending global cosmetics are game-specific.
  */
@@ -213,6 +213,16 @@ public final class ArcadeCatalog {
                 win("ice-throne", "Ice Throne", "A seat of ice rises from the surviving floor."),
                 win("last-snowflake", "Last Snowflake", "A single snowflake floats above the winner."),
                 win("shovel-salute", "Shovel Salute", "A ceremonial row of shovels rises from the floor")));
+
+        register(game("skywars", "SkyWars", "TNT", "Loot your island, fight across the sky and survive the collapse.",
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                List.of(line("sky-combat-signature", "Sky Combat Signature", "A visible identity for throwable TNT and fast island collapse.", "TNT",
+                        single("tnt-burst", "TNT Burst", "A bright TNT burst with smoke and ember sparks."),
+                        single("skyfall", "Skyfall", "A short wind ring marks the explosion path."),
+                        single("island-collapse", "Island Collapse", "A block-shatter cue marks the island crumble."))),
+                win("sky-island", "Sky Island", "The winner is raised above a floating island."),
+                win("last-survivor", "Last Survivor", "A beacon shines over the last player standing."),
+                win("skyfall-crown", "Skyfall Crown", "A floating crown of cloud and TNT frames the winner.")));
 
         register(game("turf-wars", "Turf Wars", "BOW", "Win ranged combat and control the central turf.",
                 GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
