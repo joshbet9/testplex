@@ -1,10 +1,8 @@
 # Isolated manual-acceptance candidates. Availability does not itself certify 100% in-game parity.
 # Draw My Thing and Master Builders are available as modern Arcade-format prototypes.
 # Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball, Runner and Spleef are available as live-acceptance candidates.
-# Candidate availability is not a claim of complete live parity certification.
-# Candidate availability is not a claim of complete live parity certification.
-# Candidate availability is not a claim of complete live parity certification.
 enabled-games:
+  # Enabled for mechanics review; Reborn has no original map archive for this game.
   - sneaky-assassins
   - bacon-brawl
   - bomb-lobbers
