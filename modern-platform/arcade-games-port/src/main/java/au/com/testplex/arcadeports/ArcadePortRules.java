@@ -1647,6 +1647,27 @@ public final class ArcadePortRules {
         };
     }
 
+    /** A classic-tool challenge is only meaningful in a ruleset that supplies a bow or rod. */
+    public static boolean shouldAwardGladiatorsNoBowOrRodWin(
+            boolean classicToolsAvailable, boolean usedBow, boolean usedRod) {
+        return classicToolsAvailable && !usedBow && !usedRod;
+    }
+
+    /** Half a heart is one health point in Bukkit's two-points-per-heart scale. */
+    public static boolean shouldAwardGladiatorsHalfHeartWin(double winnerHealth) {
+        return Double.isFinite(winnerHealth) && winnerHealth > 0.0D && winnerHealth <= 1.0001D;
+    }
+
+    public static String gladiatorsAchievementConfigKey(java.util.UUID playerId, String achievementId) {
+        String safeId = achievementId == null ? "" : achievementId.toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z0-9-]", "");
+        return "test-achievements.gladiators." + playerId + "." + safeId;
+    }
+
+    public static String gladiatorsMilestoneConfigKey(java.util.UUID playerId) {
+        return "test-milestones.gladiators." + playerId + ".silky-seconds";
+    }
+
     /** Turf floor is the block below players' source spawn feet location. */
     public static int turfWarsFloorYFromSpawn(double spawnY) {
         if (!Double.isFinite(spawnY)) return 63;
