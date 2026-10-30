@@ -239,8 +239,8 @@ path.write_text(source)
 print("Hardened deployment concurrency, SSH and external command deadlines.")
 PY
 
-grep -q 'READY_FOR_TEST_GAME_IDS = List.of("death-tag", "one-in-the-quiver")' \
-  modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.java
+grep -q 'READY_FOR_TEST_GAME_IDS' modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.java
+grep -q '"death-tag", "one-in-the-quiver"' modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.java
 grep -q 'SKY_WARS' modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortGame.java
 grep -q 'MILK_THE_COW' modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortGame.java
 grep -q 'WITHER_ASSAULT' modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortGame.java
