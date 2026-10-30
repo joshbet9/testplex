@@ -2094,9 +2094,21 @@ class ArcadePortGameTest {
         assertEquals(2.0D, ArcadePortRules.paintballHealthAfterHit(0), 0.00001D);
     }
 
-    @Test void microBattlesUsesNonLethalWeaponHitsAndMinimumHunger() {
-        assertEquals(4.0D, ArcadePortRules.microBattlesHitDamage(true), 0.00001D);
-        assertEquals(6.0D, ArcadePortRules.microBattlesHitDamage(false), 0.00001D);
+    @Test void microBattlesUsesSourceWeaponProjectileArmourAndKnockbackFormulas() {
+        assertEquals(9.0D, ArcadePortRules.microBattlesArrowDamage(3.0D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.microBattlesArrowDamage(0.0D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.microBattlesArrowDamage(Double.NaN), 0.00001D);
+        assertEquals(3.0D, ArcadePortRules.microBattlesMeleeDamage("WOODEN_SWORD"), 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.microBattlesMeleeDamage("STONE_AXE"), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.microBattlesMeleeDamage("IRON_SWORD"), 0.00001D);
+        assertEquals(7.0D, ArcadePortRules.microBattlesMeleeDamage("DIAMOND_SWORD"), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.microBattlesMeleeDamage("STONE_PICKAXE"), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.microBattlesMeleeDamage("AIR"), 0.00001D);
+        assertEquals(2.16D, ArcadePortRules.microBattlesDamageAfterArmor(3.0D, 7.0D), 0.00001D);
+        assertEquals(1.8D, ArcadePortRules.microBattlesDamageAfterArmor(2.5D, 7.0D), 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.microBattlesDamageAfterArmor(2.0D, 0.0D), 0.00001D);
+        assertEquals(Math.log10(3.0D) * 1.6D,
+                ArcadePortRules.microBattlesArrowKnockback(3.0D), 0.00001D);
         assertEquals(2, ArcadePortRules.microBattlesMinimumFoodLevel(0));
         assertEquals(2, ArcadePortRules.microBattlesMinimumFoodLevel(2));
         assertEquals(7, ArcadePortRules.microBattlesMinimumFoodLevel(7));
