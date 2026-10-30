@@ -4668,8 +4668,8 @@ public final class ArcadePortManager implements Listener {
         if (projectile != null) {
             trajectory = projectile.getVelocity().clone().setY(0.0D);
             double horizontalLength = trajectory.length();
-            if (horizontalLength <= 0.000001D) trajectory = new Vector(0.0D, 0.0D, 0.0D);
-            else trajectory.multiply(0.37D * knockback / horizontalLength);
+            if (horizontalLength <= 0.000001D) return;
+            trajectory.multiply(0.37D * knockback / horizontalLength);
             trajectory.setY(0.06D);
         } else {
             trajectory = target.getLocation().toVector()
