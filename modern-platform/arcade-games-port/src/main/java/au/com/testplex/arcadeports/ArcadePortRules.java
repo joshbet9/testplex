@@ -1478,6 +1478,12 @@ public final class ArcadePortRules {
         return from + Math.round((to - from) * progress);
     }
 
+    /** Interpolate one coordinate on a recorded PB ghost segment. */
+    public static double interpolateDragonEscapeCoordinate(double from, double to, double fraction) {
+        double progress = Double.isFinite(fraction) ? Math.max(0.0D, Math.min(1.0D, fraction)) : 0.0D;
+        return from + (to - from) * progress;
+    }
+
     public static boolean shouldDragonEscapePlayerBeCaught(double dragonProgress, double playerProgress) {
         return dragonProgress > playerProgress;
     }
