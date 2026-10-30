@@ -2660,7 +2660,7 @@ public final class ArcadePortManager implements Listener {
         String kit = session.sheepQuestKits.getOrDefault(id, "beserker");
         player.getInventory().clear();
         player.getInventory().setItemInOffHand(null);
-        player.setArmorContents(new ItemStack[] {
+        player.getInventory().setArmorContents(new ItemStack[] {
                 sheepQuestTeamArmourItem(team, Material.LEATHER_BOOTS),
                 sheepQuestTeamArmourItem(team, Material.LEATHER_LEGGINGS),
                 sheepQuestTeamArmourItem(team, Material.LEATHER_CHESTPLATE),
@@ -6164,10 +6164,11 @@ public final class ArcadePortManager implements Listener {
             double x = 0.0D, y = 0.0D, z = 0.0D;
             for (Location block : pen) {
                 x += block.getBlockX() + 0.5D;
-                y += block.getBlockY() + 1.0D;
+                y += block.getBlockY();
                 z += block.getBlockZ() + 0.5D;
             }
-            return new Location(session.world, x / pen.size(), y / pen.size(), z / pen.size());
+            // DATA_LOCS are the exact blocks compared by the legacy SheepData.IsInsideOwnPen().
+        return new Location(session.world, x / pen.size(), y / pen.size(), z / pen.size());
         }
         return new Location(session.world, sheepPenCenterX(team) + 0.5D, 64.0D,
                 sheepPenCenterZ(team) + 0.5D);
@@ -6315,9 +6316,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean pickUpSheepQuest(Session session, Player player, Sheep sheep, long now) {
+        ItemStack held = player == null ? null : player.getInventory().getItemInMainHand();
         if (session == null || player == null || sheep == null || !sheep.isValid()
                 || !session.alive.contains(player.getUniqueId())
-                || player.getInventory().getItemInMainHand().getType() != Material.SADDLE
+                || held == null || held.getType() != Material.SADDLE
                 || sheep.isInsideVehicle() || session.sheepCarriers.containsKey(sheep)) return false;
         UUID id = player.getUniqueId();
         if (!ArcadePortRules.sheepQuestPickupReady(now,
@@ -6370,7 +6372,7 @@ public final class ArcadePortManager implements Listener {
         List<Location> pen = sourceSheepPenBlocks(session, team);
         if (pen.isEmpty()) return sheepQuestPenCenter(session, team);
         Location marker = pen.get(ThreadLocalRandom.current().nextInt(pen.size())).clone();
-        return marker.add(0.5D, 1.0D, 0.5D);
+        return marker.add(0.5D, 0.0D, 0.5D);
     }
 
     private void updateSheepQuestThrownEntities(Session session, long now) {
@@ -6435,7 +6437,7 @@ public final class ArcadePortManager implements Listener {
                 if (top != null) top.addPassenger(sheep);
             }
             int team = session.teams.getOrDefault(carrierId, -1);
-            if (team < 0 || team > 3 || !isInsideSheepPen(session, carrier.getLocation(), team)) continue;
+            if (team < 0 || team > 3 || !isInsideSheepPen(session, sheep.getLocation(), team)) continue;
 
             int previousOwner = session.sheepOwners.getOrDefault(sheep, -1);
             sheep.leaveVehicle();
@@ -6480,7 +6482,8 @@ public final class ArcadePortManager implements Listener {
         // The source polls every live player while they hold a saddle; right-clicking
         // a sheep is not required. Its reach is 2.5 blocks and the pickup recharge is 500ms.
         for (Player player : alivePlayers(session)) {
-            if (player.getInventory().getItemInMainHand().getType() != Material.SADDLE) continue;
+            ItemStack held = player.getInventory().getItemInMainHand();
+            if (held == null || held.getType() != Material.SADDLE) continue;
             UUID id = player.getUniqueId();
             if (!ArcadePortRules.sheepQuestPickupReady(now,
                     session.sheepNextPickupAt.getOrDefault(id, 0L))) continue;

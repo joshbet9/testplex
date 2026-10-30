@@ -1,5 +1,5 @@
 # Isolated manual-acceptance candidates. Availability does not itself certify 100% in-game parity.
-# Bomb Lobbers, Dragon Escape, Paintball and Runner are open for in-game acceptance after their feature builds passed CI.
+# Sheep Quest is enabled for 26.3 in-game acceptance after its parity build passes CI.
 # Candidate availability is not a claim of complete live parity certification.
 enabled-games:
   - bacon-brawl

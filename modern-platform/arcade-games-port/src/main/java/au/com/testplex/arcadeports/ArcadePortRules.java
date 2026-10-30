@@ -1238,10 +1238,10 @@ public final class ArcadePortRules {
         };
     }
 
-    /** WorldConfig pen markers describe the floor; the sheep's feet block is one block above it. */
+    /** WorldConfig DATA_LOCS are compared with Sheep.getLocation().getBlock() in the 1.8 source. */
     public static boolean sheepQuestInsidePenMarker(int sheepBlockX, int sheepFeetY, int sheepBlockZ,
-            int markerX, int markerFloorY, int markerZ) {
-        return sheepBlockX == markerX && sheepFeetY == markerFloorY + 1 && sheepBlockZ == markerZ;
+            int markerX, int markerY, int markerZ) {
+        return sheepBlockX == markerX && sheepFeetY == markerY && sheepBlockZ == markerZ;
     }
 
     public static final double SHEEP_QUEST_PLAYER_HIT_DAMAGE = 4.0D;

@@ -2017,11 +2017,11 @@ class ArcadePortGameTest {
         assertEquals("UNASSIGNED", ArcadePortRules.sheepQuestTeamPenMarker(4));
     }
 
-    @Test void sheepQuestPenMarkersMatchTheFloorOneBlockBelowSheepFeet() {
-        assertTrue(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -4, 10, 63, -4));
-        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 63, -4, 10, 63, -4));
-        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(11, 64, -4, 10, 63, -4));
-        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -3, 10, 63, -4));
+    @Test void sheepQuestPenMarkersMatchTheExactSourceDataLocations() {
+        assertTrue(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -4, 10, 64, -4));
+        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 65, -4, 10, 64, -4));
+        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(11, 64, -4, 10, 64, -4));
+        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -3, 10, 64, -4));
     }
 
     @Test void sheepQuestPlayerHitsDropSheepAndDealDamage() {
