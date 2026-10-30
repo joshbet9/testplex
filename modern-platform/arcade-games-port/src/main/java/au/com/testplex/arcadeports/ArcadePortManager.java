@@ -1846,12 +1846,32 @@ public final class ArcadePortManager implements Listener {
             disguise.teleport(player.getLocation());
         }
         disguise.setCustomName(ChatColor.RED + player.getName());
-        // Hide the real Player entity from every other viewer (including held equipment),
+        // Hide the real Player entity from each viewer once, including held equipment,
         // while leaving the server-side Player available for combat and stat attribution.
-        for (Player viewer : Bukkit.getOnlinePlayers()) {
-            if (!viewer.getUniqueId().equals(id)) viewer.hideEntity(plugin, player);
-        }
+        hideDeathTagRealPlayer(session, player);
         player.removePotionEffect(PotionEffectType.INVISIBILITY);
+    }
+
+    private void hideDeathTagRealPlayer(Session session, Player realPlayer) {
+        if (session == null || realPlayer == null) return;
+        UUID playerId = realPlayer.getUniqueId();
+        Set<UUID> hiddenViewers = session.deathTagHiddenViewers.computeIfAbsent(
+                playerId, ignored -> new HashSet<>());
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            UUID viewerId = viewer.getUniqueId();
+            if (!viewerId.equals(playerId) && hiddenViewers.add(viewerId)) {
+                viewer.hideEntity(plugin, realPlayer);
+            }
+        }
+    }
+
+    private void showDeathTagRealPlayer(Session session, Player realPlayer) {
+        if (session == null || realPlayer == null) return;
+        Set<UUID> hiddenViewers = session.deathTagHiddenViewers.remove(realPlayer.getUniqueId());
+        if (hiddenViewers == null || hiddenViewers.isEmpty()) return;
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            if (hiddenViewers.contains(viewer.getUniqueId())) viewer.showEntity(plugin, realPlayer);
+        }
     }
 
     private void removeDeathTagDisguise(Session session, UUID playerId) {
@@ -1861,13 +1881,7 @@ public final class ArcadePortManager implements Listener {
             session.entities.remove(disguise);
             if (disguise.isValid()) disguise.remove();
         }
-        Player realPlayer = session.players.get(playerId);
-        if (realPlayer != null && realPlayer.isOnline()) {
-            for (Player viewer : Bukkit.getOnlinePlayers()) {
-                if (!viewer.getUniqueId().equals(playerId)) viewer.showEntity(plugin, realPlayer);
-            }
-            realPlayer.removePotionEffect(PotionEffectType.INVISIBILITY);
-        }
+        showDeathTagRealPlayer(session, session.players.get(playerId));
     }
 
     private void updateDeathTagDisguises(Session session) {
@@ -11123,6 +11137,7 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> tagged = new HashSet<>();
         final Set<UUID> alphaChasers = new HashSet<>();
         final Map<UUID, Mob> deathTagDisguises = new HashMap<>();
+        final Map<UUID, Set<UUID>> deathTagHiddenViewers = new HashMap<>();
         boolean deathTagRunnerSpeedUnlocked;
         Scoreboard deathTagScoreboard;
         Objective deathTagScoreboardObjective;
