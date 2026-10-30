@@ -18,8 +18,9 @@ class SnakeRulesTest {
         assertEquals(0.34D, SnakeRules.movementSpeed(126, false), 0.000001D);
         assertEquals(SnakeRules.movementSpeed(126, false), SnakeRules.movementSpeed(180, false), 0.000001D);
         assertEquals(SnakeRules.movementSpeed(126, false), SnakeRules.movementSpeed(1000, false), 0.000001D);
-        assertEquals(SnakeRules.movementSpeed(1, false) * 1.5D,
-                SnakeRules.movementSpeed(1, true), 0.000001D);
+        assertEquals(0.24D + 1.0D / 600.0D, SnakeRules.movementSpeed(1, true), 0.000001D);
+        assertEquals(0.39D, SnakeRules.movementSpeed(90, true), 0.000001D);
+        assertEquals(0.45D, SnakeRules.movementSpeed(126, true), 0.000001D);
         assertEquals(180, SnakeRules.SPEED_REFERENCE_LENGTH);
     }
 
@@ -29,6 +30,16 @@ class SnakeRulesTest {
         assertEquals(0, SnakeRules.colorIndexForParticipant(16, 16));
         assertEquals(15, SnakeRules.colorIndexForParticipant(-1, 16));
         assertEquals(0, SnakeRules.colorIndexForParticipant(8, 0));
+    }
+
+    @Test void participantSheepColoursFollowTheOriginal18DyeDataOrder() {
+        assertEquals(org.bukkit.DyeColor.BLACK, SnakeRules.colorForLegacyDyeData(0));
+        assertEquals(org.bukkit.DyeColor.RED, SnakeRules.colorForLegacyDyeData(1));
+        assertEquals(org.bukkit.DyeColor.GREEN, SnakeRules.colorForLegacyDyeData(2));
+        assertEquals(org.bukkit.DyeColor.BROWN, SnakeRules.colorForLegacyDyeData(3));
+        assertEquals(org.bukkit.DyeColor.WHITE, SnakeRules.colorForLegacyDyeData(15));
+        assertEquals(org.bukkit.DyeColor.BLACK, SnakeRules.colorForLegacyDyeData(16));
+        assertEquals(org.bukkit.DyeColor.WHITE, SnakeRules.colorForLegacyDyeData(-1));
     }
 
     @Test void sourceResitRemountsOnlyWhenTheSnakeHeadExistsAndPlayerDismounted() {
