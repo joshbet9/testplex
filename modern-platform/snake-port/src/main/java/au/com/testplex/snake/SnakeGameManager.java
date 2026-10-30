@@ -34,6 +34,7 @@ import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
@@ -75,6 +76,7 @@ public final class SnakeGameManager implements Listener {
     private static final int ROULETTE_STEPS = 12;
     private static final long FIRST_HAZARD_DELAY_MS = SnakeRules.FIRST_HAZARD_DELAY_MILLIS;
     private static final long HAZARD_INTERVAL_MS = SnakeRules.HAZARD_INTERVAL_MILLIS;
+    private static final long PREPARE_COUNTDOWN_MS = SnakeRules.PREPARE_COUNTDOWN_MILLIS;
     private static final double SEGMENT_SPACING = SnakeRules.SEGMENT_SPACING;
     private static final double SOURCE_BODY_FOLLOW_SPACING = 1.4D;
 
@@ -91,6 +93,9 @@ public final class SnakeGameManager implements Listener {
     private String mapResource;
     private final BukkitTask tickTask;
     private boolean running;
+    private boolean live;
+    private long liveAt;
+    private int lastAnnouncedCountdownSecond = -1;
     private int startingPlayerCount;
     private int tick;
     private long startedAt;
@@ -174,13 +179,16 @@ public final class SnakeGameManager implements Listener {
 
         queue.clear();
         running = true;
+        live = false;
         tick = 0;
         startingPlayerCount = players.size();
         long now = System.currentTimeMillis();
         startedAt = now;
-        nextFoodAt = now + 1_000L;
-        nextGrowAt = now + 1_000L;
-        nextHazardAt = now + FIRST_HAZARD_DELAY_MS;
+        liveAt = now + PREPARE_COUNTDOWN_MS;
+        lastAnnouncedCountdownSecond = -1;
+        nextFoodAt = Long.MAX_VALUE;
+        nextGrowAt = Long.MAX_VALUE;
+        nextHazardAt = Long.MAX_VALUE;
         foods.clear();
         hazards.clear();
         snakes.clear();
@@ -227,11 +235,11 @@ public final class SnakeGameManager implements Listener {
             grantKit(player, kit);
         }
 
-        announce(ChatColor.AQUA + "Snake is best played in 3rd Person! (Press F5)");
-        announce(ChatColor.GOLD + "Hazards and the steering roulette ramp up as the round goes on!");
         announce(ChatColor.YELLOW + "Map: " + SnakeMapCatalog.displayName(mapResource));
+        announce(ChatColor.GOLD + "Snake preparation: stay on your starting pad. The round begins in 9 seconds.");
         if (startingPlayerCount == 1) announce(ChatColor.GRAY + "Solo mechanics test: the round stays live until /snake stop or you leave.");
-        sender.sendMessage(ChatColor.GREEN + "Started Snake with " + players.size() + (players.size() == 1 ? " player." : " players."));
+        sender.sendMessage(ChatColor.GREEN + "Preparing Snake with " + players.size()
+                + (players.size() == 1 ? " player." : " players.") + " Live begins in 9 seconds.");
     }
 
     public void setKit(Player player, String rawKit) {
@@ -258,7 +266,13 @@ public final class SnakeGameManager implements Listener {
                 + (mapResource == null ? "unavailable" : SnakeMapCatalog.displayName(mapResource));
         int alive = 0;
         for (SnakeState state : snakes.values()) if (state.alive && state.player.isOnline()) alive++;
-        long elapsed = startedAt > 0L ? Math.max(0L, System.currentTimeMillis() - startedAt) : 0L;
+        long now = System.currentTimeMillis();
+        if (!live) {
+            long remaining = Math.max(0L, liveAt - now);
+            return "PREPARING; live-in=" + ((remaining + 999L) / 1000L) + "s; alive="
+                    + alive + "/" + startingPlayerCount + "; map=" + SnakeMapCatalog.displayName(mapResource);
+        }
+        long elapsed = startedAt > 0L ? Math.max(0L, now - startedAt) : 0L;
         return "LIVE; alive=" + alive + "/" + startingPlayerCount + "; food=" + foods.size()
                 + "; hazards=" + hazards.size() + "; age~" + (elapsed / 1000L) + "s"
                 + (startingPlayerCount == 1 ? "; solo test" : "");
@@ -346,6 +360,32 @@ public final class SnakeGameManager implements Listener {
         tick++;
         long now = System.currentTimeMillis();
 
+        if (!live) {
+            // Reborn's PrepareFreeze phase keeps players on their starting sheep until the 9-second countdown ends.
+            for (SnakeState state : new ArrayList<>(snakes.values())) {
+                if (!state.alive) continue;
+                if (!state.player.isOnline() || state.segments.isEmpty()) {
+                    eliminate(state, null, "disconnected during preparation");
+                    continue;
+                }
+                Sheep head = state.segments.get(0);
+                if (SnakeRules.shouldResitPlayer(head.isValid(), state.player.getVehicle() == head)) {
+                    state.player.leaveVehicle();
+                    head.addPassenger(state.player);
+                }
+            }
+
+            long remaining = liveAt - now;
+            int countdownSecond = (int) Math.max(0L, (remaining + 999L) / 1_000L);
+            if (countdownSecond > 0 && countdownSecond <= 5
+                    && countdownSecond != lastAnnouncedCountdownSecond) {
+                announce(ChatColor.YELLOW + "Snake starts in " + countdownSecond + "...");
+                lastAnnouncedCountdownSecond = countdownSecond;
+            }
+            if (now < liveAt) return;
+            beginLive(now);
+        }
+
         if (now >= nextFoodAt) {
             spawnFood();
             nextFoodAt = now + 1_000L;
@@ -394,6 +434,17 @@ public final class SnakeGameManager implements Listener {
         moveAndProcessHazards();
         processCollisions();
         checkEndCondition();
+    }
+
+    private void beginLive(long now) {
+        if (!running || live) return;
+        live = true;
+        startedAt = now;
+        nextFoodAt = now + 1_000L;
+        nextGrowAt = now + 1_000L;
+        nextHazardAt = now + FIRST_HAZARD_DELAY_MS;
+        announce(ChatColor.AQUA + "Snake is best played in 3rd Person! (Press F5)");
+        announce(ChatColor.GOLD + "Hazards and the steering roulette ramp up as the round goes on!");
     }
 
     private void moveSnake(SnakeState state, long now) {
@@ -851,7 +902,7 @@ public final class SnakeGameManager implements Listener {
     }
 
     private void checkEndCondition() {
-        if (!running) return;
+        if (!running || !live) return;
         List<SnakeState> live = snakes.values().stream().filter(s -> s.alive && s.player.isOnline()).toList();
         if (startingPlayerCount > 1 && live.size() <= 1) {
             finish(live.isEmpty() ? null : live.get(0).player, true);
@@ -867,6 +918,9 @@ public final class SnakeGameManager implements Listener {
     private void finish(Player winner, boolean announceWinner, boolean recordStats) {
         if (!running) return;
         running = false;
+        live = false;
+        liveAt = 0L;
+        lastAnnouncedCountdownSecond = -1;
         if (announceWinner && winner != null) announce(ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won Snake!");
         for (SnakeState state : new ArrayList<>(snakes.values())) {
             if (state.rouletteTask != null) {
@@ -898,6 +952,9 @@ public final class SnakeGameManager implements Listener {
         queue.clear();
         startingPlayerCount = 0;
         startedAt = 0L;
+        nextFoodAt = Long.MAX_VALUE;
+        nextGrowAt = Long.MAX_VALUE;
+        nextHazardAt = Long.MAX_VALUE;
         stats.flush();
     }
 
@@ -1050,7 +1107,7 @@ public final class SnakeGameManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND
                 || !SnakeRules.isAbilityItemInteraction(event.getAction().name())) return;
         SnakeState state = snakes.get(event.getPlayer().getUniqueId());
-        if (!running || state == null) return;
+        if (!running || !live || state == null) return;
         if (!state.alive) {
             if (event.getPlayer().getGameMode() == GameMode.SPECTATOR || !isTrackingCompass(event.getItem())) return;
             event.setCancelled(true);
@@ -1191,6 +1248,20 @@ public final class SnakeGameManager implements Listener {
             return;
         }
         if (running && snakes.containsKey(player.getUniqueId())) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPrepareMove(PlayerMoveEvent event) {
+        if (!running || live || event.getTo() == null) return;
+        SnakeState state = snakes.get(event.getPlayer().getUniqueId());
+        if (state == null || !state.alive) return;
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (from.getX() != to.getX() || from.getY() != to.getY() || from.getZ() != to.getZ()) {
+            // Keep yaw/pitch updates so players can choose their initial heading during PrepareFreeze.
+            event.setTo(new Location(from.getWorld(), from.getX(), from.getY(), from.getZ(),
+                    to.getYaw(), to.getPitch()));
+        }
     }
 
     @EventHandler
