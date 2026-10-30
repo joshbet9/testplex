@@ -267,12 +267,13 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isTurfWarsWinningLine(20, 2, 20));
     }
 
-    @Test void paintballEndsAtTenEliminationPoints() {
-        assertFalse(ArcadePortRules.isPaintballWinnerScoreReached(0));
-        assertFalse(ArcadePortRules.isPaintballWinnerScoreReached(9));
-        assertTrue(ArcadePortRules.isPaintballWinnerScoreReached(10));
-        assertTrue(ArcadePortRules.isPaintballWinnerScoreReached(11));
-        assertEquals(10, ArcadePortRules.PAINTBALL_WINNER_SCORE);
+    @Test void paintballUsesSourceTeamColoursInsteadOfAnEliminationScoreCap() {
+        assertEquals(org.bukkit.Color.AQUA, ArcadePortRules.paintballTeamColor(0));
+        assertEquals(org.bukkit.Color.RED, ArcadePortRules.paintballTeamColor(1));
+        assertEquals(org.bukkit.Material.LIGHT_BLUE_WOOL,
+                ArcadePortRules.paintballPaintedBlock(org.bukkit.Material.WHITE_WOOL, 0));
+        assertEquals(org.bukkit.Material.RED_WOOL,
+                ArcadePortRules.paintballPaintedBlock(org.bukkit.Material.WHITE_WOOL, 1));
     }
 
     @Test void paintballKitHitsPaintTheCorrectNumberOfArmourPieces() {
