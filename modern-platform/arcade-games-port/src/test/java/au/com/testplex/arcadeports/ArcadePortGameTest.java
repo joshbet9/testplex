@@ -1457,7 +1457,8 @@ class ArcadePortGameTest {
         assertEquals(0, ArcadePortRules.dragonEscapePbSegmentStartIndex(0, 4));
         assertEquals(1, ArcadePortRules.dragonEscapePbSegmentStartIndex(1, 4));
         assertEquals(2, ArcadePortRules.dragonEscapePbSegmentStartIndex(2, 4));
-        assertEquals(-1, ArcadePortRules.dragonEscapePbSegmentStartIndex(3, 4));
+        assertEquals(2, ArcadePortRules.dragonEscapePbSegmentStartIndex(3, 4),
+                "The last checkpoint still uses the final approach segment until the finish radius is reached");
         assertEquals(-1, ArcadePortRules.dragonEscapePbSegmentStartIndex(0, 1));
 
         assertEquals(0L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 0, 4));
