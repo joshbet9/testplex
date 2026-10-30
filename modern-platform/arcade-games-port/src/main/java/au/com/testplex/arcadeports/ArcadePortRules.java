@@ -28,6 +28,25 @@ public final class ArcadePortRules {
     public static final long CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS = 10_000L;
     public static final int CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT = 2;
 
+    public static final long HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS = 4_000L;
+    public static final double HEROES_OF_GWEN_WITHER_TARGET_SPEED = 4.0D;
+    public static final double HEROES_OF_GWEN_WITHER_HOME_SPEED = 6.0D;
+    public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS = 8.0D;
+    public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE = 4.0D;
+
+    /** Source MobaDirectAIMethod interprets speed as ticks per block, then divides by 20. */
+    public static double heroesOfGwenWitherStepPerTick(double sourceSpeed) {
+        return Math.max(0.0D, sourceSpeed) / 20.0D;
+    }
+
+    /** Source Earthquake damage scales with the radius proximity value (1 - distance / radius). */
+    public static double heroesOfGwenWitherEarthquakeDamage(double distanceFromBoss) {
+        double proximity = 1.0D - Math.max(0.0D, Math.min(
+                HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS, distanceFromBoss))
+                / HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS;
+        return HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE * (proximity + 0.5D);
+    }
+
     /** Reborn caps blast protection EPF at 20 before applying its TNT damage multiplier. */
     public static double castleAssaultBlastDamageMultiplier(int blastProtectionEpf) {
         int epf = Math.max(0, Math.min(20, blastProtectionEpf));
