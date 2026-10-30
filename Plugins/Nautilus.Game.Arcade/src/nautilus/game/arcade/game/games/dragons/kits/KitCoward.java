@@ -18,6 +18,7 @@ public class KitCoward extends Kit
 	private static final Perk[] PERKS =
 			{
 					new PerkLeap("Leap", 1.2, 1.0, 8000),
+					new PerkFlare(2),
 			};
 
 	private static final ItemStack[] PLAYER_ITEMS =
