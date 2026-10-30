@@ -1,5 +1,6 @@
 package au.com.testplex.snake;
 
+import org.bukkit.DyeColor;
 import org.bukkit.Location;
 import org.bukkit.util.Vector;
 
@@ -9,6 +10,12 @@ import java.util.List;
 /** Small deterministic rules shared by the Snake loop and its contract tests. */
 public final class SnakeRules {
     private static final int[] ROULETTE_SECONDS = {1, 3, 5, 10, 15, 20, 30};
+    private static final DyeColor[] LEGACY_DYE_DATA_ORDER = {
+            DyeColor.BLACK, DyeColor.RED, DyeColor.GREEN, DyeColor.BROWN,
+            DyeColor.BLUE, DyeColor.PURPLE, DyeColor.CYAN, DyeColor.LIGHT_GRAY,
+            DyeColor.GRAY, DyeColor.PINK, DyeColor.LIME, DyeColor.YELLOW,
+            DyeColor.LIGHT_BLUE, DyeColor.MAGENTA, DyeColor.ORANGE, DyeColor.WHITE
+    };
 
     public static final int SPEED_REFERENCE_LENGTH = 180;
     public static final long IDLE_TIMEOUT_MILLIS = 2_000L;
@@ -94,15 +101,22 @@ public final class SnakeRules {
      */
     public static double movementSpeed(int tailLength, boolean speedBoost) {
         double sourceGrowth = Math.min(0.7D, Math.max(0, tailLength) / (double) SPEED_REFERENCE_LENGTH);
-        // Legacy CreatureMoveFast uses multiplier 1.2 + 2 * (0.4 + sourceGrowth).
-        // Its effective movement scales at about 0.1 block/tick per multiplier unit.
-        double speed = 0.2D + sourceGrowth * 0.2D;
-        return speedBoost ? speed * 1.5D : speed;
+        // Reborn first scales the movement multiplier for Speed, then passes
+        // (1.2 + 2 * multiplier) to CreatureMoveFast. The Paper loop uses the
+        // equivalent 0.1-block-per-multiplier conversion.
+        double sourceMultiplier = 0.4D + sourceGrowth;
+        if (speedBoost) sourceMultiplier *= 1.5D;
+        return 0.1D * (1.2D + 2.0D * sourceMultiplier);
     }
 
     /** Match Reborn's per-round player index palette, wrapping safely when more than 16 players queue. */
     public static int colorIndexForParticipant(int participantIndex, int paletteSize) {
         return paletteSize <= 0 ? 0 : Math.floorMod(participantIndex, paletteSize);
+    }
+
+    /** Reproduce Bukkit 1.8 DyeColor.getByDyeData(i), not the modern enum order. */
+    public static DyeColor colorForLegacyDyeData(int dyeData) {
+        return LEGACY_DYE_DATA_ORDER[Math.floorMod(dyeData, LEGACY_DYE_DATA_ORDER.length)];
     }
 
     /** Source food collection uses a strict 2-block 3D radius. */
