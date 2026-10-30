@@ -4615,6 +4615,74 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    /** Local counterpart of Reborn's CombatManager / ChatStats accounting for Micro Battles. */
+    private void recordMicroBattlesDamage(Session session, Player attacker, Player target,
+            double eventDamage, long now) {
+        if (session == null || attacker == null || target == null
+                || !Double.isFinite(eventDamage) || eventDamage <= 0.0D) return;
+        int recordedDamage = ArcadePortRules.microBattlesChatStatDamage(eventDamage);
+        if (recordedDamage <= 0) return;
+        UUID attackerId = attacker.getUniqueId();
+        UUID targetId = target.getUniqueId();
+        session.microDamageDealt.merge(attackerId, recordedDamage, Integer::sum);
+        session.microDamageTaken.merge(targetId, recordedDamage, Integer::sum);
+        session.microRecentAttackers.computeIfAbsent(targetId, ignored -> new HashMap<>())
+                .put(attackerId, now);
+    }
+
+    /** Reborn credits the most recent CombatLog attacker as killer if the player falls later. */
+    private Player resolveMicroBattlesKiller(Session session, UUID victimId, Player suppliedKiller, long now) {
+        if (suppliedKiller != null && suppliedKiller.isOnline()
+                && !suppliedKiller.getUniqueId().equals(victimId)
+                && session.players.containsKey(suppliedKiller.getUniqueId())) return suppliedKiller;
+        Map<UUID, Long> attackers = session.microRecentAttackers.get(victimId);
+        if (attackers == null || attackers.isEmpty()) return null;
+        UUID latestId = null;
+        long latestAt = Long.MIN_VALUE;
+        for (Map.Entry<UUID, Long> entry : attackers.entrySet()) {
+            UUID attackerId = entry.getKey();
+            long hitAt = entry.getValue();
+            if (attackerId == null || attackerId.equals(victimId)
+                    || !session.players.containsKey(attackerId)
+                    || !ArcadePortRules.shouldCreditMicroBattlesAssist(now, hitAt)) continue;
+            if (hitAt > latestAt) {
+                latestAt = hitAt;
+                latestId = attackerId;
+            }
+        }
+        return latestId == null ? null : session.players.get(latestId);
+    }
+
+    /** CombatManager treats all other non-expired player attackers as assists at death. */
+    private void recordMicroBattlesAssists(Session session, UUID victimId, UUID killerId, long now) {
+        Map<UUID, Long> attackers = session.microRecentAttackers.remove(victimId);
+        if (attackers == null || attackers.isEmpty()) return;
+        for (Map.Entry<UUID, Long> entry : attackers.entrySet()) {
+            UUID attackerId = entry.getKey();
+            if (attackerId == null || attackerId.equals(victimId) || attackerId.equals(killerId)
+                    || !ArcadePortRules.shouldCreditMicroBattlesAssist(now, entry.getValue())) continue;
+            session.microAssists.merge(attackerId, 1, Integer::sum);
+        }
+    }
+
+    /** Render the source game's registered Kills / Assists / Damage Taken / Damage Dealt summary. */
+    private void sendMicroBattlesChatStats(Session session) {
+        for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
+            Player player = entry.getValue();
+            if (player == null || !player.isOnline()) continue;
+            UUID id = entry.getKey();
+            player.sendMessage(ChatColor.DARK_AQUA + "" + ChatColor.BOLD + "Micro Battles Stats");
+            player.sendMessage(ChatColor.GRAY + "Kills: " + ChatColor.WHITE
+                    + session.scores.getOrDefault(id, 0)
+                    + ChatColor.GRAY + " | Assists: " + ChatColor.WHITE
+                    + session.microAssists.getOrDefault(id, 0));
+            player.sendMessage(ChatColor.GRAY + "Damage Dealt: " + ChatColor.WHITE
+                    + session.microDamageDealt.getOrDefault(id, 0)
+                    + ChatColor.GRAY + " | Damage Taken: " + ChatColor.WHITE
+                    + session.microDamageTaken.getOrDefault(id, 0));
+        }
+    }
+
     private void applyMicroBattlesHit(Session session, Player attacker, Player target, String source) {
         applyMicroBattlesHit(session, attacker, target, source, null);
     }
@@ -4638,6 +4706,8 @@ public final class ArcadePortManager implements Listener {
         var armorAttribute = target.getAttribute(Attribute.ARMOR);
         double armorPoints = armorAttribute == null ? 0.0D : armorAttribute.getValue();
         double finalDamage = ArcadePortRules.microBattlesDamageAfterArmor(eventDamage, armorPoints);
+        // CombatManager.Attacked records integer CustomDamageEvent damage before armour is applied.
+        recordMicroBattlesDamage(session, attacker, target, eventDamage, System.currentTimeMillis());
 
         if (projectile != null || "melee".equals(source)) {
             applyMicroBattlesKnockback(attacker, target, projectile, eventDamage);
@@ -9045,6 +9115,12 @@ public final class ArcadePortManager implements Listener {
         }
         UUID eliminatedId = player.getUniqueId();
         if (!session.alive.remove(eliminatedId)) return;
+        if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            long now = System.currentTimeMillis();
+            killer = resolveMicroBattlesKiller(session, eliminatedId, killer, now);
+            recordMicroBattlesAssists(session, eliminatedId,
+                    killer == null ? null : killer.getUniqueId(), now);
+        }
         if (session.type == ArcadePortGame.DRAGONS) {
             session.dragonEliminationOrder.add(eliminatedId);
             awardDragonSurvivalGems(session, eliminatedId, System.currentTimeMillis());
@@ -9984,6 +10060,9 @@ public final class ArcadePortManager implements Listener {
             recordDeathTagRewards(session);
         }
         recordLocalStats(session, winner, announceWinner);
+        if (announceWinner && session.type == ArcadePortGame.MICRO_BATTLES) {
+            sendMicroBattlesChatStats(session);
+        }
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             removeAllMicroBorderWarnings(session);
             for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
@@ -10485,6 +10564,19 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().set(path + "wins",
                         plugin.getConfig().getInt(path + "wins", 0) + 1);
             }
+            if (session.type == ArcadePortGame.MICRO_BATTLES) {
+                plugin.getConfig().set(path + "kills",
+                        plugin.getConfig().getInt(path + "kills", 0) + score);
+                plugin.getConfig().set(path + "assists",
+                        plugin.getConfig().getInt(path + "assists", 0)
+                                + session.microAssists.getOrDefault(id, 0));
+                plugin.getConfig().set(path + "damage-dealt",
+                        plugin.getConfig().getInt(path + "damage-dealt", 0)
+                                + session.microDamageDealt.getOrDefault(id, 0));
+                plugin.getConfig().set(path + "damage-taken",
+                        plugin.getConfig().getInt(path + "damage-taken", 0)
+                                + session.microDamageTaken.getOrDefault(id, 0));
+            }
             if (session.type == ArcadePortGame.SPLEEF) {
                 plugin.getConfig().set(path + "blocks-broken",
                         plugin.getConfig().getInt(path + "blocks-broken", 0)
@@ -10857,6 +10949,22 @@ public final class ArcadePortManager implements Listener {
                         unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
                         (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
                         lore, "noop", null, null));
+            }
+            String[] microStatNames = {"Games Played", "Wins", "Kills", "Knockouts",
+                    "Assists", "Damage Dealt", "Damage Taken"};
+            String[] microStatKeys = {"games-played", "wins", "kills", "knockouts",
+                    "assists", "damage-dealt", "damage-taken"};
+            Material[] microStatIcons = {Material.BOOK, Material.GOLD_INGOT, Material.IRON_SWORD,
+                    Material.SKELETON_SKULL, Material.GOLDEN_APPLE, Material.IRON_CHESTPLATE,
+                    Material.SHIELD};
+            int[] microStatSlots = {29, 30, 31, 32, 33, 34, 35};
+            for (int i = 0; i < microStatNames.length; i++) {
+                int value = plugin.getConfig().getInt(path + microStatKeys[i], 0);
+                inventory.setItem(microStatSlots[i], statsItem(microStatIcons[i],
+                        (value > 0 ? ChatColor.GREEN : ChatColor.GRAY) + microStatNames[i],
+                        List.of(" ", ChatColor.GRAY + "Recorded locally: " + ChatColor.WHITE + value,
+                                ChatColor.DARK_GRAY + "Testplex stats; not Mineplex account data."),
+                        "noop", null, null));
             }
         } else if ("snake".equals(gameId)) {
             String[] ids = {"Cannibal", "ChooChoo", "SlimySheep"};
@@ -15466,6 +15574,10 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> turfBarrageFiring = new HashSet<>();
         final Set<UUID> turfTrackedArrows = new HashSet<>();
         final Map<UUID, String> microKits = new HashMap<>();
+        final Map<UUID, Integer> microDamageDealt = new HashMap<>();
+        final Map<UUID, Integer> microDamageTaken = new HashMap<>();
+        final Map<UUID, Integer> microAssists = new HashMap<>();
+        final Map<UUID, Map<UUID, Long>> microRecentAttackers = new HashMap<>();
         final Map<UUID, String> microGlassColours = new HashMap<>();
         final Map<UUID, String> microBorderColours = new HashMap<>();
         final Map<UUID, Set<Block>> microPersonalGlassBlocks = new HashMap<>();
