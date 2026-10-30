@@ -12432,7 +12432,6 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (!session.alive.contains(player.getUniqueId())) return;
-        Material item = heldItem == null ? Material.AIR : heldItem.getType();
         if (session.type == ArcadePortGame.TURF_WARS
                 && event.getAction().isRightClick() && item == Material.BOW
                 && "shredder".equals(session.turfWarsKits.getOrDefault(player.getUniqueId(), "marksman"))) {
