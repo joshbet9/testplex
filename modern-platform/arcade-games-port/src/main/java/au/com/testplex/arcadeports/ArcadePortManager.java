@@ -10396,9 +10396,11 @@ public final class ArcadePortManager implements Listener {
             }
             int killsFromThisTnt = priorTntKills;
             for (Player target : alivePlayers(session)) {
-                // Evolution's crouch transformation suppresses incoming combat hits; preserve
-                // that protection for custom Creeper blast damage as well.
-                if (evolutionBlast && session.evolving.contains(target.getUniqueId())) continue;
+                // A Creeper blast can interrupt the vulnerable evolution animation just
+                // like melee and projectile hits.
+                if (evolutionBlast && session.evolving.contains(target.getUniqueId())) {
+                    interruptEvolutionForHit(session, target);
+                }
                 // Reborn applies its nearby-player explosion condition without team filtering.
                 double distance = target.getLocation().distance(blast);
                 double radius = bombLobbersBlast ? bombBlastRadius : 8.0D;
