@@ -16,7 +16,7 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 - Paintball — selectable Rifle, Sniper, Shotgun and Machine Gun kits; projectile-specific paint counts, scope-charge damage, team-coloured armour, Water Bomb stacks, a 250 ms Water Bomb gate, SAVE ME marker/revival within three blocks, nearby teammate cleanse with armour/health restoration, and the source-style high-pitched hit-confirmation sound. The Machine Gun keeps the Reborn 80 ms fire gate and 250 ms cooling start, but now gains heat at 1/48 of its bar per shot so it fires 48 shots before overheating. Paintball cosmetics use one combined `Weapon & Pellet Identity` line with independent weapon-finish and pellet-style selections: the weapon finish changes the held item model, while the chosen team-coloured pellet trail is broadcast with forced rendering to every player in the Paintball world, including distant spectators and clients using reduced particle settings. Cosmetic visuals do not change projectile velocity, hitboxes or paint damage.
 - Runner — source Leaper/Archer/Frosty kit identities, 8-second Leap, 6-second Quickshot, Frost Balls replenished every 500 ms up to 16 with Slow II for two seconds, source-map bounds, trail material tracking, 600 ms decay and 1.2-second falling-block lifetime, and radius-2.5 arrow trail marking, and the source 4-damage water penalty.
 - Sheep Quest — source GREEN/BLUE/RED/YELLOW pens, team sheep capture and steals, three-sheep carry limit, and the five-minute winner based on sheep in the pen; a tie at the end is a draw.
-- Spleef — source kit selection (Snowballer, Brawler and Archer), snowballer replacement cap, Brawler Leap/Smasher, two-arrow Fletcher replenishment, source-timed hunger drain/restoration, source material damage transitions, 3D arrow-radius clearing, and the source 4-damage water penalty.
+- Spleef — source kit selection (Snowballer, Brawler and Archer), snowballer replacement cap, Brawler Leap with a 30-second cooldown, Smasher, two-arrow Fletcher replenishment, source-timed hunger drain/restoration, source material damage transitions, 3D arrow-radius clearing, and the source 4-damage water penalty. Its Snowburst, Ice Shards and Chalk Grid block-break signatures are live renderers broadcast with forced particle delivery to every player and spectator in the dedicated match world.
 - Turf Wars — team assignment, bow combat and territory block marking; source timing now uses the 40-second initial build, followed by 20-second build / 90-second combat cycles.
 
 Each game gets its own separate modern test world, so arena generation/destruction does not use the live 1.8 Testplex world. Original Reborn map archives are embedded for Bacon Brawl, Bomb Lobbers, Death Tag, Dragon Escape, Dragons, Gladiators, Micro Battles, One in the Quiver, Paintball, Runner, Sheep Quest, Spleef and Turf Wars; these load into separate source-world folders and read WorldConfig.dat spawn groups and map bounds. Evolution remains generated because an Evolution map archive is not present in the source map catalogue.
@@ -38,7 +38,7 @@ Install PacketEvents 2.14.0 on the Paper 26.3 test server for both the optional 
 
 CI verifies compilation, plugin metadata and catalogue/ID tests. It does not verify the mechanics in a running server. The first in-game iteration should cover command/GUI entry, each game start/end, weapon interactions, elimination/respawn, per-world cleanup and inventory restoration. Then compare the rough mechanics to the existing Reborn game sources and fix discrepancies one game at a time.
 
-Game-specific cosmetic renderers are still deferred for most games, but the Paintball weapon/pellet selections and Dragon Escape leader marker are now wired to their live gameplay hooks. Distinct win effects remain deferred until each game's mechanics and round lifecycle are stable.
+Game-specific cosmetic renderers are still deferred for most games, but Paintball weapon/pellet selections, Spleef block-break signatures and the Dragon Escape leader marker are now wired to their live gameplay hooks. Distinct win effects remain deferred until each game's mechanics and round lifecycle are stable.
 
 
 ## Dragon Escape race-timing acceptance
@@ -96,3 +96,13 @@ Progress is tracked per player and per round. The walk counter accumulates horiz
 Runner's `/arcadecosmetics` entry now offers 15 non-red trail colours. At the start of a round, the mechanics port samples exposed course surfaces from the selected archived map palette. If a player's chosen colour is already present on that map, it selects an unused alternative; if every colour is represented, it chooses the least represented alternative. The selected trail is applied as actual world-block changes, so players and spectators all see the same colour rather than a client-only particle effect.
 
 Live acceptance still needs to check the three achievement thresholds, the 90-second win boundary, a second client observing another player's trail, and a colour clash on a map containing the requested trail colour.
+
+
+## Spleef — cooldown and block-break visibility acceptance
+
+1. Equip Brawler and use Leap. Confirm a second use is rejected until 30 seconds have elapsed, with the remaining cooldown shown; changing kits during the cooldown must not reset it.
+2. Equip each Block Break Signature option (Snowburst, Ice Shards and Chalk Grid) in `/arcadecosmetics`, then break tiles with a Brawler pickaxe, Snowballer snowball and Archer arrow.
+3. Observe each effect from a second player and a spectator positioned far from the break. All viewers in the Spleef match world must receive the selected effect, including during Brawler's multi-block Smasher and arrow-radius damage.
+4. Confirm slow-damage colour transitions do not play a break effect until the block is actually destroyed, and the original block material is used for the Ice Shards fragments.
+
+The catalogue and renderer contract are covered by unit tests. A passing build does not replace live two-client acceptance on Paper 26.3; Spleef remains `MECHANICS_IN_PROGRESS` until that check is completed.
