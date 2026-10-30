@@ -411,7 +411,7 @@ for field in [
     "    private final Map<UUID, String> castleAssaultKitPreferences = new HashMap<>();",
     "    private final Map<UUID, String> heroesOfGwenHeroPreferences = new HashMap<>();",
 ]:
-    if field.split()[-2] not in source:
+    if ("Map<UUID, String> " + field.split("Map<UUID, String> ", 1)[1].split(" =", 1)[0]) not in source:
         anchor = "    private final Map<UUID, String> paintballKitPreferences = new HashMap<>();"
         if anchor not in source:
             raise SystemExit("Could not find kit preference field insertion point.")
