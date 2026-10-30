@@ -775,19 +775,10 @@ public final class ArcadePortRules {
         };
     }
 
-    /** Legacy Spleef wool/clay data transitions: green -> yellow -> red -> broken. */
-    /** Blocks which are part of the supported source Spleef floor palette. */
-    public static boolean isSpleefFloorMaterial(Material material) {
-        if (material == null) return false;
-        String name = material.name();
-        if (name.endsWith("_WOOL") || name.endsWith("_TERRACOTTA") || material == Material.TERRACOTTA) {
-            return true;
-        }
-        return switch (material) {
-            case SNOW_BLOCK, CLAY, STONE, COBBLESTONE, STONE_BRICKS, MOSSY_STONE_BRICKS,
-                    CRACKED_STONE_BRICKS, GRASS_BLOCK, DIRT, SPRUCE_PLANKS, OAK_PLANKS, BIRCH_PLANKS -> true;
-            default -> false;
-        };
+    /** Reborn protects only bedrock and lava; every other non-air block can be punched away. */
+    public static boolean isSpleefProtectedMaterial(Material material) {
+        return material == null || material.isAir()
+                || material == Material.BEDROCK || material == Material.LAVA;
     }
 
     /** Apply the source's green/lime -> yellow -> red -> broken material sequence. */
