@@ -8382,6 +8382,8 @@ public final class ArcadePortManager implements Listener {
                 || material.endsWith("_BUTTON")) return true;
         return material.equals("DISPENSER") || material.equals("DROPPER")
                 || material.equals("HOPPER") || material.equals("CRAFTING_TABLE")
+                || material.equals("BOOKSHELF") || material.equals("OAK_FENCE")
+                || material.equals("NETHER_BRICK_FENCE")
                 || material.equals("ENCHANTING_TABLE") || material.equals("BREWING_STAND")
                 || material.equals("ANVIL") || material.equals("CHIPPED_ANVIL")
                 || material.equals("DAMAGED_ANVIL") || material.equals("PISTON")
