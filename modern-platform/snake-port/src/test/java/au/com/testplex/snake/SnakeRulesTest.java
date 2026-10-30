@@ -164,6 +164,12 @@ class SnakeRulesTest {
         assertFalse(SnakeRules.isKitAbilityItem(null, "FEATHER"));
     }
 
+    @Test void onlyAppendedTailSegmentsUseTheSourceGhostFlag() {
+        assertFalse(SnakeRules.shouldGhostTailSegment(0));
+        assertTrue(SnakeRules.shouldGhostTailSegment(1));
+        assertTrue(SnakeRules.shouldGhostTailSegment(2));
+    }
+
     @Test void sourceAbilityItemsTriggerOnEitherClickButNeverPhysicalActions() {
         assertTrue(SnakeRules.isAbilityItemInteraction("LEFT_CLICK_AIR"));
         assertTrue(SnakeRules.isAbilityItemInteraction("LEFT_CLICK_BLOCK"));
