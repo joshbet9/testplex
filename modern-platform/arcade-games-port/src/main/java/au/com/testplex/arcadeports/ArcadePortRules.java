@@ -450,7 +450,6 @@ public final class ArcadePortRules {
     public static final long TURF_WARS_BARRAGE_FIRST_CHARGE_MILLIS = 1_000L;
     public static final long TURF_WARS_BARRAGE_CHARGE_INTERVAL_MILLIS = 250L;
     public static final int TURF_WARS_BARRAGE_MAX_CHARGE = 5;
-    public static final int TURF_WARS_STARTING_WOOL = 6;
     public static final int TURF_WARS_BUILD_PHASE_WOOL = 24;
     public static final int TURF_WARS_MARKSMAN_MAX_WOOL = 8;
     public static final int TURF_WARS_INFILTRATOR_MAX_WOOL = 4;
