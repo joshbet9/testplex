@@ -1,8 +1,8 @@
 name: Deploy Testplex Modern Paper 26.3 to isolated Hyper-V
 
 on:
-  # Reusable by the modern build workflow so deployment starts automatically
-  # only after the verified build job succeeds. Manual dispatch remains available.
+  # Reusable by a separate workflow-run handler after the latest successful
+  # modern build. Manual dispatch remains available.
   workflow_call:
     inputs:
       deploy_to_modern_test_server:
@@ -37,7 +37,7 @@ concurrency:
 jobs:
   validate_request:
     name: Validate explicit deployment approval
-    if: ${{ github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' }}
+    if: ${{ inputs.deploy_to_modern_test_server }}
     runs-on: ubuntu-22.04
     steps:
       - name: Require all deployment acknowledgements
@@ -53,7 +53,7 @@ jobs:
   deploy_modern_test_server:
     name: Deploy isolated Paper 26.3 server
     needs: validate_request
-    if: ${{ github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' && inputs.deploy_to_modern_test_server }}
+    if: ${{ inputs.deploy_to_modern_test_server }}
     runs-on: ubuntu-22.04
     environment: hyperv
     timeout-minutes: 45
