@@ -35,12 +35,14 @@
                 <filtering>false</filtering>
                 <includes>
                     <include>Bacon Brawl/**/*.zip</include>
+                    <include>Castle Assault/**/*.zip</include>
                     <include>Bomb Lobbers/**/*.zip</include>
                     <include>Death Tag/**/*.zip</include>
                     <include>Draw My Thing/**/*.zip</include>
                     <include>Dragon Escape/**/*.zip</include>
                     <include>Dragons/**/*.zip</include>
                     <include>Gladiators/**/*.zip</include>
+                    <include>Heroes of GWEN/**/*.zip</include>
                     <include>Micro Battle/**/*.zip</include>
                     <include>One in the Quiver/**/*.zip</include>
                     <include>Paintball/**/*.zip</include>
