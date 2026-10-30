@@ -3,6 +3,7 @@ package au.com.testplex.arcadeports;
 import org.bukkit.Material;
 import org.bukkit.Color;
 import org.bukkit.util.Vector;
+import org.bukkit.util.Vector;
 import java.util.Collection;
 import java.util.ArrayList;
 import java.util.List;
@@ -702,6 +703,92 @@ public final class ArcadePortRules {
             case "pyrotechnic", "pyro" -> "pyrotechnic";
             default -> null;
         };
+    }
+
+    public static int dragonsFlareCharges(String requestedKit) {
+        return switch (normalizeDragonsKit(requestedKit) == null ? "" : normalizeDragonsKit(requestedKit)) {
+            case "marksman" -> 3;
+            case "pyrotechnic" -> 2;
+            case "coward" -> 1;
+            default -> 0;
+        };
+    }
+
+    public static boolean isDragonFlareActive(long nowMillis, long expiresAtMillis) {
+        return expiresAtMillis > nowMillis;
+    }
+
+    public static boolean shouldCancelDragonsPvp(boolean directPlayerDamager, boolean playerProjectileShooter) {
+        return directPlayerDamager || playerProjectileShooter;
+    }
+
+    public static boolean shouldAllowDragonWorldItem(Material material) {
+        return material == Material.EMERALD;
+    }
+
+    /** SoloGame awards one survival gem per ten seconds alive. */
+    public static double dragonSurvivalGems(long survivedMillis) {
+        return Math.max(0L, survivedMillis) / 10_000.0D;
+    }
+
+    /** SoloGame end-of-round placement rewards, one-based. */
+    public static double dragonPlacementGemReward(int place) {
+        return switch (place) {
+            case 1 -> 20.0D;
+            case 2 -> 15.0D;
+            case 3 -> 10.0D;
+            default -> 0.0D;
+        };
+    }
+
+    /** SoloGame sidebar: 0=all alive/dead names, 1=alive names, 2=alive/dead counts. */
+    public static int dragonsSoloScoreboardMode(int totalPlayers, int alivePlayers) {
+        if (totalPlayers < 15) return 0;
+        if (alivePlayers < 16) return 1;
+        return 2;
+    }
+
+    /** Mirrors UtilAction.velocity(entity, facing, 1.2, false, 0, 0.2, 1.0, true). */
+    public static Vector dragonsLeapVelocity(Vector facing, boolean grounded) {
+        if (facing == null || !Double.isFinite(facing.getX()) || !Double.isFinite(facing.getY())
+                || !Double.isFinite(facing.getZ()) || facing.lengthSquared() <= 1.0E-12D) {
+            return new Vector();
+        }
+        Vector velocity = facing.clone().normalize().multiply(1.2D);
+        velocity.setY(velocity.getY() + 0.2D);
+        if (velocity.getY() > 1.0D) velocity.setY(1.0D);
+        if (grounded) velocity.setY(velocity.getY() + 0.2D);
+        return velocity;
+    }
+
+    /** Mirrors UtilAction.velocity(entity, trajectory, 1.0, false, 0, 0.6, 2.0, true). */
+    public static Vector dragonsContactKnockback(Vector trajectory, boolean grounded) {
+        if (trajectory == null || !Double.isFinite(trajectory.getX()) || !Double.isFinite(trajectory.getY())
+                || !Double.isFinite(trajectory.getZ()) || trajectory.lengthSquared() <= 1.0E-12D) {
+            return new Vector();
+        }
+        Vector velocity = trajectory.clone().normalize();
+        velocity.setY(velocity.getY() + 0.6D);
+        if (velocity.getY() > 2.0D) velocity.setY(2.0D);
+        if (grounded) velocity.setY(velocity.getY() + 0.2D);
+        return velocity;
+    }
+
+    public static boolean shouldDragonSparklerAttract(double y, boolean inLiquid) {
+        return y >= 4.0D && !inLiquid;
+    }
+
+    public static boolean canUseDragonSpectatorTeleport(long nowMillis, long nextAllowedMillis) {
+        return nowMillis >= nextAllowedMillis;
+    }
+
+    /** Horizontal radius is circular; the vertical limit prevents one flare protecting an entire tower. */
+    public static boolean isDragonFlareLocationProtected(
+            double horizontalDistanceSquared, double verticalDistance) {
+        return Double.isFinite(horizontalDistanceSquared) && horizontalDistanceSquared >= 0.0D
+                && horizontalDistanceSquared <= DRAGONS_FLARE_RADIUS_SQUARED
+                && Double.isFinite(verticalDistance)
+                && Math.abs(verticalDistance) <= DRAGONS_FLARE_VERTICAL_RANGE;
     }
 
     public static int dragonsFlareCharges(String requestedKit) {
