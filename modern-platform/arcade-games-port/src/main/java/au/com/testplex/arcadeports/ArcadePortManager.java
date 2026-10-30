@@ -6967,7 +6967,8 @@ public final class ArcadePortManager implements Listener {
 
         int kills = session.scores.merge(attackerId, 1, Integer::sum);
         if (ArcadePortRules.quiverRegrantsArrowAfterKill()) {
-            attacker.getInventory().setItem(ArcadePortRules.QUIVER_ARROW_SLOT, namedItem(Material.ARROW,
+            // Reborn adds one arrow for each kill; multiple melee kills can bank arrows.
+            attacker.getInventory().addItem(namedItem(Material.ARROW,
                     "Super Arrow", "One arrow per shot; earn another with each kill."));
         }
         updateQuiverScoreboard(session);
@@ -6984,6 +6985,8 @@ public final class ArcadePortManager implements Listener {
         session.quiverKillStreaks.remove(targetId);
         session.respawning.add(targetId);
         target.sendMessage(ChatColor.RED + "Eliminated! Respawning in one second.");
+        checkRoundEnd(session);
+        if (active != session) return;
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (active != session || !target.isOnline()
@@ -8994,6 +8997,7 @@ public final class ArcadePortManager implements Listener {
         if (!"enchanter".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))
                 || !(event.getProjectile() instanceof Arrow arrow)) return;
         UUID arrowId = arrow.getUniqueId();
+        session.entities.add(arrow);
         session.quiverArrowBounces.put(arrowId, ArcadePortRules.QUIVER_MAX_ARROW_BOUNCES);
         session.quiverArrowIgnoredPlayers.put(arrowId, new HashSet<>(Set.of(player.getUniqueId())));
     }
