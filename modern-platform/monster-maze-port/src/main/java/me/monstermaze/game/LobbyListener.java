@@ -23,7 +23,7 @@ public class LobbyListener implements Listener {
         this.plugin = plugin;
         this.game = game;
         this.voids = voids;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
         if (plugin.isSoloMode()) {
             new SoloIntegrityListener(plugin);
         }
@@ -39,7 +39,7 @@ public class LobbyListener implements Listener {
         }
 
         // Defer one tick so join completes cleanly
-        Bukkit.getScheduler().runTask(plugin, new Runnable() {
+        Bukkit.getScheduler().runTask(plugin.getHostPlugin(), new Runnable() {
             @Override
             public void run() {
                 if (!player.isOnline()) return;
