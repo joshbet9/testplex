@@ -7509,6 +7509,21 @@ public final class ArcadePortManager implements Listener {
                     continue;
                 }
             }
+            if (session.type == ArcadePortGame.SPLEEF
+                    && !session.alive.contains(id)
+                    && isSpleefTrackingCompass(p.getInventory().getItemInMainHand())) {
+                Player target = nearestSpleefSpectatorTarget(session, p);
+                if (target != null) {
+                    double distance = Math.sqrt(target.getLocation().distanceSquared(p.getLocation()));
+                    double height = target.getLocation().getY() - p.getLocation().getY();
+                    p.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.YELLOW + target.getName()
+                            + ChatColor.WHITE + " | Distance: " + ChatColor.YELLOW
+                            + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                            + ChatColor.WHITE + " | Height: " + ChatColor.YELLOW
+                            + String.format(java.util.Locale.ROOT, "%.1f", height));
+                    continue;
+                }
+            }
             if (session.type == ArcadePortGame.BACON_BRAWL
                     && !session.alive.contains(id)
                     && isBaconTrackingCompass(p.getInventory().getItemInMainHand())) {
@@ -10322,6 +10337,85 @@ public final class ArcadePortManager implements Listener {
         return nearest;
     }
 
+    private boolean isSpleefTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+    }
+
+    private boolean isSpleefFletchedArrow(ItemStack item) {
+        if (item == null || item.getType() != Material.ARROW || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && ChatColor.stripColor(meta.getDisplayName()).contains("Fletched Arrow");
+    }
+
+    private Player nearestSpleefSpectatorTarget(Session session, Player spectator) {
+        if (session == null || spectator == null) return null;
+        return alivePlayers(session).stream()
+                .min(java.util.Comparator.comparingDouble(target ->
+                        target.getLocation().distanceSquared(spectator.getLocation())))
+                .orElse(null);
+    }
+
+    private void updateSpleefSpectatorCompasses(Session session, long now) {
+        if (now < session.spleefNextCompassUpdateAt) return;
+        session.spleefNextCompassUpdateAt = now + 250L;
+        for (Player spectator : session.players.values()) {
+            if (spectator == null || !spectator.isOnline()
+                    || session.alive.contains(spectator.getUniqueId())) continue;
+            Player target = nearestSpleefSpectatorTarget(session, spectator);
+            if (target == null) continue;
+            boolean hasCompass = false;
+            for (ItemStack item : spectator.getInventory().getContents()) {
+                if (isSpleefTrackingCompass(item)) { hasCompass = true; break; }
+            }
+            if (!hasCompass) {
+                spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
+                        "Tracks the nearest living Spleef player."));
+            }
+            spectator.setCompassTarget(target.getLocation());
+        }
+    }
+
+    private void openSpleefSpectatorMenu(Session session, Player spectator) {
+        SpleefCompassMenuHolder holder = new SpleefCompassMenuHolder(spectator.getUniqueId());
+        holder.inventory = Bukkit.createInventory(holder, 54, "Spectator Menu");
+        populateSpleefSpectatorMenu(session, spectator, holder);
+        spectator.openInventory(holder.inventory);
+    }
+
+    private boolean populateSpleefSpectatorMenu(
+            Session session, Player spectator, SpleefCompassMenuHolder holder) {
+        List<Player> targets = alivePlayers(session).stream()
+                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        holder.inventory.clear();
+        holder.targetsBySlot.clear();
+        holder.inventory.setItem(4, namedItem(Material.COMPASS, "Tracking Compass",
+                "Choose a living player to follow."));
+        int[] slots = {
+                19, 20, 21, 22, 23, 24, 25,
+                28, 29, 30, 31, 32, 33, 34,
+                37, 38, 39, 40, 41, 42, 43,
+                46, 47, 48, 49, 50, 51, 52
+        };
+        for (int i = 0; i < Math.min(slots.length, targets.size()); i++) {
+            Player target = targets.get(i);
+            holder.targetsBySlot.put(slots[i], target.getUniqueId());
+            holder.inventory.setItem(slots[i], namedItem(Material.PLAYER_HEAD,
+                    ChatColor.AQUA + target.getName(),
+                    "Left-click to teleport; right-click to spectate."));
+        }
+        if (targets.isEmpty()) {
+            holder.inventory.setItem(22, namedItem(Material.BARRIER, ChatColor.RED + "No living players",
+                    "There are no Spleef players left to track."));
+        }
+        holder.inventory.setItem(49, namedItem(Material.BARRIER, ChatColor.RED + "Close"));
+        return !targets.isEmpty();
+    }
+
     private void useSpleefLeap(Session session, Player player, long now) {
         UUID id = player.getUniqueId();
         long readyAt = session.spleefLeapReadyAt.getOrDefault(id, 0L);
@@ -11353,8 +11447,12 @@ public final class ArcadePortManager implements Listener {
                 && event.getAction() == Action.LEFT_CLICK_AIR;
         boolean dragonsSparklerLeftClick = session.type == ArcadePortGame.DRAGONS
                 && event.getAction() == Action.LEFT_CLICK_AIR;
+        boolean spleefCompassLeftClick = session.type == ArcadePortGame.SPLEEF
+                && !session.alive.contains(event.getPlayer().getUniqueId())
+                && isSpleefTrackingCompass(event.getItem()) && event.getAction().isLeftClick();
         if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick
-                && !baconNonRightClick && !dragonEscapeDisruptorLeftClick && !dragonsSparklerLeftClick) return;
+                && !baconNonRightClick && !dragonEscapeDisruptorLeftClick
+                && !dragonsSparklerLeftClick && !spleefCompassLeftClick) return;
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
         if (event.isCancelled()) {
@@ -11377,7 +11475,11 @@ public final class ArcadePortManager implements Listener {
                         || ("waller".equals(bombKit) && heldItem.getType() == Material.STONE_SHOVEL))
                     && (event.getAction().isRightClick() || event.getAction().isLeftClick())
                     && session.alive.contains(player.getUniqueId());
-            if (!forceGladiatorHotbar && !forceBaconAbility && !forceBombControlClick) return;
+            boolean forceSpleefCompass = session.type == ArcadePortGame.SPLEEF
+                    && !session.alive.contains(player.getUniqueId())
+                    && isSpleefTrackingCompass(heldItem)
+                    && (event.getAction().isRightClick() || event.getAction().isLeftClick());
+            if (!forceGladiatorHotbar && !forceBaconAbility && !forceBombControlClick && !forceSpleefCompass) return;
         }
         if (session.type == ArcadePortGame.GLADIATORS
                 && session.alive.contains(player.getUniqueId())
@@ -11402,6 +11504,28 @@ public final class ArcadePortManager implements Listener {
                     player.setCompassTarget(target.getLocation());
                 } else {
                     player.sendMessage(ChatColor.YELLOW + "There are no living pigs to track.");
+                }
+            }
+            return;
+        }
+        if (session.type == ArcadePortGame.SPLEEF
+                && !session.alive.contains(player.getUniqueId())
+                && isSpleefTrackingCompass(heldItem)) {
+            event.setCancelled(true);
+            if (event.getAction().isRightClick()) {
+                openSpleefSpectatorMenu(session, player);
+            } else if (event.getAction().isLeftClick()) {
+                long now = System.currentTimeMillis();
+                long readyAt = session.spleefSpectateNextTeleportAt.getOrDefault(player.getUniqueId(), 0L);
+                if (now < readyAt) return;
+                Player target = nearestSpleefSpectatorTarget(session, player);
+                if (target != null) {
+                    player.setSpectatorTarget(null);
+                    player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                    player.setCompassTarget(target.getLocation());
+                    session.spleefSpectateNextTeleportAt.put(player.getUniqueId(), now + 3_000L);
+                } else {
+                    player.sendMessage(ChatColor.YELLOW + "There are no living Spleef players to track.");
                 }
             }
             return;
@@ -12065,8 +12189,27 @@ public final class ArcadePortManager implements Listener {
         if (isDragonProtectedKitItem(event.getOldCursor())) event.setCancelled(true);
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSpleefItemDrop(org.bukkit.event.player.PlayerDropItemEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SPLEEF
+                || !session.players.containsKey(event.getPlayer().getUniqueId())) return;
+        ItemStack dropped = event.getItemDrop().getItemStack();
+        if (isSpleefTrackingCompass(dropped) || isSpleefFletchedArrow(dropped)) {
+            event.setCancelled(true);
+            event.getPlayer().sendMessage(ChatColor.YELLOW + "You cannot drop your Spleef compass or fletched arrows.");
+        }
+    }
+
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
+        Session currentSession = active;
+        if (currentSession != null && currentSession.type == ArcadePortGame.SPLEEF
+                && (isSpleefFletchedArrow(event.getCurrentItem())
+                        || isSpleefFletchedArrow(event.getCursor()))) {
+            event.setCancelled(true);
+            return;
+        }
         if (event.getView().getTopInventory().getHolder() instanceof GladiatorMenuHolder holder) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof Player player)
@@ -12138,6 +12281,39 @@ public final class ArcadePortManager implements Listener {
             if (target == null || !target.isOnline() || !session.alive.contains(targetId)) {
                 spectator.sendMessage(ChatColor.YELLOW + "That player is no longer alive.");
                 openDragonsSpectatorMenu(session, spectator);
+                return;
+            }
+            spectator.closeInventory();
+            if (event.isRightClick()) {
+                spectator.setSpectatorTarget(target);
+            } else {
+                spectator.setSpectatorTarget(null);
+                spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                spectator.setCompassTarget(target.getLocation());
+            }
+            return;
+        }
+        if (event.getView().getTopInventory().getHolder() instanceof SpleefCompassMenuHolder holder) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof Player spectator)
+                    || !holder.ownerId.equals(spectator.getUniqueId())
+                    || event.getClickedInventory() != event.getView().getTopInventory()) return;
+            Session session = active;
+            if (session == null || session.type != ArcadePortGame.SPLEEF
+                    || !session.players.containsKey(spectator.getUniqueId())
+                    || session.alive.contains(spectator.getUniqueId())) {
+                spectator.closeInventory();
+                return;
+            }
+            if (event.getSlot() == 49 || event.getSlot() == 4) {
+                spectator.closeInventory();
+                return;
+            }
+            UUID targetId = holder.targetsBySlot.get(event.getSlot());
+            Player target = targetId == null ? null : session.players.get(targetId);
+            if (target == null || !target.isOnline() || !session.alive.contains(targetId)) {
+                spectator.sendMessage(ChatColor.YELLOW + "That player is no longer alive.");
+                openSpleefSpectatorMenu(session, spectator);
                 return;
             }
             spectator.closeInventory();
