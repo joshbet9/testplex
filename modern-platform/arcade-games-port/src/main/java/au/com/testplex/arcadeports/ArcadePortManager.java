@@ -8830,6 +8830,7 @@ public final class ArcadePortManager implements Listener {
                 && event.getEntity() instanceof Player quiverTarget
                 && session.players.containsKey(quiverTarget.getUniqueId())
                 && session.alive.contains(quiverTarget.getUniqueId())) {
+            double quiverIncomingDamage = event.getFinalDamage();
             event.setCancelled(true);
             if (event instanceof EntityDamageByEntityEvent quiverHit) {
                 Entity damager = quiverHit.getDamager();
@@ -8848,7 +8849,7 @@ public final class ArcadePortManager implements Listener {
             // The source SoloGame leaves environmental damage enabled (including fall
             // damage). The shared modern handler cancels Bukkit damage for all games,
             // so apply OITQ environmental damage explicitly before returning.
-            double damage = event.getFinalDamage();
+            double damage = quiverIncomingDamage;
             if (damage > 0.0D) {
                 String reason = event.getCause().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
                 if (quiverTarget.getHealth() <= damage) {
