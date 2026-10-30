@@ -4155,9 +4155,11 @@ public final class ArcadePortManager implements Listener {
         dragon.setRemoveWhenFarAway(false);
         dragon.setCustomName(ChatColor.YELLOW + "Douglas the Dragon");
         dragon.setCustomNameVisible(true);
-        Location firstTarget = session.dragonEscapeWaypoints.isEmpty()
+        int initialTargetIndex = ArcadePortRules.dragonEscapeInitialTargetIndex(
+                session.dragonEscapeWaypoints.size());
+        Location firstTarget = initialTargetIndex < 0
                 ? spawn.clone().add(0.0D, 0.0D, 8.0D)
-                : session.dragonEscapeWaypoints.get(0).clone();
+                : session.dragonEscapeWaypoints.get(initialTargetIndex).clone();
         Vector initialDirection = firstTarget.toVector().subtract(spawn.toVector()).normalize();
         Location initialLocation = dragon.getLocation();
         initialLocation.setPitch(dragonEscapePitch(initialDirection));

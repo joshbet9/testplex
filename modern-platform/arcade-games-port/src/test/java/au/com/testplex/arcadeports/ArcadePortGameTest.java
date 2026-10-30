@@ -1394,6 +1394,13 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldTriggerDragonEscapeDisruptor(40, 2.0D, false));
     }
 
+    @Test void dragonEscapeDouglasStartsByTargetingFirstAuthoredCheckpointAfterRedOrigin() {
+        assertEquals(1, ArcadePortRules.dragonEscapeInitialTargetIndex(2));
+        assertEquals(1, ArcadePortRules.dragonEscapeInitialTargetIndex(14));
+        assertEquals(-1, ArcadePortRules.dragonEscapeInitialTargetIndex(1));
+        assertEquals(-1, ArcadePortRules.dragonEscapeInitialTargetIndex(0));
+    }
+
     @Test void dragonEscapeGreenDataMarkerControlsDouglasSpeedMultiplier() {
         assertEquals(1.0D, ArcadePortRules.dragonEscapeSpeedMultiplier(100.0D), 0.00001D);
         assertEquals(1.25D, ArcadePortRules.dragonEscapeSpeedMultiplier(125.0D), 0.00001D);

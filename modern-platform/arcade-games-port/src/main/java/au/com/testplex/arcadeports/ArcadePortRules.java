@@ -430,6 +430,11 @@ public final class ArcadePortRules {
         return !isDragonEscapeWarpGraceActive(nowMillis, warpedAtMillis);
     }
 
+    /** The route list starts with the RED origin; Douglas initially flies toward the first BLACK marker. */
+    public static int dragonEscapeInitialTargetIndex(int waypointCount) {
+        return waypointCount > 1 ? 1 : -1;
+    }
+
     public static double dragonEscapeSpeedMultiplier(double greenMarkerX) {
         return Double.isFinite(greenMarkerX) ? greenMarkerX / 100.0D : 1.0D;
     }
