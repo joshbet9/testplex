@@ -3875,6 +3875,18 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private ItemStack skyWarsThrowableTntItem() {
+        ItemStack item = new ItemStack(Material.TNT, SkyWarsMixedArcadeRules.TNT_PER_DROP);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.YELLOW + "" + ChatColor.BOLD + "Left Click - Throw"
+                    + ChatColor.WHITE + " / " + ChatColor.YELLOW + ChatColor.BOLD + "Right Click - Drop");
+            meta.setLore(List.of(ChatColor.GRAY + "Throwable TNT"));
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     private void spawnSkyWarsGeneratorHolder(Session session) {
         if (session == null || active != session || !session.skyWarsLive
                 || session.skyWarsGeneratorHolder != null || session.skyWarsTntGenerator == null) return;
@@ -3884,7 +3896,7 @@ public final class ArcadePortManager implements Listener {
         holder.setInvulnerable(true);
         holder.setCanPickupItems(false);
         holder.setRemoveWhenFarAway(false);
-        holder.setHelmet(new ItemStack(Material.TNT, SkyWarsMixedArcadeRules.TNT_PER_DROP));
+        holder.setHelmet(skyWarsThrowableTntItem());
         holder.setCustomName(ChatColor.RED + "" + ChatColor.BOLD + "Throwable TNT");
         holder.setCustomNameVisible(true);
         session.skyWarsGeneratorHolder = holder;
@@ -3900,8 +3912,7 @@ public final class ArcadePortManager implements Listener {
         ArmorStand holder = session.skyWarsGeneratorHolder;
         if (holder == null || !holder.isValid() || !session.alive.contains(player.getUniqueId())) return;
         if (player.getLocation().distanceSquared(holder.getLocation()) > 4.0D) return;
-        Map<Integer, ItemStack> overflow = player.getInventory().addItem(
-                new ItemStack(Material.TNT, SkyWarsMixedArcadeRules.TNT_PER_DROP));
+        Map<Integer, ItemStack> overflow = player.getInventory().addItem(skyWarsThrowableTntItem());
         for (ItemStack item : overflow.values()) {
             player.getWorld().dropItemNaturally(player.getLocation(), item);
         }
@@ -4711,8 +4722,12 @@ public final class ArcadePortManager implements Listener {
         tnt.setFuseTicks((int) SkyWarsMixedArcadeRules.TNT_THROW_FUSE_TICKS);
         tnt.setYield(4.0F);
         if (throwForward) {
-            tnt.setVelocity(player.getLocation().getDirection().normalize()
-                    .multiply(SkyWarsMixedArcadeRules.TNT_THROW_STRENGTH).setY(0.3D));
+            // UtilAction.velocity(direction, strength, yAdd=0.3, yMax=1.0, groundBoost=false).
+            Vector velocity = player.getLocation().getDirection().normalize()
+                    .multiply(SkyWarsMixedArcadeRules.TNT_THROW_STRENGTH);
+            velocity.setY(Math.min(1.0D, velocity.getY() + 0.3D));
+            tnt.setFallDistance(0.0F);
+            tnt.setVelocity(velocity);
         }
         session.skyWarsTntOwners.put(tnt.getUniqueId(), player.getUniqueId());
         session.entities.add(tnt);
