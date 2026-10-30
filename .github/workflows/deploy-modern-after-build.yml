@@ -1,0 +1,63 @@
+name: Deploy latest successful Testplex Modern Paper build
+
+on:
+  workflow_run:
+    workflows:
+      - Testplex Modern Paper 26.3
+    types:
+      - completed
+    branches:
+      - feat/testplex-modern-26.3-platform
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  select-latest-build:
+    name: Confirm this is the latest successful modern build
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'feat/testplex-modern-26.3-platform' }}
+    runs-on: ubuntu-22.04
+    outputs:
+      deploy: ${{ steps.latest.outputs.deploy }}
+    steps:
+      - name: Skip superseded build artifacts
+        id: latest
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          runs_json="$RUNNER_TEMP/testplex-modern-runs.json"
+          curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/actions/runs?branch=feat%2Ftestplex-modern-26.3-platform&event=push&per_page=100" \
+            -o "$runs_json"
+
+          latest_run_id="$(jq -er '
+            [.workflow_runs[]
+              | select(.path == ".github/workflows/testplex-modern-build.yml")
+              | select(.event == "push")]
+            | max_by(.run_number)
+            | .id
+          ' "$runs_json")"
+
+          if [[ "$latest_run_id" != "$SOURCE_RUN_ID" ]]; then
+            echo "Build $SOURCE_RUN_ID was superseded by newer push build $latest_run_id; skipping deployment."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Build $SOURCE_RUN_ID is the latest push build; deployment is permitted."
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy:
+    name: Deploy the latest verified modern build
+    needs: select-latest-build
+    if: ${{ needs.select-latest-build.outputs.deploy == 'true' }}
+    uses: joshbet9/testplex/.github/workflows/deploy-testplex-modern-hyperv.yml@feat/testplex-modern-26.3-platform
+    with:
+      deploy_to_modern_test_server: true
+      source_run_id: ${{ github.event.workflow_run.id }}
+    secrets: inherit
