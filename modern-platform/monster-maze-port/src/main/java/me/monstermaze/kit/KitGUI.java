@@ -49,7 +49,7 @@ public final class KitGUI implements Listener {
         KitType selected = kits.getKit(player);
         for (int i = 0; i < available.size() && i < SLOTS.length; i++) {
             KitType kit = available.get(i);
-            List<String> lore = new ArrayList<>(kit.description);
+            List<String> lore = new ArrayList<>(java.util.Arrays.asList(kit.description));
             lore.add("");
             lore.add(kit == selected ? ChatColor.GREEN + "SELECTED" : ChatColor.YELLOW + "Click to select");
             inventory.setItem(SLOTS[i], item(kit.icon,
