@@ -59,6 +59,8 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
+import org.bukkit.event.entity.EntityCombustEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityTargetEvent;
@@ -9604,6 +9606,22 @@ public final class ArcadePortManager implements Listener {
         if (!ArcadePortRules.shouldAllowDragonWorldItem(event.getEntity().getItemStack().getType())) {
             event.setCancelled(true);
         }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onSneakyAssassinsEntityDeath(EntityDeathEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SNEAKY_ASSASSINS
+                || event.getEntity().getWorld() != session.world) return;
+        sneakyAssassins.handleNpcDeath(event);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSneakyAssassinsEntityCombust(EntityCombustEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SNEAKY_ASSASSINS
+                || event.getEntity().getWorld() != session.world) return;
+        sneakyAssassins.handleCombust(event);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
