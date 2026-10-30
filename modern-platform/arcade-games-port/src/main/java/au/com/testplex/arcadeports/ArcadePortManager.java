@@ -5089,6 +5089,8 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             if (player.isOnline()) {
+                // Do not leave Brutus' short resistance effect running on an eliminated spectator.
+                player.removePotionEffect(PotionEffectType.RESISTANCE);
                 player.setGameMode(GameMode.SPECTATOR);
                 player.getInventory().clear();
                 player.sendMessage(ChatColor.RED + "Knocked out! You are out of Bacon Brawl.");
