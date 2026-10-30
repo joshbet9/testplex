@@ -2349,6 +2349,7 @@ public final class ArcadePortManager implements Listener {
 
     private void tryQuiverRebound(Session session, Projectile projectile, Player shooter, Location impact) {
         UUID projectileId = projectile.getUniqueId();
+        String flightStyle = session.quiverArrowFlightStyles.remove(projectileId);
         Integer bounces = session.quiverArrowBounces.remove(projectileId);
         Set<UUID> previousHits = session.quiverArrowIgnoredPlayers.remove(projectileId);
         if (!"enchanter".equals(session.quiverKits.getOrDefault(shooter.getUniqueId(), "leaper"))
@@ -2394,6 +2395,7 @@ public final class ArcadePortManager implements Listener {
         UUID reboundId = rebound.getUniqueId();
         session.quiverArrowBounces.put(reboundId, ArcadePortRules.quiverArrowBouncesAfterBounce(bounces));
         session.quiverArrowIgnoredPlayers.put(reboundId, new HashSet<>(ignored));
+        if (flightStyle != null) session.quiverArrowFlightStyles.put(reboundId, flightStyle);
     }
 
     private Location microCrumbleSpectatorLocation(Session session, SourceMapCatalog.MapData mapData) {
@@ -2975,6 +2977,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
             updateQuiverKit(session, now);
+            updateQuiverArrowFlightCosmetics(session);
             if (session.ticks % 5L == 0L) updateQuiverSpectatorCompass(session);
             if (session.ticks % 10L == 0L) updateQuiverScoreboard(session);
         }
@@ -7040,18 +7043,109 @@ public final class ArcadePortManager implements Listener {
         }, ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS);
     }
 
-    private String quiverStreakCosmetic(UUID playerId) {
+    private String quiverCosmeticSelection(UUID playerId, String line, String defaultOption) {
         var cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
         java.io.File cosmeticsFolder = cosmeticsPlugin == null
                 ? new java.io.File(plugin.getDataFolder().getParentFile(), "TestplexModernArcade")
                 : cosmeticsPlugin.getDataFolder();
         java.io.File preferencesFile = new java.io.File(cosmeticsFolder, "player-preferences.yml");
-        if (!preferencesFile.isFile()) return "";
+        if (!preferencesFile.isFile()) return defaultOption;
         org.bukkit.configuration.file.YamlConfiguration preferences =
                 org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(preferencesFile);
         String selected = preferences.getString("players." + playerId
-                + ".games.one-in-the-quiver.cosmetics.death-streak.selected", "");
-        return selected == null ? "" : selected.toLowerCase(java.util.Locale.ROOT);
+                + ".games.one-in-the-quiver.cosmetics." + line + ".selected", defaultOption);
+        return selected == null || selected.isBlank()
+                ? defaultOption : selected.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private String quiverStreakCosmetic(UUID playerId) {
+        return quiverCosmeticSelection(playerId, "death-streak", "subtle");
+    }
+
+    private String quiverArrowFlightCosmetic(UUID playerId) {
+        return ArcadePortRules.normalizeQuiverArrowFlightCosmetic(
+                quiverCosmeticSelection(playerId, "arrow-flight", "bullseye-dash"));
+    }
+
+    private void updateQuiverArrowFlightCosmetics(Session session) {
+        if (session.quiverArrowFlightStyles.isEmpty()) return;
+        for (Entity entity : new ArrayList<>(session.entities)) {
+            if (!(entity instanceof Arrow arrow)) continue;
+            UUID arrowId = arrow.getUniqueId();
+            String style = session.quiverArrowFlightStyles.get(arrowId);
+            if (style == null) continue;
+            if (!arrow.isValid() || arrow.isDead()) {
+                session.quiverArrowFlightStyles.remove(arrowId);
+                continue;
+            }
+
+            Vector direction = arrow.getVelocity();
+            if (direction.lengthSquared() < 0.001D) continue;
+            direction.normalize();
+            Location point = arrow.getLocation();
+            switch (style) {
+                case "bullseye-dash" -> {
+                    for (int i = 0; i < 3; i++) {
+                        Location dash = point.clone().subtract(direction.clone().multiply(i * 0.18D));
+                        session.world.spawnParticle(Particle.CRIT, dash, 1, 0.01D, 0.01D, 0.01D, 0.0D);
+                    }
+                }
+                case "fletching-sparks" -> {
+                    Vector side = direction.clone().crossProduct(new Vector(0.0D, 1.0D, 0.0D));
+                    if (side.lengthSquared() < 0.001D) side = new Vector(1.0D, 0.0D, 0.0D);
+                    side.normalize().multiply(0.12D);
+                    for (int i = 0; i < 2; i++) {
+                        Location feather = point.clone().subtract(direction.clone().multiply(i * 0.2D));
+                        session.world.spawnParticle(Particle.ELECTRIC_SPARK, feather, 1,
+                                0.015D, 0.015D, 0.015D, 0.0D);
+                        session.world.spawnParticle(Particle.END_ROD, feather.clone().add(side), 1,
+                                0.0D, 0.0D, 0.0D, 0.0D);
+                        session.world.spawnParticle(Particle.END_ROD, feather.clone().subtract(side), 1,
+                                0.0D, 0.0D, 0.0D, 0.0D);
+                    }
+                }
+                case "ricochet-rune" -> session.world.spawnParticle(Particle.ENCHANT, point, 3,
+                        0.08D, 0.08D, 0.08D, 0.02D);
+                default -> { }
+            }
+        }
+    }
+
+    private void playQuiverArrowFlightImpact(Session session, Arrow arrow, Location impact) {
+        String style = session.quiverArrowFlightStyles.get(arrow.getUniqueId());
+        if (style == null || impact == null || impact.getWorld() != session.world) return;
+        Location point = impact.clone().add(0.0D, 0.12D, 0.0D);
+        switch (style) {
+            case "bullseye-dash" -> {
+                for (int i = 0; i < 16; i++) {
+                    double angle = Math.PI * 2.0D * i / 16.0D;
+                    Location ring = point.clone().add(Math.cos(angle) * 0.55D, 0.0D,
+                            Math.sin(angle) * 0.55D);
+                    session.world.spawnParticle(Particle.CRIT, ring, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+                }
+                session.world.playSound(point, Sound.BLOCK_NOTE_BLOCK_PLING, 0.65F, 1.65F);
+            }
+            case "fletching-sparks" -> {
+                session.world.spawnParticle(Particle.ELECTRIC_SPARK, point, 18,
+                        0.22D, 0.18D, 0.22D, 0.04D);
+                session.world.spawnParticle(Particle.END_ROD, point, 5,
+                        0.16D, 0.2D, 0.16D, 0.025D);
+                session.world.playSound(point, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.55F, 1.8F);
+            }
+            case "ricochet-rune" -> {
+                for (int i = 0; i < 16; i++) {
+                    double angle = Math.PI * 2.0D * i / 16.0D;
+                    Location rune = point.clone().add(Math.cos(angle) * 0.62D,
+                            Math.sin(angle * 2.0D) * 0.16D, Math.sin(angle) * 0.62D);
+                    session.world.spawnParticle(Particle.ENCHANT, rune, 2,
+                            0.0D, 0.0D, 0.0D, 0.06D);
+                }
+                session.world.spawnParticle(Particle.END_ROD, point, 3,
+                        0.08D, 0.12D, 0.08D, 0.01D);
+                session.world.playSound(point, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8F, 1.3F);
+            }
+            default -> { }
+        }
     }
 
     private void playQuiverStreakCosmetic(Session session, Player killer, Player victim, int streak) {
@@ -7129,6 +7223,7 @@ public final class ArcadePortManager implements Listener {
             tryQuiverRebound(session, projectile, shooter,
                     projectile.getLocation().clone().add(projectile.getVelocity()));
             handlePlayerHit(session, shooter, target, "arrow hit");
+            session.entities.remove(projectile);
             projectile.remove();
         } else if (session.type == ArcadePortGame.MICRO_BATTLES) {
             handlePlayerHit(session, shooter, target, "arrow hit");
@@ -9030,6 +9125,7 @@ public final class ArcadePortManager implements Listener {
         if (!(event.getProjectile() instanceof Arrow arrow)) return;
         // Track every Quiver arrow so all remaining projectiles are cleaned up at round end.
         session.entities.add(arrow);
+        session.quiverArrowFlightStyles.put(arrow.getUniqueId(), quiverArrowFlightCosmetic(player.getUniqueId()));
         if (!"enchanter".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))) return;
         UUID arrowId = arrow.getUniqueId();
         session.quiverArrowBounces.put(arrowId, ArcadePortRules.QUIVER_MAX_ARROW_BOUNCES);
@@ -9278,15 +9374,17 @@ public final class ArcadePortManager implements Listener {
 
         if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
                 && event.getEntity() instanceof Arrow quiverArrow
-                && session.quiverArrowBounces.containsKey(quiverArrow.getUniqueId())) {
+                && session.entities.contains(quiverArrow)) {
+            Location impact = quiverArrow.getLocation().clone().add(quiverArrow.getVelocity());
+            playQuiverArrowFlightImpact(session, quiverArrow, impact);
             if (event.getHitEntity() instanceof Player target
                     && quiverArrow.getShooter() instanceof Player shooter) {
                 hitProjectile(session, quiverArrow, shooter, target);
             } else {
                 if (quiverArrow.getShooter() instanceof Player shooter) {
-                    tryQuiverRebound(session, quiverArrow, shooter,
-                            quiverArrow.getLocation().clone().add(quiverArrow.getVelocity()));
+                    tryQuiverRebound(session, quiverArrow, shooter, impact);
                 }
+                session.quiverArrowFlightStyles.remove(quiverArrow.getUniqueId());
                 session.entities.remove(quiverArrow);
                 quiverArrow.remove();
             }
@@ -11482,6 +11580,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> quiverKits = new HashMap<>();
         final Map<UUID, Integer> quiverArrowBounces = new HashMap<>();
         final Map<UUID, Set<UUID>> quiverArrowIgnoredPlayers = new HashMap<>();
+        final Map<UUID, String> quiverArrowFlightStyles = new HashMap<>();
         final Map<UUID, Integer> quiverKillStreaks = new HashMap<>();
         final Map<UUID, Integer> quiverFistKills = new HashMap<>();
         final Set<UUID> quiverUsedBow = new HashSet<>();
