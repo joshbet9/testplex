@@ -90,10 +90,6 @@ final class SneakyAssassinsRules {
         return 8_000L;
     }
 
-    static long bribeDurationMillis() {
-        return 15_000L;
-    }
-
     static int sourceNpcCount() {
         return 200;
     }
