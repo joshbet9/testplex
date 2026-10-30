@@ -2199,6 +2199,7 @@ public final class ArcadePortManager implements Listener {
             giveDeathTagKit(session, player, true, session.alphaChasers.contains(player.getUniqueId()));
             player.playSound(player.getLocation(), Sound.ENTITY_ZOMBIE_AMBIENT, 1.0F, 1.0F);
             player.sendMessage(ChatColor.RED + (forcedAlpha ? "You are now an Alpha Chaser!" : "You are now a Chaser!"));
+            if (forcedAlpha) session.world.strikeLightningEffect(player.getLocation());
             session.world.spawnParticle(Particle.FLAME, player.getLocation().add(0.0D, 1.0D, 0.0D),
                     18, 0.35D, 0.5D, 0.35D, 0.04D);
         }
@@ -2239,20 +2240,18 @@ public final class ArcadePortManager implements Listener {
             // Legacy GameTeam.GetSpawn() chooses a team spawn away from active players.
             // Maximise the nearest-player clearance rather than choosing a random spawn.
             List<Player> activePlayers = alivePlayers(session);
-            Location safest = null;
-            double greatestClearance = Double.NEGATIVE_INFINITY;
-            for (Location candidate : mapData.spawnLocations()) {
+            List<Location> spawns = mapData.spawnLocations();
+            List<Double> clearances = new ArrayList<>(spawns.size());
+            for (Location candidate : spawns) {
                 double nearestPlayerDistance = activePlayers.isEmpty()
                         ? Double.POSITIVE_INFINITY
                         : activePlayers.stream()
                                 .mapToDouble(other -> candidate.distanceSquared(other.getLocation()))
                                 .min().orElse(Double.POSITIVE_INFINITY);
-                if (safest == null || nearestPlayerDistance > greatestClearance) {
-                    safest = candidate;
-                    greatestClearance = nearestPlayerDistance;
-                }
+                clearances.add(nearestPlayerDistance);
             }
-            if (safest != null) return safest.clone();
+            int safestIndex = ArcadePortRules.deathTagSafestRespawnSpawnIndex(clearances);
+            if (safestIndex >= 0) return spawns.get(safestIndex).clone();
         }
         return spawnFor(session, player);
     }
