@@ -1401,6 +1401,8 @@ public final class ArcadePortRules {
     }
 
 
+    /** Reborn's base GameTimeout for Paintball is twenty minutes. */
+    public static final long PAINTBALL_GAME_TIMEOUT_MILLIS = 1_200_000L;
     public static final long PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS = 250L;
     public static final double PAINTBALL_SAVE_ME_RADIUS = 3.0D;
 
