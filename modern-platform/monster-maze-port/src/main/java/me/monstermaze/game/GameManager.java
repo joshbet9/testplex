@@ -8,7 +8,6 @@ import me.monstermaze.kit.KitManager;
 import me.monstermaze.maze.MazeGenerator;
 import me.monstermaze.maze.MazePathfinder;
 import me.monstermaze.stats.StatTracker;
-import me.monstermaze.stats.LeaderboardBoard;
 import me.monstermaze.util.GameScoreboard;
 import me.monstermaze.util.PlayerFeedback;
 import me.monstermaze.util.TextUtil;
