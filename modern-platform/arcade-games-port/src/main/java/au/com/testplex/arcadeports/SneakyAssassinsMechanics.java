@@ -627,8 +627,7 @@ final class SneakyAssassinsMechanics {
 
     void handleEntityInteract(PlayerInteractEntityEvent event) {
         Player player = event.getPlayer();
-        if (world == null || player.getWorld() != world || !players.containsKey(player.getUniqueId())
-                || !isAlive.test(player.getUniqueId())) return;
+        if (world == null || player.getWorld() != world || !players.containsKey(player.getUniqueId())) return;
         Entity clicked = event.getRightClicked();
         if (clicked instanceof Hanging) {
             event.setCancelled(true);
@@ -637,7 +636,7 @@ final class SneakyAssassinsMechanics {
         if (!(clicked instanceof Villager villager)) return;
         // Source blocks villager trading/interactions even when the player is not bribing.
         event.setCancelled(true);
-        if (!npcIds.contains(villager.getUniqueId())
+        if (!isAlive.test(player.getUniqueId()) || !npcIds.contains(villager.getUniqueId())
                 || !"briber".equals(selectedKit(player.getUniqueId()))
                 || player.getInventory().getItemInMainHand().getType() != Material.EMERALD) return;
         long now = System.currentTimeMillis();
