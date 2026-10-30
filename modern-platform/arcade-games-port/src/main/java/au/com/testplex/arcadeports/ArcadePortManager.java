@@ -4774,6 +4774,27 @@ public final class ArcadePortManager implements Listener {
         checkRoundEnd(session);
     }
 
+    /** Match Reborn's CustomDamageEvent.AddKnockback("Paintball", 2) impulse. */
+    private void applyPaintballKnockback(Projectile projectile, Player target) {
+        if (projectile == null || target == null) return;
+        final double knockback = Math.log10(2.0D) * 2.0D;
+        Vector trajectory = projectile.getVelocity().clone();
+        trajectory.setY(0.0D);
+        double length = trajectory.length();
+        if (!Double.isFinite(length) || length < 1.0E-6D) return;
+        trajectory.multiply(0.37D * knockback / length);
+        trajectory.setY(0.06D);
+        double velocity = 0.2D + trajectory.length() * 0.8D;
+        Vector push = trajectory.normalize().multiply(velocity);
+        push.setY(Math.min(0.4D + (0.04D * knockback),
+                push.getY() + Math.abs(0.2D * knockback)));
+        if (target.isOnGround()) {
+            push.setY(Math.min(0.4D + (0.04D * knockback), push.getY() + 0.2D));
+        }
+        target.setFallDistance(0.0F);
+        target.setVelocity(push);
+    }
+
     private int applyPaintballHit(Session session, Player attacker, Player target, int paintAmount) {
         UUID targetId = target.getUniqueId();
         int before = session.paintPiecesRemaining.getOrDefault(targetId, 4);
@@ -9592,6 +9613,7 @@ public final class ArcadePortManager implements Listener {
             session.paintProjectileTeams.remove(projectile.getUniqueId());
             session.paintProjectileImpacts.remove(projectile.getUniqueId());
             session.paintballProjectileCosmetics.remove(projectile.getUniqueId());
+            applyPaintballKnockback(projectile, target);
             handlePlayerHit(session, shooter, target, "projectile hit", paintAmount);
         } else if (session.type == ArcadePortGame.DEATH_TAG) {
             if (projectile instanceof Arrow arrow
