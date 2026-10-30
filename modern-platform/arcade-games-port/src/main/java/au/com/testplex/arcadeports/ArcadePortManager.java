@@ -11716,19 +11716,23 @@ public final class ArcadePortManager implements Listener {
             Player player = event.getPlayer();
             boolean editor = session.alive.contains(player.getUniqueId())
                     && session.teams.getOrDefault(player.getUniqueId(), 0) == 0
-                    && "editor".equals(session.witherAssaultKits.getOrDefault(player.getUniqueId(), "archer"))
-                    && session.witherEditorBlocks.contains(event.getBlock());
+                    && "editor".equals(session.witherAssaultKits.getOrDefault(player.getUniqueId(), "archer"));
             boolean supportsAnotherHuman = false;
             if (editor && event.getBlock().getRelative(0, 1, 0).getType().isAir()) {
                 supportsAnotherHuman = alivePlayers(session).stream().anyMatch(human -> !human.equals(player)
                         && session.teams.getOrDefault(human.getUniqueId(), 1) == 0
                         && human.getLocation().getBlock().getRelative(0, -1, 0).equals(event.getBlock()));
             }
-            if (editor && !supportsAnotherHuman && session.witherEditorBlocks.remove(event.getBlock())) {
+            boolean aboveBuildFloor = event.getBlock().getY() >= session.witherAssaultSpawnY - 3.0D;
+            if (!editor || supportsAnotherHuman || !aboveBuildFloor) {
+                if (editor && !aboveBuildFloor) {
+                    player.sendMessage(ChatColor.YELLOW + "You may not build under this height!");
+                }
+                event.setCancelled(true);
+            } else {
+                session.witherEditorBlocks.remove(event.getBlock());
                 session.witherEditorReplacedBlocks.remove(event.getBlock());
-                event.setDropItems(false);
-                event.setExpToDrop(0);
-            } else event.setCancelled(true);
+            }
             return;
         }
         if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
