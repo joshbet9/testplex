@@ -228,16 +228,16 @@ if "skyWarsKitPreferences" not in source:
 
 if "private ItemStack skyWarsKitItem(" not in source:
     helper = extract("    private ItemStack skyWarsKitItem(", "    private void prepareSkyWarsMap(")
-    anchor = "    private void prepareSkyWarsMap("
+    anchor = "    private void updateQuiverKit("
     if anchor not in source:
-        raise SystemExit("Could not find SkyWars map preparation method.")
+        raise SystemExit("Could not find stable kit-update insertion point.")
     source = source.replace(anchor, helper + anchor, 1)
 
 if "private void updateSkyWarsCompass(" not in source:
     helpers = extract("    private Player nearestSkyWarsTarget(", "    private int skyWarsMetalArmorPieces(")
-    anchor = "    private int skyWarsMetalArmorPieces("
+    anchor = "    private void updateQuiverKit("
     if anchor not in source:
-        raise SystemExit("Could not find SkyWars metal armour helper anchor.")
+        raise SystemExit("Could not find stable compass-helper insertion point.")
     source = source.replace(anchor, helpers + anchor, 1)
 
 if "private record SkyWarsCrumbleCandidate(" not in source:
