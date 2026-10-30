@@ -1097,6 +1097,9 @@ public final class ArcadePortManager implements Listener {
                 session.dragonNextArrowAt.put(playerId, now + ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
             }
             Location spawn = spawns.get(i % spawns.size()).clone();
+            if (type == ArcadePortGame.DRAGON_ESCAPE) {
+                session.dragonEscapeStartLocations.put(player.getUniqueId(), spawn.clone());
+            }
             if (type == ArcadePortGame.MICRO_BATTLES && !sourceMapWorlds.contains(type.id())) {
                 spawn = microTeamSpawn(teamId, i / 4, (participants.size() + 3) / 4);
             } else if (type == ArcadePortGame.TURF_WARS && !sourceMapWorlds.contains(type.id())) {
@@ -4774,7 +4777,15 @@ public final class ArcadePortManager implements Listener {
         plugin.getConfig().set(path + "time-ms", elapsed);
         plugin.getConfig().set(path + "map-resource", session.dragonEscapeMapResource);
         plugin.getConfig().set(path + "map-name", session.dragonEscapeMapName);
-        // Preserve the exact finish position so the PB ghost can replay its final leg too.
+        // Store each runner's actual GREEN start and exact finish so their PB ghost replays
+        // their own lane rather than the shared RED dragon marker.
+        Location runStart = session.dragonEscapeStartLocations.get(id);
+        if (runStart == null) runStart = session.dragonEscapeStartLocation;
+        if (runStart != null) {
+            plugin.getConfig().set(path + "start.x", runStart.getX());
+            plugin.getConfig().set(path + "start.y", runStart.getY());
+            plugin.getConfig().set(path + "start.z", runStart.getZ());
+        }
         plugin.getConfig().set(path + "finish.x", player.getLocation().getX());
         plugin.getConfig().set(path + "finish.y", player.getLocation().getY());
         plugin.getConfig().set(path + "finish.z", player.getLocation().getZ());
@@ -4798,6 +4809,26 @@ public final class ArcadePortManager implements Listener {
                 + ArcadePortRules.formatDragonEscapeDelta(delta);
     }
 
+    private Location dragonEscapePersonalBestStartLocation(
+            Session session, UUID playerId, String mapResource) {
+        String path = dragonEscapePbPath(playerId, mapResource);
+        if (!path.isEmpty()
+                && plugin.getConfig().contains(path + "start.x")
+                && plugin.getConfig().contains(path + "start.y")
+                && plugin.getConfig().contains(path + "start.z")) {
+            double x = plugin.getConfig().getDouble(path + "start.x");
+            double y = plugin.getConfig().getDouble(path + "start.y");
+            double z = plugin.getConfig().getDouble(path + "start.z");
+            if (Double.isFinite(x) && Double.isFinite(y) && Double.isFinite(z)) {
+                return new Location(session.world, x, y, z);
+            }
+        }
+        // Older PB records predate per-player starts; retain their shared-route origin.
+        return session.dragonEscapeStartLocation == null
+                ? session.dragonEscapeWaypoints.get(0).clone()
+                : session.dragonEscapeStartLocation.clone();
+    }
+
     private Location dragonEscapePersonalBestFinishLocation(
             Session session, UUID playerId, String mapResource) {
         String path = dragonEscapePbPath(playerId, mapResource);
@@ -4818,11 +4849,13 @@ public final class ArcadePortManager implements Listener {
      * is the recorded finish position (or the last marker for an older PB).
      */
     private Location dragonEscapeSplitBoundaryLocation(
-            Session session, int splitIndex, Location finishLocation) {
+            Session session, int splitIndex, Location startLocation, Location finishLocation) {
         List<Location> route = session.dragonEscapeWaypoints;
         int count = route.size();
         if (count == 0) return null;
-        if (splitIndex <= 0) return route.get(0).clone();
+        if (splitIndex <= 0) {
+            return startLocation == null ? route.get(0).clone() : startLocation.clone();
+        }
         if (splitIndex >= count) {
             return finishLocation == null ? route.get(count - 1).clone() : finishLocation.clone();
         }
@@ -4840,14 +4873,16 @@ public final class ArcadePortManager implements Listener {
         int count = route.size();
         int progress = Math.max(0, Math.min(count - 1,
                 dragonEscapePlayerProgress(session, player)));
+        Location runStart = session.dragonEscapeStartLocations.get(player.getUniqueId());
+        if (runStart == null) runStart = session.dragonEscapeStartLocation;
         double distance = 0.0D;
         for (int split = 0; split < progress; split++) {
-            Location from = dragonEscapeSplitBoundaryLocation(session, split, null);
-            Location to = dragonEscapeSplitBoundaryLocation(session, split + 1, null);
+            Location from = dragonEscapeSplitBoundaryLocation(session, split, runStart, null);
+            Location to = dragonEscapeSplitBoundaryLocation(session, split + 1, runStart, null);
             distance += from.distance(to);
         }
-        Location from = dragonEscapeSplitBoundaryLocation(session, progress, null);
-        Location to = dragonEscapeSplitBoundaryLocation(session, progress + 1, null);
+        Location from = dragonEscapeSplitBoundaryLocation(session, progress, runStart, null);
+        Location to = dragonEscapeSplitBoundaryLocation(session, progress + 1, runStart, null);
         double segmentLength = from.distance(to);
         if (segmentLength > 0.001D) {
             double fraction = Math.max(0.0D, Math.min(1.0D,
@@ -4873,10 +4908,12 @@ public final class ArcadePortManager implements Listener {
                 ArcadePortRules.dragonEscapeDefaultSplitMillis(totalPb, segment, count));
         long toTime = splits.getOrDefault(segment + 1,
                 ArcadePortRules.dragonEscapeDefaultSplitMillis(totalPb, segment + 1, count));
+        Location start = dragonEscapePersonalBestStartLocation(
+                session, player.getUniqueId(), session.dragonEscapeMapResource);
         Location finish = dragonEscapePersonalBestFinishLocation(
                 session, player.getUniqueId(), session.dragonEscapeMapResource);
-        Location from = dragonEscapeSplitBoundaryLocation(session, segment, finish);
-        Location to = dragonEscapeSplitBoundaryLocation(session, segment + 1, finish);
+        Location from = dragonEscapeSplitBoundaryLocation(session, segment, start, finish);
+        Location to = dragonEscapeSplitBoundaryLocation(session, segment + 1, start, finish);
         double segmentLength = from.distance(to);
         double fraction = segmentLength < 0.001D ? 0.0D
                 : 1.0D - player.getLocation().distance(to) / segmentLength;
@@ -4889,6 +4926,7 @@ public final class ArcadePortManager implements Listener {
         if (pb <= 0L || elapsed >= pb) return null;
         Map<Integer, Long> splits = dragonEscapePersonalBestSplits(playerId, session.dragonEscapeMapResource);
         int count = session.dragonEscapeWaypoints.size();
+        Location start = dragonEscapePersonalBestStartLocation(session, playerId, session.dragonEscapeMapResource);
         Location finish = dragonEscapePersonalBestFinishLocation(session, playerId, session.dragonEscapeMapResource);
         for (int segment = 0; segment < count; segment++) {
             long fromTime = splits.getOrDefault(segment,
@@ -4899,8 +4937,8 @@ public final class ArcadePortManager implements Listener {
             if (elapsed > toTime) continue;
             double fraction = Math.max(0.0D, Math.min(1.0D,
                     (elapsed - fromTime) / (double) (toTime - fromTime)));
-            Location from = dragonEscapeSplitBoundaryLocation(session, segment, finish);
-            Location to = dragonEscapeSplitBoundaryLocation(session, segment + 1, finish);
+            Location from = dragonEscapeSplitBoundaryLocation(session, segment, start, finish);
+            Location to = dragonEscapeSplitBoundaryLocation(session, segment + 1, start, finish);
             return from.clone().add((to.getX() - from.getX()) * fraction,
                     (to.getY() - from.getY()) * fraction,
                     (to.getZ() - from.getZ()) * fraction);
@@ -10185,6 +10223,7 @@ public final class ArcadePortManager implements Listener {
         double dragonEscapeSpeedMultiplier = 1.0D;
         Location dragonEscapeLastDestructionLocation;
         final List<Location> dragonEscapeWaypoints = new ArrayList<>();
+        final Map<UUID, Location> dragonEscapeStartLocations = new HashMap<>();
         final Map<UUID, String> dragonEscapeKits = new HashMap<>();
         final Map<UUID, Integer> dragonEscapeLeapUsesRemaining = new HashMap<>();
         final Map<UUID, Long> dragonEscapeLeapReadyAt = new HashMap<>();
