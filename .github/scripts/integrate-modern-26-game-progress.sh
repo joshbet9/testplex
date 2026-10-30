@@ -770,6 +770,13 @@ source = source.replace(
     "group: testplex-isolated-hyperv-server-v2-20261031"
 )
 
+# Bound the SSH/SCP upload and preflight operations that stalled in the previous run.
+source = source.replace('          ssh "${ssh_opts[@]}" "$remote" "rm -rf', '          timeout --foreground --signal=TERM --kill-after=15s 90s ssh "${ssh_opts[@]}" "$remote" "rm -rf', 1)
+source = source.replace('          scp -p -P "$SSH_PORT"', '          timeout --foreground --signal=TERM --kill-after=30s 12m scp -p -P "$SSH_PORT"', 1)
+source = source.replace('          scp -p -P "$SSH_PORT"', '          timeout --foreground --signal=TERM --kill-after=15s 3m scp -p -P "$SSH_PORT"', 1)
+source = source.replace('          ssh "${ssh_opts[@]}" "$remote" "cd', '          timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" "cd', 1)
+source = source.replace('          ssh "${ssh_opts[@]}" "$remote" bash -s <<\'REMOTE_PREFLIGHT\'', '          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s <<\'REMOTE_PREFLIGHT\'', 1)
+
 needle = """          ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" <<'REMOTE_DEPLOY'"""
 replacement = """          echo "[deploy] opening an exclusive remote deployment lock."
           timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" <<'REMOTE_DEPLOY'"""
