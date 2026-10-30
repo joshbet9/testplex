@@ -4133,6 +4133,69 @@ public final class ArcadePortManager implements Listener {
         };
     }
 
+    private void openSkyWarsSpectatorMenu(Session session, Player spectator) {
+        List<Player> targets = alivePlayers(session).stream()
+                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        if (targets.isEmpty()) {
+            spectator.sendMessage(ChatColor.YELLOW + "There are no living SkyWars players to track.");
+            return;
+        }
+        int slot = 19;
+        int lastSlot = 18;
+        for (int i = 0; i < targets.size(); i++) {
+            lastSlot = slot;
+            slot = (slot + 2) % 9 == 0 ? slot + 3 : slot + 1;
+        }
+        int size = Math.min(54, Math.max(27, ((lastSlot / 9) + 1) * 9));
+        SkyWarsCompassMenuHolder holder = new SkyWarsCompassMenuHolder(spectator.getUniqueId());
+        holder.inventory = Bukkit.createInventory(holder, size, "Spectator Menu");
+        populateSkyWarsSpectatorMenu(session, spectator, holder);
+        spectator.openInventory(holder.inventory);
+    }
+
+    private boolean populateSkyWarsSpectatorMenu(
+            Session session, Player spectator, SkyWarsCompassMenuHolder holder) {
+        List<Player> targets = alivePlayers(session).stream()
+                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        holder.inventory.clear();
+        holder.targetsBySlot.clear();
+        ItemStack teamHeader = new ItemStack(Material.YELLOW_WOOL);
+        ItemMeta teamMeta = teamHeader.getItemMeta();
+        teamMeta.setDisplayName(ChatColor.YELLOW + "Players");
+        teamMeta.setLore(List.of(" ", ChatColor.YELLOW + "Players Alive: " + ChatColor.WHITE + targets.size()));
+        teamHeader.setItemMeta(teamMeta);
+        holder.inventory.setItem(13, teamHeader);
+
+        int slot = 19;
+        for (Player target : targets) {
+            if (slot >= holder.inventory.getSize()) break;
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            if (head.getItemMeta() instanceof SkullMeta skull) {
+                skull.setOwningPlayer(target);
+                skull.setDisplayName(ChatColor.YELLOW + target.getName());
+                double distance = Math.sqrt(spectator.getLocation().distanceSquared(target.getLocation()));
+                double heightDifference = target.getLocation().getY() - spectator.getLocation().getY();
+                String kit = session.skyWarsKits.getOrDefault(target.getUniqueId(), "ice");
+                skull.setLore(List.of(" ",
+                        ChatColor.YELLOW + "Kit: " + ChatColor.WHITE + kit,
+                        ChatColor.YELLOW + "Distance: " + ChatColor.WHITE
+                                + String.format(java.util.Locale.ROOT, "%.1f", distance),
+                        ChatColor.YELLOW + "Height Difference: " + ChatColor.WHITE
+                                + String.format(java.util.Locale.ROOT, "%.1f", heightDifference),
+                        " ", ChatColor.YELLOW + "Left Click " + ChatColor.RESET + "Teleport",
+                        ChatColor.YELLOW + "Right Click " + ChatColor.RESET + "Spectate"));
+                head.setItemMeta(skull);
+            }
+            holder.inventory.setItem(slot, head);
+            holder.targetsBySlot.put(slot, target.getUniqueId());
+            if ((slot + 2) % 9 == 0) slot += 3;
+            else slot++;
+        }
+        return !targets.isEmpty();
+    }
+
     private boolean isSkyWarsTrackingCompass(ItemStack item) {
         if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
         ItemMeta meta = item.getItemMeta();
@@ -9429,6 +9492,21 @@ public final class ArcadePortManager implements Listener {
 
     private enum StatsPage { ROOT, ARCADE, CATEGORY, GAME, DRAGON_ESCAPE_MAPS, DRAGON_ESCAPE_COLOURS }
 
+    private static final class SkyWarsCompassMenuHolder implements InventoryHolder {
+        private final UUID ownerId;
+        private final Map<Integer, UUID> targetsBySlot = new HashMap<>();
+        private Inventory inventory;
+
+        private SkyWarsCompassMenuHolder(UUID ownerId) {
+            this.ownerId = ownerId;
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return inventory;
+        }
+    }
+
     private static final class DragonCompassMenuHolder implements InventoryHolder {
         private final UUID ownerId;
         private final Map<Integer, UUID> targetsBySlot = new HashMap<>();
@@ -11457,7 +11535,7 @@ public final class ArcadePortManager implements Listener {
                     session.skyWarsSpectatorTeleportAt.put(player.getUniqueId(), now + 3_000L);
                 }
             } else if (event.getAction().isRightClick()) {
-                player.sendMessage(ChatColor.YELLOW + "The SkyWars spectator compass tracks living players.");
+                openSkyWarsSpectatorMenu(session, player);
             }
             return;
         }
@@ -12195,6 +12273,35 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof SkyWarsCompassMenuHolder holder) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof Player spectator)
+                    || !holder.ownerId.equals(spectator.getUniqueId())
+                    || event.getClickedInventory() != event.getView().getTopInventory()) return;
+            Session session = active;
+            if (session == null || session.type != ArcadePortGame.SKY_WARS
+                    || !session.players.containsKey(spectator.getUniqueId())
+                    || session.alive.contains(spectator.getUniqueId())) {
+                spectator.closeInventory();
+                return;
+            }
+            UUID targetId = holder.targetsBySlot.get(event.getSlot());
+            Player target = targetId == null ? null : session.players.get(targetId);
+            if (target == null || !target.isOnline() || !session.alive.contains(targetId)) {
+                spectator.sendMessage(ChatColor.YELLOW + "That player is no longer alive.");
+                openSkyWarsSpectatorMenu(session, spectator);
+                return;
+            }
+            spectator.closeInventory();
+            if (event.isRightClick()) {
+                spectator.setSpectatorTarget(target);
+            } else {
+                spectator.setSpectatorTarget(null);
+                spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                spectator.setCompassTarget(target.getLocation());
+            }
+            return;
+        }
         if (event.getView().getTopInventory().getHolder() instanceof DragonCompassMenuHolder holder) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof Player spectator)
