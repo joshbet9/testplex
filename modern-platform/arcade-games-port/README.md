@@ -21,6 +21,15 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 
 Each game gets its own separate modern test world, so arena generation/destruction does not use the live 1.8 Testplex world. Original Reborn map archives are embedded for Bacon Brawl, Bomb Lobbers, Death Tag, Dragon Escape, Dragons, Gladiators, Micro Battles, One in the Quiver, Paintball, Runner, Sheep Quest, Spleef and Turf Wars; these load into separate source-world folders and read WorldConfig.dat spawn groups and map bounds. Evolution remains generated because an Evolution map archive is not present in the source map catalogue.
 
+## Castle Assault and Heroes of Gwen — Mixed Arcade ports in progress
+
+Two additional source game IDs and their original Reborn map archives are now registered for the Paper 26.3 mechanics module. Both remain **disabled in `enabled-games`** until the next parity and live-server acceptance pass.
+
+- **Castle Assault** (`castle-assault`) uses the original RED/BLUE King markers, PINK/LIGHT_BLUE sentry crystal markers and BLACK objective TNT pads. The normal TNT respawn interval is 60 seconds; **Castle Assault Mixed Arcade** (`castle-assault-mixed` or `mixed-castle-assault`) uses 30 seconds. The modern runtime includes the King/crystal objective, carried TNT, thrown TNT, objective blasts, kill-driven objective damage, team combat and respawns. Source kit NPCs, chest loot and all combat feedback still need in-game parity review.
+- **Heroes of Gwen** (`heroes-of-gwen`) reads the original MOBA TOWER and POINT markers, team base locations, four role shop catalogues and shared consumables. The runtime has two tower tiers, tower guardian damage/healing, Wither objectives, beacon captures and gold income. **Heroes of Gwen Mixed Arcade** (`heroes-of-gwen-mixed` or `mixed-heroes-of-gwen`) removes the central `TOWER <team> 1` markers on the archived Heros Valley map and halves every displayed and charged store price across the 114 role-scoped catalogue entries. Full role-kit abilities, Wither movement/attacks, complete capture visuals, and source-by-source shop effect parity remain to be accepted in game.
+
+The generic Mixed Arcade queue accepts `<game-id>-mixed` and `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Rule and marker tests cover the 60s/30s TNT delay, half-price calculation, archive registration and central tower filtering; these checks are not a substitute for live acceptance. Do not enable either new game until the remaining parity checks are complete.
+
 ## Commands
 
 - `/gamepanel` → choose a supported game → **Start / Test**. The coordinator calls `/arcadeport play <game-id>`.
@@ -31,7 +40,7 @@ Each game gets its own separate modern test world, so arena generation/destructi
 - `/arcadeport ghost <on|off|toggle>` — enable or hide your Dragon Escape translucent PB player ghost.
 - `/arcadeport status`, `/arcadeport stop` (operator only).
 
-Game IDs are: `bacon-brawl`, `bomb-lobbers`, `death-tag`, `dragon-escape`, `dragons`, `evolution`, `gladiators`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. The separate Mixed Arcade alias is `turf-wars-mixed` (`mixed-turf-wars` is also accepted).
+Game IDs are: `bacon-brawl`, `bomb-lobbers`, `castle-assault`, `death-tag`, `dragon-escape`, `dragons`, `evolution`, `gladiators`, `heroes-of-gwen`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. Mixed Arcade aliases use `<game-id>-mixed` or `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Castle Assault and Heroes of Gwen remain disabled until live parity acceptance.
 
 ## Acceptance boundary
 
