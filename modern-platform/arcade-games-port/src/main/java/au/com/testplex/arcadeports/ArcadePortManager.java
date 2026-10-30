@@ -1931,6 +1931,9 @@ public final class ArcadePortManager implements Listener {
                 break;
             case DRAGON_ESCAPE: {
                 UUID id = player.getUniqueId();
+                // Reborn grants invisibility to every runner when their Dragon Escape kit is given.
+                player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,
+                        Integer.MAX_VALUE, 0, false, false, false));
                 String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
                 int leaps = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, ArcadePortRules.dragonEscapeLeapUses(kit));
                 if (!"digger".equals(kit)) {
@@ -7897,6 +7900,12 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && event.getAction() != Action.PHYSICAL
+                && isDragonEscapeUsableBlock(event.getClickedBlock())) {
+            event.setCancelled(true);
+            return;
+        }
         boolean bombLeftClick = session.type == ArcadePortGame.BOMB_LOBBERS && event.getAction().isLeftClick();
         boolean runnerLeftClick = session.type == ArcadePortGame.RUNNER && event.getAction().isLeftClick();
         boolean baconNonRightClick = session.type == ArcadePortGame.BACON_BRAWL
@@ -8237,6 +8246,27 @@ public final class ArcadePortManager implements Listener {
                 || event.getCause() != PlayerTeleportEvent.TeleportCause.ENDER_PEARL
                 || !session.players.containsKey(event.getPlayer().getUniqueId())) return;
         event.setCancelled(true);
+    }
+
+    /** Match Reborn's UtilBlock.usable guard so map containers, switches and doors stay inert. */
+    private boolean isDragonEscapeUsableBlock(Block block) {
+        if (block == null) return false;
+        if (block.getState() instanceof org.bukkit.block.Container) return true;
+        BlockData data = block.getBlockData();
+        if (data instanceof org.bukkit.block.data.Openable
+                || data instanceof org.bukkit.block.data.Powerable
+                || data instanceof org.bukkit.block.data.type.Switch) return true;
+        String material = block.getType().name();
+        if (material.endsWith("_BED") || material.endsWith("_DOOR")
+                || material.endsWith("_TRAPDOOR") || material.endsWith("_FENCE_GATE")
+                || material.endsWith("_BUTTON")) return true;
+        return material.equals("DISPENSER") || material.equals("DROPPER")
+                || material.equals("HOPPER") || material.equals("CRAFTING_TABLE")
+                || material.equals("ENCHANTING_TABLE") || material.equals("BREWING_STAND")
+                || material.equals("ANVIL") || material.equals("CHIPPED_ANVIL")
+                || material.equals("DAMAGED_ANVIL") || material.equals("PISTON")
+                || material.equals("STICKY_PISTON") || material.equals("REPEATER")
+                || material.equals("COMPARATOR");
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
