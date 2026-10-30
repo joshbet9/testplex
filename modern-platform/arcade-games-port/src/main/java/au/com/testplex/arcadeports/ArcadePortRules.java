@@ -1200,6 +1200,48 @@ public final class ArcadePortRules {
     public static final long PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS = 250L;
     public static final double PAINTBALL_SAVE_ME_RADIUS = 3.0D;
 
+    /** Reborn's Machine Gun fires on an 80 ms gate; this slower heat gain allows 48 shots per full bar. */
+    public static final int PAINTBALL_MACHINE_GUN_SHOTS_PER_HEAT_CYCLE = 48;
+    public static final double PAINTBALL_MACHINE_GUN_MAX_HEAT = 0.999D;
+    public static final long PAINTBALL_MACHINE_GUN_FIRE_COOLDOWN_MILLIS = 80L;
+    public static final long PAINTBALL_MACHINE_GUN_COOL_RECHARGE_MILLIS = 250L;
+    public static final double PAINTBALL_MACHINE_GUN_COOL_PER_TICK = 0.020D;
+
+    public static double paintballMachineGunHeatPerShot() {
+        return PAINTBALL_MACHINE_GUN_MAX_HEAT / PAINTBALL_MACHINE_GUN_SHOTS_PER_HEAT_CYCLE;
+    }
+
+    public static boolean canFirePaintballMachineGun(double currentHeat) {
+        if (!Double.isFinite(currentHeat)) return false;
+        double heat = Math.max(0.0D, Math.min(PAINTBALL_MACHINE_GUN_MAX_HEAT, currentHeat));
+        return heat < PAINTBALL_MACHINE_GUN_MAX_HEAT - paintballMachineGunHeatPerShot() * 0.5D;
+    }
+
+    public static double paintballMachineGunHeatAfterShot(double currentHeat) {
+        double heat = Double.isFinite(currentHeat)
+                ? Math.max(0.0D, currentHeat) : PAINTBALL_MACHINE_GUN_MAX_HEAT;
+        return Math.min(PAINTBALL_MACHINE_GUN_MAX_HEAT, heat + paintballMachineGunHeatPerShot());
+    }
+
+    public static double coolPaintballMachineGunHeat(double currentHeat) {
+        double heat = Double.isFinite(currentHeat) ? Math.max(0.0D, currentHeat) : 0.0D;
+        return Math.max(0.0D, heat - PAINTBALL_MACHINE_GUN_COOL_PER_TICK);
+    }
+
+    /** The selected held-item model changes for everyone; projectile physics are not affected. */
+    public static Material paintballWeaponMaterial(String kit, String skin) {
+        String safeKit = kit == null ? "rifle" : kit.toLowerCase(java.util.Locale.ROOT);
+        String safeSkin = skin == null ? "chrome-marker" : skin.toLowerCase(java.util.Locale.ROOT);
+        if ("splatter-cannon".equals(safeSkin)) return Material.CROSSBOW;
+        if ("neon-suppressor".equals(safeSkin)) return Material.BLAZE_ROD;
+        return switch (safeKit) {
+            case "sniper" -> Material.STONE_HOE;
+            case "shotgun" -> Material.GOLDEN_HORSE_ARMOR;
+            case "machine-gun" -> Material.DIAMOND_HORSE_ARMOR;
+            default -> Material.IRON_HORSE_ARMOR;
+        };
+    }
+
     public static boolean shouldPaintballWaterBombAffectPlayer(double distanceSquared, boolean sameTeam) {
         return sameTeam && distanceSquared >= 0.0D
                 && distanceSquared <= PAINTBALL_SAVE_ME_RADIUS * PAINTBALL_SAVE_ME_RADIUS;
