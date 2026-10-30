@@ -37,7 +37,7 @@ class WizardsRulesTest {
         assertEquals(16, WizardsRules.trapRuneRange(3));
         assertEquals(1.0D, WizardsRules.trapRuneSize(1));
         assertEquals(1.6D, WizardsRules.trapRuneSize(2));
-        assertEquals(2.4D, WizardsRules.trapRuneSize(3));
+        assertEquals(2.4D, WizardsRules.trapRuneSize(3), 0.0001D);
         assertEquals(10.0D, WizardsRules.trapRuneDamage(1));
         assertEquals(18.0D, WizardsRules.trapRuneDamage(3));
         assertEquals(6.0D, WizardsRules.spectralArrowDamage(1, 0.0D));
