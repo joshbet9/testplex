@@ -2305,6 +2305,15 @@ public final class ArcadePortManager implements Listener {
             clearQuiverCloak(session, attacker.getUniqueId());
         }
         if (target.getHealth() <= damage) {
+            ItemStack held = attacker.getInventory().getItemInMainHand();
+            Material heldType = held == null ? Material.AIR : held.getType();
+            if (heldType.isAir() || heldType == Material.BOW) {
+                int fistKills = session.quiverFistKills.merge(attacker.getUniqueId(), 1, Integer::sum);
+                if (ArcadePortRules.shouldAwardQuiverFistPunchKills(fistKills)) {
+                    awardQuiverAchievement(attacker, QuiverAchievement.THATS_NOT_A_SWORD,
+                            "That's not a sword… — got 3 kills with fist/bow punch.");
+                }
+            }
             scoreQuiverKill(session, attacker, target);
             return;
         }
@@ -6787,16 +6796,42 @@ public final class ArcadePortManager implements Listener {
         if (active != session || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
 
-        int kills = session.scores.merge(attacker.getUniqueId(), 1, Integer::sum);
+        UUID attackerId = attacker.getUniqueId();
+        UUID targetId = target.getUniqueId();
+        int streak = session.quiverKillStreaks.merge(attackerId, 1, Integer::sum);
+        String streakTitle = ArcadePortRules.quiverKillstreakTitle(streak);
+        if (ArcadePortRules.isQuiverKillstreakAnnouncement(streak) && streakTitle != null) {
+            for (Player viewer : session.world.getPlayers()) {
+                viewer.sendMessage(ChatColor.GREEN + "" + ChatColor.BOLD + attacker.getName()
+                        + ChatColor.RESET + ChatColor.WHITE + " got "
+                        + ChatColor.AQUA + ChatColor.BOLD + streakTitle
+                        + ChatColor.WHITE + " (" + streak + " Kills)!");
+                viewer.playSound(viewer.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL,
+                        1.0F + (streak / 10.0F), 1.0F + (streak / 10.0F));
+            }
+        }
+        playQuiverStreakCosmetic(session, attacker, target, streak);
+        if (ArcadePortRules.isQuiverPerfectRun(streak)) {
+            awardQuiverAchievement(attacker, QuiverAchievement.THE_PERFECT_GAME,
+                    "The Perfect Game — achieved a Perfect Run killstreak in a game.");
+        }
+        if ("brawler".equals(session.quiverKits.getOrDefault(attackerId, "leaper"))) {
+            attacker.setHealth(ArcadePortRules.quiverBrawlerHealthAfterKill(
+                    attacker.getHealth(), attacker.getMaxHealth()));
+            attacker.getWorld().spawnParticle(Particle.HEART,
+                    attacker.getLocation().add(0.0D, 1.0D, 0.0D), 3, 0.25D, 0.25D, 0.25D, 0.0D);
+        }
+
+        int kills = session.scores.merge(attackerId, 1, Integer::sum);
         attacker.sendMessage(ChatColor.GREEN + "Quiver kill! " + kills + "/20.");
         checkWinnerForScore(session, attacker);
         if (active != session) return;
         activateQuiverNinjaVanish(session, attacker, System.currentTimeMillis());
 
-        UUID targetId = target.getUniqueId();
         target.leaveVehicle();
         target.setGameMode(GameMode.SPECTATOR);
         session.alive.remove(targetId);
+        session.quiverKillStreaks.remove(targetId);
         session.respawning.add(targetId);
         target.sendMessage(ChatColor.RED + "Eliminated! Respawning in one second.");
 
@@ -6816,6 +6851,67 @@ public final class ArcadePortManager implements Listener {
             giveKit(session, target);
             target.sendMessage(ChatColor.GREEN + "Respawned. First to 20 kills wins.");
         }, ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS);
+    }
+
+    private String quiverStreakCosmetic(UUID playerId) {
+        var cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        java.io.File cosmeticsFolder = cosmeticsPlugin == null
+                ? new java.io.File(plugin.getDataFolder().getParentFile(), "TestplexModernArcade")
+                : cosmeticsPlugin.getDataFolder();
+        java.io.File preferencesFile = new java.io.File(cosmeticsFolder, "player-preferences.yml");
+        if (!preferencesFile.isFile()) return "";
+        org.bukkit.configuration.file.YamlConfiguration preferences =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(preferencesFile);
+        String selected = preferences.getString("players." + playerId
+                + ".games.one-in-the-quiver.cosmetics.death-streak.selected", "");
+        return selected == null ? "" : selected.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private void playQuiverStreakCosmetic(Session session, Player killer, Player victim, int streak) {
+        String style = quiverStreakCosmetic(killer.getUniqueId());
+        if (style.isEmpty()) return;
+        Location point = victim.getLocation().clone().add(0.0D, 1.0D, 0.0D);
+        switch (style) {
+            case "subtle" -> session.world.spawnParticle(Particle.CRIT, point, Math.min(8, 3 + streak),
+                    0.18D, 0.2D, 0.18D, 0.01D);
+            case "burst" -> session.world.spawnParticle(Particle.FIREWORK, point, Math.min(28, 10 + streak * 2),
+                    0.35D, 0.35D, 0.35D, 0.06D);
+            case "bullseye" -> {
+                for (int i = 0; i < 12; i++) {
+                    double angle = Math.PI * 2.0D * i / 12.0D;
+                    Location ring = point.clone().add(Math.cos(angle) * 0.8D, 0.05D, Math.sin(angle) * 0.8D);
+                    session.world.spawnParticle(Particle.CRIT, ring, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+                }
+            }
+            case "grand-finale" -> {
+                session.world.spawnParticle(Particle.EXPLOSION, point, 1, 0.12D, 0.12D, 0.12D, 0.0D);
+                session.world.spawnParticle(Particle.NOTE, point, 12, 0.5D, 0.5D, 0.5D, 1.0D);
+                session.world.playSound(point, Sound.ENTITY_PLAYER_LEVELUP, 1.0F, 1.3F);
+            }
+            default -> { }
+        }
+    }
+
+    private void recordQuiverAchievements(Session session, Player winner) {
+        if (winner == null) return;
+        UUID id = winner.getUniqueId();
+        if (ArcadePortRules.isQuiverSpeedrunnerWin(System.currentTimeMillis() - session.startedAt)) {
+            awardQuiverAchievement(winner, QuiverAchievement.SPEEDRUNNER,
+                    "Speedrunner — won a game in under 1:30.");
+        }
+        if (session.scores.getOrDefault(id, 0) >= 20 && !session.quiverUsedBow.contains(id)) {
+            awardQuiverAchievement(winner, QuiverAchievement.WHATS_A_BOW,
+                    "What's A bow? — won with 20 kills without using archery.");
+        }
+    }
+
+    private void awardQuiverAchievement(Player player, QuiverAchievement achievement, String description) {
+        if (player == null || achievement == null) return;
+        String key = achievement.configKey(player.getUniqueId());
+        if (key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        if (player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
+        plugin.saveConfig();
     }
 
     private void hitProjectile(Session session, Projectile projectile, Player shooter, Player target) {
@@ -6976,6 +7072,9 @@ public final class ArcadePortManager implements Listener {
         }
         if (announceWinner && session.type == ArcadePortGame.EVOLUTION && winner != null) {
             recordEvolutionAchievements(session, winner);
+        }
+        if (announceWinner && session.type == ArcadePortGame.ONE_IN_THE_QUIVER && winner != null) {
+            recordQuiverAchievements(session, winner);
         }
         active = null;
         if (session.tickTask != null) session.tickTask.cancel();
@@ -7601,6 +7700,19 @@ public final class ArcadePortManager implements Listener {
                                         + achievement.displayName(),
                                 lore, "noop", null, null));
             }
+        } else if ("one-in-the-quiver".equals(gameId)) {
+            int[] achievementSlots = {10, 11, 12, 13};
+            QuiverAchievement[] achievements = QuiverAchievement.values();
+            for (int i = 0; i < achievements.length; i++) {
+                QuiverAchievement achievement = achievements[i];
+                boolean unlocked = plugin.getConfig().getBoolean(achievement.configKey(targetId), false);
+                List<String> lore = List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
+                        unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked");
+                inventory.setItem(achievementSlots[i], statsItem(
+                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
+                        lore, "noop", null, null));
+            }
         } else if ("dragon-escape".equals(gameId)) {
             String resource = SourceMapCatalog.selectedResource(plugin, ArcadePortGame.DRAGON_ESCAPE);
             long personalBest = dragonEscapePersonalBestMillis(targetId, resource);
@@ -7755,6 +7867,12 @@ public final class ArcadePortManager implements Listener {
             long unlocked = plugin.getConfig().getBoolean(
                     EvolutionAchievement.OVERKILL.configKey(targetId), false) ? 1L : 0L;
             lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/1");
+        } else if ("one-in-the-quiver".equals(gameId)) {
+            long unlocked = java.util.Arrays.stream(QuiverAchievement.values())
+                    .filter(achievement -> plugin.getConfig().getBoolean(achievement.configKey(targetId), false))
+                    .count();
+            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked
+                    + "/" + QuiverAchievement.values().length);
         }
         if (!compact) lore.add(ChatColor.DARK_GRAY + "Stats recorded by the isolated test server.");
         else lore.add(ChatColor.RESET + "Click for more details!");
