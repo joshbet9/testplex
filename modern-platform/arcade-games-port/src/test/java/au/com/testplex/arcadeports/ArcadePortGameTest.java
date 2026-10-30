@@ -1636,6 +1636,60 @@ class ArcadePortGameTest {
         assertEquals(3, ArcadePortRules.gladiatorsTierForRound(4));
     }
 
+    @Test void gladiatorsVoteModesExposeTheCorrectClassicToolAvailability() {
+        assertTrue(GladiatorsMode.fromId("rodless").bowAvailable());
+        assertFalse(GladiatorsMode.fromId("rodless").rodAvailable());
+        assertTrue(GladiatorsMode.fromId("bowless").rodAvailable());
+        assertFalse(GladiatorsMode.fromId("bowless").bowAvailable());
+        assertFalse(GladiatorsMode.fromId("modern").hasClassicRangedTools());
+        assertFalse(GladiatorsMode.fromId("pot").hasClassicRangedTools());
+        assertNull(GladiatorsMode.fromId("not-a-mode"));
+    }
+
+    @Test void gladiatorsChallengeAchievementRequiresAvailableClassicToolsAndNoUse() {
+        assertTrue(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(true, false, false));
+        assertFalse(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(true, true, false));
+        assertFalse(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(true, false, true));
+        assertFalse(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(false, false, false));
+    }
+
+    @Test void gladiatorsFirstLossMovesToLowerBracketAndSecondLossEliminates() {
+        assertFalse(ArcadePortRules.shouldEliminateGladiatorAfterLoss(0));
+        assertFalse(ArcadePortRules.shouldEliminateGladiatorAfterLoss(1));
+        assertTrue(ArcadePortRules.shouldEliminateGladiatorAfterLoss(2));
+        assertTrue(ArcadePortRules.shouldEliminateGladiatorAfterLoss(3));
+    }
+
+    @Test void gladiatorsLoserArenaContainsTheDuelFootprint() {
+        assertFalse(ArcadePortRules.isOutsideGladiatorsLoserArena(0.5D, 0.5D, 0.5D, 0.5D));
+        assertFalse(ArcadePortRules.isOutsideGladiatorsLoserArena(4.1D, -3.1D, 0.5D, 0.5D));
+        assertTrue(ArcadePortRules.isOutsideGladiatorsLoserArena(4.151D, 0.5D, 0.5D, 0.5D));
+        assertTrue(ArcadePortRules.isOutsideGladiatorsLoserArena(Double.NaN, 0.0D, 0.0D, 0.0D));
+    }
+
+    @Test void gladiatorsSourceMapBoundsUseInclusiveWorldConfigBlockCoordinates() {
+        assertFalse(ArcadePortRules.isOutsideGladiatorsSourceMap(-0.5D, 10.5D, -1, 20, 0, 30));
+        assertFalse(ArcadePortRules.isOutsideGladiatorsSourceMap(20.999D, 30.999D, -1, 20, 0, 30));
+        assertTrue(ArcadePortRules.isOutsideGladiatorsSourceMap(-1.0D, 10.5D, -1, 20, 0, 30));
+        assertTrue(ArcadePortRules.isOutsideGladiatorsSourceMap(21.0D, 10.5D, -1, 20, 0, 30));
+    }
+
+    @Test void gladiatorsHalfHeartAchievementUsesOneHealthPoint() {
+        assertTrue(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(1.0D));
+        assertTrue(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(0.5D));
+        assertFalse(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(1.01D));
+        assertFalse(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(0.0D));
+        assertFalse(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(Double.NaN));
+    }
+
+    @Test void gladiatorsAchievementAndLoserBracketMilestoneKeysArePlayerScoped() {
+        java.util.UUID player = java.util.UUID.fromString("12345678-1234-1234-1234-123456789abc");
+        assertEquals("test-achievements.gladiators." + player + ".are-you-not-entertained",
+                ArcadePortRules.gladiatorsAchievementConfigKey(player, "Are You Not Entertained"));
+        assertEquals("test-milestones.gladiators." + player + ".silky-seconds",
+                ArcadePortRules.gladiatorsMilestoneConfigKey(player));
+    }
+
     @Test void gladiatorsWaitFiveSecondsAndKeepCombatInsideTheCurrentDuel() {
         assertEquals(5_000L, ArcadePortRules.GLADIATOR_ROUND_COUNTDOWN_MILLIS);
         assertFalse(ArcadePortRules.canGladiatorsFight(4_999L, 5_000L, 0, 0, false));
