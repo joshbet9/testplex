@@ -1052,10 +1052,12 @@ public final class ArcadePortManager implements Listener {
                 && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER)
                 || (type == ArcadePortGame.DRAGON_ESCAPE && !ArcadePortRules.DRAGON_ESCAPE_HAS_ROUND_TIMER)
                 || type == ArcadePortGame.DRAGONS
+                || type == ArcadePortGame.CASTLE_ASSAULT
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 600_000L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
                 : type == ArcadePortGame.DEATH_TAG ? ArcadePortRules.DEATH_TAG_GAME_TIMEOUT_MILLIS
+                : type == ArcadePortGame.HEROES_OF_GWEN ? 1_200_000L
                 : ROUND_MS);
         session.lastBaconHungerAt = now;
         session.lastBaconSlowUpdateAt = now;
@@ -12261,6 +12263,7 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
+        if (session.variantRuntime != null) session.variantRuntime.onQuit(player);
         boolean wasAlive = session.alive.remove(id);
         if (session.type == ArcadePortGame.DRAGONS && wasAlive) {
             session.dragonEliminationOrder.add(id);
