@@ -2177,6 +2177,11 @@ public final class ArcadePortManager implements Listener {
         boolean forcedAlpha = reason != null && reason.contains("forced by the time limit");
         UUID convertedPlayerId = player.getUniqueId();
         if (!forcedAlpha) session.deathTagDeathsByPlayer.merge(convertedPlayerId, 1, Integer::sum);
+        // Legacy GetKillsGems pays 4 for a Runner kill and 0 for a Chaser kill.
+        if (!forcedAlpha && killer != null && session.tagged.contains(killer.getUniqueId())) {
+            awardDeathTagTestGems(session, killer.getUniqueId(),
+                    ArcadePortRules.DEATH_TAG_RUNNER_KILL_REWARD_GEMS, "Runner kill");
+        }
         // GameTeam.SetPlacement(OUT) inserts each newly eliminated Runner at the front.
         session.deathTagRunnerPlacementOrder.add(convertedPlayerId);
         session.tagged.add(convertedPlayerId);
