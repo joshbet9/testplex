@@ -787,27 +787,41 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (stopped || game != ArcadePortGame.CASTLE_ASSAULT) return;
         Player player = event.getPlayer();
         String kit = castleAssaultPlayerKits.get(player.getUniqueId());
-        if (!"demolitionist".equals(kit)) return;
         ItemStack dropped = event.getItemDrop().getItemStack();
-        if (dropped.getType() != Material.TNT) return;
+        boolean lockedTnt = "demolitionist".equals(kit) && dropped.getType() == Material.TNT;
+        boolean lockedArrow = "archer".equals(kit) && isCastleFletchedArrow(dropped);
+        if (!lockedTnt && !lockedArrow) return;
         event.setCancelled(true);
-        player.sendMessage(ChatColor.RED + "You cannot drop your Throwing TNT.");
+        player.sendMessage(ChatColor.RED + (lockedTnt
+                ? "You cannot drop your Throwing TNT." : "You cannot drop your Fletched Arrows."));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onCastleKitInventoryClick(InventoryClickEvent event) {
         if (stopped || game != ArcadePortGame.CASTLE_ASSAULT
-                || !(event.getWhoClicked() instanceof Player player)
-                || !"demolitionist".equals(castleAssaultPlayerKits.get(player.getUniqueId()))) return;
+                || !(event.getWhoClicked() instanceof Player player)) return;
+        String kit = castleAssaultPlayerKits.get(player.getUniqueId());
+        boolean demolitionist = "demolitionist".equals(kit);
+        boolean archer = "archer".equals(kit);
+        if (!demolitionist && !archer) return;
         ItemStack current = event.getCurrentItem();
         ItemStack cursor = event.getCursor();
-        boolean movesTnt = (current != null && current.getType() == Material.TNT)
-                || (cursor != null && cursor.getType() == Material.TNT);
-        if (!movesTnt && event.getHotbarButton() >= 0) {
+        boolean movesLockedItem = demolitionist
+                && ((current != null && current.getType() == Material.TNT)
+                    || (cursor != null && cursor.getType() == Material.TNT));
+        movesLockedItem |= archer && (isCastleFletchedArrow(current) || isCastleFletchedArrow(cursor));
+        if (!movesLockedItem && event.getHotbarButton() >= 0) {
             ItemStack hotbar = player.getInventory().getItem(event.getHotbarButton());
-            movesTnt = hotbar != null && hotbar.getType() == Material.TNT;
+            movesLockedItem = demolitionist && hotbar != null && hotbar.getType() == Material.TNT
+                    || archer && isCastleFletchedArrow(hotbar);
         }
-        if (movesTnt) event.setCancelled(true);
+        if (movesLockedItem) event.setCancelled(true);
+    }
+
+    private boolean isCastleFletchedArrow(ItemStack item) {
+        if (item == null || item.getType() != Material.ARROW || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName() && meta.getDisplayName().contains("Fletched Arrow");
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -818,9 +832,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if ("demolitionist".equals(kit)) {
             event.getDrops().removeIf(item -> item != null && item.getType() == Material.TNT);
         } else if ("archer".equals(kit)) {
-            event.getDrops().removeIf(item -> item != null && item.getType() == Material.ARROW
-                    && item.hasItemMeta() && item.getItemMeta().hasDisplayName()
-                    && item.getItemMeta().getDisplayName().contains("Fletched Arrow"));
+            event.getDrops().removeIf(this::isCastleFletchedArrow);
         }
     }
 
