@@ -1255,10 +1255,10 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.SHEEP_QUEST) {
             for (int i = 0; i < ArcadePortRules.SHEEP_QUEST_INITIAL_SHEEP; i++) spawnSheep(session);
         }
-        Player player = event.getPlayer();
-        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) sneakyAssassins.onQuit(player);
-        session.alive.remove(id);
-        if (session.type == ArcadePortGame.BOMB_LOBBERS) updateBombLobbersMvpEligibility(session);
+        if (type == ArcadePortGame.SNEAKY_ASSASSINS) {
+            sneakyAssassins.start(session.world, participants, session.alive::contains,
+                    (victim, killer, reason) -> eliminate(session, victim, killer, reason));
+        }
         if (type == ArcadePortGame.MICRO_BATTLES) announce(session, ChatColor.AQUA + "Micro Battles: gather blocks; glass barriers drop after 10 seconds.");
         else announce(session, ChatColor.GOLD + type.displayName() + " started! This is a first-pass mechanics test.");
         if (type == ArcadePortGame.TURF_WARS) {
@@ -11406,12 +11406,9 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) sneakyAssassins.onQuit(player);
         session.alive.remove(id);
         if (session.type == ArcadePortGame.BOMB_LOBBERS) updateBombLobbersMvpEligibility(session);
-        if (type == ArcadePortGame.SNEAKY_ASSASSINS) {
-            sneakyAssassins.start(session.world, participants, session.alive::contains,
-                    (victim, killer, reason) -> eliminate(session, victim, killer, reason));
-        }
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             session.baconBrutusUntil.remove(id);
             session.baconCloakUntil.remove(id);
