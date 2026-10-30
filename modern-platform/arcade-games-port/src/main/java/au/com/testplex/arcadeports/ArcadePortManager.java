@@ -9727,7 +9727,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isQuiverBreakableGlass(Material material) {
-        return material == Material.GLASS || material == Material.GLASS_PANE;
+        return material != null && ArcadePortRules.isQuiverBreakableGlassMaterial(material.name());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
