@@ -872,6 +872,12 @@ class ArcadePortGameTest {
                 "A backstab breaks the guard so the normal hit/knockback can land.");
         assertFalse(ArcadePortRules.shouldBaconBrutusGuardHit(false, false),
                 "Brutus Guard should not protect outside its timer.");
+        assertTrue(ArcadePortRules.isBaconBrutusBackstab(0.0D, 1.0D, 0.0D, -1.0D),
+                "A hit from behind must break Brutus guard.");
+        assertFalse(ArcadePortRules.isBaconBrutusBackstab(0.0D, 1.0D, 0.0D, 1.0D),
+                "A hit from the front remains guarded.");
+        assertFalse(ArcadePortRules.isBaconBrutusBackstab(0.0D, 1.0D, 1.0D, 0.0D),
+                "A side hit does not count as a backstab.");
         assertTrue(ArcadePortRules.isBaconTimedCritical(500L));
         assertTrue(ArcadePortRules.isBaconTimedCritical(900L));
         assertFalse(ArcadePortRules.isBaconTimedCritical(499L));
