@@ -62,6 +62,8 @@ public final class SourceMapCatalog {
             case SHEEP_QUEST -> List.of("Sheep Quest");
             case SPLEEF -> List.of("Speef", "Super Spleef");
             case TURF_WARS -> List.of("Turf Wars");
+            case DRAW_MY_THING -> List.of("Draw My Thing");
+            case MASTER_BUILDERS -> List.of();
             default -> List.of();
         };
     }
@@ -117,7 +119,7 @@ public final class SourceMapCatalog {
         String[] prefixes = {
                 "BaconBrawl_", "Lobbers_", "DeathTag_", "DragonEscape_", "Dragons_",
                 "DR_", "Gladiators_", "Micro_", "OITQ_", "Quiver_", "Paintball_",
-                "Runner_", "Spleef_", "SP_", "TF_"
+                "Runner_", "Spleef_", "SP_", "TF_", "Draw_"
         };
         for (String prefix : prefixes) {
             if (name.regionMatches(true, 0, prefix, 0, prefix.length())) {
@@ -237,7 +239,7 @@ public final class SourceMapCatalog {
     }
 
     public static boolean hasMap(ArcadePortGame game) {
-        return resourceFor(game) != null;
+        return game != null && !mapFoldersFor(game).isEmpty();
     }
 
     public static boolean isReservedSourceWorldName(String worldName) {
