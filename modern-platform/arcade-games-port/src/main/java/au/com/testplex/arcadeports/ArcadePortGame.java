@@ -19,7 +19,8 @@ public enum ArcadePortGame {
     SPLEEF("spleef", "Spleef", Material.SNOW_BLOCK),
     TURF_WARS("turf-wars", "Turf Wars", Material.GREEN_WOOL),
     DRAW_MY_THING("draw-my-thing", "Draw My Thing", Material.WHITE_WOOL),
-    MASTER_BUILDERS("master-builders", "Master Builders", Material.GRASS_BLOCK);
+    MASTER_BUILDERS("master-builders", "Master Builders", Material.GRASS_BLOCK),
+    SNEAKY_ASSASSINS("sneaky-assassins", "Sneaky Assassins", Material.EMERALD_BLOCK);
 
     private final String id;
     private final String displayName;

@@ -2,22 +2,23 @@ package au.com.testplex.modern.model;
 
 import org.junit.jupiter.api.Test;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeCatalogTest {
     @Test
-    void registersAllEighteenArcadeGames() {
+    void registersAllNineteenArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(18, catalog.size());
-        assertEquals(18, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+        assertEquals(19, catalog.size());
+        assertEquals(19, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
     }
 
     @Test
     void eachGameHasItsOwnCosmeticLinesAndWinEffects() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         for (GameDefinition game : catalog.getGames()) {
-            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders").contains(game.getId());
+            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins").contains(game.getId());
             assertEquals(gameplayFirstPort, game.getCosmeticLines().isEmpty(),
                     game.getId() + " cosmetic lines should remain optional during this gameplay-first port");
             assertTrue(game.getWinEffects().size() >= (gameplayFirstPort ? 1 : 3),
@@ -58,7 +59,7 @@ class ArcadeCatalogTest {
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS)
                 .count();
         assertEquals(1, readyForTest);
-        assertEquals(17, inProgress);
+        assertEquals(18, inProgress);
     }
 
     @Test
@@ -129,4 +130,15 @@ class ArcadeCatalogTest {
         assertNotNull(catalog.getGame("Monster-Maze"));
         assertNull(catalog.getGame("not-a-game"));
     }
+    @Test
+    void sneakyAssassinsIsCataloguedWithoutInventingCosmeticLines() {
+        GameDefinition game = new ArcadeCatalog().getGame("sneaky-assassins");
+        assertNotNull(game);
+        assertEquals("Sneaky Assassins", game.getName());
+        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus());
+        assertTrue(game.getCosmeticLines().isEmpty());
+        assertEquals(List.of("last-assassin-standing"),
+                game.getWinEffects().stream().map(CosmeticOption::getId).toList());
+    }
+
 }

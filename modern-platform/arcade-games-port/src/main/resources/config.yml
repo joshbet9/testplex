@@ -5,6 +5,8 @@
 # Candidate availability is not a claim of complete live parity certification.
 # Candidate availability is not a claim of complete live parity certification.
 enabled-games:
+  # Enabled for mechanics review; Reborn has no original map archive for this game.
+  - sneaky-assassins
   - bacon-brawl
   - bomb-lobbers
   - dragon-escape
