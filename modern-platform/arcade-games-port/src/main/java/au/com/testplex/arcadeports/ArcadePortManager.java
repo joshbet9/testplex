@@ -4688,6 +4688,18 @@ public final class ArcadePortManager implements Listener {
                             .orElse(null);
                     if (target == null) continue;
                     spectator.setCompassTarget(target.getLocation());
+                    // CompassModule displays target details whenever a spectator holds
+                    // the Tracking Compass in their main hand.
+                    if (isDragonsTrackingCompass(spectator.getInventory().getItemInMainHand())) {
+                        double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                        double height = target.getLocation().getY() - spectator.getLocation().getY();
+                        spectator.sendActionBar(ChatColor.WHITE + "" + ChatColor.BOLD + "Nearest Target: "
+                                + ChatColor.YELLOW + target.getName()
+                                + ChatColor.WHITE + ChatColor.BOLD + " | Distance: " + ChatColor.YELLOW
+                                + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                                + ChatColor.WHITE + ChatColor.BOLD + " | Height: " + ChatColor.YELLOW
+                                + String.format(java.util.Locale.ROOT, "%.1f", height));
+                    }
                 }
             }
         }
