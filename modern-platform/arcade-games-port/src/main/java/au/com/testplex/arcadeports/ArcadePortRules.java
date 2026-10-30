@@ -16,6 +16,8 @@ public final class ArcadePortRules {
     public static final double DRAGON_ESCAPE_FINISH_Z = 77.5D;
     public static final double DRAGON_ESCAPE_CHASE_SPEED = 0.2D;
     public static final double DRAGON_ESCAPE_BLOCK_RADIUS = 10.0D;
+    public static final double DRAGON_ESCAPE_FINISH_RADIUS = 3.0D;
+    public static final double DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED = 5.0D;
     /** Only discard effectively coincident markers; close BLACK markers are valid route steps. */
     public static final double DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE = 0.75D;
     public static final String[] DRAGON_ESCAPE_BEACON_COLORS = {
@@ -1353,7 +1355,8 @@ public final class ArcadePortRules {
         double dx = x - DRAGON_ESCAPE_FINISH_X;
         double dy = y - DRAGON_ESCAPE_FINISH_Y;
         double dz = z - DRAGON_ESCAPE_FINISH_Z;
-        return dx * dx + dy * dy + dz * dz < 9.0D;
+        return dx * dx + dy * dy + dz * dz
+                < DRAGON_ESCAPE_FINISH_RADIUS * DRAGON_ESCAPE_FINISH_RADIUS;
     }
 
     /** Reborn kills runners once Douglas's route progress has overtaken theirs. */
@@ -1405,6 +1408,15 @@ public final class ArcadePortRules {
         if (waypointIndex < 0 || !Double.isFinite(distanceToNextWaypoint)
                 || distanceToNextWaypoint < 0.0D) return Double.NEGATIVE_INFINITY;
         return waypointIndex * 10_000.0D - distanceToNextWaypoint;
+    }
+
+    /** Convert a course-distance advantage to an estimated time gap for the live race display. */
+    public static long dragonEscapeCourseTimeGapMillis(
+            double leaderCourseDistance, double racerCourseDistance, double estimatedSpeed) {
+        if (!Double.isFinite(leaderCourseDistance) || !Double.isFinite(racerCourseDistance)
+                || !Double.isFinite(estimatedSpeed) || estimatedSpeed <= 0.0D) return 0L;
+        double distanceGap = Math.max(0.0D, leaderCourseDistance - racerCourseDistance);
+        return Math.max(0L, Math.round(distanceGap / estimatedSpeed * 1_000.0D));
     }
 
     public static int monotonicDragonEscapeProgress(int previous, int candidate, int waypointCount) {
