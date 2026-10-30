@@ -6572,6 +6572,7 @@ public final class ArcadePortManager implements Listener {
         session.evolutionEggDisplays.clear();
         session.evolutionEggVariants.clear();
         session.evolutionEggNextParticleAt.clear();
+        session.evolutionCreeperTnt.clear();
         session.evolutionDamageContributors.clear();
         session.evolutionPityUntil.clear();
         session.evolutionKillsAtAttempt.clear();
@@ -8590,6 +8591,7 @@ public final class ArcadePortManager implements Listener {
             bomb.setVelocity(velocity);
             session.entities.add(bomb);
             session.bombOwners.put(bomb.getUniqueId(), player.getUniqueId());
+            session.evolutionCreeperTnt.add(bomb.getUniqueId());
             session.bombLastLocations.put(bomb.getUniqueId(), spawn.clone());
             session.bombCreatedAt.put(bomb.getUniqueId(), System.currentTimeMillis());
         } else if (session.type == ArcadePortGame.EVOLUTION
@@ -9719,6 +9721,7 @@ public final class ArcadePortManager implements Listener {
         session.bombPrimed.remove(bombId);
         session.bombDirectHitResolved.remove(bombId);
         session.bombKillsByTnt.remove(bombId);
+        session.evolutionCreeperTnt.remove(bombId);
     }
 
     private boolean isBombTouchingAnyBlock(TNTPrimed bomb) {
@@ -9966,7 +9969,7 @@ public final class ArcadePortManager implements Listener {
         String bombPowerupType = session.bombPowerTypes.getOrDefault(bombId, "normal");
         boolean bombLobbersBlast = session.type == ArcadePortGame.BOMB_LOBBERS;
         boolean evolutionBlast = session.type == ArcadePortGame.EVOLUTION
-                && ownerId != null && session.evolutionLevels.getOrDefault(ownerId, 0) == 2;
+                && ownerId != null && session.evolutionCreeperTnt.contains(bombId);
         Player owner = ownerId == null ? null : session.players.get(ownerId);
         if (bombLobbersBlast && ArcadePortRules.shouldCancelBombLobbersExplosion(
                 owner != null && owner.isOnline(),
@@ -10206,6 +10209,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, BlockDisplay> evolutionEggDisplays = new HashMap<>();
         final Map<UUID, String> evolutionEggVariants = new HashMap<>();
         final Map<UUID, Long> evolutionEggNextParticleAt = new HashMap<>();
+        final Set<UUID> evolutionCreeperTnt = new HashSet<>();
         final Map<UUID, Integer> gladiatorPairs = new HashMap<>();
         final Set<Integer> gladiatorResolvedPairs = new HashSet<>();
         int gladiatorRound = -1;
