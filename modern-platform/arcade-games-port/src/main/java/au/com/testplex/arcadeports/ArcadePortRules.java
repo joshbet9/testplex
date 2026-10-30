@@ -367,6 +367,11 @@ public final class ArcadePortRules {
     public static final int MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS = 2;
     public static final int DRAGONS_MAX_DRAGONS = 5;
     public static final long DRAGONS_SPAWN_INTERVAL_MILLIS = 500L;
+    public static final double DRAGONS_FLARE_RADIUS = 24.0D;
+    public static final double DRAGONS_FLARE_RADIUS_SQUARED = DRAGONS_FLARE_RADIUS * DRAGONS_FLARE_RADIUS;
+    public static final double DRAGONS_FLARE_VERTICAL_RANGE = 24.0D;
+    public static final long DRAGONS_FLARE_DURATION_MILLIS = 6_000L;
+    public static final int DRAGONS_MARKSMAN_START_ARROWS = 1;
     public static final long DRAGONS_CONTACT_COOLDOWN_MILLIS = 2_000L;
     public static final long DRAGONS_SPARKLER_INTERVAL_MILLIS = 25_000L;
     public static final int DRAGONS_MAX_SPARKLERS = 2;
@@ -512,6 +517,28 @@ public final class ArcadePortRules {
             case "pyrotechnic", "pyro" -> "pyrotechnic";
             default -> null;
         };
+    }
+
+    public static int dragonsFlareCharges(String requestedKit) {
+        return switch (normalizeDragonsKit(requestedKit) == null ? "" : normalizeDragonsKit(requestedKit)) {
+            case "marksman" -> 3;
+            case "pyrotechnic" -> 2;
+            case "coward" -> 1;
+            default -> 0;
+        };
+    }
+
+    public static boolean isDragonFlareActive(long nowMillis, long expiresAtMillis) {
+        return expiresAtMillis > nowMillis;
+    }
+
+    /** Horizontal radius is circular; the vertical limit prevents one flare protecting an entire tower. */
+    public static boolean isDragonFlareLocationProtected(
+            double horizontalDistanceSquared, double verticalDistance) {
+        return Double.isFinite(horizontalDistanceSquared) && horizontalDistanceSquared >= 0.0D
+                && horizontalDistanceSquared <= DRAGONS_FLARE_RADIUS_SQUARED
+                && Double.isFinite(verticalDistance)
+                && Math.abs(verticalDistance) <= DRAGONS_FLARE_VERTICAL_RANGE;
     }
 
     public static boolean shouldSpawnTestDragon(int currentCount, long now, long nextSpawnAt) {
