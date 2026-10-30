@@ -684,6 +684,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private void openStore(Player player) {
         StoreHolder holder = new StoreHolder(player.getUniqueId());
         Inventory inventory = Bukkit.createInventory(holder, 27, ChatColor.DARK_GREEN + "Heroes of Gwen Store");
+        holder.inventory = inventory;
         for (int i = 0; i < storeEntries.size() && i < 27; i++) {
             StoreEntry entry = storeEntries.get(i);
             int price = ArcadePortRules.heroesOfGwenStoreItemCost(entry.cost, mixedArcade);
@@ -706,7 +707,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     public void onStoreClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)
                 || !openStores.containsKey(player.getUniqueId())
-                || !event.getView().getTopInventory().getHolder().equals(openStores.get(player.getUniqueId()))) return;
+                || !(event.getView().getTopInventory().getHolder() instanceof StoreHolder holder)
+                || !holder.equals(openStores.get(player.getUniqueId()))) return;
         event.setCancelled(true);
         if (event.getClickedInventory() != event.getView().getTopInventory()) return;
         ItemStack clicked = event.getCurrentItem();
@@ -743,7 +745,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         player.sendMessage(ChatColor.GREEN + "Purchased " + entry.name + " for " + cost + " gold.");
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 1.2F);
-        openStore(player);
+        updateGoldActionBar(player);
     }
 
     private void equip(Player player, ItemStack item) {
@@ -866,6 +868,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         objectiveRespawnAt = System.currentTimeMillis() + objectiveDelay();
     }
 
+    void onQuit(Player player) {
+        if (player == null) return;
+        UUID id = player.getUniqueId();
+        openStores.remove(id);
+        if (game == ArcadePortGame.CASTLE_ASSAULT && id.equals(objectiveCarrier)) {
+            carriedTntOldHelmet.remove(id);
+            objectiveCarrier = null;
+            objectiveRespawnAt = System.currentTimeMillis() + objectiveDelay();
+        }
+    }
+
     void onPlayerKill(Player killer) {
         if (stopped || game != ArcadePortGame.CASTLE_ASSAULT || killer == null) return;
         if (objectiveKillsEnabled == 0) return;
@@ -958,7 +971,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private static final class StoreHolder implements InventoryHolder {
         final UUID owner;
+        Inventory inventory;
         StoreHolder(UUID owner) { this.owner = owner; }
-        @Override public Inventory getInventory() { return null; }
+        @Override public Inventory getInventory() { return inventory; }
     }
 }
