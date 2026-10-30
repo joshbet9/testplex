@@ -21,6 +21,15 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 
 Each game gets its own separate modern test world, so arena generation/destruction does not use the live 1.8 Testplex world. Original Reborn map archives are embedded for Bacon Brawl, Bomb Lobbers, Death Tag, Dragon Escape, Dragons, Gladiators, Micro Battles, One in the Quiver, Paintball, Runner, Sheep Quest, Spleef and Turf Wars; these load into separate source-world folders and read WorldConfig.dat spawn groups and map bounds. Evolution remains generated because an Evolution map archive is not present in the source map catalogue.
 
+## Mixed Arcade variant foundations in progress
+
+Two additional game IDs and their archived map collections are now registered in the modern catalog:
+
+- **Castle Assault Mixed Arcade** (`castle-assault-mixed` or `mixed-castle-assault`) — the source objective TNT pickup-to-respawn delay is 60 seconds; the requested variant rule is 30 seconds.
+- **Heroes of Gwen Mixed Arcade** (`heroes-of-gwen-mixed` or `mixed-heroes-of-gwen`) — the requested rules are to omit the middle towers and halve every shop item's gold cost.
+
+The rule helpers and unit tests cover those exact values, and the original Castle Assault and Heroes of GWEN map folders are bundled by Maven. The modern game-loop ports are not yet implemented: the two IDs are deliberately absent from `enabled-games`, so they are **not playable or cleared for acceptance testing**. In particular, Heroes of Gwen still needs its MOBA tower-marker classification and shop purchase/display hooks connected to the source rules; Castle Assault still needs its objective TNT, round and combat lifecycle ported before its 30-second interval can take effect in a live game.
+
 ## Commands
 
 - `/gamepanel` → choose a supported game → **Start / Test**. The coordinator calls `/arcadeport play <game-id>`.
@@ -31,7 +40,7 @@ Each game gets its own separate modern test world, so arena generation/destructi
 - `/arcadeport ghost <on|off|toggle>` — enable or hide your Dragon Escape translucent PB player ghost.
 - `/arcadeport status`, `/arcadeport stop` (operator only).
 
-Game IDs are: `bacon-brawl`, `bomb-lobbers`, `death-tag`, `dragon-escape`, `dragons`, `evolution`, `gladiators`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. The separate Mixed Arcade alias is `turf-wars-mixed` (`mixed-turf-wars` is also accepted).
+Game IDs are: `bacon-brawl`, `bomb-lobbers`, `castle-assault`, `death-tag`, `dragon-escape`, `dragons`, `evolution`, `gladiators`, `heroes-of-gwen`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. Mixed Arcade aliases use `<game-id>-mixed` or `mixed-<game-id>`; Castle Assault and Heroes of Gwen are registered but remain disabled until their gameplay ports pass acceptance.
 
 ## Acceptance boundary
 
