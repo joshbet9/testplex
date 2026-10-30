@@ -471,6 +471,7 @@ public final class ArcadePortRules {
     public static final long TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS = 45_000L;
     public static final int TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS = 2;
     public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
+    public static final long MICRO_BATTLES_ASSIST_WINDOW_MILLIS = 15_000L;
     public static final long MICRO_BATTLES_BARRIER_DURATION_MILLIS = 10_000L;
     public static final int MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK = 3;
     public static final int MICRO_BATTLES_CRUMBLE_SCAN_INTERVAL_TICKS = 2;
@@ -1704,6 +1705,17 @@ public final class ArcadePortRules {
     public static double microBattlesKnockbackStrength(double eventDamage) {
         if (!Double.isFinite(eventDamage)) return 0.0D;
         return Math.log10(Math.max(eventDamage, 2.0D)) * 1.6D;
+    }
+
+    /** CombatManager records integer event damage, before physical armour is applied. */
+    public static int microBattlesChatStatDamage(double eventDamage) {
+        return Double.isFinite(eventDamage) && eventDamage > 0.0D ? (int) eventDamage : 0;
+    }
+
+    /** Mirrors CombatManager's 15-second CombatLog expiration window for assist credit. */
+    public static boolean shouldCreditMicroBattlesAssist(long nowMillis, long lastHitAtMillis) {
+        return lastHitAtMillis > 0L && nowMillis >= lastHitAtMillis
+                && nowMillis - lastHitAtMillis <= MICRO_BATTLES_ASSIST_WINDOW_MILLIS;
     }
 
     public static int microBattlesMinimumFoodLevel(int foodLevel) {
