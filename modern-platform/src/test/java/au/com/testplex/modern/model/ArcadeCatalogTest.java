@@ -7,10 +7,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeCatalogTest {
     @Test
-    void registersAllEighteenArcadeGames() {
+    void registersAllTwentyArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(18, catalog.size());
-        assertEquals(18, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+        assertEquals(20, catalog.size());
+        assertEquals(20, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
     }
 
     @Test
@@ -38,6 +38,19 @@ class ArcadeCatalogTest {
     }
 
     @Test
+    void castleAssaultAndHeroesOfGwenAppearInTheLobbyAsInProgress() {
+        ArcadeCatalog catalog = new ArcadeCatalog();
+        GameDefinition castleAssault = catalog.getGame("castle-assault");
+        GameDefinition heroesOfGwen = catalog.getGame("heroes-of-gwen");
+        assertNotNull(castleAssault);
+        assertNotNull(heroesOfGwen);
+        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, castleAssault.getPortStatus());
+        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, heroesOfGwen.getPortStatus());
+        assertFalse(castleAssault.isReadyForTest());
+        assertFalse(heroesOfGwen.isReadyForTest());
+    }
+
+    @Test
     void deathTagIsReadyForInGameAcceptanceWhileOtherPortsRemainInProgress() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         GameDefinition deathTag = catalog.getGame("death-tag");
@@ -58,7 +71,7 @@ class ArcadeCatalogTest {
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS)
                 .count();
         assertEquals(1, readyForTest);
-        assertEquals(17, inProgress);
+        assertEquals(19, inProgress);
     }
 
     @Test
