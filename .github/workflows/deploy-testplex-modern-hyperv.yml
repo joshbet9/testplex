@@ -527,23 +527,67 @@ jobs:
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
           done
 
-          # Migrate the previous MonsterMazeModern plugin's persistent data into
-          # the Testplex-owned ArcadeMechanicsModern/monster-maze module folder.
-          # Copy is intentionally non-destructive: existing new-module files win,
-          # and the old data folder is retained as a backup.
+          # Migrate persistent state from both historical standalone data-folder names.
+          # The 1.21 source plugin.yml names the plugin MonsterMazeStandalone, so
+          # Paper stores its data in plugins/MonsterMazeStandalone (not only the
+          # older Testplex alias plugins/MonsterMazeModern). Keep both source folders
+          # intact; cp -an preserves existing Testplex module settings.
           MM_DATA_DIR="$SERVER_DIR/plugins/ArcadeMechanicsModern/monster-maze"
-          OLD_MM_DATA_DIR="$SERVER_DIR/plugins/MonsterMazeModern"
           sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$MM_DATA_DIR"
-          if sudo -n test -d "$OLD_MM_DATA_DIR"; then
-            sudo -n cp -an "$OLD_MM_DATA_DIR/." "$MM_DATA_DIR/"
-          fi
+          for OLD_MM_DATA_DIR in \
+            "$SERVER_DIR/plugins/MonsterMazeStandalone" \
+            "$SERVER_DIR/plugins/MonsterMazeModern"; do
+            if sudo -n test -d "$OLD_MM_DATA_DIR"; then
+              sudo -n cp -an "$OLD_MM_DATA_DIR/." "$MM_DATA_DIR/"
+              echo "Migrated non-overwriting Monster Maze data from $OLD_MM_DATA_DIR."
+            fi
+          done
           MM_CONFIG="$MM_DATA_DIR/config.yml"
           if ! sudo -n test -f "$MM_CONFIG"; then
             sudo -n unzip -p "$UPLOAD_DIR/ArcadeMechanicsModern.jar" monster-maze/config.yml | sudo -n tee "$MM_CONFIG" >/dev/null
           fi
-          # Retire the obsolete standalone entry point so Paper cannot load two
-          # owners for Monster Maze on the next restart.
-          sudo -n rm -f "$SERVER_DIR/plugins/MonsterMazeModern.jar"
+
+          # Retire old standalone Monster Maze Bukkit plugins by inspecting their
+          # plugin.yml descriptor, not their filename. This catches the actual
+          # MonsterMazeStandalone.jar plus older aliases/renames without touching
+          # ArcadeMechanicsModern.jar or any unrelated plugin. The complete plugins/
+          # directory has already been snapshotted to BACKUP_DIR for rollback.
+          is_standalone_monster_maze_plugin() {
+            local descriptor="$1"
+            local plugin_name plugin_main
+            plugin_name="$(printf '%s\n' "$descriptor" | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\"" | tr -d '\r')"
+            plugin_main="$(printf '%s\n' "$descriptor" | sed -n 's/^main:[[:space:]]*//p' | head -n 1 | tr -d "'\"" | tr -d '\r')"
+            [[ "$plugin_name" == "MonsterMazeStandalone" \
+              || "$plugin_name" == "MonsterMazeModern" \
+              || "$plugin_main" == "me.monstermaze.MonsterMazePlugin" \
+              || "$plugin_main" == "me.monstermaze.MonsterMazeStandalonePlugin" ]]
+          }
+
+          RETIRED_MM_PLUGIN_DIR="$BACKUP_DIR/retired-monster-maze-plugins"
+          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$RETIRED_MM_PLUGIN_DIR"
+          shopt -s nullglob
+          for plugin_jar in "$SERVER_DIR"/plugins/*.jar; do
+            [[ -f "$plugin_jar" ]] || continue
+            descriptor="$(sudo -n unzip -p "$plugin_jar" plugin.yml 2>/dev/null || true)"
+            [[ -n "$descriptor" ]] || continue
+            if is_standalone_monster_maze_plugin "$descriptor"; then
+              retired_name="$(basename "$plugin_jar")"
+              sudo -n mv -- "$plugin_jar" "$RETIRED_MM_PLUGIN_DIR/$retired_name"
+              echo "Retired obsolete standalone Monster Maze plugin $retired_name; its descriptor identified a separate Bukkit lifecycle."
+            fi
+          done
+
+          # Fail closed: never restart Paper while another standalone Monster Maze
+          # plugin descriptor remains beside the Testplex-owned Arcade module.
+          for plugin_jar in "$SERVER_DIR"/plugins/*.jar; do
+            [[ -f "$plugin_jar" ]] || continue
+            descriptor="$(sudo -n unzip -p "$plugin_jar" plugin.yml 2>/dev/null || true)"
+            [[ -n "$descriptor" ]] || continue
+            if is_standalone_monster_maze_plugin "$descriptor"; then
+              echo "Refusing to start Testplex Modern while standalone Monster Maze plugin $plugin_jar remains installed." >&2
+              exit 1
+            fi
+          done
           set_mm_config() {
             key="$1"
             value="$2"
