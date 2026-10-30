@@ -8248,6 +8248,7 @@ public final class ArcadePortManager implements Listener {
             passenger.leaveVehicle();
             if (passenger instanceof Sheep sheep) {
                 session.sheepCarriers.remove(sheep);
+                session.sheepHolders.remove(sheep);
                 int owner = session.sheepOwners.getOrDefault(sheep, -1);
                 sheep.setColor(owner >= 0 ? sheepTeamDyeColor(owner) : DyeColor.WHITE);
                 sheep.setAI(true);
@@ -8336,7 +8337,6 @@ public final class ArcadePortManager implements Listener {
         sheep.setColor(owner >= 0 ? sheepTeamDyeColor(owner) : sheepTeamDyeColor(team));
         session.sheepNextPickupAt.put(playerId,
                 now + ArcadePortRules.SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS);
-        if (owner >= 0 && owner != team) recordSheepQuestStat(playerId, "thief");
         player.playSound(player.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 2.0F);
         player.getWorld().playEffect(sheep.getLocation(), Effect.STEP_SOUND, Material.WHITE_WOOL);
         updateSheepQuestCarryUi(session, player);
@@ -8366,6 +8366,7 @@ public final class ArcadePortManager implements Listener {
         Player holder = holderId == null ? null : session.players.get(holderId);
         if (holder != null && holder.isOnline()
                 && session.teams.getOrDefault(holderId, -1) == team) {
+            if (previousOwner >= 0 && previousOwner != team) recordSheepQuestStat(holderId, "thief");
             session.scores.merge(holderId, 1, Integer::sum);
             holder.playSound(holder.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.5F);
             holder.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, holder.getLocation().add(0, 1, 0),
@@ -8391,6 +8392,8 @@ public final class ArcadePortManager implements Listener {
             for (Player target : alivePlayers(session)) {
                 if (target.getUniqueId().equals(entry.getValue())
                         || (thrown instanceof Player thrownPlayer && thrownPlayer.equals(target))
+                        || session.teams.getOrDefault(target.getUniqueId(), -2)
+                                == session.teams.getOrDefault(entry.getValue(), -1)
                         || target.getLocation().distanceSquared(thrown.getLocation()) > 1.44D) continue;
                 if (sheepCarriedBy(session, target.getUniqueId()) > 0) {
                     if (thrower != null && thrower.isOnline()) recordSheepQuestStat(thrower.getUniqueId(), "animal-rescue");
@@ -11114,6 +11117,25 @@ public final class ArcadePortManager implements Listener {
                                 unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
                         "noop", null, null));
             }
+        } else if ("sheep-quest".equals(gameId)) {
+            String achievementKey = "test-achievements.sheep-quest." + targetId + ".selfish";
+            boolean selfish = plugin.getConfig().getBoolean(achievementKey, false);
+            inventory.setItem(13, statsItem(
+                    selfish ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                    (selfish ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + "Selfish",
+                    List.of(" ", ChatColor.GRAY + "Win Sheep Quest with more than 12 sheep in your team's pen.", " ",
+                            selfish ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
+                    "noop", null, null));
+            int thieves = plugin.getConfig().getInt(path + "thief", 0);
+            int rescues = plugin.getConfig().getInt(path + "animal-rescue", 0);
+            inventory.setItem(29, statsItem(thieves > 0 ? Material.LEAD : Material.STRING,
+                    ChatColor.GOLD + "Sheep Thief",
+                    List.of(" ", ChatColor.GRAY + "Enemy sheep successfully delivered: " + ChatColor.WHITE + thieves),
+                    "noop", null, null));
+            inventory.setItem(31, statsItem(rescues > 0 ? Material.SHEARS : Material.STRING,
+                    ChatColor.GREEN + "Animal Rescue",
+                    List.of(" ", ChatColor.GRAY + "Enemy carriers interrupted: " + ChatColor.WHITE + rescues),
+                    "noop", null, null));
         } else {
             int[] slots = {29, 30, 31, 32};
             int[] values = {played, wins, score, knockouts};
