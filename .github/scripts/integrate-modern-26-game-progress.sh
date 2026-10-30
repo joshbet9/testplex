@@ -671,9 +671,9 @@ if "sheepQuestUpdatedBeforeTimeout" in tick and "boolean sheepQuestUpdatedBefore
 
 # Preserve required Paper API imports for the Evolution egg displays / knockback hooks.
 if "import org.bukkit.entity.BlockDisplay;" not in source:
-    anchor = "import org.bukkit.entity.Block;"
+    anchor = "import org.bukkit.entity.ArmorStand;"
     if anchor not in source:
-        raise SystemExit("Could not find Bukkit Block entity import anchor.")
+        raise SystemExit("Could not find Bukkit entity import anchor.")
     source = source.replace(anchor, anchor + "\nimport org.bukkit.entity.BlockDisplay;", 1)
 if "import io.papermc.paper.event.entity.EntityKnockbackEvent;" not in source:
     anchor = "import org.bukkit.event.entity.EntityDamageEvent;"
