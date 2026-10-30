@@ -37,6 +37,8 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.SkullMeta;
+import net.kyori.adventure.text.Component;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -926,14 +928,31 @@ public final class SnakeGameManager implements Listener {
         for (SnakeState spectator : snakes.values()) {
             if (spectator.alive || !spectator.player.isOnline()) continue;
             Player player = spectator.player;
-            boolean hasCompass = java.util.Arrays.stream(player.getInventory().getContents()).anyMatch(this::isTrackingCompass);
-            if (!hasCompass) player.getInventory().addItem(trackingCompass());
+            if (player.getGameMode() != GameMode.SPECTATOR) {
+                boolean hasCompass = java.util.Arrays.stream(player.getInventory().getContents()).anyMatch(this::isTrackingCompass);
+                if (!hasCompass) player.getInventory().addItem(trackingCompass());
+            }
             SnakeState nearest = alive.stream()
                     .min((left, right) -> Double.compare(player.getLocation().distanceSquared(left.player.getLocation()),
                             player.getLocation().distanceSquared(right.player.getLocation())))
                     .orElse(null);
-            if (nearest != null) {
-                player.setCompassTarget(nearest.player.getLocation());
+            if (nearest == null) continue;
+
+            player.setCompassTarget(nearest.player.getLocation());
+            if (player.getGameMode() == GameMode.SPECTATOR) {
+                Entity currentTarget = player.getSpectatorTarget();
+                SnakeState currentState = currentTarget instanceof Player currentPlayer
+                        ? snakes.get(currentPlayer.getUniqueId()) : null;
+                if (currentState == null || !currentState.alive || !currentState.player.isOnline()) {
+                    player.setSpectatorTarget(nearest.player);
+                }
+            } else if (isTrackingCompass(player.getInventory().getItemInMainHand())) {
+                double distance = player.getLocation().distance(nearest.player.getLocation());
+                double height = nearest.player.getLocation().getY() - player.getLocation().getY();
+                String actionBar = "Nearest Target: " + nearest.player.getName()
+                        + "    Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                        + "    Height: " + String.format(java.util.Locale.ROOT, "%.1f", height);
+                player.sendActionBar(Component.text(actionBar));
             }
         }
     }
@@ -947,8 +966,15 @@ public final class SnakeGameManager implements Listener {
             ItemMeta meta = icon.getItemMeta();
             if (meta != null) {
                 meta.setDisplayName(ChatColor.GREEN + target.player.getName());
-                meta.setLore(List.of(ChatColor.GRAY + "Tail length: " + target.segments.size(),
-                        ChatColor.YELLOW + "Click to spectate"));
+                double distance = player.getLocation().distance(target.player.getLocation());
+                double height = target.player.getLocation().getY() - player.getLocation().getY();
+                meta.setLore(List.of(ChatColor.GRAY + "Kit: " + target.kit,
+                        ChatColor.GRAY + "Tail length: " + target.segments.size(),
+                        ChatColor.GRAY + "Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance),
+                        ChatColor.GRAY + "Height Difference: " + String.format(java.util.Locale.ROOT, "%.1f", height),
+                        ChatColor.YELLOW + "Left Click: Teleport",
+                        ChatColor.YELLOW + "Right Click: Spectate"));
+                if (meta instanceof SkullMeta skullMeta) skullMeta.setOwningPlayer(target.player);
                 meta.getPersistentDataContainer().set(spectatorTargetKey, PersistentDataType.STRING,
                         target.player.getUniqueId().toString());
                 icon.setItemMeta(meta);
@@ -991,7 +1017,7 @@ public final class SnakeGameManager implements Listener {
         SnakeState state = snakes.get(event.getPlayer().getUniqueId());
         if (!running || state == null) return;
         if (!state.alive) {
-            if (!isTrackingCompass(event.getItem())) return;
+            if (event.getPlayer().getGameMode() == GameMode.SPECTATOR || !isTrackingCompass(event.getItem())) return;
             event.setCancelled(true);
             if (event.getAction() == org.bukkit.event.block.Action.LEFT_CLICK_AIR
                     || event.getAction() == org.bukkit.event.block.Action.LEFT_CLICK_BLOCK) {
@@ -1120,8 +1146,14 @@ public final class SnakeGameManager implements Listener {
                 return;
             }
             player.closeInventory();
-            player.teleport(target.player.getLocation().clone().add(0.0D, 1.0D, 0.0D));
-            player.setCompassTarget(target.player.getLocation());
+            if (event.isRightClick()) {
+                player.setGameMode(GameMode.SPECTATOR);
+                player.setSpectatorTarget(target.player);
+                player.sendMessage(ChatColor.GREEN + "Spectating " + target.player.getName() + ".");
+            } else {
+                player.teleport(target.player.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                player.setCompassTarget(target.player.getLocation());
+            }
             return;
         }
         if (running && snakes.containsKey(player.getUniqueId())) event.setCancelled(true);
