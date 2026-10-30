@@ -17,6 +17,8 @@ public final class WizardsRules {
         return kit.manaPerSecond() + Math.max(0, soulStars) * SOUL_STAR_MANA_PER_SECOND;
     }
 
+    public static float initialMana() { return 0.0F; }
+
     public static float maximumMana(WizardsKit kit) {
         if (kit == null) throw new IllegalArgumentException("kit is required");
         return kit.maximumMana();

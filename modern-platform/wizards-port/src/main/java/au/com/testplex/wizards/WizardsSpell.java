@@ -70,17 +70,23 @@ public enum WizardsSpell {
     public boolean implemented() { return implemented; }
 
     public int manaCost(int level) {
-        return Math.max(1, baseManaCost + manaPerLevel * Math.max(0, level - 1));
+        return manaCost(level, 1.0D);
+    }
+
+    public int manaCost(int level, double modifier) {
+        int raw = baseManaCost + manaPerLevel * Math.max(0, level - 1);
+        return Math.max(0, (int) Math.round(raw * Math.max(0.0D, modifier)));
     }
 
     public int cooldownSeconds(int level, double modifier) {
-        int raw = Math.max(1, baseCooldown + cooldownPerLevel * Math.max(0, level - 1));
-        return Math.max(1, (int) Math.ceil(raw * Math.max(0.1D, modifier)));
+        int raw = baseCooldown + cooldownPerLevel * Math.max(0, level - 1);
+        double scale = (this == HEAL || this == RAINBOW_ROAD) ? 1.0D : Math.max(0.0D, modifier);
+        return Math.max(0, (int) Math.round(raw * scale));
     }
 
     public static WizardsSpell fromId(String id) {
         if (id == null) return null;
-        String normalized = id.toLowerCase(Locale.ROOT).replace('_', '-').replace(' ', '-');
+        String normalized = id.toLowerCase(Locale.ROOT).replace("'", "").replace('_', '-').replace(' ', '-');
         return Arrays.stream(values()).filter(spell -> spell.id.equals(normalized)).findFirst().orElse(null);
     }
 

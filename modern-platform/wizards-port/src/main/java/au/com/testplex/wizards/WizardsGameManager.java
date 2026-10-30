@@ -20,6 +20,7 @@ import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Fireball;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
@@ -845,7 +846,15 @@ public final class WizardsGameManager implements Listener {
         switch (spell) {
             case MANA_BOLT:
             case FIREBALL: {
-                Snowball projectile = caster.launchProjectile(Snowball.class);
+                Projectile projectile;
+                if (spell == WizardsSpell.FIREBALL) {
+                    Fireball fireball = caster.launchProjectile(Fireball.class);
+                    fireball.setIsIncendiary(false);
+                    fireball.setYield(0.0F);
+                    projectile = fireball;
+                } else {
+                    projectile = caster.launchProjectile(Snowball.class);
+                }
                 projectile.setVelocity(direction.multiply(spell == WizardsSpell.MANA_BOLT ? 1.8D : 1.35D));
                 projectile.getPersistentDataContainer().set(projectileKey, PersistentDataType.STRING, spell.id());
                 double damage = spell == WizardsSpell.MANA_BOLT ? level + 2.0D : level + 3.0D;
@@ -915,7 +924,7 @@ public final class WizardsGameManager implements Listener {
             case HEAL: {
                 double maximum = caster.getAttribute(Attribute.MAX_HEALTH) == null
                         ? 20.0D : caster.getAttribute(Attribute.MAX_HEALTH).getValue();
-                double heal = 3.0D + level;
+                double heal = 2.0D + (level * 0.5D);
                 if (caster.getHealth() >= maximum) {
                     caster.sendMessage(ChatColor.YELLOW + "You are already at full health.");
                     return false;
@@ -1214,7 +1223,7 @@ public final class WizardsGameManager implements Listener {
         private WizardState(WizardsKit kit) {
             this.kit = kit;
             maximumMana = WizardsRules.maximumMana(kit);
-            mana = maximumMana;
+            mana = WizardsRules.initialMana();
             wandCount = WizardsRules.startingWands(kit);
             known.put(WizardsSpell.MANA_BOLT, 1);
             known.put(WizardsSpell.WIZARDS_COMPASS, 1);

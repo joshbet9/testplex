@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class WizardsRulesTest {
     @Test
     void sourceKitManaAndWandProfilesArePreserved() {
+        assertEquals(0.0F, WizardsRules.initialMana());
         assertEquals(100.0F, WizardsRules.maximumMana(WizardsKit.MAGE));
         assertEquals(100.0F, WizardsRules.maximumMana(WizardsKit.SORCERER));
         assertEquals(100.0F, WizardsRules.maximumMana(WizardsKit.MYSTIC));

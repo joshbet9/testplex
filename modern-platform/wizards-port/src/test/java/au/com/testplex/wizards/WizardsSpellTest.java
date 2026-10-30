@@ -36,12 +36,16 @@ class WizardsSpellTest {
         assertEquals(13, WizardsSpell.FIREBALL.cooldownSeconds(2, 1.0D));
         assertEquals(11, WizardsSpell.FIREBALL.cooldownSeconds(3, 1.0D));
         assertEquals(8, WizardsSpell.FIREBALL.cooldownSeconds(3, 0.7D));
+        assertEquals(30, WizardsSpell.FIREBALL.manaCost(1, 1.0D));
+        assertEquals(21, WizardsSpell.FIREBALL.manaCost(1, 0.7D));
+        assertEquals(30, WizardsSpell.HEAL.cooldownSeconds(1, 0.5D));
     }
 
     @Test
-    void manaAndCooldownNeverDropToZero() {
-        assertEquals(1, WizardsSpell.NAPALM.manaCost(1));
-        assertEquals(1, WizardsSpell.NAPALM.cooldownSeconds(5, 0.5D));
-        assertEquals(1, WizardsSpell.RAINBOW_BEAM.cooldownSeconds(1, 0.1D));
+    void spellFormulasUseSourceMinimumsAndSupportLateGameSurges() {
+        assertEquals(60, WizardsSpell.NAPALM.manaCost(1));
+        assertEquals(2, WizardsSpell.NAPALM.cooldownSeconds(5, 0.1D));
+        assertEquals(0, WizardsSpell.NAPALM.manaCost(1, 0.0D));
+        assertEquals(0, WizardsSpell.RAINBOW_BEAM.cooldownSeconds(1, 0.0D));
     }
 }
