@@ -11029,7 +11029,7 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session != null && session.type == ArcadePortGame.MILK_THE_COW
                 && event.getPlayer().getWorld() == session.world
-                && event.getBlockClicked() != null && event.getBlockClicked().getType().isLiquid()) {
+                && event.getBlockClicked() != null && event.getBlockClicked().isLiquid()) {
             event.setCancelled(true);
         }
     }
