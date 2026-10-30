@@ -53,7 +53,7 @@ public class LeaderboardBoard implements Listener {
         if (storedMode != null) activeMode = storedMode;
         KitType storedKit = KitType.byName(plugin.getConfig().getString("leaderboard.kit", ""));
         if (storedKit != null) activeKit = storedKit;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
     }
 
     public void place(Location lobbyCenter) {
