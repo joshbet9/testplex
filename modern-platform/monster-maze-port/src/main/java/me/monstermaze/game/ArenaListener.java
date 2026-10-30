@@ -42,7 +42,7 @@ public class ArenaListener implements Listener {
     public ArenaListener(MonsterMazePlugin plugin, GameManager game) {
         this.plugin = plugin;
         this.game = game;
-        org.bukkit.Bukkit.getPluginManager().registerEvents(this, plugin);
+        org.bukkit.Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
     }
 
     private boolean inArena(Location loc) {
