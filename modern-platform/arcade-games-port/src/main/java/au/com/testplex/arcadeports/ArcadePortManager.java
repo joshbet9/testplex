@@ -31,6 +31,7 @@ import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Egg;
 import org.bukkit.entity.Fireball;
 import org.bukkit.entity.FallingBlock;
+import org.bukkit.entity.Horse;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
@@ -55,6 +56,8 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityTargetEvent;
+import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
@@ -2480,6 +2483,10 @@ public final class ArcadePortManager implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.8F, 1.6F);
     }
 
+    private boolean isDragonUsableBlock(Block clickedBlock) {
+        return clickedBlock != null && clickedBlock.getType().isInteractable();
+    }
+
     private void useDragonsLeap(Session session, Player player, long now) {
         UUID id = player.getUniqueId();
         long readyAt = session.dragonLeapReadyAt.getOrDefault(id, 0L);
@@ -2489,14 +2496,14 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.dragonLeapReadyAt.put(id, now + ArcadePortRules.DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS);
-        Vector direction = player.getLocation().getDirection().normalize().multiply(1.2D);
-        direction.setY(Math.max(0.2D, Math.min(1.0D, direction.getY() + 0.8D)));
-        player.setVelocity(direction);
-        player.setFallDistance(0.0F);
-        player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 10,
-                0.2D, 0.15D, 0.2D, 0.02D);
-        player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.8F, 1.1F);
-        player.sendMessage(ChatColor.GREEN + "Leap!");
+        Entity leapEntity = player.getVehicle() instanceof Horse ? player.getVehicle() : player;
+        leapEntity.setVelocity(ArcadePortRules.dragonsLeapVelocity(
+                leapEntity.getLocation().getDirection(), leapEntity.isOnGround()));
+        leapEntity.setFallDistance(0.0F);
+        player.getWorld().spawnParticle(Particle.FLAME, player.getLocation(), 8,
+                0.12D, 0.12D, 0.12D, 0.01D);
+        player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 1.0F, 1.0F);
+        player.sendMessage(ChatColor.YELLOW + "Skill: " + ChatColor.GREEN + "You used Leap.");
     }
 
     private void useQuiverGroundPound(Session session, Player player, long now) {
@@ -4644,26 +4651,35 @@ public final class ArcadePortManager implements Listener {
 
     private void updateDragonBarrageCharge(Session session, Player player, long now) {
         UUID id = player.getUniqueId();
+        if (!session.alive.contains(id)) return;
         if (session.dragonMarksmanFiring.contains(id)) {
+            if (player.getInventory().getItemInMainHand().getType() != Material.BOW) {
+                session.dragonMarksmanFiring.remove(id);
+                session.dragonMarksmanCharge.remove(id);
+                session.dragonMarksmanNextChargeAt.remove(id);
+                return;
+            }
             int remaining = session.dragonMarksmanCharge.getOrDefault(id, 0);
-            long nextAt = session.dragonMarksmanNextChargeAt.getOrDefault(id, now);
             if (remaining <= 0) {
                 session.dragonMarksmanFiring.remove(id);
                 session.dragonMarksmanCharge.remove(id);
                 session.dragonMarksmanNextChargeAt.remove(id);
                 return;
             }
+            long nextAt = session.dragonMarksmanNextChargeAt.getOrDefault(id, now);
             if (now < nextAt) return;
             Vector jitter = new Vector((ThreadLocalRandom.current().nextDouble() - 0.5D) / 10.0D,
                     (ThreadLocalRandom.current().nextDouble() - 0.5D) / 10.0D,
                     (ThreadLocalRandom.current().nextDouble() - 0.5D) / 10.0D);
             Arrow arrow = player.launchProjectile(Arrow.class);
-            arrow.setVelocity(player.getLocation().getDirection().clone().add(jitter).normalize().multiply(3.0D));
+            // Reborn's PerkBarrage adds jitter to the facing vector before multiplying by three.
+            arrow.setVelocity(player.getLocation().getDirection().clone().add(jitter).multiply(3.0D));
             session.entities.add(arrow);
             session.dragonTrackedArrows.add(arrow.getUniqueId());
             session.dragonMarksmanCharge.put(id, remaining - 1);
-            session.dragonMarksmanNextChargeAt.put(id, now + ArcadePortRules.DRAGONS_BARRAGE_INTERVAL_MILLIS);
-            player.playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 0.8F, 1.0F + (0.1F * (remaining - 1)));
+            session.dragonMarksmanNextChargeAt.put(id, now + ArcadePortRules.DRAGONS_BARRAGE_FIRE_INTERVAL_MILLIS);
+            player.playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1.0F,
+                    1.0F + (0.1F * (remaining - 1)));
             return;
         }
         if (!session.dragonMarksmanCharge.containsKey(id)) return;
@@ -4679,7 +4695,7 @@ public final class ArcadePortManager implements Listener {
         charge++;
         session.dragonMarksmanCharge.put(id, charge);
         session.dragonMarksmanNextChargeAt.put(id, now + ArcadePortRules.DRAGONS_BARRAGE_INTERVAL_MILLIS);
-        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.4F, 1.0F + (0.1F * charge));
+        player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 1.0F, 1.0F + (0.1F * charge));
     }
 
     private void applyDragonContactHit(Session session, EnderDragon dragon, Player target, long now) {
@@ -4688,11 +4704,10 @@ public final class ArcadePortManager implements Listener {
         long nextAllowed = session.dragonContactCooldowns.getOrDefault(key, 0L);
         if (!ArcadePortRules.shouldApplyDragonContactHit(now, nextAllowed)) return;
         session.dragonContactCooldowns.put(key, now + ArcadePortRules.DRAGONS_CONTACT_COOLDOWN_MILLIS);
-        Vector recoil = target.getLocation().toVector().subtract(dragon.getLocation().toVector());
-        if (recoil.lengthSquared() < 0.001D) recoil = new Vector(0.0D, 1.0D, 0.0D);
-        target.setVelocity(recoil.normalize().multiply(1.0D).setY(0.6D));
+        Vector trajectory = target.getLocation().toVector().subtract(dragon.getLocation().toVector());
+        target.setFallDistance(0.0F);
+        target.setVelocity(ArcadePortRules.dragonsContactKnockback(trajectory, target.isOnGround()));
         target.playEffect(EntityEffect.HURT);
-        target.sendMessage(ChatColor.RED + "A dragon struck you!");
     }
 
     private void handleDragonProjectileHit(Session session, EnderDragon dragon) {
@@ -8648,6 +8663,25 @@ public final class ArcadePortManager implements Listener {
         return last > 0L && System.currentTimeMillis() - last < 180L;
     }
 
+    @EventHandler
+    public void onDragonsEntityTarget(EntityTargetEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.DRAGONS
+                && event.getEntity().getWorld() == session.world) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOW)
+    public void onDragonsItemSpawn(ItemSpawnEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.DRAGONS
+                || event.getEntity().getWorld() != session.world) return;
+        if (!ArcadePortRules.shouldAllowDragonWorldItem(event.getEntity().getItemStack().getType())) {
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         Session session = active;
@@ -8808,13 +8842,27 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             return;
         }
+        if (session.type == ArcadePortGame.DRAGONS
+                && event.getEntity() instanceof Player dragonTarget
+                && session.players.containsKey(dragonTarget.getUniqueId())
+                && event instanceof EntityDamageByEntityEvent dragonPvp) {
+            Entity damager = dragonPvp.getDamager();
+            boolean directPlayer = damager instanceof Player;
+            boolean playerProjectile = damager instanceof Projectile projectile
+                    && projectile.getShooter() instanceof Player;
+            if (ArcadePortRules.shouldCancelDragonsPvp(directPlayer, playerProjectile)) {
+                event.setCancelled(true); // Dragons sets DamagePvP=false.
+                return;
+            }
+        }
         if (session.type == ArcadePortGame.DRAGONS && event.getEntity() instanceof EnderDragon dragon
                 && session.entities.contains(dragon)) {
             event.setCancelled(true);
-            if (event instanceof EntityDamageByEntityEvent byEntity && byEntity.getDamager() instanceof Player) {
-                setDragonTargetSky(session, dragon);
-                dragon.playEffect(EntityEffect.HURT);
-            }
+            boolean projectileHit = event instanceof EntityDamageByEntityEvent byEntity
+                    && byEntity.getDamager() instanceof Projectile;
+            // The original dragon is repelled by every non-projectile hit, not just melee.
+            if (!projectileHit) setDragonTargetSky(session, dragon);
+            dragon.playEffect(EntityEffect.HURT);
             return;
         }
         if (session.type == ArcadePortGame.DRAGONS && event.getEntity() instanceof Player dragonPlayer
@@ -8878,6 +8926,7 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.DRAGONS
                 || !(event.getEntity() instanceof Player player)
+                || !session.alive.contains(player.getUniqueId())
                 || !"marksman".equals(session.dragonKits.getOrDefault(player.getUniqueId(), "coward"))
                 || !(event.getProjectile() instanceof Arrow arrow)) return;
         UUID id = player.getUniqueId();
@@ -8886,8 +8935,8 @@ public final class ArcadePortManager implements Listener {
         int charge = session.dragonMarksmanCharge.getOrDefault(id, 0);
         if (charge > 0) {
             session.dragonMarksmanFiring.add(id);
-            session.dragonMarksmanNextChargeAt.put(id,
-                    System.currentTimeMillis() + ArcadePortRules.DRAGONS_BARRAGE_INTERVAL_MILLIS);
+            // PerkBarrage launches the first follow-up arrow on the next server tick.
+            session.dragonMarksmanNextChargeAt.put(id, System.currentTimeMillis());
         } else {
             session.dragonMarksmanCharge.remove(id);
             session.dragonMarksmanNextChargeAt.remove(id);
@@ -9390,7 +9439,8 @@ public final class ArcadePortManager implements Listener {
                 activateDragonFlare(session, player, System.currentTimeMillis());
                 return;
             }
-            if ("coward".equals(kit) && item == Material.IRON_AXE && event.getAction().isRightClick()) {
+            if ("coward".equals(kit) && item == Material.IRON_AXE && event.getAction().isRightClick()
+                    && !isDragonUsableBlock(event.getClickedBlock())) {
                 event.setCancelled(true);
                 useDragonsLeap(session, player, System.currentTimeMillis());
                 return;
@@ -9412,9 +9462,12 @@ public final class ArcadePortManager implements Listener {
                 player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.8F, 1.2F);
                 return;
             }
-            if ("marksman".equals(kit) && item == Material.BOW && event.getAction().isRightClick()) {
-                session.dragonMarksmanCharge.putIfAbsent(id, 0);
-                session.dragonMarksmanNextChargeAt.putIfAbsent(id,
+            if ("marksman".equals(kit) && item == Material.BOW && event.getAction().isRightClick()
+                    && !isDragonUsableBlock(event.getClickedBlock())
+                    && player.getInventory().contains(Material.ARROW)
+                    && !session.dragonMarksmanFiring.contains(id)) {
+                session.dragonMarksmanCharge.put(id, 0);
+                session.dragonMarksmanNextChargeAt.put(id,
                         System.currentTimeMillis() + ArcadePortRules.DRAGONS_BARRAGE_INITIAL_CHARGE_MILLIS);
                 return;
             }
