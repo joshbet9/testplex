@@ -41,6 +41,11 @@ final class PaintballRunnerParityRulesTest {
     }
 
     @Test
+    void paintballUsesTheTwentyMinuteRebornGameTimeout() {
+        assertEquals(1_200_000L, ArcadePortRules.PAINTBALL_GAME_TIMEOUT_MILLIS);
+    }
+
+    @Test
     void paintballSourceTrackerThresholdsAreExact() {
         assertFalse(ArcadePortRules.shouldAwardPaintballKillingSpree(3));
         assertTrue(ArcadePortRules.shouldAwardPaintballKillingSpree(4));
