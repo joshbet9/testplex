@@ -3226,18 +3226,30 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void applyMicroBattlesHit(Session session, Player attacker, Player target, String source) {
+    private void applyMicroBattlesHit(Session session, Player attacker, Player target, String source,
+            Vector projectileVelocity) {
         if (active != session || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
         boolean projectile = !"melee".equals(source);
-        boolean fighter = "fighter".equals(session.microKits.getOrDefault(target.getUniqueId(), "archer"));
-        double damage = ArcadePortRules.microBattlesDamageAfterIronSkin(
-                ArcadePortRules.microBattlesHitDamage(projectile), fighter);
+        double baseDamage;
         if (projectile) {
-            Vector push = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
-            if (push.lengthSquared() < 0.0001D) push = attacker.getLocation().getDirection();
-            target.setVelocity(push.normalize().multiply(1.6D).setY(0.35D));
+            Vector velocity = projectileVelocity == null ? null : projectileVelocity.clone();
+            if (velocity == null || !Double.isFinite(velocity.length())) {
+                velocity = new Vector(0.0D, 0.0D, 0.0D);
+            }
+            baseDamage = ArcadePortRules.microBattlesArrowDamage(velocity.length());
+            applyMicroBattlesArrowKnockback(target, attacker, baseDamage, velocity);
+        } else {
+            baseDamage = ArcadePortRules.microBattlesMeleeDamage(
+                    attacker.getInventory().getItemInMainHand().getType().name());
         }
+
+        boolean fighter = "fighter".equals(session.microKits.getOrDefault(target.getUniqueId(), "archer"));
+        double afterPerk = ArcadePortRules.microBattlesDamageAfterIronSkin(baseDamage, fighter);
+        var armourAttribute = target.getAttribute(Attribute.ARMOR);
+        double armourPoints = armourAttribute == null ? 0.0D : armourAttribute.getValue();
+        double damage = ArcadePortRules.microBattlesDamageAfterArmor(afterPerk, armourPoints);
+        if (damage <= 0.0D) return;
         if (target.getHealth() <= damage) {
             eliminate(session, target, attacker, "was eliminated in Micro Battles");
             return;
@@ -3246,6 +3258,35 @@ public final class ArcadePortManager implements Listener {
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
         target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0.0D, 1.0D, 0.0D),
                 5, 0.25D, 0.35D, 0.25D, 0.05D);
+    }
+
+    /** Mirrors DamageManager's projectile velocity calculation and Micro's 1.6 knockback modifier. */
+    private void applyMicroBattlesArrowKnockback(Player target, Player attacker, double damage, Vector arrowVelocity) {
+        double knockback = ArcadePortRules.microBattlesArrowKnockback(damage);
+        Vector trajectory = arrowVelocity == null ? new Vector(0.0D, 0.0D, 0.0D) : arrowVelocity.clone();
+        trajectory.setY(0.0D);
+        double horizontalLength = trajectory.length();
+        if (horizontalLength < 1.0E-6D) {
+            trajectory = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+            trajectory.setY(0.0D);
+            horizontalLength = trajectory.length();
+        }
+        if (horizontalLength < 1.0E-6D) {
+            trajectory = attacker.getLocation().getDirection().setY(0.0D);
+            horizontalLength = trajectory.length();
+        }
+        if (horizontalLength < 1.0E-6D) return;
+
+        trajectory.multiply(0.37D * knockback / horizontalLength);
+        trajectory.setY(0.06D);
+        double strength = 0.2D + trajectory.length() * 0.8D;
+        Vector velocity = trajectory.normalize().multiply(strength);
+        velocity.setY(velocity.getY() + Math.abs(0.2D * knockback));
+        double maxY = 0.4D + (0.04D * knockback);
+        if (velocity.getY() > maxY) velocity.setY(maxY);
+        if (target.isOnGround()) velocity.setY(velocity.getY() + 0.2D);
+        target.setFallDistance(0.0F);
+        target.setVelocity(velocity);
     }
 
     private void givePaintballKit(Session session, Player player, String kit) {
@@ -7216,10 +7257,15 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void handlePlayerHit(Session session, Player attacker, Player target, String source) {
-        handlePlayerHit(session, attacker, target, source, 1);
+        handlePlayerHit(session, attacker, target, source, 1, null);
     }
 
     private void handlePlayerHit(Session session, Player attacker, Player target, String source, int paintballAmount) {
+        handlePlayerHit(session, attacker, target, source, paintballAmount, null);
+    }
+
+    private void handlePlayerHit(Session session, Player attacker, Player target, String source,
+            int paintballAmount, Vector projectileVelocity) {
         if (active != session || attacker.equals(target) || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
         if (session.type == ArcadePortGame.EVOLUTION) {
@@ -7308,7 +7354,7 @@ public final class ArcadePortManager implements Listener {
                 applyPaintballHit(session, attacker, target, paintballAmount);
                 break;
             case MICRO_BATTLES:
-                applyMicroBattlesHit(session, attacker, target, source);
+                applyMicroBattlesHit(session, attacker, target, source, projectileVelocity);
                 break;
             case TURF_WARS: {
                 ItemStack heldWeapon = attacker.getInventory().getItemInMainHand();
@@ -7485,7 +7531,9 @@ public final class ArcadePortManager implements Listener {
                         "One arrow per shot; earn another with each kill."));
             }
         } else if (session.type == ArcadePortGame.MICRO_BATTLES) {
-            handlePlayerHit(session, shooter, target, "arrow hit");
+            Vector arrowVelocity = session.microArrowVelocities.remove(projectile.getUniqueId());
+            if (arrowVelocity == null) arrowVelocity = projectile.getVelocity().clone();
+            handlePlayerHit(session, shooter, target, "arrow hit", 1, arrowVelocity);
         } else {
             handlePlayerHit(session, shooter, target, "projectile hit");
         }
@@ -9225,6 +9273,11 @@ public final class ArcadePortManager implements Listener {
                         && projectile.getShooter() instanceof Player shooter
                         && session.players.containsKey(shooter.getUniqueId())) {
                     session.deathTagProjectileDamage.put(projectile.getUniqueId(), incomingDamage);
+                }
+                if (session.type == ArcadePortGame.MICRO_BATTLES && damager instanceof Arrow arrow
+                        && arrow.getShooter() instanceof Player shooter
+                        && session.alive.contains(shooter.getUniqueId())) {
+                    session.microArrowVelocities.put(arrow.getUniqueId(), arrow.getVelocity().clone());
                 }
                 if (session.type == ArcadePortGame.RUNNER && damager instanceof FallingBlock falling
                         && session.entities.contains(falling)) {
@@ -11727,6 +11780,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> microSpectateNextTeleportAt = new HashMap<>();
         final Map<UUID, Long> microNextArrowAt = new HashMap<>();
         final Set<UUID> microFletchedArrows = new HashSet<>();
+        final Map<UUID, Vector> microArrowVelocities = new HashMap<>();
         final Set<Block> microCrumbleBlocks = new HashSet<>();
         int microCrumbleMinX = -20, microCrumbleMaxX = 20, microCrumbleMinZ = -20, microCrumbleMaxZ = 20;
         int microCrumbleMinY, microCrumbleMaxY = 96, microCrumbleScanY;
