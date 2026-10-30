@@ -3585,6 +3585,7 @@ public final class ArcadePortManager implements Listener {
 
     private void updateTurfWars(Session session, long now) {
         if (active != session) return;
+        trackTurfWarsComeback(session);
         updateTurfWarsBarrages(session, now);
         if (session.ticks % 3 == 0) updateTurfWarsTerritory(session, now);
         if (active != session) return;
@@ -3617,6 +3618,15 @@ public final class ArcadePortManager implements Listener {
                 }
                 session.turfArrowNextAt.put(id,
                         now + ArcadePortRules.turfWarsArrowIntervalMillis(kit));
+            }
+        }
+    }
+
+    private void trackTurfWarsComeback(Session session) {
+        if (session == null || active != session || session.type != ArcadePortGame.TURF_WARS) return;
+        for (int team = 0; team < 2; team++) {
+            if (ArcadePortRules.turfWarsShouldTrackComeback(turfWarsRemainingLines(session, team))) {
+                session.turfTeamsBelowSixLines.add(team);
             }
         }
     }
@@ -9329,6 +9339,7 @@ public final class ArcadePortManager implements Listener {
                 session.turfBlueFront.add(session.turfAxisX * direction, 0.0D,
                         session.turfAxisZ * direction);
                 session.turfFrontlineX = session.turfRedFront.getBlockX();
+                trackTurfWarsComeback(session);
                 checkTurfWarsObjectiveEnd(session);
                 if (active != session) return;
             }
@@ -9352,6 +9363,7 @@ public final class ArcadePortManager implements Listener {
                     }
                 }
             }
+            trackTurfWarsComeback(session);
             checkTurfWarsObjectiveEnd(session);
             if (active != session) return;
         }
@@ -10031,12 +10043,19 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().set(path + "knockouts",
                         plugin.getConfig().getInt(path + "knockouts", 0) + 1);
             }
-            boolean won = winnerId != null && (winnerId.equals(id)
+            boolean turfWarsWinner = session.type == ArcadePortGame.TURF_WARS
+                    && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean won = winnerId != null && (winnerId.equals(id) || turfWarsWinner
                     || (session.type == ArcadePortGame.BOMB_LOBBERS && session.alive.contains(id)
                         && session.teams.getOrDefault(id, -2) == winningTeam));
             if (won) {
                 plugin.getConfig().set(path + "wins",
                         plugin.getConfig().getInt(path + "wins", 0) + 1);
+                if (session.type == ArcadePortGame.TURF_WARS
+                        && session.turfTeamsBelowSixLines.contains(winningTeam)) {
+                    plugin.getConfig().set(path + "the-comeback",
+                            plugin.getConfig().getInt(path + "the-comeback", 0) + 1);
+                }
             }
             if (session.type == ArcadePortGame.SPLEEF) {
                 plugin.getConfig().set(path + "blocks-broken",
@@ -10534,6 +10553,22 @@ public final class ArcadePortManager implements Listener {
                         (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
                         lore, "noop", null, null));
             }
+        } else if ("turf-wars".equals(gameId)) {
+            String[] statKeys = {"blocks-placed", "blocks-broken", "behind-enemy-lines",
+                    "the-shreddinator", "the-comeback"};
+            String[] statNames = {"Blocks Placed", "Blocks Broken", "Behind Enemy Lines",
+                    "The Shreddinator", "The Comeback"};
+            Material[] icons = {Material.RED_WOOL, Material.IRON_PICKAXE, Material.COMPASS,
+                    Material.ARROW, Material.GOLD_INGOT};
+            int[] statSlots = {10, 11, 12, 13, 14};
+            for (int i = 0; i < statKeys.length; i++) {
+                int value = plugin.getConfig().getInt(path + statKeys[i], 0);
+                inventory.setItem(statSlots[i], statsItem(value > 0 ? Material.EXPERIENCE_BOTTLE : icons[i],
+                        (value > 0 ? ChatColor.GREEN : ChatColor.GRAY) + statNames[i],
+                        List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: " + ChatColor.WHITE + value,
+                                ChatColor.DARK_GRAY + "Reborn Turf Wars stat tracker parity."),
+                        "noop", null, null));
+            }
         } else if ("runner".equals(gameId)) {
             String[] slugs = {"gettin-those-steps-in", "hop-to-it", "flash"};
             String[] names = {"Gettin’ those steps in!", "Hop to it", "Flash"};
@@ -10653,6 +10688,13 @@ public final class ArcadePortManager implements Listener {
         if ("spleef".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Blocks Broken: " + ChatColor.WHITE
                     + plugin.getConfig().getInt(path + "blocks-broken", 0));
+        }
+        if ("turf-wars".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Blocks Placed: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "blocks-placed", 0));
+            lore.add(ChatColor.GRAY + "Blocks Broken: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "blocks-broken", 0));
+            lore.add(ChatColor.GRAY + "Behind Enemy Lines: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "behind-enemy-lines", 0));
+            lore.add(ChatColor.GRAY + "The Shreddinator: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "the-shreddinator", 0));
+            lore.add(ChatColor.GRAY + "The Comeback: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "the-comeback", 0));
         }
         if ("death-tag".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Deaths: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "deaths", 0));
@@ -12153,12 +12195,11 @@ public final class ArcadePortManager implements Listener {
                 wool.setType(Material.AIR, false);
                 if (turfArrow.getShooter() instanceof Player shooter) {
                     shooter.playSound(shooter.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 0.7F, 1.5F);
-                    String base = "local-stats." + shooter.getUniqueId() + ".turf-wars.";
-                    plugin.getConfig().set(base + "blocks-broken",
-                            plugin.getConfig().getInt(base + "blocks-broken", 0) + 1);
                     if ("shredder".equals(session.turfWarsKits.getOrDefault(shooter.getUniqueId(), "marksman"))) {
-                        plugin.getConfig().set(base + "blocks-shredded",
-                                plugin.getConfig().getInt(base + "blocks-shredded", 0) + 1);
+                        String shredderStat = "local-stats." + shooter.getUniqueId()
+                                + ".turf-wars.the-shreddinator";
+                        plugin.getConfig().set(shredderStat,
+                                plugin.getConfig().getInt(shredderStat, 0) + 1);
                     }
                 }
                 session.world.playEffect(wool.getLocation(), Effect.STEP_SOUND, woolType);
@@ -14881,6 +14922,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> spleefLastHungerGainAt = new HashMap<>();
         final Map<UUID, Long> spleefNextArrowAt = new HashMap<>();
         final Map<UUID, String> turfWarsKits = new HashMap<>();
+        final Set<Integer> turfTeamsBelowSixLines = new HashSet<>();
         final Map<Integer, Location> turfTeamSpawnCentres = new HashMap<>();
         final Map<UUID, Long> turfConstructorNextAt = new HashMap<>();
         final Map<UUID, Long> turfKnockbackNextAt = new HashMap<>();
