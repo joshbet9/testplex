@@ -5097,21 +5097,34 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         session.ticks++;
         updateSourceWaterDamage(session, now);
+        boolean sheepQuestUpdatedBeforeTimeout = false;
         if (session.endsAt > 0L && now >= session.endsAt) {
-            if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
+            if (session.type == ArcadePortGame.SHEEP_QUEST) {
+                updateSheepQuest(session, now);
+                updateSheepQuestKits(session, now);
+                sheepQuestUpdatedBeforeTimeout = true;
+                Player leader = sheepQuestLeader(session);
+                if (leader != null) {
+                    finish(session, leader, true);
+                    return;
+                }
+                session.sheepQuestOvertime = true;
+                session.endsAt = 0L;
+                session.sheepQuestNextOvertimeAnnouncementAt =
+                        now + ArcadePortRules.SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS;
+                announce(session, ChatColor.GOLD + "" + ChatColor.BOLD
+                        + "First team to take the lead will win the game!");
+            } else if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
                 // Apply any chaser promotions due on the final timer tick before checking placements.
                 updateDeathTagChasers(session, now);
                 if (active != session) return;
                 checkRoundEnd(session);
                 if (active != session) return;
             }
-            if (session.type == ArcadePortGame.SHEEP_QUEST) {
-                // Most sheep in the pen at five minutes wins. A tied result is a draw, not overtime.
-                finish(session, sheepQuestLeader(session), true);
-            } else {
+            if (session.type != ArcadePortGame.SHEEP_QUEST) {
                 finish(session, timeoutWinner(session), true);
+                return;
             }
-            return;
         }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.DRAW_MY_THING) updateDrawMyThing(session, now);
@@ -5163,10 +5176,27 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (session.type == ArcadePortGame.SHEEP_QUEST) {
-            updateSheepQuest(session);
-            if (now >= lastSheepSpawn && session.sheep.size() < 12) {
+            if (!sheepQuestUpdatedBeforeTimeout) {
+                updateSheepQuest(session, now);
+                updateSheepQuestKits(session, now);
+            }
+            if (now >= session.sheepNextSpawnAt) {
+                // Reborn has no twelve-sheep cap; another neutral sheep appears every twenty seconds.
                 spawnSheep(session);
-                lastSheepSpawn = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
+                session.sheepNextSpawnAt = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
+            }
+            if (session.sheepQuestOvertime) {
+                Player leader = sheepQuestLeader(session);
+                if (leader != null) {
+                    finish(session, leader, true);
+                    return;
+                }
+                if (now >= session.sheepQuestNextOvertimeAnnouncementAt) {
+                    announce(session, ChatColor.GOLD + "" + ChatColor.BOLD
+                            + "First team to take the lead will win the game!");
+                    session.sheepQuestNextOvertimeAnnouncementAt =
+                            now + ArcadePortRules.SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS;
+                }
             }
         }
 
@@ -8839,7 +8869,8 @@ public final class ArcadePortManager implements Listener {
             String timeText = session.type == ArcadePortGame.DRAGON_ESCAPE
                     ? String.format(java.util.Locale.ROOT, "%.1fs",
                             Math.max(0L, now - session.startedAt) / 1_000.0D)
-                    : session.endsAt > 0L ? seconds + "s" : "survive";
+                    : session.type == ArcadePortGame.SHEEP_QUEST && session.sheepQuestOvertime
+                            ? "OVERTIME" : session.endsAt > 0L ? seconds + "s" : "survive";
             if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
                 String pbDelta = dragonEscapePbDeltaText(session, p, now);
                 if (!pbDelta.isEmpty()) specific += (specific.isEmpty() ? "" : ChatColor.DARK_GRAY + " | ") + pbDelta;
@@ -8970,6 +9001,24 @@ public final class ArcadePortManager implements Listener {
         // Dragon Escape is a course race: one surviving racer is not a round winner.
         // Keep solo practice and last-runner attempts live until the finish is reached.
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) return;
+        if (session.type == ArcadePortGame.SHEEP_QUEST && session.participantsAtStart > 1) {
+            Set<Integer> remainingTeams = new HashSet<>();
+            for (UUID id : session.alive) remainingTeams.add(session.teams.getOrDefault(id, -1));
+            for (UUID id : session.respawning) remainingTeams.add(session.teams.getOrDefault(id, -1));
+            if (remainingTeams.size() <= 1) {
+                int winnerTeam = remainingTeams.stream().findFirst().orElse(-1);
+                Player winner = winnerTeam < 0 ? null : session.players.values().stream()
+                        .filter(p -> p != null && p.isOnline()
+                                && session.teams.getOrDefault(p.getUniqueId(), -2) == winnerTeam
+                                && (session.alive.contains(p.getUniqueId())
+                                        || session.respawning.contains(p.getUniqueId())))
+                        .max(java.util.Comparator.comparingInt(p ->
+                                session.scores.getOrDefault(p.getUniqueId(), 0)))
+                        .orElse(null);
+                finish(session, winner, true);
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.GLADIATORS) {
             if (session.participantsAtStart > 1) progressGladiators(session);
             // Solo practice remains live until the operator stops it; it is not a tournament win.
@@ -9112,7 +9161,7 @@ public final class ArcadePortManager implements Listener {
                         || !session.players.containsKey(playerId) || !session.respawning.remove(playerId)) return;
                 Location spawn = teamSpawnFor(session, player, 4);
                 player.teleport(spawn);
-                player.setGameMode(GameMode.SURVIVAL);
+                player.setGameMode(GameMode.ADVENTURE);
                 player.setHealth(player.getMaxHealth());
                 player.setFoodLevel(20);
                 player.setSaturation(20.0F);
@@ -9120,7 +9169,9 @@ public final class ArcadePortManager implements Listener {
                 session.alive.add(playerId);
                 session.lastLocations.put(playerId, spawn.clone());
                 giveKit(session, player);
+                checkRoundEnd(session);
             }, 120L);
+            checkRoundEnd(session);
             return;
         }
         if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1
@@ -9759,7 +9810,12 @@ public final class ArcadePortManager implements Listener {
                 break;
             }
             case SHEEP_QUEST:
-                // Hits drop a carrier's stack and still deal damage, as in the original TeamGame.
+                // Rescuing a carrier drops the opposing team's sheep stack.
+                if (attacker != null && sheepCarriedBy(session, target.getUniqueId()) > 0
+                        && session.teams.getOrDefault(attacker.getUniqueId(), -1)
+                                != session.teams.getOrDefault(target.getUniqueId(), -2)) {
+                    recordSheepQuestStat(attacker.getUniqueId(), "animal-rescue");
+                }
                 dropSheepFromCarrier(session, target, "was hit");
                 double sheepQuestDamage = ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE;
                 if (target.getHealth() <= sheepQuestDamage) {
@@ -10056,6 +10112,9 @@ public final class ArcadePortManager implements Listener {
         if (announceWinner && session.type == ArcadePortGame.GLADIATORS && winner != null) {
             recordGladiatorsWinnerAchievements(session, winner);
         }
+        if (announceWinner && session.type == ArcadePortGame.SHEEP_QUEST) {
+            recordSheepQuestRewards(session, winner);
+        }
         active = null;
         if (session.tickTask != null) session.tickTask.cancel();
         if (announceWinner && session.type == ArcadePortGame.BACON_BRAWL && winner != null) {
@@ -10066,6 +10125,8 @@ public final class ArcadePortManager implements Listener {
                 int winnerTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
                 announce(session, sheepTeamChatColor(winnerTeam) + sheepTeamName(winnerTeam)
                         + ChatColor.GOLD + " team won Sheep Quest!");
+            } else if (session.type == ArcadePortGame.SHEEP_QUEST) {
+                announce(session, ChatColor.YELLOW + "Sheep Quest ended with no winning team.");
             } else if (session.type == ArcadePortGame.BACON_BRAWL) {
                 if (winner != null) {
                     int kills = session.scores.getOrDefault(winner.getUniqueId(), 0);
@@ -10172,6 +10233,13 @@ public final class ArcadePortManager implements Listener {
         session.sheep.clear();
         session.sheepOwners.clear();
         session.sheepCarriers.clear();
+        session.sheepHolders.clear();
+        session.sheepHomes.clear();
+        session.sheepThrownBy.clear();
+        session.sheepThrownAt.clear();
+        session.sheepArcherTrackedArrows.clear();
+        session.sheepArcherCharge.clear();
+        session.sheepArcherVolleyRemaining.clear();
         session.entities.clear();
         session.baconBabyPigs.clear();
         session.baconBlastItems.clear();
