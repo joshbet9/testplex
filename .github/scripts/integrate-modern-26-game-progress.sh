@@ -119,6 +119,94 @@ if "newlyIntegratedGamesRemainInProgressUntilAcceptance" not in test:
     test = test.replace(marker, addition + marker, 1)
 test_path.write_text(test)
 
+# The mechanics enum contains the 20 existing host-managed games plus the
+# three newly integrated SkyWars/Milk/Wither variants. Snake remains separate.
+port_test_path = Path("modern-platform/arcade-games-port/src/test/java/au/com/testplex/arcadeports/ArcadePortGameTest.java")
+port_test = port_test_path.read_text()
+port_test = port_test.replace(
+    "exposesTheTwentyMechanicsGamesAndIntegratedMonsterMazeModule",
+    "exposesTheTwentyThreeMechanicsGamesAndIntegratedMonsterMazeModule"
+)
+port_test = port_test.replace("assertEquals(20, ArcadePortGame.values().length)",
+                              "assertEquals(23, ArcadePortGame.values().length)")
+enum_anchor = '        assertEquals(ArcadePortGame.SNEAKY_ASSASSINS, ArcadePortGame.fromId("sneaky-assassins"));'
+enum_additions_test = '''
+        assertEquals(ArcadePortGame.SKY_WARS, ArcadePortGame.fromId("skywars"));
+        assertEquals(ArcadePortGame.MILK_THE_COW, ArcadePortGame.fromId("milk-the-cow"));
+        assertEquals(ArcadePortGame.WITHER_ASSAULT, ArcadePortGame.fromId("wither-assault"));'''
+if "ArcadePortGame.SKY_WARS, ArcadePortGame.fromId" not in port_test:
+    if enum_anchor not in port_test:
+        raise SystemExit("Could not locate game enum assertion anchor.")
+    port_test = port_test.replace(enum_anchor, enum_anchor + enum_additions_test, 1)
+
+old_map_name = "originalMapCatalogEmbedsThirteenSourceWorldsAndLeavesEvolutionExplicitlyUnmapped"
+port_test = port_test.replace(old_map_name,
+                              "originalMapCatalogEmbedsEighteenSourceWorldFoldersAndLeavesUnmappedGamesExplicitlyUnmapped")
+map_anchor = "        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BACON_BRAWL));"
+map_additions_test = """        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.CASTLE_ASSAULT));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.HEROES_OF_GWEN));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAW_MY_THING));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SKY_WARS));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MILK_THE_COW));
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.WITHER_ASSAULT).isEmpty());
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS).isEmpty());"""
+if "hasMap(ArcadePortGame.SKY_WARS)" not in port_test:
+    if map_anchor not in port_test:
+        raise SystemExit("Could not locate source map catalogue assertion anchor.")
+    port_test = port_test.replace(map_anchor, map_anchor + "\n" + map_additions_test, 1)
+port_test_path.write_text(port_test)
+
+# Restore the union of previously supported legacy map folders while adding
+# the two new archive-backed game maps. Keep Evolution, Master Builders and
+# Wither Assault unmapped instead of inventing source maps for them.
+map_path = Path("modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/SourceMapCatalog.java")
+map_source = map_path.read_text()
+map_method = map_source.find("static List<String> mapFoldersFor(ArcadePortGame game)")
+map_switch_start = map_source.find("        return switch (game) {", map_method)
+map_switch_end = map_source.find("        };", map_switch_start)
+if map_method < 0 or map_switch_start < 0 or map_switch_end < 0:
+    raise SystemExit("Could not locate SourceMapCatalog.mapFoldersFor switch.")
+map_switch_end += len("        };")
+map_switch = """        return switch (game) {
+            case BACON_BRAWL -> List.of("Bacon Brawl");
+            case CASTLE_ASSAULT -> List.of("Castle Assault");
+            case BOMB_LOBBERS -> List.of("Bomb Lobbers");
+            case DEATH_TAG -> List.of("Death Tag");
+            case DRAGON_ESCAPE -> List.of("Dragon Escape");
+            case DRAGONS -> List.of("Dragons");
+            case EVOLUTION -> List.of();
+            case GLADIATORS -> List.of("Gladiators");
+            case HEROES_OF_GWEN -> List.of("Heroes of GWEN");
+            case MICRO_BATTLES -> List.of("Micro Battle");
+            case ONE_IN_THE_QUIVER -> List.of("One in the Quiver");
+            case PAINTBALL -> List.of("Paintball", "Super Paintball");
+            case RUNNER -> List.of("Runner");
+            case SHEEP_QUEST -> List.of("Sheep Quest");
+            case SPLEEF -> List.of("Speef", "Super Spleef");
+            case TURF_WARS -> List.of("Turf Wars");
+            case DRAW_MY_THING -> List.of("Draw My Thing");
+            case MASTER_BUILDERS -> List.of();
+            case SKY_WARS -> List.of("Skywars");
+            case MILK_THE_COW -> List.of("Milk the Cow");
+            case WITHER_ASSAULT -> List.of();
+            default -> List.of();
+        };"""
+map_source = map_source[:map_switch_start] + map_switch + map_source[map_switch_end:]
+resource_method = map_source.find("static String resourceFor(ArcadePortGame game)")
+resource_switch_end = map_source.find("        };", map_source.find("        return switch (game) {", resource_method))
+resource_insert = '            case TURF_WARS -> "maps/turf-wars.zip";'
+if resource_method < 0 or resource_switch_end < 0:
+    raise SystemExit("Could not locate SourceMapCatalog.resourceFor switch.")
+resource_switch = map_source[map_source.find("        return switch (game) {", resource_method):resource_switch_end]
+if 'case MILK_THE_COW -> "maps/milk-the-cow.zip";' not in resource_switch:
+    if resource_insert not in resource_switch:
+        raise SystemExit("Could not locate default map resource insertion point.")
+    resource_switch = resource_switch.replace(resource_insert,
+        resource_insert + '\n            case MILK_THE_COW -> "maps/milk-the-cow.zip";', 1)
+    map_source = (map_source[:map_source.find("        return switch (game) {", resource_method)]
+                  + resource_switch + map_source[resource_switch_end:])
+map_path.write_text(map_source)
+
 config_path = Path("modern-platform/arcade-games-port/src/main/resources/config.yml")
 config = config_path.read_text()
 config = config.replace("# All 21 catalogue games and their mechanics are packaged in ArcadeMechanicsModern.jar.",
