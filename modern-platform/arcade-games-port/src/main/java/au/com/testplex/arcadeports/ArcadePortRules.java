@@ -1152,6 +1152,10 @@ public final class ArcadePortRules {
                 Math.max(0, killsSinceLastEvolution) + 1);
     }
 
+    public static boolean canUseEvolutionCreeperCharge(int stage, boolean leftClick, boolean holdingTnt) {
+        return stage == 2 && leftClick && holdingTnt;
+    }
+
     public static boolean evolutionOverkillRequirementMet(int killsBeforeEvolution) {
         return killsBeforeEvolution >= EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION;
     }
