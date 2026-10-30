@@ -655,6 +655,9 @@ public final class SnakeGameManager implements Listener {
                     previous, last.getLocation().toVector(), state.player.getLocation().getDirection());
             loc.add(extension.multiply(SEGMENT_SPACING));
             Sheep body = spawnSegment(loc, state.color);
+            // Reborn calls UtilEnt.ghost(tail, true, false) for appended segments:
+            // keep them visible, but remove their entity collision. The initial head remains collidable.
+            body.setCollidable(false);
             state.segments.add(body);
             Bukkit.getPluginManager().callEvent(new TailGrowEvent(state.player, state.segments.size()));
             if (state.segments.size() > state.maxTailLength) {
