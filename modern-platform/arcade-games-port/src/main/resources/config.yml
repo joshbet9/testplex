@@ -1,5 +1,5 @@
 # Isolated manual-acceptance candidates. Availability does not itself certify 100% in-game parity.
-# Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball and Runner are available as live-acceptance candidates.
+# Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball, Runner and Spleef are available as live-acceptance candidates.
 # Candidate availability is not a claim of complete live parity certification.
 enabled-games:
   - bacon-brawl
@@ -9,6 +9,7 @@ enabled-games:
   - paintball
   - runner
   - gladiators
+  - spleef
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
