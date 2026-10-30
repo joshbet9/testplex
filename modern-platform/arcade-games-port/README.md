@@ -68,3 +68,5 @@ Death Tag also tracks the legacy ComeAtMeBro stat locally: every Chaser defeat f
 Death Tag Runner trails now read the legacy `cosmetics.yml` choices: all 16 stained-glass colours and the Classic, Soul, Sparks, Smoke, Ender and Hearts styles (defaulting to white/classic). Source-default restrictions are also mirrored: ground pickups, block inventories and crafting-grid clicks are disabled; runner conversions preserve their death location.
 
 The Runner Speed I threshold is a one-way unlock: once the live Chaser-to-player ratio first rises strictly above 25%, Runners retain Speed I for the rest of the round, even if a later disconnect changes the ratio.
+
+The isolated Death Tag stats page now records lifetime local Kills, Deaths and K/D Ratio, alongside Come At Me Bro. Runner-to-Chaser conversions count as deaths; each time a Chaser is defeated and respawns also counts as a death. These counters remain local to Testplex and do not update production stats.
