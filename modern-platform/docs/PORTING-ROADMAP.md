@@ -16,7 +16,17 @@
 - `SnakeModern.jar`: independent mechanics-first port with its own test arena, sheep tails, slime food, kits, magma-cube item boxes and steering roulette.
 - `ArcadeMechanicsModern.jar`: first-pass, distinct mechanical loops for the other 14 games; separate generated arena per game. These are prototypes for rapid compatibility testing, not source-parity sign-off.
 - All 16 entries remain marked MECHANICS_IN_PROGRESS; passing CI means compile/unit tests only, not that player experience has been accepted in-game.
-- New cosmetic lines and unique win scenes are still deferred.
+- New cosmetic lines are being added game-by-game; Micro Battles now has personal middle-glass and shared border-particle colour lines. Unique win scenes for the remaining games are still deferred.
+
+## Micro Battles parity checkpoint
+
+The modern port now mirrors these source behaviours at code level: Archer / Worker / Fighter loadouts; the 10-second starting glass barrier; the four-second own-island restriction; team-coloured, protected armour and slot-8 team badge; map crumble; hunger floor; team-safe damage and projectile knockback; block growth/flow prevention; sword-drop protection while allowing other ordinary drops; spectator tracking compass with opposing-team filtering, menu selection and the three-second teleport cooldown; four-team timeout standings (surviving team count first, team kills as the tiebreak, draw on an exact tie); and the eight-kill Annihilation milestone in local test stats.
+
+Micro Battles cosmetics are now separately configurable in player preferences:
+- **Middle Glass Colour** changes the starting glass only for the owning player, using per-viewer block updates. Other players retain the normal map glass.
+- **Border Particle Colour** colours a vertical dust cue that is broadcast to nearby viewers. It appears for living players within three blocks of the nearest world-border face, at three heights, every four ticks. It is not tied to the temporary starting glass, so it remains available after that barrier is removed.
+
+Still not production-parity sign-off: the Mineplex MICRO_LAST_TWO mission backend and the legacy KillsWithinGameStatTracker / ChatStats integrations are not connected to the isolated modern server. The Annihilation bottle is a local test-server equivalent only. Four-team match flow, cosmetics, reconnect/cleanup and multi-client visibility still require live-server acceptance; this game remains MECHANICS_IN_PROGRESS.
 
 ## In-game acceptance
 
