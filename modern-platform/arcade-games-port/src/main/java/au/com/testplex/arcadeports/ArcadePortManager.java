@@ -200,6 +200,9 @@ public final class ArcadePortManager implements Listener {
         double timingMultiplier = previousHit > 0L
                 ? ArcadePortRules.baconTimedHitKnockbackMultiplier(now - previousHit) : 1.0D;
         session.baconLastSwingAt.put(id, now);
+        if (timingMultiplier >= 1.5D) {
+            session.baconHitFeedbackUntil.put(id, now + ArcadePortRules.BACON_HIT_FEEDBACK_MILLIS);
+        }
         int meter = ArcadePortRules.nextBaconMeter(session.baconMeters.getOrDefault(id, 0), rawDamage);
         session.baconMeters.put(id, meter);
         updateBaconMeterItem(session, attacker);
@@ -2982,7 +2985,7 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(player.getUniqueId())) return;
         int percent = Math.max(0, Math.min(ArcadePortRules.BACON_METER_MAX,
                 session.baconMeters.getOrDefault(player.getUniqueId(), 0)));
-        float progress = percent / (float) ArcadePortRules.BACON_METER_MAX;
+        float progress = Math.min(0.999F, percent / (float) ArcadePortRules.BACON_METER_MAX);
         if (Math.abs(player.getExp() - progress) > 0.001F) player.setExp(progress);
         if (player.getLevel() != percent) player.setLevel(percent);
 
