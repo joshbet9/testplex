@@ -87,6 +87,108 @@ if 'register(game("skywars"' not in catalog:
 catalog_path.write_text(catalog)
 
 
+
+
+test_path = Path("modern-platform/src/test/java/au/com/testplex/modern/model/ArcadeCatalogTest.java")
+test = test_path.read_text()
+test = test.replace("registersAllTwentyOneArcadeGames", "registersAllTwentyFourArcadeGames")
+test = test.replace("assertEquals(21, catalog.size())", "assertEquals(24, catalog.size())")
+test = test.replace(
+    "assertEquals(21, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size())",
+    "assertEquals(24, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size())"
+)
+test = test.replace('"heroes-of-gwen").contains(game.getId())',
+                    '"heroes-of-gwen", "milk-the-cow", "wither-assault").contains(game.getId())')
+test = test.replace("assertEquals(19, inProgress)", "assertEquals(22, inProgress)")
+marker = "    @Test\n    void allGameLookupsAreCaseInsensitive()"
+addition = '''    @Test
+    void newlyIntegratedGamesRemainInProgressUntilAcceptance() {
+        ArcadeCatalog catalog = new ArcadeCatalog();
+        for (String id : List.of("skywars", "milk-the-cow", "wither-assault")) {
+            GameDefinition game = catalog.getGame(id);
+            assertNotNull(game, id);
+            assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus(), id);
+            assertFalse(game.isReadyForTest(), id);
+        }
+    }
+
+'''
+if "newlyIntegratedGamesRemainInProgressUntilAcceptance" not in test:
+    if marker not in test:
+        raise SystemExit("Could not find the ArcadeCatalogTest insertion point.")
+    test = test.replace(marker, addition + marker, 1)
+test_path.write_text(test)
+
+config_path = Path("modern-platform/arcade-games-port/src/main/resources/config.yml")
+config = config_path.read_text()
+config = config.replace("# All 21 catalogue games and their mechanics are packaged in ArcadeMechanicsModern.jar.",
+                        "# The 24 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.")
+config = config.replace("# Only games marked READY_FOR_TEST in ArcadeCatalog may be started in the isolated server.",
+                        "# Only games formally marked READY_FOR_TEST may be started in the isolated server.")
+config = config.replace("# The other 19 ports remain installed but unavailable until their parity/acceptance gate is cleared.",
+                        "# The other 22 catalogue entries remain disabled until their parity/acceptance gate is cleared.")
+config_path.write_text(config)
+
+build_path = Path(".github/workflows/testplex-modern-build.yml")
+build = build_path.read_text()
+build = build.replace("21 Arcade catalogue games are packaged", "24 shared Arcade catalogue entries are packaged")
+build = build.replace(
+    "21 Arcade catalogue entries plus the resource-packless Wizards prototype are packaged;",
+    "24 Arcade catalogue entries plus the separate Wizards module are built; Speed Builders Arcade remains planned;"
+)
+build_path.write_text(build)
+
+roadmap_path = Path("modern-platform/docs/PORTING-ROADMAP.md")
+roadmap = roadmap_path.read_text() if roadmap_path.exists() else "# Testplex Modern porting roadmap\n"
+section = """
+## Complete 26-game programme register (31 October 2026)
+
+The overall programme tracks 26 titles/variants: **24 shared Arcade catalogue games**, the separately packaged **Wizards** module, and the planned **Speed Builders Arcade** variant. Speed Builders currently has no implementation branch or runtime code; it is tracked as planned work rather than represented by a non-functional placeholder.
+
+| # | Game | Current implementation state | Test access |
+|---:|---|---|---|
+| 1 | Bacon Brawl | Mechanics in progress | Disabled |
+| 2 | Bomb Lobbers | Mechanics in progress | Disabled |
+| 3 | Death Tag | Acceptance-ready | Enabled |
+| 4 | Dragon Escape | Mechanics in progress | Disabled |
+| 5 | Dragons (Solo) | Mechanics in progress | Disabled |
+| 6 | Evolution | Mechanics in progress | Disabled |
+| 7 | Gladiators | Mechanics implemented; runtime acceptance still required | Disabled |
+| 8 | Micro Battles | Mechanics in progress | Disabled |
+| 9 | Monster Maze | Embedded in Testplex Arcade lifecycle; mechanics in progress | Disabled |
+| 10 | One in the Quiver | Acceptance-ready | Enabled |
+| 11 | Paintball | Mechanics in progress | Disabled |
+| 12 | Runner | Mechanics in progress | Disabled |
+| 13 | Sheep Quest | Mechanics in progress | Disabled |
+| 14 | Snake | Separate modern module; mechanics in progress | Disabled |
+| 15 | Spleef | Mechanics in progress | Disabled |
+| 16 | Turf Wars | Mechanics in progress | Disabled |
+| 17 | Draw My Thing | Mechanics in progress; large-lobby turn scaling present | Disabled |
+| 18 | Master Builders | Mechanics in progress; plot/review work present | Disabled |
+| 19 | Castle Assault | Mechanics in progress | Disabled |
+| 20 | Heroes of Gwen | Mechanics in progress | Disabled |
+| 21 | Sneaky Assassins | Mechanics in progress; no archived source map | Disabled |
+| 22 | SkyWars Mixed | Mechanics-first 16-player port integrated | Disabled |
+| 23 | Milk the Cow | Mechanics-first port integrated | Disabled |
+| 24 | Wither Assault | Mechanics-first port integrated; generated test arena | Disabled |
+| 25 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
+| 26 | Speed Builders Arcade | Planned; implementation not started | Not available |
+
+**Readiness rule:** only Death Tag and One in the Quiver are in the READY_FOR_TEST allow-list and enabled-games config. Catalogue presence and successful compilation do not automatically make a game available. Every other title remains disabled until source parity and isolated multi-client acceptance are completed.
+"""
+if "Complete 26-game programme register" not in roadmap:
+    roadmap_path.write_text(roadmap.rstrip() + "\n\n" + section.strip() + "\n")
+
+modern_readme = Path("modern-platform/README.md")
+if modern_readme.exists():
+    readme = modern_readme.read_text()
+    if "Complete 26-game programme register" not in readme:
+        modern_readme.write_text(readme.rstrip() + "\n\n" + section.strip() + "\n")
+
+print("Updated shared Arcade catalogue, readiness tests and 26-game register.")
+PY
+
+
 # Git's -X ours merge deliberately kept the newer platform manager around conflicting
 # regions. Re-introduce only the missing SkyWars declarations from the feature branch,
 # retaining the rest of the newer manager.
@@ -262,105 +364,6 @@ source = source[:update_start] + update + source[update_end:]
 
 path.write_text(source)
 print("Reconciled SkyWars helper declarations, spawn placement, shared queue, and Sheep Quest holder cleanup.")
-PY
-
-test_path = Path("modern-platform/src/test/java/au/com/testplex/modern/model/ArcadeCatalogTest.java")
-test = test_path.read_text()
-test = test.replace("registersAllTwentyOneArcadeGames", "registersAllTwentyFourArcadeGames")
-test = test.replace("assertEquals(21, catalog.size())", "assertEquals(24, catalog.size())")
-test = test.replace(
-    "assertEquals(21, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size())",
-    "assertEquals(24, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size())"
-)
-test = test.replace('"heroes-of-gwen").contains(game.getId())',
-                    '"heroes-of-gwen", "milk-the-cow", "wither-assault").contains(game.getId())')
-test = test.replace("assertEquals(19, inProgress)", "assertEquals(22, inProgress)")
-marker = "    @Test\n    void allGameLookupsAreCaseInsensitive()"
-addition = '''    @Test
-    void newlyIntegratedGamesRemainInProgressUntilAcceptance() {
-        ArcadeCatalog catalog = new ArcadeCatalog();
-        for (String id : List.of("skywars", "milk-the-cow", "wither-assault")) {
-            GameDefinition game = catalog.getGame(id);
-            assertNotNull(game, id);
-            assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus(), id);
-            assertFalse(game.isReadyForTest(), id);
-        }
-    }
-
-'''
-if "newlyIntegratedGamesRemainInProgressUntilAcceptance" not in test:
-    if marker not in test:
-        raise SystemExit("Could not find the ArcadeCatalogTest insertion point.")
-    test = test.replace(marker, addition + marker, 1)
-test_path.write_text(test)
-
-config_path = Path("modern-platform/arcade-games-port/src/main/resources/config.yml")
-config = config_path.read_text()
-config = config.replace("# All 21 catalogue games and their mechanics are packaged in ArcadeMechanicsModern.jar.",
-                        "# The 24 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.")
-config = config.replace("# Only games marked READY_FOR_TEST in ArcadeCatalog may be started in the isolated server.",
-                        "# Only games formally marked READY_FOR_TEST may be started in the isolated server.")
-config = config.replace("# The other 19 ports remain installed but unavailable until their parity/acceptance gate is cleared.",
-                        "# The other 22 catalogue entries remain disabled until their parity/acceptance gate is cleared.")
-config_path.write_text(config)
-
-build_path = Path(".github/workflows/testplex-modern-build.yml")
-build = build_path.read_text()
-build = build.replace("21 Arcade catalogue games are packaged", "24 shared Arcade catalogue entries are packaged")
-build = build.replace(
-    "21 Arcade catalogue entries plus the resource-packless Wizards prototype are packaged;",
-    "24 Arcade catalogue entries plus the separate Wizards module are built; Speed Builders Arcade remains planned;"
-)
-build_path.write_text(build)
-
-roadmap_path = Path("modern-platform/docs/PORTING-ROADMAP.md")
-roadmap = roadmap_path.read_text() if roadmap_path.exists() else "# Testplex Modern porting roadmap\n"
-section = """
-## Complete 26-game programme register (31 October 2026)
-
-The overall programme tracks 26 titles/variants: **24 shared Arcade catalogue games**, the separately packaged **Wizards** module, and the planned **Speed Builders Arcade** variant. Speed Builders currently has no implementation branch or runtime code; it is tracked as planned work rather than represented by a non-functional placeholder.
-
-| # | Game | Current implementation state | Test access |
-|---:|---|---|---|
-| 1 | Bacon Brawl | Mechanics in progress | Disabled |
-| 2 | Bomb Lobbers | Mechanics in progress | Disabled |
-| 3 | Death Tag | Acceptance-ready | Enabled |
-| 4 | Dragon Escape | Mechanics in progress | Disabled |
-| 5 | Dragons (Solo) | Mechanics in progress | Disabled |
-| 6 | Evolution | Mechanics in progress | Disabled |
-| 7 | Gladiators | Mechanics implemented; runtime acceptance still required | Disabled |
-| 8 | Micro Battles | Mechanics in progress | Disabled |
-| 9 | Monster Maze | Embedded in Testplex Arcade lifecycle; mechanics in progress | Disabled |
-| 10 | One in the Quiver | Acceptance-ready | Enabled |
-| 11 | Paintball | Mechanics in progress | Disabled |
-| 12 | Runner | Mechanics in progress | Disabled |
-| 13 | Sheep Quest | Mechanics in progress | Disabled |
-| 14 | Snake | Separate modern module; mechanics in progress | Disabled |
-| 15 | Spleef | Mechanics in progress | Disabled |
-| 16 | Turf Wars | Mechanics in progress | Disabled |
-| 17 | Draw My Thing | Mechanics in progress; large-lobby turn scaling present | Disabled |
-| 18 | Master Builders | Mechanics in progress; plot/review work present | Disabled |
-| 19 | Castle Assault | Mechanics in progress | Disabled |
-| 20 | Heroes of Gwen | Mechanics in progress | Disabled |
-| 21 | Sneaky Assassins | Mechanics in progress; no archived source map | Disabled |
-| 22 | SkyWars Mixed | Mechanics-first 16-player port integrated | Disabled |
-| 23 | Milk the Cow | Mechanics-first port integrated | Disabled |
-| 24 | Wither Assault | Mechanics-first port integrated; generated test arena | Disabled |
-| 25 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
-| 26 | Speed Builders Arcade | Planned; implementation not started | Not available |
-
-**Readiness rule:** only Death Tag and One in the Quiver are in the READY_FOR_TEST allow-list and enabled-games config. Catalogue presence and successful compilation do not automatically make a game available. Every other title remains disabled until source parity and isolated multi-client acceptance are completed.
-"""
-if "Complete 26-game programme register" not in roadmap:
-    roadmap_path.write_text(roadmap.rstrip() + "\n\n" + section.strip() + "\n")
-
-modern_readme = Path("modern-platform/README.md")
-if modern_readme.exists():
-    readme = modern_readme.read_text()
-    if "Complete 26-game programme register" not in readme:
-        modern_readme.write_text(readme.rstrip() + "\n\n" + section.strip() + "\n")
-
-print("Updated shared Arcade catalogue, readiness tests and 26-game register.")
 PY
 
 python3 - <<'PY'
