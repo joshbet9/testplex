@@ -39,6 +39,7 @@ jobs:
             modern-platform/monster-maze-port/pom.xml
             modern-platform/snake-port/pom.xml
             modern-platform/arcade-games-port/pom.xml
+            modern-platform/wizards-port/pom.xml
 
       - name: Build and run catalogue tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/pom.xml clean verify
@@ -48,6 +49,9 @@ jobs:
 
       - name: Build Snake 26.3 port and run mechanics-rule tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/snake-port/pom.xml clean verify
+
+      - name: Build Wizards 26.3 resource-packless port and run rules tests
+        run: mvn --batch-mode --no-transfer-progress -f modern-platform/wizards-port/pom.xml clean verify
 
       - name: Build the other 16 Arcade mechanics prototypes
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
@@ -60,10 +64,12 @@ jobs:
           maze_jar="modern-platform/monster-maze-port/target/MonsterMazeModern.jar"
           snake_jar="modern-platform/snake-port/target/SnakeModern.jar"
           arcade_jar="modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar"
+          wizards_jar="modern-platform/wizards-port/target/WizardsModern.jar"
           test -s "$jar_file"
           test -s "$maze_jar"
           test -s "$snake_jar"
           test -s "$arcade_jar"
+          test -s "$wizards_jar"
           jar tf "$jar_file" | grep -Fxq "plugin.yml"
           jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/TestplexModernArcade.class"
           jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/model/ArcadeCatalog.class"
@@ -90,7 +96,13 @@ jobs:
             grep -Fxq "  - $candidate" <<< "$arcade_config"
           done
           ! grep -Eq "^  - (death-tag|evolution|micro-battles|one-in-the-quiver|sheep-quest|turf-wars)$" <<< "$arcade_config"
-          echo "All four modern Paper 26.3 plugin artifacts verified; Draw My Thing includes its no-resource-pack Stadium map, and all ten enabled Arcade candidates are present."
+          jar tf "$wizards_jar" | grep -Fxq "plugin.yml"
+          jar tf "$wizards_jar" | grep -Fxq "au/com/testplex/wizards/WizardsModernPlugin.class"
+          jar tf "$wizards_jar" | grep -Fxq "au/com/testplex/wizards/WizardsGameManager.class"
+          jar tf "$wizards_jar" | grep -Fxq "au/com/testplex/wizards/WizardsSpell.class"
+          unzip -p "$wizards_jar" plugin.yml | grep -Fxq "name: WizardsModern"
+          unzip -p "$wizards_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
+          echo "All five modern Paper 26.3 plugin artifacts verified; WizardsModern has no resource-pack dependency and Draw My Thing retains its Stadium map."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
@@ -101,6 +113,7 @@ jobs:
             modern-platform/monster-maze-port/target/MonsterMazeModern.jar
             modern-platform/snake-port/target/SnakeModern.jar
             modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar
+            modern-platform/wizards-port/target/WizardsModern.jar
           if-no-files-found: error
           retention-days: 14
 
@@ -114,10 +127,10 @@ jobs:
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
             echo "- Catalogue: 18 Arcade games"
-            echo "- Built artifacts: TestplexModernArcade.jar, MonsterMazeModern.jar, SnakeModern.jar and ArcadeMechanicsModern.jar"
+            echo "- Built artifacts: TestplexModernArcade.jar, MonsterMazeModern.jar, SnakeModern.jar, ArcadeMechanicsModern.jar and WizardsModern.jar"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: Monster Maze and Snake plus 16 mechanics-first prototypes, including Draw My Thing and Master Builders; in-game validation still required"
+            echo "- Gameplay ports: Monster Maze, Snake, 16 mechanics-first Arcade prototypes, and the separate resource-packless Wizards survival port; in-game validation still required"
             echo "- Deployment acceptance: eight Arcade candidates remain explicitly approved for acceptance; Draw My Thing and Master Builders are added as gameplay-in-progress test variants; Snake remains gated"
             echo "- Server deploy: a separate workflow-run handler deploys only the latest successful push artifact from feat/testplex-modern-26.3-platform; later source pushes no longer cancel an in-flight VM deployment"
           } >> "$GITHUB_STEP_SUMMARY"
