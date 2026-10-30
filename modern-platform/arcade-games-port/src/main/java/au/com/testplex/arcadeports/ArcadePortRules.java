@@ -1984,6 +1984,11 @@ public final class ArcadePortRules {
         };
     }
 
+    /** The source drains two hearts at a time during combat and is lethal outside combat. */
+    public static double turfWarsSpawnBoundaryDamage(boolean combatPhase) {
+        return combatPhase ? 2.0D : 500.0D;
+    }
+
     /** Reborn advances one line for the first combat round, two for the second, etc. */
     public static int turfWarsLinesPerKill(int combatRoundsStarted, boolean mixedArcadeVariant) {
         int sourceLines = Math.max(1, combatRoundsStarted);
