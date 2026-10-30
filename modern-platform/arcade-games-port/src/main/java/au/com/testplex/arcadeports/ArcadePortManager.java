@@ -516,6 +516,7 @@ public final class ArcadePortManager implements Listener {
                 && session.alive.contains(player.getUniqueId())) {
             session.skyWarsKits.put(player.getUniqueId(), kit);
             session.skyWarsKitReadyAt.remove(player.getUniqueId());
+            session.skyWarsIceBridgePaths.remove(player.getUniqueId());
             giveKit(session, player);
         }
         player.sendMessage(ChatColor.GREEN + "SkyWars kit set to " + kit + ".");
@@ -4195,6 +4196,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
+        processSkyWarsIceBridgePaths(session, now);
         Iterator<Map.Entry<Block, Long>> iceIterator = session.skyWarsIceBridgeExpiresAt.entrySet().iterator();
         while (iceIterator.hasNext()) {
             Map.Entry<Block, Long> entry = iceIterator.next();
@@ -4246,26 +4248,70 @@ public final class ArcadePortManager implements Listener {
         return true;
     }
 
+    private List<Block> skyWarsIceBridgePath(Location location, int length, Set<Block> shared) {
+        List<Block> result = new ArrayList<>();
+        Location path = location.clone().subtract(0.0D, 1.0D, 0.0D);
+        Vector direction = path.getDirection();
+        double horizontalLength = Math.sqrt(direction.getX() * direction.getX()
+                + direction.getZ() * direction.getZ());
+        if (Math.abs(direction.getY()) > horizontalLength) {
+            direction.setY(Math.copySign(horizontalLength, direction.getY()));
+            if (direction.lengthSquared() > 0.000001D) direction.normalize();
+        }
+        if (direction.lengthSquared() < 0.000001D) direction = new Vector(0.0D, 0.0D, 1.0D);
+        path.subtract(direction.clone().multiply(2.0D));
+        double distance = 0.0D;
+        while (distance < length) {
+            distance += 0.2D;
+            path.add(direction.clone().multiply(0.2D));
+            Block block = path.getBlock();
+            Material type = block.getType();
+            if (type == Material.ICE) continue;
+            if ((type.isAir() || type == Material.SNOW) && shared.add(block)) result.add(block);
+        }
+        return result;
+    }
+
+    private void processSkyWarsIceBridgePaths(Session session, long now) {
+        Iterator<Map.Entry<UUID, List<Block>>> paths = session.skyWarsIceBridgePaths.entrySet().iterator();
+        while (paths.hasNext()) {
+            Map.Entry<UUID, List<Block>> entry = paths.next();
+            List<Block> pending = entry.getValue();
+            if (pending.isEmpty()) {
+                paths.remove();
+                continue;
+            }
+            Block block = pending.remove(0);
+            Material original = block.getType();
+            if (!original.isAir() && original != Material.SNOW) continue;
+            if (block.equals(session.skyWarsGeneratorBase)) continue;
+            session.skyWarsIceBridgeOriginals.putIfAbsent(block, block.getBlockData().clone());
+            block.setType(Material.ICE, false);
+            enqueueSkyWarsCrumbleBlock(session, block);
+            session.skyWarsIceBridgeExpiresAt.put(block, now + 4_000L);
+            block.getWorld().playEffect(block.getLocation(), Effect.STEP_SOUND, Material.ICE);
+        }
+    }
+
     private void useSkyWarsIceBridge(Session session, Player player, long now) {
         if (!skyWarsKitReady(session, player, now, 30_000L)) return;
         player.teleport(player.getLocation().clone().add(0.0D, 1.0D, 0.0D));
         player.setVelocity(new Vector(0.0D, 0.5D, 0.0D));
         player.playSound(player.getLocation(), Sound.BLOCK_GLASS_PLACE, 0.9F, 1.5F);
         Location origin = player.getLocation().clone();
-        Vector direction = origin.getDirection().setY(0.0D);
-        if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.0D, 1.0D);
-        direction.normalize();
-        for (int step = 0; step < 8; step++) {
-            int x = origin.getBlockX() + (int) Math.round(direction.getX() * step);
-            int z = origin.getBlockZ() + (int) Math.round(direction.getZ() * step);
-            Block block = session.world.getBlockAt(x, origin.getBlockY() - 1, z);
-            if (!block.getType().isAir() || !block.getRelative(BlockFace.UP).getType().isAir()
-                    || block.equals(session.skyWarsGeneratorBase)) continue;
-            session.skyWarsIceBridgeOriginals.putIfAbsent(block, block.getBlockData().clone());
-            block.setType(Material.ICE, false);
-            enqueueSkyWarsCrumbleBlock(session, block);
-            session.skyWarsIceBridgeExpiresAt.put(block, now + 4_000L);
+        Set<Block> unique = new HashSet<>();
+        List<Block> blocks = new ArrayList<>();
+        if (Math.abs(origin.getDirection().getX()) > Math.abs(origin.getDirection().getZ())) {
+            blocks.addAll(skyWarsIceBridgePath(origin.clone().add(0.0D, 0.0D, 1.0D), 16, unique));
+            blocks.addAll(skyWarsIceBridgePath(origin.clone().add(0.0D, 0.0D, -1.0D), 16, unique));
+        } else {
+            blocks.addAll(skyWarsIceBridgePath(origin.clone().add(1.0D, 0.0D, 0.0D), 16, unique));
+            blocks.addAll(skyWarsIceBridgePath(origin.clone().add(-1.0D, 0.0D, 0.0D), 16, unique));
         }
+        blocks.addAll(skyWarsIceBridgePath(origin, 16, unique));
+        blocks.sort(java.util.Comparator.comparingDouble(block ->
+                block.getLocation().add(0.5D, 0.5D, 0.5D).distance(origin)));
+        session.skyWarsIceBridgePaths.put(player.getUniqueId(), blocks);
         player.sendActionBar(ChatColor.AQUA + "Ice Bridge!");
     }
 
@@ -8923,6 +8969,7 @@ public final class ArcadePortManager implements Listener {
         }
         session.skyWarsIceBridgeOriginals.clear();
         session.skyWarsIceBridgeExpiresAt.clear();
+        session.skyWarsIceBridgePaths.clear();
         session.skyWarsDirtProjectiles.clear();
         session.skyWarsGuardianHomes.clear();
         for (UUID playerId : new ArrayList<>(session.deathTagDisguises.keySet())) {
@@ -13634,6 +13681,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> skyWarsSpectatorTeleportAt = new HashMap<>();
         final Map<Block, Long> skyWarsIceBridgeExpiresAt = new HashMap<>();
         final Map<Block, BlockData> skyWarsIceBridgeOriginals = new HashMap<>();
+        final Map<UUID, List<Block>> skyWarsIceBridgePaths = new HashMap<>();
         final Map<UUID, UUID> skyWarsDirtProjectiles = new HashMap<>();
         final Map<UUID, UUID> skyWarsLastDamager = new HashMap<>();
         final Map<UUID, Long> skyWarsLastDamagedAt = new HashMap<>();
