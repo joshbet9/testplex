@@ -2131,9 +2131,8 @@ public final class ArcadePortManager implements Listener {
         if (player.isOnline()) {
             if (forcedAlpha) {
                 player.teleport(deathTagChaserRespawnSpawn(session, player));
-            } else if (player.getLocation().getY() < 59.0D) {
-                player.teleport(spawnFor(session, player));
             }
+            // A normal runner conversion keeps the death location, matching DeathTag.RespawnPlayer().
             player.setGameMode(GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
@@ -9662,6 +9661,43 @@ public final class ArcadePortManager implements Listener {
      * Do not interfere with plugin-owned menus such as the spectator compass menu.
      */
     /** Prevent moving or swapping the source TeamArmorModule's protected gear. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDeathTagItemPickup(EntityPickupItemEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.DEATH_TAG
+                || !(event.getEntity() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())) return;
+        event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDeathTagContainerOpen(InventoryOpenEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.DEATH_TAG
+                || !(event.getPlayer() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())) return;
+        String type = event.getInventory().getType().name();
+        Object holder = event.getInventory().getHolder();
+        boolean blockInventory = holder instanceof org.bukkit.block.BlockState
+                || holder instanceof org.bukkit.block.DoubleChest;
+        boolean restrictedInventory = switch (type) {
+            case "ANVIL", "BEACON", "BREWING", "DISPENSER", "DROPPER", "ENCHANTING",
+                    "FURNACE", "HOPPER", "MERCHANT", "ENDER_CHEST", "WORKBENCH", "CHEST" -> true;
+            default -> false;
+        };
+        if (blockInventory || restrictedInventory) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDeathTagCraftingClick(InventoryClickEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.DEATH_TAG
+                || !session.players.containsKey(event.getWhoClicked().getUniqueId())) return;
+        if ("CRAFTING".equals(event.getView().getTopInventory().getType().name())) {
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBombLobbersTeamArmorMove(InventoryClickEvent event) {
         Session session = active;

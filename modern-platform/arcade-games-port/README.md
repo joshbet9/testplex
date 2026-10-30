@@ -64,3 +64,5 @@ The Death Tag sidebar now shows live Runner and Chaser counts. Forced time-based
 Death Tag also enforces the source Adventure mode, blocks item-frame interaction, and continually restores food to 20 with saturation 1.0 so sprinting remains available for the full round.
 
 Death Tag also tracks the legacy ComeAtMeBro stat locally: every Chaser defeat from a player's second Chaser kill onward is recorded when the acceptance run completes. This stays in Testplex's isolated local stats and does not write to production Arcade data.
+
+Death Tag Runner trails now read the legacy `cosmetics.yml` choices: all 16 stained-glass colours and the Classic, Soul, Sparks, Smoke, Ender and Hearts styles (defaulting to white/classic). Source-default restrictions are also mirrored: ground pickups, block inventories and crafting-grid clicks are disabled; runner conversions preserve their death location.
