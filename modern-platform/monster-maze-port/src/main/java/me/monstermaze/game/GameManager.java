@@ -110,7 +110,7 @@ public class GameManager implements Listener {
         this.stats = new StatTracker(this, plugin);
         this.leaderboardBoard = new LeaderboardBoard(plugin);
         this.feedback = new PlayerFeedback(plugin, this);
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
         new ArenaListener(plugin, this);
     }
 
@@ -172,7 +172,7 @@ public class GameManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Pick a kit (villagers or /mm kit), then an admin runs /mm start");
             // Open kit GUI shortly after TP
             final Player p = player;
-            Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+            Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
                 @Override public void run() {
                     if (p.isOnline() && state == GameState.IDLE) {
                         kitManager.openSelector(p);
@@ -350,7 +350,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 // Lock jumping during the STARTING countdown too (pre-glass-fall): only the
                 // Jumper kit can move around the spawn; everyone else is grounded. The LIVE
                 // mainTask calls tickJumpLock() once the game starts, so we stop this one then.
-                startingTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+                startingTask = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
                     @Override public void run() {
                         if (state != GameState.STARTING) return;
                         kitManager.tickJumpLock();
@@ -366,7 +366,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                         titleArenaPlayers("", ChatColor.YELLOW + "" + t, 0, 15, 5);
                         t--;
                     }
-                }.runTaskTimer(plugin, 10L, 20L);
+                }.runTaskTimer(plugin.getHostPlugin(), 10L, 20L);
             }
         });
     }
@@ -383,7 +383,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         titleArenaPlayers("", ChatColor.YELLOW + "" + ChatColor.BOLD + "Get to the Safe Pad!", 5, 40, 5);
         broadcast(ChatColor.GREEN + "" + ChatColor.BOLD + "GO!");
 
-        secondTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        secondTask = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 if (state != GameState.LIVE) return;
                 decrementSafePadTime();
@@ -394,7 +394,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             }
         }, 20L, 20L);
 
-        mainTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        mainTask = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 if (state != GameState.LIVE) return;
                 liveTick++;
@@ -818,7 +818,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             if (remaining.isEmpty()) {
                 state = GameState.ENDING;
                 broadcast(ChatColor.GOLD + "Solo run over — reached stage " + curSafe + "!");
-                Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+                Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
                     @Override public void run() { forceStop(); }
                 }, 80L);
             }
@@ -844,7 +844,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             
             // Transition state after recording
             state = GameState.ENDING;
-            Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+            Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
                 @Override public void run() { forceStop(); }
             }, 100L);
         }
@@ -934,7 +934,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         final Location center=pad.getLocation().clone().add(0,1,0);final boolean firstPad=curSafe==1;
         for(int i=0;i<3;i++){
             final int shot=i;
-            Bukkit.getScheduler().runTaskLater(plugin,new Runnable(){@Override public void run(){
+            Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(),new Runnable(){@Override public void run(){
                 Location at=center.clone().add((shot-1)*0.45,0,shot==1?0.35:-0.35);
                 try{
                     Firework firework=at.getWorld().spawn(at,Firework.class);FireworkMeta meta=firework.getFireworkMeta();meta.setPower(1);
@@ -1120,7 +1120,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         if (!spectators.contains(event.getPlayer().getUniqueId())) return;
         if (center != null) event.setRespawnLocation(center.clone().add(0, 1, 0));
         final Player p = event.getPlayer();
-        Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+        Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 if (p.isOnline()) p.setGameMode(GameMode.SPECTATOR);
             }
