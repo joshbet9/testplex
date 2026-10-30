@@ -25,6 +25,7 @@ import org.bukkit.entity.Arrow;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Wolf;
 import org.bukkit.entity.Fireball;
+import org.bukkit.entity.LightningStrike;
 import org.bukkit.block.TileState;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
@@ -90,6 +91,7 @@ public final class WizardsGameManager implements Listener {
     private final NamespacedKey projectileOwnerKey;
     private final NamespacedKey anvilLevelKey;
     private final NamespacedKey meteorKey;
+    private final NamespacedKey lightningHitKey;
     private final LinkedHashMap<UUID, Player> queue = new LinkedHashMap<>();
     private final Map<UUID, WizardsKit> selectedKits = new HashMap<>();
     private final Map<UUID, WizardState> states = new LinkedHashMap<>();
@@ -137,6 +139,7 @@ public final class WizardsGameManager implements Listener {
         projectileOwnerKey = new NamespacedKey(plugin, "spell-owner");
         anvilLevelKey = new NamespacedKey(plugin, "anvil-level");
         meteorKey = new NamespacedKey(plugin, "endgame-meteor-size");
+        lightningHitKey = new NamespacedKey(plugin, "wizard-lightning-hit");
         arena = createArena();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         tickTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
@@ -946,6 +949,25 @@ public final class WizardsGameManager implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onDamageByEntity(EntityDamageByEntityEvent event) {
+        if (event.getDamager() instanceof LightningStrike lightning
+                && "wizard-lightning".equals(lightning.getPersistentDataContainer()
+                .get(projectileKey, PersistentDataType.STRING))) {
+            event.setCancelled(true);
+            if (lightning.getPersistentDataContainer().has(lightningHitKey, PersistentDataType.BYTE)) return;
+            lightning.getPersistentDataContainer().set(lightningHitKey, PersistentDataType.BYTE, (byte) 1);
+            if (event.getEntity() instanceof LivingEntity victim) {
+                String ownerId = lightning.getPersistentDataContainer().get(projectileOwnerKey, PersistentDataType.STRING);
+                Player owner = ownerId == null ? null : Bukkit.getPlayer(UUID.fromString(ownerId));
+                int level = lightning.getPersistentDataContainer().getOrDefault(
+                        anvilLevelKey, PersistentDataType.INTEGER, 1);
+                victim.setFireTicks(80);
+                victim.damage(2.0D + 4.0D * level, owner);
+                victim.getWorld().spawnParticle(Particle.ELECTRIC_SPARK,
+                        victim.getLocation().add(0.0D, 1.0D, 0.0D), 18, 0.35D, 0.45D, 0.35D, 0.08D);
+            }
+            return;
+        }
+
         if (event.getDamager() instanceof Wolf wolf && summonedWolves.containsKey(wolf.getUniqueId())) {
             SummonedWolfData data = summonedWolves.get(wolf.getUniqueId());
             Player owner = data == null ? null : Bukkit.getPlayer(data.owner);
@@ -1700,22 +1722,7 @@ public final class WizardsGameManager implements Listener {
                 return true;
             }
             case LIGHTNING_STRIKE: {
-                Player victim = directTarget instanceof Player direct && !direct.equals(caster)
-                        ? direct : findTargetPlayer(caster, 40.0D);
-                Block aimed = clickedBlock != null ? clickedBlock : caster.getTargetBlockExact(40);
-                Location strike = victim != null ? victim.getLocation() : (aimed == null ? null : aimed.getLocation());
-                if (strike == null) {
-                    caster.sendMessage(ChatColor.RED + "Lightning Strike needs a target.");
-                    return false;
-                }
-                caster.getWorld().strikeLightningEffect(strike);
-                for (Entity entity : caster.getWorld().getNearbyEntities(strike, 2.8D, 3.0D, 2.8D)) {
-                    if (entity instanceof Player target && !target.equals(caster)) {
-                        target.damage(2.0D + level * 4.0D, caster);
-                    }
-                }
-                caster.getWorld().spawnParticle(Particle.ELECTRIC_SPARK, strike, 20, 0.6, 1.0, 0.6, 0.1);
-                return true;
+                return launchLightningStrike(caster, level);
             }
             case SPEED_BOOST: {
                 caster.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20 * 20,
@@ -1863,9 +1870,17 @@ public final class WizardsGameManager implements Listener {
     }
 
     private void launchRumble(Player caster, int level) {
-        final Vector direction = caster.getLocation().getDirection().setY(0.0D);
-        if (direction.lengthSquared() < 0.001D) direction.setZ(1.0D);
-        direction.normalize();
+        final org.bukkit.block.BlockFace[] radial = {
+                org.bukkit.block.BlockFace.SOUTH, org.bukkit.block.BlockFace.SOUTH_WEST,
+                org.bukkit.block.BlockFace.WEST, org.bukkit.block.BlockFace.NORTH_WEST,
+                org.bukkit.block.BlockFace.NORTH, org.bukkit.block.BlockFace.NORTH_EAST,
+                org.bukkit.block.BlockFace.EAST, org.bukkit.block.BlockFace.SOUTH_EAST
+        };
+        final int radialIndex = Math.round(caster.getEyeLocation().getYaw() / 45.0F) & 0x7;
+        final org.bukkit.block.BlockFace moveDirection = radial[radialIndex];
+        final Vector direction = new Vector(moveDirection.getModX(), 0.0D, moveDirection.getModZ()).normalize();
+        final org.bukkit.block.BlockFace sideA = radial[(radialIndex + 2) & 0x7];
+        final org.bukkit.block.BlockFace sideB = radial[(radialIndex + 6) & 0x7];
         Block start = caster.getLocation().getBlock().getRelative(org.bukkit.block.BlockFace.DOWN);
         if (!start.getType().isSolid()) start = start.getRelative(org.bukkit.block.BlockFace.DOWN);
         final Block initial = start;
@@ -1873,6 +1888,7 @@ public final class WizardsGameManager implements Listener {
             private Block current = initial;
             private int travelled;
             private final Set<UUID> hit = new HashSet<>();
+            private final List<Block> previousBlocks = new ArrayList<>();
 
             @Override public void run() {
                 WizardState state = states.get(caster.getUniqueId());
@@ -1881,43 +1897,56 @@ public final class WizardsGameManager implements Listener {
                     cancel();
                     return;
                 }
-                Block next = findRumbleGround(current, direction);
+                Block next = findRumbleGround(current, moveDirection);
                 if (next == null) {
                     finishRumble(caster, current.getLocation().add(0.5D, 0.5D, 0.5D), level);
                     cancel();
                     return;
                 }
                 current = next;
+                int size = (int) (Math.min(4, Math.floor(travelled / (8.0D - level))) + 1);
+                List<Block> affectedBlocks = new ArrayList<>();
+                affectedBlocks.add(current);
+                for (int side = 1; side <= size; side++) {
+                    Block a = current.getRelative(sideA, side);
+                    Block b = current.getRelative(sideB, side);
+                    if (a.getType().isSolid()) affectedBlocks.add(a);
+                    if (b.getType().isSolid()) affectedBlocks.add(b);
+                }
+                for (Block block : affectedBlocks) {
+                    Location point = block.getLocation().add(0.5D, 0.75D, 0.5D);
+                    block.getWorld().spawnParticle(Particle.BLOCK, point, 7, 0.3D, 0.12D, 0.3D, 0.035D, block.getBlockData());
+                    block.getWorld().spawnParticle(Particle.CLOUD, point, 5, 0.3D, 0.08D, 0.3D, 0.02D);
+                    block.getWorld().playSound(point, Sound.BLOCK_STONE_BREAK, 0.2F, 0.6F + random.nextFloat() * 0.3F);
+                }
+                previousBlocks.addAll(affectedBlocks);
                 travelled++;
-                Location wave = current.getLocation().add(0.5D, 0.75D, 0.5D);
-                wave.getWorld().spawnParticle(Particle.BLOCK, wave, 10, 0.35D, 0.12D, 0.35D, 0.04D, current.getBlockData());
-                wave.getWorld().spawnParticle(Particle.CLOUD, wave, 8, 0.35D, 0.08D, 0.35D, 0.025D);
-                wave.getWorld().playSound(wave, Sound.BLOCK_STONE_BREAK, 0.35F, 0.6F + random.nextFloat() * 0.3F);
 
                 for (Player victim : alivePlayers()) {
                     if (victim.equals(caster) || hit.contains(victim.getUniqueId())
-                            || !victim.getWorld().equals(wave.getWorld())) continue;
+                            || !victim.getWorld().equals(caster.getWorld())) continue;
                     Location feet = victim.getLocation();
-                    if (feet.getBlockX() == current.getX() && feet.getBlockZ() == current.getZ()
-                            && feet.getY() >= current.getY() && feet.getY() <= current.getY() + 3.0D) {
+                    for (Block block : previousBlocks) {
+                        if (feet.getBlockX() != block.getX() || feet.getBlockZ() != block.getZ()) continue;
+                        double height = feet.getY() - block.getY();
+                        if (height < 0.0D || height > 3.0D) continue;
                         hit.add(victim.getUniqueId());
                         victim.damage(4.0D + level * 2.0D, caster);
                         victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60,
                                 Math.max(0, level - 1), true, true, true));
-                        victim.setVelocity(direction.clone().multiply(0.45D).setY(0.28D));
+                        break;
                     }
                 }
             }
         }, 5L, 1L);
     }
 
-    private Block findRumbleGround(Block current, Vector direction) {
-        int x = (int) Math.floor(current.getX() + direction.getX() + 0.5D);
-        int z = (int) Math.floor(current.getZ() + direction.getZ() + 0.5D);
+    private Block findRumbleGround(Block current, org.bukkit.block.BlockFace direction) {
         for (int y : new int[]{0, 1, -1, -2}) {
-            Block candidate = current.getWorld().getBlockAt(x, current.getY() + y, z);
-            if (candidate.getY() <= 0) continue;
-            if (candidate.getType().isSolid() && candidate.getRelative(org.bukkit.block.BlockFace.UP).isPassable()) return candidate;
+            if (current.getY() + y <= 0) continue;
+            Block candidate = current.getRelative(direction).getRelative(0, y, 0);
+            if (candidate.getType().isSolid()
+                    && candidate.getRelative(org.bukkit.block.BlockFace.UP).isPassable()) return candidate;
         }
         return null;
     }
@@ -2072,6 +2101,48 @@ public final class WizardsGameManager implements Listener {
         for (Map.Entry<Location, TemporaryBlock> entry : new ArrayList<>(temporaryBlocks.entrySet())) {
             if (now >= entry.getValue().expiresAtMillis) restoreTemporaryBlock(entry.getKey());
         }
+    }
+
+    private boolean launchLightningStrike(Player caster, int level) {
+        Vector direction = caster.getLocation().getDirection().normalize();
+        double distance = 0.0D;
+        Location eye = caster.getEyeLocation();
+        while (distance <= 150.0D) {
+            Location sample = eye.clone().add(0.0D, 0.2D, 0.0D)
+                    .add(direction.clone().multiply(distance));
+            if (!sample.getBlock().isPassable()
+                    || !sample.getBlock().getRelative(org.bukkit.block.BlockFace.UP).isPassable()) break;
+            distance += 0.2D;
+        }
+        if (distance < 2.0D) {
+            caster.sendMessage(ChatColor.RED + "Lightning Strike needs at least two blocks of clear line.");
+            return false;
+        }
+
+        Location strike = caster.getLocation().clone()
+                .add(direction.clone().multiply(distance)).add(0.0D, 0.4D, 0.0D);
+        while (strike.getBlock().getRelative(org.bukkit.block.BlockFace.UP).getType().isSolid()
+                && strike.getBlockY() < strike.getWorld().getMaxHeight() - 2) {
+            strike.add(0.0D, 1.0D, 0.0D);
+        }
+        if (strike.getBlockY() >= strike.getWorld().getMaxHeight() - 1) return false;
+
+        strike.getWorld().spawnParticle(Particle.ANGRY_VILLAGER,
+                strike.clone().add(0.0D, 1.3D, 0.0D), 7, 0.5D, 0.3D, 0.5D, 0.0D);
+        final Location destination = strike.clone();
+        final UUID ownerId = caster.getUniqueId();
+        scheduleSpellLater(() -> {
+            Player owner = Bukkit.getPlayer(ownerId);
+            if (!running || owner == null || !owner.isOnline()) return;
+            LightningStrike lightning = destination.getWorld().strikeLightning(destination);
+            lightning.getPersistentDataContainer().set(projectileKey, PersistentDataType.STRING, "wizard-lightning");
+            lightning.getPersistentDataContainer().set(projectileOwnerKey, PersistentDataType.STRING, ownerId.toString());
+            lightning.getPersistentDataContainer().set(anvilLevelKey, PersistentDataType.INTEGER, level);
+            if (plugin.getConfig().getBoolean("destructive-spells", false)) {
+                destroyEndgameBlocks(destination, 1.5D, 9);
+            }
+        }, 20L);
+        return true;
     }
 
     private void launchIceShard(Player caster, double damage) {

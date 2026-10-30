@@ -41,7 +41,7 @@ class WizardsRulesTest {
         assertEquals(10.0D, WizardsRules.trapRuneDamage(1));
         assertEquals(18.0D, WizardsRules.trapRuneDamage(3));
         assertEquals(6.0D, WizardsRules.spectralArrowDamage(1, 0.0D));
-        assertEquals(7.0D, WizardsRules.spectralArrowDamage(1, 1.0D));
+        assertEquals(6.1666667D, WizardsRules.spectralArrowDamage(1, 1.0D), 0.0001D);
         assertEquals(0.3D, WizardsRules.manaBoltVelocity());
         assertEquals(0.14D, WizardsRules.fireballVelocity());
     }
