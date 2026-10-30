@@ -3137,10 +3137,6 @@ public final class ArcadePortManager implements Listener {
             } else {
                 removeBaconBabyPig(session, id);
             }
-            if (session.ticks % 20 == 0) {
-                player.sendActionBar(ChatColor.GOLD + "Meter " + ChatColor.GREEN
-                        + session.baconMeters.getOrDefault(id, 0) + "%");
-            }
         }
         updateBaconSpectatorCompasses(session);
         updateBaconMeterScoreboard(session);
@@ -4767,11 +4763,50 @@ public final class ArcadePortManager implements Listener {
                 + (int) ArcadePortRules.DRAGON_ESCAPE_FINISH_Z;
     }
 
+    /** Live timing guide: the green section is the 500–900 ms critical window. */
+    private String baconTimingStatusText(Session session, UUID id, long now) {
+        long lastHit = session.baconLastSwingAt.getOrDefault(id, 0L);
+        if (lastHit <= 0L) {
+            return ChatColor.GRAY + "timing [" + ChatColor.RED + "■■■■"
+                    + ChatColor.GREEN + "■■■■" + ChatColor.YELLOW + "■■■■"
+                    + ChatColor.GRAY + "] land first hit";
+        }
+
+        long elapsed = Math.max(0L, now - lastHit);
+        int pointer = (int) Math.min(11L, elapsed * 12L / 1_500L);
+        StringBuilder bar = new StringBuilder("[");
+        for (int i = 0; i < 12; i++) {
+            if (i == pointer) {
+                bar.append(ChatColor.WHITE).append("▌");
+            } else if (i >= 4 && i <= 7) {
+                bar.append(ChatColor.GREEN).append("■");
+            } else if (i < 4) {
+                bar.append(ChatColor.RED).append("■");
+            } else {
+                bar.append(ChatColor.YELLOW).append("■");
+            }
+        }
+        bar.append(ChatColor.GRAY).append("]");
+
+        String state;
+        if (ArcadePortRules.isBaconTimedCritical(elapsed)) {
+            state = ChatColor.GREEN + ChatColor.BOLD + "CRITICAL NOW";
+        } else if (elapsed < ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS) {
+            state = ChatColor.RED + "wait " + (ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS - elapsed) + "ms";
+        } else if (elapsed <= ArcadePortRules.BACON_TIMED_HIT_LATE_MAX_MILLIS) {
+            state = ChatColor.YELLOW + "late";
+        } else {
+            state = ChatColor.GRAY + "reset";
+        }
+        return ChatColor.AQUA + "timing " + bar + " " + state;
+    }
+
     private String gameStatusText(Session session, Player player) {
         UUID id = player.getUniqueId();
         return switch (session.type) {
             case BACON_BRAWL -> "meter " + session.baconMeters.getOrDefault(id, 0) + "% | knockback x"
-                    + String.format(java.util.Locale.ROOT, "%.1f", session.baconKnockback);
+                    + String.format(java.util.Locale.ROOT, "%.1f", session.baconKnockback)
+                    + " | " + baconTimingStatusText(session, id, System.currentTimeMillis());
             case BOMB_LOBBERS -> "bombs " + inventoryCount(player, Material.TNT);
             case DEATH_TAG -> "IT " + session.tagged.stream().filter(session.alive::contains).count() + " | runners "
                     + Math.max(0, session.alive.size() - session.tagged.stream().filter(session.alive::contains).count());
