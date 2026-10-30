@@ -380,6 +380,10 @@ public final class ArcadePortRules {
     public static final long DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS = 8_000L;
     public static final long MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS = 20_000L;
     public static final int MICRO_BATTLES_FLETCHER_MAX_ARROWS = 3;
+    public static final double MICRO_BATTLES_BORDER_PARTICLE_DISTANCE = 3.0D;
+    public static final int MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS = 4;
+    public static final int MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS = 3;
+    public static final String MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR = "light-blue";
 
     private ArcadePortRules() {
     }
@@ -1303,6 +1307,102 @@ public final class ArcadePortRules {
             double nearestOtherDistanceSquared) {
         return elapsedMillis >= 0L && elapsedMillis < MICRO_BATTLES_CHEAT_WINDOW_MILLIS
                 && nearestOtherDistanceSquared < ownDistanceSquared;
+    }
+
+    /**
+     * Horizontal distance to the closest vertical face of the configured square world border.
+     * A negative value means the player is already outside the border.
+     */
+    public static double microBattlesDistanceToBorder(double playerX, double playerZ,
+            double centerX, double centerZ, double borderSize) {
+        if (!Double.isFinite(playerX) || !Double.isFinite(playerZ)
+                || !Double.isFinite(centerX) || !Double.isFinite(centerZ)
+                || !Double.isFinite(borderSize) || borderSize <= 0.0D) return Double.NaN;
+        double halfSize = borderSize / 2.0D;
+        double distanceToXFace = halfSize - Math.abs(playerX - centerX);
+        double distanceToZFace = halfSize - Math.abs(playerZ - centerZ);
+        return Math.min(distanceToXFace, distanceToZFace);
+    }
+
+    /** The border cue is shown on the safe side, up to and including three blocks from the face. */
+    public static boolean shouldShowMicroBattlesBorderParticles(double playerX, double playerZ,
+            double centerX, double centerZ, double borderSize) {
+        double distance = microBattlesDistanceToBorder(playerX, playerZ, centerX, centerZ, borderSize);
+        return Double.isFinite(distance) && distance >= 0.0D
+                && distance <= MICRO_BATTLES_BORDER_PARTICLE_DISTANCE;
+    }
+
+    /** Normalise the 16 supported stained-glass / dust colour names. */
+    public static String normalizeMicroBattlesColour(String requested) {
+        if (requested == null) return null;
+        String colour = requested.trim().toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return switch (colour) {
+            case "white", "orange", "magenta", "light-blue", "yellow", "lime", "pink",
+                    "gray", "light-gray", "cyan", "purple", "blue", "brown", "green", "red", "black" -> colour;
+            case "lightblue", "aqua" -> "light-blue";
+            case "silver", "lightgray", "grey" -> "light-gray";
+            default -> null;
+        };
+    }
+
+    /** Resolve the player's personal middle-glass choice without changing the shared world block. */
+    public static Material microBattlesGlassMaterial(String requested) {
+        String colour = normalizeMicroBattlesColour(requested);
+        if (colour == null) colour = MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR;
+        Material material = Material.matchMaterial(colour.toUpperCase(java.util.Locale.ROOT).replace('-', '_')
+                + "_STAINED_GLASS");
+        return material == null ? Material.LIGHT_BLUE_STAINED_GLASS : material;
+    }
+
+    /** Minecraft dye RGB values used by the shared border dust particles. */
+    public static Color microBattlesParticleColour(String requested) {
+        String colour = normalizeMicroBattlesColour(requested);
+        if (colour == null) colour = MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR;
+        return switch (colour) {
+            case "white" -> Color.fromRGB(249, 255, 254);
+            case "orange" -> Color.fromRGB(249, 128, 29);
+            case "magenta" -> Color.fromRGB(199, 78, 189);
+            case "yellow" -> Color.fromRGB(254, 216, 61);
+            case "lime" -> Color.fromRGB(128, 199, 31);
+            case "pink" -> Color.fromRGB(243, 139, 170);
+            case "gray" -> Color.fromRGB(71, 79, 82);
+            case "light-gray" -> Color.fromRGB(157, 157, 151);
+            case "cyan" -> Color.fromRGB(22, 156, 156);
+            case "purple" -> Color.fromRGB(137, 50, 184);
+            case "blue" -> Color.fromRGB(60, 68, 170);
+            case "brown" -> Color.fromRGB(131, 84, 50);
+            case "green" -> Color.fromRGB(94, 124, 22);
+            case "red" -> Color.fromRGB(176, 46, 38);
+            case "black" -> Color.fromRGB(29, 29, 33);
+            default -> Color.fromRGB(58, 179, 218);
+        };
+    }
+
+    /**
+     * Choose from every Micro Battles team, using survivors first and team kills as
+     * a tiebreak. A true tie returns -1 rather than incorrectly favouring teams 0/1.
+     */
+    public static int microBattlesTimeoutTeam(int[] aliveByTeam, int[] killsByTeam) {
+        if (aliveByTeam == null || killsByTeam == null || aliveByTeam.length < 2
+                || aliveByTeam.length != killsByTeam.length) return -1;
+        int bestTeam = -1;
+        int bestAlive = -1;
+        int bestKills = -1;
+        boolean tied = false;
+        for (int team = 0; team < aliveByTeam.length; team++) {
+            if (aliveByTeam[team] < 0 || killsByTeam[team] < 0) return -1;
+            if (aliveByTeam[team] > bestAlive
+                    || (aliveByTeam[team] == bestAlive && killsByTeam[team] > bestKills)) {
+                bestTeam = team;
+                bestAlive = aliveByTeam[team];
+                bestKills = killsByTeam[team];
+                tied = false;
+            } else if (aliveByTeam[team] == bestAlive && killsByTeam[team] == bestKills) {
+                tied = true;
+            }
+        }
+        return bestAlive <= 0 || tied ? -1 : bestTeam;
     }
 
     public static double microBattlesHitDamage(boolean projectile) {
