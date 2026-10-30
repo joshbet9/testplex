@@ -111,6 +111,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final List<Block> castleChests = new ArrayList<>();
     private final Map<UUID, Integer> castleKillStreaks = new HashMap<>();
     private final Map<UUID, String> castleAssaultPlayerKits = new HashMap<>();
+    private final Map<UUID, Long> castleArcherNextArrowAt = new HashMap<>();
     private final Map<UUID, String> selectedHeroesOfGwen = new HashMap<>();
     private final List<StoreEntry> storeEntries = new ArrayList<>();
     private final Map<UUID, StoreHolder> openStores = new HashMap<>();
@@ -523,6 +524,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void tickCastleAssault(long now) {
+        refillCastleArcherArrows(now);
         if (objectiveItem != null && objectiveItem.isValid() && activeObjectiveSpawn != null) {
             objectiveItem.teleport(activeObjectiveSpawn);
             objectiveItem.setVelocity(new Vector());
@@ -843,6 +845,45 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return 4.0D + ("demolitionist".equals(castleAssaultPlayerKits.get(owner.getUniqueId())) ? 3.0D : 0.0D);
     }
 
+    private void refillCastleArcherArrows(long now) {
+        for (UUID id : new ArrayList<>(activePlayers)) {
+            if (!"archer".equals(castleAssaultPlayerKits.get(id))) continue;
+            Player player = players.get(id);
+            if (player == null || !player.isOnline()) continue;
+            long next = castleArcherNextArrowAt.getOrDefault(id, now);
+            if (now < next) continue;
+            ItemStack arrows = player.getInventory().getItem(2);
+            int amount = arrows != null && arrows.getType() == Material.ARROW ? arrows.getAmount() : 0;
+            if (amount < ArcadePortRules.CASTLE_ASSAULT_ARCHER_MAX_ARROWS) {
+                if (amount == 0) {
+                    player.getInventory().setItem(2, namedItem(Material.ARROW, "Fletched Arrow",
+                            "Replenished by the Archer kit."));
+                } else {
+                    arrows.setAmount(amount + 1);
+                }
+                player.updateInventory();
+            }
+            castleArcherNextArrowAt.put(id, now + ArcadePortRules.CASTLE_ASSAULT_ARCHER_REFILL_MILLIS);
+        }
+    }
+
+    private int castleBlastProtectionEpf(Player player) {
+        int epf = 0;
+        for (ItemStack armour : player.getInventory().getArmorContents()) {
+            if (armour != null) epf += armour.getEnchantmentLevel(Enchantment.BLAST_PROTECTION) * 2;
+        }
+        return Math.min(20, epf);
+    }
+
+    private int castleHighestBlastProtection(Player player) {
+        int highest = 0;
+        for (ItemStack armour : player.getInventory().getArmorContents()) {
+            if (armour != null) highest = Math.max(highest,
+                    armour.getEnchantmentLevel(Enchantment.BLAST_PROTECTION));
+        }
+        return highest;
+    }
+
     private void resolveCastleExplosion(Location center, Player owner, boolean objective, double radius) {
         world.spawnParticle(Particle.EXPLOSION_EMITTER, center, 1);
         world.spawnParticle(Particle.CLOUD, center, 30, 0.65D, 0.65D, 0.65D, 0.08D);
@@ -854,11 +895,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             double distance = target.getLocation().distance(center);
             if (distance > radius) continue;
             double damage = 10.0D * Math.max(0.0D, 1.0D - distance / radius);
+            damage *= ArcadePortRules.castleAssaultBlastDamageMultiplier(castleBlastProtectionEpf(target));
             if (damage <= 0.0D) continue;
             if (target.getHealth() <= damage) hooks.eliminate(target, owner, "was caught in a Castle Assault TNT blast");
             else target.setHealth(target.getHealth() - damage);
             Vector direction = target.getLocation().toVector().subtract(center.toVector());
-            if (direction.lengthSquared() > 0.001D) target.setVelocity(direction.normalize().multiply(0.8D).setY(0.35D));
+            if (direction.lengthSquared() > 0.001D) {
+                double knockback = ArcadePortRules.castleAssaultBlastKnockbackMultiplier(
+                        castleHighestBlastProtection(target));
+                target.setVelocity(direction.normalize().multiply(0.8D * knockback)
+                        .setY(0.35D * knockback));
+            }
         }
         if (!objective) return;
         KingState enemyKing = kings.get(1 - attackingTeam);
@@ -1357,7 +1404,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     void onPlayerEliminated(Player player) {
         if (player == null) return;
         UUID id = player.getUniqueId();
-        if (game == ArcadePortGame.CASTLE_ASSAULT) castleKillStreaks.remove(id);
+        if (game == ArcadePortGame.CASTLE_ASSAULT) {
+            castleKillStreaks.remove(id);
+            castleArcherNextArrowAt.remove(id);
+        }
         activePlayers.remove(id);
         StoreHolder store = openStores.remove(id);
         if (store != null && player.isOnline()
@@ -1472,6 +1522,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String kit = ArcadePortRules.normalizeCastleAssaultKit(requestedKit);
         if (kit == null) kit = "fighter";
         castleAssaultPlayerKits.put(player.getUniqueId(), kit);
+        if ("archer".equals(kit)) {
+            castleArcherNextArrowAt.put(player.getUniqueId(),
+                    System.currentTimeMillis() + ArcadePortRules.CASTLE_ASSAULT_ARCHER_REFILL_MILLIS);
+        } else {
+            castleArcherNextArrowAt.remove(player.getUniqueId());
+        }
         for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) {
             player.removePotionEffect(effect.getType());
         }
@@ -1557,6 +1613,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         entities.clear();
         castleKillStreaks.clear();
         castleAssaultPlayerKits.clear();
+        castleArcherNextArrowAt.clear();
         selectedHeroesOfGwen.clear();
     }
 
