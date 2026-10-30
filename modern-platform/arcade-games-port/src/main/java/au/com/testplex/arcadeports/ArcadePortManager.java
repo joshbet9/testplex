@@ -2160,8 +2160,9 @@ public final class ArcadePortManager implements Listener {
                 ? data.centerZ() - 18.0D : session.world.getWorldBorder().getCenter().getZ() - 18.0D;
         double x = baseX + Math.floorMod(arenaSlot, 4) * 12.0D;
         double z = baseZ + Math.floorDiv(arenaSlot, 4) * 12.0D;
+        Location borderCenter = session.world.getWorldBorder().getCenter();
         double requiredBorder = Math.max(session.world.getWorldBorder().getSize(),
-                Math.abs(x - session.world.getWorldBorder().getCenter().getX()) * 2.0D + 40.0D);
+                Math.max(Math.abs(x - borderCenter.getX()), Math.abs(z - borderCenter.getZ())) * 2.0D + 40.0D);
         session.world.getWorldBorder().setSize(requiredBorder);
         return new Location(session.world, x + 0.5D, 64.0D, z + 0.5D);
     }
@@ -8857,14 +8858,22 @@ public final class ArcadePortManager implements Listener {
         if (session == null || !(event.getEntity() instanceof Player player)
                 || event.getEntity().getWorld() != session.world
                 || !session.players.containsKey(player.getUniqueId())) return;
-        if (session.type == ArcadePortGame.GLADIATORS && session.alive.contains(player.getUniqueId())) {
+        if (session.type == ArcadePortGame.GLADIATORS) {
+            Integer pair = session.gladiatorPairs.get(player.getUniqueId());
             GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
-            if (mode == null || !mode.bowAvailable()) {
+            long fightStartsAt = pair == null ? Long.MAX_VALUE
+                    : session.gladiatorFightStartsAtByPair.getOrDefault(pair, Long.MAX_VALUE);
+            if (!session.alive.contains(player.getUniqueId()) || pair == null
+                    || mode == null || !mode.bowAvailable()) {
                 event.setCancelled(true);
-                player.sendMessage(ChatColor.YELLOW + "The voted Gladiators ruleset has no bow.");
-            } else if (!event.isCancelled()) {
-                session.gladiatorUsedBow.add(player.getUniqueId());
+                return;
             }
+            if (System.currentTimeMillis() < fightStartsAt) {
+                event.setCancelled(true);
+                player.sendMessage(ChatColor.YELLOW + "Your duel has not started yet.");
+                return;
+            }
+            if (!event.isCancelled()) session.gladiatorUsedBow.add(player.getUniqueId());
             return;
         }
         if (session.type != ArcadePortGame.TURF_WARS || session.turfCombat) return;
@@ -8877,12 +8886,19 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         Player player = event.getPlayer();
         if (session == null || session.type != ArcadePortGame.GLADIATORS
-                || player.getWorld() != session.world || !session.alive.contains(player.getUniqueId())
-                || event.getState() != PlayerFishEvent.State.FISHING) return;
+                || player.getWorld() != session.world || event.getState() != PlayerFishEvent.State.FISHING) return;
+        Integer pair = session.gladiatorPairs.get(player.getUniqueId());
         GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
-        if (mode == null || !mode.rodAvailable()) {
+        long fightStartsAt = pair == null ? Long.MAX_VALUE
+                : session.gladiatorFightStartsAtByPair.getOrDefault(pair, Long.MAX_VALUE);
+        if (!session.alive.contains(player.getUniqueId()) || pair == null
+                || mode == null || !mode.rodAvailable()) {
             event.setCancelled(true);
-            player.sendMessage(ChatColor.YELLOW + "The voted Gladiators ruleset has no fishing rod.");
+            return;
+        }
+        if (System.currentTimeMillis() < fightStartsAt) {
+            event.setCancelled(true);
+            player.sendMessage(ChatColor.YELLOW + "Your duel has not started yet.");
             return;
         }
         if (!event.isCancelled()) session.gladiatorUsedRod.add(player.getUniqueId());
