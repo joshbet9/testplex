@@ -1391,8 +1391,10 @@ public final class ArcadePortRules {
         if (!Double.isFinite(distanceToCurrent) || !Double.isFinite(distanceToNext)
                 || !Double.isFinite(waypointSpacing)
                 || distanceToCurrent < 0.0D || distanceToNext < 0.0D || waypointSpacing < 0.0D) return false;
-        double reachRadius = Math.min(3.0D, Math.max(1.25D, waypointSpacing * 0.35D));
-        return distanceToNext <= reachRadius && distanceToNext < distanceToCurrent;
+        // Only compare the next marker in authored order. Reborn scores against
+        // the nearest checkpoint; this sequential form preserves switchbacks
+        // while allowing a runner to pass a marker between 500ms score updates.
+        return distanceToNext < distanceToCurrent;
     }
 
     public static boolean isDuplicateDragonEscapeWaypoint(double distance) {

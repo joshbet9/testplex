@@ -1304,7 +1304,10 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(0.5D, 0.5D, 1.0D));
         assertTrue(ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(0.9D, 0.1D, 1.0D));
         assertTrue(ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(5.0D, 2.5D, 10.0D));
-        assertFalse(ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(5.0D, 3.5D, 10.0D));
+        assertTrue(ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(5.0D, 3.5D, 10.0D),
+                "Leaper must not get stuck after passing a waypoint between 500ms score samples");
+        assertFalse(ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(3.5D, 5.0D, 10.0D));
+        assertFalse(ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(3.5D, 3.5D, 10.0D));
         assertFalse(ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(Double.NaN, 0.0D, 1.0D));
     }
 
