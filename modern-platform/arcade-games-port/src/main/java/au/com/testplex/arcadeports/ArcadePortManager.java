@@ -9478,7 +9478,6 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         Session session = active;
-        Session session = active;
         if (session != null && event.getWhoClicked() instanceof Player player
                 && session.players.containsKey(player.getUniqueId())) {
             if (session.type == ArcadePortGame.MICRO_BATTLES) {
