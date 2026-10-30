@@ -64,6 +64,20 @@ public final class SnakeStatsStore {
         save();
     }
 
+    public void publishToArcadeStats(UUID player, boolean won, int kills, boolean knockedOut) {
+        org.bukkit.plugin.Plugin arcade = plugin.getServer().getPluginManager().getPlugin("ArcadeMechanicsModern");
+        if (arcade == null || !arcade.isEnabled()) return;
+        try {
+            java.lang.reflect.Method method = arcade.getClass().getMethod("recordSnakeStats",
+                    UUID.class, boolean.class, int.class, boolean.class, int.class, int.class, int.class, Set.class);
+            method.invoke(arcade, player, won, kills, knockedOut,
+                    lifetimeKills(player), lifetimeSlimes(player), bestTailLength(player), achievements(player));
+        } catch (ReflectiveOperationException exception) {
+            plugin.getLogger().warning("Could not publish Snake stats to the shared Arcade stats page: "
+                    + exception.getMessage());
+        }
+    }
+
     public int lifetimeKills(UUID player) { return data.getInt(base(player) + ".lifetime-kills"); }
     public int lifetimeSlimes(UUID player) { return data.getInt(base(player) + ".lifetime-slimes"); }
     public int bestTailLength(UUID player) { return data.getInt(base(player) + ".best-tail-length"); }
