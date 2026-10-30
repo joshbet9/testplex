@@ -74,6 +74,8 @@ class MonsterMazePortContractTest {
                     new InputStreamReader(input, StandardCharsets.UTF_8));
             assertTrue(config.getBoolean("test-mode", false),
                     "The modern test port must keep production backend writes disabled by default");
+            assertEquals("Modern", config.getString("mode"),
+                    "The dedicated 26.3 acceptance server must enable Modern-mode abilities such as Cryo Blitz");
             assertFalse(config.getBoolean("record-runs", true),
                     "Test runs must not be recorded to the production backend by default");
         }
