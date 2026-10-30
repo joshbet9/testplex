@@ -68,10 +68,10 @@ public class LeaderboardManager {
         this.backend = plugin.getBackendClient();
         reload();
         if (backend != null && backend.isEnabled()) {
-            Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+            Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
                 @Override public void run() { refreshFromBackend(); }
             }, 20L);
-            Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+            Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
                 @Override public void run() { refreshFromBackend(); }
             }, 600L, 600L);
         }
@@ -86,11 +86,11 @@ public class LeaderboardManager {
     /** Capture Bukkit state on the main thread, then do all HTTP work asynchronously. */
     public void refreshFromBackend() {
         if (backend == null || !backend.isEnabled()) return;
-        Bukkit.getScheduler().runTask(plugin, new Runnable() {
+        Bukkit.getScheduler().runTask(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 final List<UUID> players = new ArrayList<UUID>();
                 for (org.bukkit.entity.Player player : Bukkit.getOnlinePlayers()) players.add(player.getUniqueId());
-                Bukkit.getScheduler().runTaskAsynchronously(plugin, new Runnable() {
+                Bukkit.getScheduler().runTaskAsynchronously(plugin.getHostPlugin(), new Runnable() {
                     @Override public void run() { refreshFromBackendAsync(players); }
                 });
             }
