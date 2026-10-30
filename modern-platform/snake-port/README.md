@@ -19,7 +19,7 @@ This module ports the existing Mineplex Reborn 1.8.9 Snake game into the isolate
 ## Commands
 
 - `/gamepanel` → Snake → Start / Test.
-- `/snake join`, `/snake start`, `/snake kit <speed|reverse|invulnerable>`, `/snake status`.
+- `/snake join`, `/snake start`, `/snake kit` (original three-kit selection inventory) or `/snake kit <speed|reverse|invulnerable>`, `/snake status`.
 - `/snake maps`, `/snake map <name>`, `/snake stats`, `/snake leave`.
 - `/snake stop` is operator-only.
 
