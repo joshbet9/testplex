@@ -4,11 +4,14 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
+import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.block.BlockBreakEvent;
@@ -26,7 +29,6 @@ import mineplex.core.common.util.UtilTime;
 import mineplex.core.common.util.UtilParticle;
 import mineplex.core.common.util.UtilParticle.ParticleType;
 import mineplex.core.common.util.UtilParticle.ViewDist;
-import mineplex.core.common.util.UtilServer;
 import mineplex.core.updater.UpdateType;
 import mineplex.core.updater.event.UpdateEvent;
 import mineplex.minecraft.game.core.damage.CustomDamageEvent;
@@ -57,10 +59,13 @@ public class Micro extends TeamGame
 			};
 	private static final long BARRIER_TIME = TimeUnit.SECONDS.toMillis(10);
 	private static final long CHEAT_TIME = TimeUnit.SECONDS.toMillis(4);
+	private static final double BORDER_WARNING_DISTANCE = 3.0;
 
 	private final Set<Block> _glass = new HashSet<>();
 	private final Map<GameTeam, Location> _teamCenters = new HashMap<>();
-	private int _cosmeticTrailTick;
+	private final Map<UUID, ArmorStand> _borderIndicators = new HashMap<>();
+	private final Map<UUID, Integer> _glassColoursSent = new HashMap<>();
+	private int _visualTick;
 
 	public Micro(ArcadeManager manager)
 	{
@@ -153,48 +158,228 @@ public class Micro extends TeamGame
 	}
 
 	/**
-	 * Optional theme trail for equipped Micro Battles cosmetics. Particle data is
-	 * rendered for every viewer so the selection is visible to opponents too.
+	 * Applies Micro Battles visual cosmetics and the border-proximity warning.
+	 * Glass changes are sent as per-player block updates, so one player's colour
+	 * never changes the blocks displayed to another player.
 	 */
 	@EventHandler
-	public void cosmeticTrail(UpdateEvent event)
+	public void updatePlayerVisuals(UpdateEvent event)
 	{
-		if (event.getType() != UpdateType.TICK || !IsLive())
+		if (event.getType() != UpdateType.TICK)
+		{
 			return;
+		}
 
-		if (++_cosmeticTrailTick % 4 != 0)
+		if (!IsLive())
+		{
+			clearPlayerVisuals();
 			return;
+		}
+
+		if (++_visualTick % 4 != 0)
+		{
+			return;
+		}
+
+		Set<UUID> activePlayers = new HashSet<>();
 
 		for (Player player : GetPlayers(true))
 		{
-			int colour = ArcadeCosmeticsMenu.getEquippedColourData(player.getUniqueId(), "microbattles");
-			if (colour >= 0)
-			{
-				Location trail = player.getLocation().clone().add(0, 0.15, 0);
-				UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) colour),
-						trail, 0.08F, 0.08F, 0.08F, 0.01F, 2, ViewDist.NORMAL, UtilServer.getPlayers());
-			}
-			String borderStyle = ArcadeCosmeticsMenu.getEquippedChoice(player.getUniqueId(), "microbattles", "border-particles");
-			if (borderStyle == null || borderStyle.isEmpty() || "off".equalsIgnoreCase(borderStyle) || _glass.isEmpty()) continue;
-			Block nearest = null;
-			double nearestDistance = 9.0;
-			for (Block glass : _glass)
-			{
-				if (glass.getType() != Material.STAINED_GLASS) continue;
-				double distance = player.getLocation().distanceSquared(glass.getLocation().add(0.5, 0.5, 0.5));
-				if (distance < nearestDistance) { nearestDistance = distance; nearest = glass; }
-			}
-			if (nearest == null) continue;
-			Location border = nearest.getLocation().add(0.5, 0.55, 0.5);
-			ParticleType particle = "spark".equalsIgnoreCase(borderStyle) ? ParticleType.FIREWORKS_SPARK
-					: "soft".equalsIgnoreCase(borderStyle) ? ParticleType.CLOUD : ParticleType.BLOCK_DUST;
-			int dustColour = colour >= 0 ? colour : 3;
-						if (particle == ParticleType.BLOCK_DUST)
-				UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) dustColour),
-						border, 0.08F, 0.08F, 0.08F, 0.005F, 2, ViewDist.NORMAL, UtilServer.getPlayers());
-			else
-				UtilParticle.PlayParticle(particle, border, 0.08F, 0.08F, 0.08F, 0.005F, 2, ViewDist.NORMAL, UtilServer.getPlayers());
+			UUID playerId = player.getUniqueId();
+			activePlayers.add(playerId);
+			applyMiddleGlassColour(player);
+			updateBorderWarning(player);
 		}
+
+		for (UUID playerId : new HashSet<>(_borderIndicators.keySet()))
+		{
+			if (!activePlayers.contains(playerId))
+			{
+				removeBorderIndicator(playerId);
+			}
+		}
+	}
+
+	private void applyMiddleGlassColour(Player player)
+	{
+		if (_glass.isEmpty())
+		{
+			_glassColoursSent.remove(player.getUniqueId());
+			return;
+		}
+
+		int selectedColour = ArcadeCosmeticsMenu.getEquippedColourData(player.getUniqueId(), "microbattles");
+		int glassColour = selectedColour < 0 ? 0 : selectedColour;
+		Integer previouslySent = _glassColoursSent.get(player.getUniqueId());
+
+		if (previouslySent != null && previouslySent == glassColour)
+		{
+			return;
+		}
+
+		for (Block glass : _glass)
+		{
+			if (glass.getType() == Material.STAINED_GLASS)
+			{
+				player.sendBlockChange(glass.getLocation(), Material.STAINED_GLASS, (byte) glassColour);
+			}
+		}
+
+		_glassColoursSent.put(player.getUniqueId(), glassColour);
+	}
+
+	private void updateBorderWarning(Player player)
+	{
+		int nearestSide = getNearestBorderSide(player.getLocation());
+		UUID playerId = player.getUniqueId();
+
+		if (nearestSide < 0)
+		{
+			removeBorderIndicator(playerId);
+			return;
+		}
+
+		updateBorderIndicator(player);
+
+		String style = ArcadeCosmeticsMenu.getEquippedChoice(playerId, "microbattles", "border-particles");
+		if (style == null || style.isEmpty())
+		{
+			style = "matching";
+		}
+		if ("off".equalsIgnoreCase(style))
+		{
+			return;
+		}
+
+		int colour = ArcadeCosmeticsMenu.getEquippedColourData(playerId, "microbattles");
+		if (colour < 0)
+		{
+			colour = 3;
+		}
+
+		ParticleType particle = "spark".equalsIgnoreCase(style) ? ParticleType.FIREWORKS_SPARK
+				: "soft".equalsIgnoreCase(style) ? ParticleType.CLOUD : ParticleType.BLOCK_DUST;
+
+		Location playerLocation = player.getLocation();
+		for (double height = 0.25; height <= 2.25; height += 0.5)
+		{
+			Location particleLocation = getBorderParticleLocation(playerLocation, nearestSide, playerLocation.getY() + height);
+
+			if (particle == ParticleType.BLOCK_DUST)
+			{
+				UtilParticle.PlayParticle(ParticleType.BLOCK_DUST.getParticle(Material.STAINED_GLASS, (byte) colour),
+						particleLocation, 0.025F, 0.025F, 0.025F, 0.005F, 1, ViewDist.NORMAL, player);
+			}
+			else
+			{
+				UtilParticle.PlayParticle(particle, particleLocation,
+						0.025F, 0.025F, 0.025F, 0.005F, 1, ViewDist.NORMAL, player);
+			}
+		}
+	}
+
+	/**
+	 * Returns the closest map edge when it is within three horizontal blocks.
+	 * The four edges are based on the map's MineplexWorld bounds, rather than
+	 * the temporary glass barrier, which disappears shortly after a round starts.
+	 */
+	private int getNearestBorderSide(Location location)
+	{
+		double west = Math.abs(location.getX() - WorldData.MinX);
+		double east = Math.abs((WorldData.MaxX - 1) - location.getX());
+		double north = Math.abs(location.getZ() - WorldData.MinZ);
+		double south = Math.abs((WorldData.MaxZ - 1) - location.getZ());
+		double nearest = Math.min(Math.min(west, east), Math.min(north, south));
+
+		if (nearest > BORDER_WARNING_DISTANCE)
+		{
+			return -1;
+		}
+		if (nearest == west)
+		{
+			return 0;
+		}
+		if (nearest == east)
+		{
+			return 1;
+		}
+		if (nearest == north)
+		{
+			return 2;
+		}
+		return 3;
+	}
+
+	private Location getBorderParticleLocation(Location playerLocation, int side, double y)
+	{
+		double minX = WorldData.MinX + 0.15;
+		double maxX = WorldData.MaxX - 0.85;
+		double minZ = WorldData.MinZ + 0.15;
+		double maxZ = WorldData.MaxZ - 0.85;
+		double x = Math.max(minX, Math.min(maxX, playerLocation.getX()));
+		double z = Math.max(minZ, Math.min(maxZ, playerLocation.getZ()));
+
+		if (side == 0)
+		{
+			x = minX;
+		}
+		else if (side == 1)
+		{
+			x = maxX;
+		}
+		else if (side == 2)
+		{
+			z = minZ;
+		}
+		else
+		{
+			z = maxZ;
+		}
+
+		return new Location(playerLocation.getWorld(), x, y, z);
+	}
+
+	private void updateBorderIndicator(Player player)
+	{
+		UUID playerId = player.getUniqueId();
+		ArmorStand indicator = _borderIndicators.get(playerId);
+		Location location = player.getLocation().clone().add(0, 2.6, 0);
+
+		if (indicator == null || !indicator.isValid())
+		{
+			indicator = player.getWorld().spawn(location, ArmorStand.class);
+			indicator.setVisible(false);
+			indicator.setGravity(false);
+			indicator.setBasePlate(false);
+			indicator.setMarker(true);
+			indicator.setSmall(true);
+			indicator.setRemoveWhenFarAway(false);
+			indicator.setCustomName(ChatColor.RED + "" + ChatColor.BOLD + "! " + ChatColor.YELLOW + "BORDER");
+			indicator.setCustomNameVisible(true);
+			_borderIndicators.put(playerId, indicator);
+		}
+		else
+		{
+			indicator.teleport(location);
+		}
+	}
+
+	private void removeBorderIndicator(UUID playerId)
+	{
+		ArmorStand indicator = _borderIndicators.remove(playerId);
+		if (indicator != null && indicator.isValid())
+		{
+			indicator.remove();
+		}
+	}
+
+	private void clearPlayerVisuals()
+	{
+		for (UUID playerId : new HashSet<>(_borderIndicators.keySet()))
+		{
+			removeBorderIndicator(playerId);
+		}
+		_glassColoursSent.clear();
 	}
 
 	@EventHandler
@@ -248,6 +433,7 @@ public class Micro extends TeamGame
 			}
 
 			_glass.clear();
+			_glassColoursSent.clear();
 			_teamCenters.clear();
 		}
 	}
