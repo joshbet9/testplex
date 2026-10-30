@@ -12295,6 +12295,7 @@ public final class ArcadePortManager implements Listener {
                 && !dragonsSparklerLeftClick && !spleefCompassLeftClick) return;
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
+        Material item = heldItem == null ? Material.AIR : heldItem.getType();
         if (event.isCancelled()) {
             boolean forceGladiatorHotbar = session.type == ArcadePortGame.GLADIATORS
                     && event.getAction().isRightClick() && heldItem != null && heldItem.hasItemMeta()
@@ -12440,7 +12441,6 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             return;
         }
-        Material item = heldItem == null ? Material.AIR : heldItem.getType();
         if (session.type == ArcadePortGame.BOMB_LOBBERS && event.getAction().isRightClick()
                 && "wind-charge".equals(bombLobbersPowerupType(heldItem))) {
             event.setCancelled(true);
