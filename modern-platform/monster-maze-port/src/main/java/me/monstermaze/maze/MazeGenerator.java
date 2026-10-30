@@ -76,11 +76,24 @@ public class MazeGenerator {
      * Empty lobby glass box. Also ensures the permanent quartz shell exists
      * (built once, kept forever in this world).
      */
-    public void buildLobby(Location origin) {
-        if (mazeLive) {
-            teardownMazePatternOnly();
+    /** Set the arena origin without constructing a private lobby or NPC platform. */
+    public void setArenaCenter(Location origin) {
+        if (origin == null || origin.getWorld() == null) {
+            throw new IllegalArgumentException("Monster Maze arena origin must have a world.");
         }
+        if (mazeLive) teardownMazePatternOnly();
+        this.center = origin.clone().getBlock().getLocation().add(0.5, 0, 0.5);
+        clearRuntimeLists();
+        mazeBlocks.clear();
+        mazeLive = false;
+    }
 
+    /**
+     * Legacy isolated-module fixture. Testplex Modern never calls this method;
+     * its only lobby is the shared Arcade lobby.
+     */
+    public void buildLobby(Location origin) {
+        setArenaCenter(origin);
         this.center = origin.clone().getBlock().getLocation().add(0.5, 0, 0.5);
         clearRuntimeLists();
 
@@ -252,29 +265,10 @@ public class MazeGenerator {
         });
     }
 
+    /** Remove the active maze geometry without creating a Monster Maze lobby. */
     public void returnToLobby() {
         if (center == null) return;
         teardownMazePatternOnly();
-        World world = center.getWorld();
-        int cx = center.getBlockX();
-        int cy = center.getBlockY();
-        int cz = center.getBlockZ();
-        int ly = cy + LOBBY_Y_OFFSET;
-
-        for (int x = -LOBBY_R; x <= LOBBY_R; x++) {
-            for (int z = -LOBBY_R; z <= LOBBY_R; z++) {
-                setQuiet(world.getBlockAt(cx + x, ly - 1, cz + z), Material.QUARTZ_BLOCK);
-            }
-        }
-        setQuiet(world.getBlockAt(cx, ly - 1, cz), Material.EMERALD_BLOCK);
-        for (int x = -LOBBY_R; x <= LOBBY_R; x++) {
-            for (int z = -LOBBY_R; z <= LOBBY_R; z++) {
-                if (Math.abs(x) != LOBBY_R && Math.abs(z) != LOBBY_R) continue;
-                for (int y = 0; y <= 2; y++) {
-                    world.getBlockAt(cx + x, ly + y, cz + z).setType(Material.WHITE_STAINED_GLASS);
-                }
-            }
-        }
         mazeLive = false;
     }
 
