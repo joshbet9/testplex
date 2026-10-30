@@ -1675,8 +1675,35 @@ public final class ArcadePortRules {
         return bestAlive <= 0 || tied ? -1 : bestTeam;
     }
 
-    public static double microBattlesHitDamage(boolean projectile) {
-        return projectile ? 4.0D : 6.0D;
+    /** Reborn DamageManager.WeaponDamage defaults to one point for non-weapons. */
+    public static double microBattlesMeleeDamage(Material weapon) {
+        if (weapon == null || weapon.isAir()) return 1.0D;
+        String name = weapon.name();
+        if (!name.endsWith("_SWORD") && !name.endsWith("_AXE")) return 1.0D;
+        int damage = 6;
+        if (name.contains("WOOD")) damage -= 3;
+        else if (name.contains("STONE")) damage -= 2;
+        else if (name.contains("DIAMOND")) damage += 1;
+        // Gold weapons retain the DamageManager base of six.
+        return damage;
+    }
+
+    /** Reborn DamageManager replaces arrow damage with projectile velocity multiplied by three. */
+    public static double microBattlesArrowDamage(double projectileSpeed) {
+        return Double.isFinite(projectileSpeed) && projectileSpeed > 0.0D ? projectileSpeed * 3.0D : 0.0D;
+    }
+
+    /** Reborn's 1.8 armour calculation is damage * (25 - armourPoints) / 25. */
+    public static double microBattlesDamageAfterArmor(double damage, double armorPoints) {
+        if (!Double.isFinite(damage) || damage <= 0.0D) return 0.0D;
+        double armor = Double.isFinite(armorPoints) ? Math.max(0.0D, Math.min(25.0D, armorPoints)) : 0.0D;
+        return damage * (25.0D - armor) / 25.0D;
+    }
+
+    /** Reborn knockback uses log10(max(damage, 2)) and multiplies by Micro's 1.6 perk. */
+    public static double microBattlesKnockbackStrength(double eventDamage) {
+        if (!Double.isFinite(eventDamage)) return 0.0D;
+        return Math.log10(Math.max(eventDamage, 2.0D)) * 1.6D;
     }
 
     public static int microBattlesMinimumFoodLevel(int foodLevel) {
