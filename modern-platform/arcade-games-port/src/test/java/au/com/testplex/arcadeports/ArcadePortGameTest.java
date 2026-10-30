@@ -119,7 +119,7 @@ class ArcadePortGameTest {
 
 
     @Test void exposesTheFourteenGamesNotCoveredByDedicatedMechanicsModules() {
-        assertEquals(14, ArcadePortGame.values().length);
+        assertEquals(15, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
