@@ -4140,6 +4140,21 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSkyWarsPrepareFreeze(PlayerMoveEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SKY_WARS || session.skyWarsLive
+                || !session.alive.contains(event.getPlayer().getUniqueId())) return;
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (to == null || from.getWorld() != session.world || to.getWorld() != session.world) return;
+        if (from.getX() == to.getX() && from.getY() == to.getY() && from.getZ() == to.getZ()) return;
+        Location frozen = from.clone();
+        frozen.setYaw(to.getYaw());
+        frozen.setPitch(to.getPitch());
+        event.setTo(frozen);
+    }
+
     private boolean isSkyWarsKitItem(Session session, UUID ownerId, ItemStack item) {
         if (session == null || session.type != ArcadePortGame.SKY_WARS
                 || ownerId == null || item == null || !item.hasItemMeta()) return false;
@@ -12072,9 +12087,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.SKY_WARS) {
             Player player = event.getPlayer();
             Material placedType = event.getBlockPlaced().getType();
-            boolean specialBlock = placedType == Material.CHEST || placedType == Material.TRAPPED_CHEST
-                    || placedType == Material.ENDER_CHEST || placedType == Material.BARREL
-                    || placedType == Material.HOPPER || placedType == Material.TNT
+            boolean specialBlock = placedType == Material.TNT
                     || placedType == Material.BEDROCK || placedType == Material.BARRIER
                     || placedType.name().contains("COMMAND_BLOCK");
             boolean protectedKitItem = isSkyWarsKitItem(session, player.getUniqueId(), event.getItemInHand());
