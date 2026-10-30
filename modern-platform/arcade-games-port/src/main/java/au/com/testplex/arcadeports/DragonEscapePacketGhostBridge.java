@@ -3,6 +3,7 @@ package au.com.testplex.arcadeports;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityData;
 import com.github.retrooper.packetevents.protocol.entity.data.EntityDataTypes;
+import com.github.retrooper.packetevents.protocol.entity.pose.EntityPose;
 import com.github.retrooper.packetevents.protocol.player.GameMode;
 import com.github.retrooper.packetevents.protocol.player.TextureProperty;
 import com.github.retrooper.packetevents.protocol.player.User;
@@ -18,7 +19,6 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerSp
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -75,11 +75,14 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         byte flags = (byte) (INVISIBLE_FLAG
                 | (sneaking ? SNEAKING_FLAG : 0)
                 | (sprinting ? SPRINTING_FLAG : 0));
-        if (flags != state.entityFlags) {
+        EntityPose pose = sneaking ? EntityPose.CROUCHING : EntityPose.STANDING;
+        if (flags != state.entityFlags || pose != state.entityPose) {
             state.entityFlags = flags;
+            state.entityPose = pose;
             PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                     new WrapperPlayServerEntityMetadata(state.entityId, List.of(
-                            new EntityData<>(0, EntityDataTypes.BYTE, flags))));
+                            new EntityData<>(0, EntityDataTypes.BYTE, flags),
+                            new EntityData<>(6, EntityDataTypes.ENTITY_POSE, pose))));
         }
     }
 
@@ -139,9 +142,10 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         PacketEvents.getAPI().getPlayerManager().sendPacket(viewer,
                 new WrapperPlayServerEntityMetadata(entityId, List.of(
                         new EntityData<>(0, EntityDataTypes.BYTE, flags),
+                        new EntityData<>(6, EntityDataTypes.ENTITY_POSE, EntityPose.STANDING),
                         new EntityData<>(PLAYER_SKIN_PARTS_METADATA_INDEX, EntityDataTypes.BYTE, (byte) 0x7f))));
 
-        return new GhostState(entityId, ghostUuid, teamName, flags);
+        return new GhostState(entityId, ghostUuid, teamName, flags, EntityPose.STANDING);
     }
 
     @Override
@@ -175,12 +179,15 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         private final UUID profileUuid;
         private final String teamName;
         private byte entityFlags;
+        private EntityPose entityPose;
 
-        private GhostState(int entityId, UUID profileUuid, String teamName, byte entityFlags) {
+        private GhostState(int entityId, UUID profileUuid, String teamName,
+                           byte entityFlags, EntityPose entityPose) {
             this.entityId = entityId;
             this.profileUuid = profileUuid;
             this.teamName = teamName;
             this.entityFlags = entityFlags;
+            this.entityPose = entityPose;
         }
     }
 }
