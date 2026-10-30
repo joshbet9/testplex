@@ -170,8 +170,17 @@ public final class DragonEscapePacketGhostBridge implements DragonEscapeGhostBri
         }
     }
 
-    private record GhostState(
-            int entityId, UUID profileUuid, String teamName,
-            byte entityFlags) {
+    private static final class GhostState {
+        private final int entityId;
+        private final UUID profileUuid;
+        private final String teamName;
+        private byte entityFlags;
+
+        private GhostState(int entityId, UUID profileUuid, String teamName, byte entityFlags) {
+            this.entityId = entityId;
+            this.profileUuid = profileUuid;
+            this.teamName = teamName;
+            this.entityFlags = entityFlags;
+        }
     }
 }
