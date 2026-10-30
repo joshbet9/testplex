@@ -1,5 +1,8 @@
 # Isolated manual-acceptance candidates. Availability does not itself certify 100% in-game parity.
+# Draw My Thing and Master Builders are available as modern Arcade-format prototypes.
 # Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball, Runner and Spleef are available as live-acceptance candidates.
+# Candidate availability is not a claim of complete live parity certification.
+# Candidate availability is not a claim of complete live parity certification.
 # Candidate availability is not a claim of complete live parity certification.
 enabled-games:
   - bacon-brawl
@@ -10,6 +13,8 @@ enabled-games:
   - runner
   - gladiators
   - spleef
+  - draw-my-thing
+  - master-builders
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:

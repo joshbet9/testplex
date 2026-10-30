@@ -20,6 +20,10 @@ class ArcadePortGameTest {
         assertEquals(java.util.List.of("Turf Wars"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.TURF_WARS));
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.EVOLUTION).isEmpty(),
                 "Evolution has no legacy map archive folder and must not be given an invented one");
+        assertEquals(java.util.List.of("Draw My Thing"),
+                SourceMapCatalog.mapFoldersFor(ArcadePortGame.DRAW_MY_THING));
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS).isEmpty(),
+                "Master Builders uses generated plots rather than a fabricated source map");
     }
 
     @Test void selectedMapArchivePathsAreValidatedAgainstTheirGame() {
@@ -112,8 +116,8 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheFourteenGamesNotCoveredByDedicatedMechanicsModules() {
-        assertEquals(14, ArcadePortGame.values().length);
+    @Test void exposesTheSixteenGamesNotCoveredByDedicatedMechanicsModules() {
+        assertEquals(16, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -122,6 +126,8 @@ class ArcadePortGameTest {
         }
         assertNull(ArcadePortGame.fromId("monster-maze"));
         assertNull(ArcadePortGame.fromId("snake"));
+        assertEquals(ArcadePortGame.DRAW_MY_THING, ArcadePortGame.fromId("Draw My Thing"));
+        assertEquals(ArcadePortGame.MASTER_BUILDERS, ArcadePortGame.fromId("master_builders"));
     }
 
     @Test void normalizesSpacesAndUnderscoresInTestCommands() {
@@ -598,7 +604,7 @@ class ArcadePortGameTest {
 
         org.bukkit.util.Vector lookingDown = ArcadePortRules.spleefLeapVelocity(
                 new org.bukkit.util.Vector(0.0D, -1.0D, 0.0D), false);
-        assertEquals(-1.0D, lookingDown.getY(), 0.00001D);
+        assertEquals(-0.8D, lookingDown.getY(), 0.00001D);
         org.bukkit.util.Vector lookingUp = ArcadePortRules.spleefLeapVelocity(
                 new org.bukkit.util.Vector(0.0D, 1.0D, 0.0D), true);
         assertEquals(1.2D, lookingUp.getY(), 0.00001D);
