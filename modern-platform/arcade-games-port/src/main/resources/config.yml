@@ -5,6 +5,7 @@
 # Candidate availability is not a claim of complete live parity certification.
 # Candidate availability is not a claim of complete live parity certification.
 enabled-games:
+  - sneaky-assassins
   - bacon-brawl
   - bomb-lobbers
   - dragon-escape
