@@ -4439,36 +4439,6 @@ public final class ArcadePortManager implements Listener {
                 .filter(e -> e instanceof EnderDragon && e.isValid())
                 .map(e -> (EnderDragon) e).toList();
 
-        for (Iterator<Entity> it = session.entities.iterator(); it.hasNext();) {
-            Entity entity = it.next();
-            if (!(entity instanceof Item item) || !session.dragonSparklerItems.contains(item.getUniqueId())) continue;
-            UUID sparklerId = item.getUniqueId();
-            if (!item.isValid() || ArcadePortRules.shouldExpireDragonSparkler(
-                    item.getTicksLived(), item.getLocation().getY(), item.getLocation().getBlock().isLiquid())) {
-                session.dragonSparklerItems.remove(sparklerId);
-                it.remove();
-                item.remove();
-                continue;
-            }
-            if (perkUpdate) {
-                Location itemLocation = item.getLocation();
-                renderDragonSparklerBurst(itemLocation);
-            }
-            if (!targetUpdate) continue;
-            Location itemLocation = item.getLocation();
-            // Dragons ignores a low or submerged Sparkler for targeting but the Sparkler
-            // itself remains until PerkSparkler's >100 tick cleanup.
-            if (!ArcadePortRules.shouldDragonSparklerAttract(
-                    itemLocation.getY(), itemLocation.getBlock().isLiquid())) continue;
-            if (isDragonLocationProtected(session, itemLocation, now)) continue;
-            for (EnderDragon dragon : dragons) {
-                if (dragon.getLocation().distanceSquared(itemLocation)
-                        > ArcadePortRules.DRAGONS_SPARKLER_RANGE_SQUARED) continue;
-                session.dragonTargetPlayers.remove(dragon.getUniqueId());
-                session.dragonTargetLocations.put(dragon.getUniqueId(), itemLocation.clone());
-            }
-        }
-
         if (targetUpdate) {
             for (EnderDragon dragon : dragons) {
                 UUID dragonId = dragon.getUniqueId();
@@ -4526,6 +4496,36 @@ public final class ArcadePortManager implements Listener {
                         applyDragonContactHit(session, dragon, player, now);
                     }
                 }
+            }
+        }
+
+        for (Iterator<Entity> it = session.entities.iterator(); it.hasNext();) {
+            Entity entity = it.next();
+            if (!(entity instanceof Item item) || !session.dragonSparklerItems.contains(item.getUniqueId())) continue;
+            UUID sparklerId = item.getUniqueId();
+            if (!item.isValid() || ArcadePortRules.shouldExpireDragonSparkler(
+                    item.getTicksLived(), item.getLocation().getY(), item.getLocation().getBlock().isLiquid())) {
+                session.dragonSparklerItems.remove(sparklerId);
+                it.remove();
+                item.remove();
+                continue;
+            }
+            if (perkUpdate) {
+                Location itemLocation = item.getLocation();
+                renderDragonSparklerBurst(itemLocation);
+            }
+            if (!targetUpdate) continue;
+            Location itemLocation = item.getLocation();
+            // Dragons ignores a low or submerged Sparkler for targeting but the Sparkler
+            // itself remains until PerkSparkler's >100 tick cleanup.
+            if (!ArcadePortRules.shouldDragonSparklerAttract(
+                    itemLocation.getY(), itemLocation.getBlock().isLiquid())) continue;
+            if (isDragonLocationProtected(session, itemLocation, now)) continue;
+            for (EnderDragon dragon : dragons) {
+                if (dragon.getLocation().distanceSquared(itemLocation)
+                        > ArcadePortRules.DRAGONS_SPARKLER_RANGE_SQUARED) continue;
+                session.dragonTargetPlayers.remove(dragon.getUniqueId());
+                session.dragonTargetLocations.put(dragon.getUniqueId(), itemLocation.clone());
             }
         }
 
