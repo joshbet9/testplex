@@ -15,6 +15,7 @@ enabled-games:
   - spleef
   - draw-my-thing
   - master-builders
+  - sneaky-assassins
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
