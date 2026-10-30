@@ -151,6 +151,7 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey gladiatorMenuActionKey;
     private final NamespacedKey gladiatorMenuValueKey;
     private final NamespacedKey gladiatorPotionKey;
+    private final NamespacedKey gladiatorHotbarKey;
     private final ModernArcadeLobby lobby;
     private final ModernArcadeLobbyRuntime lobbyRuntime;
 
@@ -163,6 +164,7 @@ public final class ArcadePortManager implements Listener {
         this.gladiatorMenuActionKey = new NamespacedKey(plugin, "gladiators-menu-action");
         this.gladiatorMenuValueKey = new NamespacedKey(plugin, "gladiators-menu-value");
         this.gladiatorPotionKey = new NamespacedKey(plugin, "gladiators-healing-pot");
+        this.gladiatorHotbarKey = new NamespacedKey(plugin, "gladiators-hotbar-editor");
         this.lobby = new ModernArcadeLobby(plugin);
         Bukkit.getPluginManager().registerEvents(this, plugin);
         Bukkit.getPluginManager().registerEvents(lobby, plugin);
@@ -2241,6 +2243,11 @@ public final class ArcadePortManager implements Listener {
             }
         }
         player.getInventory().setArmorContents(armorItems);
+        ItemStack editor = namedItem(Material.CHEST, "Hotbar Editor", "Right-click to rearrange your duel hotbar.");
+        ItemMeta editorMeta = editor.getItemMeta();
+        editorMeta.getPersistentDataContainer().set(gladiatorHotbarKey, PersistentDataType.BYTE, (byte) 1);
+        editor.setItemMeta(editorMeta);
+        player.getInventory().setItem(8, editor);
         applyGladiatorHotbarLayout(player);
         player.updateInventory();
     }
@@ -9116,6 +9123,12 @@ public final class ArcadePortManager implements Listener {
         ItemStack heldItem = event.getItem();
 
         if (event.isCancelled()) {
+            boolean forceGladiatorHotbar = session.type == ArcadePortGame.GLADIATORS
+                    && event.getAction().isRightClick() && heldItem != null && heldItem.hasItemMeta()
+                    && heldItem.getItemMeta().getPersistentDataContainer()
+                            .has(gladiatorHotbarKey, PersistentDataType.BYTE)
+                    && session.alive.contains(player.getUniqueId())
+                    && session.gladiatorPairs.containsKey(player.getUniqueId());
             boolean forceBaconAbility = session.type == ArcadePortGame.BACON_BRAWL
                     && event.getAction().isRightClick() && heldItem != null
                     && heldItem.getType() == Material.IRON_AXE
@@ -9129,7 +9142,17 @@ public final class ArcadePortManager implements Listener {
                         || ("waller".equals(bombKit) && heldItem.getType() == Material.STONE_SHOVEL))
                     && (event.getAction().isRightClick() || event.getAction().isLeftClick())
                     && session.alive.contains(player.getUniqueId());
-            if (!forceBaconAbility && !forceBombControlClick) return;
+            if (!forceGladiatorHotbar && !forceBaconAbility && !forceBombControlClick) return;
+        }
+        if (session.type == ArcadePortGame.GLADIATORS
+                && session.alive.contains(player.getUniqueId())
+                && session.gladiatorPairs.containsKey(player.getUniqueId())
+                && heldItem != null && heldItem.hasItemMeta()
+                && heldItem.getItemMeta().getPersistentDataContainer()
+                        .has(gladiatorHotbarKey, PersistentDataType.BYTE)) {
+            event.setCancelled(true);
+            openGladiatorHotbarMenu(player);
+            return;
         }
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && !session.alive.contains(player.getUniqueId())
