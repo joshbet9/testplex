@@ -14,7 +14,7 @@ public final class BuildBypassListener implements Listener {
     public static final String METADATA = "monstermaze_build_bypass";
 
     public BuildBypassListener(MonsterMazePlugin plugin) {
-        org.bukkit.Bukkit.getPluginManager().registerEvents(this, plugin);
+        org.bukkit.Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
     }
 
     private boolean allowed(Player player) {
