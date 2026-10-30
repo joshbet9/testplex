@@ -174,10 +174,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport start <game-id>");
                     return true;
                 }
-                boolean mixedTurfWars = isMixedTurfWarsId(args[1]);
-                ArcadePortGame requestedGame = mixedTurfWars ? ArcadePortGame.TURF_WARS
+                boolean mixedTurfWarsStart = isMixedTurfWarsId(args[1]);
+                ArcadePortGame requestedStartGame = mixedTurfWarsStart ? ArcadePortGame.TURF_WARS
                         : ArcadePortGame.fromId(args[1]);
-                manager.startFromLobby(requestedGame, sender, mixedTurfWars);
+                manager.startFromLobby(requestedStartGame, sender, mixedTurfWarsStart);
                 return true;
             case "kit":
                 if (!(sender instanceof Player player)) {
