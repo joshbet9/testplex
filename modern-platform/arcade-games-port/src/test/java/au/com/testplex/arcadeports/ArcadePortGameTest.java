@@ -186,6 +186,19 @@ class ArcadePortGameTest {
                 new int[] {1, 2}, new int[] {1}));
     }
 
+    @Test void microBattlesAnnihilationMatchesEightKillSourceTracker() {
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesAnnihilation(0));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesAnnihilation(7));
+        assertTrue(ArcadePortRules.shouldAwardMicroBattlesAnnihilation(8));
+        assertTrue(ArcadePortRules.shouldAwardMicroBattlesAnnihilation(9));
+
+        java.util.UUID playerId = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
+        assertEquals("test-achievements.micro-battles." + playerId + ".annihilation",
+                MicroBattlesAchievement.ANNIHILATION.configKey(playerId));
+        assertEquals("", ArcadePortRules.microBattlesAchievementConfigKey(null, "annihilation"));
+        assertEquals("", ArcadePortRules.microBattlesAchievementConfigKey(playerId, "Invalid Slug"));
+    }
+
     @Test void microBattlesVerticalMapScanUsesExclusiveMaximum() {
         assertFalse(ArcadePortRules.isMicroCrumbleScanComplete(95, 96));
         assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(96, 96));
