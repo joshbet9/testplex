@@ -718,6 +718,18 @@ jobs:
             fi
           done
           if ! sudo -n grep -Fq 'MonsterMazeStandalone enabled.' "$SERVER_DIR/logs/latest.log"; then
+            echo "MonsterMazeModern did not complete onEnable; collecting diagnostics before rollback." >&2
+            echo "===== Modern service status =====" >&2
+            sudo -n systemctl status --no-pager --full testplex-modern.service >&2 || true
+            echo "===== Recent Paper log lines (Monster Maze, errors and exceptions) =====" >&2
+            sudo -n grep -i -E -C 3 'MonsterMaze|ERROR|SEVERE|Exception|Caused by:|Failed|Could not|Unable to' "$SERVER_DIR/logs/latest.log" | tail -n 240 >&2 || true
+            echo "===== Latest Paper log tail =====" >&2
+            sudo -n tail -n 180 "$SERVER_DIR/logs/latest.log" >&2 || true
+            echo "===== Modern service journal =====" >&2
+            sudo -n journalctl -u testplex-modern.service -n 100 --no-pager -o short-iso >&2 || true
+            echo "===== Host memory and OOM diagnostics =====" >&2
+            free -h >&2 || true
+            sudo -n dmesg -T 2>/dev/null | grep -i -E 'out of memory|oom|killed process|java' | tail -n 40 >&2 || true
             echo "MonsterMazeModern did not complete onEnable; rolling back the modern-only deployment." >&2
             rollback
             exit 1
