@@ -1813,7 +1813,8 @@ public final class ArcadePortManager implements Listener {
                     ? session.world.spawn(player.getLocation(), WitherSkeleton.class)
                     : session.world.spawn(player.getLocation(), Skeleton.class);
             disguise.setAI(false);
-            disguise.setInvulnerable(true);
+            // Keep the proxy damage-event-capable; onDamage forwards hits to the hidden player.
+            disguise.setInvulnerable(false);
             disguise.setSilent(true);
             disguise.setPersistent(true);
             disguise.setRemoveWhenFarAway(false);
@@ -8676,6 +8677,24 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.type == ArcadePortGame.DEATH_TAG) {
+            Player disguiseOwner = deathTagDisguiseOwner(session, event.getEntity());
+            if (disguiseOwner != null) {
+                double proxyDamage = event.getFinalDamage();
+                event.setCancelled(true);
+                if (event instanceof EntityDamageByEntityEvent byEntity) {
+                    Entity damager = byEntity.getDamager();
+                    if (damager instanceof Player attacker) {
+                        handlePlayerHit(session, attacker, disguiseOwner, "melee");
+                    } else if (damager instanceof Projectile projectile
+                            && projectile.getShooter() instanceof Player shooter
+                            && session.players.containsKey(shooter.getUniqueId())) {
+                        session.deathTagProjectileDamage.put(projectile.getUniqueId(), proxyDamage);
+                    }
+                }
+                return;
+            }
+        }
         if (event.getEntity() instanceof Player target && session.players.containsKey(target.getUniqueId())) {
             double incomingDamage = event.getFinalDamage();
             if (session.type == ArcadePortGame.DEATH_TAG) {
@@ -8741,6 +8760,22 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private Player deathTagDisguiseOwner(Session session, Entity entity) {
+        if (session == null || entity == null) return null;
+        for (Map.Entry<UUID, Mob> entry : session.deathTagDisguises.entrySet()) {
+            Mob disguise = entry.getValue();
+            if (disguise == null || !disguise.getUniqueId().equals(entity.getUniqueId())) continue;
+            Player owner = session.players.get(entry.getKey());
+            return owner != null && owner.isOnline() && session.alive.contains(entry.getKey()) ? owner : null;
+        }
+        return null;
+    }
+
+    private Player deathTagProjectileTarget(Session session, Entity hitEntity) {
+        if (hitEntity instanceof Player player) return player;
+        return deathTagDisguiseOwner(session, hitEntity);
+    }
+
     private void handleDeathTagDamage(Session session, Player target,
             EntityDamageEvent event, double incomingDamage) {
         if (active != session || target == null || !session.alive.contains(target.getUniqueId())
@@ -8798,16 +8833,8 @@ public final class ArcadePortManager implements Listener {
                 || !"archer".equals(session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher"))
                 || !(event.getProjectile() instanceof Arrow arrow)) return;
 
-        boolean hasFletchedArrow = false;
-        for (ItemStack item : player.getInventory().getContents()) {
-            if (item == null || item.getType() != Material.ARROW || !item.hasItemMeta()) continue;
-            ItemMeta meta = item.getItemMeta();
-            if (meta.hasDisplayName() && meta.getDisplayName().contains("Fletched Arrow")) {
-                hasFletchedArrow = true;
-                break;
-            }
-        }
-        if (!hasFletchedArrow) return;
+        // Archer is the only Death Tag kit with a bow; track every shot for remove-on-impact.
+        // Do not inspect the inventory here: the final arrow may already have been consumed.
         session.deathTagFletchedArrows.add(arrow.getUniqueId());
         session.entities.add(arrow);
     }
@@ -8853,9 +8880,9 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.DEATH_TAG
                 && event.getEntity() instanceof Arrow deathTagArrow
                 && session.deathTagFletchedArrows.remove(deathTagArrow.getUniqueId())) {
-            if (event.getHitEntity() instanceof Player target
-                    && deathTagArrow.getShooter() instanceof Player shooter) {
-                handleDeathTagArcherArrowHit(session, deathTagArrow, shooter, target);
+            Player hitTarget = deathTagProjectileTarget(session, event.getHitEntity());
+            if (hitTarget != null && deathTagArrow.getShooter() instanceof Player shooter) {
+                handleDeathTagArcherArrowHit(session, deathTagArrow, shooter, hitTarget);
             }
             session.deathTagProjectileDamage.remove(deathTagArrow.getUniqueId());
             session.entities.remove(deathTagArrow);
@@ -9024,9 +9051,12 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
-        if (event.getHitEntity() instanceof Player target && event.getEntity() instanceof Projectile projectile) {
+        Player projectileTarget = session.type == ArcadePortGame.DEATH_TAG
+                ? deathTagProjectileTarget(session, event.getHitEntity())
+                : event.getHitEntity() instanceof Player player ? player : null;
+        if (projectileTarget != null && event.getEntity() instanceof Projectile projectile) {
             ProjectileSource source = projectile.getShooter();
-            if (source instanceof Player shooter) hitProjectile(session, projectile, shooter, target);
+            if (source instanceof Player shooter) hitProjectile(session, projectile, shooter, projectileTarget);
         } else if (session.type == ArcadePortGame.TURF_WARS && session.turfCombat && event.getHitBlock() != null
                 && event.getEntity() instanceof Projectile projectile && projectile.getShooter() instanceof Player shooter) {
             Block block = event.getHitBlock();
