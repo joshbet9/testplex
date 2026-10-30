@@ -48,7 +48,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         getServer().getPluginManager().registerEvents(mapMenu, this);
         for (Player online : Bukkit.getOnlinePlayers()) {
             Bukkit.getScheduler().runTask(this, () -> {
-                if (online.isOnline()) grantConfiguredAdmin(online);
+                if (online.isOnline()) {
+                    grantConfiguredAdmin(online);
+                    if (manager != null) manager.restoreMonsterMazeKitPreference(online);
+                }
             });
         }
         if (getCommand("arcadeport") == null) {
@@ -102,7 +105,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         Bukkit.getScheduler().runTask(this, () -> {
-            if (player.isOnline()) grantConfiguredAdmin(player);
+            if (player.isOnline()) {
+                grantConfiguredAdmin(player);
+                if (manager != null) manager.restoreMonsterMazeKitPreference(player);
+            }
         });
     }
 
