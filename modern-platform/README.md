@@ -22,6 +22,7 @@ The build uses Paper's official Maven repository and a version range for the cur
 - `snake-port/` builds `SnakeModern.jar`, a Paper-native mechanics-first port with an isolated arena.
 - `arcade-games-port/` builds `ArcadeMechanicsModern.jar`, first-pass game loops and dedicated test arenas for the other 16 games, including Draw My Thing and Master Builders.
 - Game Details routes Monster Maze through `/arcadeport play monster-maze`; its participants, queue, stop handling and return-to-lobby flow are owned by Testplex Arcade.
+- Deployment migrates saved module data from both old standalone data folders (`plugins/MonsterMazeStandalone/` and `plugins/MonsterMazeModern/`), then inspects plugin descriptors and quarantines any standalone Monster Maze Bukkit JAR (including the source project's actual `MonsterMazeStandalone.jar` name) in the deployment backup before Paper restarts. The independent `joshbet9/MonsterMaze` project and its separate services are not modified.
 
 **Important:** the 16 prototype loops are intentionally rough starting points, not a claim of original Mineplex parity. All 18 games remain in progress until their mechanics have passed in-game acceptance. CI confirms compile/unit-level checks only. Cosmetic renderers, progression milestones, and win scenes are out of scope during this parity pass for every game except Monster Maze, where customisation is a core pillar and remains part of acceptance.
 
