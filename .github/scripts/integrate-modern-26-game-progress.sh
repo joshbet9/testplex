@@ -976,7 +976,7 @@ from pathlib import Path
 import re
 
 plugin = Path("modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.java").read_text()
-match = re.search(r"READY_FOR_TEST_GAME_IDS\\s*=\\s*(?:java\\.util\\.)?List\\.of\\s*\\(([^)]*)\\)", plugin, re.S)
+match = re.search(r"READY_FOR_TEST_GAME_IDS\s*=\s*(?:java\.util\.)?List\.of\s*\(([^)]*)\)", plugin, re.S)
 if not match:
     raise SystemExit("Could not read the runtime READY_FOR_TEST allow-list.")
 runtime_enabled = re.findall(r'"([^"]+)"', match.group(1))
