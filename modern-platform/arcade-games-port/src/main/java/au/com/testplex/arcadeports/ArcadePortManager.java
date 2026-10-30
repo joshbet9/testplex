@@ -1635,6 +1635,7 @@ public final class ArcadePortManager implements Listener {
             player.getInventory().clear();
             giveKit(session, player);
             session.lastLocations.put(player.getUniqueId(), spawn.clone());
+            if (type == ArcadePortGame.RUNNER) session.runnerMarathonLastSample.put(player.getUniqueId(), spawn.clone());
             if (type == ArcadePortGame.DRAW_MY_THING) {
                 session.drawStartLocations.put(player.getUniqueId(), spawn.clone());
             }
@@ -3912,6 +3913,10 @@ public final class ArcadePortManager implements Listener {
                         session.paintballKits.getOrDefault(player.getUniqueId(), "rifle"));
                 break;
             case RUNNER: {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION,
+                        Integer.MAX_VALUE, 0, false, false, false), true);
+                player.setFoodLevel(20);
+                player.setSaturation(20.0F);
                 String kit = session.runnerKits.getOrDefault(player.getUniqueId(), "leaper");
                 switch (kit) {
                     case "archer":
@@ -4370,6 +4375,11 @@ public final class ArcadePortManager implements Listener {
         player.getInventory().setItem(1, namedItem(Material.SPLASH_POTION, "Water Bomb",
                 "Clean painted teammates or revive an eliminated teammate near the SAVE ME marker.", waterBombs));
         setPaintballArmor(session, player);
+        if ("rifle".equals(safeKit) || "shotgun".equals(safeKit)) {
+            int speedLevel = "shotgun".equals(safeKit) ? 1 : 0;
+            player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 160, speedLevel, false, false, true), true);
+        } else player.removePotionEffect(PotionEffectType.SPEED);
+        player.removePotionEffect(PotionEffectType.SLOWNESS);
         player.setExp(0.0F);
         player.setSneaking(false);
         player.updateInventory();
@@ -4429,7 +4439,7 @@ public final class ArcadePortManager implements Listener {
         int paintAmount = ArcadePortRules.paintballPaintAmount(kit, false, 0.0D);
         for (int i = 0; i < shots; i++) {
             Projectile projectile;
-            boolean redTeam = session.teams.getOrDefault(playerId, 0) == 0;
+            boolean redTeam = ArcadePortRules.isPaintballRedTeam(session.teams.getOrDefault(playerId, 0));
             if (redTeam) projectile = player.launchProjectile(EnderPearl.class);
             else projectile = player.launchProjectile(Snowball.class);
 
@@ -4455,25 +4465,76 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updatePaintballKitState(Session session, long now) {
+        updatePaintballSpectatorCompasses(session, now);
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
             String kit = session.paintballKits.getOrDefault(id, "rifle");
             if ("sniper".equals(kit)) {
                 ItemStack held = player.getInventory().getItemInMainHand();
-                if (player.isSneaking() && "sniper".equals(paintballKitForItem(held))) {
+                boolean scoped = player.isSneaking() && "sniper".equals(paintballKitForItem(held));
+                if (scoped) {
                     player.setExp(Math.min(0.999F, player.getExp() + 0.03332F));
-                } else if (player.getExp() > 0.0F && !player.isSneaking()) {
-                    player.setExp(0.0F);
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 8, false, false, true), true);
+                } else {
+                    player.removePotionEffect(PotionEffectType.SLOWNESS);
+                    if (player.getExp() > 0.0F) player.setExp(0.0F);
                 }
             } else if ("machine-gun".equals(kit)) {
                 Long lastShot = session.paintballLastShotAt.get(id);
                 if (lastShot == null || now - lastShot >= ArcadePortRules.PAINTBALL_MACHINE_GUN_COOL_RECHARGE_MILLIS) {
                     player.setExp((float) ArcadePortRules.coolPaintballMachineGunHeat(player.getExp()));
                 }
-            } else if (player.getExp() != 0.0F) {
-                player.setExp(0.0F);
+            } else {
+                player.removePotionEffect(PotionEffectType.SLOWNESS);
+                if (player.getExp() != 0.0F) player.setExp(0.0F);
+            }
+            if (session.ticks % 80 == 0) {
+                if ("rifle".equals(kit) || "shotgun".equals(kit)) {
+                    int speedLevel = "shotgun".equals(kit) ? 1 : 0;
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 160, speedLevel, false, false, true), true);
+                } else player.removePotionEffect(PotionEffectType.SPEED);
             }
             if (session.ticks % 10 == 0) updatePaintballWeaponSkin(session, player);
+        }
+    }
+
+    private boolean isPaintballTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+    }
+
+    private void updatePaintballSpectatorCompasses(Session session, long now) {
+        if (now < session.paintballNextCompassUpdateAt) return;
+        session.paintballNextCompassUpdateAt = now + 250L;
+        List<Player> living = alivePlayers(session);
+        if (living.isEmpty()) return;
+        for (Player spectator : session.players.values()) {
+            if (spectator == null || !spectator.isOnline()
+                    || session.alive.contains(spectator.getUniqueId())
+                    || spectator.getWorld() != session.world) continue;
+            boolean hasCompass = java.util.Arrays.stream(spectator.getInventory().getContents())
+                    .anyMatch(this::isPaintballTrackingCompass);
+            if (!hasCompass) spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
+                    "Tracks the nearest opposing Paintball player."));
+            int team = session.teams.getOrDefault(spectator.getUniqueId(), -1);
+            Player target = living.stream()
+                    .filter(candidate -> session.teams.getOrDefault(candidate.getUniqueId(), -2) != team)
+                    .min(java.util.Comparator.comparingDouble(candidate ->
+                            candidate.getLocation().distanceSquared(spectator.getLocation())))
+                    .orElse(null);
+            if (target == null) continue;
+            spectator.setCompassTarget(target.getLocation());
+            if (isPaintballTrackingCompass(spectator.getInventory().getItemInMainHand())) {
+                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                double height = target.getLocation().getY() - spectator.getLocation().getY();
+                spectator.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.RED + target.getName()
+                        + ChatColor.WHITE + " | Distance: " + ChatColor.RED
+                        + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                        + ChatColor.WHITE + " | Height: " + ChatColor.RED
+                        + String.format(java.util.Locale.ROOT, "%.1f", height));
+            }
         }
     }
 
@@ -4512,7 +4573,8 @@ public final class ArcadePortManager implements Listener {
     private void trackPaintballProjectileCosmetic(Session session, Player shooter, Projectile projectile) {
         if (session == null || shooter == null || projectile == null) return;
         int team = session.teams.getOrDefault(shooter.getUniqueId(), 0);
-        Color colour = team == 0 ? Color.RED : Color.AQUA;
+        Color colour = ArcadePortRules.paintballTeamColor(team);
+        session.paintProjectileTeams.put(projectile.getUniqueId(), team);
         String style = paintballCosmeticOption(shooter.getUniqueId(), "pellet");
         session.paintballProjectileCosmetics.put(projectile.getUniqueId(),
                 new PaintballProjectileVisual(projectile, style, colour));
@@ -4531,6 +4593,36 @@ public final class ArcadePortManager implements Listener {
         session.world.spawnParticle(Particle.DUST, receivers, null,
                 point.getX(), point.getY(), point.getZ(), count,
                 offsetX, offsetY, offsetZ, 0.0D, dust, true);
+    }
+
+    private void paintPaintballBlockImpact(Session session, Projectile projectile) {
+        if (session == null || projectile == null || projectile.getWorld() != session.world) return;
+        UUID projectileId = projectile.getUniqueId();
+        if (!session.paintProjectileImpacts.add(projectileId)) return;
+        Integer team = session.paintProjectileTeams.get(projectileId);
+        if (team == null && projectile.getShooter() instanceof Player shooter) {
+            team = session.teams.getOrDefault(shooter.getUniqueId(), 0);
+        }
+        if (team == null) return;
+        Location impact = projectile.getLocation().clone();
+        int centerX = impact.getBlockX();
+        int centerY = impact.getBlockY();
+        int centerZ = impact.getBlockZ();
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dy = -2; dy <= 2; dy++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    if (dx * dx + dy * dy + dz * dz > 2.25D) continue;
+                    Block block = session.world.getBlockAt(centerX + dx, centerY + dy, centerZ + dz);
+                    if (block.getLocation().add(0.5D, 0.5D, 0.5D).distanceSquared(impact) > 2.25D) continue;
+                    Material painted = ArcadePortRules.paintballPaintedBlock(block.getType(), team);
+                    if (painted == null) continue;
+                    session.paintballOriginalBlocks.putIfAbsent(block, block.getBlockData().clone());
+                    block.setType(painted, false);
+                }
+            }
+        }
+        session.world.playSound(impact, Sound.BLOCK_WOOL_PLACE, 0.8F, 1.4F);
+        session.world.spawnParticle(Particle.SPLASH, impact, 12, 0.3D, 0.25D, 0.3D, 0.02D);
     }
 
     private void updatePaintballPelletCosmetics(Session session) {
@@ -4557,7 +4649,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void setPaintballArmor(Session session, Player player) {
-        Color teamColor = session.teams.getOrDefault(player.getUniqueId(), 0) == 0 ? Color.RED : Color.AQUA;
+        Color teamColor = ArcadePortRules.paintballTeamColor(session.teams.getOrDefault(player.getUniqueId(), 0));
         ItemStack[] armor = new ItemStack[] {
                 new ItemStack(Material.LEATHER_BOOTS),
                 new ItemStack(Material.LEATHER_LEGGINGS),
@@ -4584,7 +4676,7 @@ public final class ArcadePortManager implements Listener {
         marker.setCanPickupItems(false);
         marker.setCustomName(ChatColor.RED + "SAVE ME! " + player.getName());
         marker.setCustomNameVisible(true);
-        Color teamColor = session.teams.getOrDefault(player.getUniqueId(), 0) == 0 ? Color.RED : Color.AQUA;
+        Color teamColor = ArcadePortRules.paintballTeamColor(session.teams.getOrDefault(player.getUniqueId(), 0));
         ItemStack[] armor = new ItemStack[] {
                 new ItemStack(Material.LEATHER_BOOTS), new ItemStack(Material.LEATHER_LEGGINGS),
                 new ItemStack(Material.LEATHER_CHESTPLATE), new ItemStack(Material.LEATHER_HELMET)
@@ -4657,6 +4749,7 @@ public final class ArcadePortManager implements Listener {
             target.setFoodLevel(20);
             target.setSaturation(20.0F);
             session.paintPiecesRemaining.put(targetId, 4);
+            session.paintballRevives.merge(throwerId, 1, Integer::sum);
             givePaintballKit(session, target, session.paintballKits.getOrDefault(targetId, "rifle"));
             target.sendMessage(ChatColor.GREEN + "You were revived by " + thrower.getName() + "!");
             thrower.sendMessage(ChatColor.GREEN + "Revived " + target.getName() + "!");
@@ -5098,6 +5191,7 @@ public final class ArcadePortManager implements Listener {
             markRunnerFootprints(session, now);
             processRunnerBlocks(session, now);
             updateRunnerKits(session, now);
+            updateRunnerDistance(session, now);
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             updateDragonEscapeSafeLocations(session);
@@ -8567,6 +8661,33 @@ public final class ArcadePortManager implements Listener {
         if (session.alive.size() <= 1) finish(session, alivePlayers(session).stream().findFirst().orElse(null), true);
     }
 
+    private void recordPaintballKill(Session session, Player killer, Player victim) {
+        if (session == null || killer == null || victim == null) return;
+        UUID killerId = killer.getUniqueId();
+        UUID victimId = victim.getUniqueId();
+        session.paintballDeaths.merge(victimId, 1, Integer::sum);
+        long now = System.currentTimeMillis();
+        Long lastKill = session.paintballLastKillAt.get(killerId);
+        int streak = lastKill == null || now - lastKill > 5_000L
+                ? 1 : session.paintballRecentKills.getOrDefault(killerId, 0) + 1;
+        session.paintballRecentKills.put(killerId, streak);
+        session.paintballLastKillAt.put(killerId, now);
+        if (ArcadePortRules.shouldAwardPaintballKillingSpree(streak)) {
+            session.paintballKillingSpreeAwards.merge(killerId, 1, Integer::sum);
+        }
+        session.paintballRecentKills.remove(victimId);
+        session.paintballLastKillAt.remove(victimId);
+        int team = session.teams.getOrDefault(killerId, -1);
+        long teammatesAlive = session.alive.stream()
+                .filter(id -> session.teams.getOrDefault(id, -2) == team).count();
+        if (teammatesAlive == 1) {
+            int soloKills = session.paintballLastStandKills.merge(killerId, 1, Integer::sum);
+            if (ArcadePortRules.shouldAwardPaintballLastStand(soloKills)) {
+                session.paintballLastStandAwards.merge(killerId, 1, Integer::sum);
+            }
+        }
+    }
+
     private void eliminate(Session session, Player player, Player killer, String reason) {
         if (active != session || player == null) return;
         if (session.type == ArcadePortGame.BACON_BRAWL
@@ -8688,8 +8809,18 @@ public final class ArcadePortManager implements Listener {
             awardDragonSurvivalGems(session, eliminatedId, System.currentTimeMillis());
         }
         player.leaveVehicle();
+        if (session.type == ArcadePortGame.PAINTBALL) {
+            if (killer != null && session.players.containsKey(killer.getUniqueId())) {
+                recordPaintballKill(session, killer, player);
+            } else {
+                session.paintballDeaths.merge(player.getUniqueId(), 1, Integer::sum);
+            }
+        }
         if (session.type == ArcadePortGame.PAINTBALL && player.isOnline()) {
             spawnPaintballSaveMeMarker(session, player);
+            player.setHealth(20.0D);
+            player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 30, 0, false, false, true), true);
+            player.setVelocity(new Vector(0.0D, 1.2D, 0.0D));
             player.setGameMode(GameMode.SPECTATOR);
             player.setAllowFlight(true);
             player.setFlying(true);
@@ -9454,8 +9585,11 @@ public final class ArcadePortManager implements Listener {
         } else if (session.type == ArcadePortGame.BOMB_LOBBERS) {
             handlePlayerHit(session, shooter, target, "bomb hit");
         } else if (session.type == ArcadePortGame.PAINTBALL) {
+            paintPaintballBlockImpact(session, projectile);
             int paintAmount = session.paintProjectileDamage.getOrDefault(projectile.getUniqueId(), 1);
             session.paintProjectileDamage.remove(projectile.getUniqueId());
+            session.paintProjectileTeams.remove(projectile.getUniqueId());
+            session.paintProjectileImpacts.remove(projectile.getUniqueId());
             session.paintballProjectileCosmetics.remove(projectile.getUniqueId());
             handlePlayerHit(session, shooter, target, "projectile hit", paintAmount);
         } else if (session.type == ArcadePortGame.DEATH_TAG) {
@@ -9669,7 +9803,22 @@ public final class ArcadePortManager implements Listener {
         session.dragonFlareZones.clear();
         session.dragonWaterDamageNextAt.clear();
         session.paintProjectileDamage.clear();
+        session.paintProjectileTeams.clear();
+        session.paintProjectileImpacts.clear();
         session.paintballProjectileCosmetics.clear();
+        for (Map.Entry<Block, BlockData> entry : session.paintballOriginalBlocks.entrySet()) {
+            Block block = entry.getKey();
+            if (block != null && block.getWorld() == session.world) block.setBlockData(entry.getValue(), false);
+        }
+        session.paintballOriginalBlocks.clear();
+        session.paintballDeaths.clear();
+        session.paintballRevives.clear();
+        session.paintballRecentKills.clear();
+        session.paintballLastKillAt.clear();
+        session.paintballKillingSpreeAwards.clear();
+        session.paintballLastStandKills.clear();
+        session.paintballLastStandAwards.clear();
+        session.paintballNextCompassUpdateAt = 0L;
         session.paintballLastShotAt.clear();
         session.paintballWaterBombLastThrowAt.clear();
         session.paintballWaterBombs.clear();
@@ -9681,8 +9830,17 @@ public final class ArcadePortManager implements Listener {
         session.quiverCloakedUntil.clear();
         for (Block block : session.evolutionWebs.keySet()) if (block.getType() == Material.COBWEB) block.setType(Material.AIR, false);
         session.evolutionWebs.clear();
+        for (Map.Entry<Block, BlockData> entry : session.runnerOriginalBlockData.entrySet()) {
+            Block block = entry.getKey();
+            if (block != null && block.getWorld() == session.world) block.setBlockData(entry.getValue(), false);
+        }
+        session.runnerOriginalBlockData.clear();
         session.runnerBlocks.clear();
         session.runnerBlockMaterials.clear();
+        session.runnerMarathonLastSample.clear();
+        session.runnerMarathonDistance.clear();
+        session.runnerMarathonNextSampleAt = 0L;
+        session.runnerCompassNextUpdateAt = 0L;
         session.runnerWalkedBlocks.clear();
         session.runnerJumpCounts.clear();
         session.runnerTrailOptions.clear();
@@ -10077,7 +10235,9 @@ public final class ArcadePortManager implements Listener {
             }
             boolean turfWarsWinner = session.type == ArcadePortGame.TURF_WARS
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
-            boolean won = winnerId != null && (winnerId.equals(id) || turfWarsWinner
+            boolean paintballWinner = session.type == ArcadePortGame.PAINTBALL
+                    && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean won = winnerId != null && (winnerId.equals(id) || turfWarsWinner || paintballWinner
                     || (session.type == ArcadePortGame.BOMB_LOBBERS && session.alive.contains(id)
                         && session.teams.getOrDefault(id, -2) == winningTeam));
             if (won) {
@@ -10088,6 +10248,22 @@ public final class ArcadePortManager implements Listener {
                     plugin.getConfig().set(path + "the-comeback",
                             plugin.getConfig().getInt(path + "the-comeback", 0) + 1);
                 }
+            }
+            if (session.type == ArcadePortGame.RUNNER) {
+                int marathonDistance = (int) Math.round(session.runnerMarathonDistance.getOrDefault(id, 0.0D));
+                plugin.getConfig().set(path + "marathon-runner",
+                        plugin.getConfig().getInt(path + "marathon-runner", 0) + marathonDistance);
+            }
+            if (session.type == ArcadePortGame.PAINTBALL) {
+                plugin.getConfig().set(path + "kills", plugin.getConfig().getInt(path + "kills", 0) + score);
+                plugin.getConfig().set(path + "deaths", plugin.getConfig().getInt(path + "deaths", 0)
+                        + session.paintballDeaths.getOrDefault(id, 0));
+                plugin.getConfig().set(path + "medic", plugin.getConfig().getInt(path + "medic", 0)
+                        + session.paintballRevives.getOrDefault(id, 0));
+                plugin.getConfig().set(path + "killing-spree", plugin.getConfig().getInt(path + "killing-spree", 0)
+                        + session.paintballKillingSpreeAwards.getOrDefault(id, 0));
+                plugin.getConfig().set(path + "last-stand", plugin.getConfig().getInt(path + "last-stand", 0)
+                        + session.paintballLastStandAwards.getOrDefault(id, 0));
             }
             if (session.type == ArcadePortGame.SPLEEF) {
                 plugin.getConfig().set(path + "blocks-broken",
@@ -10109,6 +10285,25 @@ public final class ArcadePortManager implements Listener {
                 if (comeAtMeBro > 0) {
                     plugin.getConfig().set(path + "come-at-me-bro",
                             plugin.getConfig().getInt(path + "come-at-me-bro", 0) + comeAtMeBro);
+                }
+            }
+        }
+        if (session.type == ArcadePortGame.PAINTBALL && winnerId != null && winningTeam >= 0) {
+            long elapsed = Math.max(0L, System.currentTimeMillis() - session.startedAt);
+            int startingWinners = (int) session.teams.values().stream().filter(team -> team == winningTeam).count();
+            long survivingWinners = session.alive.stream()
+                    .filter(id -> session.teams.getOrDefault(id, -2) == winningTeam).count();
+            for (UUID id : session.alive) {
+                if (session.teams.getOrDefault(id, -2) != winningTeam) continue;
+                String path = localStatsPath(id, ArcadePortGame.PAINTBALL.id());
+                if (ArcadePortRules.shouldAwardPaintballSpeedrunner(elapsed, true)) {
+                    plugin.getConfig().set(path + "speedrunner",
+                            plugin.getConfig().getInt(path + "speedrunner", 0) + 1);
+                }
+                if (ArcadePortRules.shouldAwardPaintballFlawlessVictory(
+                        startingWinners, (int) survivingWinners, true)) {
+                    plugin.getConfig().set(path + "flawless-victory",
+                            plugin.getConfig().getInt(path + "flawless-victory", 0) + 1);
                 }
             }
         }
@@ -10728,13 +10923,26 @@ public final class ArcadePortManager implements Listener {
             lore.add(ChatColor.GRAY + "The Shreddinator: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "the-shreddinator", 0));
             lore.add(ChatColor.GRAY + "The Comeback: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "the-comeback", 0));
         }
-        if ("death-tag".equals(gameId)) {
+        if ("death-tag".equals(gameId) || "paintball".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Deaths: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "deaths", 0));
+        }
+        if ("death-tag".equals(gameId)) {
             lore.add(ChatColor.GRAY + "K/D Ratio: " + ChatColor.WHITE
                     + String.format(java.util.Locale.ROOT, "%.2f",
                     plugin.getConfig().getDouble(path + "kill-death-ratio", 0.0D)));
             lore.add(ChatColor.GRAY + "Come At Me Bro: " + ChatColor.WHITE
                     + plugin.getConfig().getInt(path + "come-at-me-bro", 0));
+        }
+        if ("paintball".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Killing Spree: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "killing-spree", 0));
+            lore.add(ChatColor.GRAY + "Last Stand: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "last-stand", 0));
+            lore.add(ChatColor.GRAY + "Medic: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "medic", 0));
+            lore.add(ChatColor.GRAY + "Speedrunner: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "speedrunner", 0));
+            lore.add(ChatColor.GRAY + "Flawless Victory: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "flawless-victory", 0));
         }
         if ("bacon-brawl".equals(gameId)) {
             long unlocked = java.util.Arrays.stream(BaconBrawlAchievement.values())
@@ -10760,6 +10968,8 @@ public final class ArcadePortManager implements Listener {
             lore.add(ChatColor.GRAY + "TNT thrown: " + plugin.getConfig().getInt(path + "thrown", 0));
             lore.add(ChatColor.GRAY + "Direct hits: " + plugin.getConfig().getInt(path + "direct-hits", 0));
         } else if ("runner".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Marathon Runner: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "marathon-runner", 0) + " blocks");
             String[] slugs = {"gettin-those-steps-in", "hop-to-it", "flash"};
             long unlocked = java.util.Arrays.stream(slugs)
                     .filter(slug -> plugin.getConfig().getBoolean(runnerAchievementKey(targetId, slug), false))
@@ -11096,6 +11306,57 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void updateRunnerDistance(Session session, long now) {
+        if (now >= session.runnerMarathonNextSampleAt) {
+            session.runnerMarathonNextSampleAt = now + 1_000L;
+            for (Player player : alivePlayers(session)) {
+                UUID id = player.getUniqueId();
+                Location current = player.getLocation().clone();
+                Location previous = session.runnerMarathonLastSample.put(id, current);
+                if (previous != null && previous.getWorld() == current.getWorld()) {
+                    double distance = previous.distance(current);
+                    if (Double.isFinite(distance) && distance >= 0.0D) {
+                        session.runnerMarathonDistance.merge(id, distance, Double::sum);
+                    }
+                }
+            }
+        }
+        if (now >= session.runnerCompassNextUpdateAt) {
+            session.runnerCompassNextUpdateAt = now + 250L;
+            List<Player> targets = alivePlayers(session);
+            if (targets.isEmpty()) return;
+            for (Player spectator : session.players.values()) {
+                if (spectator == null || !spectator.isOnline()
+                        || session.alive.contains(spectator.getUniqueId())
+                        || spectator.getWorld() != session.world) continue;
+                boolean hasCompass = java.util.Arrays.stream(spectator.getInventory().getContents())
+                        .anyMatch(this::isRunnerTrackingCompass);
+                if (!hasCompass) spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
+                        "Tracks the nearest surviving Runner."));
+                Player target = targets.stream().min(java.util.Comparator.comparingDouble(candidate ->
+                        candidate.getLocation().distanceSquared(spectator.getLocation()))).orElse(null);
+                if (target == null) continue;
+                spectator.setCompassTarget(target.getLocation());
+                if (isRunnerTrackingCompass(spectator.getInventory().getItemInMainHand())) {
+                    double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                    double height = target.getLocation().getY() - spectator.getLocation().getY();
+                    spectator.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.GREEN + target.getName()
+                            + ChatColor.WHITE + " | Distance: " + ChatColor.GREEN
+                            + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                            + ChatColor.WHITE + " | Height: " + ChatColor.GREEN
+                            + String.format(java.util.Locale.ROOT, "%.1f", height));
+                }
+            }
+        }
+    }
+
+    private boolean isRunnerTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+    }
+
     private Material runnerTrailMaterial(Session session, Player owner) {
         String selected = session.runnerTrailOptions.getOrDefault(owner.getUniqueId(), "trail-cyan");
         String colour = selected.startsWith("trail-") ? selected.substring("trail-".length()) : selected;
@@ -11149,6 +11410,7 @@ public final class ArcadePortManager implements Listener {
                 session.runnerBlocks.containsKey(block))) return;
         // World-block changes are sent by the server to all players and spectators.
         Material trail = runnerTrailMaterial(session, owner);
+        session.runnerOriginalBlockData.putIfAbsent(block, block.getBlockData().clone());
         block.setType(trail, false);
         session.runnerBlocks.put(block, now);
         session.runnerBlockMaterials.put(block, trail);
@@ -12402,11 +12664,18 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
-         if (session.type == ArcadePortGame.PAINTBALL) {
-            // Block impacts and non-player entity impacts also end the visible pellet trail.
-            session.paintballProjectileCosmetics.remove(event.getEntity().getUniqueId());
-            if (event.getHitEntity() == null) {
-                session.paintProjectileDamage.remove(event.getEntity().getUniqueId());
+        if (session.type == ArcadePortGame.PAINTBALL
+                && event.getEntity() instanceof Projectile paintProjectile
+                && session.paintProjectileDamage.containsKey(paintProjectile.getUniqueId())) {
+            paintPaintballBlockImpact(session, paintProjectile);
+            session.paintballProjectileCosmetics.remove(paintProjectile.getUniqueId());
+            if (event.getHitBlock() != null || !(event.getHitEntity() instanceof Player)) {
+                session.paintProjectileDamage.remove(paintProjectile.getUniqueId());
+                session.paintProjectileTeams.remove(paintProjectile.getUniqueId());
+                session.paintProjectileImpacts.remove(paintProjectile.getUniqueId());
+                session.entities.remove(paintProjectile);
+                paintProjectile.remove();
+                return;
             }
         }
 
@@ -12439,6 +12708,13 @@ public final class ArcadePortManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPaintballTrackingCompassDrop(org.bukkit.event.player.PlayerDropItemEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.PAINTBALL) return;
+        if (isPaintballTrackingCompass(event.getItemDrop().getItemStack())) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBaconTrackingCompassDrop(org.bukkit.event.player.PlayerDropItemEvent event) {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.BACON_BRAWL) return;
@@ -12464,6 +12740,15 @@ public final class ArcadePortManager implements Listener {
                 || !(event.getEntity() instanceof Player player)
                 || !session.players.containsKey(player.getUniqueId())) return;
         event.setFoodLevel(20); // Dragons sets HungerSet=20.
+    }
+
+    @EventHandler
+    public void onPaintballNaturalRegeneration(EntityRegainHealthEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.PAINTBALL
+                || !(event.getEntity() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())) return;
+        if (event.getRegainReason() == EntityRegainHealthEvent.RegainReason.SATIATED) event.setCancelled(true);
     }
 
     @EventHandler
@@ -13023,10 +13308,14 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPaintballPearlTeleport(PlayerTeleportEvent event) {
         Session session = active;
-        if (session == null || session.type != ArcadePortGame.PAINTBALL
-                || event.getCause() != PlayerTeleportEvent.TeleportCause.ENDER_PEARL
-                || !session.players.containsKey(event.getPlayer().getUniqueId())) return;
-        event.setCancelled(true);
+        if (session == null || !session.players.containsKey(event.getPlayer().getUniqueId())) return;
+        UUID playerId = event.getPlayer().getUniqueId();
+        if (session.type == ArcadePortGame.RUNNER) {
+            session.runnerMarathonLastSample.remove(playerId);
+            return;
+        }
+        if (session.type == ArcadePortGame.PAINTBALL
+                && event.getCause() == PlayerTeleportEvent.TeleportCause.ENDER_PEARL) event.setCancelled(true);
     }
 
     /** Match Reborn's UtilBlock.usable guard so map containers, switches and doors stay inert. */
@@ -14823,6 +15112,17 @@ public final class ArcadePortManager implements Listener {
         int masterBuilderReviewIndex;
         final Map<UUID, Integer> paintPiecesRemaining = new HashMap<>();
         final Map<UUID, String> paintballKits = new HashMap<>();
+        final Map<UUID, Integer> paintProjectileTeams = new HashMap<>();
+        final Set<UUID> paintProjectileImpacts = new HashSet<>();
+        final Map<Block, BlockData> paintballOriginalBlocks = new HashMap<>();
+        final Map<UUID, Integer> paintballDeaths = new HashMap<>();
+        final Map<UUID, Integer> paintballRevives = new HashMap<>();
+        final Map<UUID, Integer> paintballRecentKills = new HashMap<>();
+        final Map<UUID, Long> paintballLastKillAt = new HashMap<>();
+        final Map<UUID, Integer> paintballKillingSpreeAwards = new HashMap<>();
+        final Map<UUID, Integer> paintballLastStandKills = new HashMap<>();
+        final Map<UUID, Integer> paintballLastStandAwards = new HashMap<>();
+        long paintballNextCompassUpdateAt;
         final Map<UUID, Long> paintballLastShotAt = new HashMap<>();
         final Map<UUID, Long> paintballWaterBombLastThrowAt = new HashMap<>();
         final Set<UUID> paintballWaterBombs = new HashSet<>();
@@ -15066,6 +15366,11 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, List<DragonEscapeGhostFrame>> dragonEscapeRunGhostFrames = new HashMap<>();
         final Map<Block, Long> runnerBlocks = new HashMap<>();
         final Map<Block, Material> runnerBlockMaterials = new HashMap<>();
+        final Map<Block, BlockData> runnerOriginalBlockData = new HashMap<>();
+        final Map<UUID, Location> runnerMarathonLastSample = new HashMap<>();
+        final Map<UUID, Double> runnerMarathonDistance = new HashMap<>();
+        long runnerMarathonNextSampleAt;
+        long runnerCompassNextUpdateAt;
         final Map<UUID, String> runnerKits = new HashMap<>();
         final Map<UUID, Long> runnerLeapReadyAt = new HashMap<>();
         final Map<UUID, Long> runnerQuickshotReadyAt = new HashMap<>();
