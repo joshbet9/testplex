@@ -29,7 +29,7 @@ public final class BackendClient {
         this.pendingDir = new File(plugin.getDataFolder(), "backend-pending");
         if (isEnabled()) {
             plugin.getLogger().info("Monster Maze backend API enabled: " + baseUrl);
-            Bukkit.getScheduler().runTaskLater(plugin, new Runnable() { @Override public void run() { flushPending(); } }, 40L);
+            Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() { @Override public void run() { flushPending(); } }, 40L);
         }
     }
     public boolean isEnabled() { return !baseUrl.isEmpty() && !token.isEmpty(); }
