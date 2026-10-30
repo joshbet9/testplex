@@ -9505,9 +9505,19 @@ public final class ArcadePortManager implements Listener {
         }
 
         if (session.type == ArcadePortGame.MICRO_BATTLES
-                && event.getEntity() instanceof Arrow microArrow
-                && session.microFletchedArrows.remove(microArrow.getUniqueId())) {
-            microArrow.remove();
+                && event.getEntity() instanceof Arrow microArrow) {
+            UUID arrowId = microArrow.getUniqueId();
+            boolean removeOnImpact = session.microFletchedArrows.remove(arrowId);
+            Vector arrowVelocity = session.microArrowVelocities.remove(arrowId);
+            if (event.getHitEntity() instanceof Player target
+                    && microArrow.getShooter() instanceof Player shooter
+                    && session.players.containsKey(shooter.getUniqueId())
+                    && session.players.containsKey(target.getUniqueId())) {
+                if (arrowVelocity == null) arrowVelocity = microArrow.getVelocity().clone();
+                handlePlayerHit(session, shooter, target, "arrow hit", 1, arrowVelocity);
+            }
+            // Reborn's Fletcher arrows disappear on impact, after their hit is resolved.
+            if (removeOnImpact) microArrow.remove();
             return;
         }
 
