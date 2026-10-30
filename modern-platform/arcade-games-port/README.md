@@ -6,9 +6,13 @@ This plugin adds first-pass playable mechanics harnesses for the 15 Arcade games
 
 SkyWars is registered as the isolated `skywars-mixed` variant for Paper 26.3. It uses the archived 1.8 SkyWars maps and authored player-island spawns, and accepts up to 16 players without modifying the legacy Solo SkyWars or Team SkyWars classes.
 
-The fast format uses a 5-second preparation window, an 8-minute round ceiling, a world-border close beginning 60 seconds after the fight starts (45-second shrink), and a shared throwable-TNT generator that supplies two TNT every 15 seconds. Island, connector and middle chests are populated from separate loot pools; sponge marker blocks are removed. Players can break/place ordinary blocks after the start, throw TNT with right-click, and drop their inventory on elimination. SkyWars is still a manual-acceptance candidate, not a claim of complete 1.8 parity.
+The fast format uses a 5-second preparation window, an 8-minute live-round ceiling, a block-by-block distance-priority island crumble beginning 60 seconds after the fight starts, and a 45-second world-border close to 32 blocks. The shared generator holds two throwable TNT until collected, then recharges 15 seconds later. Throwable TNT keeps the source 60-tick fuse, 1.6 throw strength and 500 ms click recharge; left-click throws, right-click drops. Island, connector and middle chest pools use the original item families, weights, spawn probabilities and marker groups. The original RED-point Zombie Guardians are spawned with their 15-health gold-armour setup, tether, fire resistance and middle-loot death drop.
+
+The lobby kit selector exposes the five legacy SkyWars kits: Ice (temporary bridge), Fire (area burst), Air (Void Saver and double jump), Metal (armour scaling and Magnet) and Earth (recharging Throwable Dirt). A nearest-target compass is provided to alive players and remains usable by eliminated spectators.
 
 Join with `/arcadeport join skywars-mixed`, quick-start with `/arcadeport play skywars-mixed`, or start the queued lobby with `/arcadeport start skywars-mixed`. Choose an installed map with `/arcadeport maps skywars`.
+
+SkyWars remains a manual-acceptance candidate, not a claim of complete 1.8 parity. The port still needs local Maven compilation and in-game validation, including all archived maps, loot rolls, each kit under combat, guardian pathing/death rewards, TNT damage and disconnect cleanup.
 
 ## Games covered in this first pass
 
