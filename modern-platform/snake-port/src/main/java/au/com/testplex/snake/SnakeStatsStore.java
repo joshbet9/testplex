@@ -28,15 +28,15 @@ public final class SnakeStatsStore {
     public void recordKill(Player player, int killsThisRound) {
         String path = base(player.getUniqueId());
         data.set(path + ".lifetime-kills", data.getInt(path + ".lifetime-kills") + 1);
-        if (killsThisRound == SnakeRules.CANNIBAL_KILLS_REQUIRED) award(player.getUniqueId(), "Cannibal");
-        save();
+        if (killsThisRound == SnakeRules.CANNIBAL_KILLS_REQUIRED
+                && award(player.getUniqueId(), "Cannibal")) save();
     }
 
     public void recordSlime(Player player, int slimesThisRound) {
         String path = base(player.getUniqueId());
         data.set(path + ".lifetime-slimes", data.getInt(path + ".lifetime-slimes") + 1);
-        if (slimesThisRound == SnakeRules.SLIMY_SHEEP_REQUIRED) award(player.getUniqueId(), "SlimySheep");
-        save();
+        if (slimesThisRound == SnakeRules.SLIMY_SHEEP_REQUIRED
+                && award(player.getUniqueId(), "SlimySheep")) save();
     }
 
     public void recordTailLength(Player player, int tailLength) {
@@ -44,16 +44,16 @@ public final class SnakeStatsStore {
         if (tailLength > data.getInt(path + ".best-tail-length")) {
             data.set(path + ".best-tail-length", tailLength);
         }
-        if (tailLength >= SnakeRules.CHOO_CHOO_LENGTH_REQUIRED) award(player.getUniqueId(), "ChooChoo");
-        save();
+        if (tailLength == SnakeRules.CHOO_CHOO_LENGTH_REQUIRED
+                && award(player.getUniqueId(), "ChooChoo")) save();
     }
 
-    private void award(UUID player, String stat) {
+    private boolean award(UUID player, String stat) {
         String path = base(player) + ".achievements." + stat;
-        if (!data.getBoolean(path)) {
-            data.set(path, true);
-            plugin.getLogger().info("Snake achievement " + stat + " awarded to " + player + ".");
-        }
+        if (data.getBoolean(path)) return false;
+        data.set(path, true);
+        plugin.getLogger().info("Snake achievement " + stat + " awarded to " + player + ".");
+        return true;
     }
 
     public void recordGameEnd(UUID player, boolean won, int killsThisRound) {
