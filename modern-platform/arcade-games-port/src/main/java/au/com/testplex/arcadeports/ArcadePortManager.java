@@ -8420,6 +8420,23 @@ public final class ArcadePortManager implements Listener {
                         (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
                         lore, "noop", null, null));
             }
+            int[] metricSlots = {29, 30, 31, 32};
+            int[] metricValues = {
+                    plugin.getConfig().getInt(path + "kills", score),
+                    plugin.getConfig().getInt(path + "assists", 0),
+                    plugin.getConfig().getInt(path + "damage-taken", 0),
+                    plugin.getConfig().getInt(path + "damage-dealt", 0)
+            };
+            String[] metricLabels = {"Kills", "Assists", "Damage Taken", "Damage Dealt"};
+            for (int i = 0; i < metricSlots.length; i++) {
+                int value = metricValues[i];
+                inventory.setItem(metricSlots[i], statsItem(
+                        value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (value > 0 ? ChatColor.GREEN : ChatColor.RED) + metricLabels[i],
+                        List.of(" ", ChatColor.GRAY + "Recorded by this local test server: " + ChatColor.WHITE + value,
+                                ChatColor.DARK_GRAY + "Equivalent to the original Micro Battles chat stats."),
+                        "noop", null, null));
+            }
         } else {
             int[] slots = {29, 30, 31, 32};
             int[] values = {played, wins, score, knockouts};
@@ -8511,6 +8528,15 @@ public final class ArcadePortManager implements Listener {
         lore.add(ChatColor.GRAY + "Wins: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "wins", 0));
         lore.add(ChatColor.GRAY + "Score / Kills: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "score", 0));
         lore.add(ChatColor.GRAY + "Knockouts: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "knockouts", 0));
+        if ("micro-battles".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Kills: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "kills", plugin.getConfig().getInt(path + "score", 0)));
+            lore.add(ChatColor.GRAY + "Assists: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "assists", 0));
+            lore.add(ChatColor.GRAY + "Damage Taken: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "damage-taken", 0));
+            lore.add(ChatColor.GRAY + "Damage Dealt: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "damage-dealt", 0));
+        }
         if ("death-tag".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Deaths: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "deaths", 0));
             lore.add(ChatColor.GRAY + "K/D Ratio: " + ChatColor.WHITE
