@@ -1122,7 +1122,8 @@ public final class ArcadePortManager implements Listener {
             player.closeInventory();
             player.leaveVehicle();
             player.teleport(spawn);
-            player.setGameMode(type == ArcadePortGame.BACON_BRAWL ? GameMode.ADVENTURE : GameMode.SURVIVAL);
+            player.setGameMode(type == ArcadePortGame.BACON_BRAWL
+                    || type == ArcadePortGame.ONE_IN_THE_QUIVER ? GameMode.ADVENTURE : GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
             player.setSaturation(20.0F);
@@ -2153,7 +2154,18 @@ public final class ArcadePortManager implements Listener {
                         sword = new ItemStack(Material.STONE_SWORD);
                         break;
                 }
-                player.getInventory().setItem(ArcadePortRules.QUIVER_SWORD_SLOT, sword);
+                // Adventure mode mirrors the source Quiver rules. Give the kit weapon only
+            // the stained-glass break predicate; the BlockBreak listener enforces it again.
+            Set<Material> breakableGlass = new HashSet<>();
+            for (Material candidate : Material.values()) {
+                if (isQuiverBreakableGlass(candidate)) breakableGlass.add(candidate);
+            }
+            ItemMeta swordMeta = sword.getItemMeta();
+            if (swordMeta != null) {
+                swordMeta.setCanDestroy(breakableGlass);
+                sword.setItemMeta(swordMeta);
+            }
+            player.getInventory().setItem(ArcadePortRules.QUIVER_SWORD_SLOT, sword);
                 player.getInventory().setItem(ArcadePortRules.QUIVER_BOW_SLOT, new ItemStack(Material.BOW));
                 player.getInventory().setItem(ArcadePortRules.QUIVER_ARROW_SLOT, namedItem(Material.ARROW,
                         "Super Arrow", "One arrow per shot; earn another with each kill."));
@@ -6050,7 +6062,7 @@ public final class ArcadePortManager implements Listener {
                         || !session.players.containsKey(victimId) || !session.respawning.remove(victimId)) return;
                 Location spawn = spawnFor(session, player);
                 player.teleport(spawn);
-                player.setGameMode(GameMode.SURVIVAL);
+                player.setGameMode(GameMode.ADVENTURE);
                 player.setHealth(player.getMaxHealth());
                 player.setFoodLevel(20);
                 player.setSaturation(20.0F);
@@ -7008,7 +7020,7 @@ public final class ArcadePortManager implements Listener {
                     || !session.players.containsKey(targetId) || !session.respawning.remove(targetId)) return;
             Location spawn = spawnFor(session, target);
             target.teleport(spawn);
-            target.setGameMode(GameMode.SURVIVAL);
+            target.setGameMode(GameMode.ADVENTURE);
             target.setHealth(target.getMaxHealth());
             target.setFoodLevel(20);
             target.setSaturation(20.0F);
