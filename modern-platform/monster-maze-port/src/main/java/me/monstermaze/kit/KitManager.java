@@ -114,7 +114,6 @@ public class KitManager implements Listener {
      *  or TRANSPARENT (see-through ghosts). */
     private enum VisMode { VISIBLE, INVISIBLE, TRANSPARENT }
 
-    private KitGUI gui;
 
     public KitManager(MonsterMazePlugin plugin, GameManager game, me.monstermaze.util.GameScoreboard scoreboard) {
         this.plugin = plugin;
@@ -122,7 +121,6 @@ public class KitManager implements Listener {
         this.scoreboard = scoreboard;
         Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
 
-        this.gui = new KitGUI(plugin, game, this);
 
         // Slowball constructor tick (every 2 seconds = PerkConstructor rate)
         Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
@@ -145,10 +143,6 @@ public class KitManager implements Listener {
                 tickAbilityBars();
             }
         }, 1L, 1L);
-    }
-
-    public void openSelector(Player player) {
-        gui.open(player);
     }
 
     public KitType getKit(Player player) {
@@ -1158,11 +1152,7 @@ public class KitManager implements Listener {
         if (game.getState() != GameState.LIVE && game.getState() != GameState.STARTING) return;
         Player p = (Player) event.getWhoClicked();
         if (!game.getAlivePlayers().contains(p)) return;
-        // Allow kit GUI only
-        if (event.getInventory() != null && event.getView().getTitle() != null
-                && event.getView().getTitle().equals(KitGUI.TITLE)) {
-            return;
-        }
+        // Testplex's shared lobby owns kit selection; all match inventories stay locked.
         event.setCancelled(true);
     }
 
