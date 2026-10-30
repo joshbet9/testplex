@@ -2105,6 +2105,8 @@ public final class ArcadePortManager implements Listener {
             if (!sourceArenas) buildGladiatorArenaAt(session.world, center, matchTier, false);
         }
 
+        session.gladiatorArenaCentersByPair.put(pair, center.clone());
+
         Location[] spawns;
         if (sourceArenas) {
             spawns = gladiatorArenaSpawnPair(session, center, true);
@@ -6437,6 +6439,7 @@ public final class ArcadePortManager implements Listener {
         session.gladiatorResolvedPairs.add(pair);
         session.gladiatorPairs.remove(victimId);
         session.gladiatorPairs.remove(killer.getUniqueId());
+        session.gladiatorArenaCentersByPair.remove(pair);
         session.gladiatorFightStartsAtByPair.remove(pair);
         session.gladiatorRoundStartedAtByPair.remove(pair);
         session.gladiatorNextPoisonAtByPair.remove(pair);
@@ -6513,6 +6516,7 @@ public final class ArcadePortManager implements Listener {
             }
             session.gladiatorResolvedPairs.add(pair);
             session.gladiatorPairs.remove(id);
+            session.gladiatorArenaCentersByPair.remove(pair);
             session.gladiatorFightStartsAtByPair.remove(pair);
             session.gladiatorRoundStartedAtByPair.remove(pair);
             session.gladiatorNextPoisonAtByPair.remove(pair);
@@ -8044,8 +8048,28 @@ public final class ArcadePortManager implements Listener {
 
     private void checkPlayerArena(Session session, Player player) {
         if (!session.alive.contains(player.getUniqueId())) return;
-        if (session.type == ArcadePortGame.GLADIATORS
-                && !session.gladiatorPairs.containsKey(player.getUniqueId())) return;
+        if (session.type == ArcadePortGame.GLADIATORS) {
+            Integer pair = session.gladiatorPairs.get(player.getUniqueId());
+            if (pair == null) return;
+            int bracket = session.gladiatorPairBrackets.getOrDefault(pair, GLADIATOR_BRACKET_WINNERS);
+            Location location = player.getLocation();
+            if (bracket == GLADIATOR_BRACKET_LOSERS) {
+                Location center = session.gladiatorArenaCentersByPair.get(pair);
+                if (center != null && (Math.abs(location.getX() - center.getX()) > 3.65D
+                        || Math.abs(location.getZ() - center.getZ()) > 3.65D)) {
+                    eliminate(session, player, null, "left the loser's bracket arena");
+                    return;
+                }
+            } else {
+                SourceMapCatalog.MapData gladiatorMap = sourceMapData.get(session.type.id());
+                if (gladiatorMap != null && gladiatorMap.hasBounds()
+                        && (location.getX() < gladiatorMap.minX() || location.getX() > gladiatorMap.maxX()
+                        || location.getZ() < gladiatorMap.minZ() || location.getZ() > gladiatorMap.maxZ())) {
+                    eliminate(session, player, null, "left the Gladiators arena");
+                    return;
+                }
+            }
+        }
         Location location = player.getLocation();
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(session.type.id());
         double voidThresholdY;
@@ -10985,6 +11009,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> gladiatorPairs = new HashMap<>();
         final Set<Integer> gladiatorResolvedPairs = new HashSet<>();
         final Map<Integer, Integer> gladiatorPairBrackets = new HashMap<>();
+        final Map<Integer, Location> gladiatorArenaCentersByPair = new HashMap<>();
         final Map<Integer, Long> gladiatorFightStartsAtByPair = new HashMap<>();
         final Map<Integer, Long> gladiatorRoundStartedAtByPair = new HashMap<>();
         final Map<Integer, Long> gladiatorNextPoisonAtByPair = new HashMap<>();
