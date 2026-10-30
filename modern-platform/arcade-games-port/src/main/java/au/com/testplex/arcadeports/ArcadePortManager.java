@@ -1466,6 +1466,35 @@ public final class ArcadePortManager implements Listener {
             announce(session, ChatColor.AQUA + "Master Builders: build " + ChatColor.YELLOW + session.masterBuilderTheme
                     + ChatColor.AQUA + " in 3 minutes, followed by player reviews.");
         }
+        if (type == ArcadePortGame.CASTLE_ASSAULT || type == ArcadePortGame.HEROES_OF_GWEN) {
+            session.variantRuntime = new CastleAssaultHeroesOfGwenRuntime(plugin, type, world,
+                    sourceMapData.get(type.id()), participants, session.teams, mixedArcadeVariant,
+                    new CastleAssaultHeroesOfGwenRuntime.Hooks() {
+                        @Override
+                        public void eliminate(Player victim, Player killer, String reason) {
+                            ArcadePortManager.this.eliminate(session, victim, killer, reason);
+                        }
+
+                        @Override
+                        public void finish(Player winner, int winningTeam, String reason) {
+                            if (active == session) ArcadePortManager.this.finish(session, winner, winner != null);
+                        }
+                    });
+            if (!session.variantRuntime.isReady()) {
+                sender.sendMessage(ChatColor.RED + "The authentic " + type.displayName()
+                        + " source markers could not be prepared. The round was cancelled without enabling this game.");
+                finish(session, null, false);
+                return;
+            }
+            if (type == ArcadePortGame.CASTLE_ASSAULT) {
+                announce(session, ChatColor.GOLD + "Castle Assault: destroy the two enemy sentry crystals, then defeat the King. "
+                        + "Objective TNT respawns every "
+                        + ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(mixedArcadeVariant) / 1000L + " seconds.");
+            } else {
+                announce(session, ChatColor.GOLD + "Heroes of Gwen: destroy the enemy towers, then defeat the Wither. "
+                        + (mixedArcadeVariant ? "Middle towers are removed and store prices are halved." : "Earn gold to buy upgrades."));
+            }
+        }
         if (participants.size() == 1) announce(session, ChatColor.GRAY + "Solo test mode: the run will remain available for practice until the timer ends or you reset it.");
         session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
         sender.sendMessage(ChatColor.GREEN + "Started " + type.displayName() + " with " + participants.size() + (participants.size() == 1 ? " player." : " players."));
@@ -4611,6 +4640,7 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.variantRuntime != null) session.variantRuntime.tick(now);
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.DRAW_MY_THING) updateDrawMyThing(session, now);
         if (session.type == ArcadePortGame.MASTER_BUILDERS) updateMasterBuilders(session, now);
@@ -8008,6 +8038,8 @@ public final class ArcadePortManager implements Listener {
     private String gameStatusText(Session session, Player player) {
         UUID id = player.getUniqueId();
         return switch (session.type) {
+            case CASTLE_ASSAULT -> "objective TNT | kills " + scoreFor(session, id);
+            case HEROES_OF_GWEN -> "gold store | team " + (session.teams.getOrDefault(id, 0) + 1);
             case BACON_BRAWL -> "meter " + session.baconMeters.getOrDefault(id, 0) + "% | knockback x"
                     + String.format(java.util.Locale.ROOT, "%.1f", session.baconKnockback)
                     + " | " + baconTimingStatusText(session, id, System.currentTimeMillis());
@@ -8062,6 +8094,11 @@ public final class ArcadePortManager implements Listener {
     private void checkRoundEnd(Session session) {
         if (active != session) return;
         if (session.type == ArcadePortGame.DRAW_MY_THING || session.type == ArcadePortGame.MASTER_BUILDERS) return;
+        // Castle Assault and Heroes of Gwen end through their objective controllers, not last-player rules.
+        if (session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN) {
+            if (session.alive.isEmpty() && session.respawning.isEmpty()) finish(session, null, true);
+            return;
+        }
         // An empty live set is a real end condition even during a one-player test.
         if (session.alive.isEmpty()) {
             if (!ArcadePortRules.shouldFinishWhenNobodyIsAlive(session.alive.size(), session.respawning.size())) return;
@@ -9128,6 +9165,10 @@ public final class ArcadePortManager implements Listener {
             recordDeathTagRewards(session);
         }
         recordLocalStats(session, winner, announceWinner);
+        if (session.variantRuntime != null) {
+            session.variantRuntime.stop();
+            session.variantRuntime = null;
+        }
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
         }
@@ -14334,6 +14375,7 @@ public final class ArcadePortManager implements Listener {
         long startedAt;
          boolean microBarrierActive;
         final boolean mixedArcadeVariant;
+        CastleAssaultHeroesOfGwenRuntime variantRuntime;
         boolean turfCombat;
         long turfPhaseEndsAt;
         int turfFrontlineX = -1;
