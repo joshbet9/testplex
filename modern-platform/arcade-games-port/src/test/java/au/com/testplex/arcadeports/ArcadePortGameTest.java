@@ -2000,11 +2000,11 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.teamWithBestTimeoutStanding(2, 2, 4, 4));
     }
 
-    @Test void deathTagLightsAlternateBetweenGoldAndWhiteWool() {
-        assertEquals(org.bukkit.Material.WHITE_WOOL,
+    @Test void deathTagLightsAlternateBetweenGoldAndBlackWool() {
+        assertEquals(org.bukkit.Material.BLACK_WOOL,
                 ArcadePortRules.deathTagNextLightMaterial(org.bukkit.Material.GOLD_BLOCK));
         assertEquals(org.bukkit.Material.GOLD_BLOCK,
-                ArcadePortRules.deathTagNextLightMaterial(org.bukkit.Material.WHITE_WOOL));
+                ArcadePortRules.deathTagNextLightMaterial(org.bukkit.Material.BLACK_WOOL));
         assertEquals(org.bukkit.Material.GOLD_BLOCK,
                 ArcadePortRules.deathTagNextLightMaterial(org.bukkit.Material.GLOWSTONE));
     }
