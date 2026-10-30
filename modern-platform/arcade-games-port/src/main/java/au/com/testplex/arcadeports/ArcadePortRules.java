@@ -459,7 +459,16 @@ public final class ArcadePortRules {
     public static final int DRAGON_ESCAPE_DISRUPTOR_MAX_TNT = 2;
     public static final long DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS = 8_000L;
     public static final long DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS = 8_000L;
+    public static final long DRAGON_ESCAPE_SCORE_UPDATE_MILLIS = 500L;
     public static final int DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS = 40;
+
+    public static boolean shouldRunDragonEscapeScoreUpdate(long nowMillis, long nextUpdateAtMillis) {
+        return nowMillis >= nextUpdateAtMillis;
+    }
+
+    public static long nextDragonEscapeScoreUpdateAt(long nowMillis) {
+        return nowMillis + DRAGON_ESCAPE_SCORE_UPDATE_MILLIS;
+    }
 
     /** Reborn applies the 0.2 lift, caps Y, then adds a further 0.2 when grounded. */
     public static double dragonEscapeLeapVerticalVelocity(double normalizedFacingY, boolean grounded) {

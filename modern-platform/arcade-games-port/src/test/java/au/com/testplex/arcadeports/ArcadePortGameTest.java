@@ -1336,6 +1336,14 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isDragonEscapeWarpGraceActive(2_000L, 1_000L));
     }
 
+    @Test void dragonEscapeRacerScoresUseTheSourceFiveHundredMillisecondCadence() {
+        assertTrue(ArcadePortRules.shouldRunDragonEscapeScoreUpdate(1_000L, 0L));
+        assertFalse(ArcadePortRules.shouldRunDragonEscapeScoreUpdate(1_499L, 1_500L));
+        assertTrue(ArcadePortRules.shouldRunDragonEscapeScoreUpdate(1_500L, 1_500L));
+        assertEquals(2_000L, ArcadePortRules.nextDragonEscapeScoreUpdateAt(1_500L));
+        assertEquals(500L, ArcadePortRules.DRAGON_ESCAPE_SCORE_UPDATE_MILLIS);
+    }
+
     @Test void dragonEscapeLeapUsesSourceVelocityClampBeforeGroundBoostAndSourceItemCharges() {
         assertEquals(0.4D, ArcadePortRules.dragonEscapeLeapVerticalVelocity(0.0D, true), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.dragonEscapeLeapVerticalVelocity(0.9D, false), 0.00001D);

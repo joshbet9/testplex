@@ -4246,42 +4246,44 @@ public final class ArcadePortManager implements Listener {
     }
 
     private int dragonEscapePlayerProgress(Session session, Player player) {
-        if (!session.dragonEscapeWaypoints.isEmpty()) {
-            UUID id = player.getUniqueId();
-            int previousProgress = session.dragonEscapePlayerProgress.getOrDefault(id, 0);
-            int observedIndex = getClosestDragonEscapeWaypointIndex(session, player.getLocation());
-            Integer trackedObserved = session.dragonEscapeObservedWaypoint.get(id);
-            int previousObserved = ArcadePortRules.dragonEscapeObservedWaypointBaseline(
-                    trackedObserved == null ? previousProgress : trackedObserved, observedIndex,
-                    trackedObserved != null);
-            int nextExpected = Math.min(session.dragonEscapeWaypoints.size() - 1,
-                    Math.max(0, previousObserved + 1));
-            double distanceToNext = player.getLocation().distance(session.dragonEscapeWaypoints.get(nextExpected));
-            double distanceToObserved = player.getLocation().distance(session.dragonEscapeWaypoints.get(observedIndex));
-            long now = System.currentTimeMillis();
-            long warpedAt = session.dragonEscapeWarpedAt.getOrDefault(id, -1L);
-            if (ArcadePortRules.shouldRejectDragonEscapeShortcut(previousObserved, observedIndex,
-                    distanceToNext, distanceToObserved, now, warpedAt)) {
-                eliminate(session, player, null, "cheating");
-                return previousProgress;
-            }
-            session.dragonEscapeObservedWaypoint.put(id, Math.max(previousObserved, observedIndex));
-            int candidate = getDragonEscapeWaypointIndex(session, player.getLocation(), previousProgress);
-            if (ArcadePortRules.isDragonEscapeWarpGraceActive(now, warpedAt)) {
-                candidate = Math.max(candidate, observedIndex);
-            }
-            int progress = ArcadePortRules.monotonicDragonEscapeProgress(
-                    previousProgress, candidate, session.dragonEscapeWaypoints.size());
-            session.dragonEscapePlayerProgress.put(id, progress);
-            Map<Integer, Long> runSplits = session.dragonEscapeRunSplitMillis.computeIfAbsent(id, ignored -> new HashMap<>());
-            runSplits.putIfAbsent(0, 0L);
-            long elapsed = Math.max(0L, now - session.startedAt);
-            for (int passed = previousProgress; passed < progress; passed++) {
-                runSplits.putIfAbsent(passed + 1, elapsed);
-            }
-            return progress;
+        if (session.dragonEscapeWaypoints.isEmpty()) return player.getLocation().getBlockZ();
+        return session.dragonEscapePlayerProgress.getOrDefault(player.getUniqueId(), 0);
+    }
+
+    /** Mutates checkpoint/rank state only on Reborn's 500ms FAST score cadence. */
+    private int updateDragonEscapePlayerProgress(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        int previousProgress = session.dragonEscapePlayerProgress.getOrDefault(id, 0);
+        int observedIndex = getClosestDragonEscapeWaypointIndex(session, player.getLocation());
+        Integer trackedObserved = session.dragonEscapeObservedWaypoint.get(id);
+        int previousObserved = ArcadePortRules.dragonEscapeObservedWaypointBaseline(
+                trackedObserved == null ? previousProgress : trackedObserved, observedIndex,
+                trackedObserved != null);
+        int nextExpected = Math.min(session.dragonEscapeWaypoints.size() - 1,
+                Math.max(0, previousObserved + 1));
+        double distanceToNext = player.getLocation().distance(session.dragonEscapeWaypoints.get(nextExpected));
+        double distanceToObserved = player.getLocation().distance(session.dragonEscapeWaypoints.get(observedIndex));
+        long warpedAt = session.dragonEscapeWarpedAt.getOrDefault(id, -1L);
+        if (ArcadePortRules.shouldRejectDragonEscapeShortcut(previousObserved, observedIndex,
+                distanceToNext, distanceToObserved, now, warpedAt)) {
+            eliminate(session, player, null, "cheating");
+            return previousProgress;
         }
-        return player.getLocation().getBlockZ();
+        session.dragonEscapeObservedWaypoint.put(id, Math.max(previousObserved, observedIndex));
+        int candidate = getDragonEscapeWaypointIndex(session, player.getLocation(), previousProgress);
+        if (ArcadePortRules.isDragonEscapeWarpGraceActive(now, warpedAt)) {
+            candidate = Math.max(candidate, observedIndex);
+        }
+        int progress = ArcadePortRules.monotonicDragonEscapeProgress(
+                previousProgress, candidate, session.dragonEscapeWaypoints.size());
+        session.dragonEscapePlayerProgress.put(id, progress);
+        Map<Integer, Long> runSplits = session.dragonEscapeRunSplitMillis.computeIfAbsent(id, ignored -> new HashMap<>());
+        runSplits.putIfAbsent(0, 0L);
+        long elapsed = Math.max(0L, now - session.startedAt);
+        for (int passed = previousProgress; passed < progress; passed++) {
+            runSplits.putIfAbsent(passed + 1, elapsed);
+        }
+        return progress;
     }
 
     private int getClosestDragonEscapeWaypointIndex(Session session, Location location) {
@@ -4592,22 +4594,29 @@ public final class ArcadePortManager implements Listener {
                 session.dragonEscapeLastDestructionLocation = location.clone();
             }
 
-            int lastIndex = session.dragonEscapeWaypoints.size() - 1;
-            for (Player player : new ArrayList<>(alivePlayers(session))) {
-                int playerIndex = dragonEscapePlayerProgress(session, player);
-                Location playerNext = session.dragonEscapeWaypoints.get(Math.min(lastIndex, playerIndex + 1));
-                Location dragonNext = session.dragonEscapeWaypoints.get(Math.min(lastIndex, dragonIndex + 1));
-                double playerScore = playerIndex * 10_000.0D - player.getLocation().distance(playerNext);
-                double dragonScore = dragonIndex * 10_000.0D - location.distance(dragonNext);
-                if (playerIndex == lastIndex && player.getLocation().distance(
-                        session.dragonEscapeWaypoints.get(lastIndex)) < 3.0D) {
-                    recordDragonEscapeFinish(session, player, System.currentTimeMillis());
-                    finish(session, player, true);
-                    return;
-                }
-                if (dragonScore > playerScore) {
-                    eliminate(session, player, null, "was caught by Douglas the Dragon");
-                    if (active != session) return;
+            long now = System.currentTimeMillis();
+            if (ArcadePortRules.shouldRunDragonEscapeScoreUpdate(
+                    now, session.dragonEscapeNextScoreUpdateAt)) {
+                session.dragonEscapeNextScoreUpdateAt =
+                        ArcadePortRules.nextDragonEscapeScoreUpdateAt(now);
+                int lastIndex = session.dragonEscapeWaypoints.size() - 1;
+                for (Player player : new ArrayList<>(alivePlayers(session))) {
+                    int playerIndex = updateDragonEscapePlayerProgress(session, player, now);
+                    if (!session.alive.contains(player.getUniqueId())) continue;
+                    Location playerNext = session.dragonEscapeWaypoints.get(Math.min(lastIndex, playerIndex + 1));
+                    Location dragonNext = session.dragonEscapeWaypoints.get(Math.min(lastIndex, dragonIndex + 1));
+                    double playerScore = playerIndex * 10_000.0D - player.getLocation().distance(playerNext);
+                    double dragonScore = dragonIndex * 10_000.0D - location.distance(dragonNext);
+                    if (playerIndex == lastIndex && player.getLocation().distance(
+                            session.dragonEscapeWaypoints.get(lastIndex)) < 3.0D) {
+                        recordDragonEscapeFinish(session, player, now);
+                        finish(session, player, true);
+                        return;
+                    }
+                    if (dragonScore > playerScore) {
+                        eliminate(session, player, null, "was caught by Douglas the Dragon");
+                        if (active != session) return;
+                    }
                 }
             }
             return;
@@ -9892,6 +9901,7 @@ public final class ArcadePortManager implements Listener {
         UUID dragonEscapeBeaconLeader;
         String dragonEscapeBeaconColor = "white";
         int dragonEscapeDragonProgress;
+        long dragonEscapeNextScoreUpdateAt;
         final Map<UUID, Integer> dragonEscapePlayerProgress = new HashMap<>();
         final Map<UUID, Map<Integer, Long>> dragonEscapeRunSplitMillis = new HashMap<>();
         final Map<Block, Long> runnerBlocks = new HashMap<>();
