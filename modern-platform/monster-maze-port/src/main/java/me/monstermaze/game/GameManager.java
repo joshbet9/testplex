@@ -129,24 +129,6 @@ public class GameManager implements Listener {
         mazeGenerator.setArenaCenter(center);
     }
 
-    /** Call on enable: void spawn becomes lobby center. */
-    public void bootstrapLobby(Location voidSpawn) {
-        if (voidSpawn == null) return;
-        this.center = voidSpawn.clone();
-        mazeGenerator.setArenaCenter(center);
-    }
-
-    public Location getLobbySpawn() {
-        if (mazeGenerator.getLobbyCenter() != null) {
-            // Feet on the elevated lobby platform
-            return mazeGenerator.getLobbyCenter().add(0, 1, 0);
-        }
-        if (center != null) {
-            return center.clone().add(0.5, 1, 0.5);
-        }
-        return null;
-    }
-
     /** Compatibility bridge: all player lobby returns belong to Testplex Arcade. */
     public void sendToLobby(Player player) {
         if (player != null && player.isOnline()) {
@@ -465,12 +447,8 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 p.showPlayer(target);
             }
 
-            if (testplexManagedRound && testplexReturnToLobby != null) {
-                testplexReturnToLobby.accept(p);
-            } else {
-                Location lobby = getLobbySpawn();
-                if (lobby != null) p.teleport(lobby);
-            }
+            if (testplexReturnToLobby != null) testplexReturnToLobby.accept(p);
+            else plugin.getHostPlugin().returnPlayerToArcadeLobby(p);
         }
         alive.clear();
         spectators.clear();
@@ -485,23 +463,6 @@ public void startGame(Location preferCenter, int requestedPattern) {
         roundParticipants.clear();
         testplexManagedRound = false;
         testplexReturnToLobby = null;
-    }
-
-    /** Rebuild + redraw the lobby leaderboard hologram. Safe to call outside a live game. */
-    private void refreshLeaderboardBoard() {
-        if (mazeGenerator.getLobbyCenter() != null) {
-            leaderboardBoard.place(mazeGenerator.getLobbyCenter());
-            leaderboardBoard.render(plugin.getMode());
-        } else {
-            leaderboardBoard.remove();
-        }
-    }
-
-    /** Public hook to redraw the lobby board (e.g. after a mode change). */
-    public void rerenderLeaderboardBoard() {
-        if (state == GameState.IDLE || state == GameState.ENDING) {
-            refreshLeaderboardBoard();
-        }
     }
 
     private void cleanupEntities() {
@@ -1075,12 +1036,8 @@ public void startGame(Location preferCenter, int requestedPattern) {
         World arenaWorld = center.getWorld();
         if (shouldRedirectUnregisteredPlayer(state, roundParticipants.contains(id),
                 arenaWorld, player.getWorld())) {
-            if (testplexManagedRound && testplexReturnToLobby != null) {
-                testplexReturnToLobby.accept(player);
-            } else {
-                Location lobby = getLobbySpawn();
-                if (lobby != null) player.teleport(lobby);
-            }
+            if (testplexReturnToLobby != null) testplexReturnToLobby.accept(player);
+            else plugin.getHostPlugin().returnPlayerToArcadeLobby(player);
             return;
         }
         if (!roundParticipants.contains(id)
