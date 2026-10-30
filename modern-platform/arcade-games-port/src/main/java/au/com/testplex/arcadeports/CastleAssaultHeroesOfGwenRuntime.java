@@ -87,6 +87,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final NamespacedKey objectiveTntKey;
     private final NamespacedKey thrownTntOwnerKey;
     private final NamespacedKey shopItemKey;
+    private final NamespacedKey shopRoleKey;
     private final NamespacedKey kingKey;
     private final NamespacedKey towerKey;
     private final Map<Integer, KingState> kings = new HashMap<>();
@@ -129,6 +130,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         this.objectiveTntKey = new NamespacedKey(plugin, "castle-objective-tnt");
         this.thrownTntOwnerKey = new NamespacedKey(plugin, "castle-thrown-tnt-owner");
         this.shopItemKey = new NamespacedKey(plugin, "heroes-gwen-store-item");
+        this.shopRoleKey = new NamespacedKey(plugin, "heroes-gwen-store-role");
         this.kingKey = new NamespacedKey(plugin, "castle-king-team");
         this.towerKey = new NamespacedKey(plugin, "heroes-gwen-tower");
         for (Player player : participants) this.players.put(player.getUniqueId(), player);
@@ -289,20 +291,124 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void initialiseStore() {
-        addStoreEntry(Material.IRON_SWORD, "Stone Sword", 500, "A dependable melee upgrade.");
-        addStoreEntry(Material.GOLDEN_SWORD, "Frostbound Sword", 750, "Slows opponents on hit.");
-        addStoreEntry(Material.IRON_HELMET, "Archer's Bane", 150, "Light protective upgrade.");
-        addStoreEntry(Material.IRON_CHESTPLATE, "Archer's Bane Chestplate", 200, "Projectile protection.");
-        addStoreEntry(Material.IRON_LEGGINGS, "Archer's Bane Leggings", 200, "Movement and defence upgrade.");
-        addStoreEntry(Material.IRON_BOOTS, "Archer's Bane Boots", 150, "Movement upgrade.");
-        addStoreEntry(Material.GOLDEN_APPLE, "Golden Applegate", 250, "A quick recovery item.");
-        addStoreEntry(Material.POTION, "Small Health Potion", 100, "Restores health.");
-        addStoreEntry(Material.ENDER_PEARL, "Ender Pearl", 750, "A short-range escape.");
-        addStoreEntry(Material.BOW, "Hunter's Bow", 500, "A ranged weapon.");
+        addStoreEntry("Assassin", Material.GOLDEN_SWORD, "Sword of Time", 800, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.IRON_SWORD, "Adventurer's Sword", 1000, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.DIAMOND_SWORD, "Pumpkin King's Blade", 1750, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.LEATHER_HELMET, "Leather Cap", 200, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.LEATHER_HELMET, "Ninja's Mask", 500, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.LEATHER_HELMET, "Urchin's Cap", 600, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.CHAINMAIL_HELMET, "Bruiser's Helm", 1000, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.LEATHER_CHESTPLATE, "Leather Chestplate", 250, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.LEATHER_CHESTPLATE, "Ninja's Chestcloth", 750, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.LEATHER_CHESTPLATE, "Urchin's Chestcloth", 850, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.CHAINMAIL_CHESTPLATE, "Bruiser's Chestplate", 1250, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.LEATHER_LEGGINGS, "Leather Leggings", 250, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.LEATHER_LEGGINGS, "Ninja's Leggings", 750, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.LEATHER_LEGGINGS, "Urchin's Leggings", 850, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.CHAINMAIL_LEGGINGS, "Bruiser's Leggings", 1250, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.LEATHER_BOOTS, "Leather Boots", 200, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.LEATHER_BOOTS, "Ninja's Boots", 500, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.LEATHER_BOOTS, "Urchin's Boots", 600, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.CHAINMAIL_BOOTS, "Bruiser's Boots", 1000, "Legacy Assassin store item.");
+        addStoreEntry("Warrior", Material.STONE_SWORD, "Stone Sword", 500, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.GOLDEN_SWORD, "Frostbound Sword", 750, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.GOLDEN_SWORD, "Swift Blade", 750, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_SWORD, "Knight's Blade", 1250, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_HELMET, "Archer's Bane", 150, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_HELMET, "Superior Archer's Bane", 350, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_HELMET, "Brawler's Plate", 350, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_HELMET, "Superior Brawler's Plate", 750, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.DIAMOND_HELMET, "Prince's Plate", 1200, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_CHESTPLATE, "Archer's Bane", 200, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_CHESTPLATE, "Superior Archer's Bane", 450, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_CHESTPLATE, "Brawler's Plate", 450, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_CHESTPLATE, "Superior Brawler's Plate", 1000, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.DIAMOND_CHESTPLATE, "Prince's Plate", 1500, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_LEGGINGS, "Archer's Bane", 200, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_LEGGINGS, "Superior Archer's Bane", 450, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_LEGGINGS, "Brawler's Plate", 450, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_LEGGINGS, "Superior Brawler's Plate", 1000, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.DIAMOND_LEGGINGS, "Prince's Plate", 1500, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_BOOTS, "Archer's Bane", 150, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_BOOTS, "Superior Archer's Bane", 350, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_BOOTS, "Brawler's Plate", 350, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.IRON_BOOTS, "Superior Brawler's Plate", 750, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.DIAMOND_BOOTS, "Prince's Plate", 1200, "Legacy Warrior store item.");
+        addStoreEntry("Mage", Material.LEATHER_HELMET, "Leather Cap", 200, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_HELMET, "Adept's Cap", 750, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_HELMET, "Helm of Focus", 750, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_HELMET, "Battle Mage Cap", 750, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.GOLDEN_HELMET, "Golden Helmet", 1000, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_CHESTPLATE, "Leather Chestplate", 400, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_CHESTPLATE, "Adept's Chestplate", 1500, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_CHESTPLATE, "Chestplate of Focus", 1250, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_CHESTPLATE, "Battle Mage Chestplate", 1250, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.GOLDEN_CHESTPLATE, "Golden Chestplate", 1250, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_LEGGINGS, "Leather Leggings", 400, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_LEGGINGS, "Adept's Leggings", 1000, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_LEGGINGS, "Leggings of Focus", 1000, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_LEGGINGS, "Battle Mage Leggings", 1000, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.GOLDEN_LEGGINGS, "Golden Leggings", 1000, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_BOOTS, "Leather Boots", 200, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_BOOTS, "Adept's Boots", 750, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_BOOTS, "Boots of Focus", 750, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.LEATHER_BOOTS, "Battle Mage Boots", 750, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.GOLDEN_BOOTS, "Golden Boots", 1000, "Legacy Mage store item.");
+        addStoreEntry("Hunter", Material.BOW, "Hunter's Bow", 500, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.BOW, "Elven Bow", 750, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.BOW, "Eagle's Bow", 1000, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.BOW, "Bow of Pursuit", 1200, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.BOW, "Vampiric Bow", 1500, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.BOW, "Bow of Renewal", 1750, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.BOW, "Specialist's Bow", 1000, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_HELMET, "Leather Helmet", 200, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_HELMET, "Leather Cap of Holding", 400, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_HELMET, "Leather Cap of Nimble Fingers", 400, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_HELMET, "Focused Cap", 500, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_HELMET, "Vampiric Helmet", 500, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.CHAINMAIL_HELMET, "Chainmail Helmet", 500, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_CHESTPLATE, "Leather Chestplate", 250, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_CHESTPLATE, "Leather Chestplate of Nimble Fingers", 750, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_CHESTPLATE, "Focused Chestplate", 750, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_CHESTPLATE, "Vampiric Chestplate", 750, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.CHAINMAIL_CHESTPLATE, "Chainmail Chestplate", 500, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_LEGGINGS, "Leather Leggings", 250, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_LEGGINGS, "Leather Leggings of Nimble Fingers", 750, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_LEGGINGS, "Focused Leggings", 750, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_LEGGINGS, "Vampiric Leggings", 700, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.CHAINMAIL_LEGGINGS, "Chainmail Leggings", 500, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_BOOTS, "Leather Boots", 250, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_BOOTS, "Leather Boots of Nimble Fingers", 400, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_BOOTS, "Focused Boots", 600, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_BOOTS, "Vampiric Boots", 500, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.LEATHER_BOOTS, "Leather Hiking Boots", 300, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.CHAINMAIL_BOOTS, "Leather Moccasins", 500, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.CHAINMAIL_BOOTS, "Leather Crosstrainers", 800, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.CHAINMAIL_BOOTS, "Chainmail Boots", 500, "Legacy Hunter store item.");
+        addStoreEntry("Assassin", Material.POTION, "Small Health Potion", 100, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.POTION, "Large Health Potion", 200, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.POTION, "Power Potion", 1000, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.POTION, "Speed Potion", 500, "Legacy Assassin store item.");
+        addStoreEntry("Assassin", Material.ENDER_PEARL, "Ender Pearl", 750, "Legacy Assassin store item.");
+        addStoreEntry("Warrior", Material.POTION, "Small Health Potion", 100, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.POTION, "Large Health Potion", 200, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.POTION, "Power Potion", 1000, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.POTION, "Speed Potion", 500, "Legacy Warrior store item.");
+        addStoreEntry("Warrior", Material.ENDER_PEARL, "Ender Pearl", 750, "Legacy Warrior store item.");
+        addStoreEntry("Mage", Material.POTION, "Small Health Potion", 100, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.POTION, "Large Health Potion", 200, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.POTION, "Power Potion", 1000, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.POTION, "Speed Potion", 500, "Legacy Mage store item.");
+        addStoreEntry("Mage", Material.ENDER_PEARL, "Ender Pearl", 750, "Legacy Mage store item.");
+        addStoreEntry("Hunter", Material.POTION, "Small Health Potion", 100, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.POTION, "Large Health Potion", 200, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.POTION, "Power Potion", 1000, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.POTION, "Speed Potion", 500, "Legacy Hunter store item.");
+        addStoreEntry("Hunter", Material.ENDER_PEARL, "Ender Pearl", 750, "Legacy Hunter store item.");
     }
 
-    private void addStoreEntry(Material material, String name, int cost, String description) {
-        storeEntries.add(new StoreEntry(material, name, cost, description));
+    private void addStoreEntry(String role, Material material, String name, int cost, String description) {
+        storeEntries.add(new StoreEntry(role, material, name, cost, description));
     }
 
     private static Location first(List<Location> locations) {
@@ -682,22 +788,60 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void openStore(Player player) {
-        StoreHolder holder = new StoreHolder(player.getUniqueId());
+        StoreHolder holder = new StoreHolder(player.getUniqueId(), null);
         Inventory inventory = Bukkit.createInventory(holder, 27, ChatColor.DARK_GREEN + "Heroes of Gwen Store");
         holder.inventory = inventory;
-        for (int i = 0; i < storeEntries.size() && i < 27; i++) {
-            StoreEntry entry = storeEntries.get(i);
+        String[] roles = {"Assassin", "Warrior", "Mage", "Hunter"};
+        Material[] icons = {Material.GOLDEN_SWORD, Material.IRON_SWORD, Material.POTION, Material.BOW};
+        for (int i = 0; i < roles.length; i++) {
+            String role = roles[i];
+            ItemStack option = new ItemStack(icons[i]);
+            ItemMeta meta = option.getItemMeta();
+            meta.setDisplayName(ChatColor.GREEN + role + " Upgrades");
+            long count = storeEntries.stream().filter(entry -> entry.role.equals(role)).count();
+            meta.setLore(List.of(ChatColor.GRAY + "Browse the legacy " + role + " store.",
+                    ChatColor.WHITE + count + " source items",
+                    ChatColor.YELLOW + "Mixed Arcade prices are half cost."));
+            meta.getPersistentDataContainer().set(shopRoleKey, PersistentDataType.STRING, role);
+            option.setItemMeta(meta);
+            inventory.setItem(10 + i * 2, option);
+        }
+        openStores.put(player.getUniqueId(), holder);
+        player.openInventory(inventory);
+        updateGoldActionBar(player);
+    }
+
+    private void openStore(Player player, String role) {
+        if (role == null) {
+            openStore(player);
+            return;
+        }
+        StoreHolder holder = new StoreHolder(player.getUniqueId(), role);
+        Inventory inventory = Bukkit.createInventory(holder, 45, ChatColor.DARK_GREEN + "Heroes of Gwen: " + role);
+        holder.inventory = inventory;
+        int slot = 0;
+        for (int index = 0; index < storeEntries.size() && slot < 45; index++) {
+            StoreEntry entry = storeEntries.get(index);
+            if (!entry.role.equals(role)) continue;
             int price = ArcadePortRules.heroesOfGwenStoreItemCost(entry.cost, mixedArcade);
             ItemStack item = new ItemStack(entry.material);
             ItemMeta meta = item.getItemMeta();
             meta.setDisplayName(ChatColor.GREEN + entry.name);
             meta.setLore(List.of(ChatColor.GRAY + entry.description,
-                    ChatColor.WHITE + "Cost: " + ChatColor.GOLD + price + " gold",
+                    ChatColor.WHITE + "Standard cost: " + ChatColor.GRAY + entry.cost,
+                    ChatColor.WHITE + "Your cost: " + ChatColor.GOLD + price + " gold",
                     ChatColor.YELLOW + "Click to purchase"));
-            meta.getPersistentDataContainer().set(shopItemKey, PersistentDataType.INTEGER, i);
+            meta.getPersistentDataContainer().set(shopItemKey, PersistentDataType.INTEGER, index);
             item.setItemMeta(meta);
-            inventory.setItem(i, item);
+            inventory.setItem(slot++, item);
         }
+        ItemStack back = new ItemStack(Material.ARROW);
+        ItemMeta backMeta = back.getItemMeta();
+        backMeta.setDisplayName(ChatColor.YELLOW + "Back to role selection");
+        backMeta.setLore(List.of(ChatColor.GRAY + "Choose a different role's store."));
+        backMeta.getPersistentDataContainer().set(shopRoleKey, PersistentDataType.STRING, "back");
+        back.setItemMeta(backMeta);
+        inventory.setItem(44, back);
         openStores.put(player.getUniqueId(), holder);
         player.openInventory(inventory);
         updateGoldActionBar(player);
@@ -713,9 +857,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (event.getClickedInventory() != event.getView().getTopInventory()) return;
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || !clicked.hasItemMeta()) return;
+        String selectedRole = clicked.getItemMeta().getPersistentDataContainer()
+                .get(shopRoleKey, PersistentDataType.STRING);
+        if (selectedRole != null) {
+            openStore(player, "back".equals(selectedRole) ? null : selectedRole);
+            return;
+        }
         Integer index = clicked.getItemMeta().getPersistentDataContainer().get(shopItemKey, PersistentDataType.INTEGER);
         if (index == null || index < 0 || index >= storeEntries.size()) return;
-        purchaseStoreItem(player, storeEntries.get(index));
+        StoreEntry entry = storeEntries.get(index);
+        if (!entry.role.equals(holder.role)) return;
+        purchaseStoreItem(player, entry);
     }
 
     @EventHandler
@@ -733,15 +885,19 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         playerGold.put(player.getUniqueId(), gold - cost);
         ItemStack reward = new ItemStack(entry.material);
-        if (entry.material == Material.GOLDEN_APPLE) {
-            player.getInventory().addItem(reward);
-        } else if (entry.material == Material.POTION || entry.material == Material.ENDER_PEARL || entry.material == Material.BOW) {
-            player.getInventory().addItem(reward);
+        ItemMeta rewardMeta = reward.getItemMeta();
+        rewardMeta.setDisplayName(ChatColor.GREEN + entry.name);
+        reward.setItemMeta(rewardMeta);
+        String materialName = entry.material.name();
+        if (materialName.endsWith("_HELMET") || materialName.endsWith("_CHESTPLATE")
+                || materialName.endsWith("_LEGGINGS") || materialName.endsWith("_BOOTS")) {
+            equip(player, reward);
+        } else if (materialName.endsWith("_SWORD")) {
+            player.getInventory().setItem(0, reward);
+        } else if (entry.material == Material.BOW) {
+            player.getInventory().setItem(1, reward);
         } else {
-            switch (entry.material) {
-                case IRON_HELMET, IRON_CHESTPLATE, IRON_LEGGINGS, IRON_BOOTS -> equip(player, reward);
-                default -> player.getInventory().addItem(reward);
-            }
+            player.getInventory().addItem(reward);
         }
         player.sendMessage(ChatColor.GREEN + "Purchased " + entry.name + " for " + cost + " gold.");
         player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 1.2F);
@@ -749,13 +905,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void equip(Player player, ItemStack item) {
-        switch (item.getType()) {
-            case IRON_HELMET -> player.getInventory().setHelmet(item);
-            case IRON_CHESTPLATE -> player.getInventory().setChestplate(item);
-            case IRON_LEGGINGS -> player.getInventory().setLeggings(item);
-            case IRON_BOOTS -> player.getInventory().setBoots(item);
-            default -> player.getInventory().addItem(item);
-        }
+        String name = item.getType().name();
+        if (name.endsWith("_HELMET")) player.getInventory().setHelmet(item);
+        else if (name.endsWith("_CHESTPLATE")) player.getInventory().setChestplate(item);
+        else if (name.endsWith("_LEGGINGS")) player.getInventory().setLeggings(item);
+        else if (name.endsWith("_BOOTS")) player.getInventory().setBoots(item);
+        else player.getInventory().addItem(item);
     }
 
     private void addGold(Player player, int amount, String reason) {
@@ -957,11 +1112,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private static final class StoreEntry {
+        final String role;
         final Material material;
         final String name;
         final int cost;
         final String description;
-        StoreEntry(Material material, String name, int cost, String description) {
+        StoreEntry(String role, Material material, String name, int cost, String description) {
+            this.role = role;
             this.material = material;
             this.name = name;
             this.cost = cost;
@@ -971,8 +1128,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private static final class StoreHolder implements InventoryHolder {
         final UUID owner;
+        final String role;
         Inventory inventory;
-        StoreHolder(UUID owner) { this.owner = owner; }
+        StoreHolder(UUID owner, String role) {
+            this.owner = owner;
+            this.role = role;
+        }
         @Override public Inventory getInventory() { return inventory; }
     }
 }
