@@ -9756,26 +9756,40 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             if (!session.alive.contains(witherTarget.getUniqueId())) return;
             int targetTeam = session.teams.getOrDefault(witherTarget.getUniqueId(), 0);
-            if (targetTeam == 1) return;
+            if (targetTeam == 1) {
+                if (damager instanceof Arrow arrow && session.witherBlindArrows.remove(arrow.getUniqueId())) {
+                    witherTarget.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 80, 0, false, false, false));
+                    arrow.getWorld().spawnParticle(Particle.EXPLOSION, arrow.getLocation(), 1);
+                    session.entities.remove(arrow);
+                    arrow.remove();
+                }
+                return;
+            }
             Player witherAttacker = null;
-            if (event instanceof EntityDamageByEntityEvent byEntity) {
-                Entity damager = byEntity.getDamager();
-                if (damager instanceof Projectile projectile
-                        && projectile.getShooter() instanceof Player shooter
+            if (damager instanceof WitherSkull) return;
+            if (damager instanceof Projectile projectile) {
+                if (projectile.getShooter() instanceof Player shooter
                         && session.players.containsKey(shooter.getUniqueId())
                         && session.teams.getOrDefault(shooter.getUniqueId(), 0) == 1) {
                     witherAttacker = shooter;
-                } else if (damager instanceof Player) {
-                    // The source Wither kit is explicitly unable to deal melee damage.
-                    return;
-                } else {
-                    return;
-                }
+                } else return;
+                if (projectile instanceof Arrow) event.setDamage(event.getDamage() * 0.75D);
+            } else if (damager instanceof Skeleton minion
+                    && session.witherMinionOwners.containsKey(minion.getUniqueId())) {
+                witherAttacker = session.players.get(session.witherMinionOwners.get(minion.getUniqueId()));
+            } else if (damager instanceof Player) {
+                // The source Wither kit explicitly prevents Wither melee and team damage.
+                return;
+            } else if (damager != null) {
+                return;
             }
             double damage = event.getFinalDamage();
             if (damage > 0.0D) {
-                if (witherTarget.getHealth() <= damage) eliminate(session, witherTarget, witherAttacker, "was struck by a Wither");
-                else witherTarget.setHealth(witherTarget.getHealth() - damage);
+                if (witherTarget.getHealth() <= damage) {
+                    playerOutWitherAssault(session, witherTarget);
+                    if (active != session) return;
+                    if (witherAttacker != null) witherAttacker.sendMessage(ChatColor.GREEN + "Human stunned: " + witherTarget.getName());
+                } else witherTarget.setHealth(witherTarget.getHealth() - damage);
             }
             return;
         }
@@ -10139,6 +10153,19 @@ public final class ArcadePortManager implements Listener {
         session.microFletchedArrows.add(arrow.getUniqueId());
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onWitherAssaultBowShoot(EntityShootBowEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.WITHER_ASSAULT
+                || !(event.getEntity() instanceof Player shooter)
+                || session.teams.getOrDefault(shooter.getUniqueId(), 1) != 0
+                || !session.alive.contains(shooter.getUniqueId())
+                || !"archer".equals(session.witherAssaultKits.getOrDefault(shooter.getUniqueId(), "archer"))
+                || !(event.getProjectile() instanceof Arrow arrow)) return;
+        session.witherBlindArrows.add(arrow.getUniqueId());
+        session.entities.add(arrow);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBowShoot(EntityShootBowEvent event) {
         Session session = active;
@@ -10154,6 +10181,36 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
 
+        if (session.type == ArcadePortGame.WITHER_ASSAULT
+                && event.getEntity() instanceof ThrownPotion revivalPotion
+                && isWitherRevivalPotion(revivalPotion.getItem())) {
+            if (revivalPotion.getShooter() instanceof Player thrower
+                    && session.alive.contains(thrower.getUniqueId())
+                    && session.teams.getOrDefault(thrower.getUniqueId(), 1) == 0) {
+                Location impact = revivalPotion.getLocation();
+                for (Map.Entry<UUID, Skeleton> entry : new ArrayList<>(session.witherOutCopies.entrySet())) {
+                    Skeleton copy = entry.getValue();
+                    if (copy != null && copy.isValid() && copy.getLocation().distanceSquared(impact) <= 9.0D) {
+                        reviveWitherHuman(session, thrower, entry.getKey());
+                        break;
+                    }
+                }
+            }
+            revivalPotion.remove();
+            return;
+        }
+        if (session.type == ArcadePortGame.WITHER_ASSAULT
+                && event.getEntity() instanceof Arrow smokeArrow
+                && session.witherBlindArrows.remove(smokeArrow.getUniqueId())) {
+            if (event.getHitEntity() instanceof Player hitWither
+                    && session.teams.getOrDefault(hitWither.getUniqueId(), 0) == 1
+                    && session.alive.contains(hitWither.getUniqueId())) {
+                hitWither.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 80, 0, false, false, false));
+            }
+            session.entities.remove(smokeArrow);
+            smokeArrow.remove();
+            return;
+        }
         if (session.type == ArcadePortGame.DEATH_TAG
                 && event.getEntity() instanceof Arrow deathTagArrow
                 && session.deathTagFletchedArrows.remove(deathTagArrow.getUniqueId())) {
@@ -11294,6 +11351,22 @@ public final class ArcadePortManager implements Listener {
         if (active != session) return;
         List<Player> cows = alivePlayers(session).stream()
                 .filter(player -> session.teams.getOrDefault(player.getUniqueId(), 0) == 1).toList();
+        for (Player cowPlayer : cows) {
+            disguiseMilkCowPlayer(session, cowPlayer);
+            UUID id = cowPlayer.getUniqueId();
+            long nextAt = session.milkChargeHungerAt.getOrDefault(id, 0L);
+            if (now >= nextAt) {
+                int food = cowPlayer.getFoodLevel();
+                if (cowPlayer.isSprinting()) {
+                    if (food <= 0) cowPlayer.setSprinting(false);
+                    else cowPlayer.setFoodLevel(food - 1);
+                    cowPlayer.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 4, 1, false, false, false));
+                } else if (food < 20) {
+                    cowPlayer.setFoodLevel(food + 1);
+                }
+                session.milkChargeHungerAt.put(id, now + 250L);
+            }
+        }
         List<Player> farmers = alivePlayers(session).stream()
                 .filter(player -> session.teams.getOrDefault(player.getUniqueId(), 0) == 0).toList();
         if (cows.isEmpty() && !farmers.isEmpty() && session.participantsAtStart > 1) {
@@ -11322,7 +11395,7 @@ public final class ArcadePortManager implements Listener {
                 damageMilkCowFarmer(session, target, cowPlayer, 3.0D);
                 Vector push = target.getLocation().toVector().subtract(cowPlayer.getLocation().toVector());
                 push.setY(0.45D);
-                if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(1.15D));
+                if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(1.6D).setY(0.55D));
                 cowPlayer.getWorld().playSound(cowPlayer.getLocation(), Sound.ENTITY_COW_HURT, 0.7F, 1.1F);
                 if (active != session) return;
             }
@@ -11482,10 +11555,11 @@ public final class ArcadePortManager implements Listener {
                     || session.teams.getOrDefault(target.getUniqueId(), 1) != 0
                     || !session.alive.contains(target.getUniqueId())) continue;
             double distance = target.getLocation().distance(centre);
-            damageMilkCowFarmer(session, target, player, Math.max(1.0D, 4.5D - distance * 0.55D));
+            double scale = Math.max(0.0D, 1.0D - distance / 6.0D);
+            damageMilkCowFarmer(session, target, player, 4.0D * scale + 0.5D);
             Vector push = target.getLocation().toVector().subtract(centre.toVector());
-            push.setY(0.55D);
-            if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(1.0D));
+            push.setY(0.4D + scale);
+            if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(1.8D * scale));
             if (active != session) return;
         }
     }
@@ -12913,6 +12987,56 @@ public final class ArcadePortManager implements Listener {
     public void onExplode(EntityExplodeEvent event) {
         Session session = active;
         if (session == null || event.getEntity() == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.WITHER_ASSAULT
+                && event.getEntity() instanceof WitherSkull skull && session.entities.contains(skull)) {
+            event.blockList().clear();
+            event.setCancelled(true);
+            Location blast = skull.getLocation().clone();
+            Player owner = skull.getShooter() instanceof Player player ? player : null;
+            double ageScale = 0.4D + 0.6D * Math.min(1.0D, skull.getTicksLived() / 20.0D);
+            session.world.spawnParticle(Particle.EXPLOSION_EMITTER, blast, 1);
+            session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
+            for (Player target : alivePlayers(session)) {
+                if (session.teams.getOrDefault(target.getUniqueId(), 1) != 0) continue;
+                double distance = target.getLocation().distance(blast);
+                if (distance > 7.0D) continue;
+                double scale = Math.max(0.0D, 1.0D - distance / 7.0D);
+                double damage = 2.0D + 10.0D * scale * ageScale;
+                Vector away = target.getEyeLocation().toVector().subtract(blast.toVector());
+                if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 1.0D, 0.0D);
+                target.setVelocity(target.getVelocity().add(away.normalize().multiply(1.25D * scale)
+                        .setY(Math.max(0.3D, 0.65D * scale))));
+                target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0.0D, 1.0D, 0.0D),
+                        10, 0.35D, 0.4D, 0.35D, 0.04D);
+                if (target.getHealth() <= damage) playerOutWitherAssault(session, target);
+                else target.setHealth(target.getHealth() - damage);
+                if (active != session) return;
+                if (owner != null) owner.sendActionBar(ChatColor.RED + "Wither Skull hit " + target.getName());
+            }
+            for (int x = -4; x <= 4; x++) for (int y = -4; y <= 4; y++) for (int z = -4; z <= 4; z++) {
+                if (x * x + y * y + z * z > 16) continue;
+                Block block = blast.getWorld().getBlockAt(blast.getBlockX() + x, blast.getBlockY() + y, blast.getBlockZ() + z);
+                Material material = block.getType();
+                if (material.isAir() || material == Material.BEDROCK || material == Material.IRON_BLOCK
+                        || material == Material.BARRIER || material == Material.WATER || material == Material.LAVA) continue;
+                session.witherExplosionBlocks.putIfAbsent(block, block.getBlockData().clone());
+                block.setType(Material.AIR, false);
+            }
+            Map<Block, BlockData> restore = new HashMap<>(session.witherExplosionBlocks);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (active != session) return;
+                for (Map.Entry<Block, BlockData> entry : restore.entrySet()) {
+                    Block block = entry.getKey();
+                    if (block != null && block.getWorld() == session.world && block.getType().isAir()) {
+                        block.setBlockData(entry.getValue(), false);
+                    }
+                    session.witherExplosionBlocks.remove(block);
+                }
+            }, 120L);
+            session.entities.remove(skull);
+            skull.remove();
+            return;
+        }
         if (!(event.getEntity() instanceof TNTPrimed bomb)) {
             event.blockList().clear();
             event.setCancelled(true);
