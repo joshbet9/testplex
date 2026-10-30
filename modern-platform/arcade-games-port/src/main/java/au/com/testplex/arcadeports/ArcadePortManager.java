@@ -118,6 +118,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -3613,6 +3614,25 @@ public final class ArcadePortManager implements Listener {
                 sponge.setType(Material.AIR, false);
             }
         }
+        // The source SkyWars map uses custom marker 56 to hide its ore beneath stone.
+        for (Location marker : map.customLocations("56")) {
+            marker.getBlock().setType(Material.STONE, false);
+        }
+        if (map.hasBounds()) {
+            session.skyWarsCrumbleMinX = map.minX();
+            session.skyWarsCrumbleMaxX = map.maxX();
+            session.skyWarsCrumbleMinZ = map.minZ();
+            session.skyWarsCrumbleMaxZ = map.maxZ();
+            session.skyWarsCrumbleMinY = map.hasVerticalBounds() ? map.minY() : 0;
+            session.skyWarsCrumbleMaxY = map.hasVerticalBounds() ? map.maxY()
+                    : Math.min(128, session.world.getMaxHeight() - 1);
+            session.skyWarsCrumbleScanY = session.skyWarsCrumbleMinY;
+            session.skyWarsCrumbleCenterX = map.centerX();
+            session.skyWarsCrumbleCenterZ = map.centerZ();
+            session.skyWarsCrumbleBoundsValid = session.skyWarsCrumbleMaxX > session.skyWarsCrumbleMinX
+                    && session.skyWarsCrumbleMaxZ > session.skyWarsCrumbleMinZ
+                    && session.skyWarsCrumbleMaxY >= session.skyWarsCrumbleMinY;
+        }
         int island = 0;
         int connector = 0;
         int middle = 0;
@@ -3687,7 +3707,67 @@ public final class ArcadePortManager implements Listener {
         return true;
     }
 
+    private void scanSkyWarsCrumbleLayer(Session session) {
+        if (!session.skyWarsCrumbleBoundsValid || session.skyWarsCrumbleScanComplete) return;
+        int y = session.skyWarsCrumbleScanY++;
+        if (y > session.skyWarsCrumbleMaxY) {
+            session.skyWarsCrumbleScanComplete = true;
+            return;
+        }
+        for (int x = session.skyWarsCrumbleMinX; x < session.skyWarsCrumbleMaxX; x++) {
+            for (int z = session.skyWarsCrumbleMinZ; z < session.skyWarsCrumbleMaxZ; z++) {
+                Block block = session.world.getBlockAt(x, y, z);
+                if (!block.getType().isAir()) enqueueSkyWarsCrumbleBlock(session, block);
+            }
+        }
+        if (session.skyWarsCrumbleScanY > session.skyWarsCrumbleMaxY) {
+            session.skyWarsCrumbleScanComplete = true;
+            plugin.getLogger().info("SkyWars crumble index prepared with "
+                    + session.skyWarsCrumbleQueue.size() + " source-map blocks.");
+        }
+    }
+
+    private void enqueueSkyWarsCrumbleBlock(Session session, Block block) {
+        if (block == null || block.getWorld() != session.world || block.getType().isAir()
+                || session.skyWarsCrumbleQueued.containsKey(block)) return;
+        long sequence = ++session.skyWarsCrumbleSequence;
+        double dx = block.getX() + 0.5D - session.skyWarsCrumbleCenterX;
+        double dz = block.getZ() + 0.5D - session.skyWarsCrumbleCenterZ;
+        double distanceSquared = dx * dx + dz * dz;
+        session.skyWarsCrumbleQueued.put(block, sequence);
+        session.skyWarsCrumbleQueue.add(new SkyWarsCrumbleCandidate(block, distanceSquared, sequence));
+    }
+
+    private void removeSkyWarsCrumbleBlocks(Session session, int maximumPerTick) {
+        for (int removed = 0; removed < maximumPerTick && !session.skyWarsCrumbleQueue.isEmpty(); ) {
+            SkyWarsCrumbleCandidate candidate = session.skyWarsCrumbleQueue.poll();
+            Block block = candidate.block();
+            Long currentSequence = session.skyWarsCrumbleQueued.get(block);
+            if (currentSequence == null || currentSequence.longValue() != candidate.sequence()) continue;
+            session.skyWarsCrumbleQueued.remove(block);
+            Block lowest = block;
+            int depth = 0;
+            while (depth++ < 128 && lowest.getY() > session.world.getMinHeight()
+                    && lowest.getRelative(BlockFace.DOWN).getType() != Material.AIR) {
+                lowest = lowest.getRelative(BlockFace.DOWN);
+            }
+            if (lowest.getWorld() != session.world || lowest.getType().isAir()) continue;
+            if (lowest.getType() == Material.OAK_DOOR || lowest.getType() == Material.IRON_DOOR) {
+                lowest.getRelative(BlockFace.UP).setType(Material.AIR, false);
+            }
+            if (ThreadLocalRandom.current().nextDouble() > 0.95D) {
+                session.world.spawnFallingBlock(lowest.getLocation().add(0.5D, 0.5D, 0.5D),
+                        lowest.getBlockData());
+            }
+            lowest.setType(Material.AIR, false);
+            removed++;
+        }
+    }
+
     private void updateSkyWars(Session session, long now) {
+        if (!session.skyWarsCrumbleScanComplete && session.ticks % 2 == 0) {
+            scanSkyWarsCrumbleLayer(session);
+        }
         if (!session.skyWarsLive && now >= session.skyWarsLiveAt) {
             session.skyWarsLive = true;
             for (Player player : alivePlayers(session)) {
@@ -3710,11 +3790,18 @@ public final class ArcadePortManager implements Listener {
             border.setSize(SkyWarsMixedArcadeRules.FINAL_BORDER_SIZE,
                     SkyWarsMixedArcadeRules.BORDER_SHRINK_MILLIS / 1000L);
             announce(session, ChatColor.RED + "The islands are crumbling! The world border is closing on mid.");
+            if (!session.skyWarsCrumbleBoundsValid) {
+                plugin.getLogger().warning("SkyWars map " + session.world.getName()
+                        + " has no usable WorldConfig bounds; block-by-block crumble is unavailable.");
+            }
             for (Player player : alivePlayers(session)) {
                 player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.35F, 1.5F);
             }
         }
 
+        if (session.skyWarsCrumbleStarted && session.skyWarsCrumbleScanComplete) {
+            removeSkyWarsCrumbleBlocks(session, 4);
+        }
         if (session.skyWarsLive && session.skyWarsTntGenerator != null && now >= session.skyWarsNextTntAt) {
             ItemStack tnt = namedItem(Material.TNT, "Throwable TNT",
                     "Right-click to throw at opponents.");
@@ -11016,6 +11103,7 @@ public final class ArcadePortManager implements Listener {
             } else {
                 event.setDropItems(true);
                 event.setExpToDrop(0);
+                session.skyWarsCrumbleQueued.remove(event.getBlock());
             }
             return;
         }
@@ -11086,7 +11174,11 @@ public final class ArcadePortManager implements Listener {
                     || placedType.name().contains("COMMAND_BLOCK");
             boolean allowed = session.alive.contains(player.getUniqueId()) && session.skyWarsLive
                     && event.getBlockPlaced().getY() < session.world.getMaxHeight() - 2 && !specialBlock;
-            if (!allowed) event.setCancelled(true);
+            if (!allowed) {
+                event.setCancelled(true);
+            } else {
+                enqueueSkyWarsCrumbleBlock(session, event.getBlockPlaced());
+            }
             return;
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
@@ -12560,6 +12652,8 @@ public final class ArcadePortManager implements Listener {
 
     private record DragonFlareZone(UUID ownerId, Location center, long expiresAtMillis) { }
 
+    private record SkyWarsCrumbleCandidate(Block block, double distanceSquared, long sequence) { }
+
     private static final class Session {
         final ArcadePortGame type;
         final World world;
@@ -12796,6 +12890,24 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> skyWarsLastDamagedAt = new HashMap<>();
         final Map<UUID, Long> skyWarsLastTntThrowAt = new HashMap<>();
         final Map<UUID, UUID> skyWarsTntOwners = new HashMap<>();
+        final Map<Block, Long> skyWarsCrumbleQueued = new HashMap<>();
+        final PriorityQueue<SkyWarsCrumbleCandidate> skyWarsCrumbleQueue = new PriorityQueue<>(
+                (left, right) -> {
+                    int distanceOrder = Double.compare(right.distanceSquared(), left.distanceSquared());
+                    return distanceOrder != 0 ? distanceOrder : Long.compare(left.sequence(), right.sequence());
+                });
+        int skyWarsCrumbleMinX;
+        int skyWarsCrumbleMaxX;
+        int skyWarsCrumbleMinZ;
+        int skyWarsCrumbleMaxZ;
+        int skyWarsCrumbleMinY;
+        int skyWarsCrumbleMaxY;
+        int skyWarsCrumbleScanY;
+        double skyWarsCrumbleCenterX;
+        double skyWarsCrumbleCenterZ;
+        long skyWarsCrumbleSequence;
+        boolean skyWarsCrumbleBoundsValid;
+        boolean skyWarsCrumbleScanComplete;
         long skyWarsLiveAt;
         long skyWarsCrumbleAt;
         long skyWarsNextTntAt;
