@@ -130,7 +130,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Mechanics-first modern prototypes for the 14 remaining Arcade games.
+ * Mechanics-first modern prototypes for the remaining Arcade games.
  * Each game gets its own persistent test world and distinct baseline loop.
  * These implementations are deliberately marked in progress until parity and
  * live gameplay acceptance are done.
@@ -9718,7 +9718,15 @@ public final class ArcadePortManager implements Listener {
                     if (milkAttacker != null
                             && session.teams.getOrDefault(milkAttacker.getUniqueId(), -1) == 0) return;
                 }
-                damageMilkCowFarmer(session, milkTarget, milkAttacker, event.getFinalDamage());
+                double milkDamage = event.getFinalDamage();
+                if (event instanceof EntityDamageByEntityEvent byEntity
+                        && byEntity.getCause() == EntityDamageEvent.DamageCause.ENTITY_ATTACK
+                        && milkAttacker != null
+                        && session.teams.getOrDefault(milkAttacker.getUniqueId(), -1) == 1) {
+                    // KitCow's source PerkDamageSet applies four points to melee hits.
+                    milkDamage = 4.0D;
+                }
+                damageMilkCowFarmer(session, milkTarget, milkAttacker, milkDamage);
                 return;
             }
         }
@@ -9737,11 +9745,9 @@ public final class ArcadePortManager implements Listener {
                         && session.players.containsKey(shooter.getUniqueId())
                         && session.teams.getOrDefault(shooter.getUniqueId(), 0) == 1) {
                     witherAttacker = shooter;
-                } else if (damager instanceof Player playerAttacker
-                        && session.teams.getOrDefault(playerAttacker.getUniqueId(), -1) == 0) {
+                } else if (damager instanceof Player) {
+                    // The source Wither kit is explicitly unable to deal melee damage.
                     return;
-                } else if (damager instanceof Player playerAttacker) {
-                    witherAttacker = playerAttacker;
                 } else {
                     return;
                 }
@@ -11039,6 +11045,7 @@ public final class ArcadePortManager implements Listener {
 
         for (Player farmer : farmers) {
             UUID id = farmer.getUniqueId();
+            if (session.teams.getOrDefault(id, 0) != 0) continue;
             if (farmer.isOnGround() && session.milkDoubleJumpUsed.remove(id)) {
                 farmer.setAllowFlight(true);
             }
