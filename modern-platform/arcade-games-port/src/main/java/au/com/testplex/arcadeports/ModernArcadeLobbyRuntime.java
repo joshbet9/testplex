@@ -228,7 +228,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             case BACON_BRAWL -> List.of(
                     new KitChoice("el-muchacho-pigo", "El Muchacho Pigo", Material.PORKCHOP),
                     new KitChoice("mama-piggles", "Mama Piggles", Material.COOKED_PORKCHOP),
-                    new KitChoice("pig", "Pig", Material.PINK_WOOL));
+                    new KitChoice("pig", "Pig Cloak", Material.PHANTOM_MEMBRANE),
+                    new KitChoice("brutus-bacon", "Brutus Bacon", Material.SHIELD));
             case BOMB_LOBBERS -> List.of(
                     new KitChoice("jumper", "Jumper", Material.RABBIT_FOOT),
                     new KitChoice("armorer", "Armorer", Material.IRON_CHESTPLATE),
@@ -559,7 +560,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             case "list"->sender.sendMessage(ChatColor.GOLD+"Test bots: "+(bots.isEmpty()?"none":String.join(", ",bots.values().stream().map(b->b.name).toList())));
             case "cosmetics","menu"->{if(!(sender instanceof Player p)){sender.sendMessage("Players only.");return;}if(args.length<2){sender.sendMessage(ChatColor.YELLOW+"/arcadeport bot cosmetics <name>");return;}Bot b=bots.get(key(args[1]));if(b==null)sender.sendMessage(ChatColor.RED+"No bot named "+args[1]+".");else openBotCosmetics(p,b);}
             case "form"->{if(args.length<3){sender.sendMessage(ChatColor.YELLOW+"/arcadeport bot form <name> <pig|pink-sheep>");return;}Bot b=bots.get(key(args[1]));if(b==null){sender.sendMessage(ChatColor.RED+"No bot named "+args[1]+".");return;}b.form="pink-sheep".equalsIgnoreCase(args[2])?"pink-sheep":"pig";saveBot(b);replaceBotEntity(b);sender.sendMessage(ChatColor.GREEN+"Updated "+b.name+"'s form.");}
-            case "kit"->{if(args.length<3){sender.sendMessage(ChatColor.YELLOW+"/arcadeport bot kit <name> <kit-id>");return;}Bot b=bots.get(key(args[1]));if(b==null){sender.sendMessage(ChatColor.RED+"No bot named "+args[1]+".");return;}String kit=ArcadePortRules.normalizeBaconBrawlKit(args[2]);if(kit==null){sender.sendMessage(ChatColor.YELLOW+"Bacon Brawl bot kits: el-muchacho-pigo, mama-piggles, pig.");return;}b.kit=kit;b.form=ArcadePortRules.baconBrawlUsesSheepAvatar(kit)?"pink-sheep":"pig";saveBot(b);replaceBotEntity(b);sender.sendMessage(ChatColor.GREEN+"Updated "+b.name+"'s kit to "+kit+".");}
+            case "kit"->{if(args.length<3){sender.sendMessage(ChatColor.YELLOW+"/arcadeport bot kit <name> <kit-id>");return;}Bot b=bots.get(key(args[1]));if(b==null){sender.sendMessage(ChatColor.RED+"No bot named "+args[1]+".");return;}String kit=ArcadePortRules.normalizeBaconBrawlKit(args[2]);if(kit==null){sender.sendMessage(ChatColor.YELLOW+"Bacon Brawl bot kits: el-muchacho-pigo, mama-piggles, pig (Pig Cloak), brutus-bacon.");return;}b.kit=kit;b.form=ArcadePortRules.baconBrawlUsesSheepAvatar(kit)?"pink-sheep":"pig";saveBot(b);replaceBotEntity(b);sender.sendMessage(ChatColor.GREEN+"Updated "+b.name+"'s kit to "+kit+".");}
             default->sender.sendMessage(ChatColor.YELLOW+"/arcadeport bot <summon|remove|clear|list|cosmetics|form|kit> ...");
         }
     }
