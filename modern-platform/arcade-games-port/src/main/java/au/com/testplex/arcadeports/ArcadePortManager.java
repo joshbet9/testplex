@@ -7449,6 +7449,9 @@ public final class ArcadePortManager implements Listener {
             awardDragonSurvivalGems(session, eliminatedId, System.currentTimeMillis());
         }
         player.leaveVehicle();
+        if (session.type == ArcadePortGame.SKY_WARS && player.isOnline()) {
+            dropSkyWarsInventory(player);
+        }
         if (session.type == ArcadePortGame.PAINTBALL && player.isOnline()) {
             spawnPaintballSaveMeMarker(session, player);
             player.setGameMode(GameMode.SPECTATOR);
@@ -9883,6 +9886,11 @@ public final class ArcadePortManager implements Listener {
     public void onDamage(EntityDamageEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.SKY_WARS && event.getEntity() instanceof Player skyWarsTarget
+                && session.players.containsKey(skyWarsTarget.getUniqueId())) {
+            applySkyWarsDamage(session, skyWarsTarget, event);
+            return;
+        }
         if (session.type == ArcadePortGame.BOMB_LOBBERS
                 && event instanceof EntityDamageByEntityEvent byEntity
                 && byEntity.getDamager() instanceof Player attacker) {
@@ -10544,7 +10552,23 @@ public final class ArcadePortManager implements Listener {
                         || ("waller".equals(bombKit) && heldItem.getType() == Material.STONE_SHOVEL))
                     && (event.getAction().isRightClick() || event.getAction().isLeftClick())
                     && session.alive.contains(player.getUniqueId());
-            if (!forceBaconAbility && !forceBombControlClick) return;
+            boolean forceSkyWarsTnt = session.type == ArcadePortGame.SKY_WARS
+                    && event.getAction().isRightClick() && heldItem != null
+                    && heldItem.getType() == Material.TNT
+                    && session.alive.contains(player.getUniqueId());
+            if (!forceBaconAbility && !forceBombControlClick && !forceSkyWarsTnt) return;
+        }
+        if (session.type == ArcadePortGame.SKY_WARS
+                && event.getAction().isRightClick() && heldItem != null
+                && heldItem.getType() == Material.TNT
+                && session.alive.contains(player.getUniqueId())) {
+            event.setCancelled(true);
+            if (!session.skyWarsLive) {
+                player.sendMessage(ChatColor.YELLOW + "TNT can be thrown when the match begins.");
+            } else {
+                throwSkyWarsTnt(session, player);
+            }
+            return;
         }
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && !session.alive.contains(player.getUniqueId())
@@ -12306,6 +12330,17 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
+        if (session.type == ArcadePortGame.SKY_WARS) {
+            UUID skyWarsTntId = bomb.getUniqueId();
+            // Keep map chests and anvils intact; other terrain remains destructible.
+            event.blockList().removeIf(block -> block.getType() == Material.CHEST
+                    || block.getType() == Material.TRAPPED_CHEST
+                    || block.getType() == Material.ENDER_CHEST
+                    || block.getType() == Material.ANVIL);
+            Bukkit.getScheduler().runTaskLater(plugin,
+                    () -> session.skyWarsTntOwners.remove(skyWarsTntId), 20L);
+            return;
+        }
         UUID bombId = bomb.getUniqueId();
         UUID ownerId = session.bombOwners.get(bombId);
         int priorTntKills = session.bombKillsByTnt.getOrDefault(bombId, 0);
