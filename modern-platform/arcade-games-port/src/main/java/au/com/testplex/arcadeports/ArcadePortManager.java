@@ -4849,6 +4849,18 @@ public final class ArcadePortManager implements Listener {
             if (session.type == ArcadePortGame.BACON_BRAWL) {
                 updateBaconMeterItem(session, p);
                 if (now < session.baconHitFeedbackUntil.getOrDefault(id, 0L)) continue;
+
+                // Keep all Bacon Brawl combat information visible in one compact action-bar line.
+                // This avoids the normal score field pushing the live timing meter off the end.
+                int meter = session.baconMeters.getOrDefault(id, 0);
+                String baconTimeText = session.endsAt > 0L ? seconds + "s" : "survive";
+                String knockback = String.format(java.util.Locale.ROOT, "%.1f", session.baconKnockback);
+                p.sendActionBar(ChatColor.GOLD + "BACON" + ChatColor.GRAY + " | " + baconTimeText
+                        + ChatColor.DARK_GRAY + " | " + ChatColor.GREEN + "alive " + alive
+                        + ChatColor.DARK_GRAY + " | " + ChatColor.AQUA + "meter " + meter + "%"
+                        + ChatColor.DARK_GRAY + " | " + ChatColor.YELLOW + "kb x" + knockback
+                        + ChatColor.DARK_GRAY + " | " + baconTimingStatusText(session, id, now));
+                continue;
             }
             int score = session.scores.getOrDefault(id, 0);
             String specific = gameStatusText(session, p);
