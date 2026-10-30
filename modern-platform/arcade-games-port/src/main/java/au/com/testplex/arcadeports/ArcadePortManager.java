@@ -8741,7 +8741,7 @@ public final class ArcadePortManager implements Listener {
                 cosmetic = preferences.getString(path, "turtle-shell");
             }
         }
-        if (!List.of("turtle-shell", "starburst-tnt", "pixel-crater").contains(cosmetic)) {
+        if (cosmetic == null || !List.of("turtle-shell", "starburst-tnt", "pixel-crater").contains(cosmetic)) {
             cosmetic = "turtle-shell";
         }
 

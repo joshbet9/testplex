@@ -30,7 +30,7 @@ public final class ArcadeCatalog {
 
         register(game("bomb-lobbers", "Bomb Lobbers", "TNT", "Land direct TNT hits while surviving the Turtles arena.",
                 GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
-                List.of(line("tnt-impact", "TNT Impact Signature", "Direct-hit presentation, not blast damage.", "TNT",
+                List.of(line("tnt-impact", "TNT Impact Signature", "A signature effect on every TNT detonation.", "TNT",
                         single("turtle-shell", "Turtle Shell", "A spinning shell-shaped ring."),
                         single("starburst-tnt", "Starburst TNT", "A radial star-shaped detonation."),
                         single("pixel-crater", "Pixel Crater", "A square shockwave with ember sparks."))),

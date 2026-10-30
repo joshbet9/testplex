@@ -217,7 +217,7 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.areBombLobbersEnemies(1, ArcadePortRules.opposingBombLobbersTeam(1)));
     }
 
-    @Test void oneInTheQuiverNeedsTwentyKillsToWin()
+    @Test void oneInTheQuiverNeedsTwentyKillsToWin() {
         assertFalse(ArcadePortRules.isQuiverWinnerScoreReached(0));
         assertFalse(ArcadePortRules.isQuiverWinnerScoreReached(19));
         assertTrue(ArcadePortRules.isQuiverWinnerScoreReached(20));
