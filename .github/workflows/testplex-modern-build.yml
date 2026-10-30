@@ -106,7 +106,7 @@ jobs:
           }
           snake_config="$(unzip -p "$snake_jar" config.yml)"
           grep -Fxq "enabled: false" <<< "$snake_config"
-          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 21 Arcade catalogue games are packaged, only Death Tag and One in the Quiver are enabled, and Snake remains gated."
+          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 24 shared Arcade catalogue games are packaged, Wizards is built as a separate module, Speed Builders Arcade is tracked as planned work, only Death Tag and One in the Quiver are enabled, and Snake and Wizards remain gated."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
@@ -129,11 +129,11 @@ jobs:
             echo
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
-            echo "- Catalogue: 21 Arcade games (two READY_FOR_TEST, 19 MECHANICS_IN_PROGRESS)"
+            echo "- Catalogue: 24 shared Arcade games (two READY_FOR_TEST, 22 MECHANICS_IN_PROGRESS)"
             echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar, ArcadeMechanicsModern.jar and WizardsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: 21 Arcade catalogue entries plus the resource-packless Wizards prototype are packaged; unfinished ports remain installed but unavailable for starting live games"
+            echo "- Gameplay ports: 24 shared Arcade catalogue entries are packaged; Wizards is a separate disabled module, and Speed Builders Arcade is planned but not implemented; unfinished ports remain unavailable for starting live games"
             echo "- Playable allow-list: Death Tag and One in the Quiver only; all other catalogue entries, Snake and Wizards remain gated pending readiness promotion"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
