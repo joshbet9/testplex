@@ -1,9 +1,10 @@
 # Isolated manual-acceptance candidates. Availability does not itself certify 100% in-game parity.
-# Dragon Escape is open for in-game acceptance now that Bomb Lobbers has passed.
+# One in the Quiver is now available for hands-on acceptance after its source-parity build passed.
 enabled-games:
   - bacon-brawl
   - bomb-lobbers
   - dragon-escape
+  - one-in-the-quiver
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
