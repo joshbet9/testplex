@@ -108,7 +108,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         display(world, "kit-text", ChatColor.GREEN + "" + ChatColor.BOLD + "KIT SELECT | " + name);
         display(world, "team-text", ChatColor.BLUE + "" + ChatColor.BOLD + "TEAM / QUEUE | " + name);
         display(world, "kit-display", ChatColor.GREEN + "Choose a " + name + " kit");
-        display(world, "team-display", ChatColor.BLUE + (selectedGame == ArcadePortGame.BACON_BRAWL ? "FREE FOR ALL" : "TEAM QUEUE")
+        boolean freeForAll = selectedGame == ArcadePortGame.BACON_BRAWL
+                || selectedGame == ArcadePortGame.SKY_WARS;
+        display(world, "team-display", ChatColor.BLUE + (freeForAll ? "FREE FOR ALL" : "TEAM QUEUE")
                 + ChatColor.WHITE + " | Queued: " + manager.queuedCount(selectedGame) + ChatColor.GRAY + " | Bots: " + bots.size());
     }
 
