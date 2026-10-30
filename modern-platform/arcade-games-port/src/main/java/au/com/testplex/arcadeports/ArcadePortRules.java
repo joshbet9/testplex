@@ -381,6 +381,7 @@ public final class ArcadePortRules {
     public static final long MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS = 20_000L;
     public static final int MICRO_BATTLES_FLETCHER_MAX_ARROWS = 3;
     public static final int MICRO_BATTLES_FLETCHER_STARTING_ARROWS = 1;
+    public static final long MICRO_BATTLES_COMBAT_LOG_EXPIRY_MILLIS = 15_000L;
     public static final double MICRO_BATTLES_BORDER_PARTICLE_DISTANCE = 3.0D;
     public static final int MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS = 4;
     public static final int MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS = 3;
@@ -1436,6 +1437,14 @@ public final class ArcadePortRules {
     /** The Reborn Last2Tracker grants mission progress when exactly two teams remain alive. */
     public static boolean shouldAwardMicroBattlesLastTwo(int aliveTeams) {
         return aliveTeams == 2;
+    }
+
+    /** Mirrors Reborn CombatManager's 15-second attacker expiry and excludes the credited killer. */
+    public static boolean shouldCreditMicroBattlesAssist(boolean playerAttacker, boolean creditedKiller,
+            long nowMillis, long lastDamageAt) {
+        return playerAttacker && !creditedKiller && lastDamageAt > 0L
+                && nowMillis >= lastDamageAt
+                && nowMillis - lastDamageAt < MICRO_BATTLES_COMBAT_LOG_EXPIRY_MILLIS;
     }
 
     /** Stable local test-server key; production Mineplex achievement storage remains separate. */
