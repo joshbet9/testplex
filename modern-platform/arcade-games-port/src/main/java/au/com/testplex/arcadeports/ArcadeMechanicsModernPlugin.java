@@ -21,11 +21,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         if (!getConfig().contains("enabled-games")) {
             getConfig().set("enabled-games", java.util.List.of("bacon-brawl"));
         }
-        String acceptanceRevision = "dragons-runner-acceptance-candidate-v2";
+        String acceptanceRevision = "dragons-runner-skywars-mixed-candidate-v3";
         if (!acceptanceRevision.equals(getConfig().getString("acceptance-games-revision", ""))) {
             java.util.List<String> enabled = new java.util.ArrayList<>(getConfig().getStringList("enabled-games"));
             // Preserve prior acceptance candidates and any locally maintained allow-list entries.
-            for (String candidate : java.util.List.of("bomb-lobbers", "dragon-escape", "paintball", "runner", "dragons")) {
+            for (String candidate : java.util.List.of("bomb-lobbers", "dragon-escape", "paintball", "runner", "dragons", "skywars")) {
                 if (!enabled.contains(candidate)) enabled.add(candidate);
             }
             if (!enabled.contains("dragons")) enabled.add("dragons");
@@ -120,6 +120,15 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         return normalized.equals("turf-wars-mixed") || normalized.equals("mixed-turf-wars");
     }
 
+    private boolean isMixedSkyWarsId(String requestedId) {
+        if (requestedId == null) return false;
+        String normalized = requestedId.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return normalized.equals("skywars") || normalized.equals("sky-wars")
+                || normalized.equals("skywars-mixed") || normalized.equals("sky-wars-mixed")
+                || normalized.equals("mixed-skywars") || normalized.equals("mixed-sky-wars");
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
@@ -135,9 +144,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     return true;
                 }
                 boolean mixedTurfWars = isMixedTurfWarsId(args[1]);
+                boolean mixedSkyWars = isMixedSkyWarsId(args[1]);
+                boolean mixedArcade = mixedTurfWars || mixedSkyWars;
                 ArcadePortGame requestedGame = mixedTurfWars ? ArcadePortGame.TURF_WARS
-                        : ArcadePortGame.fromId(args[1]);
-                manager.queue(requestedGame, player, sub.equals("play"), mixedTurfWars);
+                        : mixedSkyWars ? ArcadePortGame.SKY_WARS : ArcadePortGame.fromId(args[1]);
+                manager.queue(requestedGame, player, sub.equals("play"), mixedArcade);
                 return true;
             case "lobby":
             case "selectgame":
@@ -176,9 +187,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     return true;
                 }
                 boolean mixedTurfWarsStart = isMixedTurfWarsId(args[1]);
+                boolean mixedSkyWarsStart = isMixedSkyWarsId(args[1]);
+                boolean mixedArcadeStart = mixedTurfWarsStart || mixedSkyWarsStart;
                 ArcadePortGame requestedStartGame = mixedTurfWarsStart ? ArcadePortGame.TURF_WARS
-                        : ArcadePortGame.fromId(args[1]);
-                manager.startFromLobby(requestedStartGame, sender, mixedTurfWarsStart);
+                        : mixedSkyWarsStart ? ArcadePortGame.SKY_WARS : ArcadePortGame.fromId(args[1]);
+                manager.startFromLobby(requestedStartGame, sender, mixedArcadeStart);
                 return true;
             case "kit":
                 if (!(sender instanceof Player player)) {
@@ -226,6 +239,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play turf-wars-mixed" + ChatColor.GRAY
                         + " — dedicated Mixed Arcade Turf Wars (20s / 10s build, 45s combat; 2-column turf shifts)");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport play skywars-mixed" + ChatColor.GRAY
+                        + " — 16-player SkyWars FFA (5s start, 60s crumble, 15s TNT drops, 8-minute limit)");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a Bomb Lobbers, Bacon Brawl, Dragons, Micro Battles, One in the Quiver, Paintball, Runner, Spleef or Death Tag kit; use runnerkit-<kit> for Runner");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport ghost <on|off|toggle>" + ChatColor.GRAY + " — show or hide your Dragon Escape PB ghost");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport dragoncolor <colour>" + ChatColor.GRAY + " — set your Dragon Escape leader beacon colour");
