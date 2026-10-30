@@ -80,6 +80,7 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -4104,6 +4105,236 @@ public final class ArcadePortManager implements Listener {
             lowest.setType(Material.AIR, false);
             removed++;
         }
+    }
+
+    private int skyWarsMetalArmorPieces(Player player) {
+        int pieces = 0;
+        for (ItemStack armor : player.getInventory().getArmorContents()) {
+            if (armor == null) continue;
+            Material type = armor.getType();
+            String name = type.name();
+            if (name.startsWith("IRON_") || name.startsWith("GOLDEN_")
+                    || name.startsWith("CHAINMAIL_")) pieces++;
+        }
+        return pieces;
+    }
+
+    private void updateSkyWarsKits(Session session, long now) {
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            String kit = session.skyWarsKits.getOrDefault(id, "ice");
+            if ("air".equals(kit)) {
+                if (player.isOnGround()) {
+                    session.skyWarsSafeLocations.put(id, player.getLocation().clone());
+                    if (now >= session.skyWarsKitReadyAt.getOrDefault(id, 0L) && !player.getAllowFlight()) {
+                        player.setAllowFlight(true);
+                        player.setFlying(false);
+                    }
+                }
+            } else if ("metal".equals(kit) && now % 1000L < 50L) {
+                var maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
+                if (maxHealth != null) {
+                    double value = 20.0D + skyWarsMetalArmorPieces(player);
+                    maxHealth.setBaseValue(value);
+                    if (player.getHealth() > value) player.setHealth(value);
+                }
+            } else if ("earth".equals(kit) && now >= session.skyWarsNextDirtAt.getOrDefault(id, Long.MAX_VALUE)) {
+                int dirt = inventoryCount(player, Material.DIRT);
+                if (dirt < 4) {
+                    player.getInventory().addItem(namedItem(Material.DIRT, "Throwable Dirt",
+                            "Click to throw dirt and knock back an opponent."));
+                    session.skyWarsNextDirtAt.put(id, now + (dirt < 3 ? 1_000L : 20_000L));
+                } else {
+                    session.skyWarsNextDirtAt.put(id, now + 20_000L);
+                }
+            }
+        }
+
+        Iterator<Map.Entry<Block, Long>> iceIterator = session.skyWarsIceBridgeExpiresAt.entrySet().iterator();
+        while (iceIterator.hasNext()) {
+            Map.Entry<Block, Long> entry = iceIterator.next();
+            if (now < entry.getValue()) continue;
+            Block block = entry.getKey();
+            BlockData original = session.skyWarsIceBridgeOriginals.remove(block);
+            if (block.getType() == Material.ICE && original != null) block.setBlockData(original, false);
+            iceIterator.remove();
+        }
+
+        for (Map.Entry<UUID, UUID> entry : new ArrayList<>(session.skyWarsDirtProjectiles.entrySet())) {
+            Entity entity = Bukkit.getEntity(entry.getKey());
+            if (!(entity instanceof FallingBlock dirt) || !dirt.isValid()) {
+                session.skyWarsDirtProjectiles.remove(entry.getKey());
+                continue;
+            }
+            Player owner = session.players.get(entry.getValue());
+            if (owner == null || !owner.isOnline()) {
+                dirt.remove();
+                session.entities.remove(dirt);
+                session.skyWarsDirtProjectiles.remove(entry.getKey());
+                continue;
+            }
+            Player target = alivePlayers(session).stream()
+                    .filter(candidate -> !candidate.getUniqueId().equals(owner.getUniqueId()))
+                    .filter(candidate -> candidate.getLocation().distanceSquared(dirt.getLocation()) <= 1.25D)
+                    .findFirst().orElse(null);
+            if (target != null) {
+                target.damage(1.0D, owner);
+                Vector knockback = dirt.getVelocity().clone();
+                if (knockback.lengthSquared() < 0.001D) knockback = target.getLocation().toVector().subtract(owner.getLocation().toVector());
+                if (knockback.lengthSquared() > 0.001D) target.setVelocity(knockback.normalize().multiply(1.4D).setY(0.5D));
+                target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.3F);
+                dirt.remove();
+                session.entities.remove(dirt);
+                session.skyWarsDirtProjectiles.remove(entry.getKey());
+            }
+        }
+    }
+
+    private boolean skyWarsKitReady(Session session, Player player, long now, long cooldownMillis) {
+        long readyAt = session.skyWarsKitReadyAt.getOrDefault(player.getUniqueId(), 0L);
+        if (now < readyAt) {
+            player.sendActionBar(ChatColor.RED + "Ability ready in "
+                    + String.format(java.util.Locale.ROOT, "%.1f", (readyAt - now) / 1000.0D) + "s");
+            return false;
+        }
+        session.skyWarsKitReadyAt.put(player.getUniqueId(), now + cooldownMillis);
+        return true;
+    }
+
+    private void useSkyWarsIceBridge(Session session, Player player, long now) {
+        if (!skyWarsKitReady(session, player, now, 30_000L)) return;
+        player.teleport(player.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+        player.setVelocity(new Vector(0.0D, 0.5D, 0.0D));
+        player.playSound(player.getLocation(), Sound.BLOCK_GLASS_PLACE, 0.9F, 1.5F);
+        Location origin = player.getLocation().clone();
+        Vector direction = origin.getDirection().setY(0.0D);
+        if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.0D, 1.0D);
+        direction.normalize();
+        for (int step = 0; step < 8; step++) {
+            int x = origin.getBlockX() + (int) Math.round(direction.getX() * step);
+            int z = origin.getBlockZ() + (int) Math.round(direction.getZ() * step);
+            Block block = session.world.getBlockAt(x, origin.getBlockY() - 1, z);
+            if (!block.getType().isAir() || !block.getRelative(BlockFace.UP).getType().isAir()
+                    || block.equals(session.skyWarsGeneratorBase)) continue;
+            session.skyWarsIceBridgeOriginals.putIfAbsent(block, block.getBlockData().clone());
+            block.setType(Material.ICE, false);
+            session.skyWarsIceBridgeExpiresAt.put(block, now + 4_000L);
+        }
+        player.sendActionBar(ChatColor.AQUA + "Ice Bridge!");
+    }
+
+    private void useSkyWarsFireBurst(Session session, Player player, long now) {
+        if (!skyWarsKitReady(session, player, now, 30_000L)) return;
+        Location center = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
+        for (Player target : alivePlayers(session)) {
+            if (target.getUniqueId().equals(player.getUniqueId())
+                    || target.getLocation().distanceSquared(center) > 36.0D) continue;
+            target.setFireTicks(100);
+            target.damage(6.0D, player);
+        }
+        for (double radius = 0.5D; radius <= 6.0D; radius += 0.5D) {
+            for (int angle = 0; angle < 40; angle++) {
+                double theta = Math.PI * 2.0D * angle / 40.0D;
+                Location at = center.clone().add(Math.cos(theta) * radius, 0.0D,
+                        Math.sin(theta) * radius);
+                session.world.spawnParticle(Particle.FLAME, at, 1, 0.0D, 0.0D, 0.0D, 0.005D);
+            }
+        }
+        session.world.playSound(center, Sound.ITEM_FIRECHARGE_USE, 1.0F, 0.85F);
+    }
+
+    private void useSkyWarsVoidSaver(Session session, Player player) {
+        Location safe = session.skyWarsSafeLocations.get(player.getUniqueId());
+        if (safe == null || safe.getWorld() != session.world) {
+            player.sendMessage(ChatColor.YELLOW + "You have not recorded a safe location yet.");
+            return;
+        }
+        consumeHeld(player);
+        player.getInventory().remove(Material.ENDER_EYE);
+        player.teleport(safe.clone().add(0.0D, 2.0D, 0.0D));
+        player.setFallDistance(0.0F);
+        player.setVelocity(new Vector(0.0D, 0.2D, 0.0D));
+        player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.9F);
+        player.getWorld().spawnParticle(Particle.WITCH, player.getEyeLocation(), 10,
+                0.4D, 0.4D, 0.4D, 0.05D);
+    }
+
+    private Player skyWarsPlayerInSight(Session session, Player player, double range) {
+        var hit = session.world.rayTraceEntities(player.getEyeLocation(),
+                player.getEyeLocation().getDirection(), range, 0.5D,
+                entity -> entity instanceof Player target && session.alive.contains(target.getUniqueId())
+                        && !target.getUniqueId().equals(player.getUniqueId()));
+        return hit != null && hit.getHitEntity() instanceof Player target ? target : null;
+    }
+
+    private void useSkyWarsMagnetism(Session session, Player player, long now) {
+        Player target = skyWarsPlayerInSight(session, player, 12.0D);
+        if (target == null) {
+            player.sendMessage(ChatColor.YELLOW + "Look directly at an opponent to use Magnet.");
+            return;
+        }
+        int armourPieces = skyWarsMetalArmorPieces(target);
+        if (armourPieces == 0) {
+            player.sendMessage(ChatColor.YELLOW + "That opponent is not wearing metal armour.");
+            return;
+        }
+        if (!skyWarsKitReady(session, player, now, 15_000L)) return;
+        target.damage(1.0D, player);
+        Vector pull = player.getLocation().toVector().subtract(target.getLocation().toVector());
+        if (pull.lengthSquared() > 0.001D) {
+            double magnitude = (0.5D + armourPieces / 4.0D);
+            target.setVelocity(pull.normalize().multiply(magnitude).setY(Math.max(0.6D, pull.normalize().getY() * magnitude)));
+        }
+        player.getWorld().spawnParticle(Particle.FIREWORK, player.getEyeLocation(), 8,
+                0.3D, 0.3D, 0.3D, 0.02D);
+        player.playSound(player.getLocation(), Sound.BLOCK_BEACON_ACTIVATE, 0.7F, 1.4F);
+    }
+
+    private void throwSkyWarsDirt(Session session, Player player, long now) {
+        if (!skyWarsKitReady(session, player, now, 500L)) return;
+        ItemStack held = player.getInventory().getItemInMainHand();
+        if (held == null || held.getType() != Material.DIRT) return;
+        consumeHeld(player);
+        Location spawn = player.getEyeLocation().add(player.getLocation().getDirection());
+        FallingBlock dirt = session.world.spawnFallingBlock(spawn, Material.DIRT.createBlockData());
+        dirt.setDropItem(false);
+        dirt.setHurtEntities(false);
+        dirt.setVelocity(player.getLocation().getDirection().normalize().multiply(2.0D));
+        session.skyWarsDirtProjectiles.put(dirt.getUniqueId(), player.getUniqueId());
+        session.entities.add(dirt);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSkyWarsDoubleJump(PlayerToggleFlightEvent event) {
+        Player player = event.getPlayer();
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SKY_WARS
+                || !session.players.containsKey(player.getUniqueId())
+                || !session.alive.contains(player.getUniqueId())
+                || !"air".equals(session.skyWarsKits.getOrDefault(player.getUniqueId(), "ice"))) return;
+        event.setCancelled(true);
+        long now = System.currentTimeMillis();
+        if (!skyWarsKitReady(session, player, now, 25_000L)) {
+            player.setAllowFlight(false);
+            return;
+        }
+        player.setAllowFlight(false);
+        player.setFlying(false);
+        Vector direction = player.getLocation().getDirection().normalize();
+        player.setVelocity(direction.multiply(1.0D).setY(0.85D));
+        player.setFallDistance(0.0F);
+        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_ENDER_EYE_LAUNCH, 0.8F, 1.4F);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSkyWarsFallingDirtLand(EntityChangeBlockEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SKY_WARS
+                || !session.skyWarsDirtProjectiles.containsKey(event.getEntity().getUniqueId())) return;
+        event.setCancelled(true);
+        session.skyWarsDirtProjectiles.remove(event.getEntity().getUniqueId());
+        session.entities.remove(event.getEntity());
+        event.getEntity().remove();
     }
 
     private void updateSkyWars(Session session, long now) {
@@ -8639,6 +8870,14 @@ public final class ArcadePortManager implements Listener {
             if (block != null && block.getWorld() == session.world) block.setBlockData(entry.getValue(), false);
         }
         session.deathTagOriginalLightBlocks.clear();
+        for (Map.Entry<Block, BlockData> entry : session.skyWarsIceBridgeOriginals.entrySet()) {
+            Block block = entry.getKey();
+            if (block != null && block.getType() == Material.ICE) block.setBlockData(entry.getValue(), false);
+        }
+        session.skyWarsIceBridgeOriginals.clear();
+        session.skyWarsIceBridgeExpiresAt.clear();
+        session.skyWarsDirtProjectiles.clear();
+        session.skyWarsGuardianHomes.clear();
         for (UUID playerId : new ArrayList<>(session.deathTagDisguises.keySet())) {
             removeDeathTagDisguise(session, playerId);
         }
@@ -11043,6 +11282,36 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.type == ArcadePortGame.SKY_WARS && event.getAction().isRightClick()
+                && session.skyWarsLive && session.alive.contains(player.getUniqueId())) {
+            String kit = session.skyWarsKits.getOrDefault(player.getUniqueId(), "ice");
+            Material ability = heldItem == null ? Material.AIR : heldItem.getType();
+            if ("ice".equals(kit) && ability == Material.ICE) {
+                event.setCancelled(true);
+                useSkyWarsIceBridge(session, player, System.currentTimeMillis());
+                return;
+            }
+            if ("fire".equals(kit) && ability == Material.BLAZE_ROD) {
+                event.setCancelled(true);
+                useSkyWarsFireBurst(session, player, System.currentTimeMillis());
+                return;
+            }
+            if ("air".equals(kit) && ability == Material.ENDER_EYE) {
+                event.setCancelled(true);
+                useSkyWarsVoidSaver(session, player);
+                return;
+            }
+            if ("metal".equals(kit) && ability == Material.COMPARATOR) {
+                event.setCancelled(true);
+                useSkyWarsMagnetism(session, player, System.currentTimeMillis());
+                return;
+            }
+            if ("earth".equals(kit) && ability == Material.DIRT) {
+                event.setCancelled(true);
+                throwSkyWarsDirt(session, player, System.currentTimeMillis());
+                return;
+            }
+        }
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && !session.alive.contains(player.getUniqueId())
                 && isBaconTrackingCompass(heldItem)) {
@@ -11483,7 +11752,14 @@ public final class ArcadePortManager implements Listener {
             if (!session.alive.contains(event.getPlayer().getUniqueId()) || !session.skyWarsLive || protectedBlock) {
                 event.setCancelled(true);
             } else {
-                event.setDropItems(true);
+                if ("metal".equals(session.skyWarsKits.getOrDefault(event.getPlayer().getUniqueId(), "ice"))
+                        && event.getBlock().getType() == Material.IRON_ORE) {
+                    event.setDropItems(false);
+                    event.getBlock().getWorld().dropItemNaturally(event.getBlock().getLocation().add(0.5D, 0.5D, 0.5D),
+                            new ItemStack(Material.IRON_INGOT));
+                } else {
+                    event.setDropItems(true);
+                }
                 event.setExpToDrop(0);
                 session.skyWarsCrumbleQueued.remove(event.getBlock());
             }
