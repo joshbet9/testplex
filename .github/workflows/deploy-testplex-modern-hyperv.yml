@@ -9,7 +9,7 @@ on:
         required: true
         type: boolean
       source_run_id:
-        description: Successful Testplex Modern Paper 26.3 build run ID (uploads all four modern JARs)
+        description: Successful Testplex Modern Paper 26.3 build run ID (uploads the three Testplex plugin JARs)
         required: true
         type: string
   workflow_dispatch:
@@ -20,7 +20,7 @@ on:
         type: boolean
         default: false
       source_run_id:
-        description: Successful Testplex Modern Paper 26.3 build run ID (uploads all four modern JARs)
+        description: Successful Testplex Modern Paper 26.3 build run ID (uploads the three Testplex plugin JARs)
         required: true
         type: string
         default: "40819650403"
@@ -141,7 +141,7 @@ jobs:
           ref: 231fb1830ca53a3cdd7451391ac3d384a03ec5bb
           path: monstermaze-source
 
-      - name: Verify and stage the four JARs and Monster Maze worlds
+      - name: Verify and stage the three Testplex JARs and Monster Maze worlds
         id: stage-jars
         shell: bash
         env:
@@ -197,7 +197,7 @@ jobs:
           # Capture pre-deploy service states before any service is stopped. The
           # failure handler uses these flags to restore only services that were
           # running before this attempt.
-          state_lines="$(ssh "${ssh_opts[@]}" "$remote" 'set -e; sudo -n true; for unit in testplex-reborn.service monstermaze-18.service monstermaze-21.service testplex-modern.service; do state="$(sudo -n systemctl is-active "$unit" 2>/dev/null || true)"; printf "%s=%s\n" "$unit" "${state:-unknown}"; done')"
+          state_lines="$(ssh "${ssh_opts[@]}" "$remote" 'set -e; sudo -n true; for unit in testplex-reborn.service testplex-modern.service; do state="$(sudo -n systemctl is-active "$unit" 2>/dev/null || true)"; printf "%s=%s\n" "$unit" "${state:-unknown}"; done')"
           get_state() {
             printf '%s\n' "$state_lines" | awk -F= -v unit="$1" '$1 == unit {print $2; exit}'
           }
@@ -208,8 +208,6 @@ jobs:
           }
           for pair in \
             "testplex-reborn.service:testplex_reborn_was_active" \
-            "monstermaze-18.service:monstermaze18_was_active" \
-            "monstermaze-21.service:monstermaze21_was_active" \
             "testplex-modern.service:modern_was_active"; do
             unit="${pair%%:*}"
             output="${pair#*:}"
@@ -257,10 +255,10 @@ jobs:
             done
             [[ "$stopped" == "true" ]] || { echo "Modern Testplex did not stop cleanly." >&2; exit 1; }
           fi
-          # The VM is memory-constrained. Stop competing legacy game services
-          # automatically; the outer workflow restores their previous state if
-          # anything fails, and successful deploys leave only modern Paper up.
-          for unit in testplex-reborn.service monstermaze-18.service monstermaze-21.service; do
+          # Stop only Testplex's own 1.8 reference server when needed. The separate
+          # Monster Maze project/services are intentionally not inspected, stopped,
+          # restarted or modified by this Testplex deployment.
+          for unit in testplex-reborn.service; do
             state="$(sudo -n systemctl is-active "$unit" 2>/dev/null || true)"
             if [[ "$state" == "active" ]]; then
               echo "Stopping $unit automatically to reserve VM memory for modern Paper."
@@ -273,10 +271,6 @@ jobs:
               [[ "$stopped" == "true" ]] || { echo "$unit did not stop cleanly." >&2; exit 1; }
             fi
           done
-          if pgrep -f '[s]pigot-1\.8\.8-1\.9-SNAPSHOT\.jar' >/dev/null 2>&1; then
-            echo "A legacy 1.8 Spigot process remains active outside systemd; refusing deployment." >&2
-            exit 1
-          fi
           available_mb="$(awk '/MemAvailable/ {print int($2/1024)}' /proc/meminfo)"
           # The modern JVM is capped at 1536 MiB. Require at least 2 GiB free
           # after stopping the current server: this leaves roughly 512 MiB for
@@ -287,7 +281,7 @@ jobs:
             echo "Only $available_mb MiB is available after stopping legacy services. Need at least 2000 MiB for the 1536 MiB Paper heap plus native/OS reserve." >&2
             exit 1
           fi
-          echo "Preflight passed: competing legacy services are inactive, target is isolated, port is free, and memory headroom is sufficient for a 1536 MiB heap."
+          echo "Preflight passed: Testplex legacy service is inactive, separate Monster Maze services were untouched, target is isolated, port is free, and memory headroom is sufficient for a 1536 MiB heap."
           REMOTE_PREFLIGHT
 
       - name: Upload verified JARs to the isolated directory
@@ -762,15 +756,13 @@ jobs:
           echo "The legacy testplex-reborn.service and standalone Monster Maze units were not modified."
 
       - name: Restore previously running game servers if modern deployment fails
-        if: ${{ failure() && (steps.remote-preflight.outputs.testplex_reborn_was_active == 'true' || steps.remote-preflight.outputs.monstermaze18_was_active == 'true' || steps.remote-preflight.outputs.monstermaze21_was_active == 'true' || steps.remote-preflight.outputs.modern_was_active == 'true') }}
+        if: ${{ failure() && (steps.remote-preflight.outputs.testplex_reborn_was_active == 'true' || steps.remote-preflight.outputs.modern_was_active == 'true') }}
         shell: bash
         env:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
           HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
           HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
           TESTPLEX_REBORN_WAS_ACTIVE: ${{ steps.remote-preflight.outputs.testplex_reborn_was_active }}
-          MONSTERMAZE18_WAS_ACTIVE: ${{ steps.remote-preflight.outputs.monstermaze18_was_active }}
-          MONSTERMAZE21_WAS_ACTIVE: ${{ steps.remote-preflight.outputs.monstermaze21_was_active }}
           MODERN_WAS_ACTIVE: ${{ steps.remote-preflight.outputs.modern_was_active }}
         run: |
           set -euo pipefail
@@ -782,21 +774,17 @@ jobs:
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
           ssh "${ssh_opts[@]}" "$remote" bash -s -- \
-            "$TESTPLEX_REBORN_WAS_ACTIVE" "$MONSTERMAZE18_WAS_ACTIVE" "$MONSTERMAZE21_WAS_ACTIVE" "$MODERN_WAS_ACTIVE" <<'REMOTE_RESTORE'
+            "$TESTPLEX_REBORN_WAS_ACTIVE" "$MODERN_WAS_ACTIVE" <<'REMOTE_RESTORE'
           set -euo pipefail
           reborn="$1"
-          mm18="$2"
-          mm21="$3"
-          modern="$4"
+          modern="$2"
           if [[ "$modern" == "true" ]]; then
             sudo -n systemctl start testplex-modern.service
           else
             sudo -n systemctl stop testplex-modern.service 2>/dev/null || true
           fi
           [[ "$reborn" != "true" ]] || sudo -n systemctl start testplex-reborn.service
-          [[ "$mm18" != "true" ]] || sudo -n systemctl start monstermaze-18.service
-          [[ "$mm21" != "true" ]] || sudo -n systemctl start monstermaze-21.service
-          echo "Previous service state restored where possible."
+          echo "Previous Testplex service state restored where possible. Separate Monster Maze services were never changed."
           REMOTE_RESTORE
 
       - name: Remove temporary modern deployment artifacts
@@ -847,6 +835,6 @@ jobs:
             echo "- Destination: /home/monstermaze/servers/testplex-modern"
             echo "- Dedicated unit: testplex-modern.service"
             echo "- Dedicated Minecraft port: 25568"
-            echo "- Memory safety: active legacy Testplex/MM services are stopped automatically for the modern deployment and restored if deployment fails; successful deployments leave only modern Paper running"
+            echo "- Memory safety: only Testplex's own legacy service is stopped; separate Monster Maze services are left untouched, and deployment aborts rather than stopping them when memory is insufficient; successful deployments leave only modern Paper running"
             echo "- Rollback: modern-only backup created before replacement; startup is checked before success"
           } >> "$GITHUB_STEP_SUMMARY"
