@@ -2823,12 +2823,16 @@ public final class ArcadePortManager implements Listener {
                         player.getInventory().setItem(0, new ItemStack(Material.STONE_AXE));
                         player.getInventory().setItem(1, new ItemStack(Material.STONE_PICKAXE));
                         player.getInventory().setItem(2, new ItemStack(Material.STONE_SHOVEL));
-                        player.getInventory().setItem(3, revivalPotion());
+                        ItemStack editorPotions = revivalPotion();
+                        editorPotions.setAmount(2);
+                        player.getInventory().setItem(3, editorPotions);
                         player.getInventory().setItem(4, new ItemStack(Material.MUSHROOM_STEW));
                         player.getInventory().setItem(5, new ItemStack(Material.MUSHROOM_STEW));
                     } else if ("medic".equals(kit)) {
                         player.getInventory().setItem(0, new ItemStack(Material.STONE_AXE));
-                        player.getInventory().setItem(1, revivalPotion());
+                        ItemStack medicPotions = revivalPotion();
+                        medicPotions.setAmount(2);
+                        player.getInventory().setItem(1, medicPotions);
                         player.getInventory().setItem(2, new ItemStack(Material.MUSHROOM_STEW));
                         player.getInventory().setItem(3, new ItemStack(Material.MUSHROOM_STEW));
                         session.witherMedicNextRefillAt.putIfAbsent(player.getUniqueId(),
@@ -2836,10 +2840,12 @@ public final class ArcadePortManager implements Listener {
                     } else {
                         player.getInventory().setItem(0, new ItemStack(Material.IRON_SWORD));
                         player.getInventory().setItem(1, new ItemStack(Material.BOW));
-                        player.getInventory().setItem(2, revivalPotion());
+                        ItemStack archerPotions = revivalPotion();
+                        archerPotions.setAmount(2);
+                        player.getInventory().setItem(2, archerPotions);
                         player.getInventory().setItem(3, new ItemStack(Material.MUSHROOM_STEW));
                         player.getInventory().setItem(4, new ItemStack(Material.MUSHROOM_STEW));
-                        player.getInventory().setItemInOffHand(new ItemStack(Material.SHIELD));
+                        player.getInventory().setItem(5, new ItemStack(Material.ARROW, 4));
                     }
                 }
                 break;
@@ -7080,10 +7086,16 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.MILK_THE_COW && session.participantsAtStart > 1) {
-            long farmers = session.alive.stream().filter(id -> session.teams.getOrDefault(id, 0) == 0).count();
-            long cows = session.alive.stream().filter(id -> session.teams.getOrDefault(id, 0) == 1).count();
-            if (farmers == 0 && cows > 0) finish(session, bestTimeoutPlayerOnTeam(session, 1), true);
-            else if (cows == 0 && farmers > 0) updateMilkCow(session, System.currentTimeMillis());
+            List<UUID> farmers = session.alive.stream().filter(id -> session.teams.getOrDefault(id, 0) == 0).toList();
+            List<UUID> cows = session.alive.stream().filter(id -> session.teams.getOrDefault(id, 0) == 1).toList();
+            if (farmers.isEmpty() && !cows.isEmpty()) {
+                // Source EndCheck awards each surviving Cow 15 points before placements are calculated.
+                for (UUID cowId : cows) session.scores.put(cowId,
+                        MilkCowRules.scoreAfterChange(session.scores.getOrDefault(cowId, 0), MilkCowRules.SCORE_TO_WIN));
+                finish(session, bestTimeoutPlayerOnTeam(session, 1), true);
+            } else if (cows.isEmpty() && !farmers.isEmpty()) {
+                updateMilkCow(session, System.currentTimeMillis());
+            }
             return;
         }
         if (session.type == ArcadePortGame.WITHER_ASSAULT && session.participantsAtStart > 1) {
@@ -11016,7 +11028,10 @@ public final class ArcadePortManager implements Listener {
     public void onMilkCowBucketFill(PlayerBucketFillEvent event) {
         Session session = active;
         if (session != null && session.type == ArcadePortGame.MILK_THE_COW
-                && event.getPlayer().getWorld() == session.world) event.setCancelled(true);
+                && event.getPlayer().getWorld() == session.world
+                && event.getBlockClicked() != null && event.getBlockClicked().getType().isLiquid()) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -11114,7 +11129,7 @@ public final class ArcadePortManager implements Listener {
         if (session.players.values().stream().noneMatch(p -> p.isOnline()
                 && session.alive.contains(p.getUniqueId())
                 && session.teams.getOrDefault(p.getUniqueId(), 0) == 0)) {
-            finish(session, null, true);
+            finish(session, bestTimeoutPlayerOnTeam(session, 1), true);
             return;
         }
         checkRoundEnd(session);
@@ -11437,11 +11452,6 @@ public final class ArcadePortManager implements Listener {
             setMilkCowRole(session, promoted);
             cows = List.of(promoted);
         }
-        if (session.participantsAtStart > 1 && farmers.isEmpty() && !cows.isEmpty()) {
-            finish(session, cows.get(0), true);
-            return;
-        }
-
         for (Player cowPlayer : cows) {
             if (!cowPlayer.isSprinting()) continue;
             Location forward = cowPlayer.getLocation().clone().add(cowPlayer.getLocation().getDirection().setY(0).normalize());
