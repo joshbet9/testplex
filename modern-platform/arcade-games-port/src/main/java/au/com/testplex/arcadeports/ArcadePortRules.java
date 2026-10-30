@@ -104,13 +104,28 @@ public final class ArcadePortRules {
         return 0.5D + charge / 200.0D;
     }
 
-    /** Pig spends meter on invincibility; higher charge gives a longer defensive window. */
-    public static long baconPigInvincibilityDurationMillis(int percent) {
+    /** Meter-powered Pig Cloak and Brutus Bacon abilities share a charge-scaled duration. */
+    public static long baconAbilityDurationMillis(int percent) {
         int charge = Math.max(0, Math.min(BACON_METER_MAX, percent));
         if (!canUseBaconMeterAbility(charge)) return 0L;
         return BACON_PIG_INVINCIBILITY_MIN_MILLIS
                 + Math.round((BACON_PIG_INVINCIBILITY_MAX_MILLIS
                         - BACON_PIG_INVINCIBILITY_MIN_MILLIS) * charge / (double) BACON_METER_MAX);
+    }
+
+    /** Retained as a compatibility alias for earlier tests and callers. */
+    public static long baconPigInvincibilityDurationMillis(int percent) {
+        return baconAbilityDurationMillis(percent);
+    }
+
+    public static boolean isBaconTimedCritical(long intervalMillis) {
+        return intervalMillis >= BACON_TIMED_HIT_GOOD_MIN_MILLIS
+                && intervalMillis <= BACON_TIMED_HIT_GOOD_MAX_MILLIS;
+    }
+
+    /** Brutus blocks a frontal hit; a true backstab disables the guard before normal knockback. */
+    public static boolean shouldBaconBrutusGuardHit(boolean active, boolean backstab) {
+        return active && !backstab;
     }
 
     /** Mama Piggles spends meter to set Bacon Blast launch and impact power. */
@@ -870,7 +885,8 @@ public final class ArcadePortRules {
         return switch (value) {
             case "el-muchacho-pigo", "muchacho", "body-slam", "pigo" -> "el-muchacho-pigo";
             case "mama", "mama-pig", "mama-piggles" -> "mama-piggles";
-            case "pig", "sneaky-pig", "sheep", "sheep-pig" -> "pig";
+            case "pig", "sneaky-pig", "sheep", "sheep-pig", "pig-cloak", "cloak-pig" -> "pig";
+            case "brutus", "brutus-bacon", "bacon-brutus", "brutus-pig" -> "brutus-bacon";
             default -> null;
         };
     }
