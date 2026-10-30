@@ -30,7 +30,7 @@ public final class PlayerFeedback implements Listener {
     public PlayerFeedback(MonsterMazePlugin plugin, GameManager game) {
         this.plugin = plugin;
         this.game = game;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
     }
 
     @EventHandler
@@ -84,7 +84,7 @@ public final class PlayerFeedback implements Listener {
                 display.setTextOpacity((byte) Math.max(0, 255 - age * 10));
                 age++;
             }
-        }.runTaskTimer(plugin, 1L, 1L);
+        }.runTaskTimer(plugin.getHostPlugin(), 1L, 1L);
     }
 
     private void showToAllowedViewers(Player subject, TextDisplay display) {
