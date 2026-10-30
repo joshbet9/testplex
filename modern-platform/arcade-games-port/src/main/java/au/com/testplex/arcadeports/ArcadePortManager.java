@@ -1286,8 +1286,17 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.DEATH_TAG) {
             if (participants.size() > 1) {
                 Player chaser = participants.get(ThreadLocalRandom.current().nextInt(participants.size()));
-                session.tagged.add(chaser.getUniqueId());
-                session.alphaChasers.add(chaser.getUniqueId());
+                UUID initialChaserId = chaser.getUniqueId();
+                session.tagged.add(initialChaserId);
+                session.alphaChasers.add(initialChaserId);
+                // In the legacy game, the first FAST update calls setChaser(..., true):
+                // the initial Alpha is an OUT Runner placement and receives the forced bonus.
+                session.deathTagRunnerPlacementOrder.add(initialChaserId);
+                awardDeathTagTestGems(session, initialChaserId,
+                        ArcadePortRules.DEATH_TAG_FORCED_CHASER_REWARD_GEMS, "Forced Chaser");
+                session.world.strikeLightningEffect(chaser.getLocation());
+                announce(session, ChatColor.GREEN + chaser.getName() + ChatColor.GRAY
+                        + " has become an " + ChatColor.RED + "Alpha Chaser" + ChatColor.GRAY + ".");
                 chaser.sendMessage(ChatColor.RED + "You are the Alpha Chaser! Tag every runner.");
                 for (Player p : participants) if (p != chaser) p.sendMessage(ChatColor.GREEN + "Run! Avoid the tagged player.");
             } else {
