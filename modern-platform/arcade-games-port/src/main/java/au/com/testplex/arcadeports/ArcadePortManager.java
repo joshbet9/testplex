@@ -31,6 +31,7 @@ import org.bukkit.entity.Egg;
 import org.bukkit.entity.Fireball;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Item;
+import org.bukkit.entity.ItemFrame;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
@@ -1754,6 +1755,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void giveDeathTagKit(Session session, Player player, boolean chaser, boolean alphaChaser) {
+        player.setGameMode(GameMode.ADVENTURE);
         player.getInventory().clear();
         for (PotionEffect effect : player.getActivePotionEffects()) player.removePotionEffect(effect.getType());
         if (chaser) {
@@ -9297,6 +9299,11 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.DEATH_TAG
+                && event.getRightClicked() instanceof ItemFrame) {
+            event.setCancelled(true);
+            return;
+        }
         Player player = event.getPlayer();
         if (!session.alive.contains(player.getUniqueId())) return;
         ItemStack held = player.getInventory().getItemInMainHand();
