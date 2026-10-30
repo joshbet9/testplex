@@ -541,6 +541,9 @@ class ArcadePortGameTest {
         assertEquals(1.2D, ArcadePortRules.quiverReboundPower(30.0D), 0.00001D);
         assertEquals(0.03D, ArcadePortRules.quiverReboundVerticalArc(3.0D), 0.00001D);
         assertEquals(0.0D, ArcadePortRules.quiverReboundVerticalArc(Double.NaN), 0.00001D);
+        assertEquals("bullseye-dash", ArcadePortRules.normalizeQuiverArrowFlightCosmetic(null));
+        assertEquals("ricochet-rune", ArcadePortRules.normalizeQuiverArrowFlightCosmetic("RICOCHET-RUNE"));
+        assertEquals("bullseye-dash", ArcadePortRules.normalizeQuiverArrowFlightCosmetic("unknown"));
         assertTrue(ArcadePortRules.shouldRemoveQuiverInvisibilityOnHit(true, true));
         assertFalse(ArcadePortRules.shouldRemoveQuiverInvisibilityOnHit(false, true));
         assertEquals(10_000L, ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS);
