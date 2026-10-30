@@ -15,6 +15,7 @@
 - `MonsterMazeModern.jar`: mechanics-first import of the 1.21 standalone implementation, with production backend writes/heartbeats blocked by default.
 - `SnakeModern.jar`: independent mechanics-first port with its own test arena, sheep tails, slime food, kits, magma-cube item boxes and steering roulette.
 - `ArcadeMechanicsModern.jar`: first-pass, distinct mechanical loops for the other 14 games; separate generated arena per game. These are prototypes for rapid compatibility testing, not source-parity sign-off.
+- `WizardsModern.jar`: separate resource-pack-independent survival port; four original kits, loot/spell progression and fifteen initial spell effects in a generated arena. Six spell effects and late-game parity remain in progress.
 - Gladiators now has the lobby rules vote, in-duel hotbar editing, parallel double-elimination brackets, per-duel combat timers, two requested achievements, Silky Seconds tracking and player-selectable kill messages. It is an isolated 26.3 acceptance candidate; keep its catalogue status in progress until multiplayer sign-off.
 - All 16 entries remain marked MECHANICS_IN_PROGRESS; passing CI means compile/unit tests only, not that player experience has been accepted in-game.
 - New cosmetic lines and unique win scenes are still deferred.
@@ -27,5 +28,6 @@ For each game: confirm Game Panel entry; lobby/arena transfer; round start/reset
 
 1. **Monster Maze** — validate Original/Modern/Classic, maze patterns, Safe Pads, beacon visibility, compass, mobs, kits, round cleanup and two-player flow.
 2. **Snake** — validate steering/movement, tail spacing/collisions, slime growth, kit timers, item-box contacts/roulette, wall hits, disconnects and cleanup.
-3. **Other 14 games** — compare each rough modern mechanics loop against the existing Reborn source, repair API/round/map discrepancies and only then add further mechanics.
+3. **Wizards** — complete the remaining spell effects, source-accurate late-game events, map strategy and multi-client round lifecycle/restore checks; keep the modern item presentation vanilla and resource-pack independent.
+4. **Other 14 games** — compare each rough modern mechanics loop against the existing Reborn source, repair API/round/map discrepancies and only then add further mechanics.
 4. After gameplay loops are accepted, go line-by-line through each game's cosmetic line and distinct win effect, rendering and testing each. Keep legacy/global cosmetics separate where they are intentionally shared.
