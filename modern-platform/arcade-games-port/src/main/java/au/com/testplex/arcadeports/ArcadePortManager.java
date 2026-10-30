@@ -80,6 +80,7 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
@@ -3874,33 +3875,79 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
-    public void onSkyWarsGeneratorPickup(EntityPickupItemEvent event) {
-        Session session = active;
-        if (session == null || session.type != ArcadePortGame.SKY_WARS
-                || session.skyWarsGeneratorDropId == null
-                || !event.getItem().getUniqueId().equals(session.skyWarsGeneratorDropId)) return;
-        event.setCancelled(true);
-        if (!(event.getEntity() instanceof Player player)
-                || !session.skyWarsLive || !session.alive.contains(player.getUniqueId())) return;
+    private void spawnSkyWarsGeneratorHolder(Session session) {
+        if (session == null || active != session || !session.skyWarsLive
+                || session.skyWarsGeneratorHolder != null || session.skyWarsTntGenerator == null) return;
+        ArmorStand holder = session.world.spawn(session.skyWarsTntGenerator.clone(), ArmorStand.class);
+        holder.setGravity(false);
+        holder.setVisible(false);
+        holder.setInvulnerable(true);
+        holder.setCanPickupItems(false);
+        holder.setRemoveWhenFarAway(false);
+        holder.setHelmet(new ItemStack(Material.TNT, SkyWarsMixedArcadeRules.TNT_PER_DROP));
+        holder.setCustomName(ChatColor.RED + "" + ChatColor.BOLD + "Throwable TNT");
+        holder.setCustomNameVisible(true);
+        session.skyWarsGeneratorHolder = holder;
+        session.skyWarsGeneratorHolderId = holder.getUniqueId();
+        session.entities.add(holder);
+        if (session.skyWarsGeneratorBase != null) session.skyWarsGeneratorBase.setType(Material.GOLD_BLOCK, false);
+        session.world.spawnParticle(Particle.FIREWORK, session.skyWarsTntGenerator, 8,
+                0.2D, 0.3D, 0.2D, 0.05D);
+        session.world.playSound(session.skyWarsTntGenerator, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.7F, 1.2F);
+    }
 
-        Item drop = event.getItem();
-        ItemStack reward = drop.getItemStack().clone();
-        Map<Integer, ItemStack> overflow = player.getInventory().addItem(reward);
+    private void collectSkyWarsGenerator(Session session, Player player, long now) {
+        ArmorStand holder = session.skyWarsGeneratorHolder;
+        if (holder == null || !holder.isValid() || !session.alive.contains(player.getUniqueId())) return;
+        if (player.getLocation().distanceSquared(holder.getLocation()) > 4.0D) return;
+        Map<Integer, ItemStack> overflow = player.getInventory().addItem(
+                new ItemStack(Material.TNT, SkyWarsMixedArcadeRules.TNT_PER_DROP));
         for (ItemStack item : overflow.values()) {
             player.getWorld().dropItemNaturally(player.getLocation(), item);
         }
-        session.entities.remove(drop);
-        drop.remove();
-        session.skyWarsGeneratorDrop = null;
-        session.skyWarsGeneratorDropId = null;
+        session.entities.remove(holder);
+        holder.remove();
+        session.skyWarsGeneratorHolder = null;
+        session.skyWarsGeneratorHolderId = null;
         if (session.skyWarsGeneratorBase != null) session.skyWarsGeneratorBase.setType(Material.IRON_BLOCK, false);
-        session.skyWarsNextTntAt = System.currentTimeMillis()
-                + SkyWarsMixedArcadeRules.TNT_GENERATOR_INTERVAL_MILLIS;
+        session.skyWarsNextTntAt = now + SkyWarsMixedArcadeRules.TNT_GENERATOR_INTERVAL_MILLIS;
         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8F, 1.35F);
         player.sendActionBar(ChatColor.GREEN + "Throwable TNT collected!");
         String statPath = localStatsPath(player.getUniqueId(), "skywars") + "bomb-pickups";
         plugin.getConfig().set(statPath, plugin.getConfig().getInt(statPath, 0) + 1);
+    }
+
+    private void updateSkyWarsGenerator(Session session, long now) {
+        if (!session.skyWarsLive || session.skyWarsTntGenerator == null) return;
+        ArmorStand holder = session.skyWarsGeneratorHolder;
+        if (holder == null || !holder.isValid()) {
+            session.skyWarsGeneratorHolder = null;
+            session.skyWarsGeneratorHolderId = null;
+            if (now >= session.skyWarsNextTntAt) spawnSkyWarsGeneratorHolder(session);
+            return;
+        }
+        Location rotating = holder.getLocation();
+        rotating.setYaw(rotating.getYaw() + 10.0F);
+        holder.teleport(rotating);
+        if (session.ticks % 10 == 0) {
+            holder.setCustomName((session.ticks % 20 == 0 ? ChatColor.RED : ChatColor.WHITE)
+                    + "" + ChatColor.BOLD + "Throwable TNT");
+        }
+        alivePlayers(session).stream()
+                .filter(player -> player.getLocation().distanceSquared(holder.getLocation()) <= 4.0D)
+                .min(java.util.Comparator.comparingDouble(player ->
+                        player.getLocation().distanceSquared(holder.getLocation())))
+                .ifPresent(player -> collectSkyWarsGenerator(session, player, now));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSkyWarsGeneratorHolderManipulate(PlayerArmorStandManipulateEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.SKY_WARS
+                && session.skyWarsGeneratorHolderId != null
+                && event.getRightClicked().getUniqueId().equals(session.skyWarsGeneratorHolderId)) {
+            event.setCancelled(true);
+        }
     }
 
     private Location skyWarsTntGenerator(Session session) {
@@ -4804,6 +4851,7 @@ public final class ArcadePortManager implements Listener {
             updateSkyWarsKits(session, now);
             updateSkyWarsCompass(session);
             updateSkyWars(session, now);
+            updateSkyWarsGenerator(session, now);
         }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
@@ -13923,8 +13971,8 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> skyWarsLastTntThrowAt = new HashMap<>();
         final Map<UUID, UUID> skyWarsTntOwners = new HashMap<>();
         final Map<UUID, Location> skyWarsGuardianHomes = new HashMap<>();
-        Item skyWarsGeneratorDrop;
-        UUID skyWarsGeneratorDropId;
+        ArmorStand skyWarsGeneratorHolder;
+        UUID skyWarsGeneratorHolderId;
         Block skyWarsGeneratorBase;
         final Map<Block, Long> skyWarsCrumbleQueued = new HashMap<>();
         final PriorityQueue<SkyWarsCrumbleCandidate> skyWarsCrumbleQueue = new PriorityQueue<>(
