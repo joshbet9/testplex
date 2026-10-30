@@ -8167,6 +8167,7 @@ public final class ArcadePortManager implements Listener {
                 && session.alive.contains(attacker.getUniqueId())
                 && !session.evolving.contains(attacker.getUniqueId())
                 && session.evolutionLevels.getOrDefault(attacker.getUniqueId(), 0) == 2
+                && attacker.getInventory().getItemInMainHand() != null
                 && attacker.getInventory().getItemInMainHand().getType() == Material.TNT) {
             // Attacking an entity with left-click dispatches a damage event rather than
             // PlayerInteractEvent. Route the charge through the same launch handler.
