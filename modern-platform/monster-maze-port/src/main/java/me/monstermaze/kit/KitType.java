@@ -54,7 +54,13 @@ public enum KitType {
 
     public static KitType byName(String name) {
         if (name == null) return null;
-        for (KitType k : values()) if (k.name().equalsIgnoreCase(name) || k.id.equalsIgnoreCase(name)) return k;
+        String value = name.trim().toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        for (KitType kit : values()) {
+            String enumId = kit.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+            String displayId = kit.id.toLowerCase(java.util.Locale.ROOT).replace(' ', '-');
+            if (enumId.equals(value) || displayId.equals(value)) return kit;
+        }
         return null;
     }
 
