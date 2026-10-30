@@ -1619,6 +1619,11 @@ public final class ArcadePortRules {
         return totalPlayers > 0 && chasers >= 0 && (double) chasers / (double) totalPlayers > 0.25D;
     }
 
+    /** Reborn's speed threshold is a one-way unlock, even if later disconnects lower the ratio. */
+    public static boolean deathTagRunnerSpeedUnlocked(boolean alreadyUnlocked, int chasers, int totalPlayers) {
+        return alreadyUnlocked || deathTagRunnersReceiveSpeed(chasers, totalPlayers);
+    }
+
     /** Chasers retain their opening Speed I only until the runners earn their own Speed I. */
     public static boolean deathTagChasersReceiveSpeed(int chasers, int totalPlayers) {
         return chasers > 0 && !deathTagRunnersReceiveSpeed(chasers, totalPlayers);
