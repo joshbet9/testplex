@@ -6693,6 +6693,10 @@ public final class ArcadePortManager implements Listener {
             if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
                 player.teleport(dragonEscapeSpectatorLocation(session));
             } else if (session.type == ArcadePortGame.DRAGONS) {
+                session.dragonMarksmanCharge.remove(player.getUniqueId());
+                session.dragonMarksmanNextChargeAt.remove(player.getUniqueId());
+                session.dragonMarksmanFiring.remove(player.getUniqueId());
+                session.dragonWaterDamageNextAt.remove(player.getUniqueId());
                 player.getInventory().clear();
                 player.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
                         "Points to the nearest survivor. Left-click to spectate them."));
@@ -7380,6 +7384,7 @@ public final class ArcadePortManager implements Listener {
         session.dragonContactCooldowns.clear();
         session.dragonFlareZones.clear();
         session.dragonSparklezThrows.clear();
+        session.dragonWaterDamageNextAt.clear();
         session.paintProjectileDamage.clear();
         session.paintballLastShotAt.clear();
         session.paintballWaterBombLastThrowAt.clear();
@@ -11166,6 +11171,12 @@ public final class ArcadePortManager implements Listener {
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
         session.alive.remove(id);
+        if (session.type == ArcadePortGame.DRAGONS) {
+            session.dragonMarksmanCharge.remove(id);
+            session.dragonMarksmanNextChargeAt.remove(id);
+            session.dragonMarksmanFiring.remove(id);
+            session.dragonWaterDamageNextAt.remove(id);
+        }
         if (session.type == ArcadePortGame.BOMB_LOBBERS) updateBombLobbersMvpEligibility(session);
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             session.baconBrutusUntil.remove(id);
@@ -11360,6 +11371,12 @@ public final class ArcadePortManager implements Listener {
         final Set<Block> microBarrierBlocks = new HashSet<>();
         final Map<String, Long> dragonContactCooldowns = new HashMap<>();
         final List<DragonFlareZone> dragonFlareZones = new ArrayList<>();
+        final Map<UUID, Long> dragonWaterDamageNextAt = new HashMap<>();
+        long dragonNextTargetUpdateAt;
+        long dragonNextPerkUpdateAt;
+        long dragonNextCompassUpdateAt;
+        long dragonNextCompassMenuRefreshAt;
+        boolean dragonMissingSpawnWarned;
         final Map<UUID, String> dragonKits = new HashMap<>();
         final Map<UUID, Long> dragonNextSparklerAt = new HashMap<>();
         final Map<UUID, Long> dragonNextArrowAt = new HashMap<>();
