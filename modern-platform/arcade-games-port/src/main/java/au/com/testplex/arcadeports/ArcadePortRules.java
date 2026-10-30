@@ -754,9 +754,14 @@ public final class ArcadePortRules {
         };
     }
 
+    /**
+     * Mirrors Reborn PerkIronSkin(0.5): subtract a fixed half damage point
+     * from eligible hits rather than reducing all incoming damage by 50%.
+     * The source perk leaves damage of one point or less unchanged.
+     */
     public static double microBattlesDamageAfterIronSkin(double damage, boolean fighter) {
         if (!fighter || damage <= 1.0D) return damage;
-        return Math.max(0.0D, damage * 0.5D);
+        return Math.max(0.0D, damage - 0.5D);
     }
 
     public static boolean shouldReplenishMicroArrow(long nowMillis, long nextArrowAt,
