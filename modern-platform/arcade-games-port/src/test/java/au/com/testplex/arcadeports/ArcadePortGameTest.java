@@ -1978,6 +1978,8 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.sheepQuestPickupReady(1_500L, 1_500L));
         assertFalse(ArcadePortRules.sheepQuestPickupReady(1_499L, 1_500L));
         assertEquals(8_000L, ArcadePortRules.SHEEP_QUEST_BESERKER_JUMP_COOLDOWN_MILLIS);
+        assertEquals(10_000L, ArcadePortRules.SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS);
+        assertEquals(6.0D, ArcadePortRules.SHEEP_QUEST_THROWER_DAMAGE, 0.00001D);
     }
 
     @Test void sheepQuestTiedTimerGoesToSuddenDeathOvertime() {

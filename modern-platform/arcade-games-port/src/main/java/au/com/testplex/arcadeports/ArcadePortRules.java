@@ -1256,6 +1256,8 @@ public final class ArcadePortRules {
     public static final int SHEEP_QUEST_ARCHER_MAX_ARROWS = 5;
     public static final int SHEEP_QUEST_ARCHER_BARRAGE_MAX_ARROWS = 5;
     public static final long SHEEP_QUEST_ARCHER_BARRAGE_INITIAL_CHARGE_MILLIS = 1_000L;
+    public static final long SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS = 10_000L;
+    public static final double SHEEP_QUEST_THROWER_DAMAGE = 6.0D;
     public static final long SHEEP_QUEST_ARCHER_BARRAGE_CHARGE_INTERVAL_MILLIS = 250L;
 
     public static String normalizeSheepQuestKit(String requestedKit) {
