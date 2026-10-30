@@ -4996,9 +4996,10 @@ public final class ArcadePortManager implements Listener {
             Location to = dragonEscapePersonalBestSplitLocation(
                     session, playerId, session.dragonEscapeMapResource, segment + 1,
                     dragonEscapeSplitBoundaryLocation(session, segment + 1, start, finish));
-            return from.clone().add((to.getX() - from.getX()) * fraction,
-                    (to.getY() - from.getY()) * fraction,
-                    (to.getZ() - from.getZ()) * fraction);
+            return new Location(session.world,
+                    ArcadePortRules.interpolateDragonEscapeCoordinate(from.getX(), to.getX(), fraction),
+                    ArcadePortRules.interpolateDragonEscapeCoordinate(from.getY(), to.getY(), fraction),
+                    ArcadePortRules.interpolateDragonEscapeCoordinate(from.getZ(), to.getZ(), fraction));
         }
         return finish == null ? session.dragonEscapeWaypoints.get(count - 1).clone() : finish;
     }
