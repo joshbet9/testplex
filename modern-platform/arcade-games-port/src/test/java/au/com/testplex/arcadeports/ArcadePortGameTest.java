@@ -18,6 +18,8 @@ class ArcadePortGameTest {
         assertEquals(java.util.List.of("Speef", "Super Spleef"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.SPLEEF));
         assertEquals(java.util.List.of("Turf Wars"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.TURF_WARS));
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.SNEAKY_ASSASSINS).isEmpty(),
+                "Sneaky Assassins has no archived map in Mineplex Reborn; do not invent one.");
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.EVOLUTION).isEmpty(),
                 "Evolution has no legacy map archive folder and must not be given an invented one");
     }
@@ -112,8 +114,8 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheFourteenGamesNotCoveredByDedicatedMechanicsModules() {
-        assertEquals(14, ArcadePortGame.values().length);
+    @Test void exposesTheFifteenGamesNotCoveredByDedicatedMechanicsModules() {
+        assertEquals(15, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -122,6 +124,7 @@ class ArcadePortGameTest {
         }
         assertNull(ArcadePortGame.fromId("monster-maze"));
         assertNull(ArcadePortGame.fromId("snake"));
+        assertEquals(ArcadePortGame.SNEAKY_ASSASSINS, ArcadePortGame.fromId("sneaky-assassins"));
     }
 
     @Test void normalizesSpacesAndUnderscoresInTestCommands() {
