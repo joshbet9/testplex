@@ -8619,7 +8619,6 @@ public final class ArcadePortManager implements Listener {
         if (!event.isCancelled()) session.gladiatorUsedRod.add(player.getUniqueId());
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onGladiatorPotionSplash(PotionSplashEvent event) {
         Session session = active;
@@ -8650,6 +8649,7 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
