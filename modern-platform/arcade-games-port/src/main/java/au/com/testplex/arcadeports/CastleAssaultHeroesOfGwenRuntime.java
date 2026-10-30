@@ -100,6 +100,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, StoreHolder> openStores = new HashMap<>();
 
     private Item objectiveItem;
+    private Location activeObjectiveSpawn;
     private UUID objectiveCarrier;
     private long objectiveRespawnAt;
     private long nextGoldAt;
@@ -177,7 +178,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Zombie king = world.spawn(location, Zombie.class);
         king.setAI(false);
         king.setSilent(true);
-        king.setInvulnerable(true);
+        king.setInvulnerable(false);
         king.setRemoveWhenFarAway(false);
         king.setCustomName(teamColour(team) + name + ChatColor.RED + " ❤ " + CASTLE_KING_HEALTH);
         king.setCustomNameVisible(true);
@@ -264,7 +265,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (maxHealth != null) maxHealth.setBaseValue(275.0D);
         wither.setHealth(275.0D);
         wither.setAI(false);
-        wither.setInvulnerable(true);
+        wither.setInvulnerable(false);
         wither.setSilent(true);
         wither.setRemoveWhenFarAway(false);
         wither.setCustomName(teamColour(team) + (team == 0 ? "Red" : "Blue") + " Wither");
@@ -324,10 +325,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     static boolean isMiddleTowerMarker(String marker) {
-        String upper = marker == null ? "" : marker.toUpperCase(Locale.ROOT);
-        return upper.contains("MIDDLE") || upper.contains("MIDLANE")
+        if (marker == null) return false;
+        String upper = marker.toUpperCase(Locale.ROOT);
+        if (upper.contains("MIDDLE") || upper.contains("MIDLANE")
                 || upper.contains("MID LANE") || upper.contains("CENTER")
-                || upper.contains("CENTRE");
+                || upper.contains("CENTRE")) return true;
+        for (String part : upper.split("[ _-]+")) {
+            if ("MID".equals(part) || "MIDDLE".equals(part) || "CENTER".equals(part)
+                    || "CENTRE".equals(part)) return true;
+        }
+        return false;
     }
 
     private long objectiveDelay() {
@@ -372,8 +379,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Block platform = spawn.getBlock().getRelative(BlockFace.DOWN);
         rememberBlock(platform);
         platform.setType(Material.REDSTONE_BLOCK, false);
+        activeObjectiveSpawn = spawn.clone();
         objectiveItem = world.dropItem(spawn, new ItemStack(Material.TNT));
         objectiveItem.setPickupDelay(0);
+        objectiveItem.setUnlimitedLifetime(true);
         objectiveItem.setCustomName(ChatColor.RED + "Objective TNT");
         objectiveItem.setCustomNameVisible(true);
         objectiveItem.getPersistentDataContainer().set(objectiveTntKey, PersistentDataType.BYTE, (byte) 1);
@@ -394,18 +403,20 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         event.setCancelled(true);
         objectiveCarrier = player.getUniqueId();
+        objectiveRespawnAt = System.currentTimeMillis() + objectiveDelay();
         ItemStack helmet = player.getInventory().getHelmet();
         carriedTntOldHelmet.put(player.getUniqueId(), helmet == null ? null : helmet.clone());
         player.getInventory().setHelmet(namedItem(Material.TNT, ChatColor.RED + "Carrying Objective TNT",
                 "Right-click to detonate at an enemy objective."));
         objectiveItem.remove();
         objectiveItem = null;
-        for (Location location : objectiveTntSpawns) {
-            Block block = location.getBlock().getRelative(BlockFace.DOWN);
+        if (activeObjectiveSpawn != null) {
+            Block block = activeObjectiveSpawn.getBlock().getRelative(BlockFace.DOWN);
             if (block.getType() == Material.REDSTONE_BLOCK) {
                 rememberBlock(block);
                 block.setType(Material.IRON_BLOCK, false);
             }
+            activeObjectiveSpawn = null;
         }
         announce(ChatColor.GOLD + player.getName() + " picked up Objective TNT! Get to the enemy sentries.");
     }
@@ -438,7 +449,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         restoreCarrierHelmet(carrier);
         objectiveCarrier = null;
         resolveCastleExplosion(carrier.getLocation().clone(), carrier, true, 4.0D);
-        objectiveRespawnAt = System.currentTimeMillis() + objectiveDelay();
         carrier.sendMessage(ChatColor.GOLD + "Objective TNT detonated!");
     }
 
@@ -481,7 +491,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         int attackingTeam = teams.getOrDefault(owner.getUniqueId(), -1);
         for (Player target : onlinePlayers()) {
             if (target.equals(owner) && objective) continue;
-            if (!objective && teams.getOrDefault(target.getUniqueId(), -2) == attackingTeam) continue;
+            if (!target.equals(owner) && teams.getOrDefault(target.getUniqueId(), -2) == attackingTeam) continue;
             double distance = target.getLocation().distance(center);
             if (distance > radius) continue;
             double damage = 10.0D * Math.max(0.0D, 1.0D - distance / radius);
@@ -631,6 +641,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         for (Player player : onlinePlayers()) {
             if (teams.getOrDefault(player.getUniqueId(), -1) != tower.owner) addGold(player, reward, "Enemy tower destroyed");
         }
+        Wither wither = withers.get(tower.owner);
+        if (wither != null && wither.isValid()) {
+            double witherDamage = tower.first ? 50.0D : 100.0D;
+            if (wither.getHealth() <= witherDamage) {
+                int winnerTeam = 1 - tower.owner;
+                announce(ChatColor.GOLD + teamName(winnerTeam) + " destroyed the enemy Wither!");
+                hooks.finish(firstPlayerOnTeam(winnerTeam), winnerTeam, "enemy Wither defeated by tower damage");
+                return;
+            }
+            wither.setHealth(wither.getHealth() - witherDamage);
+        }
         int remaining = (int) towers.getOrDefault(tower.owner, List.of()).stream().filter(t -> !t.dead).count();
         if (remaining == 0) {
             witherDamageable.put(tower.owner, true);
@@ -749,6 +770,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void checkTeamDeparture() {
+        if (players.size() <= 1) return;
         for (int team = 0; team < 2; team++) {
             final int currentTeam = team;
             boolean hasOnlinePlayer = players.values().stream().anyMatch(player -> player.isOnline()
