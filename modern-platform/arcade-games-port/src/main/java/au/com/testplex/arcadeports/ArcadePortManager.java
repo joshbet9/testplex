@@ -84,6 +84,7 @@ import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -1292,7 +1293,7 @@ public final class ArcadePortManager implements Listener {
                 session.skyWarsKits.put(player.getUniqueId(), selectedKit);
                 session.skyWarsKitReadyAt.put(player.getUniqueId(), 0L);
                 if ("air".equals(selectedKit)) session.skyWarsSafeLocations.put(player.getUniqueId(), spawn.clone());
-                if ("earth".equals(selectedKit)) session.skyWarsNextDirtAt.put(player.getUniqueId(), now);
+                if ("earth".equals(selectedKit)) session.skyWarsNextDirtAt.put(player.getUniqueId(), now + 1_000L);
             }
             if (type == ArcadePortGame.RUNNER) {
                 UUID playerId = player.getUniqueId();
@@ -2888,7 +2889,7 @@ public final class ArcadePortManager implements Listener {
                                 Integer.MAX_VALUE, 0, false, false, false));
                     }
                     case "air" -> player.getInventory().addItem(namedItem(Material.ENDER_EYE,
-                            "Void Saver", "Right-click to teleport to your last safe grounded position."));
+                            "Eye of Ender", "Right-click for a one-use teleport to your last safe location."));
                     case "metal" -> {
                         player.getInventory().addItem(new ItemStack(Material.STONE_PICKAXE));
                         player.getInventory().addItem(namedItem(Material.COMPARATOR,
@@ -4126,7 +4127,7 @@ public final class ArcadePortManager implements Listener {
         return switch (kit) {
             case "ice" -> "Ice Bridge".equals(name);
             case "fire" -> "Fire Burst".equals(name);
-            case "air" -> "Void Saver".equals(name);
+            case "air" -> "Eye of Ender".equals(name);
             case "metal" -> "Magnet".equals(name);
             case "earth" -> "Throwable Dirt".equals(name);
             default -> false;
@@ -4246,6 +4247,31 @@ public final class ArcadePortManager implements Listener {
         return pieces;
     }
 
+    private int skyWarsThrowableDirtCount(Player player) {
+        int count = 0;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item == null || item.getType() != Material.DIRT || !item.hasItemMeta()) continue;
+            ItemMeta meta = item.getItemMeta();
+            if (meta != null && meta.hasDisplayName()
+                    && "Throwable Dirt".equals(ChatColor.stripColor(meta.getDisplayName()))) {
+                count += item.getAmount();
+            }
+        }
+        return count;
+    }
+
+    private ItemStack createSkyWarsThrowableDirt() {
+        ItemStack dirt = namedItem(Material.DIRT, "Throwable Dirt",
+                "Right-click to throw dirt and knock back an opponent.");
+        ItemMeta meta = dirt.getItemMeta();
+        if (meta != null) {
+            meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            dirt.setItemMeta(meta);
+        }
+        return dirt;
+    }
+
     private void updateSkyWarsKits(Session session, long now) {
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
@@ -4267,11 +4293,8 @@ public final class ArcadePortManager implements Listener {
                     if (player.getHealth() > value) player.setHealth(value);
                 }
             } else if ("earth".equals(kit) && now >= session.skyWarsNextDirtAt.getOrDefault(id, Long.MAX_VALUE)) {
-                int dirt = inventoryCount(player, Material.DIRT);
-                if (dirt < 4) {
-                    player.getInventory().addItem(namedItem(Material.DIRT, "Throwable Dirt",
-                            "Click to throw dirt and knock back an opponent."));
-                }
+                int dirt = skyWarsThrowableDirtCount(player);
+                if (dirt < 4) player.getInventory().addItem(createSkyWarsThrowableDirt());
                 session.skyWarsNextDirtAt.put(id, now + 20_000L);
             }
         }
@@ -4465,7 +4488,7 @@ public final class ArcadePortManager implements Listener {
     private void throwSkyWarsDirt(Session session, Player player, long now) {
         if (!skyWarsKitReady(session, player, now, 500L)) return;
         ItemStack held = player.getInventory().getItemInMainHand();
-        if (held == null || held.getType() != Material.DIRT) return;
+        if (!isSkyWarsKitItem(session, player.getUniqueId(), held)) return;
         consumeHeld(player);
         Location spawn = player.getEyeLocation().add(player.getLocation().getDirection());
         FallingBlock dirt = session.world.spawnFallingBlock(spawn, Material.DIRT.createBlockData());
@@ -11473,35 +11496,20 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.SKY_WARS && event.getAction().isRightClick()
-                && session.skyWarsLive && session.alive.contains(player.getUniqueId())) {
+                && session.skyWarsLive && session.alive.contains(player.getUniqueId())
+                && isSkyWarsKitItem(session, player.getUniqueId(), heldItem)) {
             if (isSkyWarsUsableBlock(event.getClickedBlock())) return;
             String kit = session.skyWarsKits.getOrDefault(player.getUniqueId(), "ice");
-            Material ability = heldItem == null ? Material.AIR : heldItem.getType();
-            if ("ice".equals(kit) && ability == Material.ICE) {
-                event.setCancelled(true);
-                useSkyWarsIceBridge(session, player, System.currentTimeMillis());
-                return;
+            event.setCancelled(true);
+            switch (kit) {
+                case "ice" -> useSkyWarsIceBridge(session, player, System.currentTimeMillis());
+                case "fire" -> useSkyWarsFireBurst(session, player, System.currentTimeMillis());
+                case "air" -> useSkyWarsVoidSaver(session, player);
+                case "metal" -> useSkyWarsMagnetism(session, player, System.currentTimeMillis());
+                case "earth" -> throwSkyWarsDirt(session, player, System.currentTimeMillis());
+                default -> { }
             }
-            if ("fire".equals(kit) && ability == Material.BLAZE_ROD) {
-                event.setCancelled(true);
-                useSkyWarsFireBurst(session, player, System.currentTimeMillis());
-                return;
-            }
-            if ("air".equals(kit) && ability == Material.ENDER_EYE) {
-                event.setCancelled(true);
-                useSkyWarsVoidSaver(session, player);
-                return;
-            }
-            if ("metal".equals(kit) && ability == Material.COMPARATOR) {
-                event.setCancelled(true);
-                useSkyWarsMagnetism(session, player, System.currentTimeMillis());
-                return;
-            }
-            if ("earth".equals(kit) && ability == Material.DIRT) {
-                event.setCancelled(true);
-                throwSkyWarsDirt(session, player, System.currentTimeMillis());
-                return;
-            }
+            return;
         }
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && !session.alive.contains(player.getUniqueId())
