@@ -8062,16 +8062,16 @@ public final class ArcadePortManager implements Listener {
             int bracket = session.gladiatorPairBrackets.getOrDefault(pair, GLADIATOR_BRACKET_WINNERS);
             if (bracket == GLADIATOR_BRACKET_LOSERS) {
                 Location center = session.gladiatorArenaCentersByPair.get(pair);
-                if (center != null && (Math.abs(location.getX() - center.getX()) > 3.65D
-                        || Math.abs(location.getZ() - center.getZ()) > 3.65D)) {
+                if (center != null && ArcadePortRules.isOutsideGladiatorsLoserArena(
+                        location.getX(), location.getZ(), center.getX(), center.getZ())) {
                     eliminate(session, player, null, "left the loser's bracket arena");
                     return;
                 }
             } else {
                 SourceMapCatalog.MapData gladiatorMap = sourceMapData.get(session.type.id());
                 if (gladiatorMap != null && gladiatorMap.hasBounds()
-                        && (location.getX() <= gladiatorMap.minX() || location.getX() >= gladiatorMap.maxX() + 1.0D
-                        || location.getZ() <= gladiatorMap.minZ() || location.getZ() >= gladiatorMap.maxZ() + 1.0D)) {
+                        && ArcadePortRules.isOutsideGladiatorsSourceMap(location.getX(), location.getZ(),
+                                gladiatorMap.minX(), gladiatorMap.maxX(), gladiatorMap.minZ(), gladiatorMap.maxZ())) {
                     eliminate(session, player, null, "left the Gladiators arena");
                     return;
                 }
