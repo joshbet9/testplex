@@ -70,7 +70,7 @@ public final class MMUtilityCommandListener implements Listener {
             return;
         }
         if (player.hasMetadata(BuildBypassListener.METADATA)) {
-            player.removeMetadata(BuildBypassListener.METADATA, plugin);
+            player.removeMetadata(BuildBypassListener.METADATA, plugin.getHostPlugin());
             player.sendMessage(ChatColor.YELLOW + "Monster Maze build bypass " + ChatColor.RED + "DISABLED" + ChatColor.YELLOW + ".");
         } else {
             player.setMetadata(BuildBypassListener.METADATA, new FixedMetadataValue(plugin.getHostPlugin(), true));
