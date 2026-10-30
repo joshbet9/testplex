@@ -76,7 +76,7 @@ public final class SnakeModernPlugin extends JavaPlugin implements CommandExecut
                     return true;
                 }
                 if (args.length < 2) {
-                    player.sendMessage(ChatColor.YELLOW + "Usage: /snake kit <speed|reverse|invulnerable>");
+                    game.openKitMenu(player);
                     return true;
                 }
                 game.setKit(player, args[1]);
@@ -113,7 +113,7 @@ public final class SnakeModernPlugin extends JavaPlugin implements CommandExecut
                 sender.sendMessage(ChatColor.GOLD + "=== Snake ===");
                 sender.sendMessage(ChatColor.YELLOW + "/snake join" + ChatColor.GRAY + " — join the next round");
                 sender.sendMessage(ChatColor.YELLOW + "/snake start" + ChatColor.GRAY + " — start queued players (solo allowed for testing)");
-                sender.sendMessage(ChatColor.YELLOW + "/snake kit <speed|reverse|invulnerable>" + ChatColor.GRAY + " — select a kit");
+                sender.sendMessage(ChatColor.YELLOW + "/snake kit [speed|reverse|invulnerable]" + ChatColor.GRAY + " — choose a kit from the menu or select by name");
                 sender.sendMessage(ChatColor.YELLOW + "/snake status" + ChatColor.GRAY + " — inspect the round");
                 sender.sendMessage(ChatColor.YELLOW + "/snake maps" + ChatColor.GRAY + " — list the original Snake maps");
                 sender.sendMessage(ChatColor.YELLOW + "/snake map <name>" + ChatColor.GRAY + " — select an original map");
