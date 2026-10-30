@@ -1147,6 +1147,11 @@ public final class ArcadePortRules {
         return String.format(java.util.Locale.ROOT, "%d:%02d", totalSeconds / 60L, totalSeconds % 60L);
     }
 
+    public static int nextEvolutionOverkillKillCount(int killsSinceLastEvolution) {
+        return Math.min(EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION,
+                Math.max(0, killsSinceLastEvolution) + 1);
+    }
+
     public static boolean evolutionOverkillRequirementMet(int killsBeforeEvolution) {
         return killsBeforeEvolution >= EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION;
     }
