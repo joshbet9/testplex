@@ -878,6 +878,18 @@ public final class ArcadePortRules {
         return Math.hypot(backX - fromX, backZ - fromZ) < 0.8D;
     }
 
+    /** Brutus considers any attack from the rear half-plane a guard-breaking backstab. */
+    public static boolean isBaconBrutusBackstab(double targetLookX, double targetLookZ,
+            double attackerFromTargetX, double attackerFromTargetZ) {
+        double lookLength = Math.hypot(targetLookX, targetLookZ);
+        double attackerLength = Math.hypot(attackerFromTargetX, attackerFromTargetZ);
+        if (!Double.isFinite(lookLength) || !Double.isFinite(attackerLength)
+                || lookLength < 1.0E-6D || attackerLength < 1.0E-6D) return false;
+        double dot = (targetLookX / lookLength) * (attackerFromTargetX / attackerLength)
+                + (targetLookZ / lookLength) * (attackerFromTargetZ / attackerLength);
+        return dot < -0.25D;
+    }
+
     /** Canonical kit IDs mirror the official names; old test aliases remain accepted. */
     public static String normalizeBaconBrawlKit(String requested) {
         if (requested == null) return null;
