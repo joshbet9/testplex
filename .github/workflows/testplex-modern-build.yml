@@ -57,23 +57,15 @@ jobs:
         run: |
           set -euo pipefail
           jar_file="modern-platform/target/TestplexModernArcade.jar"
-          maze_jar="modern-platform/monster-maze-port/target/MonsterMazeModern.jar"
           snake_jar="modern-platform/snake-port/target/SnakeModern.jar"
           arcade_jar="modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar"
           test -s "$jar_file"
-          test -s "$maze_jar"
           test -s "$snake_jar"
           test -s "$arcade_jar"
           jar tf "$jar_file" | grep -Fxq "plugin.yml"
           jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/TestplexModernArcade.class"
           jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/model/ArcadeCatalog.class"
           unzip -p "$jar_file" plugin.yml | grep -Fxq "api-version: '26.3'"
-          jar tf "$maze_jar" | grep -Fxq "plugin.yml"
-          jar tf "$maze_jar" | grep -Fxq "me/monstermaze/MonsterMazePlugin.class"
-          jar tf "$maze_jar" | grep -Fxq "me/monstermaze/maze/MazeGenerator.class"
-          jar tf "$maze_jar" | grep -Fxq "me/monstermaze/util/PlayerFeedback.class"
-          unzip -p "$maze_jar" plugin.yml | grep -Fxq "name: MonsterMazeModern"
-          unzip -p "$maze_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
           jar tf "$snake_jar" | grep -Fxq "plugin.yml"
           jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeModernPlugin.class"
           jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeRules.class"
@@ -82,6 +74,11 @@ jobs:
           jar tf "$arcade_jar" | grep -Fxq "plugin.yml"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadePortManager.class"
+          jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/MonsterMazePlugin.class"
+          jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/game/GameManager.class"
+          jar tf "$arcade_jar" | grep -Fxq "monster-maze/maps.yml"
+          jar tf "$arcade_jar" | grep -Fxq "monster-maze/config.yml"
+          ! jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/MonsterMazeStandalonePlugin.class"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "name: ArcadeMechanicsModern"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
           jar tf "$arcade_jar" | grep -Fxq "source-maps/Draw My Thing/Draw_Stadium.zip"
@@ -98,7 +95,6 @@ jobs:
           name: testplex-modern-paper-26.3
           path: |
             modern-platform/target/TestplexModernArcade.jar
-            modern-platform/monster-maze-port/target/MonsterMazeModern.jar
             modern-platform/snake-port/target/SnakeModern.jar
             modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar
           if-no-files-found: error
@@ -114,7 +110,7 @@ jobs:
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
             echo "- Catalogue: 18 Arcade games"
-            echo "- Built artifacts: TestplexModernArcade.jar, MonsterMazeModern.jar, SnakeModern.jar and ArcadeMechanicsModern.jar"
+            echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar and ArcadeMechanicsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
             echo "- Gameplay ports: Monster Maze and Snake plus 16 mechanics-first prototypes, including Draw My Thing and Master Builders; in-game validation still required"
