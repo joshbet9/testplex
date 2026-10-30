@@ -234,17 +234,21 @@ public final class ArcadePortManager implements Listener {
         Map<UUID, Player> queued = queues.get(type.id());
         int count = queued == null ? 0
                 : (int) queued.values().stream().filter(p -> p != null && p.isOnline()).count();
-        if (type == ArcadePortGame.TURF_WARS) {
-            Map<UUID, Player> mixedQueue = queues.get("turf-wars-mixed");
-            if (mixedQueue != null) {
-                count += (int) mixedQueue.values().stream().filter(p -> p != null && p.isOnline()).count();
-            }
+        Map<UUID, Player> mixedQueue = queues.get(queueKey(type, true));
+        if (mixedQueue != null) {
+            count += (int) mixedQueue.values().stream().filter(p -> p != null && p.isOnline()).count();
         }
         return count;
     }
 
+    private static boolean supportsMixedArcadeVariant(ArcadePortGame type) {
+        return type == ArcadePortGame.TURF_WARS
+                || type == ArcadePortGame.CASTLE_ASSAULT
+                || type == ArcadePortGame.HEROES_OF_GWEN;
+    }
+
     private static String queueKey(ArcadePortGame type, boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? "turf-wars-mixed" : type.id();
+        return mixedArcadeVariant ? type.id() + "-mixed" : type.id();
     }
 
     public void removeFromQueues(Player player) {
@@ -784,8 +788,8 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "Unknown game id. Use /arcadeport help for the available IDs.");
             return;
         }
-        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS) {
-            player.sendMessage(ChatColor.RED + "The Mixed Arcade variant is only available for Turf Wars.");
+        if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
+            player.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
             return;
         }
         if (!isGameEnabled(type)) {
@@ -812,7 +816,7 @@ public final class ArcadePortManager implements Listener {
                 ? "The existing start countdown is already running."
                 : quickStart ? "Starting after a short join window so friends can join too."
                 : "An operator/player can use /arcadeport start "
-                        + (mixedArcadeVariant ? "turf-wars-mixed" : type.id()) + ".";
+                        + (mixedArcadeVariant ? type.id() + "-mixed" : type.id()) + ".";
         player.sendMessage(ChatColor.GREEN + "Queued for " + type.displayName() + variantName + ". " + nextAction);
         if (quickStart) scheduleQuickStart(type, mixedArcadeVariant);
         if (type == ArcadePortGame.GLADIATORS) openGladiatorLobbyVoteMenu(player);
@@ -856,8 +860,8 @@ public final class ArcadePortManager implements Listener {
 
     public void startFromLobby(ArcadePortGame type, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
-        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS) {
-            sender.sendMessage(ChatColor.RED + "The Mixed Arcade variant is only available for Turf Wars.");
+        if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
+            sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
             return;
         }
         if (type == null) {
@@ -882,7 +886,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (SourceMapCatalog.hasMap(type)) {
             String selectedResource = plugin.getConfig().getString("selected-maps." + type.id(),
-                    SourceMapCatalog.resourceFor(type));
+                    SourceMapCatalog.selectedResource(plugin, type));
             if (!SourceMapCatalog.isInstalledResource(plugin, type, selectedResource)) {
                 sender.sendMessage(ChatColor.RED + "The selected map is no longer installed for " + type.displayName()
                         + ". Open Set Game and choose an installed map again.");
@@ -976,8 +980,8 @@ public final class ArcadePortManager implements Listener {
 
     public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
-        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS) {
-            sender.sendMessage(ChatColor.RED + "The Mixed Arcade variant is only available for Turf Wars.");
+        if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
+            sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
             return;
         }
         if (type == null) {
@@ -991,7 +995,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (SourceMapCatalog.hasMap(type)) {
             String selectedResource = plugin.getConfig().getString("selected-maps." + type.id(),
-                    SourceMapCatalog.resourceFor(type));
+                    SourceMapCatalog.selectedResource(plugin, type));
             if (!SourceMapCatalog.isInstalledResource(plugin, type, selectedResource)) {
                 sender.sendMessage(ChatColor.RED + "The selected map is no longer installed for " + type.displayName()
                         + ". Open Set Game and choose an installed map again.");
@@ -1012,7 +1016,7 @@ public final class ArcadePortManager implements Listener {
             participants.add(requester);
         }
         if (participants.isEmpty()) {
-            String requestedId = mixedArcadeVariant ? "turf-wars-mixed" : type.id();
+            String requestedId = mixedArcadeVariant ? type.id() + "-mixed" : type.id();
             sender.sendMessage(ChatColor.YELLOW + "No online players queued. Use /arcadeport join "
                     + requestedId + " or /arcadeport play " + requestedId + ".");
             return;
@@ -1119,6 +1123,7 @@ public final class ArcadePortManager implements Listener {
                 && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER)
                 || (type == ArcadePortGame.DRAGON_ESCAPE && !ArcadePortRules.DRAGON_ESCAPE_HAS_ROUND_TIMER)
                 || type == ArcadePortGame.DRAGONS
+                || type == ArcadePortGame.CASTLE_ASSAULT
                 || type == ArcadePortGame.DRAW_MY_THING
                 || type == ArcadePortGame.MASTER_BUILDERS
                 || (type == ArcadePortGame.GLADIATORS && participants.size() < 2)
@@ -1127,6 +1132,7 @@ public final class ArcadePortManager implements Listener {
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
                 : type == ArcadePortGame.DEATH_TAG ? ArcadePortRules.DEATH_TAG_GAME_TIMEOUT_MILLIS
                 : type == ArcadePortGame.TURF_WARS ? ArcadePortRules.TURF_WARS_GAME_TIMEOUT_MILLIS
+                : type == ArcadePortGame.HEROES_OF_GWEN ? 1_200_000L
                 : ROUND_MS);
         session.lastBaconHungerAt = now;
         session.lastBaconSlowUpdateAt = now;
@@ -1261,7 +1267,8 @@ public final class ArcadePortManager implements Listener {
             int teamCount = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST ? 4 : 2;
             boolean teamMode = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST
                     || type == ArcadePortGame.BOMB_LOBBERS || type == ArcadePortGame.PAINTBALL
-                    || type == ArcadePortGame.TURF_WARS;
+                    || type == ArcadePortGame.TURF_WARS || type == ArcadePortGame.CASTLE_ASSAULT
+                    || type == ArcadePortGame.HEROES_OF_GWEN;
             SourceMapCatalog.MapData selectedMap = sourceMapData.get(type.id());
             int teamId = teamMode && selectedMap != null
                     ? selectedMap.teamIndexForSpawn(i, teamCount)
