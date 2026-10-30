@@ -332,7 +332,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         witherDamageable.put(team, false);
         witherHomes.put(team, location.clone());
         String boundaryMarker = team == 0 ? "ORANGE" : "LIGHT_BLUE";
-        List<Location> boundary = map.dataLocations(boundaryMarker).stream().map(Location::clone).toList();
+        List<Location> boundary = new ArrayList<>(map.dataLocations(boundaryMarker).stream()
+                .map(Location::clone).toList());
+        if (boundary.size() >= 3) {
+            double centerX = boundary.stream().mapToDouble(Location::getX).average().orElse(0.0D);
+            double centerZ = boundary.stream().mapToDouble(Location::getZ).average().orElse(0.0D);
+            boundary.sort(java.util.Comparator.comparingDouble(point ->
+                    Math.atan2(point.getZ() - centerZ, point.getX() - centerX)));
+        }
         witherBoundaries.put(team, boundary);
         witherNextEarthquakeAt.put(team, System.currentTimeMillis() + ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS);
     }
