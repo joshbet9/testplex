@@ -7,10 +7,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeCatalogTest {
     @Test
-    void registersAllSixteenArcadeGames() {
+    void registersAllSeventeenArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(16, catalog.size());
-        assertEquals(16, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+        assertEquals(17, catalog.size());
+        assertEquals(17, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
     }
 
     @Test
@@ -55,7 +55,16 @@ class ArcadeCatalogTest {
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS)
                 .count();
         assertEquals(1, readyForTest);
-        assertEquals(15, inProgress);
+        assertEquals(16, inProgress);
+    }
+
+    @Test
+    void skyWarsIsRegisteredButNotMarkedReadyBeforeLiveAcceptance() {
+        GameDefinition skyWars = new ArcadeCatalog().getGame("skywars");
+        assertNotNull(skyWars);
+        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, skyWars.getPortStatus());
+        assertFalse(skyWars.isReadyForTest());
+        assertTrue(skyWars.getWinEffects().size() >= 3);
     }
 
     @Test
