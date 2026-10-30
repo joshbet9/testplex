@@ -528,9 +528,9 @@ jobs:
           done
 
           sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
-          # Install the platform catalogue, Monster Maze (whose core feedback/nameplate features are in this port),
-          # and the Arcade mechanics module. Bacon Brawl, Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball, Runner and Spleef are enabled for live acceptance; all other games remain gated.
-          for jar in TestplexModernArcade.jar MonsterMazeModern.jar ArcadeMechanicsModern.jar; do
+          # Install all four modern plugins, including SnakeModern with the three original Reborn map archives.
+          # The plugin startup check below must verify the same four artifacts that are installed here.
+          for jar in TestplexModernArcade.jar MonsterMazeModern.jar SnakeModern.jar ArcadeMechanicsModern.jar; do
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
           done
 
