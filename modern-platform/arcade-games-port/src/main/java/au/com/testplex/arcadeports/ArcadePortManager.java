@@ -3632,6 +3632,8 @@ public final class ArcadePortManager implements Listener {
             session.skyWarsCrumbleBoundsValid = session.skyWarsCrumbleMaxX > session.skyWarsCrumbleMinX
                     && session.skyWarsCrumbleMaxZ > session.skyWarsCrumbleMinZ
                     && session.skyWarsCrumbleMaxY >= session.skyWarsCrumbleMinY;
+        } else {
+            session.skyWarsCrumbleScanComplete = true;
         }
         int island = 0;
         int connector = 0;
