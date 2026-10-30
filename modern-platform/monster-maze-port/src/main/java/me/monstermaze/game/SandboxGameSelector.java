@@ -52,7 +52,7 @@ public final class SandboxGameSelector implements Listener, CommandExecutor {
     public SandboxGameSelector(MonsterMazePlugin plugin, GameManager game) {
         this.plugin = plugin;
         this.game = game;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
         if (plugin.getCommand("games") != null) {
             plugin.getCommand("games").setExecutor(this);
         }
@@ -290,7 +290,7 @@ public final class SandboxGameSelector implements Listener, CommandExecutor {
             preview.setPitch(0.0F);
         }
         player.teleport(preview);
-        Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+        Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 if (!player.isOnline() || !HUB_WORLD_NAME.equals(player.getWorld().getName())) return;
                 player.performCommand("cosmeticproto preview " + gameKey);
@@ -300,7 +300,7 @@ public final class SandboxGameSelector implements Listener, CommandExecutor {
         final long returnTicks = "baconbrawl".equals(gameKey) ? 20L * 21L
                 : ("dragonescape".equals(gameKey) ? 20L * 16L
                 : ("evolution".equals(gameKey) ? 20L * 3L : 20L * 13L));
-        Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+        Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 Integer currentSequence = previewSequenceByPlayer.get(player.getUniqueId());
                 if (player.isOnline() && HUB_WORLD_NAME.equals(player.getWorld().getName())
