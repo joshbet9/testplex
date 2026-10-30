@@ -17,6 +17,7 @@ import org.bukkit.World;
 import org.bukkit.WorldBorder;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.BlockState;
@@ -46,6 +47,8 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDamageEvent;
+import org.bukkit.event.block.BlockFromToEvent;
+import org.bukkit.event.block.BlockGrowEvent;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
@@ -84,6 +87,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
+import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -142,6 +146,7 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey statsCategoryKey;
     private final NamespacedKey statsGameKey;
     private final NamespacedKey bombPowerupKey;
+    private final NamespacedKey microTeamItemKey;
     private final ModernArcadeLobby lobby;
     private final ModernArcadeLobbyRuntime lobbyRuntime;
 
@@ -151,6 +156,7 @@ public final class ArcadePortManager implements Listener {
         this.statsCategoryKey = new NamespacedKey(plugin, "stats-category");
         this.statsGameKey = new NamespacedKey(plugin, "stats-game");
         this.bombPowerupKey = new NamespacedKey(plugin, "bomb-lobbers-powerup");
+        this.microTeamItemKey = new NamespacedKey(plugin, "micro-team-item");
         this.lobby = new ModernArcadeLobby(plugin);
         Bukkit.getPluginManager().registerEvents(this, plugin);
         Bukkit.getPluginManager().registerEvents(lobby, plugin);
@@ -946,6 +952,8 @@ public final class ArcadePortManager implements Listener {
         session.baconKnockback = ArcadePortRules.initialBaconKnockback(participants.size());
         session.baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
         session.microBarrierActive = type == ArcadePortGame.MICRO_BATTLES;
+        YamlConfiguration microCosmeticPreferences = type == ArcadePortGame.MICRO_BATTLES
+                ? loadMicroBattlesCosmeticPreferences() : null;
         SourceMapCatalog.MapData microSourceMap = sourceMapData.get(type.id());
         if (type == ArcadePortGame.MICRO_BATTLES) {
             session.microCrumbleMinX = microSourceMap == null ? -HALF_SIZE : microSourceMap.minX();
@@ -963,6 +971,26 @@ public final class ArcadePortManager implements Listener {
                 Block barrier = marker.getBlock();
                 session.microBarrierBlocks.add(barrier);
                 barrier.setType(Material.GLASS, false);
+            }
+        }
+        if (type == ArcadePortGame.MICRO_BATTLES && session.microBarrierBlocks.isEmpty()) {
+            // Source-map fallback: retain the same two-block team-island glass rings as the generated arena.
+            for (int team = 0; team < 4; team++) {
+                Location island = microSourceMap == null ? islandSpawn(team * 2) : microTeamCenter(session, team);
+                int cx = island.getBlockX(), cy = island.getBlockY(), cz = island.getBlockZ();
+                for (int offset = -4; offset <= 4; offset++) {
+                    for (int y = cy; y <= ArcadePortRules.microBattlesBarrierTopY(cy); y++) {
+                        Block[] ring = {
+                                session.world.getBlockAt(cx + offset, y, cz - 4),
+                                session.world.getBlockAt(cx + offset, y, cz + 4),
+                                session.world.getBlockAt(cx - 4, y, cz + offset),
+                                session.world.getBlockAt(cx + 4, y, cz + offset)
+                        };
+                        for (Block barrier : ring) {
+                            if (barrier.getType() == Material.GLASS) session.microBarrierBlocks.add(barrier);
+                        }
+                    }
+                }
             }
         }
         if (type == ArcadePortGame.DEATH_TAG) {
@@ -1080,9 +1108,14 @@ public final class ArcadePortManager implements Listener {
                 session.bombDoubleJumpAvailable.add(player.getUniqueId());
             }
             if (type == ArcadePortGame.MICRO_BATTLES) {
-                session.microKits.put(player.getUniqueId(), microKitPreferences.getOrDefault(player.getUniqueId(), "archer"));
-                session.microNextArrowAt.put(player.getUniqueId(),
+                UUID microId = player.getUniqueId();
+                session.microKits.put(microId, microKitPreferences.getOrDefault(microId, "archer"));
+                session.microNextArrowAt.put(microId,
                         now + ArcadePortRules.MICRO_BATTLES_FLETCHER_INTERVAL_MILLIS);
+                session.microGlassColours.put(microId, microBattlesColourSelection(
+                        microCosmeticPreferences, microId, "middle-glass-colour"));
+                session.microBorderColours.put(microId, microBattlesColourSelection(
+                        microCosmeticPreferences, microId, "border-particle-colour"));
             }
             if (type == ArcadePortGame.ONE_IN_THE_QUIVER) {
                 session.quiverKits.put(player.getUniqueId(), quiverKitPreferences.getOrDefault(player.getUniqueId(), "leaper"));
@@ -1124,6 +1157,13 @@ public final class ArcadePortManager implements Listener {
             player.getInventory().clear();
             giveKit(session, player);
             session.lastLocations.put(player.getUniqueId(), spawn.clone());
+            if (type == ArcadePortGame.MICRO_BATTLES) {
+                UUID microId = player.getUniqueId();
+                Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    if (active == session && player.isOnline() && session.alive.contains(microId)
+                            && session.microBarrierActive) applyMicroMiddleGlassCosmetic(session, player);
+                }, 2L);
+            }
         }
         if (type == ArcadePortGame.BOMB_LOBBERS) {
             cacheBombLobbersTeamSpawnCentres(session);
@@ -2511,25 +2551,159 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void setMicroTeamArmor(Session session, Player player) {
-        Color teamColor = switch (session.teams.getOrDefault(player.getUniqueId(), 0)) {
+        int team = session.teams.getOrDefault(player.getUniqueId(), 0);
+        Color teamColor = microTeamDyeColor(team);
+        ChatColor chatColor = microTeamChatColor(team);
+        ItemStack[] armor = new ItemStack[] {
+                microTeamArmorPiece(Material.LEATHER_BOOTS, teamColor, chatColor),
+                microTeamArmorPiece(Material.LEATHER_LEGGINGS, teamColor, chatColor),
+                microTeamArmorPiece(Material.LEATHER_CHESTPLATE, teamColor, chatColor),
+                microTeamArmorPiece(Material.LEATHER_HELMET, teamColor, chatColor)
+        };
+        player.getInventory().setArmorContents(armor);
+        ItemStack teamBadge = microTeamArmorPiece(Material.LEATHER_CHESTPLATE, teamColor, chatColor);
+        ItemMeta badgeMeta = teamBadge.getItemMeta();
+        if (badgeMeta != null) {
+            badgeMeta.setDisplayName(chatColor + "" + ChatColor.BOLD + "Team " + microTeamName(team));
+            badgeMeta.setLore(List.of(ChatColor.GRAY + "Your team colour.", ChatColor.DARK_GRAY + "Cannot be moved or equipped."));
+            badgeMeta.getPersistentDataContainer().set(microTeamItemKey, PersistentDataType.STRING, "hotbar");
+            teamBadge.setItemMeta(badgeMeta);
+        }
+        player.getInventory().setItem(8, teamBadge);
+    }
+
+    private ItemStack microTeamArmorPiece(Material material, Color colour, ChatColor chatColor) {
+        ItemStack item = new ItemStack(material);
+        if (item.getItemMeta() instanceof LeatherArmorMeta meta) {
+            meta.setColor(colour);
+            meta.setDisplayName(chatColor + "" + ChatColor.BOLD + "Team Armor");
+            meta.setUnbreakable(true);
+            meta.getPersistentDataContainer().set(microTeamItemKey, PersistentDataType.STRING, "armour");
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private Color microTeamDyeColor(int team) {
+        return switch (team) {
             case 0 -> Color.RED;
             case 1 -> Color.AQUA;
             case 2 -> Color.LIME;
             default -> Color.YELLOW;
         };
-        ItemStack[] armor = new ItemStack[] {
-                new ItemStack(Material.LEATHER_BOOTS),
-                new ItemStack(Material.LEATHER_LEGGINGS),
-                new ItemStack(Material.LEATHER_CHESTPLATE),
-                new ItemStack(Material.LEATHER_HELMET)
+    }
+
+    private ChatColor microTeamChatColor(int team) {
+        return switch (team) {
+            case 0 -> ChatColor.RED;
+            case 1 -> ChatColor.AQUA;
+            case 2 -> ChatColor.GREEN;
+            default -> ChatColor.YELLOW;
         };
-        for (ItemStack piece : armor) {
-            if (piece.getItemMeta() instanceof LeatherArmorMeta meta) {
-                meta.setColor(teamColor);
-                piece.setItemMeta(meta);
+    }
+
+    private String microTeamName(int team) {
+        return switch (team) {
+            case 0 -> "Red";
+            case 1 -> "Blue";
+            case 2 -> "Green";
+            default -> "Yellow";
+        };
+    }
+
+    private boolean isMicroTeamLockedItem(ItemStack item) {
+        return item != null && item.hasItemMeta()
+                && item.getItemMeta().getPersistentDataContainer().has(microTeamItemKey, PersistentDataType.STRING);
+    }
+
+    private YamlConfiguration loadMicroBattlesCosmeticPreferences() {
+        var preferencesPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (preferencesPlugin == null || !preferencesPlugin.isEnabled()) return new YamlConfiguration();
+        File preferencesFile = new File(preferencesPlugin.getDataFolder(), "player-preferences.yml");
+        return YamlConfiguration.loadConfiguration(preferencesFile);
+    }
+
+    private String microBattlesColourSelection(YamlConfiguration preferences, UUID playerId, String lineId) {
+        if (preferences == null) return ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR;
+        String selected = preferences.getString("players." + playerId + ".games.micro-battles.cosmetics."
+                + lineId + ".selected", ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR);
+        String normalized = ArcadePortRules.normalizeMicroBattlesColour(selected);
+        return normalized == null ? ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR : normalized;
+    }
+
+    private int microBarrierTeam(Session session, Block barrier) {
+        int nearestTeam = 0;
+        double nearestDistance = Double.POSITIVE_INFINITY;
+        for (int team = 0; team < 4; team++) {
+            Location center = microTeamCenter(session, team);
+            double distance = horizontalDistanceSquared(barrier.getLocation(), center);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearestTeam = team;
             }
         }
-        player.getInventory().setArmorContents(armor);
+        return nearestTeam;
+    }
+
+    /** Sends the chosen glass only to its owner; the server world stays unchanged for everyone else. */
+    private void applyMicroMiddleGlassCosmetic(Session session, Player player) {
+        UUID playerId = player.getUniqueId();
+        int team = session.teams.getOrDefault(playerId, -1);
+        if (team < 0 || !session.microBarrierActive || !session.alive.contains(playerId)) return;
+        Material glass = ArcadePortRules.microBattlesGlassMaterial(
+                session.microGlassColours.getOrDefault(playerId, ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR));
+        Set<Block> personalBlocks = new HashSet<>();
+        for (Block barrier : session.microBarrierBlocks) {
+            if (microBarrierTeam(session, barrier) != team || !barrier.getChunk().isLoaded()) continue;
+            player.sendBlockChange(barrier.getLocation(), glass.createBlockData());
+            personalBlocks.add(barrier);
+        }
+        if (!personalBlocks.isEmpty()) session.microPersonalGlassBlocks.put(playerId, personalBlocks);
+    }
+
+    private void restoreMicroMiddleGlassCosmetic(Session session, Player player) {
+        if (session == null || player == null || !player.isOnline()) return;
+        Set<Block> personalBlocks = session.microPersonalGlassBlocks.remove(player.getUniqueId());
+        if (personalBlocks == null) return;
+        for (Block block : personalBlocks) {
+            if (block != null && block.getWorld() == session.world && block.getChunk().isLoaded()) {
+                player.sendBlockChange(block.getLocation(), block.getBlockData());
+            }
+        }
+    }
+
+    /** The source cue is a shared vertical wall marker, positioned at the nearest world-border face. */
+    private void updateMicroBattlesBorderParticles(Session session) {
+        if (active != session || session.type != ArcadePortGame.MICRO_BATTLES
+                || session.ticks % ArcadePortRules.MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS != 0) return;
+        WorldBorder border = session.world.getWorldBorder();
+        Location center = border.getCenter();
+        double half = border.getSize() / 2.0D;
+        for (Player player : alivePlayers(session)) {
+            Location location = player.getLocation();
+            double x = location.getX(), z = location.getZ();
+            if (!ArcadePortRules.shouldShowMicroBattlesBorderParticles(
+                    x, z, center.getX(), center.getZ(), border.getSize())) continue;
+            double xFaceDistance = half - Math.abs(x - center.getX());
+            double zFaceDistance = half - Math.abs(z - center.getZ());
+            boolean xFace = xFaceDistance <= zFaceDistance;
+            double edgeX = center.getX() + (x >= center.getX() ? half - 0.06D : -half + 0.06D);
+            double edgeZ = center.getZ() + (z >= center.getZ() ? half - 0.06D : -half + 0.06D);
+            double along = xFace ? Math.max(center.getZ() - half + 0.08D,
+                    Math.min(center.getZ() + half - 0.08D, z))
+                    : Math.max(center.getX() - half + 0.08D, Math.min(center.getX() + half - 0.08D, x));
+            Color colour = ArcadePortRules.microBattlesParticleColour(
+                    session.microBorderColours.getOrDefault(player.getUniqueId(),
+                            ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR));
+            Particle.DustOptions dust = new Particle.DustOptions(colour, 1.2F);
+            // Three points make the border obvious across the player's full height, not just on the floor.
+            for (double height : new double[] {0.15D, 0.95D, 1.75D}) {
+                Location cue = xFace
+                        ? new Location(session.world, edgeX, location.getY() + height, along)
+                        : new Location(session.world, along, location.getY() + height, edgeZ);
+                session.world.spawnParticle(Particle.DUST, cue, 2, 0.015D, 0.025D, 0.015D, 0.0D, dust);
+            }
+        }
     }
 
     private void enforceMicroBattlesHunger(Session session) {
@@ -2905,6 +3079,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
         if (session.type == ArcadePortGame.GLADIATORS) updateGladiators(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            updateMicroBattlesBorderParticles(session);
             enforceMicroBattlesHunger(session);
             updateMicroBattlesArrows(session, now);
             updateMicroCrumble(session, now);
@@ -10398,6 +10573,9 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> spleefLastHungerGainAt = new HashMap<>();
         final Map<UUID, Long> spleefNextArrowAt = new HashMap<>();
         final Map<UUID, String> microKits = new HashMap<>();
+        final Map<UUID, String> microGlassColours = new HashMap<>();
+        final Map<UUID, String> microBorderColours = new HashMap<>();
+        final Map<UUID, Set<Block>> microPersonalGlassBlocks = new HashMap<>();
         final Map<UUID, Long> microNextArrowAt = new HashMap<>();
         final Set<UUID> microFletchedArrows = new HashSet<>();
         final Set<Block> microCrumbleBlocks = new HashSet<>();
