@@ -1959,6 +1959,13 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateDeathTagConditions(Session session, long now) {
+        // Reborn's GameFlagManager enforces HungerSet=20 and resets saturation on FAST updates.
+        if (session.ticks % 10 == 0) {
+            for (Player player : alivePlayers(session)) {
+                player.setFoodLevel(20);
+                player.setSaturation(1.0F);
+            }
+        }
         long tagged = session.tagged.stream().filter(session.alive::contains).count();
         boolean runnersHaveSpeed = ArcadePortRules.deathTagRunnersReceiveSpeed((int) tagged, session.alive.size());
         for (Player player : alivePlayers(session)) {
@@ -3157,10 +3164,11 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) updateQuiverKit(session, now);
         if (session.type == ArcadePortGame.DRAGONS) updateTestDragons(session, now);
-        if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
-            updateDeathTagChasers(session, now);
+        if (session.type == ArcadePortGame.DEATH_TAG) {
+            if (session.participantsAtStart > 1) updateDeathTagChasers(session, now);
+            else updateDeathTagConditions(session, now);
+            updateDeathTagLights(session, now);
         }
-        if (session.type == ArcadePortGame.DEATH_TAG) updateDeathTagLights(session, now);
         if (session.type == ArcadePortGame.BACON_BRAWL) updateBaconBrawl(session, now);
         if (session.type == ArcadePortGame.BOMB_LOBBERS) updateBombLobbers(session);
         if (session.type == ArcadePortGame.SPLEEF) updateSpleef(session, now);

@@ -60,3 +60,5 @@ The estimated time gaps use course distance at a fixed display pace; they are pr
 The modern Death Tag port now resolves environmental damage with the legacy Iron Skin exclusions, gives the Null and Archer runner kits their perkless unarmed melee hit, and applies default melee knockback where the source perks do not suppress it. Every Archer arrow now follows the source 300% knockback hit path, including the final arrow in the inventory. Chasers use native Skeleton / Wither Skeleton visual proxies while the real player remains the combat entity; this is a server-side visual approximation, not a packet-level player disguise. Living players on both sides receive the source-style nearest-opponent Tracking Compass with distance and height feedback.
 
 The Death Tag sidebar now shows live Runner and Chaser counts. Forced time-based Alpha promotions use Chaser team spawns, while converted runners retain their death-location respawn.
+
+Death Tag also enforces the source Adventure mode, blocks item-frame interaction, and continually restores food to 20 with saturation 1.0 so sprinting remains available for the full round.
