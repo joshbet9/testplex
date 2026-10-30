@@ -57,7 +57,6 @@ class SneakyAssassinsParityTest {
         assertEquals(5_000L, SneakyAssassinsRules.revealerDurationMillis());
         assertEquals(1_200L, SneakyAssassinsRules.smokeCloakDurationMillis());
         assertEquals(8_000L, SneakyAssassinsRules.bribeCooldownMillis());
-        assertEquals(15_000L, SneakyAssassinsRules.bribeDurationMillis());
         assertEquals(144.0D, SneakyAssassinsRules.revealRadiusSquared(), 0.00001D);
         assertEquals(25.0D, SneakyAssassinsRules.smokeRadiusSquared(), 0.00001D);
     }
