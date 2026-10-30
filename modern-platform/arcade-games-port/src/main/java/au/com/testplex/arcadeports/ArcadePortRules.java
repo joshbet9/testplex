@@ -420,7 +420,7 @@ public final class ArcadePortRules {
     public static final long SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS = 2_000L;
     public static final int SPLEEF_ARCHER_MAX_ARROWS = 2;
     public static final int SPLEEF_SNOWBALLER_MAX_SNOWBALLS = 16;
-    public static final long SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS = 6_000L;
+    public static final long SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS = 30_000L;
     public static final long SPLEEF_SMASHER_COOLDOWN_MILLIS = 250L;
     public static final long TURF_WARS_INITIAL_BUILD_PHASE_MILLIS = 40_000L;
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
