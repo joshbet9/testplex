@@ -1544,6 +1544,11 @@ class ArcadePortGameTest {
         assertEquals(0L, ArcadePortRules.evolutionPityRemainingMillis(0L, 30_000L));
         assertEquals("1:30", ArcadePortRules.formatEvolutionPityRemaining(90_000L));
         assertEquals("0:01", ArcadePortRules.formatEvolutionPityRemaining(1L));
+        assertTrue(ArcadePortRules.canUseEvolutionCreeperCharge(2, true, true));
+        assertFalse(ArcadePortRules.canUseEvolutionCreeperCharge(1, true, true));
+        assertFalse(ArcadePortRules.canUseEvolutionCreeperCharge(3, true, true));
+        assertFalse(ArcadePortRules.canUseEvolutionCreeperCharge(2, false, true));
+        assertFalse(ArcadePortRules.canUseEvolutionCreeperCharge(2, true, false));
         assertEquals(1, ArcadePortRules.nextEvolutionOverkillKillCount(0));
         assertEquals(2, ArcadePortRules.nextEvolutionOverkillKillCount(1));
         assertEquals(2, ArcadePortRules.nextEvolutionOverkillKillCount(2));
