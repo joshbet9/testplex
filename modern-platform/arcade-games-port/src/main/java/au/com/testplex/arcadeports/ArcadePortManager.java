@@ -8043,19 +8043,6 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (event.getEntity() instanceof Player target && session.players.containsKey(target.getUniqueId())) {
-            if (session.type == ArcadePortGame.EVOLUTION
-                    && event instanceof EntityDamageByEntityEvent evolutionDamage) {
-                Entity damager = evolutionDamage.getDamager();
-                Player contributor = damager instanceof Player direct
-                        ? direct
-                        : damager instanceof Projectile projectile
-                        && projectile.getShooter() instanceof Player shooter ? shooter : null;
-                if (contributor != null && !contributor.getUniqueId().equals(target.getUniqueId())
-                        && session.alive.contains(contributor.getUniqueId())
-                        && event.getFinalDamage() > 0.0D) {
-                    recordEvolutionDamage(session, target, contributor, System.currentTimeMillis());
-                }
-            }
             event.setCancelled(true);
             if (session.type == ArcadePortGame.DRAGON_ESCAPE
                     && event instanceof EntityDamageByEntityEvent dragonEscapeDamage) {
@@ -10062,6 +10049,8 @@ public final class ArcadePortManager implements Listener {
                     if (bombLobbersBlast) {
                         session.bombPlayersDamaged.add(target.getUniqueId());
                         recordBombLobbersDamage(session, target, ownerId, System.currentTimeMillis());
+                    } else if (evolutionBlast && owner != null && owner.isOnline()) {
+                        recordEvolutionDamage(session, target, owner, System.currentTimeMillis());
                     }
                     if (target.getHealth() <= blastDamage) {
                         if (bombLobbersBlast && owner != null && owner.isOnline()
