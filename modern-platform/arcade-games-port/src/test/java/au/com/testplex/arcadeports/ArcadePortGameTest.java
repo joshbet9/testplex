@@ -1578,6 +1578,29 @@ class ArcadePortGameTest {
         assertEquals(3, ArcadePortRules.gladiatorsTierForRound(4));
     }
 
+    @Test void gladiatorsChallengeAchievementRequiresAvailableClassicToolsAndNoUse() {
+        assertTrue(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(true, false, false));
+        assertFalse(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(true, true, false));
+        assertFalse(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(true, false, true));
+        assertFalse(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(false, false, false));
+    }
+
+    @Test void gladiatorsHalfHeartAchievementUsesOneHealthPoint() {
+        assertTrue(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(1.0D));
+        assertTrue(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(0.5D));
+        assertFalse(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(1.01D));
+        assertFalse(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(0.0D));
+        assertFalse(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(Double.NaN));
+    }
+
+    @Test void gladiatorsAchievementAndLoserBracketMilestoneKeysArePlayerScoped() {
+        java.util.UUID player = java.util.UUID.fromString("12345678-1234-1234-1234-123456789abc");
+        assertEquals("test-achievements.gladiators." + player + ".are-you-not-entertained",
+                ArcadePortRules.gladiatorsAchievementConfigKey(player, "Are You Not Entertained"));
+        assertEquals("test-milestones.gladiators." + player + ".silky-seconds",
+                ArcadePortRules.gladiatorsMilestoneConfigKey(player));
+    }
+
     @Test void gladiatorsWaitFiveSecondsAndKeepCombatInsideTheCurrentDuel() {
         assertEquals(5_000L, ArcadePortRules.GLADIATOR_ROUND_COUNTDOWN_MILLIS);
         assertFalse(ArcadePortRules.canGladiatorsFight(4_999L, 5_000L, 0, 0, false));
