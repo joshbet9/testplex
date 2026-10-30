@@ -1371,6 +1371,11 @@ public final class ArcadePortRules {
     }
 
     /** Avoid rechecking the same destruction sphere every server tick. */
+    public static boolean isDragonEscapeBlockInsideDestructionRadius(double distanceSquared) {
+        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
+                && distanceSquared <= DRAGON_ESCAPE_BLOCK_RADIUS * DRAGON_ESCAPE_BLOCK_RADIUS;
+    }
+
     public static boolean shouldProcessDragonEscapeDestruction(double distanceSquared, boolean hasPreviousCenter) {
         return !hasPreviousCenter || !Double.isFinite(distanceSquared) || distanceSquared >= 0.25D;
     }

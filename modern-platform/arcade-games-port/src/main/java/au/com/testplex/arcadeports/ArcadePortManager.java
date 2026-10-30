@@ -4590,14 +4590,17 @@ public final class ArcadePortManager implements Listener {
             Location lastDestruction = session.dragonEscapeLastDestructionLocation;
             double movedSquared = lastDestruction == null ? 0.0D : location.distanceSquared(lastDestruction);
             if (ArcadePortRules.shouldProcessDragonEscapeDestruction(movedSquared, lastDestruction != null)) {
-                int radius = (int) Math.ceil(ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS);
-                double radiusSquared = ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS
-                        * ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS;
+                // Reborn tests each block centre against the dragon's actual position.
+                // Search one extra block in each axis because the centre can still be
+                // inside the radius when its integer block offset is radius + 1.
+                int radius = (int) Math.ceil(ArcadePortRules.DRAGON_ESCAPE_BLOCK_RADIUS) + 1;
                 for (int dx = -radius; dx <= radius; dx++) {
                     for (int dy = -radius; dy <= radius; dy++) {
                         for (int dz = -radius; dz <= radius; dz++) {
-                            if (dx * dx + dy * dy + dz * dz > radiusSquared) continue;
                             Block block = location.getBlock().getRelative(dx, dy, dz);
+                            Location blockCenter = block.getLocation().add(0.5D, 0.5D, 0.5D);
+                            if (!ArcadePortRules.isDragonEscapeBlockInsideDestructionRadius(
+                                    location.distanceSquared(blockCenter))) continue;
                             if (block.isLiquid() || block.getRelative(BlockFace.UP).isLiquid()) continue;
                             if (session.dragonEscapeMapName.contains("Hell") && block.getY() < 30) continue;
                             if (session.dragonEscapeMapName.contains("Pirate") && block.getY() < 6) continue;

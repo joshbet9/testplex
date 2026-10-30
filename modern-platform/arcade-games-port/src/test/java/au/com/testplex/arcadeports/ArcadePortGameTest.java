@@ -1282,6 +1282,14 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldProcessDragonEscapeDestruction(Double.NaN, true));
     }
 
+    @Test void dragonEscapeDouglasDestructionUsesBlockCentreWithinTenBlocks() {
+        assertTrue(ArcadePortRules.isDragonEscapeBlockInsideDestructionRadius(0.0D));
+        assertTrue(ArcadePortRules.isDragonEscapeBlockInsideDestructionRadius(100.0D));
+        assertFalse(ArcadePortRules.isDragonEscapeBlockInsideDestructionRadius(100.0001D));
+        assertFalse(ArcadePortRules.isDragonEscapeBlockInsideDestructionRadius(Double.NaN));
+        assertFalse(ArcadePortRules.isDragonEscapeBlockInsideDestructionRadius(-1.0D));
+    }
+
     @Test void dragonEscapeFallbackCrumblesOnlyItsGeneratedCourse() {
         assertTrue(ArcadePortRules.shouldCrumbleDragonEscapeFallbackTrack(false, 0));
         assertTrue(ArcadePortRules.shouldCrumbleDragonEscapeFallbackTrack(false, 82));
