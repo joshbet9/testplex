@@ -62,6 +62,7 @@ public final class SourceMapCatalog {
             case SHEEP_QUEST -> List.of("Sheep Quest");
             case SPLEEF -> List.of("Speef", "Super Spleef");
             case TURF_WARS -> List.of("Turf Wars");
+            case SKY_WARS -> List.of("Skywars");
             default -> List.of();
         };
     }
@@ -237,7 +238,7 @@ public final class SourceMapCatalog {
     }
 
     public static boolean hasMap(ArcadePortGame game) {
-        return resourceFor(game) != null;
+        return resourceFor(game) != null || !mapFoldersFor(game).isEmpty();
     }
 
     public static boolean isReservedSourceWorldName(String worldName) {
