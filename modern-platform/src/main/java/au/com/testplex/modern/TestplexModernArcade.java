@@ -14,6 +14,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.UUID;
+
 /**
  * Independent Paper 26.3 entry point. This module intentionally does not depend
  * on the legacy Mineplex Reborn Maven reactor or its 1.8 NMS classes.
@@ -122,6 +124,29 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
             action.execute(sender);
             return true;
         });
+    }
+
+    /**
+     * Small runtime bridge for game-specific renderers in the optional
+     * ArcadeMechanicsModern plugin. The group keeps independently selected
+     * Paintball weapon and pellet cosmetics on a single menu line.
+     */
+    public String getSelectedCosmeticOption(UUID playerId, String gameId, String selectionGroup) {
+        if (playerId == null || gameId == null || selectionGroup == null || catalog == null || preferences == null) {
+            return null;
+        }
+        GameDefinition game = catalog.getGame(gameId);
+        if (game == null) return null;
+        String group = selectionGroup.toLowerCase(java.util.Locale.ROOT);
+        for (var line : game.getCosmeticLines()) {
+            for (var option : line.getOptions()) {
+                if (group.equals(option.getSelectionGroup())
+                        && preferences.isSelected(playerId, game, line, option.getId())) {
+                    return option.getId();
+                }
+            }
+        }
+        return null;
     }
 
     public ArcadeCatalog getCatalog() { return catalog; }
