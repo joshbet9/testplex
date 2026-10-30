@@ -315,6 +315,7 @@ class ArcadePortGameTest {
         assertEquals(2, ArcadePortRules.requiredDeathTagChasers(59_999L));
         assertEquals(3, ArcadePortRules.requiredDeathTagChasers(60_000L));
         assertEquals(1, ArcadePortRules.requiredDeathTagChasers(-1L));
+        assertEquals(30_000L, ArcadePortRules.DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS);
     }
 
     @Test void sourceWorldResetOnlyAcceptsReservedWorldNames() {
@@ -1679,6 +1680,27 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.deathTagRunnersReceiveSpeed(2, 6));
         assertFalse(ArcadePortRules.deathTagRunnersReceiveSpeed(0, 4));
         assertFalse(ArcadePortRules.deathTagRunnersReceiveSpeed(0, 0));
+    }
+
+    @Test void deathTagChasersKeepSpeedUntilRunnersCrossTheStrictQuarterThreshold() {
+        assertTrue(ArcadePortRules.deathTagChasersReceiveSpeed(1, 4));
+        assertTrue(ArcadePortRules.deathTagChasersReceiveSpeed(1, 5));
+        assertFalse(ArcadePortRules.deathTagChasersReceiveSpeed(2, 6));
+        assertFalse(ArcadePortRules.deathTagChasersReceiveSpeed(0, 4));
+    }
+
+    @Test void deathTagArcherUsesThreeTimesKnockbackAndAlphaHalvesIt() {
+        assertEquals(3.0D, ArcadePortRules.deathTagArcherArrowKnockbackMultiplier(false), 0.00001D);
+        assertEquals(1.5D, ArcadePortRules.deathTagArcherArrowKnockbackMultiplier(true), 0.00001D);
+        assertEquals(2, ArcadePortRules.DEATH_TAG_ARCHER_MAX_ARROWS);
+        assertEquals(2_000L, ArcadePortRules.DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS);
+    }
+
+    @Test void deathTagTraitorKnockbackUsesTheSourceFourHundredMillisecondRecharge() {
+        assertTrue(ArcadePortRules.deathTagTraitorKnockbackReady(1_000L, 0L));
+        assertFalse(ArcadePortRules.deathTagTraitorKnockbackReady(1_399L, 1_000L));
+        assertTrue(ArcadePortRules.deathTagTraitorKnockbackReady(1_400L, 1_000L));
+        assertEquals(400L, ArcadePortRules.DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS);
     }
 
     @Test void deathTagEndsWhenOneRunnerRemainsExceptInSmallTestLobbies() {
