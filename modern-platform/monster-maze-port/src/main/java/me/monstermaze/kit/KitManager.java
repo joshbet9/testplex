@@ -121,13 +121,13 @@ public class KitManager implements Listener {
         this.plugin = plugin;
         this.game = game;
         this.scoreboard = scoreboard;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
 
         this.gui = new KitGUI(plugin, game, this);
         this.npcs = new KitSelectorNPCs(plugin, game, this, gui);
 
         // Slowball constructor tick (every 2 seconds = PerkConstructor rate)
-        Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override
             public void run() {
                 if (game.getState() != GameState.LIVE) return;
@@ -138,7 +138,7 @@ public class KitManager implements Listener {
         }, 40L, 40L);
 
         // Jumper jumpEvent + Repulsor launched cleanup every tick
-        Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override
             public void run() {
                 if (game.getState() != GameState.LIVE) return;
@@ -765,7 +765,7 @@ public class KitManager implements Listener {
                     .build());
             meta.setPower(0);
             fw.setFireworkMeta(meta);
-            Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+            Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
                 @Override public void run() {
                     if (fw.isValid()) fw.detonate();
                 }
@@ -835,7 +835,7 @@ public class KitManager implements Listener {
                         .build());
                 meta.setPower(0);
                 fw.setFireworkMeta(meta);
-                Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+                Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
                     @Override public void run() {
                         if (fw.isValid()) fw.detonate();
                     }
@@ -1187,7 +1187,7 @@ public class KitManager implements Listener {
         visMode.remove(id);
         scoreboard.setGhost(id, false);
         // Re-render remaining players' views of each other now that this player has left.
-        Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+        Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() { refreshViews(); }
         }, 1L);
     }
