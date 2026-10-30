@@ -212,11 +212,12 @@ class ArcadePortGameTest {
                 MicroBattlesAchievement.LAST_TWO.configKey(playerId));
     }
 
-    @Test void microBattlesVerticalMapScanUsesExclusiveMaximum() {
+    @Test void microBattlesVerticalMapScanIncludesSourceMaximumY() {
         assertFalse(ArcadePortRules.isMicroCrumbleScanComplete(95, 96));
-        assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(96, 96));
+        assertFalse(ArcadePortRules.isMicroCrumbleScanComplete(96, 96));
         assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(97, 96));
-        assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(0, 0));
+        assertFalse(ArcadePortRules.isMicroCrumbleScanComplete(0, 0));
+        assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(1, 0));
     }
 
     @Test void microBattlesOpeningRestrictionOnlyPunishesLeavingForAnotherIsland() {
@@ -641,8 +642,8 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldReplenishMicroArrow(20_000L, 20_000L, 2, 3));
         assertFalse(ArcadePortRules.shouldReplenishMicroArrow(19_999L, 20_000L, 2, 3));
         assertFalse(ArcadePortRules.shouldReplenishMicroArrow(20_000L, 20_000L, 3, 3));
-        assertEquals(2.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(4.0D, true), 0.00001D);
-        assertEquals(3.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(6.0D, true), 0.00001D);
+        assertEquals(3.5D, ArcadePortRules.microBattlesDamageAfterIronSkin(4.0D, true), 0.00001D);
+        assertEquals(5.5D, ArcadePortRules.microBattlesDamageAfterIronSkin(6.0D, true), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(1.0D, true), 0.00001D);
         assertEquals(4.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(4.0D, false), 0.00001D);
     }

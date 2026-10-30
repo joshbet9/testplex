@@ -734,9 +734,9 @@ public final class ArcadePortRules {
         return nowMillis >= nextArrowAt && namedArrows < Math.max(0, maximum);
     }
 
-    /** Map MAX_Y is exclusive; scanning is complete as soon as the next Y reaches it. */
-    public static boolean isMicroCrumbleScanComplete(int nextY, int maxYExclusive) {
-        return nextY >= maxYExclusive;
+    /** Reborn's MapCrumbleModule scans WorldData.MaxY inclusively. */
+    public static boolean isMicroCrumbleScanComplete(int nextY, int maxYInclusive) {
+        return nextY > maxYInclusive;
     }
 
     /** The source Micro Battles glass barrier is two blocks high, starting at the island spawn Y. */

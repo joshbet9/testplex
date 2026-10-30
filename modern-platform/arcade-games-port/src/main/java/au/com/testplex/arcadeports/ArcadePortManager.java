@@ -2995,12 +2995,12 @@ public final class ArcadePortManager implements Listener {
             if (best.getWorld() != spectatorCenter.getWorld() || best.getType().isAir()) continue;
 
             Material material = best.getType();
-            if (material == Material.OAK_DOOR || material == Material.IRON_DOOR) {
+            if (material.name().endsWith("_DOOR")) {
                 best.getRelative(BlockFace.UP).setType(Material.AIR, false);
             } else if (ThreadLocalRandom.current().nextDouble() > 0.95D) {
+                // The source spawnFallingBlock overload keeps the server's default item-drop behaviour.
                 FallingBlock falling = session.world.spawnFallingBlock(
                         best.getLocation().add(0.5D, 0.5D, 0.5D), best.getBlockData());
-                falling.setDropItem(false);
                 session.entities.add(falling);
             }
             best.setType(Material.AIR, false);
@@ -11370,17 +11370,10 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
-            Player player = event.getPlayer();
-            Block placed = event.getBlockPlaced();
-            boolean insideSourceBounds = placed.getX() >= session.microCrumbleMinX
-                    && placed.getX() < session.microCrumbleMaxX
-                    && placed.getZ() >= session.microCrumbleMinZ
-                    && placed.getZ() < session.microCrumbleMaxZ;
-            boolean allowed = session.alive.contains(player.getUniqueId()) && insideSourceBounds
-                    && placed.getY() > Math.max(0, session.microCrumbleMinY)
-                    && placed.getY() < session.world.getMaxHeight();
-            if (!allowed) event.setCancelled(true);
-            else session.microCrumbleBlocks.add(placed);
+            // Source MapCrumbleModule tracks every block placed in its game world.
+            if (session.alive.contains(event.getPlayer().getUniqueId())) {
+                session.microCrumbleBlocks.add(event.getBlockPlaced());
+            }
             return;
         }
         if (session.type == ArcadePortGame.TURF_WARS) {
