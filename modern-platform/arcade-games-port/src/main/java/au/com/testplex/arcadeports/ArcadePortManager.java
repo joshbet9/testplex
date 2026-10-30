@@ -3082,10 +3082,20 @@ public final class ArcadePortManager implements Listener {
     }
 
     /**
-     * Broadcast the selected pellet skin as world particles. World.spawnParticle
-     * is intentional: spectators and opponents see the same cosmetic trail as
-     * the shooter. It never changes projectile velocity, hitboxes or damage.
+     * Broadcast the selected pellet skin to every client in this isolated
+     * Paintball world. The explicit Paper receiver list plus force=true means
+     * distant spectators and players using reduced particle settings still get
+     * the same trail. This never changes projectile velocity, hitboxes or damage.
      */
+    private void spawnPaintballCosmeticDust(
+            Session session, Location point, int count,
+            double offsetX, double offsetY, double offsetZ, Particle.DustOptions dust) {
+        List<Player> receivers = new ArrayList<>(session.world.getPlayers());
+        session.world.spawnParticle(Particle.DUST, receivers, null,
+                point.getX(), point.getY(), point.getZ(), count,
+                offsetX, offsetY, offsetZ, 0.0D, dust, true);
+    }
+
     private void updatePaintballPelletCosmetics(Session session) {
         for (Map.Entry<UUID, PaintballProjectileVisual> entry
                 : new ArrayList<>(session.paintballProjectileCosmetics.entrySet())) {
@@ -3099,21 +3109,21 @@ public final class ArcadePortManager implements Listener {
             Particle.DustOptions dust = new Particle.DustOptions(visual.teamColor(), 1.35F);
             switch (visual.style()) {
                 case "paint-drip" -> {
-                    session.world.spawnParticle(Particle.DUST, point.clone().add(0.0D, -0.08D, 0.0D),
-                            1, 0.008D, 0.008D, 0.008D, 0.0D, dust);
-                    session.world.spawnParticle(Particle.DUST, point.clone().add(0.0D, -0.16D, 0.0D),
-                            1, 0.008D, 0.008D, 0.008D, 0.0D, dust);
+                    spawnPaintballCosmeticDust(session, point.clone().add(0.0D, -0.08D, 0.0D),
+                            1, 0.008D, 0.008D, 0.008D, dust);
+                    spawnPaintballCosmeticDust(session, point.clone().add(0.0D, -0.16D, 0.0D),
+                            1, 0.008D, 0.008D, 0.008D, dust);
                 }
                 case "stencil-stamp" -> {
                     for (double dx : new double[] {-0.035D, 0.035D}) {
                         for (double dz : new double[] {-0.035D, 0.035D}) {
-                            session.world.spawnParticle(Particle.DUST, point.clone().add(dx, 0.0D, dz),
-                                    1, 0.0D, 0.0D, 0.0D, 0.0D, dust);
+                            spawnPaintballCosmeticDust(session, point.clone().add(dx, 0.0D, dz),
+                                    1, 0.0D, 0.0D, 0.0D, dust);
                         }
                     }
                 }
-                default -> session.world.spawnParticle(Particle.DUST, point, 4,
-                        0.045D, 0.045D, 0.045D, 0.0D, dust);
+                default -> spawnPaintballCosmeticDust(session, point, 4,
+                        0.045D, 0.045D, 0.045D, dust);
             }
         }
     }
