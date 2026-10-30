@@ -4185,8 +4185,8 @@ public final class ArcadePortManager implements Listener {
     private int dragonEscapePlayerProgress(Session session, Player player) {
         if (!session.dragonEscapeWaypoints.isEmpty()) {
             UUID id = player.getUniqueId();
-            int candidate = getDragonEscapeWaypointIndex(session, player.getLocation());
             int previousProgress = session.dragonEscapePlayerProgress.getOrDefault(id, 0);
+            int candidate = getDragonEscapeWaypointIndex(session, player.getLocation(), previousProgress);
             int progress = ArcadePortRules.monotonicDragonEscapeProgress(
                     previousProgress, candidate, session.dragonEscapeWaypoints.size());
             session.dragonEscapePlayerProgress.put(id, progress);
@@ -4331,9 +4331,10 @@ public final class ArcadePortManager implements Listener {
         if (active != session || dragon == null || !dragon.isValid() || dragon.isDead()) return;
         Location location = dragon.getLocation();
         if (!session.dragonEscapeWaypoints.isEmpty()) {
+            int dragonCandidate = getDragonEscapeWaypointIndex(
+                    session, location, session.dragonEscapeDragonProgress);
             int dragonIndex = ArcadePortRules.monotonicDragonEscapeProgress(
-                    session.dragonEscapeDragonProgress,
-                    getDragonEscapeWaypointIndex(session, location), session.dragonEscapeWaypoints.size());
+                    session.dragonEscapeDragonProgress, dragonCandidate, session.dragonEscapeWaypoints.size());
             session.dragonEscapeDragonProgress = dragonIndex;
             Location target = session.dragonEscapeWaypoints.get(
                     Math.min(session.dragonEscapeWaypoints.size() - 1, dragonIndex + 1));
@@ -4609,14 +4610,18 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private int getDragonEscapeWaypointIndex(Session session, Location location) {
-        int bestIndex = 0;
-        double bestDistance = Double.POSITIVE_INFINITY;
-        for (int i = 0; i < session.dragonEscapeWaypoints.size(); i++) {
-            double distance = session.dragonEscapeWaypoints.get(i).distance(location);
-            if (distance < bestDistance) { bestDistance = distance; bestIndex = i; }
-        }
-        return bestIndex;
+    private int getDragonEscapeWaypointIndex(Session session, Location location, int currentProgress) {
+        int lastIndex = session.dragonEscapeWaypoints.size() - 1;
+        if (lastIndex < 0) return -1;
+        int current = Math.max(0, Math.min(lastIndex, currentProgress));
+        if (current >= lastIndex || location == null || location.getWorld() != session.world) return current;
+        Location currentMarker = session.dragonEscapeWaypoints.get(current);
+        Location nextMarker = session.dragonEscapeWaypoints.get(current + 1);
+        double distanceToCurrent = location.distance(currentMarker);
+        double distanceToNext = location.distance(nextMarker);
+        double spacing = currentMarker.distance(nextMarker);
+        return ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(
+                distanceToCurrent, distanceToNext, spacing) ? current + 1 : current;
     }
 
     private void launchDragonHazard(Session session) {

@@ -1299,6 +1299,20 @@ public final class ArcadePortRules {
         return Math.min(waypointCount - 1, Math.max(0, Math.max(previous, candidate)));
     }
 
+    /**
+     * Dragon Escape routes contain tight switchbacks. Only advance to the next authored
+     * waypoint when it is both within reach and closer than the current waypoint; never
+     * jump to a later marker merely because it happens to be spatially nearby.
+     */
+    public static boolean shouldAdvanceDragonEscapeWaypoint(
+            double distanceToCurrent, double distanceToNext, double waypointSpacing) {
+        if (!Double.isFinite(distanceToCurrent) || !Double.isFinite(distanceToNext)
+                || !Double.isFinite(waypointSpacing)
+                || distanceToCurrent < 0.0D || distanceToNext < 0.0D || waypointSpacing < 0.0D) return false;
+        double reachRadius = Math.min(3.0D, Math.max(1.25D, waypointSpacing * 0.35D));
+        return distanceToNext <= reachRadius && distanceToNext < distanceToCurrent;
+    }
+
     public static boolean isDuplicateDragonEscapeWaypoint(double distance) {
         return isDuplicateDragonEscapeWaypoint(distance, DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE);
     }
