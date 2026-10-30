@@ -7,7 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Modern catalogue for all 19 Arcade games. Each game owns its own cosmetic
+ * Modern catalogue for all 21 Arcade games. Each game owns its own cosmetic
  * lines and win-scene choices; actual render/gameplay handlers are added with
  * each port rather than pretending global cosmetics are game-specific.
  */
@@ -230,6 +230,22 @@ public final class ArcadeCatalog {
                 GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(),
                 win("builders-podium", "Builder's Podium", "The top-rated build rises above the winning builder.")));
+
+        register(game("castle-assault", "Castle Assault", "TNT",
+                "Destroy the enemy sentry crystals and defeat their King. Mixed Arcade doubles objective TNT spawns.",
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                List.of(),
+                win("castle-breach", "Castle Breach", "The enemy castle gates collapse around the winning team."),
+                win("kingfall", "Kingfall", "The defeated King falls as the winning banner rises."),
+                win("sentry-shatter", "Sentry Shatter", "The last sentry crystal breaks in a burst of red sparks.")));
+
+        register(game("heroes-of-gwen", "Heroes of Gwen", "PRISMARINE_BRICKS",
+                "Choose a hero role, capture beacons, destroy enemy towers and defeat the Wither. Mixed Arcade removes middle towers and halves store prices.",
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                List.of(),
+                win("gwen-throne", "Gwen Throne", "A crystal throne rises above the winning hero."),
+                win("beacon-crown", "Beacon Crown", "Captured beacons form a crown around the victor."),
+                win("wither-fall", "Wither Fall", "The defeated Wither fades behind the winning team.")));
 
         register(game("turf-wars", "Turf Wars", "BOW", "Win ranged combat and control the central turf.",
                 GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,

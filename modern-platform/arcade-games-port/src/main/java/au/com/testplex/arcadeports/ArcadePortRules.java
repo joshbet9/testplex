@@ -13,6 +13,27 @@ import java.util.List;
  * needing a live Paper server.
  */
 public final class ArcadePortRules {
+    /** Reborn's normal Castle Assault objective TNT pickup-to-respawn delay. */
+    public static final long CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS = 60_000L;
+
+    /** Mixed Arcade halves the wait between objective TNT spawns. */
+    public static long castleAssaultObjectiveTntRespawnMillis(boolean mixedArcadeVariant) {
+        return mixedArcadeVariant
+                ? CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS / 2L
+                : CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS;
+    }
+
+    /** Heroes of Gwen's Mixed Arcade store prices are half their standard cost. */
+    public static int heroesOfGwenStoreItemCost(int standardCost, boolean mixedArcadeVariant) {
+        if (standardCost < 0) throw new IllegalArgumentException("Store item cost cannot be negative.");
+        return mixedArcadeVariant ? standardCost / 2 : standardCost;
+    }
+
+    /** Middle towers are omitted only in the Mixed Arcade version of Heroes of Gwen. */
+    public static boolean heroesOfGwenShouldSpawnTower(boolean mixedArcadeVariant, boolean middleTower) {
+        return !mixedArcadeVariant || !middleTower;
+    }
+
     public static final long DRAW_MY_THING_GAME_MILLIS = 300_000L;
     public static final long DRAW_MY_THING_BASE_ROUND_MILLIS = 30_000L;
     public static final long DRAW_MY_THING_INTERMISSION_MILLIS = 3_000L;

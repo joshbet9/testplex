@@ -280,17 +280,21 @@ public final class ArcadePortManager implements Listener {
         Map<UUID, Player> queued = queues.get(type.id());
         int count = queued == null ? 0
                 : (int) queued.values().stream().filter(p -> p != null && p.isOnline()).count();
-        if (type == ArcadePortGame.TURF_WARS) {
-            Map<UUID, Player> mixedQueue = queues.get("turf-wars-mixed");
-            if (mixedQueue != null) {
-                count += (int) mixedQueue.values().stream().filter(p -> p != null && p.isOnline()).count();
-            }
+        Map<UUID, Player> mixedQueue = queues.get(queueKey(type, true));
+        if (mixedQueue != null) {
+            count += (int) mixedQueue.values().stream().filter(p -> p != null && p.isOnline()).count();
         }
         return count;
     }
 
+    private static boolean supportsMixedArcadeVariant(ArcadePortGame type) {
+        return type == ArcadePortGame.TURF_WARS
+                || type == ArcadePortGame.CASTLE_ASSAULT
+                || type == ArcadePortGame.HEROES_OF_GWEN;
+    }
+
     private static String queueKey(ArcadePortGame type, boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? "turf-wars-mixed" : type.id();
+        return mixedArcadeVariant ? type.id() + "-mixed" : type.id();
     }
 
     public void removeFromQueues(Player player) {
@@ -1149,8 +1153,8 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "Unknown game id. Use /arcadeport help for the available IDs.");
             return;
         }
-        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS) {
-            player.sendMessage(ChatColor.RED + "The Mixed Arcade variant is only available for Turf Wars.");
+        if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
+            player.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
             return;
         }
         if (!isGameEnabled(type)) {
@@ -1177,7 +1181,7 @@ public final class ArcadePortManager implements Listener {
                 ? "The existing start countdown is already running."
                 : quickStart ? "Starting after a short join window so friends can join too."
                 : "An operator/player can use /arcadeport start "
-                        + (mixedArcadeVariant ? "turf-wars-mixed" : type.id()) + ".";
+                        + (mixedArcadeVariant ? type.id() + "-mixed" : type.id()) + ".";
         player.sendMessage(ChatColor.GREEN + "Queued for " + type.displayName() + variantName + ". " + nextAction);
         if (quickStart) scheduleQuickStart(type, mixedArcadeVariant);
         if (type == ArcadePortGame.GLADIATORS) openGladiatorLobbyVoteMenu(player);
@@ -1221,8 +1225,8 @@ public final class ArcadePortManager implements Listener {
 
     public void startFromLobby(ArcadePortGame type, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
-        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS) {
-            sender.sendMessage(ChatColor.RED + "The Mixed Arcade variant is only available for Turf Wars.");
+        if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
+            sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
             return;
         }
         if (type == null) {
@@ -1247,7 +1251,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (SourceMapCatalog.hasMap(type)) {
             String selectedResource = plugin.getConfig().getString("selected-maps." + type.id(),
-                    SourceMapCatalog.resourceFor(type));
+                    SourceMapCatalog.selectedResource(plugin, type));
             if (!SourceMapCatalog.isInstalledResource(plugin, type, selectedResource)) {
                 sender.sendMessage(ChatColor.RED + "The selected map is no longer installed for " + type.displayName()
                         + ". Open Set Game and choose an installed map again.");
@@ -1341,8 +1345,8 @@ public final class ArcadePortManager implements Listener {
 
     public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
-        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS) {
-            sender.sendMessage(ChatColor.RED + "The Mixed Arcade variant is only available for Turf Wars.");
+        if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
+            sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
             return;
         }
         if (type == null) {
@@ -1356,7 +1360,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (SourceMapCatalog.hasMap(type)) {
             String selectedResource = plugin.getConfig().getString("selected-maps." + type.id(),
-                    SourceMapCatalog.resourceFor(type));
+                    SourceMapCatalog.selectedResource(plugin, type));
             if (!SourceMapCatalog.isInstalledResource(plugin, type, selectedResource)) {
                 sender.sendMessage(ChatColor.RED + "The selected map is no longer installed for " + type.displayName()
                         + ". Open Set Game and choose an installed map again.");
@@ -1378,7 +1382,7 @@ public final class ArcadePortManager implements Listener {
             participants.add(requester);
         }
         if (participants.isEmpty()) {
-            String requestedId = mixedArcadeVariant ? "turf-wars-mixed" : type.id();
+            String requestedId = mixedArcadeVariant ? type.id() + "-mixed" : type.id();
             sender.sendMessage(ChatColor.YELLOW + "No online players queued. Use /arcadeport join "
                     + requestedId + " or /arcadeport play " + requestedId + ".");
             return;
@@ -1507,6 +1511,7 @@ public final class ArcadePortManager implements Listener {
                 && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER)
                 || (type == ArcadePortGame.DRAGON_ESCAPE && !ArcadePortRules.DRAGON_ESCAPE_HAS_ROUND_TIMER)
                 || type == ArcadePortGame.DRAGONS
+                || type == ArcadePortGame.CASTLE_ASSAULT
                 || type == ArcadePortGame.SNEAKY_ASSASSINS
                 || type == ArcadePortGame.DRAW_MY_THING
                 || type == ArcadePortGame.MASTER_BUILDERS
@@ -1516,6 +1521,7 @@ public final class ArcadePortManager implements Listener {
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
                 : type == ArcadePortGame.DEATH_TAG ? ArcadePortRules.DEATH_TAG_GAME_TIMEOUT_MILLIS
                 : type == ArcadePortGame.TURF_WARS ? ArcadePortRules.TURF_WARS_GAME_TIMEOUT_MILLIS
+                : type == ArcadePortGame.HEROES_OF_GWEN ? 1_200_000L
                 : type == ArcadePortGame.PAINTBALL ? ArcadePortRules.PAINTBALL_GAME_TIMEOUT_MILLIS
                 : ROUND_MS);
         session.lastBaconHungerAt = now;
@@ -1655,7 +1661,8 @@ public final class ArcadePortManager implements Listener {
             int teamCount = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST ? 4 : 2;
             boolean teamMode = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST
                     || type == ArcadePortGame.BOMB_LOBBERS || type == ArcadePortGame.PAINTBALL
-                    || type == ArcadePortGame.TURF_WARS;
+                    || type == ArcadePortGame.TURF_WARS || type == ArcadePortGame.CASTLE_ASSAULT
+                    || type == ArcadePortGame.HEROES_OF_GWEN;
             SourceMapCatalog.MapData selectedMap = sourceMapData.get(type.id());
             int teamId = teamMode && selectedMap != null
                     ? selectedMap.teamIndexForSpawn(i, teamCount)
@@ -1864,6 +1871,35 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.MASTER_BUILDERS) {
             announce(session, ChatColor.AQUA + "Master Builders: build " + ChatColor.YELLOW + session.masterBuilderTheme
                     + ChatColor.AQUA + " in 3 minutes, followed by player reviews.");
+        }
+        if (type == ArcadePortGame.CASTLE_ASSAULT || type == ArcadePortGame.HEROES_OF_GWEN) {
+            session.variantRuntime = new CastleAssaultHeroesOfGwenRuntime(plugin, type, world,
+                    sourceMapData.get(type.id()), participants, session.teams, mixedArcadeVariant,
+                    new CastleAssaultHeroesOfGwenRuntime.Hooks() {
+                        @Override
+                        public void eliminate(Player victim, Player killer, String reason) {
+                            ArcadePortManager.this.eliminate(session, victim, killer, reason);
+                        }
+
+                        @Override
+                        public void finish(Player winner, int winningTeam, String reason) {
+                            if (active == session) ArcadePortManager.this.finish(session, winner, winner != null);
+                        }
+                    });
+            if (!session.variantRuntime.isReady()) {
+                sender.sendMessage(ChatColor.RED + "The authentic " + type.displayName()
+                        + " source markers could not be prepared. The round was cancelled without enabling this game.");
+                finish(session, null, false);
+                return;
+            }
+            if (type == ArcadePortGame.CASTLE_ASSAULT) {
+                announce(session, ChatColor.GOLD + "Castle Assault: destroy the two enemy sentry crystals, then defeat the King. "
+                        + "Objective TNT respawns every "
+                        + ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(mixedArcadeVariant) / 1000L + " seconds.");
+            } else {
+                announce(session, ChatColor.GOLD + "Heroes of Gwen: destroy the enemy towers, then defeat the Wither. "
+                        + (mixedArcadeVariant ? "Middle towers are removed and store prices are halved." : "Earn gold to buy upgrades."));
+            }
         }
         if (participants.size() == 1) announce(session, ChatColor.GRAY + "Solo test mode: the run will remain available for practice until the timer ends or you reset it.");
         session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
@@ -3859,6 +3895,22 @@ public final class ArcadePortManager implements Listener {
     private void giveKit(Session session, Player player) {
         player.getInventory().clear();
         switch (session.type) {
+            case CASTLE_ASSAULT:
+                player.getInventory().addItem(new ItemStack(Material.IRON_SWORD),
+                        new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 16),
+                        new ItemStack(Material.TNT, 2));
+                player.getInventory().setChestplate(new ItemStack(Material.IRON_CHESTPLATE));
+                player.getInventory().setLeggings(new ItemStack(Material.IRON_LEGGINGS));
+                player.getInventory().setBoots(new ItemStack(Material.IRON_BOOTS));
+                break;
+            case HEROES_OF_GWEN:
+                player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
+                        new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 8),
+                        namedItem(Material.GOLD_INGOT, "Gold & Store", "Right-click to open the Heroes of Gwen store."));
+                player.getInventory().setChestplate(new ItemStack(Material.LEATHER_CHESTPLATE));
+                player.getInventory().setLeggings(new ItemStack(Material.LEATHER_LEGGINGS));
+                player.getInventory().setBoots(new ItemStack(Material.LEATHER_BOOTS));
+                break;
             case SNEAKY_ASSASSINS:
                 sneakyAssassins.giveKit(player);
                 break;
@@ -5308,6 +5360,7 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.variantRuntime != null) session.variantRuntime.tick(now);
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.DRAW_MY_THING) updateDrawMyThing(session, now);
         if (session.type == ArcadePortGame.MASTER_BUILDERS) updateMasterBuilders(session, now);
@@ -8702,6 +8755,8 @@ public final class ArcadePortManager implements Listener {
     private String gameStatusText(Session session, Player player) {
         UUID id = player.getUniqueId();
         return switch (session.type) {
+            case CASTLE_ASSAULT -> "objective TNT | kills " + scoreFor(session, id);
+            case HEROES_OF_GWEN -> "gold store | team " + (session.teams.getOrDefault(id, 0) + 1);
             case BACON_BRAWL -> "meter " + session.baconMeters.getOrDefault(id, 0) + "% | knockback x"
                     + String.format(java.util.Locale.ROOT, "%.1f", session.baconKnockback)
                     + " | " + baconTimingStatusText(session, id, System.currentTimeMillis());
@@ -8761,6 +8816,11 @@ public final class ArcadePortManager implements Listener {
     private void checkRoundEnd(Session session) {
         if (active != session) return;
         if (session.type == ArcadePortGame.DRAW_MY_THING || session.type == ArcadePortGame.MASTER_BUILDERS) return;
+        // Castle Assault and Heroes of Gwen end through their objective controllers, not last-player rules.
+        if (session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN) {
+            if (session.alive.isEmpty() && session.respawning.isEmpty()) finish(session, null, true);
+            return;
+        }
         // An empty live set is a real end condition even during a one-player test.
         if (session.alive.isEmpty()) {
             if (!ArcadePortRules.shouldFinishWhenNobodyIsAlive(session.alive.size(), session.respawning.size())) return;
@@ -8848,6 +8908,44 @@ public final class ArcadePortManager implements Listener {
 
     private void eliminate(Session session, Player player, Player killer, String reason) {
         if (active != session || player == null) return;
+        if ((session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN)
+                && session.alive.contains(player.getUniqueId())) {
+            UUID victimId = player.getUniqueId();
+            if (!session.alive.remove(victimId)) return;
+            if (session.variantRuntime != null) session.variantRuntime.onPlayerEliminated(player);
+            if (killer != null && !killer.getUniqueId().equals(victimId)
+                    && session.players.containsKey(killer.getUniqueId())) {
+                int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+                killer.sendMessage(ChatColor.GREEN + session.type.displayName() + " kill! " + kills + " kills.");
+                if (session.variantRuntime != null) session.variantRuntime.onPlayerKill(killer);
+            }
+            session.respawning.add(victimId);
+            player.leaveVehicle();
+            player.setGameMode(GameMode.SPECTATOR);
+            player.getInventory().clear();
+            player.sendMessage(ChatColor.RED + "Defeated: " + reason + ". You will respawn for your team.");
+            long respawnTicks = session.type == ArcadePortGame.CASTLE_ASSAULT ? 100L : 240L;
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (active != session || !player.isOnline()
+                        || !session.players.containsKey(victimId)
+                        || !session.respawning.remove(victimId)) return;
+                Location spawn = teamSpawnFor(session, player, 2);
+                player.teleport(spawn);
+                player.setGameMode(GameMode.SURVIVAL);
+                player.setHealth(player.getMaxHealth());
+                player.setFoodLevel(20);
+                player.setSaturation(20.0F);
+                player.setFireTicks(0);
+                session.alive.add(victimId);
+                if (session.variantRuntime != null) session.variantRuntime.onPlayerRespawned(player);
+                session.lastLocations.put(victimId, spawn.clone());
+                giveKit(session, player);
+                player.sendMessage(ChatColor.GREEN + "You are back in the fight!");
+                checkRoundEnd(session);
+            }, respawnTicks);
+            checkRoundEnd(session);
+            return;
+        }
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && session.alive.contains(player.getUniqueId())) {
             UUID playerId = player.getUniqueId();
@@ -9886,6 +9984,10 @@ public final class ArcadePortManager implements Listener {
             recordDeathTagRewards(session);
         }
         recordLocalStats(session, winner, announceWinner);
+        if (session.variantRuntime != null) {
+            session.variantRuntime.stop();
+            session.variantRuntime = null;
+        }
         if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) sneakyAssassins.stop();
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
@@ -12132,6 +12234,36 @@ public final class ArcadePortManager implements Listener {
     public void onDamage(EntityDamageEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if ((session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN)
+                && event.getEntity() instanceof Player teamTarget
+                && session.players.containsKey(teamTarget.getUniqueId())) {
+            event.setCancelled(true);
+            if (!session.alive.contains(teamTarget.getUniqueId())) return;
+            Player attacker = null;
+            if (event instanceof EntityDamageByEntityEvent byEntity) {
+                Entity damager = byEntity.getDamager();
+                if (damager instanceof Player direct) attacker = direct;
+                else if (damager instanceof Projectile projectile
+                        && projectile.getShooter() instanceof Player shooter) attacker = shooter;
+            }
+            if (attacker != null) {
+                if (!session.players.containsKey(attacker.getUniqueId())
+                        || !session.alive.contains(attacker.getUniqueId())
+                        || attacker.getUniqueId().equals(teamTarget.getUniqueId())
+                        || session.teams.getOrDefault(attacker.getUniqueId(), -1)
+                                == session.teams.getOrDefault(teamTarget.getUniqueId(), -2)) return;
+            }
+            double damage = Math.max(0.0D, event.getFinalDamage());
+            if (damage <= 0.0D) return;
+            if (teamTarget.getHealth() <= damage) {
+                eliminate(session, teamTarget, attacker, attacker == null
+                        ? "was defeated" : "was defeated by " + attacker.getName());
+            } else {
+                teamTarget.setHealth(teamTarget.getHealth() - damage);
+                teamTarget.playSound(teamTarget.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
             sneakyAssassins.handleDamage(event);
             return;
@@ -15259,6 +15391,7 @@ public final class ArcadePortManager implements Listener {
         Player player = event.getPlayer();
         if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) sneakyAssassins.onQuit(player);
         boolean wasAlive;
+        if (session.variantRuntime != null) session.variantRuntime.onQuit(player);
         if (session.type == ArcadePortGame.GLADIATORS) {
             forfeitGladiator(player, session);
             wasAlive = false;
@@ -15668,6 +15801,7 @@ public final class ArcadePortManager implements Listener {
         long startedAt;
          boolean microBarrierActive;
         final boolean mixedArcadeVariant;
+        CastleAssaultHeroesOfGwenRuntime variantRuntime;
         final List<Location> turfSurfaceLocations = new ArrayList<>();
         Location turfRedFront;
         Location turfRedBase;

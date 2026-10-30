@@ -7,7 +7,7 @@
     <artifactId>testplex-modern-arcade-mechanics</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <name>Testplex Modern Arcade Mechanics</name>
-    <description>Testplex Arcade mechanics, including the integrated Monster Maze game module, for Paper 26.3.</description>
+    <description>Modern Arcade mechanics, integrated Monster Maze and source-mapped Mixed Arcade ports for Paper 26.3.</description>
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -36,12 +36,14 @@
                 <filtering>false</filtering>
                 <includes>
                     <include>Bacon Brawl/**/*.zip</include>
+                    <include>Castle Assault/**/*.zip</include>
                     <include>Bomb Lobbers/**/*.zip</include>
                     <include>Death Tag/**/*.zip</include>
                     <include>Draw My Thing/**/*.zip</include>
                     <include>Dragon Escape/**/*.zip</include>
                     <include>Dragons/**/*.zip</include>
                     <include>Gladiators/**/*.zip</include>
+                    <include>Heroes of GWEN/**/*.zip</include>
                     <include>Micro Battle/**/*.zip</include>
                     <include>One in the Quiver/**/*.zip</include>
                     <include>Paintball/**/*.zip</include>

@@ -8,17 +8,17 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeCatalogTest {
     @Test
-    void registersAllNineteenArcadeGames() {
+    void registersAllTwentyOneArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(19, catalog.size());
-        assertEquals(19, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+        assertEquals(21, catalog.size());
+        assertEquals(21, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
     }
 
     @Test
     void eachGameHasItsOwnCosmeticLinesAndWinEffects() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         for (GameDefinition game : catalog.getGames()) {
-            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins").contains(game.getId());
+            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen").contains(game.getId());
             assertEquals(gameplayFirstPort, game.getCosmeticLines().isEmpty(),
                     game.getId() + " cosmetic lines should remain optional during this gameplay-first port");
             assertTrue(game.getWinEffects().size() >= (gameplayFirstPort ? 1 : 3),
@@ -36,6 +36,19 @@ class ArcadeCatalogTest {
                 assertTrue(winIds.add(win.getId()), game.getId() + " has duplicate win-effect ids");
             }
         }
+    }
+
+    @Test
+    void castleAssaultAndHeroesOfGwenAppearInTheLobbyAsInProgress() {
+        ArcadeCatalog catalog = new ArcadeCatalog();
+        GameDefinition castleAssault = catalog.getGame("castle-assault");
+        GameDefinition heroesOfGwen = catalog.getGame("heroes-of-gwen");
+        assertNotNull(castleAssault);
+        assertNotNull(heroesOfGwen);
+        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, castleAssault.getPortStatus());
+        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, heroesOfGwen.getPortStatus());
+        assertFalse(castleAssault.isReadyForTest());
+        assertFalse(heroesOfGwen.isReadyForTest());
     }
 
     @Test
@@ -59,7 +72,7 @@ class ArcadeCatalogTest {
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS)
                 .count();
         assertEquals(1, readyForTest);
-        assertEquals(18, inProgress);
+        assertEquals(20, inProgress);
     }
 
     @Test
