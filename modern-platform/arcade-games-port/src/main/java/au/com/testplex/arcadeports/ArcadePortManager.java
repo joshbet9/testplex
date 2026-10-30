@@ -3659,51 +3659,191 @@ public final class ArcadePortManager implements Listener {
         return markers.get(0).clone().add(0.5D, 0.75D, 0.5D);
     }
 
+    private static SkyWarsLootEntry skyWarsLoot(Material material) {
+        return skyWarsLoot(material, 1, 1, 100, null);
+    }
+
+    private static SkyWarsLootEntry skyWarsLoot(Material material, int minimum, int maximum) {
+        return skyWarsLoot(material, minimum, maximum, 100, null);
+    }
+
+    private static SkyWarsLootEntry skyWarsLoot(Material material, int minimum, int maximum, int weight) {
+        return skyWarsLoot(material, minimum, maximum, weight, null);
+    }
+
+    private static SkyWarsLootEntry skyWarsBook(Enchantment enchantment) {
+        return skyWarsLoot(Material.ENCHANTED_BOOK, 1, 1, 100, enchantment);
+    }
+
+    private static SkyWarsLootEntry skyWarsLoot(Material material, int minimum, int maximum,
+            int weight, Enchantment storedEnchantment) {
+        return new SkyWarsLootEntry(material, minimum, maximum, weight, storedEnchantment);
+    }
+
+    private static SkyWarsLootPool skyWarsPool(double probability, int minimum, int maximum,
+            SkyWarsLootEntry... items) {
+        return new SkyWarsLootPool(probability, minimum, maximum, 0.0D, List.of(), List.of(items));
+    }
+
+    private static SkyWarsLootPool skyWarsEnchantedPool(double probability, int minimum, int maximum,
+            double enchantmentProbability, List<SkyWarsLootEnchantment> enchantments,
+            SkyWarsLootEntry... items) {
+        return new SkyWarsLootPool(probability, minimum, maximum, enchantmentProbability,
+                List.copyOf(enchantments), List.of(items));
+    }
+
+    private List<SkyWarsLootPool> skyWarsLootPools(int tier) {
+        List<SkyWarsLootPool> pools = new ArrayList<>();
+        if (tier == 0) {
+            pools.add(skyWarsPool(1.0D, 2, 3,
+                    skyWarsLoot(Material.GOLDEN_HELMET), skyWarsLoot(Material.GOLDEN_CHESTPLATE),
+                    skyWarsLoot(Material.GOLDEN_LEGGINGS), skyWarsLoot(Material.GOLDEN_BOOTS)));
+            pools.add(skyWarsEnchantedPool(1.0D, 1, 1, 0.5D,
+                    List.of(new SkyWarsLootEnchantment(Enchantment.SHARPNESS, 1, 100)),
+                    skyWarsLoot(Material.STONE_SWORD)));
+            pools.add(skyWarsPool(0.8D, 1, 1,
+                    skyWarsLoot(Material.STONE_AXE), skyWarsLoot(Material.STONE_SHOVEL)));
+            pools.add(skyWarsPool(0.15D, 1, 1, skyWarsLoot(Material.BOW)));
+            pools.add(skyWarsPool(0.8D, 1, 2,
+                    skyWarsLoot(Material.COOKED_BEEF, 1, 3),
+                    skyWarsLoot(Material.COOKED_CHICKEN, 1, 3),
+                    skyWarsLoot(Material.COOKED_COD, 1, 3)));
+            pools.add(skyWarsPool(0.9D, 1, 1,
+                    skyWarsLoot(Material.OAK_PLANKS, 16, 32),
+                    skyWarsLoot(Material.COBBLESTONE, 16, 32)));
+            pools.add(skyWarsPool(0.4D, 1, 1,
+                    skyWarsLoot(Material.SNOWBALL, 2, 5), skyWarsLoot(Material.EGG, 2, 5)));
+            return pools;
+        }
+
+        if (tier == 1) {
+            pools.add(skyWarsEnchantedPool(1.0D, 1, 2, 0.6D,
+                    List.of(new SkyWarsLootEnchantment(Enchantment.PROTECTION, 1, 100),
+                            new SkyWarsLootEnchantment(Enchantment.PROJECTILE_PROTECTION, 1, 100)),
+                    skyWarsLoot(Material.CHAINMAIL_HELMET), skyWarsLoot(Material.CHAINMAIL_CHESTPLATE),
+                    skyWarsLoot(Material.CHAINMAIL_LEGGINGS), skyWarsLoot(Material.CHAINMAIL_BOOTS)));
+            pools.add(skyWarsPool(0.8D, 1, 1, skyWarsLoot(Material.STONE_SWORD)));
+            pools.add(skyWarsPool(0.7D, 1, 1,
+                    skyWarsLoot(Material.IRON_AXE), skyWarsLoot(Material.IRON_PICKAXE),
+                    skyWarsLoot(Material.FISHING_ROD)));
+            pools.add(skyWarsPool(0.25D, 1, 1, skyWarsLoot(Material.BOW)));
+            pools.add(skyWarsPool(0.8D, 1, 2,
+                    skyWarsLoot(Material.COOKED_BEEF, 1, 3),
+                    skyWarsLoot(Material.COOKED_CHICKEN, 1, 3),
+                    skyWarsLoot(Material.COOKED_COD, 1, 3)));
+            pools.add(skyWarsPool(0.9D, 1, 1,
+                    skyWarsLoot(Material.OAK_PLANKS, 16, 32),
+                    skyWarsLoot(Material.COBBLESTONE, 16, 32),
+                    skyWarsLoot(Material.GLASS, 16, 32)));
+            pools.add(skyWarsPool(1.0D, 1, 2,
+                    skyWarsLoot(Material.ARROW, 4, 8, 150),
+                    skyWarsLoot(Material.SNOWBALL, 2, 5), skyWarsLoot(Material.EGG, 2, 5),
+                    skyWarsLoot(Material.LAVA_BUCKET, 1, 1, 80),
+                    skyWarsLoot(Material.WATER_BUCKET), skyWarsLoot(Material.ENDER_PEARL, 1, 2)));
+            pools.add(skyWarsPool(0.25D, 1, 1,
+                    skyWarsBook(Enchantment.SHARPNESS), skyWarsBook(Enchantment.KNOCKBACK),
+                    skyWarsBook(Enchantment.POWER), skyWarsBook(Enchantment.PUNCH),
+                    skyWarsBook(Enchantment.PROTECTION)));
+            return pools;
+        }
+
+        pools.add(skyWarsPool(1.0D, 1, 2,
+                skyWarsLoot(Material.IRON_HELMET), skyWarsLoot(Material.IRON_CHESTPLATE),
+                skyWarsLoot(Material.IRON_LEGGINGS), skyWarsLoot(Material.IRON_BOOTS)));
+        pools.add(skyWarsPool(0.4D, 1, 1, skyWarsLoot(Material.IRON_SWORD)));
+        pools.add(skyWarsPool(0.4D, 1, 1,
+                skyWarsLoot(Material.DIAMOND_SWORD, 1, 1, 30),
+                skyWarsLoot(Material.DIAMOND, 1, 3)));
+        pools.add(skyWarsPool(0.8D, 1, 1,
+                skyWarsLoot(Material.IRON_AXE), skyWarsLoot(Material.IRON_PICKAXE),
+                skyWarsLoot(Material.FISHING_ROD)));
+        pools.add(skyWarsPool(0.35D, 1, 1, skyWarsLoot(Material.BOW)));
+        pools.add(skyWarsPool(0.8D, 1, 2,
+                skyWarsLoot(Material.COOKED_BEEF, 1, 3),
+                skyWarsLoot(Material.COOKED_CHICKEN, 1, 3),
+                skyWarsLoot(Material.COOKED_COD, 1, 3)));
+        pools.add(skyWarsPool(1.0D, 2, 3,
+                skyWarsLoot(Material.EXPERIENCE_BOTTLE, 5, 10, 130),
+                skyWarsLoot(Material.ARROW, 6, 10, 160),
+                skyWarsLoot(Material.SNOWBALL, 2, 5), skyWarsLoot(Material.EGG, 2, 5),
+                skyWarsLoot(Material.LAVA_BUCKET, 1, 1, 60),
+                skyWarsLoot(Material.WATER_BUCKET, 1, 1, 130),
+                skyWarsLoot(Material.ENDER_PEARL, 1, 2),
+                skyWarsLoot(Material.MUSHROOM_STEW, 1, 1, 130)));
+        pools.add(skyWarsPool(0.5D, 1, 1,
+                skyWarsBook(Enchantment.SHARPNESS), skyWarsBook(Enchantment.KNOCKBACK),
+                skyWarsBook(Enchantment.POWER), skyWarsBook(Enchantment.PUNCH),
+                skyWarsBook(Enchantment.PROTECTION)));
+        return pools;
+    }
+
+    private ItemStack createSkyWarsLootItem(SkyWarsLootEntry entry) {
+        int amount = ThreadLocalRandom.current().nextInt(entry.minimumAmount(), entry.maximumAmount() + 1);
+        ItemStack item = new ItemStack(entry.material(), amount);
+        if (entry.storedEnchantment() != null && item.getItemMeta() instanceof org.bukkit.inventory.meta.EnchantmentStorageMeta bookMeta) {
+            bookMeta.addStoredEnchant(entry.storedEnchantment(), 1, true);
+            item.setItemMeta(bookMeta);
+        }
+        return item;
+    }
+
+    private ItemStack rollSkyWarsPoolItem(SkyWarsLootPool pool) {
+        int totalWeight = pool.items().stream().mapToInt(SkyWarsLootEntry::weight).sum();
+        if (totalWeight <= 0) return null;
+        int selectedWeight = ThreadLocalRandom.current().nextInt(totalWeight);
+        SkyWarsLootEntry selected = null;
+        for (SkyWarsLootEntry entry : pool.items()) {
+            selectedWeight -= entry.weight();
+            if (selectedWeight < 0) {
+                selected = entry;
+                break;
+            }
+        }
+        if (selected == null) return null;
+        ItemStack item = createSkyWarsLootItem(selected);
+        if (!pool.enchantments().isEmpty()
+                && ThreadLocalRandom.current().nextDouble() < pool.enchantmentProbability()) {
+            int enchantmentWeight = pool.enchantments().stream()
+                    .mapToInt(SkyWarsLootEnchantment::weight).sum();
+            int roll = ThreadLocalRandom.current().nextInt(enchantmentWeight);
+            for (SkyWarsLootEnchantment enchantment : pool.enchantments()) {
+                roll -= enchantment.weight();
+                if (roll < 0) {
+                    item.addUnsafeEnchantment(enchantment.enchantment(),
+                            ThreadLocalRandom.current().nextInt(1, enchantment.maximumLevel() + 1));
+                    break;
+                }
+            }
+        }
+        return item;
+    }
+
     private boolean populateSkyWarsChest(Location location, int tier) {
         if (location == null || location.getWorld() == null) return false;
-        if (!(location.getBlock().getState() instanceof org.bukkit.block.Chest chest)) return false;
+        Block block = location.getBlock();
+        if (block.getType() != Material.CHEST) {
+            if (!block.getType().isAir() && !block.isReplaceable()) {
+                plugin.getLogger().warning("SkyWars chest marker was blocked by " + block.getType()
+                        + " at " + block.getLocation() + "; skipping that chest.");
+                return false;
+            }
+            block.setType(Material.CHEST, false);
+        }
+        if (!(block.getState() instanceof org.bukkit.block.Chest chest)) return false;
         Inventory inventory = chest.getBlockInventory();
         inventory.clear();
-        List<ItemStack> pool = new ArrayList<>();
-        if (tier == 0) {
-            pool.addAll(List.of(
-                    new ItemStack(Material.WOODEN_SWORD), new ItemStack(Material.STONE_SWORD),
-                    new ItemStack(Material.STONE_AXE), new ItemStack(Material.BOW),
-                    new ItemStack(Material.GOLDEN_HELMET), new ItemStack(Material.GOLDEN_CHESTPLATE),
-                    new ItemStack(Material.CHAINMAIL_LEGGINGS), new ItemStack(Material.LEATHER_BOOTS),
-                    new ItemStack(Material.ARROW, 8), new ItemStack(Material.COOKED_BEEF, 4),
-                    new ItemStack(Material.OAK_PLANKS, 24), new ItemStack(Material.SNOWBALL, 8),
-                    new ItemStack(Material.EGG, 4), new ItemStack(Material.FISHING_ROD)));
-        } else if (tier == 1) {
-            pool.addAll(List.of(
-                    new ItemStack(Material.STONE_SWORD), new ItemStack(Material.IRON_SWORD),
-                    new ItemStack(Material.IRON_AXE), new ItemStack(Material.BOW),
-                    new ItemStack(Material.CHAINMAIL_HELMET), new ItemStack(Material.CHAINMAIL_CHESTPLATE),
-                    new ItemStack(Material.IRON_LEGGINGS), new ItemStack(Material.CHAINMAIL_BOOTS),
-                    new ItemStack(Material.ARROW, 12), new ItemStack(Material.COOKED_BEEF, 6),
-                    new ItemStack(Material.OAK_PLANKS, 32), new ItemStack(Material.SNOWBALL, 12),
-                    new ItemStack(Material.ENDER_PEARL), new ItemStack(Material.GOLDEN_APPLE)));
-        } else {
-            pool.addAll(List.of(
-                    new ItemStack(Material.IRON_SWORD), new ItemStack(Material.DIAMOND_SWORD),
-                    new ItemStack(Material.BOW), new ItemStack(Material.IRON_HELMET),
-                    new ItemStack(Material.IRON_CHESTPLATE), new ItemStack(Material.DIAMOND_CHESTPLATE),
-                    new ItemStack(Material.DIAMOND_LEGGINGS), new ItemStack(Material.IRON_BOOTS),
-                    new ItemStack(Material.ARROW, 16), new ItemStack(Material.GOLDEN_APPLE, 2),
-                    new ItemStack(Material.ENDER_PEARL, 2), new ItemStack(Material.OAK_PLANKS, 48),
-                    new ItemStack(Material.COOKED_BEEF, 8), new ItemStack(Material.DIAMOND, 2)));
-        }
-        int minimum = tier == 0 ? 3 : tier == 1 ? 4 : 5;
-        int maximum = tier == 0 ? 5 : tier == 1 ? 6 : 8;
-        int count = ThreadLocalRandom.current().nextInt(minimum, maximum + 1);
-        for (int slotIndex = 0; slotIndex < count; slotIndex++) {
-            ItemStack item = pool.get(ThreadLocalRandom.current().nextInt(pool.size())).clone();
-            int slot = ThreadLocalRandom.current().nextInt(inventory.getSize());
-            int attempts = 0;
-            while (inventory.getItem(slot) != null && attempts++ < inventory.getSize()) {
-                slot = ThreadLocalRandom.current().nextInt(inventory.getSize());
+        List<Integer> freeSlots = new ArrayList<>(inventory.getSize());
+        for (int slot = 0; slot < inventory.getSize(); slot++) freeSlots.add(slot);
+        for (SkyWarsLootPool pool : skyWarsLootPools(tier)) {
+            if (ThreadLocalRandom.current().nextDouble() >= pool.probability() || freeSlots.isEmpty()) continue;
+            int rolls = ThreadLocalRandom.current().nextInt(pool.minimumPerChest(), pool.maximumPerChest() + 1);
+            for (int roll = 0; roll < rolls && !freeSlots.isEmpty(); roll++) {
+                ItemStack item = rollSkyWarsPoolItem(pool);
+                if (item == null) continue;
+                int slotIndex = ThreadLocalRandom.current().nextInt(freeSlots.size());
+                int slot = freeSlots.remove(slotIndex);
+                inventory.setItem(slot, item);
             }
-            if (attempts < inventory.getSize()) inventory.setItem(slot, item);
         }
         chest.update(true, false);
         return true;
@@ -12655,6 +12795,15 @@ public final class ArcadePortManager implements Listener {
     private record DragonFlareZone(UUID ownerId, Location center, long expiresAtMillis) { }
 
     private record SkyWarsCrumbleCandidate(Block block, double distanceSquared, long sequence) { }
+
+    private record SkyWarsLootEntry(Material material, int minimumAmount, int maximumAmount,
+            int weight, Enchantment storedEnchantment) { }
+
+    private record SkyWarsLootEnchantment(Enchantment enchantment, int maximumLevel, int weight) { }
+
+    private record SkyWarsLootPool(double probability, int minimumPerChest, int maximumPerChest,
+            double enchantmentProbability, List<SkyWarsLootEnchantment> enchantments,
+            List<SkyWarsLootEntry> items) { }
 
     private static final class Session {
         final ArcadePortGame type;
