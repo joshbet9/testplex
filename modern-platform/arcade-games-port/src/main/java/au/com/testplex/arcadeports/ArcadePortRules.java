@@ -1751,6 +1751,26 @@ public final class ArcadePortRules {
         return lastUseMillis <= 0L || nowMillis - lastUseMillis >= DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS;
     }
 
+    /**
+     * Select the authored Chaser respawn spawn with the greatest distance to its nearest
+     * active player, matching the legacy team-spawn preference to stay away from players.
+     * Positive infinity is valid when the arena currently has no active players.
+     */
+    public static int deathTagSafestRespawnSpawnIndex(java.util.List<Double> nearestPlayerDistances) {
+        if (nearestPlayerDistances == null || nearestPlayerDistances.isEmpty()) return -1;
+        int bestIndex = -1;
+        double bestClearance = -1.0D;
+        for (int i = 0; i < nearestPlayerDistances.size(); i++) {
+            Double clearance = nearestPlayerDistances.get(i);
+            if (clearance == null || Double.isNaN(clearance) || clearance < 0.0D) continue;
+            if (bestIndex < 0 || clearance > bestClearance) {
+                bestIndex = i;
+                bestClearance = clearance;
+            }
+        }
+        return bestIndex;
+    }
+
     /** The source Death Tag game only awards winning placement to surviving Runners. */
     public static boolean deathTagHasRunnerWinner(int runnersRemaining) {
         return runnersRemaining > 0;
