@@ -164,6 +164,8 @@ public final class ArcadePortManager implements Listener {
     private final Map<String, SourceMapCatalog.MapData> sourceMapData = new HashMap<>();
     private final Map<UUID, PlayerSnapshot> pendingRestore = new HashMap<>();
     private final Map<UUID, String> paintballKitPreferences = new HashMap<>();
+    private final Map<UUID, String> castleAssaultKitPreferences = new HashMap<>();
+    private final Map<UUID, String> heroesOfGwenHeroPreferences = new HashMap<>();
     private final Map<UUID, String> deathTagRunnerKitPreferences = new HashMap<>();
     private final Map<UUID, String> baconKitPreferences = new HashMap<>();
     private final Map<UUID, String> bombLobbersKitPreferences = new HashMap<>();
@@ -504,6 +506,8 @@ public final class ArcadePortManager implements Listener {
         Session running = active;
         if (running != null && running.players.containsKey(player.getUniqueId())) {
             switch (running.type) {
+                case CASTLE_ASSAULT -> { selectCastleAssaultKit(player, value); return; }
+                case HEROES_OF_GWEN -> { selectHeroesOfGwenHero(player, value); return; }
                 case BACON_BRAWL -> { selectBaconBrawlKit(player, value); return; }
                 case BOMB_LOBBERS -> { selectBombLobbersKit(player, value); return; }
                 case SPLEEF -> { selectSpleefKit(player, value); return; }
@@ -518,7 +522,9 @@ public final class ArcadePortManager implements Listener {
                 default -> { }
             }
         }
-        if (value.startsWith("quiver-")) { selectQuiverKit(player, value); }
+        if (ArcadePortRules.normalizeCastleAssaultKit(value) != null) selectCastleAssaultKit(player, value);
+        else if (ArcadePortRules.normalizeHeroesOfGwenHero(value) != null) selectHeroesOfGwenHero(player, value);
+        else if (value.startsWith("quiver-")) { selectQuiverKit(player, value); }
         else if (value.startsWith("spleef-")) { selectSpleefKit(player, value.substring("spleef-".length())); }
         else if (value.startsWith("micro-")) { selectMicroBattlesKit(player, value.substring("micro-".length())); }
         else if (ArcadePortRules.normalizeBaconBrawlKit(value) != null) selectBaconBrawlKit(player, value);
@@ -532,6 +538,49 @@ public final class ArcadePortManager implements Listener {
         else if (value.startsWith("runnerkit-")) selectRunnerKit(player, value);
         else if (ArcadePortRules.normalizeTurfWarsKit(value) != null) selectTurfWarsKit(player, value);
         else selectDeathTagRunnerKit(player, value);
+    }
+
+    public void selectCastleAssaultKit(Player player, String requestedKit) {
+        if (player == null) return;
+        String kit = ArcadePortRules.normalizeCastleAssaultKit(requestedKit);
+        if (kit == null) {
+            player.sendMessage(ChatColor.YELLOW + "Castle Assault kits: alchemist, archer, demolitionist, fighter, tank.");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        castleAssaultKitPreferences.put(id, kit);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.CASTLE_ASSAULT
+                && session.players.containsKey(id) && session.alive.contains(id)
+                && session.variantRuntime != null) {
+            session.variantRuntime.giveCastleAssaultKit(player, kit);
+            player.sendMessage(ChatColor.GREEN + "Castle Assault kit changed to " + kit + ".");
+        } else {
+            player.sendMessage(ChatColor.GREEN + "Castle Assault kit set to " + kit + " for your next game.");
+        }
+    }
+
+    public void selectHeroesOfGwenHero(Player player, String requestedHero) {
+        if (player == null) return;
+        String hero = ArcadePortRules.normalizeHeroesOfGwenHero(requestedHero);
+        if (hero == null) {
+            player.sendMessage(ChatColor.YELLOW + "Heroes of Gwen heroes: Hattori, Devon, Anath, Dana, Biff, Larissa, Bardolf, Rowena, Ivy, Bob Ross.");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        heroesOfGwenHeroPreferences.put(id, hero);
+        String display = ArcadePortRules.heroesOfGwenHeroDisplayName(hero);
+        String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.HEROES_OF_GWEN
+                && session.players.containsKey(id) && session.variantRuntime != null) {
+            session.variantRuntime.setHeroesOfGwenHero(player, hero);
+            player.sendMessage(ChatColor.GREEN + "Heroes of Gwen hero set to " + display + " (" + role + "). "
+                    + ChatColor.YELLOW + "Hero abilities are still being ported; your current combat loadout is unchanged.");
+        } else {
+            player.sendMessage(ChatColor.GREEN + "Heroes of Gwen hero set to " + display
+                    + " (" + role + ") for your next game.");
+        }
     }
 
     public void selectBombLobbersKit(Player player, String requestedKit) {
@@ -3318,14 +3367,19 @@ public final class ArcadePortManager implements Listener {
     private void giveKit(Session session, Player player) {
         player.getInventory().clear();
         switch (session.type) {
-            case CASTLE_ASSAULT:
-                player.getInventory().addItem(new ItemStack(Material.IRON_SWORD),
-                        new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 16),
-                        new ItemStack(Material.TNT, 2));
-                player.getInventory().setChestplate(new ItemStack(Material.IRON_CHESTPLATE));
-                player.getInventory().setLeggings(new ItemStack(Material.IRON_LEGGINGS));
-                player.getInventory().setBoots(new ItemStack(Material.IRON_BOOTS));
+            case CASTLE_ASSAULT: {
+                String kit = castleAssaultKitPreferences.getOrDefault(player.getUniqueId(), "fighter");
+                if (session.variantRuntime != null && session.variantRuntime.isReady()) {
+                    session.variantRuntime.giveCastleAssaultKit(player, kit);
+                } else {
+                    player.getInventory().addItem(new ItemStack(Material.DIAMOND_SWORD));
+                    player.getInventory().setHelmet(new ItemStack(Material.DIAMOND_HELMET));
+                    player.getInventory().setChestplate(new ItemStack(Material.IRON_CHESTPLATE));
+                    player.getInventory().setLeggings(new ItemStack(Material.IRON_LEGGINGS));
+                    player.getInventory().setBoots(new ItemStack(Material.DIAMOND_BOOTS));
+                }
                 break;
+            }
             case HEROES_OF_GWEN:
                 player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
                         new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 8),
@@ -3333,6 +3387,10 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().setChestplate(new ItemStack(Material.LEATHER_CHESTPLATE));
                 player.getInventory().setLeggings(new ItemStack(Material.LEATHER_LEGGINGS));
                 player.getInventory().setBoots(new ItemStack(Material.LEATHER_BOOTS));
+                if (session.variantRuntime != null && session.variantRuntime.isReady()) {
+                    session.variantRuntime.setHeroesOfGwenHero(player,
+                            heroesOfGwenHeroPreferences.getOrDefault(player.getUniqueId(), "hattori"));
+                }
                 break;
             case BACON_BRAWL: {
                 for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) player.removePotionEffect(effect.getType());
