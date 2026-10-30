@@ -1048,7 +1048,7 @@ public final class SnakeGameManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onAbilityInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND
-                || event.getAction() == org.bukkit.event.block.Action.PHYSICAL) return;
+                || !SnakeRules.isAbilityItemInteraction(event.getAction().name())) return;
         SnakeState state = snakes.get(event.getPlayer().getUniqueId());
         if (!running || state == null) return;
         if (!state.alive) {
