@@ -3134,20 +3134,11 @@ public final class ArcadePortManager implements Listener {
             Location point = projectile.getLocation();
             Particle.DustOptions dust = new Particle.DustOptions(visual.teamColor(), 1.35F);
             switch (visual.style()) {
-                case "paint-drip" -> {
-                    spawnPaintballCosmeticDust(session, point.clone().add(0.0D, -0.08D, 0.0D),
-                            1, 0.008D, 0.008D, 0.008D, dust);
-                    spawnPaintballCosmeticDust(session, point.clone().add(0.0D, -0.16D, 0.0D),
-                            1, 0.008D, 0.008D, 0.008D, dust);
-                }
-                case "stencil-stamp" -> {
-                    for (double dx : new double[] {-0.035D, 0.035D}) {
-                        for (double dz : new double[] {-0.035D, 0.035D}) {
-                            spawnPaintballCosmeticDust(session, point.clone().add(dx, 0.0D, dz),
-                                    1, 0.0D, 0.0D, 0.0D, dust);
-                        }
-                    }
-                }
+                case "paint-drip" -> spawnPaintballCosmeticDust(session,
+                        point.clone().add(0.0D, -0.10D, 0.0D),
+                        2, 0.012D, 0.075D, 0.012D, dust);
+                case "stencil-stamp" -> spawnPaintballCosmeticDust(session, point,
+                        4, 0.035D, 0.0D, 0.035D, dust);
                 default -> spawnPaintballCosmeticDust(session, point, 4,
                         0.045D, 0.045D, 0.045D, dust);
             }
