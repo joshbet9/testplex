@@ -10298,7 +10298,9 @@ public final class ArcadePortManager implements Listener {
                 : ArcadePortRules.SPLEEF_DEFAULT_KNOCKBACK;
         Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
         if (direction.lengthSquared() <= 0.000001D) return;
-        target.setVelocity(direction.normalize().multiply(power).setY(0.1D));
+        Vector velocity = direction.normalize().multiply(power);
+        velocity.setY(Math.min(10.0D, velocity.getY() + 0.1D + (target.isOnGround() ? 0.2D : 0.0D)));
+        target.setVelocity(velocity);
         target.playEffect(EntityEffect.HURT);
     }
 
@@ -10416,8 +10418,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.spleefLeapReadyAt.put(id, now + ArcadePortRules.SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS);
-        Vector launch = player.getLocation().getDirection().normalize().multiply(1.2D);
-        launch.setY(Math.min(1.2D, Math.max(0.2D, launch.getY() + 0.2D)));
+        Vector launch = player.getLocation().getDirection().clone().normalize().multiply(1.2D);
+        launch.setY(Math.min(1.2D, launch.getY() + 0.2D + (player.isOnGround() ? 0.2D : 0.0D)));
         player.setVelocity(launch);
         player.setFallDistance(0.0F);
         player.getWorld().spawnParticle(Particle.FLAME, player.getLocation(), 8, 0.25D, 0.15D, 0.25D, 0.02D);
@@ -11709,9 +11711,12 @@ public final class ArcadePortManager implements Listener {
             useQuiverGroundPound(session, player, System.currentTimeMillis());
             return;
         }
+        boolean spleefLeapClickedUsableBlock = event.getClickedBlock() != null
+                && event.getClickedBlock().getType().isInteractable();
         if (session.type == ArcadePortGame.SPLEEF
                 && "brawler".equals(session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer"))
-                && item == Material.IRON_AXE && event.getAction().isRightClick()) {
+                && item == Material.IRON_AXE && event.getAction().isRightClick()
+                && !spleefLeapClickedUsableBlock) {
             event.setCancelled(true);
             useSpleefLeap(session, player, System.currentTimeMillis());
             return;
