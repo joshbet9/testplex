@@ -613,6 +613,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             e.getWorld().spawnParticle(particle(b.theme),e.getLocation().add(0,1,0),2,0.2,0.2,0.2,0.01);
             return;
         }
+        // Let a landed hit's knockback play through instead of having the NPC chase loop
+        // overwrite its velocity on the next scheduler tick.
+        if (now < b.knockbackUntil) {
+            e.getWorld().spawnParticle(particle(b.theme),e.getLocation().add(0,1,0),2,0.2,0.2,0.2,0.01);
+            return;
+        }
         List<Player> targets=manager.botTargets(e.getWorld(),b.deployedGame);Player nearest=null;double distance=Double.POSITIVE_INFINITY;
         for(Player p:targets){double d=p.getLocation().distanceSquared(e.getLocation());if(d<distance){distance=d;nearest=p;}}
         if(nearest==null)return;
@@ -776,6 +782,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
         actor.setCollidable(false);
         actor.setNoDamageTicks(0);
+        bot.knockbackUntil = now + 800L;
         ArcadePortManager.BaconBrawlBotHitResult hit =
                 manager.applyBaconBrawlBotHit(attacker, actor, bot.name, bot.kit, rawDamage);
         if (hit.meter() < 0) return;
@@ -840,7 +847,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     public void shutdown(){if(task!=null)task.cancel();returnBotsToLobby();for(Entity e:new ArrayList<>(showcase))if(e!=null&&e.isValid())e.remove();for(Entity e:new ArrayList<>(kitNpcs))if(e!=null&&e.isValid())e.remove();if(teamNpc!=null&&teamNpc.isValid())teamNpc.remove();}
 
     private final class Bot{
-        final String key,name;String theme,form,kit;Entity actor;Location actorLocation,arenaSpawn;boolean inGame;ArcadePortGame deployedGame;long nextAttackAt;
+        final String key,name;String theme,form,kit;Entity actor;Location actorLocation,arenaSpawn;boolean inGame;ArcadePortGame deployedGame;long nextAttackAt,knockbackUntil;
         Bot(String key,String name,String theme,String form,String kit){this.key=key;this.name=name;this.theme=List.of(THEMES).contains(theme)?theme:"porky";this.form="pink-sheep".equals(form)?"pink-sheep":"pig";this.kit=ArcadePortRules.normalizeBaconBrawlKit(kit)==null?"el-muchacho-pigo":kit;}
     }
 }
