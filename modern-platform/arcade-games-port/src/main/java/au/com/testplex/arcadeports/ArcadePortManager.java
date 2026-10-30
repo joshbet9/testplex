@@ -607,10 +607,9 @@ public final class ArcadePortManager implements Listener {
                 .replace('_', '-').replace(' ', '-');
         if (kit.startsWith("runner-")) kit = kit.substring("runner-".length());
         if (!Set.of("basher", "archer", "traitor", "null").contains(kit)) {
-            player.sendMessage(ChatColor.YELLOW + "Kits: rifle, sniper, shotgun, machine-gun, runner-basher, runner-archer, runner-traitor, runner-null.");
+            player.sendMessage(ChatColor.YELLOW + "Death Tag runner kits: basher, archer, traitor, null.");
             return;
         }
-        deathTagRunnerKitPreferences.put(player.getUniqueId(), kit);
         Session session = active;
         if (session != null && session.type == ArcadePortGame.DEATH_TAG
                 && session.players.containsKey(player.getUniqueId())) {
@@ -618,10 +617,12 @@ public final class ArcadePortManager implements Listener {
                 player.sendMessage(ChatColor.RED + "Chasers cannot switch back to a runner kit.");
                 return;
             }
+            deathTagRunnerKitPreferences.put(player.getUniqueId(), kit);
             session.deathTagRunnerKits.put(player.getUniqueId(), kit);
             giveDeathTagKit(session, player, false, false);
             player.sendMessage(ChatColor.GREEN + "Death Tag runner kit set to " + kit + ".");
         } else {
+            deathTagRunnerKitPreferences.put(player.getUniqueId(), kit);
             player.sendMessage(ChatColor.GREEN + "Death Tag runner kit set to " + kit + " for your next test.");
         }
     }
@@ -1158,7 +1159,8 @@ public final class ArcadePortManager implements Listener {
             if (participants.size() > 1) {
                 Player chaser = participants.get(ThreadLocalRandom.current().nextInt(participants.size()));
                 session.tagged.add(chaser.getUniqueId());
-                chaser.sendMessage(ChatColor.RED + "You are IT! Tag every runner.");
+                session.alphaChasers.add(chaser.getUniqueId());
+                chaser.sendMessage(ChatColor.RED + "You are the Alpha Chaser! Tag every runner.");
                 for (Player p : participants) if (p != chaser) p.sendMessage(ChatColor.GREEN + "Run! Avoid the tagged player.");
             } else {
                 // Solo mechanics test: use an isolated vanilla chaser so Death Tag is still interactive.
@@ -1711,9 +1713,7 @@ public final class ArcadePortManager implements Listener {
                     alphaChaser ? "Alpha Chaser" : "Chaser",
                     alphaChaser ? "Deal 6 damage and resist 4 damage per attack." : "Deal 4 damage and resist 2 damage per attack."));
             player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 40, 4, false, false, true));
-            if (alphaChaser) {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 40, 1, false, false, true));
-            }
+            // Source Alpha damage is fixed by PerkDamageSet(6); do not stack a modern Strength buff.
         } else {
             String kit = session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher");
             switch (kit) {
@@ -1746,7 +1746,7 @@ public final class ArcadePortManager implements Listener {
         for (Player player : alivePlayers(session)) {
             if (session.tagged.contains(player.getUniqueId())) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 40, 4, false, false, true));
-                if (!runnersHaveSpeed) {
+                if (ArcadePortRules.deathTagChasersReceiveSpeed((int) tagged, session.alive.size())) {
                     player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, false, false, true));
                 } else {
                     player.removePotionEffect(PotionEffectType.SPEED);
@@ -1761,10 +1761,10 @@ public final class ArcadePortManager implements Listener {
             if (!session.tagged.contains(player.getUniqueId())
                     && "archer".equals(session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher"))) {
                 Long lastArrow = session.deathTagLastArrowAt.get(player.getUniqueId());
-                if (lastArrow == null || now - lastArrow >= 2_000L) {
+                if (lastArrow == null || now - lastArrow >= ArcadePortRules.DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS) {
                     session.deathTagLastArrowAt.put(player.getUniqueId(), now);
                     int arrows = inventoryCount(player, Material.ARROW);
-                    if (arrows < 2) {
+                    if (arrows < ArcadePortRules.DEATH_TAG_ARCHER_MAX_ARROWS) {
                         player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow", "Replenished by the Archer kit."));
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.6F, 1.3F);
                     }
@@ -1797,11 +1797,25 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void makeDeathTagChaser(Session session, Player player, String reason) {
+        makeDeathTagChaser(session, player, reason, null);
+    }
+
+    private void makeDeathTagChaser(Session session, Player player, String reason, Player killer) {
         if (active != session || player == null || !session.alive.contains(player.getUniqueId())) return;
+
+        // A Chaser who is defeated remains a Chaser. Respawn that role rather than
+        // sending them through runner-to-Chaser conversion again.
+        if (session.tagged.contains(player.getUniqueId())) {
+            awardDeathTagKill(session, killer);
+            respawnDeathTagChaser(session, player);
+            return;
+        }
+
         boolean forcedAlpha = reason != null && reason.contains("forced by the time limit");
-        boolean newlyTagged = session.tagged.add(player.getUniqueId());
+        session.tagged.add(player.getUniqueId());
         if (forcedAlpha) session.alphaChasers.add(player.getUniqueId());
-        else if (newlyTagged) session.alphaChasers.remove(player.getUniqueId());
+        else session.alphaChasers.remove(player.getUniqueId());
+        awardDeathTagKill(session, killer);
         if (player.isOnline()) {
             if (player.getLocation().getY() < 59.0D) player.teleport(spawnFor(session, player));
             player.setGameMode(GameMode.SURVIVAL);
@@ -1811,14 +1825,67 @@ public final class ArcadePortManager implements Listener {
             player.setFireTicks(0);
             player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
             giveDeathTagKit(session, player, true, session.alphaChasers.contains(player.getUniqueId()));
-            if (newlyTagged) {
-                player.playSound(player.getLocation(), Sound.ENTITY_ZOMBIE_AMBIENT, 1.0F, 1.0F);
-                player.sendMessage(ChatColor.RED + "You are now a Chaser!");
-                session.world.spawnParticle(Particle.FLAME, player.getLocation().add(0.0D, 1.0D, 0.0D),
-                        18, 0.35D, 0.5D, 0.35D, 0.04D);
-            }
+            player.playSound(player.getLocation(), Sound.ENTITY_ZOMBIE_AMBIENT, 1.0F, 1.0F);
+            player.sendMessage(ChatColor.RED + (forcedAlpha ? "You are now an Alpha Chaser!" : "You are now a Chaser!"));
+            session.world.spawnParticle(Particle.FLAME, player.getLocation().add(0.0D, 1.0D, 0.0D),
+                    18, 0.35D, 0.5D, 0.35D, 0.04D);
         }
-        if (newlyTagged) announce(session, ChatColor.RED + player.getName() + ChatColor.GRAY + " became a Chaser (" + reason + ").");
+        announce(session, ChatColor.RED + player.getName() + ChatColor.GRAY + " became "
+                + (forcedAlpha ? "an Alpha Chaser" : "a Chaser") + " (" + reason + ").");
+    }
+
+    private void awardDeathTagKill(Session session, Player killer) {
+        if (killer == null || !killer.isOnline() || !session.scores.containsKey(killer.getUniqueId())) return;
+        int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+        killer.sendMessage(ChatColor.GREEN + "Death Tag kill! " + kills + " kills.");
+    }
+
+    private void respawnDeathTagChaser(Session session, Player player) {
+        if (active != session || player == null || !player.isOnline()) return;
+        if (player.getLocation().getY() < 59.0D) player.teleport(spawnFor(session, player));
+        player.leaveVehicle();
+        player.setGameMode(GameMode.SURVIVAL);
+        player.setHealth(player.getMaxHealth());
+        player.setFoodLevel(20);
+        player.setSaturation(20.0F);
+        player.setFireTicks(0);
+        player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+        giveDeathTagKit(session, player, true, session.alphaChasers.contains(player.getUniqueId()));
+        player.sendMessage(ChatColor.RED + "You respawned as a Chaser.");
+    }
+
+    private void handleDeathTagArcherArrowHit(Session session, Arrow arrow, Player shooter, Player target) {
+        UUID shooterId = shooter.getUniqueId();
+        UUID targetId = target.getUniqueId();
+        if (active != session || !session.alive.contains(shooterId) || !session.alive.contains(targetId)
+                || session.tagged.contains(shooterId)
+                || !"archer".equals(session.deathTagRunnerKits.getOrDefault(shooterId, "basher"))
+                || !session.tagged.contains(targetId)) return;
+
+        double baseDamage = session.deathTagProjectileDamage.getOrDefault(arrow.getUniqueId(),
+                ArcadePortRules.deathTagRunnerDamage("archer", true));
+        session.deathTagProjectileDamage.remove(arrow.getUniqueId());
+        double damage = ArcadePortRules.deathTagDamageAfterIronSkin(baseDamage,
+                session.alphaChasers.contains(targetId));
+        if (damage > 0.0D) {
+            if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
+                respawnDeathTagChaser(session, target);
+                awardDeathTagKill(session, shooter);
+                checkRoundEnd(session);
+                return;
+            }
+            target.setHealth(target.getHealth() - damage);
+            target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.05F);
+        }
+        Vector direction = arrow.getVelocity();
+        if (direction.lengthSquared() < 0.001D) {
+            direction = target.getLocation().toVector().subtract(shooter.getLocation().toVector());
+        }
+        if (direction.lengthSquared() > 0.001D) {
+            double multiplier = ArcadePortRules.deathTagArcherArrowKnockbackMultiplier(
+                    session.alphaChasers.contains(targetId));
+            target.setVelocity(direction.normalize().multiply(multiplier));
+        }
     }
 
     private void updateDeathTagChasers(Session session, long now) {
@@ -5846,7 +5913,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1
                 && session.alive.contains(player.getUniqueId())) {
-            makeDeathTagChaser(session, player, reason);
+            makeDeathTagChaser(session, player, reason, killer);
             checkRoundEnd(session);
             return;
         }
@@ -6189,7 +6256,7 @@ public final class ArcadePortManager implements Listener {
                     double damage = ArcadePortRules.deathTagChaserDamage(
                             session.alphaChasers.contains(attacker.getUniqueId()));
                     if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
-                        makeDeathTagChaser(session, target, "was killed by a chaser");
+                        makeDeathTagChaser(session, target, "was killed by a chaser", attacker);
                         checkRoundEnd(session);
                     } else {
                         target.setHealth(target.getHealth() - damage);
@@ -6202,19 +6269,30 @@ public final class ArcadePortManager implements Listener {
                             session.alphaChasers.contains(target.getUniqueId()));
                     if (damage > 0.0D) {
                         if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
-                            makeDeathTagChaser(session, target, "was defeated by a runner");
+                            respawnDeathTagChaser(session, target);
+                            awardDeathTagKill(session, attacker);
                         } else {
                             target.setHealth(target.getHealth() - damage);
                             target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.05F);
                         }
                     }
-                    if ("basher".equals(kit) && !"projectile hit".equals(source)) {
-                        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 2, false, false, true));
-                    } else if ("traitor".equals(kit) && !"projectile hit".equals(source)) {
-                        Vector knockbackDirection = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
-                        double multiplier = ArcadePortRules.deathTagKnockbackMultiplier(
-                                session.alphaChasers.contains(target.getUniqueId()));
-                        if (knockbackDirection.lengthSquared() > 0.001D) target.setVelocity(knockbackDirection.normalize().multiply(0.8D * multiplier).setY(0.1D));
+                    if ("basher".equals(kit) && !"projectile hit".equals(source)
+                            && !ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
+                        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 2, false, false, true));
+                    } else if ("traitor".equals(kit) && !"projectile hit".equals(source)
+                            && !ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
+                        String cooldownKey = attacker.getUniqueId() + ":" + target.getUniqueId();
+                        long now = System.currentTimeMillis();
+                        long lastUse = session.deathTagTraitorKnockbackAt.getOrDefault(cooldownKey, 0L);
+                        if (ArcadePortRules.deathTagTraitorKnockbackReady(now, lastUse)) {
+                            session.deathTagTraitorKnockbackAt.put(cooldownKey, now);
+                            Vector knockbackDirection = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+                            double multiplier = ArcadePortRules.deathTagKnockbackMultiplier(
+                                    session.alphaChasers.contains(target.getUniqueId()));
+                            if (knockbackDirection.lengthSquared() > 0.001D) {
+                                target.setVelocity(knockbackDirection.normalize().multiply(0.8D * multiplier).setY(0.1D));
+                            }
+                        }
                     }
                 }
                 break;
@@ -8030,6 +8108,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (event.getEntity() instanceof Player target && session.players.containsKey(target.getUniqueId())) {
+            double incomingDamage = event.getFinalDamage();
             event.setCancelled(true);
             if (session.type == ArcadePortGame.DRAGON_ESCAPE
                     && event instanceof EntityDamageByEntityEvent dragonEscapeDamage) {
@@ -8045,6 +8124,11 @@ public final class ArcadePortManager implements Listener {
             }
             if (event instanceof EntityDamageByEntityEvent byEntity) {
                 Entity damager = byEntity.getDamager();
+                if (session.type == ArcadePortGame.DEATH_TAG && damager instanceof Projectile projectile
+                        && projectile.getShooter() instanceof Player shooter
+                        && session.players.containsKey(shooter.getUniqueId())) {
+                    session.deathTagProjectileDamage.put(projectile.getUniqueId(), incomingDamage);
+                }
                 if (session.type == ArcadePortGame.RUNNER && damager instanceof FallingBlock falling
                         && session.entities.contains(falling)) {
                     handleRunnerFallingBlockHit(session, falling, target);
@@ -8081,6 +8165,31 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onQuiverBowShoot(EntityShootBowEvent event) {
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onDeathTagBowShoot(EntityShootBowEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.DEATH_TAG
+                || !(event.getEntity() instanceof Player player)
+                || player.getWorld() != session.world
+                || !session.alive.contains(player.getUniqueId())
+                || session.tagged.contains(player.getUniqueId())
+                || !"archer".equals(session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher"))
+                || !(event.getProjectile() instanceof Arrow arrow)) return;
+
+        boolean hasFletchedArrow = false;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item == null || item.getType() != Material.ARROW || !item.hasItemMeta()) continue;
+            ItemMeta meta = item.getItemMeta();
+            if (meta.hasDisplayName() && meta.getDisplayName().contains("Fletched Arrow")) {
+                hasFletchedArrow = true;
+                break;
+            }
+        }
+        if (!hasFletchedArrow) return;
+        session.deathTagFletchedArrows.add(arrow.getUniqueId());
+        session.entities.add(arrow);
+    }
+
         Session session = active;
         if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
                 || !(event.getEntity() instanceof Player player)
@@ -8115,6 +8224,19 @@ public final class ArcadePortManager implements Listener {
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+
+        if (session.type == ArcadePortGame.DEATH_TAG
+                && event.getEntity() instanceof Arrow deathTagArrow
+                && session.deathTagFletchedArrows.remove(deathTagArrow.getUniqueId())) {
+            if (event.getHitEntity() instanceof Player target
+                    && deathTagArrow.getShooter() instanceof Player shooter) {
+                handleDeathTagArcherArrowHit(session, deathTagArrow, shooter, target);
+            }
+            session.deathTagProjectileDamage.remove(deathTagArrow.getUniqueId());
+            session.entities.remove(deathTagArrow);
+            deathTagArrow.remove();
+            return;
+        }
 
         if (session.type == ArcadePortGame.BOMB_LOBBERS
                 && "wind-projectile".equals(event.getEntity().getPersistentDataContainer()
@@ -10172,6 +10294,9 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> alphaChasers = new HashSet<>();
         final Map<UUID, String> deathTagRunnerKits = new HashMap<>();
         final Map<UUID, Long> deathTagLastArrowAt = new HashMap<>();
+        final Set<UUID> deathTagFletchedArrows = new HashSet<>();
+        final Map<UUID, Double> deathTagProjectileDamage = new HashMap<>();
+        final Map<String, Long> deathTagTraitorKnockbackAt = new HashMap<>();
         final Map<Block, BlockData> deathTagOriginalLightBlocks = new LinkedHashMap<>();
         long deathTagNextLightAt;
         final Map<UUID, String> baconKits = new HashMap<>();
