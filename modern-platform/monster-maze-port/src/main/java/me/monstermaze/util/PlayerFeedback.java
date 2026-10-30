@@ -23,7 +23,7 @@ import java.util.Set;
 
 /** Short-lived modern-only floating health feedback above players in Monster Maze. */
 public final class PlayerFeedback implements Listener {
-    private final Plugin plugin;
+    private final MonsterMazePlugin plugin;
     private final GameManager game;
     private final Set<TextDisplay> activeDisplays = new HashSet<TextDisplay>();
 
@@ -91,9 +91,9 @@ public final class PlayerFeedback implements Listener {
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             if (viewer.getWorld() != subject.getWorld()
                     || game.getKitManager().isHiddenFrom(viewer, subject)) {
-                viewer.hideEntity(plugin, display);
+                viewer.hideEntity(plugin.getHostPlugin(), display);
             } else {
-                viewer.showEntity(plugin, display);
+                viewer.showEntity(plugin.getHostPlugin(), display);
             }
         }
     }
