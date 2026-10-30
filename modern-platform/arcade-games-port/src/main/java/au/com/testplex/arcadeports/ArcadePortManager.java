@@ -1324,6 +1324,13 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.SKY_WARS) {
             prepareSkyWarsMap(session);
             session.skyWarsTntGenerator = skyWarsTntGenerator(session);
+            if (session.skyWarsTntGenerator != null) {
+                session.skyWarsGeneratorBase = session.skyWarsTntGenerator.getBlock().getRelative(BlockFace.DOWN);
+                session.skyWarsGeneratorBase.setType(Material.IRON_BLOCK, false);
+            } else {
+                plugin.getLogger().warning("SkyWars map " + session.world.getName()
+                        + " has no LIME throwable-TNT generator marker.");
+            }
             announce(session, ChatColor.YELLOW + "SkyWars starts in 5 seconds. Loot your island quickly!");
         }
         if (type == ArcadePortGame.BOMB_LOBBERS) {
@@ -3656,7 +3663,7 @@ public final class ArcadePortManager implements Listener {
         if (map == null) return null;
         List<Location> markers = map.dataLocations("LIME");
         if (markers.isEmpty()) return null;
-        return markers.get(0).clone().add(0.5D, 0.75D, 0.5D);
+        return markers.get(0).clone().subtract(0.0D, 0.5D, 0.0D);
     }
 
     private static SkyWarsLootEntry skyWarsLoot(Material material) {
@@ -3821,14 +3828,7 @@ public final class ArcadePortManager implements Listener {
     private boolean populateSkyWarsChest(Location location, int tier) {
         if (location == null || location.getWorld() == null) return false;
         Block block = location.getBlock();
-        if (block.getType() != Material.CHEST) {
-            if (!block.getType().isAir() && !block.isReplaceable()) {
-                plugin.getLogger().warning("SkyWars chest marker was blocked by " + block.getType()
-                        + " at " + block.getLocation() + "; skipping that chest.");
-                return false;
-            }
-            block.setType(Material.CHEST, false);
-        }
+        if (block.getType() != Material.CHEST) block.setType(Material.CHEST, false);
         if (!(block.getState() instanceof org.bukkit.block.Chest chest)) return false;
         Inventory inventory = chest.getBlockInventory();
         inventory.clear();
@@ -3944,34 +3944,60 @@ public final class ArcadePortManager implements Listener {
         if (session.skyWarsCrumbleStarted && session.skyWarsCrumbleScanComplete) {
             removeSkyWarsCrumbleBlocks(session, 4);
         }
-        if (session.skyWarsLive && session.skyWarsTntGenerator != null && now >= session.skyWarsNextTntAt) {
+        if (session.skyWarsLive && session.skyWarsTntGenerator != null
+                && (session.skyWarsGeneratorDrop == null || !session.skyWarsGeneratorDrop.isValid())
+                && now >= session.skyWarsNextTntAt) {
             ItemStack tnt = namedItem(Material.TNT, "Throwable TNT",
-                    "Right-click to throw at opponents.");
+                    "Left-click to throw; right-click to drop.");
             tnt.setAmount(SkyWarsMixedArcadeRules.TNT_PER_DROP);
-            session.world.dropItemNaturally(session.skyWarsTntGenerator.clone(), tnt);
-            session.skyWarsNextTntAt = now + SkyWarsMixedArcadeRules.TNT_GENERATOR_INTERVAL_MILLIS;
-            session.world.playSound(session.skyWarsTntGenerator, Sound.BLOCK_NOTE_BLOCK_PLING, 0.8F, 1.4F);
+            Item drop = session.world.dropItem(session.skyWarsTntGenerator.clone(), tnt);
+            drop.setPickupDelay(0);
+            drop.setUnlimitedLifetime(true);
+            drop.setCustomName(ChatColor.YELLOW + "Throwable TNT");
+            drop.setCustomNameVisible(true);
+            drop.setGlowing(true);
+            session.skyWarsGeneratorDrop = drop;
+            session.entities.add(drop);
+            session.skyWarsGeneratorDropId = drop.getUniqueId();
+            if (session.skyWarsGeneratorBase != null) session.skyWarsGeneratorBase.setType(Material.GOLD_BLOCK, false);
+            session.world.playSound(session.skyWarsTntGenerator, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.7F, 1.2F);
         }
     }
 
-    private void throwSkyWarsTnt(Session session, Player player) {
+    private void throwSkyWarsTnt(Session session, Player player, boolean throwForward) {
         if (session == null || active != session || !session.skyWarsLive
                 || !session.alive.contains(player.getUniqueId())) return;
         long now = System.currentTimeMillis();
         long last = session.skyWarsLastTntThrowAt.getOrDefault(player.getUniqueId(), 0L);
-        if (last > 0L && now - last < 300L) return;
+        if (last > 0L && now - last < SkyWarsMixedArcadeRules.TNT_THROW_COOLDOWN_MILLIS) return;
         ItemStack held = player.getInventory().getItemInMainHand();
         if (held == null || held.getType() != Material.TNT) return;
         session.skyWarsLastTntThrowAt.put(player.getUniqueId(), now);
         consumeHeld(player);
-        Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(0.8D));
+        Location spawn = player.getEyeLocation().add(player.getLocation().getDirection());
         TNTPrimed tnt = session.world.spawn(spawn, TNTPrimed.class);
         tnt.setFuseTicks((int) SkyWarsMixedArcadeRules.TNT_THROW_FUSE_TICKS);
         tnt.setYield(4.0F);
-        tnt.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.45D));
+        if (throwForward) {
+            tnt.setVelocity(player.getLocation().getDirection().normalize()
+                    .multiply(SkyWarsMixedArcadeRules.TNT_THROW_STRENGTH).setY(0.3D));
+        }
         session.skyWarsTntOwners.put(tnt.getUniqueId(), player.getUniqueId());
         session.entities.add(tnt);
         player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.65F, 1.35F);
+    }
+
+    private boolean isSkyWarsUsableBlock(Block block) {
+        if (block == null) return false;
+        if (block.getState() instanceof InventoryHolder) return true;
+        Material material = block.getType();
+        String name = material.name();
+        return name.endsWith("_DOOR") || name.endsWith("_TRAPDOOR")
+                || name.endsWith("_BUTTON") || name.endsWith("_PRESSURE_PLATE")
+                || material == Material.LEVER || material == Material.CRAFTING_TABLE
+                || material == Material.ENCHANTING_TABLE || material == Material.BELL
+                || material == Material.CAKE || material == Material.REPEATER
+                || material == Material.COMPARATOR;
     }
 
     private void applySkyWarsDamage(Session session, Player target, EntityDamageEvent event) {
@@ -10768,8 +10794,11 @@ public final class ArcadePortManager implements Listener {
                 && event.getAction() == Action.LEFT_CLICK_AIR;
         boolean dragonsSparklerLeftClick = session.type == ArcadePortGame.DRAGONS
                 && event.getAction() == Action.LEFT_CLICK_AIR;
+        boolean skyWarsTntClick = session.type == ArcadePortGame.SKY_WARS
+                && (event.getAction().isLeftClick() || event.getAction().isRightClick());
         if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick
-                && !baconNonRightClick && !dragonEscapeDisruptorLeftClick && !dragonsSparklerLeftClick) return;
+                && !baconNonRightClick && !dragonEscapeDisruptorLeftClick && !dragonsSparklerLeftClick
+                && !skyWarsTntClick) return;
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
         if (event.isCancelled()) {
@@ -10787,20 +10816,21 @@ public final class ArcadePortManager implements Listener {
                     && (event.getAction().isRightClick() || event.getAction().isLeftClick())
                     && session.alive.contains(player.getUniqueId());
             boolean forceSkyWarsTnt = session.type == ArcadePortGame.SKY_WARS
-                    && event.getAction().isRightClick() && heldItem != null
-                    && heldItem.getType() == Material.TNT
+                    && (event.getAction().isRightClick() || event.getAction().isLeftClick())
+                    && heldItem != null && heldItem.getType() == Material.TNT
                     && session.alive.contains(player.getUniqueId());
             if (!forceBaconAbility && !forceBombControlClick && !forceSkyWarsTnt) return;
         }
         if (session.type == ArcadePortGame.SKY_WARS
-                && event.getAction().isRightClick() && heldItem != null
-                && heldItem.getType() == Material.TNT
+                && (event.getAction().isRightClick() || event.getAction().isLeftClick())
+                && heldItem != null && heldItem.getType() == Material.TNT
                 && session.alive.contains(player.getUniqueId())) {
+            if (isSkyWarsUsableBlock(event.getClickedBlock())) return;
             event.setCancelled(true);
             if (!session.skyWarsLive) {
-                player.sendMessage(ChatColor.YELLOW + "TNT can be thrown when the match begins.");
+                player.sendMessage(ChatColor.YELLOW + "TNT can be used when the match begins.");
             } else {
-                throwSkyWarsTnt(session, player);
+                throwSkyWarsTnt(session, player, event.getAction().isLeftClick());
             }
             return;
         }
@@ -13041,6 +13071,9 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> skyWarsLastDamagedAt = new HashMap<>();
         final Map<UUID, Long> skyWarsLastTntThrowAt = new HashMap<>();
         final Map<UUID, UUID> skyWarsTntOwners = new HashMap<>();
+        Item skyWarsGeneratorDrop;
+        UUID skyWarsGeneratorDropId;
+        Block skyWarsGeneratorBase;
         final Map<Block, Long> skyWarsCrumbleQueued = new HashMap<>();
         final PriorityQueue<SkyWarsCrumbleCandidate> skyWarsCrumbleQueue = new PriorityQueue<>(
                 (left, right) -> {
