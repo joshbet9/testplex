@@ -1376,6 +1376,13 @@ public final class ArcadePortRules {
         return !hasAuthoredRoute && crumbleZ > -24 && crumbleZ < 78;
     }
 
+    /** Reborn's rank score: checkpoint index * 10,000 less distance to the next marker. */
+    public static double dragonEscapeRankScore(int waypointIndex, double distanceToNextWaypoint) {
+        if (waypointIndex < 0 || !Double.isFinite(distanceToNextWaypoint)
+                || distanceToNextWaypoint < 0.0D) return Double.NEGATIVE_INFINITY;
+        return waypointIndex * 10_000.0D - distanceToNextWaypoint;
+    }
+
     public static int monotonicDragonEscapeProgress(int previous, int candidate, int waypointCount) {
         if (waypointCount <= 0) return -1;
         return Math.min(waypointCount - 1, Math.max(0, Math.max(previous, candidate)));

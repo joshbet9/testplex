@@ -1299,6 +1299,17 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.monotonicDragonEscapeProgress(0, 1, 0));
     }
 
+    @Test void dragonEscapeRankingUsesCheckpointScoreThenDistanceToNextMarker() {
+        assertEquals(-2.0D, ArcadePortRules.dragonEscapeRankScore(0, 2.0D), 0.00001D);
+        assertEquals(9_997.0D, ArcadePortRules.dragonEscapeRankScore(1, 3.0D), 0.00001D);
+        assertTrue(ArcadePortRules.dragonEscapeRankScore(2, 9_999.0D)
+                > ArcadePortRules.dragonEscapeRankScore(1, 0.0D));
+        assertEquals(Double.NEGATIVE_INFINITY,
+                ArcadePortRules.dragonEscapeRankScore(-1, 0.0D));
+        assertEquals(Double.NEGATIVE_INFINITY,
+                ArcadePortRules.dragonEscapeRankScore(0, Double.NaN));
+    }
+
     @Test void dragonEscapeCheckpointProgressCannotJumpAheadAtNearbySwitchbacks() {
         assertFalse(ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(0.0D, 1.0D, 1.0D));
         assertFalse(ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(0.5D, 0.5D, 1.0D));

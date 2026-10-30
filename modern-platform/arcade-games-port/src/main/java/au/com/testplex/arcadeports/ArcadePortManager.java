@@ -4236,23 +4236,13 @@ public final class ArcadePortManager implements Listener {
     /** Reborn ranks by checkpoint score and distance, then warps to the next higher-ranked live racer. */
     private Player dragonEscapeNextRankedPlayerAhead(Session session, Player player) {
         List<Player> ranked = new ArrayList<>(alivePlayers(session));
-        Map<UUID, Double> scores = new HashMap<>();
-        for (Player racer : ranked) {
-            int progress = dragonEscapePlayerProgress(session, racer);
-            double distance = 0.0D;
-            if (!session.dragonEscapeWaypoints.isEmpty()) {
-                int next = Math.min(session.dragonEscapeWaypoints.size() - 1,
-                        Math.max(0, progress + 1));
-                distance = racer.getLocation().distance(session.dragonEscapeWaypoints.get(next));
-            }
-            scores.put(racer.getUniqueId(), progress * 10_000.0D - distance);
-        }
+        Map<UUID, Double> scores = session.dragonEscapePlayerRankScores;
+        // Reborn's Warper sorts the scores last written on its 500ms FAST update;
+        // it does not recalculate ranks at the instant the pearl is clicked.
         ranked.removeIf(candidate -> !session.alive.contains(candidate.getUniqueId())
                 || !candidate.isOnline() || !scores.containsKey(candidate.getUniqueId()));
-        ranked.sort((left, right) -> {
-            int byScore = Double.compare(scores.get(right.getUniqueId()), scores.get(left.getUniqueId()));
-            return byScore != 0 ? byScore : left.getName().compareToIgnoreCase(right.getName());
-        });
+        ranked.sort((left, right) ->
+                Double.compare(scores.get(right.getUniqueId()), scores.get(left.getUniqueId())));
         int ownRank = ranked.indexOf(player);
         return ownRank > 0 ? ranked.get(ownRank - 1) : null;
     }
@@ -4617,8 +4607,11 @@ public final class ArcadePortManager implements Listener {
                     if (!session.alive.contains(player.getUniqueId())) continue;
                     Location playerNext = session.dragonEscapeWaypoints.get(Math.min(lastIndex, playerIndex + 1));
                     Location dragonNext = session.dragonEscapeWaypoints.get(Math.min(lastIndex, dragonIndex + 1));
-                    double playerScore = playerIndex * 10_000.0D - player.getLocation().distance(playerNext);
-                    double dragonScore = dragonIndex * 10_000.0D - location.distance(dragonNext);
+                    double playerScore = ArcadePortRules.dragonEscapeRankScore(
+                            playerIndex, player.getLocation().distance(playerNext));
+                    double dragonScore = ArcadePortRules.dragonEscapeRankScore(
+                            dragonIndex, location.distance(dragonNext));
+                    session.dragonEscapePlayerRankScores.put(player.getUniqueId(), playerScore);
                     if (playerIndex == lastIndex && player.getLocation().distance(
                             session.dragonEscapeWaypoints.get(lastIndex)) < 3.0D) {
                         recordDragonEscapeFinish(session, player, now);
@@ -9918,6 +9911,7 @@ public final class ArcadePortManager implements Listener {
         int dragonEscapeDragonProgress;
         long dragonEscapeNextScoreUpdateAt;
         final Map<UUID, Integer> dragonEscapePlayerProgress = new HashMap<>();
+        final Map<UUID, Double> dragonEscapePlayerRankScores = new HashMap<>();
         final Map<UUID, Map<Integer, Long>> dragonEscapeRunSplitMillis = new HashMap<>();
         final Map<Block, Long> runnerBlocks = new HashMap<>();
         final Map<Block, Material> runnerBlockMaterials = new HashMap<>();
