@@ -813,6 +813,7 @@ final class SneakyAssassinsMechanics {
         addSmokeBomb(player);
         if (count == 4) {
             masterAssassins.add(id);
+            incrementLocalStat(id, "master-assassin");
             powerUpCounts.put(id, 5);
             player.getInventory().addItem(createMasterCompass());
             player.sendMessage(ChatColor.GOLD + "You are now a Master Assassin! Your compass tracks the nearest player.");
@@ -916,7 +917,11 @@ final class SneakyAssassinsMechanics {
             if (target == null || !target.isOnline() || !isAlive.test(id)
                     || target.getWorld() != impact.getWorld()
                     || target.getLocation().distanceSquared(impact) > REVEALER_RADIUS * REVEALER_RADIUS) continue;
-            revealPlayer(id, System.currentTimeMillis() + REVEALER_DURATION_MILLIS);
+            long now = System.currentTimeMillis();
+            if (revealUntil.getOrDefault(id, 0L) <= now && ownerId != null) {
+                incrementLocalStat(ownerId, "i-see-you");
+            }
+            revealPlayer(id, now + REVEALER_DURATION_MILLIS);
             target.sendMessage(ChatColor.AQUA + "You have been revealed!");
             if (thrower != null) thrower.sendMessage(ChatColor.AQUA + "Revealed " + target.getName() + "!");
         }
@@ -988,6 +993,10 @@ final class SneakyAssassinsMechanics {
         if (!npcIds.remove(id)) return;
         event.getDrops().clear();
         event.setDroppedExp(0);
+        Player killer = event.getEntity().getKiller();
+        if (killer != null && players.containsKey(killer.getUniqueId())) {
+            incrementLocalStat(killer.getUniqueId(), "incompetence");
+        }
         bribes.remove(id);
         npcNextAttackAt.remove(id);
     }
@@ -1029,8 +1038,13 @@ final class SneakyAssassinsMechanics {
         }
     }
 
-    void onKill(Player killer) {
+    void onKill(Player killer, Player victim) {
         if (killer == null || !killer.isOnline() || !players.containsKey(killer.getUniqueId())) return;
+        if (victim != null && powerUpCounts.getOrDefault(killer.getUniqueId(), 0) == 0
+                && powerUpCounts.getOrDefault(victim.getUniqueId(), 0) >= 4) {
+            incrementLocalStat(killer.getUniqueId(), "the-masters-master");
+            unlockTheMastersMaster(killer);
+        }
         var attribute = killer.getAttribute(Attribute.MAX_HEALTH);
         if (attribute != null) {
             attribute.setBaseValue(attribute.getBaseValue() + 2.0D);
@@ -1057,6 +1071,26 @@ final class SneakyAssassinsMechanics {
         if (held == null || held.getType().isAir()) return;
         if (held.getAmount() <= 1) player.getInventory().setItemInMainHand(null);
         else held.setAmount(held.getAmount() - 1);
+    }
+
+    private String localStatPath(UUID playerId, String stat) {
+        return "local-stats." + playerId + ".sneaky-assassins." + stat;
+    }
+
+    private void incrementLocalStat(UUID playerId, String stat) {
+        if (playerId == null) return;
+        String path = localStatPath(playerId, stat);
+        plugin.getConfig().set(path, plugin.getConfig().getInt(path, 0) + 1);
+        plugin.saveConfig();
+    }
+
+    private void unlockTheMastersMaster(Player player) {
+        if (player == null) return;
+        String path = "test-achievements.sneaky-assassins." + player.getUniqueId() + ".the-masters-master";
+        if (plugin.getConfig().getBoolean(path, false)) return;
+        plugin.getConfig().set(path, true);
+        plugin.saveConfig();
+        player.sendMessage(ChatColor.GOLD + "Achievement unlocked: The Master's Master — defeat an assassin with 4+ power-ups while you have none.");
     }
 
     private void announce(String message) {
