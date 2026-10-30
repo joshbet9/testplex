@@ -12431,6 +12431,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (!session.alive.contains(player.getUniqueId())) return;
+        Material item = heldItem == null ? Material.AIR : heldItem.getType();
         if (session.type == ArcadePortGame.TURF_WARS
                 && event.getAction().isRightClick() && item == Material.BOW
                 && "shredder".equals(session.turfWarsKits.getOrDefault(player.getUniqueId(), "marksman"))) {
@@ -12440,7 +12441,6 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             return;
         }
-        Material item = heldItem == null ? Material.AIR : heldItem.getType();
         if (session.type == ArcadePortGame.BOMB_LOBBERS && event.getAction().isRightClick()
                 && "wind-charge".equals(bombLobbersPowerupType(heldItem))) {
             event.setCancelled(true);
@@ -12952,8 +12952,6 @@ public final class ArcadePortManager implements Listener {
                 event.setCancelled(true);
                 player.sendMessage(ChatColor.YELLOW + "You can only build on your own coloured turf, within five blocks of the clay.");
             } else {
-                event.setDropItems(false);
-                event.setExpToDrop(0);
                 String base = "local-stats." + player.getUniqueId() + ".turf-wars.";
                 plugin.getConfig().set(base + "blocks-placed",
                         plugin.getConfig().getInt(base + "blocks-placed", 0) + 1);
