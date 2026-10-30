@@ -109,6 +109,13 @@ class TurfWarsMixedVariantTest {
     }
 
     @Test
+    void comebackTrackerStartsAtFiveRemainingLinesAndNotSix() {
+        assertFalse(ArcadePortRules.turfWarsShouldTrackComeback(6));
+        assertTrue(ArcadePortRules.turfWarsShouldTrackComeback(5));
+        assertTrue(ArcadePortRules.turfWarsShouldTrackComeback(0));
+    }
+
+    @Test
     void territoryAndSpawnBoundaryIntervalsMatchTheSourcePerks() {
         assertEquals(2_000L, ArcadePortRules.TURF_WARS_TERRITORY_KNOCKBACK_COOLDOWN_MILLIS);
         assertEquals(2_000L, ArcadePortRules.TURF_WARS_SPAWN_DAMAGE_COOLDOWN_MILLIS);
