@@ -21,5 +21,9 @@ class SkyWarsMixedArcadeRulesTest {
         assertEquals(start + 485_000L, SkyWarsMixedArcadeRules.roundEndsAt(start));
         assertEquals(45_000L, SkyWarsMixedArcadeRules.BORDER_SHRINK_MILLIS);
         assertEquals(32.0D, SkyWarsMixedArcadeRules.FINAL_BORDER_SIZE);
+        assertEquals(60L, SkyWarsMixedArcadeRules.TNT_THROW_FUSE_TICKS);
+        assertEquals(500L, SkyWarsMixedArcadeRules.TNT_THROW_COOLDOWN_MILLIS);
+        assertEquals(1.6D, SkyWarsMixedArcadeRules.TNT_THROW_STRENGTH);
+        assertEquals(2, SkyWarsMixedArcadeRules.TNT_PER_DROP);
     }
 }
