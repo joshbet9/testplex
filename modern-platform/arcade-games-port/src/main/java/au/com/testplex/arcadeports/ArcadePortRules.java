@@ -3,6 +3,8 @@ package au.com.testplex.arcadeports;
 import org.bukkit.Material;
 import org.bukkit.Color;
 import java.util.Collection;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Small deterministic rules used by the mechanics-first Arcade prototypes.
@@ -425,6 +427,10 @@ public final class ArcadePortRules {
     public static final long TURF_WARS_INITIAL_BUILD_PHASE_MILLIS = 40_000L;
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
     public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
+    public static final long TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS = 20_000L;
+    public static final long TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS = 10_000L;
+    public static final long TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS = 45_000L;
+    public static final int TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS = 2;
     public static final long MICRO_BATTLES_CHEAT_WINDOW_MILLIS = 4_000L;
     public static final long MICRO_BATTLES_BARRIER_DURATION_MILLIS = 10_000L;
     public static final int MICRO_BATTLES_CRUMBLE_BLOCKS_PER_TICK = 3;
@@ -1812,10 +1818,54 @@ public final class ArcadePortRules {
         return ironSword ? 12.0D : 6.0D;
     }
 
+    public static long turfWarsInitialBuildPhaseMillis(boolean mixedArcadeVariant) {
+        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS
+                : TURF_WARS_INITIAL_BUILD_PHASE_MILLIS;
+    }
+
+    public static long turfWarsBuildPhaseMillis(boolean mixedArcadeVariant) {
+        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS
+                : TURF_WARS_BUILD_PHASE_MILLIS;
+    }
+
+    public static long turfWarsCombatPhaseMillis(boolean mixedArcadeVariant) {
+        return mixedArcadeVariant ? TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS
+                : TURF_WARS_COMBAT_PHASE_MILLIS;
+    }
+
     public static int advanceTurfFrontline(int currentFrontline, int teamId) {
-        if (teamId == 0) return currentFrontline + 1;
-        if (teamId == 1) return currentFrontline - 1;
+        return advanceTurfFrontline(currentFrontline, teamId, 1);
+    }
+
+    public static int advanceTurfFrontline(int currentFrontline, int teamId, boolean mixedArcadeVariant) {
+        return advanceTurfFrontline(currentFrontline, teamId, mixedArcadeVariant
+                ? TURF_WARS_MIXED_ARCADE_TURF_ADVANCE_BLOCKS : 1);
+    }
+
+    public static int advanceTurfFrontline(int currentFrontline, int teamId, int blocks) {
+        int distance = Math.max(0, blocks);
+        if (teamId == 0) return currentFrontline + distance;
+        if (teamId == 1) return currentFrontline - distance;
         return currentFrontline;
+    }
+
+    /**
+     * Every newly captured column must be repainted when a kill advances the line.
+     * The maximum X coordinate is exclusive, matching the source map bounds.
+     */
+    public static List<Integer> turfWarsCapturedColumns(int oldFrontline, int newFrontline,
+            int teamId, int minX, int maxXExclusive) {
+        if ((teamId != 0 && teamId != 1) || maxXExclusive <= minX || oldFrontline == newFrontline) {
+            return List.of();
+        }
+        int first = teamId == 0 ? oldFrontline + 1 : newFrontline + 1;
+        int last = teamId == 0 ? newFrontline : oldFrontline;
+        first = Math.max(first, minX);
+        last = Math.min(last, maxXExclusive - 1);
+        if (first > last) return List.of();
+        List<Integer> columns = new ArrayList<>(last - first + 1);
+        for (int x = first; x <= last; x++) columns.add(x);
+        return List.copyOf(columns);
     }
 
     /**

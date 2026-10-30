@@ -17,7 +17,7 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 - Runner — source Leaper/Archer/Frosty kit identities, 8-second Leap, 6-second Quickshot, Frost Balls replenished every 500 ms up to 16 with Slow II for two seconds, source-map bounds, trail material tracking, 600 ms decay and 1.2-second falling-block lifetime, and radius-2.5 arrow trail marking, and the source 4-damage water penalty.
 - Sheep Quest — source GREEN/BLUE/RED/YELLOW pens, team sheep capture and steals, three-sheep carry limit, and the five-minute winner based on sheep in the pen; a tie at the end is a draw.
 - Spleef — source kit selection (Snowballer, Brawler and Archer), snowballer replacement cap, Brawler Leap with a 30-second cooldown, Smasher, two-arrow Fletcher replenishment, source-timed hunger drain/restoration, source material damage transitions, 3D arrow-radius clearing, and the source 4-damage water penalty. Its Snowburst, Ice Shards and Chalk Grid block-break signatures are live renderers broadcast with forced particle delivery to every player and spectator in the dedicated match world.
-- Turf Wars — team assignment, bow combat and territory block marking; source timing now uses the 40-second initial build, followed by 20-second build / 90-second combat cycles.
+- Turf Wars — team assignment, bow combat and territory block marking. Standard Turf Wars keeps its 40-second opening build, then 20-second build / 90-second combat cycles. The dedicated Mixed Arcade variant is started with `turf-wars-mixed` (or `mixed-turf-wars`): its opening build is 20 seconds, later build phases are 10 seconds, combat phases are 45 seconds, and each kill advances the frontline by two columns with both newly captured columns repainted. Standard Turf Wars timings and one-column advances are unchanged.
 
 Each game gets its own separate modern test world, so arena generation/destruction does not use the live 1.8 Testplex world. Original Reborn map archives are embedded for Bacon Brawl, Bomb Lobbers, Death Tag, Dragon Escape, Dragons, Gladiators, Micro Battles, One in the Quiver, Paintball, Runner, Sheep Quest, Spleef and Turf Wars; these load into separate source-world folders and read WorldConfig.dat spawn groups and map bounds. Evolution remains generated because an Evolution map archive is not present in the source map catalogue.
 
@@ -26,11 +26,12 @@ Each game gets its own separate modern test world, so arena generation/destructi
 - `/gamepanel` → choose a supported game → **Start / Test**. The coordinator calls `/arcadeport play <game-id>`.
 - `/arcadeport play <id>` — joins a quick-start window, giving others a few seconds to join.
 - `/arcadeport join <id>` then `/arcadeport start <id>` — queue a multi-player test.
+- `/arcadeport play turf-wars-mixed` or `/arcadeport join turf-wars-mixed` then `/arcadeport start turf-wars-mixed` — use the dedicated Mixed Arcade Turf Wars timings and double-column capture. This variant has its own queue and does not change standard `turf-wars`.
 - `/arcadeport kit <el-muchacho-pigo|mama-piggles|pig|mama-pig|sheep-pig|jumper|dragon-escape-jumper|dragon-escape-disruptor|dragon-escape-warper|dragon-escape-digger|disruptor|warper|digger|armorer|pitcher|waller|snowballer|brawler|archer|rifle|sniper|shotgun|machine-gun|runner-basher|runner-archer|runner-traitor|runner-null>` — choose a game kit before a test; Bacon Brawl kits lock at round start, so changes apply on the next test; legacy kit aliases remain accepted.
 - `/arcadeport ghost <on|off|toggle>` — enable or hide your Dragon Escape translucent PB player ghost.
 - `/arcadeport status`, `/arcadeport stop` (operator only).
 
-Game IDs are: `bacon-brawl`, `bomb-lobbers`, `death-tag`, `dragon-escape`, `dragons`, `evolution`, `gladiators`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`.
+Game IDs are: `bacon-brawl`, `bomb-lobbers`, `death-tag`, `dragon-escape`, `dragons`, `evolution`, `gladiators`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. The separate Mixed Arcade alias is `turf-wars-mixed` (`mixed-turf-wars` is also accepted).
 
 ## Acceptance boundary
 

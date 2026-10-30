@@ -147,6 +147,7 @@ public final class ArcadePortManager implements Listener {
     private Session active;
     private BukkitTask pendingStart;
     private ArcadePortGame pendingType;
+    private boolean pendingMixedArcadeVariant;
     private BukkitTask manualStartCountdown;
     private ArcadePortGame manualStartType;
     private long lastDragonHazard;
@@ -187,7 +188,19 @@ public final class ArcadePortManager implements Listener {
     public int queuedCount(ArcadePortGame type) {
         if (type == null) return 0;
         Map<UUID, Player> queued = queues.get(type.id());
-        return queued == null ? 0 : (int) queued.values().stream().filter(p -> p != null && p.isOnline()).count();
+        int count = queued == null ? 0
+                : (int) queued.values().stream().filter(p -> p != null && p.isOnline()).count();
+        if (type == ArcadePortGame.TURF_WARS) {
+            Map<UUID, Player> mixedQueue = queues.get("turf-wars-mixed");
+            if (mixedQueue != null) {
+                count += (int) mixedQueue.values().stream().filter(p -> p != null && p.isOnline()).count();
+            }
+        }
+        return count;
+    }
+
+    private static String queueKey(ArcadePortGame type, boolean mixedArcadeVariant) {
+        return mixedArcadeVariant ? "turf-wars-mixed" : type.id();
     }
 
     public void removeFromQueues(Player player) {
@@ -700,8 +713,16 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void queue(ArcadePortGame type, Player player, boolean quickStart) {
+        queue(type, player, quickStart, false);
+    }
+
+    public void queue(ArcadePortGame type, Player player, boolean quickStart, boolean mixedArcadeVariant) {
         if (type == null) {
             player.sendMessage(ChatColor.RED + "Unknown game id. Use /arcadeport help for the available IDs.");
+            return;
+        }
+        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS) {
+            player.sendMessage(ChatColor.RED + "The Mixed Arcade variant is only available for Turf Wars.");
             return;
         }
         if (!isGameEnabled(type)) {
@@ -720,33 +741,42 @@ public final class ArcadePortManager implements Listener {
         }
         lobby.ensurePlayerInLobby(player);
         for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(player.getUniqueId());
-        queues.computeIfAbsent(type.id(), ignored -> new LinkedHashMap<>()).put(player.getUniqueId(), player);
+        String key = queueKey(type, mixedArcadeVariant);
+        queues.computeIfAbsent(key, ignored -> new LinkedHashMap<>()).put(player.getUniqueId(), player);
+        String variantName = mixedArcadeVariant ? " (Mixed Arcade)" : "";
         String nextAction = manualStartCountdown != null && manualStartType == type
                 ? "The existing start countdown is already running."
                 : quickStart ? "Starting after a short join window so friends can join too."
-                : "An operator/player can use /arcadeport start " + type.id() + ".";
-        player.sendMessage(ChatColor.GREEN + "Queued for " + type.displayName() + ". " + nextAction);
-        if (quickStart) scheduleQuickStart(type);
+                : "An operator/player can use /arcadeport start "
+                        + (mixedArcadeVariant ? "turf-wars-mixed" : type.id()) + ".";
+        player.sendMessage(ChatColor.GREEN + "Queued for " + type.displayName() + variantName + ". " + nextAction);
+        if (quickStart) scheduleQuickStart(type, mixedArcadeVariant);
     }
 
     private void scheduleQuickStart(ArcadePortGame type) {
+        scheduleQuickStart(type, false);
+    }
+
+    private void scheduleQuickStart(ArcadePortGame type, boolean mixedArcadeVariant) {
         if (active != null) return;
         if (manualStartCountdown != null) {
-            for (Player player : onlineQueuedPlayers(type)) {
+            for (Player player : onlineQueuedPlayers(type, mixedArcadeVariant)) {
                 player.sendMessage(ChatColor.YELLOW + manualStartType.displayName()
                         + " already has a start countdown; the queued quick-start will not create a second timer.");
             }
             return;
         }
         if (pendingStart != null) {
-            if (pendingType == type) return;
+            if (pendingType == type && pendingMixedArcadeVariant == mixedArcadeVariant) return;
             pendingStart.cancel();
         }
         pendingType = type;
+        pendingMixedArcadeVariant = mixedArcadeVariant;
         pendingStart = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             pendingStart = null;
             pendingType = null;
-            startQueued(type, null, Bukkit.getConsoleSender());
+            pendingMixedArcadeVariant = false;
+            startQueued(type, null, Bukkit.getConsoleSender(), mixedArcadeVariant);
         }, JOIN_WINDOW_TICKS);
     }
 
@@ -756,6 +786,15 @@ public final class ArcadePortManager implements Listener {
      * are being tested.
      */
     public void startFromLobby(ArcadePortGame type, org.bukkit.command.CommandSender sender) {
+        startFromLobby(type, sender, false);
+    }
+
+    public void startFromLobby(ArcadePortGame type, org.bukkit.command.CommandSender sender,
+            boolean mixedArcadeVariant) {
+        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS) {
+            sender.sendMessage(ChatColor.RED + "The Mixed Arcade variant is only available for Turf Wars.");
+            return;
+        }
         if (type == null) {
             sender.sendMessage(ChatColor.RED + "Unknown game id.");
             return;
@@ -788,11 +827,14 @@ public final class ArcadePortManager implements Listener {
 
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (player.isOnline() && lobby.isLobbyWorld(player.getWorld())) {
-                queues.computeIfAbsent(type.id(), ignored -> new LinkedHashMap<>())
+                for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
+                    existingQueue.remove(player.getUniqueId());
+                }
+                queues.computeIfAbsent(queueKey(type, mixedArcadeVariant), ignored -> new LinkedHashMap<>())
                         .put(player.getUniqueId(), player);
             }
         }
-        LinkedHashMap<UUID, Player> queue = queues.get(type.id());
+        LinkedHashMap<UUID, Player> queue = queues.get(queueKey(type, mixedArcadeVariant));
         boolean anyQueued = queue != null
                 && queue.values().stream().anyMatch(player -> player != null && player.isOnline());
         if (!anyQueued) {
@@ -805,15 +847,16 @@ public final class ArcadePortManager implements Listener {
             pendingStart.cancel();
             pendingStart = null;
             pendingType = null;
+            pendingMixedArcadeVariant = false;
         }
 
         Player requester = sender instanceof Player player && lobby.isLobbyWorld(player.getWorld())
                 ? player : null;
-        List<Player> notifyPlayers = onlineQueuedPlayers(type);
+        List<Player> notifyPlayers = onlineQueuedPlayers(type, mixedArcadeVariant);
         String hostName = sender instanceof Player player ? player.getName() : "An operator";
         clearLobbyCountdownStatus();
         try {
-            startQueued(type, requester, sender);
+            startQueued(type, requester, sender, mixedArcadeVariant);
         } catch (RuntimeException exception) {
             plugin.getLogger().log(java.util.logging.Level.SEVERE,
                     "Unhandled error while starting " + type.displayName() + ".", exception);
@@ -821,7 +864,8 @@ public final class ArcadePortManager implements Listener {
                     + ". The error was logged on the server; no successful round start was recorded.");
             return;
         }
-        if (active != null && active.type == type) {
+        if (active != null && active.type == type
+                && active.mixedArcadeVariant == mixedArcadeVariant) {
             for (Player player : notifyPlayers) {
                 if (player != null && player.isOnline()) {
                     player.sendMessage(ChatColor.AQUA + "" + ChatColor.BOLD + hostName
@@ -832,7 +876,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private List<Player> onlineQueuedPlayers(ArcadePortGame type) {
-        LinkedHashMap<UUID, Player> queue = queues.get(type.id());
+        return onlineQueuedPlayers(type, false);
+    }
+
+    private List<Player> onlineQueuedPlayers(ArcadePortGame type, boolean mixedArcadeVariant) {
+        LinkedHashMap<UUID, Player> queue = queues.get(queueKey(type, mixedArcadeVariant));
         if (queue == null) return List.of();
         return queue.values().stream().filter(player -> player != null && player.isOnline()).toList();
     }
@@ -858,6 +906,15 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender) {
+        startQueued(type, requester, sender, false);
+    }
+
+    public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender,
+            boolean mixedArcadeVariant) {
+        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS) {
+            sender.sendMessage(ChatColor.RED + "The Mixed Arcade variant is only available for Turf Wars.");
+            return;
+        }
         if (type == null) {
             sender.sendMessage(ChatColor.RED + "Unknown game id.");
             return;
@@ -880,7 +937,8 @@ public final class ArcadePortManager implements Listener {
             sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running: " + active.type.displayName() + ".");
             return;
         }
-        LinkedHashMap<UUID, Player> queue = queues.get(type.id());
+        String selectedQueueKey = queueKey(type, mixedArcadeVariant);
+        LinkedHashMap<UUID, Player> queue = queues.get(selectedQueueKey);
         List<Player> participants = new ArrayList<>();
         if (queue != null) {
             for (Player player : queue.values()) if (player != null && player.isOnline()) participants.add(player);
@@ -889,14 +947,18 @@ public final class ArcadePortManager implements Listener {
             participants.add(requester);
         }
         if (participants.isEmpty()) {
-            sender.sendMessage(ChatColor.YELLOW + "No online players queued. Use /arcadeport join " + type.id() + " or /arcadeport play " + type.id() + ".");
+            String requestedId = mixedArcadeVariant ? "turf-wars-mixed" : type.id();
+            sender.sendMessage(ChatColor.YELLOW + "No online players queued. Use /arcadeport join "
+                    + requestedId + " or /arcadeport play " + requestedId + ".");
             return;
         }
-        if (queue != null) queues.remove(type.id());
-        if (pendingStart != null && pendingType == type) {
+        if (queue != null) queues.remove(selectedQueueKey);
+        if (pendingStart != null && pendingType == type
+                && pendingMixedArcadeVariant == mixedArcadeVariant) {
             pendingStart.cancel();
             pendingStart = null;
             pendingType = null;
+            pendingMixedArcadeVariant = false;
         }
         World world;
         if (SourceMapCatalog.hasMap(type)) {
@@ -962,7 +1024,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (!sourceMapWorlds.contains(type.id())) buildArena(type, world);
-        Session session = new Session(type, world, participants);
+        Session session = new Session(type, world, participants, mixedArcadeVariant);
         active = session;
         long now = System.currentTimeMillis();
         session.startedAt = now;
@@ -1024,9 +1086,9 @@ public final class ArcadePortManager implements Listener {
             session.deathTagNextLightAt = now + 1_000L;
         }
         session.turfCombat = false;
-        // Reborn doubles the opening build window; later build windows are 20 seconds.
+        // The dedicated Mixed Arcade mode halves all three phase windows; standard Turf Wars is unchanged.
         session.turfPhaseEndsAt = type == ArcadePortGame.TURF_WARS
-                ? now + ArcadePortRules.TURF_WARS_INITIAL_BUILD_PHASE_MILLIS : 0L;
+                ? now + ArcadePortRules.turfWarsInitialBuildPhaseMillis(mixedArcadeVariant) : 0L;
         SourceMapCatalog.MapData turfSourceMap = type == ArcadePortGame.TURF_WARS
                 ? sourceMapData.get(type.id()) : null;
         if (turfSourceMap != null && turfSourceMap.hasBounds()
@@ -1258,7 +1320,10 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.MICRO_BATTLES) announce(session, ChatColor.AQUA + "Micro Battles: gather blocks; glass barriers drop after 10 seconds.");
         else announce(session, ChatColor.GOLD + type.displayName() + " started! This is a first-pass mechanics test.");
         if (type == ArcadePortGame.TURF_WARS) {
-            announce(session, ChatColor.GREEN + "Opening build phase: place your team's wool on your own turf for 40 seconds.");
+            long openingSeconds = ArcadePortRules.turfWarsInitialBuildPhaseMillis(mixedArcadeVariant) / 1_000L;
+            String modeLabel = mixedArcadeVariant ? " Mixed Arcade" : "";
+            announce(session, ChatColor.GREEN + "Opening" + modeLabel
+                    + " build phase: place your team's wool on your own turf for " + openingSeconds + " seconds.");
         }
         if (type == ArcadePortGame.DRAGON_ESCAPE) {
             setupDragonEscapeRaceScoreboard(session);
@@ -4474,12 +4539,15 @@ public final class ArcadePortManager implements Listener {
         if (now < session.turfPhaseEndsAt) return;
         session.turfCombat = !session.turfCombat;
         if (session.turfCombat) {
-            session.turfPhaseEndsAt = now + ArcadePortRules.TURF_WARS_COMBAT_PHASE_MILLIS;
-            announce(session, ChatColor.RED + "Combat phase! Kills advance your team's turf.");
+            session.turfPhaseEndsAt = now + ArcadePortRules.turfWarsCombatPhaseMillis(session.mixedArcadeVariant);
+            String gainLabel = session.mixedArcadeVariant ? "two blocks" : "one block";
+            announce(session, ChatColor.RED + "Combat phase! Kills advance your team's turf by " + gainLabel + ".");
         } else {
-            session.turfPhaseEndsAt = now + ArcadePortRules.TURF_WARS_BUILD_PHASE_MILLIS;
+            session.turfPhaseEndsAt = now + ArcadePortRules.turfWarsBuildPhaseMillis(session.mixedArcadeVariant);
             for (Player player : alivePlayers(session)) giveTurfWarsWool(session, player);
-            announce(session, ChatColor.GREEN + "Build phase! You have 20 seconds to reinforce your team's turf.");
+            long buildSeconds = ArcadePortRules.turfWarsBuildPhaseMillis(session.mixedArcadeVariant) / 1_000L;
+            announce(session, ChatColor.GREEN + "Build phase! You have " + buildSeconds
+                    + " seconds to reinforce your team's turf.");
         }
     }
 
@@ -7102,16 +7170,21 @@ public final class ArcadePortManager implements Listener {
         int team = session.teams.getOrDefault(attacker.getUniqueId(), -1);
         if (team != 0 && team != 1) return;
         int oldFrontline = session.turfFrontlineX;
-        int nextFrontline = ArcadePortRules.advanceTurfFrontline(oldFrontline, team);
-        int paintedX = team == 0 ? nextFrontline : oldFrontline;
+        int nextFrontline = ArcadePortRules.advanceTurfFrontline(
+                oldFrontline, team, session.mixedArcadeVariant);
         session.turfFrontlineX = nextFrontline;
         Material turf = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
-        for (int z = session.turfMinZ; z < session.turfMaxZExclusive; z++) {
-            session.world.getBlockAt(paintedX, session.turfFloorY, z).setType(turf, false);
-            for (int y = session.turfFloorY + 1; y <= session.turfFloorY + 5; y++) {
-                Block structure = session.world.getBlockAt(paintedX, y, z);
-                if (structure.getType() == Material.RED_WOOL || structure.getType() == Material.BLUE_WOOL) {
-                    structure.setType(Material.AIR, false);
+        List<Integer> capturedColumns = ArcadePortRules.turfWarsCapturedColumns(
+                oldFrontline, nextFrontline, team,
+                session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive);
+        for (int paintedX : capturedColumns) {
+            for (int z = session.turfMinZ; z < session.turfMaxZExclusive; z++) {
+                session.world.getBlockAt(paintedX, session.turfFloorY, z).setType(turf, false);
+                for (int y = session.turfFloorY + 1; y <= session.turfFloorY + 5; y++) {
+                    Block structure = session.world.getBlockAt(paintedX, y, z);
+                    if (structure.getType() == Material.RED_WOOL || structure.getType() == Material.BLUE_WOOL) {
+                        structure.setType(Material.AIR, false);
+                    }
                 }
             }
         }
@@ -8259,6 +8332,7 @@ public final class ArcadePortManager implements Listener {
             pendingStart.cancel();
             pendingStart = null;
             pendingType = null;
+            pendingMixedArcadeVariant = false;
         }
         Session stopping = active;
         List<Player> participantsToReturn = stopping == null
@@ -8274,7 +8348,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     public String status() {
-        String game = active == null ? "idle" : active.type.displayName() + " (" + active.alive.size() + "/" + active.participantsAtStart + " alive)";
+        String variant = active != null && active.mixedArcadeVariant ? " (Mixed Arcade)" : "";
+        String game = active == null ? "idle" : active.type.displayName() + variant
+                + " (" + active.alive.size() + "/" + active.participantsAtStart + " alive)";
         int queued = queues.values().stream().mapToInt(Map::size).sum();
         return game + "; queued=" + queued + "; cleared-games=" + enabledGamesLabel();
     }
@@ -11644,6 +11720,7 @@ public final class ArcadePortManager implements Listener {
         int baconKnockbackEscalations;
         long startedAt;
          boolean microBarrierActive;
+        final boolean mixedArcadeVariant;
         boolean turfCombat;
         long turfPhaseEndsAt;
         int turfFrontlineX = -1;
@@ -11656,10 +11733,11 @@ public final class ArcadePortManager implements Listener {
         long endsAt;
         int ticks;
         BukkitTask tickTask;
-        Session(ArcadePortGame type, World world, List<Player> participants) {
+        Session(ArcadePortGame type, World world, List<Player> participants, boolean mixedArcadeVariant) {
             this.type = type;
             this.world = world;
             this.participantsAtStart = participants.size();
+            this.mixedArcadeVariant = mixedArcadeVariant;
         }
     }
 
