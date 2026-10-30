@@ -86,6 +86,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         if (manager != null) manager.stop(reason == null ? "Monster Maze stopped" : reason);
     }
 
+    public boolean startMonsterMazeTournamentRound(java.util.List<Player> participants) {
+        return manager != null && manager.startMonsterMazeTournamentRound(participants);
+    }
+
     @Override
     public void onDisable() {
         if (manager != null) manager.shutdown();
