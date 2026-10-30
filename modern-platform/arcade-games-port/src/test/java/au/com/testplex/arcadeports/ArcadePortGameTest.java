@@ -18,6 +18,7 @@ class ArcadePortGameTest {
         assertEquals(java.util.List.of("Speef", "Super Spleef"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.SPLEEF));
         assertEquals(java.util.List.of("Turf Wars"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.TURF_WARS));
+        assertEquals(java.util.List.of("Skywars"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.SKY_WARS));
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.EVOLUTION).isEmpty(),
                 "Evolution has no legacy map archive folder and must not be given an invented one");
     }
@@ -28,9 +29,14 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.PAINTBALL, "source-maps/Super Paintball/SP_Arena.zip"));
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.SKY_WARS, "source-maps/Skywars/Skywars_Aquarius.zip"));
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.BACON_BRAWL, "maps/bacon-brawl.zip"),
                 "Pre-map-selector configurations using the legacy default resource remain valid");
 
+        assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.SKY_WARS, "source-maps/Bacon Brawl/BaconBrawl_Castle.zip"),
+                "SkyWars must not accept an archive from another game's folder");
         assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.BACON_BRAWL, "source-maps/Bomb Lobbers/Lobbers_Docks.zip"),
                 "A valid archive belonging to another game must not be accepted");
