@@ -151,7 +151,7 @@ jobs:
           source_dir="$RUNNER_TEMP/testplex-modern-artifact"
           stage_dir="$RUNNER_TEMP/testplex-modern-verified"
           mkdir -p "$stage_dir"
-          for jar in TestplexModernArcade.jar MonsterMazeModern.jar SnakeModern.jar ArcadeMechanicsModern.jar; do
+          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar; do
             matches="$(find "$source_dir" -type f -name "$jar" | wc -l | tr -d ' ')"
             [[ "$matches" == "1" ]] || { echo "Expected exactly one $jar in the selected artifact; got $matches." >&2; exit 1; }
             source_jar="$(find "$source_dir" -type f -name "$jar" -print -quit)"
@@ -160,7 +160,7 @@ jobs:
             cp "$source_jar" "$stage_dir/$jar"
           done
 
-          # These physical worlds are required by MonsterMazeModern's maps.yml.
+          # These physical worlds are required by the Monster Maze game module bundled inside ArcadeMechanicsModern.
           map_root="$GITHUB_WORKSPACE/monstermaze-source/solo/1.21/maps"
           map_source_sha="$(git -C "$GITHUB_WORKSPACE/monstermaze-source" rev-parse HEAD)"
           for world in mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido; do
@@ -173,7 +173,7 @@ jobs:
           tar -tzf "$stage_dir/MonsterMazeMaps.tar.gz" >/dev/null
           (cd "$stage_dir" && sha256sum *.jar MonsterMazeMaps.tar.gz MonsterMazeMapsSource.txt > SHA256SUMS)
           echo "stage_dir=$stage_dir" >> "$GITHUB_OUTPUT"
-          echo "Verified four modern JARs ($SOURCE_SHA) and seven Monster Maze source worlds ($map_source_sha)"
+          echo "Verified three Testplex Modern JARs ($SOURCE_SHA), with Monster Maze bundled in ArcadeMechanicsModern, and seven source worlds ($map_source_sha)"
 
       - name: Validate isolated target and automatically stop competing services
         id: remote-preflight
@@ -433,7 +433,7 @@ jobs:
 
           [[ "$BUILD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid source build SHA." >&2; exit 1; }
           [[ "$ACCEPT_EULA" == "true" ]] || { echo "Minecraft EULA acknowledgement missing." >&2; exit 1; }
-          for jar in TestplexModernArcade.jar MonsterMazeModern.jar SnakeModern.jar ArcadeMechanicsModern.jar; do
+          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar; do
             sudo -n test -s "$UPLOAD_DIR/$jar"
           done
           sudo -n test -s "$UPLOAD_DIR/MonsterMazeMaps.tar.gz"
@@ -530,18 +530,29 @@ jobs:
           done
 
           sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
-          # Install all four modern plugins, including SnakeModern with the three original Reborn map archives.
-          # The plugin startup check below must verify the same four artifacts that are installed here.
-          for jar in TestplexModernArcade.jar MonsterMazeModern.jar SnakeModern.jar ArcadeMechanicsModern.jar; do
+          # Install the three Bukkit plugins owned by the Testplex Modern server.
+          # Monster Maze gameplay is compiled into ArcadeMechanicsModern and is not a plugin of its own.
+          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar; do
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
           done
 
-          # This isolated acceptance instance must run Modern mode so QOL kit abilities (including Cryo Blitz) are available.
-          MM_CONFIG="$SERVER_DIR/plugins/MonsterMazeModern/config.yml"
-          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$SERVER_DIR/plugins/MonsterMazeModern"
-          if ! sudo -n test -f "$MM_CONFIG"; then
-            sudo -n unzip -p "$UPLOAD_DIR/MonsterMazeModern.jar" config.yml | sudo -n tee "$MM_CONFIG" >/dev/null
+          # Migrate the previous MonsterMazeModern plugin's persistent data into
+          # the Testplex-owned ArcadeMechanicsModern/monster-maze module folder.
+          # Copy is intentionally non-destructive: existing new-module files win,
+          # and the old data folder is retained as a backup.
+          MM_DATA_DIR="$SERVER_DIR/plugins/ArcadeMechanicsModern/monster-maze"
+          OLD_MM_DATA_DIR="$SERVER_DIR/plugins/MonsterMazeModern"
+          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$MM_DATA_DIR"
+          if sudo -n test -d "$OLD_MM_DATA_DIR"; then
+            sudo -n cp -an "$OLD_MM_DATA_DIR/." "$MM_DATA_DIR/"
           fi
+          MM_CONFIG="$MM_DATA_DIR/config.yml"
+          if ! sudo -n test -f "$MM_CONFIG"; then
+            sudo -n unzip -p "$UPLOAD_DIR/ArcadeMechanicsModern.jar" monster-maze/config.yml | sudo -n tee "$MM_CONFIG" >/dev/null
+          fi
+          # Retire the obsolete standalone entry point so Paper cannot load two
+          # owners for Monster Maze on the next restart.
+          sudo -n rm -f "$SERVER_DIR/plugins/MonsterMazeModern.jar"
           set_mm_config() {
             key="$1"
             value="$2"
@@ -712,15 +723,15 @@ jobs:
             rollback
             exit 1
           fi
-          for plugin in TestplexModernArcade MonsterMazeModern SnakeModern ArcadeMechanicsModern; do
+          for plugin in TestplexModernArcade SnakeModern ArcadeMechanicsModern; do
             if ! sudo -n grep -Fq "$plugin" "$SERVER_DIR/logs/latest.log"; then
               echo "Expected plugin name $plugin not found in the modern server log." >&2
               rollback
               exit 1
             fi
           done
-          if ! sudo -n grep -Fq 'MonsterMazeStandalone enabled.' "$SERVER_DIR/logs/latest.log"; then
-            echo "MonsterMazeModern did not complete onEnable; collecting diagnostics before rollback." >&2
+          if ! sudo -n grep -Fq 'Monster Maze game module registered with Testplex Arcade.' "$SERVER_DIR/logs/latest.log"; then
+            echo "Monster Maze did not register inside Testplex Arcade; collecting diagnostics before rollback." >&2
             echo "===== Modern service status =====" >&2
             sudo -n systemctl status --no-pager --full testplex-modern.service >&2 || true
             echo "===== Recent Paper log lines (Monster Maze, errors and exceptions) =====" >&2
@@ -732,7 +743,7 @@ jobs:
             echo "===== Host memory and OOM diagnostics =====" >&2
             free -h >&2 || true
             sudo -n dmesg -T 2>/dev/null | grep -i -E 'out of memory|oom|killed process|java' | tail -n 40 >&2 || true
-            echo "MonsterMazeModern did not complete onEnable; rolling back the modern-only deployment." >&2
+            echo "Monster Maze did not register inside Testplex Arcade; rolling back the modern-only deployment." >&2
             rollback
             exit 1
           fi
@@ -742,7 +753,7 @@ jobs:
             exit 1
           fi
           sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR"
-          echo "Modern Paper 26.3 is ready with Monster Maze, Snake, and the eight approved Arcade candidates available for in-game acceptance; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
+          echo "Modern Paper 26.3 is ready with Monster Maze hosted by Testplex Arcade, Snake, and the approved Arcade candidates available for in-game acceptance; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "Legacy services were not stopped, restarted, or overwritten by this workflow."
           REMOTE_DEPLOY
 
