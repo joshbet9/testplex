@@ -4116,6 +4116,23 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private boolean isSkyWarsKitItem(Session session, UUID ownerId, ItemStack item) {
+        if (session == null || session.type != ArcadePortGame.SKY_WARS
+                || ownerId == null || item == null || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null || !meta.hasDisplayName()) return false;
+        String name = ChatColor.stripColor(meta.getDisplayName());
+        String kit = session.skyWarsKits.getOrDefault(ownerId, "ice");
+        return switch (kit) {
+            case "ice" -> "Ice Bridge".equals(name);
+            case "fire" -> "Fire Burst".equals(name);
+            case "air" -> "Void Saver".equals(name);
+            case "metal" -> "Magnet".equals(name);
+            case "earth" -> "Throwable Dirt".equals(name);
+            default -> false;
+        };
+    }
+
     private boolean isSkyWarsTrackingCompass(ItemStack item) {
         if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
         ItemMeta meta = item.getItemMeta();
@@ -4589,7 +4606,8 @@ public final class ArcadePortManager implements Listener {
     private void dropSkyWarsInventory(Player player) {
         Location location = player.getLocation();
         for (ItemStack item : player.getInventory().getContents()) {
-            if (item != null && !item.getType().isAir() && !isSkyWarsTrackingCompass(item)) {
+            if (item != null && !item.getType().isAir() && !isSkyWarsTrackingCompass(item)
+                    && !isSkyWarsKitItem(active, player.getUniqueId(), item)) {
                 location.getWorld().dropItemNaturally(location, item.clone());
             }
         }
@@ -11944,8 +11962,10 @@ public final class ArcadePortManager implements Listener {
                     || placedType == Material.HOPPER || placedType == Material.TNT
                     || placedType == Material.BEDROCK || placedType == Material.BARRIER
                     || placedType.name().contains("COMMAND_BLOCK");
+            boolean protectedKitItem = isSkyWarsKitItem(session, player.getUniqueId(), event.getItemInHand());
             boolean allowed = session.alive.contains(player.getUniqueId()) && session.skyWarsLive
-                    && event.getBlockPlaced().getY() < session.world.getMaxHeight() - 2 && !specialBlock;
+                    && event.getBlockPlaced().getY() < session.world.getMaxHeight() - 2
+                    && !specialBlock && !protectedKitItem;
             if (!allowed) {
                 event.setCancelled(true);
             } else {
@@ -12101,7 +12121,9 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || !session.players.containsKey(event.getPlayer().getUniqueId())) return;
         if (session.type != ArcadePortGame.SKY_WARS
-                || isSkyWarsTrackingCompass(event.getItemDrop().getItemStack())) {
+                || isSkyWarsTrackingCompass(event.getItemDrop().getItemStack())
+                || isSkyWarsKitItem(session, event.getPlayer().getUniqueId(),
+                        event.getItemDrop().getItemStack())) {
             event.setCancelled(true);
         }
     }
@@ -12140,6 +12162,35 @@ public final class ArcadePortManager implements Listener {
                 || !(event.getWhoClicked() instanceof Player player)
                 || !session.players.containsKey(player.getUniqueId())) return;
         if (isDragonProtectedKitItem(event.getOldCursor())) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSkyWarsKitItemMove(InventoryClickEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SKY_WARS
+                || !(event.getWhoClicked() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())) return;
+        ItemStack hotbarSwap = null;
+        int button = event.getHotbarButton();
+        if (button >= 0) hotbarSwap = player.getInventory().getItem(button);
+        if (isSkyWarsKitItem(session, player.getUniqueId(), event.getCurrentItem())
+                || isSkyWarsKitItem(session, player.getUniqueId(), event.getCursor())
+                || isSkyWarsKitItem(session, player.getUniqueId(), hotbarSwap)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSkyWarsKitItemDrag(InventoryDragEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SKY_WARS
+                || !(event.getWhoClicked() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())) return;
+        if (isSkyWarsKitItem(session, player.getUniqueId(), event.getOldCursor())
+                || event.getNewItems().values().stream()
+                        .anyMatch(item -> isSkyWarsKitItem(session, player.getUniqueId(), item))) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler
