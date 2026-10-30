@@ -15,8 +15,8 @@ class WizardsSpellTest {
     }
 
     @Test
-    void firstMilestoneOnlyExposesImplementedSpellEffectsToLoot() {
-        assertEquals(15, WizardsSpell.implementedSpells().size());
+    void allTwentyOneOriginalSpellEffectsAreImplementedAndLootable() {
+        assertEquals(21, WizardsSpell.implementedSpells().size());
         assertTrue(WizardsSpell.MANA_BOLT.implemented());
         assertTrue(WizardsSpell.FIREBALL.implemented());
         assertTrue(WizardsSpell.HEAL.implemented());
@@ -25,12 +25,12 @@ class WizardsSpellTest {
         assertTrue(WizardsSpell.SPECTRAL_ARROW.implemented());
         assertTrue(WizardsSpell.SUMMON_WOLVES.implemented());
         assertTrue(WizardsSpell.WEB_SHOT.implemented());
-        assertFalse(WizardsSpell.IMPLODE.implemented());
-        assertFalse(WizardsSpell.NAPALM.implemented());
-        assertFalse(WizardsSpell.RAINBOW_BEAM.implemented());
-        assertFalse(WizardsSpell.RAINBOW_ROAD.implemented());
-        assertFalse(WizardsSpell.RUMBLE.implemented());
-        assertFalse(WizardsSpell.TRAP_RUNE.implemented());
+        assertTrue(WizardsSpell.IMPLODE.implemented());
+        assertTrue(WizardsSpell.NAPALM.implemented());
+        assertTrue(WizardsSpell.RAINBOW_BEAM.implemented());
+        assertTrue(WizardsSpell.RAINBOW_ROAD.implemented());
+        assertTrue(WizardsSpell.RUMBLE.implemented());
+        assertTrue(WizardsSpell.TRAP_RUNE.implemented());
     }
 
     @Test
@@ -51,8 +51,15 @@ class WizardsSpellTest {
     }
 
     @Test
-    void spellFormulasUseSourceMinimumsAndSupportLateGameSurges() {
+    void everySpellUsesItsOriginalManaAndCooldownProgression() {
         assertEquals(60, WizardsSpell.NAPALM.manaCost(1));
+        assertEquals(80, WizardsSpell.SUMMON_WOLVES.manaCost(1));
+        assertEquals(70, WizardsSpell.SUMMON_WOLVES.manaCost(2));
+        assertEquals(35, WizardsSpell.WEB_SHOT.manaCost(2));
+        assertEquals(25, WizardsSpell.TRAP_RUNE.cooldownSeconds(2, 1.0D));
+        assertEquals(8, WizardsSpell.RAINBOW_BEAM.cooldownSeconds(1, 1.0D));
+        assertEquals(9, WizardsSpell.RAINBOW_BEAM.cooldownSeconds(2, 1.0D));
+        assertEquals(20, WizardsSpell.RAINBOW_ROAD.cooldownSeconds(3, 0.5D));
         assertEquals(2, WizardsSpell.NAPALM.cooldownSeconds(5, 0.1D));
         assertEquals(0, WizardsSpell.NAPALM.manaCost(1, 0.0D));
         assertEquals(0, WizardsSpell.RAINBOW_BEAM.cooldownSeconds(1, 0.0D));

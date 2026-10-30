@@ -25,6 +25,7 @@ import org.bukkit.entity.Arrow;
 import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Wolf;
 import org.bukkit.entity.Fireball;
+import org.bukkit.block.TileState;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
@@ -56,6 +57,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
@@ -95,6 +97,9 @@ public final class WizardsGameManager implements Listener {
     private final Set<UUID> ownedEntities = new HashSet<>();
     private final Map<UUID, SpectralArrowData> spectralArrows = new HashMap<>();
     private final Map<UUID, SummonedWolfData> summonedWolves = new HashMap<>();
+    private final Map<UUID, ManaBoltData> manaBolts = new HashMap<>();
+    private final List<TrapRuneData> trapRunes = new ArrayList<>();
+    private final List<BukkitTask> spellTasks = new ArrayList<>();
     private final List<Location> chests = new ArrayList<>();
     private final Random random = new Random();
 
@@ -360,6 +365,9 @@ public final class WizardsGameManager implements Listener {
         tick++;
         tickSpectralArrows();
         tickSummonedWolves();
+        tickManaBolts();
+        tickTrapRunes();
+        expireTemporaryBlocks();
         long elapsed = System.currentTimeMillis() - startedAt;
 
         while (paceStep < WizardsRules.GAME_PACE_MINUTES.length
@@ -693,6 +701,11 @@ public final class WizardsGameManager implements Listener {
         if (event.getDamager() instanceof Projectile projectile) {
             String projectileSpell = projectile.getPersistentDataContainer().get(projectileKey, PersistentDataType.STRING);
             if (projectileSpell != null && event.getEntity() instanceof Player victim) {
+                String ownerId = projectile.getPersistentDataContainer().get(projectileOwnerKey, PersistentDataType.STRING);
+                if (ownerId != null && ownerId.equals(victim.getUniqueId().toString())) {
+                    event.setCancelled(true);
+                    return;
+                }
                 if ("web-shot".equals(projectileSpell)) {
                     event.setCancelled(true);
                     return;
@@ -701,7 +714,7 @@ public final class WizardsGameManager implements Listener {
                     SpectralArrowData data = spectralArrows.remove(projectile.getUniqueId());
                     if (data != null) {
                         double distance = data.origin.distance(victim.getLocation());
-                        event.setDamage(6.0D + distance / Math.max(1.0D, 7.0D - data.level));
+                        event.setDamage(3.0D + distance / Math.max(1.0D, 7.0D - data.level));
                     }
                 } else {
                     Double damage = projectile.getPersistentDataContainer().get(projectileDamageKey, PersistentDataType.DOUBLE);
@@ -743,9 +756,26 @@ public final class WizardsGameManager implements Listener {
         } else if ("spectral-arrow".equals(spell)) {
             spectralArrows.remove(projectile.getUniqueId());
             location.getWorld().spawnParticle(Particle.ELECTRIC_SPARK, location, 14, 0.25D, 0.25D, 0.25D, 0.04D);
+        } else if ("mana-bolt".equals(spell)) {
+            manaBolts.remove(projectile.getUniqueId());
+            location.getWorld().spawnParticle(Particle.END_ROD, location, 24, 0.45D, 0.45D, 0.45D, 0.12D);
+            location.getWorld().playSound(location, Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 0.7F);
         } else if ("fireball".equals(spell)) {
-            location.getWorld().spawnParticle(Particle.FLAME, location, 18, 0.4D, 0.4D, 0.4D, 0.02D);
-            location.getWorld().playSound(location, Sound.ENTITY_BLAZE_HURT, 0.5F, 1.4F);
+            String ownerId = projectile.getPersistentDataContainer().get(projectileOwnerKey, PersistentDataType.STRING);
+            Player owner = ownerId == null ? null : Bukkit.getPlayer(UUID.fromString(ownerId));
+            Double damage = projectile.getPersistentDataContainer().get(projectileDamageKey, PersistentDataType.DOUBLE);
+            for (Player victim : alivePlayers()) {
+                if (owner == null || victim.equals(owner) || !victim.getWorld().equals(location.getWorld())) continue;
+                double distance = victim.getLocation().distance(location);
+                if (distance <= 4.5D) {
+                    double scaledDamage = (damage == null ? 6.0D : damage) * Math.max(0.2D, 1.0D - distance / 5.0D);
+                    victim.damage(scaledDamage, owner);
+                    victim.setFireTicks(Math.max(victim.getFireTicks(), 40 + (int) (damage == null ? 0 : damage * 10)));
+                }
+            }
+            location.getWorld().spawnParticle(Particle.FLAME, location, 32, 0.6D, 0.6D, 0.6D, 0.04D);
+            location.getWorld().spawnParticle(Particle.LAVA, location, 8, 0.35D, 0.35D, 0.35D, 0.0D);
+            location.getWorld().playSound(location, Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 1.1F);
         } else if ("anvil-drop".equals(spell)) {
             handleAnvilImpact(projectile);
         } else {
@@ -1025,6 +1055,114 @@ public final class WizardsGameManager implements Listener {
         Location origin = caster.getEyeLocation();
         Vector direction = origin.getDirection().normalize();
         switch (spell) {
+            case IMPLODE: {
+                Block target = caster.getTargetBlockExact(50);
+                if (target == null) {
+                    caster.sendMessage(ChatColor.RED + "Implode needs a block to target within 50 blocks.");
+                    return false;
+                }
+                Location centre = target.getLocation().add(0.5D, 0.5D, 0.5D);
+                int size = (int) (1.5F + level * 0.7F);
+                int radius = size * 2;
+                List<Block> affected = new ArrayList<>();
+                for (int x = -radius; x <= radius; x++) {
+                    for (int y = -radius; y <= radius; y++) {
+                        for (int z = -radius; z <= radius; z++) {
+                            Block block = target.getRelative(x, y, z);
+                            if (block.getType().isAir() || block.getType() == Material.BEDROCK
+                                    || block.getState() instanceof InventoryHolder || block.getState() instanceof TileState) continue;
+                            Location blockCentre = block.getLocation().add(0.5D, 0.5D, 0.5D);
+                            if (centre.distance(blockCentre) + Math.abs(y / 4.0D) <= radius + 0.5D) affected.add(block);
+                        }
+                    }
+                }
+                if (affected.isEmpty()) {
+                    caster.sendMessage(ChatColor.GRAY + "There is nothing for Implode to gather at that location.");
+                    return false;
+                }
+                java.util.Collections.shuffle(affected, random);
+                for (int i = 0; i < affected.size(); i++) {
+                    Block block = affected.get(i);
+                    if (i % 3 == 0) {
+                        block.getWorld().spawnParticle(Particle.BLOCK, block.getLocation().add(0.5D, 0.5D, 0.5D),
+                                5, 0.22D, 0.22D, 0.22D, 0.04D, block.getBlockData());
+                    }
+                }
+                caster.getWorld().playSound(centre, Sound.BLOCK_BEACON_DEACTIVATE, 1.2F, 0.5F);
+                for (Player victim : alivePlayers()) {
+                    if (victim.equals(caster) || !victim.getWorld().equals(centre.getWorld())) continue;
+                    double distance = victim.getLocation().distance(centre);
+                    if (distance <= radius + 2.0D) {
+                        Vector pull = centre.toVector().subtract(victim.getLocation().toVector());
+                        pull.normalize().multiply(Math.max(0.25D, 1.15D - distance / (radius + 2.0D)));
+                        pull.setY(Math.max(0.15D, pull.getY() + 0.25D));
+                        victim.setVelocity(pull);
+                    }
+                }
+                scheduleSpellLater(() -> {
+                    if (!running) return;
+                    if (plugin.getConfig().getBoolean("destructive-spells", false)) {
+                        for (Block block : affected) {
+                            if (!block.getType().isAir() && block.getType() != Material.BEDROCK
+                                    && !(block.getState() instanceof InventoryHolder) && !(block.getState() instanceof TileState)) {
+                                block.setType(Material.AIR, false);
+                            }
+                        }
+                    }
+                    centre.getWorld().spawnParticle(Particle.EXPLOSION, centre, 2 + level, 0.8D, 0.8D, 0.8D, 0.08D);
+                    centre.getWorld().spawnParticle(Particle.CLOUD, centre, 40, radius / 3.0D, 1.0D, radius / 3.0D, 0.12D);
+                    centre.getWorld().playSound(centre, Sound.ENTITY_GENERIC_EXPLODE, 1.3F, 0.7F);
+                    for (Player victim : alivePlayers()) {
+                        if (victim.equals(caster) || !victim.getWorld().equals(centre.getWorld())) continue;
+                        double distance = victim.getLocation().distance(centre);
+                        if (distance <= radius + 2.0D) {
+                            victim.damage(Math.max(1.0D, (2.0D + level * 2.0D) * (1.0D - distance / (radius + 3.0D))), caster);
+                            Vector push = victim.getLocation().toVector().subtract(centre.toVector());
+                            if (push.lengthSquared() > 0.001D) victim.setVelocity(push.normalize().multiply(0.65D).setY(0.35D));
+                        }
+                    }
+                }, 20L);
+                return true;
+            }
+            case NAPALM: {
+                launchNapalm(caster, level);
+                return true;
+            }
+            case RAINBOW_BEAM: {
+                Player victim = directTarget instanceof Player direct && !direct.equals(caster)
+                        ? direct : findTargetPlayer(caster, 80.0D);
+                Block aimed = caster.getTargetBlockExact(80);
+                Location end;
+                if (victim != null) {
+                    end = victim.getEyeLocation();
+                    double distance = caster.getEyeLocation().distance(end);
+                    double damage = (level * 2.0D) + 2.0D;
+                    if (distance > 16.0D) damage = Math.max(1.0D, damage * (1.0D - (distance - 16.0D) / 64.0D));
+                    victim.damage(damage, caster);
+                    victim.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, victim.getLocation().add(0.0D, 1.0D, 0.0D),
+                            18, 0.35D, 0.45D, 0.35D, 0.08D);
+                    victim.getWorld().playSound(victim.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0F, 1.2F);
+                } else if (aimed != null) {
+                    end = aimed.getLocation().add(0.5D, 0.5D, 0.5D);
+                } else {
+                    caster.sendMessage(ChatColor.RED + "Rainbow Beam needs a target within 80 blocks.");
+                    return false;
+                }
+                drawRainbowBeam(caster.getEyeLocation().clone().subtract(0.0D, 0.1D, 0.0D), end);
+                caster.playSound(caster.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.2F, 1.0F);
+                return true;
+            }
+            case RAINBOW_ROAD: {
+                launchRainbowRoad(caster, level);
+                return true;
+            }
+            case RUMBLE: {
+                launchRumble(caster, level);
+                return true;
+            }
+            case TRAP_RUNE: {
+                return placeTrapRune(caster, level, clickedBlock);
+            }
             case ANVIL_DROP: {
                 int radius = 4 + level * 2;
                 List<Player> targets = new ArrayList<>();
@@ -1064,12 +1202,12 @@ public final class WizardsGameManager implements Listener {
                 return true;
             }
             case ICE_SHARDS: {
-                launchIceShard(caster, 4);
+                launchIceShard(caster, 2.0D);
                 for (int i = 1; i <= level; i++) {
                     final Player shooter = caster;
                     Bukkit.getScheduler().runTaskLater(plugin, () -> {
                         WizardState current = states.get(shooter.getUniqueId());
-                        if (running && current != null && current.alive && shooter.isOnline()) launchIceShard(shooter, 4);
+                        if (running && current != null && current.alive && shooter.isOnline()) launchIceShard(shooter, 2.0D);
                     }, i * 5L);
                 }
                 return true;
@@ -1078,6 +1216,7 @@ public final class WizardsGameManager implements Listener {
                 Arrow arrow = caster.launchProjectile(Arrow.class);
                 arrow.setVelocity(arrow.getVelocity().multiply(2.3D));
                 arrow.getPersistentDataContainer().set(projectileKey, PersistentDataType.STRING, spell.id());
+                arrow.getPersistentDataContainer().set(projectileOwnerKey, PersistentDataType.STRING, caster.getUniqueId().toString());
                 spectralArrows.put(arrow.getUniqueId(), new SpectralArrowData(caster.getUniqueId(), level,
                         caster.getLocation().clone(), arrow.getLocation().clone()));
                 ownedEntities.add(arrow.getUniqueId());
@@ -1133,8 +1272,13 @@ public final class WizardsGameManager implements Listener {
                 }
                 projectile.setVelocity(direction.multiply(spell == WizardsSpell.MANA_BOLT ? 1.8D : 1.35D));
                 projectile.getPersistentDataContainer().set(projectileKey, PersistentDataType.STRING, spell.id());
-                double damage = spell == WizardsSpell.MANA_BOLT ? level + 2.0D : level + 3.0D;
+                projectile.getPersistentDataContainer().set(projectileOwnerKey, PersistentDataType.STRING, caster.getUniqueId().toString());
+                projectile.getPersistentDataContainer().set(anvilLevelKey, PersistentDataType.INTEGER, level);
+                double damage = spell == WizardsSpell.MANA_BOLT ? 4.0D + level * 2.0D : level + 6.0D;
                 projectile.getPersistentDataContainer().set(projectileDamageKey, PersistentDataType.DOUBLE, damage);
+                if (spell == WizardsSpell.MANA_BOLT) {
+                    manaBolts.put(projectile.getUniqueId(), new ManaBoltData(caster.getUniqueId(), level, caster.getLocation().clone()));
+                }
                 ownedEntities.add(projectile.getUniqueId());
                 caster.getWorld().spawnParticle(spell == WizardsSpell.MANA_BOLT ? Particle.END_ROD : Particle.FLAME,
                         origin.add(direction.clone().multiply(1.2D)), 5, 0.08, 0.08, 0.08, 0.01);
@@ -1200,7 +1344,7 @@ public final class WizardsGameManager implements Listener {
             case HEAL: {
                 double maximum = caster.getAttribute(Attribute.MAX_HEALTH) == null
                         ? 20.0D : caster.getAttribute(Attribute.MAX_HEALTH).getValue();
-                double heal = 2.0D + (level * 0.5D);
+                double heal = 3.0D + level;
                 if (caster.getHealth() >= maximum) {
                     caster.sendMessage(ChatColor.YELLOW + "You are already at full health.");
                     return false;
@@ -1243,15 +1387,15 @@ public final class WizardsGameManager implements Listener {
                 caster.getWorld().strikeLightningEffect(strike);
                 for (Entity entity : caster.getWorld().getNearbyEntities(strike, 2.8D, 3.0D, 2.8D)) {
                     if (entity instanceof Player target && !target.equals(caster)) {
-                        target.damage(2.0D + level * 2.0D, caster);
+                        target.damage(2.0D + level * 4.0D, caster);
                     }
                 }
                 caster.getWorld().spawnParticle(Particle.ELECTRIC_SPARK, strike, 20, 0.6, 1.0, 0.6, 0.1);
                 return true;
             }
             case SPEED_BOOST: {
-                caster.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, (6 + level * 2) * 20,
-                        Math.max(0, level - 1), true, true, true));
+                caster.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 20 * 20,
+                        level, true, true, true));
                 caster.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, caster.getLocation().add(0, 1, 0), 12, 0.4, 0.5, 0.4, 0.05);
                 caster.getWorld().playSound(caster.getLocation(), Sound.ENTITY_BREEZE_JUMP, 0.8F, 1.4F);
                 return true;
@@ -1271,6 +1415,338 @@ public final class WizardsGameManager implements Listener {
             }
             default:
                 return false;
+        }
+    }
+
+    private void scheduleSpellLater(Runnable action, long delayTicks) {
+        spellTasks.add(Bukkit.getScheduler().runTaskLater(plugin, action, delayTicks));
+    }
+
+    private void scheduleSpellTask(BukkitRunnable runnable, long delayTicks, long periodTicks) {
+        spellTasks.add(runnable.runTaskTimer(plugin, delayTicks, periodTicks));
+    }
+
+    private void launchNapalm(Player caster, int level) {
+        if (states.get(caster.getUniqueId()) == null) return;
+        final Location napalm = caster.getEyeLocation().add(0.0D, 0.5D, 0.0D)
+                .add(caster.getEyeLocation().getDirection().normalize().multiply(2.0D));
+        final Vector step = caster.getEyeLocation().getDirection().normalize().multiply(0.15D);
+        final int maximumLength = 5 + 10 * level;
+        scheduleSpellTask(new BukkitRunnable() {
+            private int ticks;
+            private double travelled;
+            private double size = 1.0D;
+
+            @Override public void run() {
+                WizardState state = states.get(caster.getUniqueId());
+                if (!running || !caster.isOnline() || state == null || !state.alive || travelled >= maximumLength) {
+                    cancel();
+                    return;
+                }
+                napalm.add(step);
+                travelled += 0.15D;
+                ticks++;
+                size = Math.min(8.0D, size + 0.06D);
+                if (!napalm.getBlock().isPassable()) {
+                    cancel();
+                    return;
+                }
+
+                napalm.getWorld().spawnParticle(Particle.FLAME, napalm, Math.min(35, 8 + (int) (size * 3)),
+                        size / 5.0D, size / 5.0D, size / 5.0D, 0.025D);
+                napalm.getWorld().spawnParticle(Particle.SMOKE, napalm, 4 + (int) size,
+                        size / 7.0D, size / 7.0D, size / 7.0D, 0.01D);
+
+                double heatRadius = size * 1.1D;
+                for (Player victim : alivePlayers()) {
+                    if (victim.equals(caster) || !victim.getWorld().equals(napalm.getWorld())) continue;
+                    double heat = heatRadius - victim.getLocation().distance(napalm);
+                    if (heat <= 0.0D) continue;
+                    victim.setFireTicks(Math.max(victim.getFireTicks(), (int) (heat * 40.0D)));
+                    if (ticks % 10 == 0) victim.damage(Math.max(0.5D, heat / 1.5D), caster);
+                }
+
+                // Legacy Napalm can destroy blocks; modern test arenas instead get reversible flame.
+                if (ticks % 3 == 0 && plugin.getConfig().getBoolean("temporary-spell-fire", true)) {
+                    int radius = Math.max(1, (int) Math.ceil(size * 0.75D));
+                    for (int attempts = 0; attempts < 3; attempts++) {
+                        int x = random.nextInt(radius * 2 + 1) - radius;
+                        int y = random.nextInt(radius * 2 + 1) - radius;
+                        int z = random.nextInt(radius * 2 + 1) - radius;
+                        Block fire = napalm.clone().add(x, y, z).getBlock();
+                        if (fire.getType().isAir() && fire.getRelative(org.bukkit.block.BlockFace.DOWN).getType().isSolid()) {
+                            setTemporaryBlock(fire.getLocation(), Material.FIRE, 60L);
+                        }
+                    }
+                }
+                if (ticks % 8 == 0) napalm.getWorld().playSound(napalm, Sound.ENTITY_BLAZE_SHOOT,
+                        0.65F, 0.7F + (float) size / 12.0F);
+            }
+        }, 0L, 1L);
+    }
+
+    private void drawRainbowBeam(Location start, Location end) {
+        Vector delta = end.toVector().subtract(start.toVector());
+        double distance = delta.length();
+        int points = Math.max(1, (int) Math.ceil(distance / 0.3D));
+        Vector step = delta.multiply(1.0D / points);
+        for (int i = 0; i <= points; i++) {
+            Location point = start.clone().add(step.clone().multiply(i));
+            point.getWorld().spawnParticle(i % 2 == 0 ? Particle.END_ROD : Particle.HAPPY_VILLAGER,
+                    point, 1, 0.015D, 0.015D, 0.015D, 0.0D);
+        }
+    }
+
+    private void launchRainbowRoad(Player caster, int level) {
+        final Vector look = caster.getLocation().getDirection();
+        final Vector horizontal = look.clone().setY(0.0D);
+        if (horizontal.lengthSquared() < 0.001D) horizontal.setZ(1.0D);
+        horizontal.normalize();
+        final Vector side = new Vector(-horizontal.getZ(), 0.0D, horizontal.getX());
+        final double verticalStep = Math.max(-1.0D, Math.min(1.0D, -caster.getLocation().getPitch() / 30.0D));
+        final Location cursor = caster.getLocation().getBlock().getRelative(org.bukkit.block.BlockFace.DOWN).getLocation()
+                .add(0.5D, 0.0D, 0.5D);
+        final Material[] rainbow = {
+                Material.RED_STAINED_GLASS, Material.ORANGE_STAINED_GLASS, Material.YELLOW_STAINED_GLASS,
+                Material.LIME_STAINED_GLASS, Material.GREEN_STAINED_GLASS, Material.CYAN_STAINED_GLASS,
+                Material.LIGHT_BLUE_STAINED_GLASS, Material.BLUE_STAINED_GLASS, Material.PURPLE_STAINED_GLASS,
+                Material.MAGENTA_STAINED_GLASS, Material.PINK_STAINED_GLASS
+        };
+        final int maximumSteps = 3 + 10 * level;
+        scheduleSpellTask(new BukkitRunnable() {
+            private int steps;
+            private int colourIndex;
+
+            @Override public void run() {
+                WizardState state = states.get(caster.getUniqueId());
+                if (!running || !caster.isOnline() || state == null || !state.alive || steps++ >= maximumSteps) {
+                    cancel();
+                    return;
+                }
+                for (int width = -1; width <= 1; width++) {
+                    Location tile = cursor.clone().add(side.clone().multiply(width));
+                    Material colour = rainbow[colourIndex++ % rainbow.length];
+                    if (setTemporaryBlock(tile, colour, 280L + random.nextInt(120), true)) {
+                        tile.getWorld().spawnParticle(Particle.END_ROD, tile.clone().add(0.5D, 1.0D, 0.5D),
+                                3, 0.18D, 0.08D, 0.18D, 0.015D);
+                        tile.getWorld().playSound(tile, Sound.BLOCK_GLASS_PLACE, 0.25F,
+                                1.4F + (colourIndex % 5) * 0.1F);
+                    }
+                }
+                cursor.add(horizontal).add(0.0D, verticalStep, 0.0D);
+            }
+        }, 5L, 5L);
+    }
+
+    private void launchRumble(Player caster, int level) {
+        final Vector direction = caster.getLocation().getDirection().setY(0.0D);
+        if (direction.lengthSquared() < 0.001D) direction.setZ(1.0D);
+        direction.normalize();
+        Block start = caster.getLocation().getBlock().getRelative(org.bukkit.block.BlockFace.DOWN);
+        if (!start.getType().isSolid()) start = start.getRelative(org.bukkit.block.BlockFace.DOWN);
+        final Block initial = start;
+        scheduleSpellTask(new BukkitRunnable() {
+            private Block current = initial;
+            private int travelled;
+            private final Set<UUID> hit = new HashSet<>();
+
+            @Override public void run() {
+                WizardState state = states.get(caster.getUniqueId());
+                if (!running || !caster.isOnline() || state == null || !state.alive || travelled >= 10 * level) {
+                    finishRumble(caster, current.getLocation().add(0.5D, 0.5D, 0.5D), level);
+                    cancel();
+                    return;
+                }
+                Block next = findRumbleGround(current, direction);
+                if (next == null) {
+                    finishRumble(caster, current.getLocation().add(0.5D, 0.5D, 0.5D), level);
+                    cancel();
+                    return;
+                }
+                current = next;
+                travelled++;
+                Location wave = current.getLocation().add(0.5D, 0.75D, 0.5D);
+                wave.getWorld().spawnParticle(Particle.BLOCK, wave, 10, 0.35D, 0.12D, 0.35D, 0.04D, current.getBlockData());
+                wave.getWorld().spawnParticle(Particle.CLOUD, wave, 8, 0.35D, 0.08D, 0.35D, 0.025D);
+                wave.getWorld().playSound(wave, Sound.BLOCK_STONE_BREAK, 0.35F, 0.6F + random.nextFloat() * 0.3F);
+
+                for (Player victim : alivePlayers()) {
+                    if (victim.equals(caster) || hit.contains(victim.getUniqueId())
+                            || !victim.getWorld().equals(wave.getWorld())) continue;
+                    Location feet = victim.getLocation();
+                    if (feet.getBlockX() == current.getX() && feet.getBlockZ() == current.getZ()
+                            && feet.getY() >= current.getY() && feet.getY() <= current.getY() + 3.0D) {
+                        hit.add(victim.getUniqueId());
+                        victim.damage(4.0D + level * 2.0D, caster);
+                        victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60,
+                                Math.max(0, level - 1), true, true, true));
+                        victim.setVelocity(direction.clone().multiply(0.45D).setY(0.28D));
+                    }
+                }
+            }
+        }, 5L, 1L);
+    }
+
+    private Block findRumbleGround(Block current, Vector direction) {
+        int x = (int) Math.floor(current.getX() + direction.getX() + 0.5D);
+        int z = (int) Math.floor(current.getZ() + direction.getZ() + 0.5D);
+        for (int y : new int[]{0, 1, -1, -2}) {
+            Block candidate = current.getWorld().getBlockAt(x, current.getY() + y, z);
+            if (candidate.getY() <= 0) continue;
+            if (candidate.getType().isSolid() && candidate.getRelative(org.bukkit.block.BlockFace.UP).isPassable()) return candidate;
+        }
+        return null;
+    }
+
+    private void finishRumble(Player caster, Location centre, int level) {
+        if (centre.getWorld() == null) return;
+        double radius = 2.0D + level * 0.5D;
+        centre.getWorld().spawnParticle(Particle.EXPLOSION, centre, 1, 0.3D, 0.2D, 0.3D, 0.0D);
+        centre.getWorld().spawnParticle(Particle.CLOUD, centre, 28, radius / 2.0D, 0.25D, radius / 2.0D, 0.08D);
+        centre.getWorld().playSound(centre, Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 0.65F);
+        for (Player victim : alivePlayers()) {
+            if (victim.equals(caster) || !victim.getWorld().equals(centre.getWorld())) continue;
+            double distance = victim.getLocation().distance(centre);
+            if (distance >= 2.0D) continue;
+            double damage = (1.0D + level / 5.0D) * (2.0D - distance);
+            victim.damage(damage, caster);
+            Vector push = victim.getLocation().toVector().subtract(centre.toVector());
+            if (push.lengthSquared() > 0.001D) victim.setVelocity(push.normalize().multiply(0.8D).setY(0.38D));
+        }
+    }
+
+    private boolean placeTrapRune(Player caster, int level, Block clickedBlock) {
+        Block target = clickedBlock != null ? clickedBlock : caster.getTargetBlockExact(level * 4 + 4);
+        if (target == null || !target.getType().isSolid()) {
+            caster.sendMessage(ChatColor.RED + "Trap Rune needs a solid floor within " + (level * 4 + 4) + " blocks.");
+            return false;
+        }
+        Location centre = target.getLocation().add(0.5D, 1.0D, 0.5D);
+        if (!centre.getBlock().isPassable()) {
+            caster.sendMessage(ChatColor.RED + "Trap Rune cannot be drawn on that surface.");
+            return false;
+        }
+        double size = Math.max(1.0D, level * 0.8D);
+        trapRunes.add(new TrapRuneData(caster.getUniqueId(), centre, level, size, System.currentTimeMillis()));
+        caster.getWorld().playSound(centre, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8F, 0.55F);
+        caster.sendMessage(ChatColor.LIGHT_PURPLE + "Trap Rune drawn. It arms after five seconds.");
+        drawTrapRune(centre, size, false);
+        return true;
+    }
+
+    private void tickTrapRunes() {
+        long now = System.currentTimeMillis();
+        var iterator = trapRunes.iterator();
+        while (iterator.hasNext()) {
+            TrapRuneData rune = iterator.next();
+            Player owner = Bukkit.getPlayer(rune.owner);
+            WizardState ownerState = owner == null ? null : states.get(rune.owner);
+            if (owner == null || !owner.isOnline() || ownerState == null || !ownerState.alive
+                    || now - rune.createdAt >= 100_000L || rune.centre.getWorld() == null
+                    || !rune.centre.getBlock().isPassable()
+                    || !rune.centre.clone().add(0.0D, -1.0D, 0.0D).getBlock().getType().isSolid()) {
+                iterator.remove();
+                continue;
+            }
+            long ageTicks = (now - rune.createdAt) / 50L;
+            boolean armed = ageTicks >= 100L;
+            if (tick % 5 == 0) drawTrapRune(rune.centre, rune.size, armed);
+            if (!armed) continue;
+
+            Player trigger = null;
+            for (Player victim : alivePlayers()) {
+                if (victim.equals(owner) || !victim.getWorld().equals(rune.centre.getWorld())) continue;
+                Location loc = victim.getLocation();
+                if (Math.abs(loc.getX() - rune.centre.getX()) <= rune.size
+                        && Math.abs(loc.getZ() - rune.centre.getZ()) <= rune.size
+                        && loc.getY() >= rune.centre.getY() - 0.1D && loc.getY() <= rune.centre.getY() + 0.9D) {
+                    trigger = victim;
+                    break;
+                }
+            }
+            if (trigger != null) {
+                detonateTrapRune(rune, owner);
+                iterator.remove();
+            }
+        }
+    }
+
+    private void drawTrapRune(Location centre, double size, boolean armed) {
+        Particle particle = armed ? Particle.FLAME : Particle.WITCH;
+        for (int i = 0; i < 4; i++) {
+            double t = i / 3.0D;
+            Location[] points = {
+                    centre.clone().add(-size + size * 2.0D * t, 0.04D, -size),
+                    centre.clone().add(size, 0.04D, -size + size * 2.0D * t),
+                    centre.clone().add(size - size * 2.0D * t, 0.04D, size),
+                    centre.clone().add(-size, 0.04D, size - size * 2.0D * t)
+            };
+            for (Location point : points) point.getWorld().spawnParticle(particle, point, 1, 0.01D, 0.01D, 0.01D, 0.0D);
+        }
+        if (armed) centre.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, centre, 3,
+                size / 2.0D, 0.02D, size / 2.0D, 0.0D);
+    }
+
+    private void detonateTrapRune(TrapRuneData rune, Player owner) {
+        Location centre = rune.centre;
+        double radius = rune.size * 1.2D;
+        double maxDamage = rune.level * 4.0D + 6.0D;
+        centre.getWorld().spawnParticle(Particle.EXPLOSION, centre, 2, 0.3D, 0.15D, 0.3D, 0.0D);
+        centre.getWorld().spawnParticle(Particle.SMOKE, centre, 36, radius / 1.5D, 0.25D, radius / 1.5D, 0.08D);
+        centre.getWorld().playSound(centre, Sound.ENTITY_WITHER_SHOOT, 1.0F, 0.9F);
+        for (Player victim : alivePlayers()) {
+            if (!victim.getWorld().equals(centre.getWorld())) continue;
+            double distance = victim.getLocation().distance(centre);
+            if (distance > radius + 1.0D) continue;
+            double damage = Math.max(1.0D, maxDamage * Math.max(0.15D, 1.0D - distance / (radius + 1.0D)));
+            victim.damage(damage, owner);
+            Vector push = victim.getLocation().toVector().subtract(centre.toVector());
+            if (push.lengthSquared() > 0.001D) victim.setVelocity(push.normalize().multiply(1.0D).setY(0.45D));
+        }
+    }
+
+    private void tickManaBolts() {
+        var iterator = manaBolts.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, ManaBoltData> entry = iterator.next();
+            Entity entity = Bukkit.getEntity(entry.getKey());
+            ManaBoltData data = entry.getValue();
+            Player owner = Bukkit.getPlayer(data.owner);
+            WizardState ownerState = owner == null ? null : states.get(data.owner);
+            if (!(entity instanceof Snowball bolt) || !bolt.isValid() || owner == null || !owner.isOnline()
+                    || ownerState == null || !ownerState.alive
+                    || bolt.getLocation().distance(data.origin) >= 20.0D + data.level * 10.0D) {
+                if (entity != null && entity.isValid()) entity.remove();
+                ownedEntities.remove(entry.getKey());
+                iterator.remove();
+                continue;
+            }
+            Player nearest = null;
+            double nearestDistance = 20.0D + data.level * 10.0D + 10.0D;
+            Vector currentDirection = bolt.getVelocity().clone().normalize();
+            for (Player candidate : alivePlayers()) {
+                if (candidate.equals(owner) || !candidate.getWorld().equals(bolt.getWorld())) continue;
+                Vector offset = candidate.getLocation().clone().add(0.0D, 1.0D, 0.0D).toVector()
+                        .subtract(bolt.getLocation().toVector());
+                double distance = offset.length();
+                if (distance >= nearestDistance || distance < 0.1D
+                        || currentDirection.dot(offset.clone().normalize()) < 0.0D) continue;
+                nearest = candidate;
+                nearestDistance = distance;
+            }
+            if (nearest != null) {
+                Vector steer = nearest.getLocation().clone().add(0.0D, 1.0D, 0.0D).toVector()
+                        .subtract(bolt.getLocation().toVector()).normalize();
+                bolt.setVelocity(currentDirection.add(steer.multiply(0.08D)).normalize().multiply(1.8D));
+            }
+            bolt.getWorld().spawnParticle(Particle.END_ROD, bolt.getLocation(), 1, 0.02D, 0.02D, 0.02D, 0.0D);
+        }
+    }
+
+    private void expireTemporaryBlocks() {
+        long now = System.currentTimeMillis();
+        for (Map.Entry<Location, TemporaryBlock> entry : new ArrayList<>(temporaryBlocks.entrySet())) {
+            if (now >= entry.getValue().expiresAtMillis) restoreTemporaryBlock(entry.getKey());
         }
     }
 
@@ -1323,12 +1799,25 @@ public final class WizardsGameManager implements Listener {
     }
 
     private boolean setTemporaryBlock(Location location, Material material, long durationTicks) {
+        return setTemporaryBlock(location, material, durationTicks, false);
+    }
+
+    private boolean setTemporaryBlock(Location location, Material material, long durationTicks, boolean replaceSolid) {
         Block block = location.getBlock();
-        if (!block.isPassable()) return false;
+        if (!replaceSolid && !block.isPassable()) return false;
+        if (block.getType() == Material.BEDROCK || block.getState() instanceof InventoryHolder
+                || block.getState() instanceof TileState) return false;
         Location key = block.getLocation();
-        temporaryBlocks.putIfAbsent(key, new TemporaryBlock(block.getBlockData().clone(), material));
+        TemporaryBlock temporary = temporaryBlocks.get(key);
+        if (temporary == null) {
+            temporary = new TemporaryBlock(block.getBlockData().clone(), material,
+                    System.currentTimeMillis() + Math.max(1L, durationTicks) * 50L);
+            temporaryBlocks.put(key, temporary);
+        } else {
+            temporary.placedMaterial = material;
+            temporary.expiresAtMillis = System.currentTimeMillis() + Math.max(1L, durationTicks) * 50L;
+        }
         block.setType(material, false);
-        Bukkit.getScheduler().runTaskLater(plugin, () -> restoreTemporaryBlock(key), durationTicks);
         return true;
     }
 
@@ -1365,8 +1854,12 @@ public final class WizardsGameManager implements Listener {
         }
         for (UUID id : new ArrayList<>(manaBars.keySet())) removeManaBar(id);
         restoreAllTemporaryBlocks();
+        for (BukkitTask task : spellTasks) if (task != null && !task.isCancelled()) task.cancel();
+        spellTasks.clear();
         spectralArrows.clear();
         summonedWolves.clear();
+        manaBolts.clear();
+        trapRunes.clear();
 
         for (UUID id : ownedEntities) {
             Entity entity = Bukkit.getEntity(id);
@@ -1550,10 +2043,38 @@ public final class WizardsGameManager implements Listener {
 
     private static final class TemporaryBlock {
         private final org.bukkit.block.data.BlockData originalData;
-        private final Material placedMaterial;
-        private TemporaryBlock(org.bukkit.block.data.BlockData originalData, Material placedMaterial) {
+        private Material placedMaterial;
+        private long expiresAtMillis;
+        private TemporaryBlock(org.bukkit.block.data.BlockData originalData, Material placedMaterial, long expiresAtMillis) {
             this.originalData = originalData;
             this.placedMaterial = placedMaterial;
+            this.expiresAtMillis = expiresAtMillis;
+        }
+    }
+
+    private static final class ManaBoltData {
+        private final UUID owner;
+        private final int level;
+        private final Location origin;
+        private ManaBoltData(UUID owner, int level, Location origin) {
+            this.owner = owner;
+            this.level = level;
+            this.origin = origin;
+        }
+    }
+
+    private static final class TrapRuneData {
+        private final UUID owner;
+        private final Location centre;
+        private final int level;
+        private final double size;
+        private final long createdAt;
+        private TrapRuneData(UUID owner, Location centre, int level, double size, long createdAt) {
+            this.owner = owner;
+            this.centre = centre;
+            this.level = level;
+            this.size = size;
+            this.createdAt = createdAt;
         }
     }
 

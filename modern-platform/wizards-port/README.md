@@ -13,8 +13,8 @@ All spell books, wands, inventory menus and feedback use ordinary Paper/Minecraf
 - Free-for-all, last-wizard-standing round flow in a generated isolated test arena.
 - Loot chests with food, armour, wands and spellbooks; spellbooks level known spells and convert duplicates at max level into mana.
 - Mana regeneration, Soul Star boosts, wand slots, per-spell cooldowns and an inventory spell selector.
-- Fifteen cast implementations: Anvil Drop, Fireball, Flash, Frost Barrier, Gust, Heal, Ice Prison, Ice Shards, Lightning Strike, Mana Bolt, Spectral Arrow, Speed Boost, Summon Wolves, Web Shot and Wizard's Compass.
-- All 21 historical spell definitions are catalogued. The six still gated spells are Implode, Napalm, Rainbow Beam, Rainbow Road, Rumble and Trap Rune; they are excluded from live loot until their effects are ported.
+- All 21 historical spells now have playable implementations: Anvil Drop, Fireball, Flash, Frost Barrier, Gust, Heal, Ice Prison, Ice Shards, Implode, Lightning Strike, Mana Bolt, Napalm, Rainbow Beam, Rainbow Road, Rumble, Spectral Arrow, Speed Boost, Summon Wolves, Trap Rune, Web Shot and Wizard's Compass.
+- Spell maximum levels, mana deltas, cooldown deltas and loot weights are aligned to the original SpellType definitions. Implode's block removal is opt-in (`destructive-spells: true`) so a generated test arena remains reusable; Napalm fire and Rainbow Road blocks expire and restore automatically.
 
 The repository currently has no Wizards map archive. This module therefore creates a clearly-labelled generated arena for mechanics testing; it does not claim the original map layout or source map chest placements.
 
@@ -31,4 +31,4 @@ Right-click a wand to open the spell selector. Left-click a spell in the selecto
 
 ## Status and outstanding parity
 
-This is a mechanics-in-progress test port, not READY_FOR_TEST and not a 100% parity claim. The initial milestone still needs live multi-client acceptance and further source comparison. Outstanding work includes the remaining six spell effects (Implode, Napalm, Rainbow Beam, Rainbow Road, Rumble and Trap Rune), source-accurate endgame meteor/lightning pressure, complete loot weighting, map parity, damage/armour balancing, and repeated disconnect/reconnect/round-cleanup validation.
+This is a mechanics-in-progress test port, not READY_FOR_TEST and not a 100% parity claim. The initial milestone still needs live multi-client acceptance and further source comparison. Outstanding work includes source-accurate endgame meteor/lightning pressure, complete map parity, kit/gear balancing, damage/armour comparison, multiplayer acceptance, and repeated disconnect/reconnect/round-cleanup validation.
