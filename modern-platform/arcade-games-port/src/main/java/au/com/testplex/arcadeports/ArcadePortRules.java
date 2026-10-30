@@ -1437,6 +1437,30 @@ public final class ArcadePortRules {
                 && distance >= 0.0D && threshold >= 0.0D && distance < threshold;
     }
 
+    /**
+     * A split is recorded when the racer reaches that authored waypoint. Segment N therefore
+     * runs from waypoint N to N+1; the final waypoint has no following route segment.
+     */
+    public static int dragonEscapePbSegmentStartIndex(int waypointIndex, int waypointCount) {
+        return waypointCount > 1 && waypointIndex >= 0 && waypointIndex < waypointCount - 1
+                ? waypointIndex : -1;
+    }
+
+    /** Evenly distribute a legacy PB across authored waypoints when split data is unavailable. */
+    public static long dragonEscapeDefaultSplitMillis(long totalMillis, int splitIndex, int waypointCount) {
+        if (totalMillis <= 0L || waypointCount <= 1) return 0L;
+        int boundedIndex = Math.max(0, Math.min(waypointCount - 1, splitIndex));
+        return Math.round(totalMillis * (boundedIndex / (double) (waypointCount - 1)));
+    }
+
+    /** Interpolate a PB timestamp along one route segment, clamping invalid fractions safely. */
+    public static long interpolateDragonEscapeSplitMillis(long fromMillis, long toMillis, double fraction) {
+        long from = Math.max(0L, fromMillis);
+        long to = Math.max(from, toMillis);
+        double progress = Double.isFinite(fraction) ? Math.max(0.0D, Math.min(1.0D, fraction)) : 0.0D;
+        return from + Math.round((to - from) * progress);
+    }
+
     public static boolean shouldDragonEscapePlayerBeCaught(double dragonProgress, double playerProgress) {
         return dragonProgress > playerProgress;
     }
