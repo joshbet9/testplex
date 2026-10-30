@@ -1652,6 +1652,10 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.deathTagHitIsLethal(4.01D, 4.0D));
         assertTrue(ArcadePortRules.deathTagHitIsLethal(4.0D, 4.0D));
         assertTrue(ArcadePortRules.deathTagHitIsLethal(1.0D, 6.0D));
+        assertFalse(ArcadePortRules.shouldAwardDeathTagComeAtMeBro(0));
+        assertFalse(ArcadePortRules.shouldAwardDeathTagComeAtMeBro(1));
+        assertTrue(ArcadePortRules.shouldAwardDeathTagComeAtMeBro(2));
+        assertTrue(ArcadePortRules.shouldAwardDeathTagComeAtMeBro(5));
         assertFalse(ArcadePortRules.deathTagHitIsLethal(1.0D, 0.0D));
         assertEquals(4.0D, ArcadePortRules.deathTagChaserDamage(false));
         assertEquals(6.0D, ArcadePortRules.deathTagChaserDamage(true));

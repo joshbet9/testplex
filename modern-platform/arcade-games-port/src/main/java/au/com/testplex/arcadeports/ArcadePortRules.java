@@ -1576,6 +1576,11 @@ public final class ArcadePortRules {
         return hitDamage > 0.0D && currentHealth <= hitDamage;
     }
 
+    /** ComeAtMeBro starts awarding one stat per additional Chaser kill after the second kill. */
+    public static boolean shouldAwardDeathTagComeAtMeBro(int chaserKillsByPlayer) {
+        return chaserKillsByPlayer >= 2;
+    }
+
     public static double deathTagChaserDamage(boolean alphaChaser) {
         return alphaChaser ? 6.0D : 4.0D;
     }

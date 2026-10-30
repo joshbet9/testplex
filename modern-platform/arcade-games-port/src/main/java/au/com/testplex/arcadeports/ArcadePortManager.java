@@ -2102,6 +2102,15 @@ public final class ArcadePortManager implements Listener {
         killer.sendMessage(ChatColor.GREEN + "Death Tag kill! " + kills + " kills.");
     }
 
+    private void recordDeathTagChaserKill(Session session, Player killer) {
+        if (session == null || killer == null || !killer.isOnline()) return;
+        UUID id = killer.getUniqueId();
+        int chaserKills = session.deathTagChaserKillsByPlayer.merge(id, 1, Integer::sum);
+        if (ArcadePortRules.shouldAwardDeathTagComeAtMeBro(chaserKills)) {
+            session.deathTagComeAtMeBroAwards.merge(id, 1, Integer::sum);
+        }
+    }
+
     private Location deathTagChaserRespawnSpawn(Session session, Player player) {
         SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
         if (mapData != null && !mapData.spawnLocations().isEmpty()) {
@@ -2142,6 +2151,7 @@ public final class ArcadePortManager implements Listener {
             if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
                 respawnDeathTagChaser(session, target);
                 awardDeathTagKill(session, shooter);
+                recordDeathTagChaserKill(session, shooter);
                 checkRoundEnd(session);
                 return;
             }
@@ -6749,6 +6759,7 @@ public final class ArcadePortManager implements Listener {
                         if (lethalHit) {
                             respawnDeathTagChaser(session, target);
                             awardDeathTagKill(session, attacker);
+                            recordDeathTagChaserKill(session, attacker);
                         } else {
                             target.setHealth(target.getHealth() - damage);
                             target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.05F);
@@ -7371,6 +7382,13 @@ public final class ArcadePortManager implements Listener {
             if (won) {
                 plugin.getConfig().set(path + "wins",
                         plugin.getConfig().getInt(path + "wins", 0) + 1);
+            }
+            if (session.type == ArcadePortGame.DEATH_TAG) {
+                int comeAtMeBro = session.deathTagComeAtMeBroAwards.getOrDefault(id, 0);
+                if (comeAtMeBro > 0) {
+                    plugin.getConfig().set(path + "come-at-me-bro",
+                            plugin.getConfig().getInt(path + "come-at-me-bro", 0) + comeAtMeBro);
+                }
             }
         }
         plugin.saveConfig();
@@ -10857,6 +10875,8 @@ public final class ArcadePortManager implements Listener {
         Team deathTagChaserScoreboardLine;
         String deathTagChaserScoreboardEntry;
         final Map<UUID, String> deathTagRunnerKits = new HashMap<>();
+        final Map<UUID, Integer> deathTagChaserKillsByPlayer = new HashMap<>();
+        final Map<UUID, Integer> deathTagComeAtMeBroAwards = new HashMap<>();
         final Map<UUID, Long> deathTagLastArrowAt = new HashMap<>();
         final Map<UUID, Long> deathTagSoloChaserHitReadyAt = new HashMap<>();
         final Set<UUID> deathTagFletchedArrows = new HashSet<>();

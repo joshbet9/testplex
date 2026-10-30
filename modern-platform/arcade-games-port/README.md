@@ -62,3 +62,5 @@ The modern Death Tag port now resolves environmental damage with the legacy Iron
 The Death Tag sidebar now shows live Runner and Chaser counts. Forced time-based Alpha promotions use Chaser team spawns, while converted runners retain their death-location respawn.
 
 Death Tag also enforces the source Adventure mode, blocks item-frame interaction, and continually restores food to 20 with saturation 1.0 so sprinting remains available for the full round.
+
+Death Tag also tracks the legacy ComeAtMeBro stat locally: every Chaser defeat from a player's second Chaser kill onward is recorded when the acceptance run completes. This stays in Testplex's isolated local stats and does not write to production Arcade data.
