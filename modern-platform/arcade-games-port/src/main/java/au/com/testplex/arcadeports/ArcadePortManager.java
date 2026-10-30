@@ -1618,8 +1618,8 @@ public final class ArcadePortManager implements Listener {
                     details + " Votes: " + count + "." + mine, "vote", mode.id());
             inventory.setItem(slots[i], option);
         }
-        if (allowHotbar) inventory.setItem(22, gladiatorMenuItem(Material.CHEST, "Hotbar Editor",
-                "Rearrange your hotbar during the tournament.", "hotbar", null));
+        inventory.setItem(22, gladiatorMenuItem(Material.WRITABLE_BOOK, "Hotbar Editor",
+                "Available once your duel begins: /arcadeport hotbar.", null, null));
         inventory.setItem(26, gladiatorMenuItem(Material.CLOCK, "Voting",
                 "Choose one ruleset. Votes are visible to the lobby.", null, null));
         player.openInventory(inventory);
@@ -1889,9 +1889,10 @@ public final class ArcadePortManager implements Listener {
             player.closeInventory();
             player.sendMessage(ChatColor.GREEN + "Lobby vote recorded: " + mode.displayName() + ".");
             for (Player queued : queue.values()) {
-                if (queued != null && queued.isOnline() && !queued.getUniqueId().equals(player.getUniqueId())) {
-                    queued.sendMessage(ChatColor.GOLD + player.getName() + " voted " + mode.displayName() + ".");
-                }
+                if (queued == null || !queued.isOnline()) continue;
+                queued.sendMessage(ChatColor.GOLD + player.getName() + " voted " + mode.displayName() + ".");
+                openGladiatorVoteMenu(queued, gladiatorLobbyVotes,
+                        "Gladiators Lobby — PvP Vote", false);
             }
             return;
         }
@@ -1899,11 +1900,16 @@ public final class ArcadePortManager implements Listener {
                 || session.gladiatorVotingEndsAt <= System.currentTimeMillis()
                 || !session.players.containsKey(player.getUniqueId())) return;
         session.gladiatorVotes.put(player.getUniqueId(), mode.id());
-        player.closeInventory();
         player.sendMessage(ChatColor.GREEN + "Vote recorded: " + mode.displayName() + ".");
         long onlineVoters = session.players.values().stream()
                 .filter(candidate -> candidate != null && candidate.isOnline()).count();
-        if (session.gladiatorVotes.size() >= onlineVoters) resolveGladiatorVote(session);
+        if (session.gladiatorVotes.size() >= onlineVoters) {
+            resolveGladiatorVote(session);
+            return;
+        }
+        for (Player voter : session.players.values()) {
+            if (voter != null && voter.isOnline()) openGladiatorVoteMenu(voter);
+        }
     }
 
     private void resolveGladiatorVote(Session session) {
@@ -9668,10 +9674,7 @@ public final class ArcadePortManager implements Listener {
                 ItemMeta meta = clicked.getItemMeta();
                 String action = meta.getPersistentDataContainer().get(gladiatorMenuActionKey, PersistentDataType.STRING);
                 String value = meta.getPersistentDataContainer().get(gladiatorMenuValueKey, PersistentDataType.STRING);
-                if ("hotbar".equals(action)) {
-                    player.closeInventory();
-                    player.sendMessage(ChatColor.YELLOW + "The hotbar editor is available once your duel begins. Use /arcadeport hotbar.");
-                } else if ("vote".equals(action)) {
+                if ("vote".equals(action)) {
                     Session voting = active;
                     voteGladiators(voting, player, GladiatorsMode.fromId(value));
                 }
