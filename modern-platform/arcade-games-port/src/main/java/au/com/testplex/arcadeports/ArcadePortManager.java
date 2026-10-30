@@ -2329,6 +2329,34 @@ public final class ArcadePortManager implements Listener {
                 used[next] = true;
             }
         }
+        boolean editorPresent = false;
+        for (ItemStack item : ordered) {
+            if (item != null && !item.getType().isAir() && item.hasItemMeta()
+                    && item.getItemMeta().getPersistentDataContainer()
+                            .has(gladiatorHotbarKey, PersistentDataType.BYTE)) {
+                editorPresent = true;
+                break;
+            }
+        }
+        if (!editorPresent) {
+            ItemStack editor = null;
+            for (ItemStack item : source) {
+                if (item != null && item.hasItemMeta()
+                        && item.getItemMeta().getPersistentDataContainer()
+                                .has(gladiatorHotbarKey, PersistentDataType.BYTE)) {
+                    editor = item;
+                    break;
+                }
+            }
+            if (editor != null) {
+                for (int slot = 8; slot >= 0; slot--) {
+                    if (ordered[slot] == null || ordered[slot].getType().isAir()) {
+                        ordered[slot] = editor;
+                        break;
+                    }
+                }
+            }
+        }
         for (int i = 0; i < 9; i++) player.getInventory().setItem(i, ordered[i]);
     }
 
