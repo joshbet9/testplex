@@ -3223,6 +3223,30 @@ public final class ArcadePortManager implements Listener {
         int damage = ArcadePortRules.sourceWorldWaterDamage(session.type, map == null ? "" : map.mapName());
         if (damage <= 0) return;
 
+        if (session.type == ArcadePortGame.DRAGONS) {
+            // Reborn checks water on FASTER and applies a separate 500ms Recharge to each player.
+            for (Player player : new ArrayList<>(alivePlayers(session))) {
+                UUID id = player.getUniqueId();
+                long nextDamageAt = session.dragonWaterDamageNextAt.getOrDefault(id, 0L);
+                if (now < nextDamageAt) continue;
+                session.dragonWaterDamageNextAt.put(id,
+                        now + ArcadePortRules.DRAGONS_WATER_DAMAGE_INTERVAL_MILLIS);
+                Block feet = player.getLocation().getBlock();
+                Material lower = feet.getType();
+                Material upper = feet.getRelative(BlockFace.UP).getType();
+                if (lower != Material.WATER && upper != Material.WATER) continue;
+                if (player.getHealth() <= damage) {
+                    eliminate(session, player, null, "was lost to the water");
+                    if (active != session) return;
+                } else {
+                    player.setHealth(player.getHealth() - damage);
+                    player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_SPLASH, 0.8F,
+                            1.0F + ThreadLocalRandom.current().nextFloat() * 0.5F);
+                }
+            }
+            return;
+        }
+
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             // Reborn's GameFlagManager checks every player on its FASTER cadence
             // and applies an independent 500ms Recharge per player.
