@@ -1552,41 +1552,6 @@ public final class ArcadePortManager implements Listener {
         };
     }
 
-    private void giveGladiatorKit(Session session, Player player) {
-        int tier = Math.max(0, Math.min(3, session.gladiatorRound));
-        Material sword = switch (tier) {
-            case 1 -> Material.STONE_SWORD;
-            case 2 -> Material.IRON_SWORD;
-            case 3 -> Material.DIAMOND_SWORD;
-            default -> Material.WOODEN_SWORD;
-        };
-        Material[] armor = switch (tier) {
-            case 1 -> new Material[]{Material.GOLDEN_BOOTS, Material.GOLDEN_LEGGINGS, Material.GOLDEN_CHESTPLATE, Material.GOLDEN_HELMET};
-            case 2 -> new Material[]{Material.CHAINMAIL_BOOTS, Material.CHAINMAIL_LEGGINGS, Material.CHAINMAIL_CHESTPLATE, Material.CHAINMAIL_HELMET};
-            case 3 -> new Material[]{Material.IRON_BOOTS, Material.IRON_LEGGINGS, Material.IRON_CHESTPLATE, Material.IRON_HELMET};
-            default -> new Material[]{Material.LEATHER_BOOTS, Material.LEATHER_LEGGINGS, Material.LEATHER_CHESTPLATE, Material.LEATHER_HELMET};
-        };
-        player.getInventory().clear();
-        player.getInventory().addItem(new ItemStack(sword), new ItemStack(Material.FISHING_ROD),
-                new ItemStack(Material.BOW), new ItemStack(Material.ARROW, new int[]{3, 5, 7, 10}[tier]));
-        ItemStack[] armorItems = new ItemStack[4];
-        for (int i = 0; i < armorItems.length; i++) {
-            armorItems[i] = new ItemStack(armor[i]);
-            if (armorItems[i].getItemMeta() instanceof LeatherArmorMeta meta) {
-                Color color = switch (tier) {
-                    case 1 -> Color.YELLOW;
-                    case 2 -> Color.ORANGE;
-                    case 3 -> Color.RED;
-                    default -> Color.LIME;
-                };
-                meta.setColor(color);
-                armorItems[i].setItemMeta(meta);
-            }
-        }
-        player.getInventory().setArmorContents(armorItems);
-        player.updateInventory();
-    }
-
     private enum GladiatorMenuType { VOTE, HOTBAR, KILL_MESSAGES }
 
     private static final class GladiatorMenuHolder implements InventoryHolder {
@@ -1961,6 +1926,7 @@ public final class ArcadePortManager implements Listener {
         if (active != session || advancing.isEmpty()) return;
         if (initial) {
             session.gladiatorRound = ArcadePortRules.gladiatorsStartingTierForPlayers(advancing.size());
+            session.gladiatorLoserRound = session.gladiatorRound;
             session.gladiatorWinnerQueue.clear();
             session.gladiatorLoserQueue.clear();
             session.gladiatorLosses.clear();
@@ -2015,12 +1981,21 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
-        // Loser matches do not wait for winners' bracket matches to finish.
-        while (session.gladiatorLoserQueue.size() >= 2) {
-            UUID first = session.gladiatorLoserQueue.remove(0);
-            UUID second = session.gladiatorLoserQueue.remove(0);
-            startGladiatorMatch(session, first, second, GLADIATOR_BRACKET_LOSERS);
-            if (active != session) return;
+        // Loser matches do not wait for winners' bracket matches to finish,
+        // but their equipment tier advances on the loser's bracket's own cadence.
+        if (!hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_LOSERS)
+                && session.gladiatorLoserQueue.size() >= 2) {
+            if (session.gladiatorLoserBracketStarted) {
+                session.gladiatorLoserRound = ArcadePortRules.gladiatorsTierForRound(session.gladiatorLoserRound + 1);
+                session.gladiatorLoserArenaCursor = 0;
+            }
+            while (session.gladiatorLoserQueue.size() >= 2) {
+                UUID first = session.gladiatorLoserQueue.remove(0);
+                UUID second = session.gladiatorLoserQueue.remove(0);
+                startGladiatorMatch(session, first, second, GLADIATOR_BRACKET_LOSERS);
+                session.gladiatorLoserBracketStarted = true;
+                if (active != session) return;
+            }
         }
 
         if (hasOpenGladiatorMatches(session, -1)) return;
@@ -2064,6 +2039,9 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
+        int matchTier = bracket == GLADIATOR_BRACKET_LOSERS
+                ? session.gladiatorLoserRound
+                : bracket == GLADIATOR_BRACKET_FINAL ? 3 : session.gladiatorRound;
         int pair = session.gladiatorNextPairId++;
         session.gladiatorPairs.put(firstId, pair);
         session.gladiatorPairs.put(secondId, pair);
@@ -2078,7 +2056,7 @@ public final class ArcadePortManager implements Listener {
         Location center;
         if (bracket == GLADIATOR_BRACKET_LOSERS) {
             center = gladiatorLoserArenaCenter(session, session.gladiatorLoserArenaCursor++);
-            buildGladiatorArenaAt(session.world, center, session.gladiatorRound, true);
+            buildGladiatorArenaAt(session.world, center, matchTier, true);
         } else {
             if (bracket == GLADIATOR_BRACKET_FINAL) {
                 SourceMapCatalog.MapData data = sourceMapData.get(session.type.id());
@@ -2095,7 +2073,7 @@ public final class ArcadePortManager implements Listener {
                 int slot = session.gladiatorWinnerArenaCursor++;
                 center = centers.get(Math.floorMod(slot, centers.size())).clone();
             }
-            if (!sourceArenas) buildGladiatorArenaAt(session.world, center, session.gladiatorRound, false);
+            if (!sourceArenas) buildGladiatorArenaAt(session.world, center, matchTier, false);
         }
 
         Location[] spawns;
@@ -2124,7 +2102,7 @@ public final class ArcadePortManager implements Listener {
             player.setSaturation(20.0F);
             player.setFireTicks(0);
             player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
-            giveGladiatorKit(session, player);
+            giveGladiatorKit(session, player, matchTier);
             session.lastLocations.put(player.getUniqueId(), spawn.clone());
             String bracketName = bracket == GLADIATOR_BRACKET_WINNERS ? "Winners bracket"
                     : bracket == GLADIATOR_BRACKET_LOSERS ? "Loser's bracket" : "Grand final";
@@ -2168,7 +2146,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void giveGladiatorKit(Session session, Player player) {
-        int tier = Math.max(0, Math.min(3, session.gladiatorRound));
+        giveGladiatorKit(session, player, session.gladiatorRound);
+    }
+
+    private void giveGladiatorKit(Session session, Player player, int requestedTier) {
+        int tier = Math.max(0, Math.min(3, requestedTier));
         Material sword = switch (tier) {
             case 1 -> Material.STONE_SWORD;
             case 2 -> Material.IRON_SWORD;
@@ -10966,11 +10948,14 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> gladiatorUsedRod = new HashSet<>();
         final Map<UUID, String> gladiatorVotes = new HashMap<>();
         int gladiatorRound = -1;
+        int gladiatorLoserRound = -1;
         int gladiatorPairCount;
         int gladiatorNextPairId;
         int gladiatorWinnerArenaCursor;
         int gladiatorLoserArenaCursor;
         long gladiatorVotingEndsAt;
+        boolean gladiatorWinnerBracketStarted;
+        boolean gladiatorLoserBracketStarted;
         String gladiatorMode = "rodless";
         boolean gladiatorWinnerBracketStarted;
         final Map<UUID, Integer> teams = new HashMap<>();
