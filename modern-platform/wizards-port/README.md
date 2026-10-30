@@ -13,6 +13,7 @@ All spell books, wands, inventory menus and feedback use ordinary Paper/Minecraf
 - Free-for-all, last-wizard-standing round flow in a generated isolated test arena.
 - Loot chests with food, armour, wands and spellbooks; spellbooks level known spells and convert duplicates at max level into mana.
 - Mana regeneration, Soul Star boosts, wand slots, per-spell cooldowns and an inventory spell selector.
+- Gust uses a 45-block forward pyramid with its source velocity scaling and temporary fall-damage protection; Ice Prison is a thrown projectile that creates an expiring ice impact sphere.
 - All 21 historical spells now have playable implementations: Anvil Drop, Fireball, Flash, Frost Barrier, Gust, Heal, Ice Prison, Ice Shards, Implode, Lightning Strike, Mana Bolt, Napalm, Rainbow Beam, Rainbow Road, Rumble, Spectral Arrow, Speed Boost, Summon Wolves, Trap Rune, Web Shot and Wizard's Compass.
 - Spell maximum levels, mana deltas, cooldown deltas and loot weights are aligned to the original SpellType definitions. Implode's block removal is opt-in (`destructive-spells: true`) so a generated test arena remains reusable; Napalm fire and Rainbow Road blocks expire and restore automatically.
 

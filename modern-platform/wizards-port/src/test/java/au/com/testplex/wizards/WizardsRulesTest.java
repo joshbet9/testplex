@@ -26,18 +26,20 @@ class WizardsRulesTest {
 
     @Test
     void originalSummonWebTrapAndProjectileFormulasArePreserved() {
-        assertEquals(3, WizardsRules.summonedWolfCount(1));
-        assertEquals(4, WizardsRules.summonedWolfCount(2));
-        assertEquals(5, WizardsRules.summonedWolfCount(3));
+        assertEquals(1, WizardsRules.summonedWolfCount(1));
+        assertEquals(2, WizardsRules.summonedWolfCount(2));
+        assertEquals(3, WizardsRules.summonedWolfCount(3));
         assertEquals(2, WizardsRules.webShotCount(1));
         assertEquals(4, WizardsRules.webShotCount(2));
         assertEquals(6, WizardsRules.webShotCount(3));
-        assertEquals(16, WizardsRules.trapRuneRange(1));
-        assertEquals(20, WizardsRules.trapRuneRange(2));
-        assertEquals(24, WizardsRules.trapRuneRange(3));
+        assertEquals(8, WizardsRules.trapRuneRange(1));
+        assertEquals(12, WizardsRules.trapRuneRange(2));
+        assertEquals(16, WizardsRules.trapRuneRange(3));
         assertEquals(1.0D, WizardsRules.trapRuneSize(1));
-        assertEquals(3.0D, WizardsRules.trapRuneDamage(1));
-        assertEquals(9.0D, WizardsRules.trapRuneDamage(3));
+        assertEquals(1.6D, WizardsRules.trapRuneSize(2));
+        assertEquals(2.4D, WizardsRules.trapRuneSize(3));
+        assertEquals(10.0D, WizardsRules.trapRuneDamage(1));
+        assertEquals(18.0D, WizardsRules.trapRuneDamage(3));
         assertEquals(6.0D, WizardsRules.spectralArrowDamage(1, 0.0D));
         assertEquals(7.0D, WizardsRules.spectralArrowDamage(1, 1.0D));
         assertEquals(0.3D, WizardsRules.manaBoltVelocity());

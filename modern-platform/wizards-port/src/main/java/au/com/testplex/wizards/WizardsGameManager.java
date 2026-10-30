@@ -101,6 +101,7 @@ public final class WizardsGameManager implements Listener {
     private final Map<UUID, SpectralArrowData> spectralArrows = new HashMap<>();
     private final Map<UUID, SummonedWolfData> summonedWolves = new HashMap<>();
     private final Map<UUID, ManaBoltData> manaBolts = new HashMap<>();
+    private final Map<UUID, Long> fallingProtection = new HashMap<>();
     private final List<TrapRuneData> trapRunes = new ArrayList<>();
     private final List<BukkitTask> spellTasks = new ArrayList<>();
     private final Map<UUID, MeteorData> endgameMeteors = new HashMap<>();
@@ -393,6 +394,7 @@ public final class WizardsGameManager implements Listener {
         tickSummonedWolves();
         tickManaBolts();
         tickTrapRunes();
+        tickFallingProtection();
         tickEndgame();
         tickEndgameMeteors();
         expireTemporaryBlocks();
@@ -969,7 +971,7 @@ public final class WizardsGameManager implements Listener {
                     event.setCancelled(true);
                     return;
                 }
-                if ("web-shot".equals(projectileSpell)) {
+                if ("web-shot".equals(projectileSpell) || "ice-prison".equals(projectileSpell)) {
                     event.setCancelled(true);
                     return;
                 }
@@ -1017,6 +1019,12 @@ public final class WizardsGameManager implements Listener {
             placeWebAt(target);
             location.getWorld().spawnParticle(Particle.CLOUD, location, 10, 0.25D, 0.25D, 0.25D, 0.03D);
             location.getWorld().playSound(location, Sound.BLOCK_COBWEB_PLACE, 0.6F, 1.1F);
+        } else if ("ice-prison".equals(spell)) {
+            int strength = projectile.getPersistentDataContainer().getOrDefault(
+                    anvilLevelKey, PersistentDataType.INTEGER, 4);
+            createIcePrison(location, strength);
+            ownedEntities.remove(projectile.getUniqueId());
+            projectile.remove();
         } else if ("ice-shards".equals(spell)) {
             location.getWorld().spawnParticle(Particle.SNOWFLAKE, location, 18, 0.3D, 0.3D, 0.3D, 0.03D);
             location.getWorld().playSound(location, Sound.BLOCK_GLASS_BREAK, 0.7F, 1.4F);
@@ -1083,6 +1091,41 @@ public final class WizardsGameManager implements Listener {
         impact.getWorld().playSound(impact, Sound.BLOCK_ANVIL_LAND, 1.2F, 0.8F);
         ownedEntities.remove(entity.getUniqueId());
         entity.remove();
+    }
+
+    private void createIcePrison(Location centre, int strength) {
+        if (centre == null || centre.getWorld() == null) return;
+        int radius = Math.max(1, strength);
+        long duration = (20L + random.nextInt(10)) * 20L;
+        int placed = 0;
+        for (int x = -radius; x <= radius; x++) {
+            for (int y = -radius; y <= radius; y++) {
+                for (int z = -radius; z <= radius; z++) {
+                    if ((x * x) + (y * y) + (z * z) > radius * radius) continue;
+                    Location block = centre.getBlock().getLocation().add(x, y, z);
+                    if (setTemporaryBlock(block, Material.ICE, duration, false)) placed++;
+                }
+            }
+        }
+        if (placed > 0) {
+            centre.getWorld().spawnParticle(Particle.SNOWFLAKE, centre, Math.min(80, 20 + placed),
+                    radius / 2.0D, radius / 2.0D, radius / 2.0D, 0.04D);
+            centre.getWorld().playSound(centre, Sound.ENTITY_SILVERFISH_HURT, 2.0F, 1.0F);
+        }
+    }
+
+    private void tickFallingProtection() {
+        long now = System.currentTimeMillis();
+        var iterator = fallingProtection.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<UUID, Long> entry = iterator.next();
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player == null || !player.isOnline() || now >= entry.getValue()) {
+                iterator.remove();
+            } else {
+                player.setFallDistance(0.0F);
+            }
+        }
     }
 
     private void placeWebAt(Location target) {
@@ -1594,21 +1637,43 @@ public final class WizardsGameManager implements Listener {
                 return true;
             }
             case GUST: {
-                double radius = 10.0D + level * 3.0D;
-                int affected = 0;
-                for (Entity entity : caster.getWorld().getNearbyEntities(caster.getLocation(), radius, radius, radius)) {
-                    if (!(entity instanceof Player target) || target.equals(caster)) continue;
-                    Vector push = target.getLocation().toVector().subtract(caster.getLocation().toVector());
-                    double distance = Math.max(1.0D, push.length());
-                    push.normalize().multiply(Math.max(0.45D, (1.0D + level * 0.25D) * (1.0D - distance / (radius * 1.5D))));
-                    push.setY(0.35D + level * 0.08D);
-                    target.setVelocity(push);
-                    affected++;
+                Vector facing = caster.getLocation().getDirection().setY(0.0D);
+                if (facing.lengthSquared() < 0.001D) facing.setZ(1.0D);
+                facing.normalize();
+                Vector gustVelocity = facing.clone().multiply(1.5D).setY(0.3D)
+                        .multiply(1.2D + level * 0.4D);
+                double gustSize = level * 3.0D + 10.0D;
+                List<Map.Entry<Player, Double>> affected = new ArrayList<>();
+                for (Player target : alivePlayers()) {
+                    if (target.equals(caster) || !target.getWorld().equals(caster.getWorld())
+                            || !target.canSee(caster)) continue;
+                    Vector offset = target.getLocation().toVector().subtract(caster.getLocation().toVector());
+                    double forward = offset.dot(facing);
+                    if (forward <= 0.0D || forward > 45.0D) continue;
+                    Vector lateral = offset.clone().subtract(facing.clone().multiply(forward));
+                    double widthAtDistance = gustSize * (forward / 45.0D);
+                    if (lateral.length() > widthAtDistance) continue;
+                    double strength = Math.max(0.2D, 1.0D - forward / 45.0D);
+                    affected.add(Map.entry(target, strength));
+                }
+                if (affected.isEmpty()) {
+                    caster.sendMessage(ChatColor.GRAY + "Gust needs an enemy in the forward cone.");
+                    return false;
+                }
+                for (Map.Entry<Player, Double> entry : affected) {
+                    Player target = entry.getKey();
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        WizardState current = states.get(target.getUniqueId());
+                        if (!running || current == null || !current.alive || !target.isOnline()) return;
+                        target.setVelocity(gustVelocity.clone().multiply(Math.max(0.2D, entry.getValue())));
+                        fallingProtection.put(target.getUniqueId(), System.currentTimeMillis() + 2_000L);
+                        target.getWorld().playSound(target.getLocation(), Sound.ENTITY_BAT_TAKEOFF, 1.0F, 0.7F);
+                    });
                 }
                 caster.getWorld().spawnParticle(Particle.CLOUD, caster.getLocation().add(0, 1, 0), 35,
-                        radius / 5.0D, 0.5D, radius / 5.0D, 0.12D);
-                caster.getWorld().playSound(caster.getLocation(), Sound.ENTITY_BREEZE_WIND_BURST, 0.9F, 1.0F);
-                return affected > 0;
+                        gustSize / 5.0D, 0.5D, gustSize / 5.0D, 0.12D);
+                caster.getWorld().playSound(caster.getLocation(), Sound.ENTITY_BAT_TAKEOFF, 1.0F, 0.7F);
+                return true;
             }
             case HEAL: {
                 double maximum = caster.getAttribute(Attribute.MAX_HEALTH) == null
@@ -1624,24 +1689,14 @@ public final class WizardsGameManager implements Listener {
                 return true;
             }
             case ICE_PRISON: {
-                Player victim = directTarget instanceof Player direct && !direct.equals(caster)
-                        ? direct : findTargetPlayer(caster, 20.0D);
-                if (victim == null) {
-                    caster.sendMessage(ChatColor.RED + "Ice Prison needs an enemy in your line of sight.");
-                    return false;
-                }
-                Location base = victim.getLocation().getBlock().getLocation();
-                int radius = 1 + (level / 2);
-                for (int x = -radius; x <= radius; x++) {
-                    for (int z = -radius; z <= radius; z++) {
-                        if (Math.abs(x) != radius && Math.abs(z) != radius) continue;
-                        for (int y = 0; y <= 2 + level / 2; y++) {
-                            setTemporaryBlock(base.clone().add(x, y, z), Material.ICE, 80L);
-                        }
-                    }
-                }
-                victim.getWorld().spawnParticle(Particle.SNOWFLAKE, base.clone().add(0, 1, 0), 28, 1, 1, 1, 0.05);
-                victim.getWorld().playSound(base, Sound.BLOCK_GLASS_PLACE, 0.9F, 0.7F);
+                Snowball projectile = caster.launchProjectile(Snowball.class);
+                projectile.setVelocity(direction.clone().multiply(1.7D));
+                projectile.getPersistentDataContainer().set(projectileKey, PersistentDataType.STRING, "ice-prison");
+                projectile.getPersistentDataContainer().set(projectileOwnerKey, PersistentDataType.STRING,
+                        caster.getUniqueId().toString());
+                projectile.getPersistentDataContainer().set(anvilLevelKey, PersistentDataType.INTEGER, 3 + level);
+                ownedEntities.add(projectile.getUniqueId());
+                caster.getWorld().playSound(caster.getLocation(), Sound.ENTITY_CREEPER_PRIMED, 0.7F, 0.8F);
                 return true;
             }
             case LIGHTNING_STRIKE: {
@@ -2073,11 +2128,11 @@ public final class WizardsGameManager implements Listener {
 
     private boolean setTemporaryBlock(Location location, Material material, long durationTicks, boolean replaceSolid) {
         Block block = location.getBlock();
-        if (!replaceSolid && !block.isPassable()) return false;
-        if (block.getType() == Material.BEDROCK || block.getState() instanceof InventoryHolder
-                || block.getState() instanceof TileState) return false;
         Location key = block.getLocation();
         TemporaryBlock temporary = temporaryBlocks.get(key);
+        if (!replaceSolid && !block.isPassable() && temporary == null) return false;
+        if (block.getType() == Material.BEDROCK || block.getState() instanceof InventoryHolder
+                || block.getState() instanceof TileState) return false;
         if (temporary == null) {
             temporary = new TemporaryBlock(block.getBlockData().clone(), material,
                     System.currentTimeMillis() + Math.max(1L, durationTicks) * 50L);
@@ -2123,6 +2178,7 @@ public final class WizardsGameManager implements Listener {
         }
         for (UUID id : new ArrayList<>(manaBars.keySet())) removeManaBar(id);
         restoreAllTemporaryBlocks();
+        fallingProtection.clear();
         endgameMeteors.clear();
         for (BukkitTask task : spellTasks) if (task != null && !task.isCancelled()) task.cancel();
         spellTasks.clear();

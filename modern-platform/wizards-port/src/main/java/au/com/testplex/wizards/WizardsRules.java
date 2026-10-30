@@ -29,7 +29,7 @@ public final class WizardsRules {
     }
 
     public static int summonedWolfCount(int spellLevel) {
-        return Math.max(0, spellLevel) + 2;
+        return Math.max(0, spellLevel);
     }
 
     public static int webShotCount(int spellLevel) {
@@ -37,15 +37,15 @@ public final class WizardsRules {
     }
 
     public static int trapRuneRange(int spellLevel) {
-        return Math.max(0, spellLevel) * 4 + 12;
+        return Math.max(0, spellLevel) * 4 + 4;
     }
 
     public static double trapRuneSize(int spellLevel) {
-        return Math.max(0, spellLevel);
+        return Math.max(1.0D, Math.max(0, spellLevel) * 0.8D);
     }
 
     public static double trapRuneDamage(int spellLevel) {
-        return Math.max(0, spellLevel) * 2.0D + 3.0D;
+        return Math.max(0, spellLevel) * 4.0D + 6.0D;
     }
 
     public static double spectralArrowDamage(int spellLevel, double travelledBlocks) {
