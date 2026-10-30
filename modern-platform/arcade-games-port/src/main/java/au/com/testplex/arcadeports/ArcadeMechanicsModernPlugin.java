@@ -192,6 +192,28 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.GRAY + "Current beacon colour: " + manager.dragonEscapeBeaconColor(player.getUniqueId()));
                 } else manager.setDragonEscapeBeaconColor(player, args[1]);
                 return true;
+            case "vote":
+                if (!(sender instanceof Player voter)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                manager.openGladiatorVote(voter);
+                return true;
+            case "hotbar":
+                if (!(sender instanceof Player editor)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                manager.openGladiatorHotbarEditor(editor);
+                return true;
+            case "killmessage":
+            case "killmessages":
+                if (!(sender instanceof Player cosmeticsPlayer)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                manager.openGladiatorKillMessages(cosmeticsPlayer);
+                return true;
             case "status":
                 sender.sendMessage(ChatColor.GOLD + "Modern Arcade ports: " + ChatColor.WHITE + manager.status());
                 return true;
@@ -210,6 +232,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a Bomb Lobbers, Bacon Brawl, Dragons, Micro Battles, One in the Quiver, Paintball, Runner, Spleef or Death Tag kit; use runnerkit-<kit> for Runner");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport ghost <on|off|toggle>" + ChatColor.GRAY + " — show or hide your Dragon Escape PB ghost");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport dragoncolor <colour>" + ChatColor.GRAY + " — set your Dragon Escape leader beacon colour");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport vote" + ChatColor.GRAY + " — reopen the active Gladiators rules vote");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport hotbar" + ChatColor.GRAY + " — edit your Gladiators hotbar during a duel");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport killmessage" + ChatColor.GRAY + " — choose your Gladiators kill-message cosmetic");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport status" + ChatColor.GRAY + " — active game and queue counts");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport stop" + ChatColor.GRAY + " — operator reset");
                 sender.sendMessage(ChatColor.DARK_GRAY + "Cleared game IDs: " + manager.enabledGamesLabel());
