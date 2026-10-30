@@ -47,6 +47,8 @@ import org.bukkit.entity.Mob;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Pig;
 import org.bukkit.entity.Projectile;
+import org.bukkit.entity.Skeleton;
+import org.bukkit.entity.Wither;
 import org.bukkit.entity.Sheep;
 import org.bukkit.entity.Skeleton;
 import org.bukkit.entity.Snowball;
@@ -2796,6 +2798,7 @@ public final class ArcadePortManager implements Listener {
                     player.getInventory().setItem(0, namedItem(Material.IRON_AXE, "Cow Bomb", "Right-click to launch a baby cow."));
                     player.getInventory().setItem(1, namedItem(Material.IRON_SHOVEL, "Body Slam", "Right-click to leap and slam nearby Farmers."));
                     player.getInventory().setItem(2, namedItem(Material.LEATHER, "Cow Charge", "Sprint into Farmers to knock them back."));
+                    disguiseMilkCowPlayer(session, player);
                 } else {
                     player.getInventory().setItem(0, new ItemStack(Material.BUCKET));
                     player.setAllowFlight(true);
@@ -2804,22 +2807,39 @@ public final class ArcadePortManager implements Listener {
                 break;
             case WITHER_ASSAULT:
                 if (session.teams.getOrDefault(player.getUniqueId(), 0) == 1) {
-                    player.getInventory().setItem(0, namedItem(Material.GOLDEN_SWORD, "Wither Blast", "Left-click to launch a Wither skull."));
+                    player.getInventory().setItem(0, namedItem(Material.GOLDEN_SWORD, "Wither Skull", "Left-click to launch a Wither Skull (2 second cooldown)."));
+                    player.getInventory().setItem(1, namedItem(Material.DIAMOND_SWORD, "Wither Minions", "Left-click to summon two skeletal minions."));
+                    player.getInventory().setItem(2, namedItem(Material.COMPASS, "Smell Humans", "Right-click to reveal nearby Humans (30 second cooldown)."));
+                    player.getInventory().setOffHand(new ItemStack(Material.SHIELD));
                     player.setAllowFlight(true);
                     player.setFlying(true);
                     player.setFlySpeed((float) WitherAssaultMovementRules.SPAWN_HOVER_SPEED);
+                    disguiseWitherPlayer(session, player);
                 } else {
                     String kit = session.witherAssaultKits.getOrDefault(player.getUniqueId(), "archer");
+                    player.setAllowFlight(true);
+                    player.setFlying(false);
                     if ("editor".equals(kit)) {
-                        player.getInventory().setItem(0, new ItemStack(Material.IRON_PICKAXE));
-                        player.getInventory().setItem(1, new ItemStack(Material.COBBLESTONE, 32));
+                        player.getInventory().setItem(0, new ItemStack(Material.STONE_AXE));
+                        player.getInventory().setItem(1, new ItemStack(Material.STONE_PICKAXE));
+                        player.getInventory().setItem(2, new ItemStack(Material.STONE_SHOVEL));
+                        player.getInventory().setItem(3, revivalPotion());
+                        player.getInventory().setItem(4, new ItemStack(Material.MUSHROOM_STEW));
+                        player.getInventory().setItem(5, new ItemStack(Material.MUSHROOM_STEW));
                     } else if ("medic".equals(kit)) {
-                        player.getInventory().setItem(0, new ItemStack(Material.STONE_SWORD));
-                        player.getInventory().setItem(1, new ItemStack(Material.GOLDEN_APPLE, 2));
+                        player.getInventory().setItem(0, new ItemStack(Material.STONE_AXE));
+                        player.getInventory().setItem(1, revivalPotion());
+                        player.getInventory().setItem(2, new ItemStack(Material.MUSHROOM_STEW));
+                        player.getInventory().setItem(3, new ItemStack(Material.MUSHROOM_STEW));
+                        session.witherMedicNextRefillAt.putIfAbsent(player.getUniqueId(),
+                                System.currentTimeMillis() + 45_000L);
                     } else {
-                        player.getInventory().setItem(0, new ItemStack(Material.BOW));
-                        player.getInventory().setItem(1, new ItemStack(Material.ARROW, 16));
-                        player.getInventory().setItem(2, new ItemStack(Material.STONE_SWORD));
+                        player.getInventory().setItem(0, new ItemStack(Material.IRON_SWORD));
+                        player.getInventory().setItem(1, new ItemStack(Material.BOW));
+                        player.getInventory().setItem(2, revivalPotion());
+                        player.getInventory().setItem(3, new ItemStack(Material.MUSHROOM_STEW));
+                        player.getInventory().setItem(4, new ItemStack(Material.MUSHROOM_STEW));
+                        player.getInventory().setOffHand(new ItemStack(Material.SHIELD));
                     }
                 }
                 break;
@@ -10894,7 +10914,325 @@ public final class ArcadePortManager implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_BURP, 1.0F, 1.0F);
     }
 
-    private Set<Integer> randomPlayerSlots(int playerCount, int selectedCount) {
+    private ItemStack revivalPotion() {
+        ItemStack potion = new ItemStack(Material.SPLASH_POTION);
+        ItemMeta meta = potion.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.RESET + "Revival Potion");
+            meta.setLore(List.of(ChatColor.GRAY + "Splash near a fallen Human to revive them."));
+            potion.setItemMeta(meta);
+        }
+        return potion;
+    }
+
+    private boolean isWitherRevivalPotion(ItemStack item) {
+        if (item == null || item.getType() != Material.SPLASH_POTION || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && ChatColor.stripColor(meta.getDisplayName()).equalsIgnoreCase("Revival Potion");
+    }
+
+    private void disguiseMilkCowPlayer(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        Cow disguise = session.milkCowDisguises.get(id);
+        if (disguise == null || !disguise.isValid()) {
+            disguise = session.world.spawn(player.getLocation(), Cow.class);
+            disguise.setAI(false);
+            disguise.setInvulnerable(true);
+            disguise.setSilent(true);
+            disguise.setRemoveWhenFarAway(false);
+            disguise.setCustomName(ChatColor.RED + player.getName());
+            disguise.setCustomNameVisible(true);
+            session.milkCowDisguises.put(id, disguise);
+            session.entities.add(disguise);
+        }
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 60, 0, false, false, false));
+        disguise.teleport(player.getLocation());
+    }
+
+    private void disguiseWitherPlayer(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        Wither disguise = session.witherDisguises.get(id);
+        if (disguise == null || !disguise.isValid()) {
+            disguise = session.world.spawn(player.getLocation(), Wither.class);
+            disguise.setAI(false);
+            disguise.setInvulnerable(true);
+            disguise.setSilent(true);
+            disguise.setRemoveWhenFarAway(false);
+            disguise.setCustomName(ChatColor.RED + player.getName());
+            disguise.setCustomNameVisible(true);
+            session.witherDisguises.put(id, disguise);
+            session.entities.add(disguise);
+        }
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 60, 0, false, false, false));
+        disguise.teleport(player.getLocation());
+    }
+
+    private void playerOutWitherAssault(Session session, Player player) {
+        if (active != session || player == null || !session.alive.remove(player.getUniqueId())) return;
+        UUID id = player.getUniqueId();
+        player.playEffect(EntityEffect.HURT);
+        player.setHealth(player.getMaxHealth());
+        player.setVelocity(new Vector(0.0D, 1.2D, 0.0D));
+        player.setAllowFlight(true);
+        player.setFlying(true);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, Integer.MAX_VALUE, 0,
+                false, false, false));
+        Skeleton copy = session.world.spawn(player.getLocation(), Skeleton.class);
+        copy.setAI(false);
+        copy.setInvulnerable(true);
+        copy.setSilent(true);
+        copy.setGravity(false);
+        copy.setCollidable(false);
+        copy.setRemoveWhenFarAway(false);
+        copy.getEquipment().setArmorContents(player.getInventory().getArmorContents());
+        copy.setCustomName(ChatColor.YELLOW + "XX " + player.getName() + " XX");
+        copy.setCustomNameVisible(true);
+        session.witherOutCopies.put(id, copy);
+        session.entities.add(copy);
+        player.sendMessage(ChatColor.YELLOW + "You are down! A teammate can revive you with a Revival Potion.");
+        if (session.players.values().stream().noneMatch(p -> p.isOnline()
+                && session.alive.contains(p.getUniqueId())
+                && session.teams.getOrDefault(p.getUniqueId(), 0) == 0)) {
+            finish(session, null, true);
+            return;
+        }
+        checkRoundEnd(session);
+    }
+
+    private void reviveWitherHuman(Session session, Player thrower, UUID revivedId) {
+        if (active != session || thrower == null || !session.alive.contains(thrower.getUniqueId())
+                || session.teams.getOrDefault(thrower.getUniqueId(), 1) != 0) return;
+        Player revived = session.players.get(revivedId);
+        Skeleton copy = session.witherOutCopies.remove(revivedId);
+        if (revived == null || copy == null || !revived.isOnline() || !copy.isValid()) return;
+        Location at = copy.getLocation().clone();
+        copy.remove();
+        session.entities.remove(copy);
+        revived.teleport(at);
+        revived.setGameMode(GameMode.SURVIVAL);
+        revived.setHealth(revived.getMaxHealth());
+        revived.setFoodLevel(20);
+        revived.setSaturation(20.0F);
+        revived.setFireTicks(0);
+        revived.setAllowFlight(false);
+        revived.setFlying(false);
+        revived.removePotionEffect(PotionEffectType.INVISIBILITY);
+        revived.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 100, 4, false, false, false));
+        session.alive.add(revivedId);
+        session.lastLocations.put(revivedId, at.clone());
+        revived.sendMessage(ChatColor.GREEN + "You have been revived by " + thrower.getName() + "!");
+        thrower.sendMessage(ChatColor.GREEN + "Revived " + revived.getName() + ".");
+        thrower.playSound(thrower.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.4F);
+    }
+
+    private void updateWitherMinions(Session session, long now) {
+        for (Map.Entry<UUID, Long> entry : new ArrayList<>(session.witherMinionCreatedAt.entrySet())) {
+            UUID minionId = entry.getKey();
+            Entity entity = session.entities.stream().filter(candidate -> candidate.getUniqueId().equals(minionId))
+                    .findFirst().orElse(null);
+            if (!(entity instanceof Skeleton skeleton) || !skeleton.isValid()
+                    || now - entry.getValue() >= 15_000L || skeleton.getLocation().getY() < 0) {
+                session.entities.remove(entity);
+                if (entity != null && entity.isValid()) entity.remove();
+                session.witherMinionCreatedAt.remove(minionId);
+                session.witherMinionOwners.remove(minionId);
+                continue;
+            }
+            Player target = alivePlayers(session).stream()
+                    .filter(player -> session.teams.getOrDefault(player.getUniqueId(), 1) == 0)
+                    .min(java.util.Comparator.comparingDouble(p -> p.getLocation().distanceSquared(skeleton.getLocation())))
+                    .orElse(null);
+            if (target != null) skeleton.setTarget(target);
+        }
+    }
+
+    private void launchWitherMinions(Session session, Player player, long now) {
+        UUID owner = player.getUniqueId();
+        if (now < session.witherMinionReadyAt.getOrDefault(owner, 0L)) {
+            player.sendMessage(ChatColor.YELLOW + "Wither Minions are recharging.");
+            return;
+        }
+        session.witherMinionReadyAt.put(owner, now + 10_000L);
+        for (int i = 0; i < 2; i++) {
+            Skeleton minion = session.world.spawn(player.getEyeLocation(), Skeleton.class);
+            minion.setRemoveWhenFarAway(false);
+            minion.setCustomName(ChatColor.DARK_GRAY + "Skeletal Minion");
+            minion.setCustomNameVisible(false);
+            minion.getEquipment().setHelmet(new ItemStack(Material.WITHER_SKELETON_SKULL));
+            minion.getEquipment().setChestplate(new ItemStack(Material.LEATHER_CHESTPLATE));
+            minion.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 300, 0, false, false, false));
+            minion.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 300, 0, false, false, false));
+            Vector direction = player.getLocation().getDirection().clone();
+            direction.add(new Vector(ThreadLocalRandom.current().nextDouble(-0.25D, 0.25D),
+                    ThreadLocalRandom.current().nextDouble(-0.15D, 0.15D),
+                    ThreadLocalRandom.current().nextDouble(-0.25D, 0.25D))).normalize().multiply(1.1D);
+            minion.setVelocity(direction);
+            session.witherMinionOwners.put(minion.getUniqueId(), owner);
+            session.witherMinionCreatedAt.put(minion.getUniqueId(), now);
+            session.entities.add(minion);
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_WITHER_HURT, 1.0F, 0.7F);
+    }
+
+    private void useWitherScent(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        if (now < session.witherScentReadyAt.getOrDefault(id, 0L)) {
+            player.sendMessage(ChatColor.YELLOW + "Smell Humans is recharging.");
+            return;
+        }
+        session.witherScentReadyAt.put(id, now + 30_000L);
+        int revealed = 0;
+        for (Player human : alivePlayers(session)) {
+            if (session.teams.getOrDefault(human.getUniqueId(), 1) != 0) continue;
+            human.addPotionEffect(new PotionEffect(PotionEffectType.GLOWING, 80, 0, false, false, false));
+            human.getWorld().spawnParticle(Particle.SOUL, human.getLocation().add(0.0D, 1.0D, 0.0D), 14,
+                    0.35D, 0.5D, 0.35D, 0.02D);
+            revealed++;
+        }
+        player.sendMessage(ChatColor.RED + "Human scent found: " + revealed + " living Human(s).");
+        player.playSound(player.getLocation(), Sound.ENTITY_WARDEN_LISTENING_ANGRY, 0.8F, 1.1F);
+    }
+
+    private void updateWitherAssault(Session session, long now) {
+        if (active != session) return;
+        List<Player> withers = alivePlayers(session).stream()
+                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), 0) == 1).toList();
+        List<Player> humans = alivePlayers(session).stream()
+                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), 0) == 0).toList();
+        if (withers.isEmpty() && !humans.isEmpty() && session.participantsAtStart > 1) {
+            Player promoted = humans.get(ThreadLocalRandom.current().nextInt(humans.size()));
+            session.teams.put(promoted.getUniqueId(), 1);
+            promoted.teleport(witherAssaultSpawn(session, promoted));
+            giveKit(session, promoted);
+            withers = List.of(promoted);
+            announce(session, ChatColor.RED + promoted.getName() + " has become a Wither.");
+        }
+        for (Player wither : withers) {
+            UUID id = wither.getUniqueId();
+            if (!wither.getAllowFlight()) wither.setAllowFlight(true);
+            if (!wither.isFlying()) wither.setFlying(true);
+            disguiseWitherPlayer(session, wither);
+            double target = WitherAssaultMovementRules.targetFlySpeed(
+                    wither.getLocation().getY(), session.witherAssaultSpawnY, session.witherAssaultYLimit);
+            double current = session.witherFlySpeeds.getOrDefault(id,
+                    WitherAssaultMovementRules.SPAWN_HOVER_SPEED);
+            double next = WitherAssaultMovementRules.approachSpeed(current, target);
+            session.witherFlySpeeds.put(id, next);
+            wither.setFlySpeed((float) next);
+
+            List<Location> collisionCentres = new ArrayList<>();
+            for (int x = -2; x <= 2; x++) {
+                for (int y = -1; y <= 2; y++) {
+                    for (int z = -2; z <= 2; z++) {
+                        Block block = wither.getLocation().getBlock().getRelative(x, y, z);
+                        if (!block.getType().isAir() && !block.isPassable()) {
+                            collisionCentres.add(block.getLocation().add(0.5D, 0.5D, 0.5D));
+                        }
+                    }
+                }
+            }
+            Vector bump = new Vector();
+            for (Location centre : collisionCentres) {
+                Vector away = wither.getLocation().toVector().subtract(centre.toVector());
+                double distanceSquared = Math.max(0.25D, away.lengthSquared());
+                bump.add(away.normalize().multiply(1.0D / distanceSquared));
+            }
+            if (bump.lengthSquared() > 1.0E-5D) {
+                bump.normalize().multiply(0.6D);
+                bump.setY(Math.max(0.25D, Math.min(0.8D, bump.getY() + 0.4D)));
+                wither.setVelocity(bump);
+            }
+        }
+        for (Player human : humans) {
+            UUID id = human.getUniqueId();
+            String kit = session.witherAssaultKits.getOrDefault(id, "archer");
+            if (human.isOnGround()) {
+                long readyAt = session.witherLeapReadyAt.getOrDefault(id, 0L);
+                if (now >= readyAt && !human.getAllowFlight()) human.setAllowFlight(true);
+            }
+            if ("medic".equals(kit) && now >= session.witherMedicNextRefillAt.getOrDefault(id, now + 45_000L)) {
+                if (!hasRevivalPotion(human)) {
+                    human.getInventory().addItem(revivalPotion());
+                    human.playSound(human.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0F, 1.0F);
+                }
+                session.witherMedicNextRefillAt.put(id, now + 45_000L);
+            }
+            if ("archer".equals(kit) && now >= session.witherFletcherNextAt.getOrDefault(id, now + 4_000L)) {
+                int arrows = human.getInventory().all(Material.ARROW).values().stream()
+                        .mapToInt(ItemStack::getAmount).sum();
+                if (arrows < 4) human.getInventory().addItem(new ItemStack(Material.ARROW, 1));
+                session.witherFletcherNextAt.put(id, now + 4_000L);
+            }
+        }
+
+        // Fire Storm: blocking with the shield spends the charge bar and releases a pair of arrows per tick.
+        for (Player wither : withers) {
+            if (!wither.isBlocking()) {
+                wither.setExp(Math.min(0.999F, wither.getExp() + 0.05F));
+            } else if (wither.getExp() > 0.0F) {
+                wither.setExp(Math.max(0.0F, wither.getExp() - 0.05F));
+                for (int i = 0; i < 2; i++) {
+                    Arrow arrow = wither.launchProjectile(Arrow.class);
+                    arrow.setVelocity(wither.getLocation().getDirection().normalize().multiply(2.0D));
+                    session.witherFireArrows.add(arrow.getUniqueId());
+                    session.entities.add(arrow);
+                }
+                wither.getWorld().playSound(wither.getLocation(), Sound.BLOCK_FIRE_AMBIENT, 0.1F, 0.5F);
+            }
+        }
+
+        // Smoke Arrow: nearby Withers are blinded and the arrow is consumed on proximity.
+        for (UUID arrowId : new ArrayList<>(session.witherBlindArrows)) {
+            Entity entity = session.entities.stream().filter(candidate -> candidate.getUniqueId().equals(arrowId))
+                    .findFirst().orElse(null);
+            if (!(entity instanceof Arrow arrow) || !arrow.isValid() || arrow.isOnGround()
+                    || arrow.getTicksLived() > 120) {
+                session.witherBlindArrows.remove(arrowId);
+                session.entities.remove(entity);
+                if (entity != null && entity.isValid()) entity.remove();
+                continue;
+            }
+            Player closeWither = withers.stream()
+                    .filter(wither -> wither.getLocation().add(0.0D, 3.0D, 0.0D).distanceSquared(arrow.getLocation())
+                            <= 36.0D)
+                    .findFirst().orElse(null);
+            if (closeWither != null) {
+                closeWither.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 80, 0, false, false, false));
+                arrow.getWorld().spawnParticle(Particle.EXPLOSION, arrow.getLocation(), 1);
+                arrow.remove();
+                session.entities.remove(arrow);
+                session.witherBlindArrows.remove(arrowId);
+            } else {
+                arrow.getWorld().spawnParticle(Particle.LARGE_SMOKE, arrow.getLocation(), 1, 0, 0, 0, 0);
+            }
+        }
+        updateWitherMinions(session, now);
+    }
+
+    private boolean hasRevivalPotion(Player player) {
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (isWitherRevivalPotion(item)) return true;
+        }
+        return false;
+    }
+
+    private void launchWitherAssaultSkull(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        if (now < session.witherLastAttackAt.getOrDefault(id, 0L)) {
+            player.sendMessage(ChatColor.YELLOW + "Wither Skull is recharging.");
+            return;
+        }
+        session.witherLastAttackAt.put(id, now + 2_000L);
+        WitherSkull skull = player.launchProjectile(WitherSkull.class);
+        skull.setIsIncendiary(false);
+        skull.setYield(0.0F);
+        skull.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.15D));
+        session.entities.add(skull);
+        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_WITHER_SHOOT, 0.8F, 1.0F);
+    }
+
+    private boolean isQuiverBreakableGlass(Material material) {
         if (playerCount <= 0 || selectedCount <= 0) return Set.of();
         List<Integer> slots = new ArrayList<>();
         for (int i = 0; i < playerCount; i++) slots.add(i);
@@ -12838,7 +13176,21 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> milkBombReadyAt = new HashMap<>();
         final Map<UUID, Long> milkBodySlamStartedAt = new HashMap<>();
         final Map<UUID, Long> milkBodySlamReadyAt = new HashMap<>();
+        final Map<UUID, Cow> milkCowDisguises = new HashMap<>();
+        final Map<UUID, Long> milkChargeHungerAt = new HashMap<>();
         final Map<UUID, String> witherAssaultKits = new HashMap<>();
+        final Map<UUID, Wither> witherDisguises = new HashMap<>();
+        final Map<UUID, Skeleton> witherOutCopies = new HashMap<>();
+        final Map<UUID, UUID> witherMinionOwners = new HashMap<>();
+        final Map<UUID, Long> witherMinionCreatedAt = new HashMap<>();
+        final Map<UUID, Long> witherMinionReadyAt = new HashMap<>();
+        final Map<UUID, Long> witherScentReadyAt = new HashMap<>();
+        final Map<UUID, Long> witherLeapReadyAt = new HashMap<>();
+        final Map<UUID, Long> witherMedicNextRefillAt = new HashMap<>();
+        final Map<UUID, Long> witherFletcherNextAt = new HashMap<>();
+        final Set<UUID> witherBlindArrows = new HashSet<>();
+        final Set<UUID> witherFireArrows = new HashSet<>();
+        final Map<Block, BlockData> witherExplosionBlocks = new HashMap<>();
         final Set<Block> witherEditorBlocks = new HashSet<>();
         final Map<UUID, Long> witherLastAttackAt = new HashMap<>();
         final Map<UUID, Double> witherFlySpeeds = new HashMap<>();
