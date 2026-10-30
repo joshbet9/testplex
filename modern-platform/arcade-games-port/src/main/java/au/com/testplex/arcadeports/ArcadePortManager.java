@@ -1756,6 +1756,11 @@ public final class ArcadePortManager implements Listener {
 
     private void giveDeathTagKit(Session session, Player player, boolean chaser, boolean alphaChaser) {
         player.setGameMode(GameMode.ADVENTURE);
+        UUID playerId = player.getUniqueId();
+        session.deathTagRunnerTrailColours.putIfAbsent(playerId,
+                deathTagCosmeticChoice(playerId, "trail-colour", "white"));
+        session.deathTagRunnerTrailStyles.putIfAbsent(playerId,
+                deathTagCosmeticChoice(playerId, "trail-style", "classic"));
         player.getInventory().clear();
         for (PotionEffect effect : player.getActivePotionEffects()) player.removePotionEffect(effect.getType());
         if (chaser) {
@@ -1958,6 +1963,65 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private String deathTagCosmeticChoice(UUID playerId, String setting, String fallback) {
+        java.io.File cosmeticsFile = new java.io.File(plugin.getDataFolder(), "cosmetics.yml");
+        if (!cosmeticsFile.isFile()) return fallback;
+        org.bukkit.configuration.file.YamlConfiguration cosmetics =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(cosmeticsFile);
+        String value = cosmetics.getString("players." + playerId + ".arcade.deathtag." + setting, fallback);
+        return value == null || value.isBlank() ? fallback : value.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private Material deathTagTrailGlass(String colour) {
+        String materialName = switch (colour == null ? "white" : colour.toLowerCase(java.util.Locale.ROOT)) {
+            case "orange" -> "ORANGE_STAINED_GLASS";
+            case "magenta" -> "MAGENTA_STAINED_GLASS";
+            case "lightblue" -> "LIGHT_BLUE_STAINED_GLASS";
+            case "yellow" -> "YELLOW_STAINED_GLASS";
+            case "lime" -> "LIME_STAINED_GLASS";
+            case "pink" -> "PINK_STAINED_GLASS";
+            case "gray" -> "GRAY_STAINED_GLASS";
+            case "silver" -> "LIGHT_GRAY_STAINED_GLASS";
+            case "cyan" -> "CYAN_STAINED_GLASS";
+            case "purple" -> "PURPLE_STAINED_GLASS";
+            case "blue" -> "BLUE_STAINED_GLASS";
+            case "brown" -> "BROWN_STAINED_GLASS";
+            case "green" -> "GREEN_STAINED_GLASS";
+            case "red" -> "RED_STAINED_GLASS";
+            case "black" -> "BLACK_STAINED_GLASS";
+            default -> "WHITE_STAINED_GLASS";
+        };
+        Material material = Material.matchMaterial(materialName);
+        return material == null ? Material.WHITE_STAINED_GLASS : material;
+    }
+
+    private void updateDeathTagRunnerTrails(Session session) {
+        if (session.ticks % 3 != 0) return;
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            if (session.tagged.contains(id)) continue;
+            Location point = player.getLocation().clone().add(0.0D, 0.15D, 0.0D);
+            Material trailGlass = deathTagTrailGlass(session.deathTagRunnerTrailColours.get(id));
+            session.world.spawnParticle(Particle.BLOCK, point, 2,
+                    0.06D, 0.06D, 0.06D, 0.01D, trailGlass.createBlockData());
+
+            String style = session.deathTagRunnerTrailStyles.getOrDefault(id, "classic");
+            switch (style) {
+                case "soul" -> session.world.spawnParticle(Particle.WITCH, point, 3,
+                        0.12D, 0.12D, 0.12D, 0.01D);
+                case "sparks" -> session.world.spawnParticle(Particle.FIREWORK, point, 3,
+                        0.12D, 0.12D, 0.12D, 0.02D);
+                case "smoke" -> session.world.spawnParticle(Particle.SMOKE, point, 3,
+                        0.12D, 0.12D, 0.12D, 0.01D);
+                case "ender" -> session.world.spawnParticle(Particle.PORTAL, point, 3,
+                        0.12D, 0.12D, 0.12D, 0.01D);
+                case "hearts" -> session.world.spawnParticle(Particle.HEART, point, 2,
+                        0.12D, 0.12D, 0.12D, 0.01D);
+                default -> { /* Classic uses only the selected stained-glass trail. */ }
+            }
+        }
+    }
+
     private void updateDeathTagConditions(Session session, long now) {
         // Reborn's GameFlagManager enforces HungerSet=20 and resets saturation on FAST updates.
         if (session.ticks % 10 == 0) {
@@ -1985,6 +2049,7 @@ public final class ArcadePortManager implements Listener {
         updateDeathTagDisguises(session);
         updateDeathTagCompass(session);
         updateDeathTagScoreboard(session);
+        updateDeathTagRunnerTrails(session);
         for (Player player : alivePlayers(session)) {
             if (!session.tagged.contains(player.getUniqueId())
                     && "archer".equals(session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher"))) {
@@ -10875,6 +10940,8 @@ public final class ArcadePortManager implements Listener {
         Team deathTagChaserScoreboardLine;
         String deathTagChaserScoreboardEntry;
         final Map<UUID, String> deathTagRunnerKits = new HashMap<>();
+        final Map<UUID, String> deathTagRunnerTrailColours = new HashMap<>();
+        final Map<UUID, String> deathTagRunnerTrailStyles = new HashMap<>();
         final Map<UUID, Integer> deathTagChaserKillsByPlayer = new HashMap<>();
         final Map<UUID, Integer> deathTagComeAtMeBroAwards = new HashMap<>();
         final Map<UUID, Long> deathTagLastArrowAt = new HashMap<>();
