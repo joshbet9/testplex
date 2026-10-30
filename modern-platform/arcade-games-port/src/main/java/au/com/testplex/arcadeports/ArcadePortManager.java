@@ -1178,9 +1178,9 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
-        if (active != null) {
-            sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running: "
-                    + active.type.displayName() + ".");
+        if (active != null || monsterMazeRunning()) {
+            sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running"
+                    + (active == null ? " (Monster Maze)." : ": " + active.type.displayName() + "."));
             return;
         }
         if (manualStartCountdown != null) {
@@ -1307,8 +1307,9 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
-        if (active != null) {
-            sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running: " + active.type.displayName() + ".");
+        if (active != null || monsterMazeRunning()) {
+            sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running"
+                    + (active == null ? " (Monster Maze)." : ": " + active.type.displayName() + "."));
             return;
         }
         String selectedQueueKey = queueKey(type, mixedArcadeVariant);
