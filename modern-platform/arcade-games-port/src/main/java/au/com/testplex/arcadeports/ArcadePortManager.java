@@ -1291,7 +1291,7 @@ public final class ArcadePortManager implements Listener {
                 session.skyWarsKits.put(player.getUniqueId(), selectedKit);
                 session.skyWarsKitReadyAt.put(player.getUniqueId(), 0L);
                 if ("air".equals(selectedKit)) session.skyWarsSafeLocations.put(player.getUniqueId(), spawn.clone());
-                if ("earth".equals(selectedKit)) session.skyWarsNextDirtAt.put(player.getUniqueId(), now + 20_000L);
+                if ("earth".equals(selectedKit)) session.skyWarsNextDirtAt.put(player.getUniqueId(), now);
             }
             if (type == ArcadePortGame.RUNNER) {
                 UUID playerId = player.getUniqueId();
@@ -2893,11 +2893,7 @@ public final class ArcadePortManager implements Listener {
                         player.getInventory().addItem(namedItem(Material.COMPARATOR,
                                 "Magnet", "Right-click to pull a metal-armoured opponent towards you."));
                     }
-                    case "earth" -> {
-                        player.getInventory().addItem(new ItemStack(Material.WOODEN_SHOVEL));
-                        player.getInventory().setItem(2, namedItem(Material.DIRT, "Throwable Dirt",
-                                "Click to throw dirt and knock back an opponent."));
-                    }
+                    case "earth" -> player.getInventory().addItem(new ItemStack(Material.WOODEN_SHOVEL));
                     default -> { }
                 }
                 if ("air".equals(kit)) {
@@ -4189,10 +4185,8 @@ public final class ArcadePortManager implements Listener {
                 if (dirt < 4) {
                     player.getInventory().addItem(namedItem(Material.DIRT, "Throwable Dirt",
                             "Click to throw dirt and knock back an opponent."));
-                    session.skyWarsNextDirtAt.put(id, now + (dirt < 3 ? 1_000L : 20_000L));
-                } else {
-                    session.skyWarsNextDirtAt.put(id, now + 20_000L);
                 }
+                session.skyWarsNextDirtAt.put(id, now + 20_000L);
             }
         }
 
