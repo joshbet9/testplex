@@ -201,8 +201,8 @@ public final class ArcadePortManager implements Listener {
         Map<UUID, Player> queued = queues.get(type.id());
         int count = queued == null ? 0
                 : (int) queued.values().stream().filter(p -> p != null && p.isOnline()).count();
-        if (type == ArcadePortGame.TURF_WARS) {
-            Map<UUID, Player> mixedQueue = queues.get("turf-wars-mixed");
+        if (type == ArcadePortGame.TURF_WARS || type == ArcadePortGame.SKY_WARS) {
+            Map<UUID, Player> mixedQueue = queues.get(queueKey(type, true));
             if (mixedQueue != null) {
                 count += (int) mixedQueue.values().stream().filter(p -> p != null && p.isOnline()).count();
             }
@@ -211,7 +211,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private static String queueKey(ArcadePortGame type, boolean mixedArcadeVariant) {
-        return mixedArcadeVariant ? "turf-wars-mixed" : type.id();
+        return mixedArcadeVariant ? type.id() + "-mixed" : type.id();
     }
 
     public void removeFromQueues(Player player) {
@@ -728,8 +728,12 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "Unknown game id. Use /arcadeport help for the available IDs.");
             return;
         }
-        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS) {
-            player.sendMessage(ChatColor.RED + "The Mixed Arcade variant is only available for Turf Wars.");
+        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS && type != ArcadePortGame.SKY_WARS) {
+            player.sendMessage(ChatColor.RED + "That Mixed Arcade variant is not available.");
+            return;
+        }
+        if (type == ArcadePortGame.SKY_WARS && !mixedArcadeVariant) {
+            player.sendMessage(ChatColor.RED + "Use /arcadeport join skywars-mixed for the 16-player Mixed Arcade rules.");
             return;
         }
         if (!isGameEnabled(type)) {
@@ -746,16 +750,25 @@ public final class ArcadePortManager implements Listener {
                     + " is already counting down. Wait for that round to start before queueing another game.");
             return;
         }
+        String key = queueKey(type, mixedArcadeVariant);
+        LinkedHashMap<UUID, Player> targetQueue = queues.computeIfAbsent(key, ignored -> new LinkedHashMap<>());
+        int queuedPlayers = (int) targetQueue.values().stream()
+                .filter(queued -> queued != null && queued.isOnline()
+                        && !queued.getUniqueId().equals(player.getUniqueId())).count();
+        if (type == ArcadePortGame.SKY_WARS && mixedArcadeVariant
+                && !SkyWarsMixedArcadeRules.hasRoom(queuedPlayers)) {
+            player.sendMessage(ChatColor.RED + "SkyWars Mixed Arcade is full (16/16 players).");
+            return;
+        }
         lobby.ensurePlayerInLobby(player);
         for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(player.getUniqueId());
-        String key = queueKey(type, mixedArcadeVariant);
         queues.computeIfAbsent(key, ignored -> new LinkedHashMap<>()).put(player.getUniqueId(), player);
         String variantName = mixedArcadeVariant ? " (Mixed Arcade)" : "";
         String nextAction = manualStartCountdown != null && manualStartType == type
                 ? "The existing start countdown is already running."
                 : quickStart ? "Starting after a short join window so friends can join too."
                 : "An operator/player can use /arcadeport start "
-                        + (mixedArcadeVariant ? "turf-wars-mixed" : type.id()) + ".";
+                        + (mixedArcadeVariant ? type.id() + "-mixed" : type.id()) + ".";
         player.sendMessage(ChatColor.GREEN + "Queued for " + type.displayName() + variantName + ". " + nextAction);
         if (quickStart) scheduleQuickStart(type, mixedArcadeVariant);
     }
@@ -798,8 +811,12 @@ public final class ArcadePortManager implements Listener {
 
     public void startFromLobby(ArcadePortGame type, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
-        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS) {
-            sender.sendMessage(ChatColor.RED + "The Mixed Arcade variant is only available for Turf Wars.");
+        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS && type != ArcadePortGame.SKY_WARS) {
+            sender.sendMessage(ChatColor.RED + "That Mixed Arcade variant is not available.");
+            return;
+        }
+        if (type == ArcadePortGame.SKY_WARS && !mixedArcadeVariant) {
+            sender.sendMessage(ChatColor.RED + "Use /arcadeport start skywars-mixed for the 16-player Mixed Arcade rules.");
             return;
         }
         if (type == null) {
@@ -823,8 +840,7 @@ public final class ArcadePortManager implements Listener {
             clearLobbyCountdownStatus();
         }
         if (SourceMapCatalog.hasMap(type)) {
-            String selectedResource = plugin.getConfig().getString("selected-maps." + type.id(),
-                    SourceMapCatalog.resourceFor(type));
+            String selectedResource = SourceMapCatalog.selectedResource(plugin, type);
             if (!SourceMapCatalog.isInstalledResource(plugin, type, selectedResource)) {
                 sender.sendMessage(ChatColor.RED + "The selected map is no longer installed for " + type.displayName()
                         + ". Open Set Game and choose an installed map again.");
@@ -837,8 +853,14 @@ public final class ArcadePortManager implements Listener {
                 for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
                     existingQueue.remove(player.getUniqueId());
                 }
-                queues.computeIfAbsent(queueKey(type, mixedArcadeVariant), ignored -> new LinkedHashMap<>())
-                        .put(player.getUniqueId(), player);
+                LinkedHashMap<UUID, Player> targetQueue = queues.computeIfAbsent(
+                        queueKey(type, mixedArcadeVariant), ignored -> new LinkedHashMap<>());
+                if (type == ArcadePortGame.SKY_WARS && mixedArcadeVariant
+                        && targetQueue.size() >= SkyWarsMixedArcadeRules.MAX_PLAYERS) {
+                    player.sendMessage(ChatColor.YELLOW + "SkyWars Mixed Arcade is full (16 players); you were left in the lobby.");
+                    continue;
+                }
+                targetQueue.put(player.getUniqueId(), player);
             }
         }
         LinkedHashMap<UUID, Player> queue = queues.get(queueKey(type, mixedArcadeVariant));
@@ -918,8 +940,12 @@ public final class ArcadePortManager implements Listener {
 
     public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
-        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS) {
-            sender.sendMessage(ChatColor.RED + "The Mixed Arcade variant is only available for Turf Wars.");
+        if (mixedArcadeVariant && type != ArcadePortGame.TURF_WARS && type != ArcadePortGame.SKY_WARS) {
+            sender.sendMessage(ChatColor.RED + "That Mixed Arcade variant is not available.");
+            return;
+        }
+        if (type == ArcadePortGame.SKY_WARS && !mixedArcadeVariant) {
+            sender.sendMessage(ChatColor.RED + "Use /arcadeport start skywars-mixed for the 16-player Mixed Arcade rules.");
             return;
         }
         if (type == null) {
@@ -932,8 +958,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (SourceMapCatalog.hasMap(type)) {
-            String selectedResource = plugin.getConfig().getString("selected-maps." + type.id(),
-                    SourceMapCatalog.resourceFor(type));
+            String selectedResource = SourceMapCatalog.selectedResource(plugin, type);
             if (!SourceMapCatalog.isInstalledResource(plugin, type, selectedResource)) {
                 sender.sendMessage(ChatColor.RED + "The selected map is no longer installed for " + type.displayName()
                         + ". Open Set Game and choose an installed map again.");
@@ -954,10 +979,17 @@ public final class ArcadePortManager implements Listener {
             participants.add(requester);
         }
         if (participants.isEmpty()) {
-            String requestedId = mixedArcadeVariant ? "turf-wars-mixed" : type.id();
+            String requestedId = mixedArcadeVariant ? type.id() + "-mixed" : type.id();
             sender.sendMessage(ChatColor.YELLOW + "No online players queued. Use /arcadeport join "
                     + requestedId + " or /arcadeport play " + requestedId + ".");
             return;
+        }
+        if (type == ArcadePortGame.SKY_WARS && mixedArcadeVariant
+                && participants.size() > SkyWarsMixedArcadeRules.MAX_PLAYERS) {
+            for (Player overflow : participants.subList(SkyWarsMixedArcadeRules.MAX_PLAYERS, participants.size())) {
+                overflow.sendMessage(ChatColor.YELLOW + "SkyWars Mixed Arcade has a 16-player limit; you were left in the lobby.");
+            }
+            participants = new ArrayList<>(participants.subList(0, SkyWarsMixedArcadeRules.MAX_PLAYERS));
         }
         if (queue != null) queues.remove(selectedQueueKey);
         if (pendingStart != null && pendingType == type
@@ -1021,6 +1053,22 @@ public final class ArcadePortManager implements Listener {
             sender.sendMessage(ChatColor.RED + "The authentic " + type.displayName()
                     + " map or its WorldConfig metadata could not be loaded. No fallback arena was generated; see server logs.");
             return;
+        }
+        if (type == ArcadePortGame.SKY_WARS) {
+            SourceMapCatalog.MapData skyWarsMap = sourceMapData.get(type.id());
+            List<Location> skyWarsStarts = skyWarsMap == null ? List.of() : skyWarsMap.spawnLocations();
+            if (skyWarsStarts.isEmpty() && skyWarsMap != null) skyWarsStarts = skyWarsMap.dataLocations("GREEN");
+            if (skyWarsStarts.isEmpty()) {
+                sender.sendMessage(ChatColor.RED + "The selected SkyWars map has no authored player-island spawns. Choose a different map.");
+                return;
+            }
+            if (participants.size() > skyWarsStarts.size()) {
+                for (Player overflow : participants.subList(skyWarsStarts.size(), participants.size())) {
+                    overflow.sendMessage(ChatColor.YELLOW + "This SkyWars map has only "
+                            + skyWarsStarts.size() + " player spawns; you were left in the lobby.");
+                }
+                participants = new ArrayList<>(participants.subList(0, skyWarsStarts.size()));
+            }
         }
         if (type == ArcadePortGame.BACON_BRAWL
                 && !prepareBaconSourceSpawns(world, sourceMapData.get(type.id()), participants.size())) {
