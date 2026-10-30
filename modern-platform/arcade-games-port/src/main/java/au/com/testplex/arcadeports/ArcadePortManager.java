@@ -1684,9 +1684,21 @@ public final class ArcadePortManager implements Listener {
 
     private String gladiatorHotbarItemKey(ItemStack item) {
         if (item == null || item.getType().isAir()) return "";
+        Material type = item.getType();
         ItemMeta meta = item.getItemMeta();
-        return item.getType().name() + ":" + (meta != null && meta.hasDisplayName()
-                ? ChatColor.stripColor(meta.getDisplayName()) : "");
+        // Keep layouts stable when the tournament upgrades the weapon material each tier
+        // or when the lobby vote changes between bow, rod, modern and pot loadouts.
+        if (type.name().endsWith("_SWORD")) return "SWORD";
+        if (type == Material.BOW || type == Material.FISHING_ROD) return "RANGED";
+        if (type == Material.ARROW) return "ARROW";
+        if (type == Material.SHIELD) return "SHIELD";
+        if (meta != null && meta.getPersistentDataContainer().has(gladiatorPotionKey, PersistentDataType.BYTE)) {
+            return "HEALING_POTIONS";
+        }
+        if (meta != null && meta.hasDisplayName()) {
+            return type.name() + ":" + ChatColor.stripColor(meta.getDisplayName());
+        }
+        return type.name();
     }
 
     private void saveGladiatorHotbarLayout(Player player) {
