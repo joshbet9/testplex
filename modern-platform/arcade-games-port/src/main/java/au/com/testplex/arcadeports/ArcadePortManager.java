@@ -947,6 +947,7 @@ public final class ArcadePortManager implements Listener {
                 && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER)
                 || (type == ArcadePortGame.DRAGON_ESCAPE && !ArcadePortRules.DRAGON_ESCAPE_HAS_ROUND_TIMER)
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
+                : type == ArcadePortGame.GLADIATORS && participants.size() < 2 ? 0L
                 : type == ArcadePortGame.GLADIATORS ? 600_000L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
                 : ROUND_MS);
@@ -1194,8 +1195,12 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.GLADIATORS && participants.size() > 1) {
             beginGladiatorVote(session);
         } else if (type == ArcadePortGame.GLADIATORS && participants.size() == 1) {
-            session.gladiatorMode = GladiatorsMode.RODLESS.id();
+            String savedVote = gladiatorLobbyVotes.remove(participants.get(0).getUniqueId());
+            GladiatorsMode soloMode = GladiatorsMode.fromId(savedVote);
+            session.gladiatorMode = soloMode == null ? GladiatorsMode.RODLESS.id() : soloMode.id();
             giveGladiatorKit(session, participants.get(0));
+            participants.get(0).sendMessage(ChatColor.YELLOW
+                    + "Solo practice only: the double-elimination tournament begins when at least two players join.");
         }
         if (type == ArcadePortGame.MICRO_BATTLES) announce(session, ChatColor.AQUA + "Micro Battles: gather blocks; glass barriers drop after 10 seconds.");
         else announce(session, ChatColor.GOLD + type.displayName() + " started! This is a first-pass mechanics test.");
@@ -6124,8 +6129,9 @@ public final class ArcadePortManager implements Listener {
         // Dragon Escape is a course race: one surviving racer is not a round winner.
         // Keep solo practice and last-runner attempts live until the finish is reached.
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) return;
-        if (session.type == ArcadePortGame.GLADIATORS && session.participantsAtStart > 1) {
-            progressGladiators(session);
+        if (session.type == ArcadePortGame.GLADIATORS) {
+            if (session.participantsAtStart > 1) progressGladiators(session);
+            // Solo practice remains live until the operator stops it; it is not a tournament win.
             return;
         }
         if ((session.type == ArcadePortGame.MICRO_BATTLES || session.type == ArcadePortGame.PAINTBALL
