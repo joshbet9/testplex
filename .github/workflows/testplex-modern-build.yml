@@ -71,6 +71,7 @@ jobs:
           jar tf "$maze_jar" | grep -Fxq "plugin.yml"
           jar tf "$maze_jar" | grep -Fxq "me/monstermaze/MonsterMazePlugin.class"
           jar tf "$maze_jar" | grep -Fxq "me/monstermaze/maze/MazeGenerator.class"
+          jar tf "$maze_jar" | grep -Fxq "me/monstermaze/util/PlayerFeedback.class"
           unzip -p "$maze_jar" plugin.yml | grep -Fxq "name: MonsterMazeModern"
           unzip -p "$maze_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
           jar tf "$snake_jar" | grep -Fxq "plugin.yml"
@@ -85,7 +86,7 @@ jobs:
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
           unzip -p "$arcade_jar" config.yml | grep -Fxq "  - bacon-brawl"
           ! unzip -p "$arcade_jar" config.yml | grep -Eq "^  - (bomb-lobbers|death-tag|dragon-escape|dragons|evolution|gladiators|micro-battles|one-in-the-quiver|paintball|runner|sheep-quest|spleef|turf-wars)$"
-          echo "All four modern Paper 26.3 plugin artifacts verified; only Bacon Brawl is enabled for live acceptance."
+          echo "All four modern Paper 26.3 plugin artifacts verified; Monster Maze feedback is packaged and Bacon Brawl remains the only other enabled Arcade mechanics prototype."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
@@ -111,7 +112,9 @@ jobs:
             echo "- Catalogue: 16 Arcade games"
             echo "- Built artifacts: TestplexModernArcade.jar, MonsterMazeModern.jar, SnakeModern.jar and ArcadeMechanicsModern.jar"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
-            echo "- Gameplay ports: Monster Maze/Snake plus 14 mechanics-first prototypes; in-game validation still required"
+            echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
+            echo "- Gameplay ports: Monster Maze and Snake plus 14 mechanics-first prototypes; in-game validation still required"
+            echo "- Deployment acceptance: Monster Maze plugin will be installed with the platform; Snake remains gated"
             echo "- Server deploy: successful pushes to feat/testplex-modern-26.3-platform automatically invoke the isolated Hyper-V deploy job; pull requests and manual build-only runs do not deploy"
           } >> "$GITHUB_STEP_SUMMARY"
 
