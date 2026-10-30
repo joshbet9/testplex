@@ -7,6 +7,8 @@ import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.Color;
 import org.bukkit.DyeColor;
 import org.bukkit.EntityEffect;
+import org.bukkit.Effect;
+import org.bukkit.FireworkEffect;
 import org.bukkit.GameMode;
 import org.bukkit.GameRule;
 import org.bukkit.Location;
@@ -31,6 +33,7 @@ import org.bukkit.entity.EnderDragon;
 import org.bukkit.entity.Egg;
 import org.bukkit.entity.Fireball;
 import org.bukkit.entity.FallingBlock;
+import org.bukkit.entity.Firework;
 import org.bukkit.entity.Horse;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.LivingEntity;
@@ -76,6 +79,7 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.FireworkMeta;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
@@ -2500,9 +2504,8 @@ public final class ArcadePortManager implements Listener {
         leapEntity.setVelocity(ArcadePortRules.dragonsLeapVelocity(
                 leapEntity.getLocation().getDirection(), leapEntity.isOnGround()));
         leapEntity.setFallDistance(0.0F);
-        player.getWorld().spawnParticle(Particle.FLAME, player.getLocation(), 8,
-                0.12D, 0.12D, 0.12D, 0.01D);
-        player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 1.0F, 1.0F);
+        player.setFallDistance(0.0F);
+        player.playEffect(player.getLocation(), Effect.BLAZE_SHOOT, 8);
         player.sendMessage(ChatColor.YELLOW + "Skill: " + ChatColor.GREEN + "You used Leap.");
     }
 
@@ -4296,7 +4299,9 @@ public final class ArcadePortManager implements Listener {
         }
 
         long dragonCount = session.entities.stream().filter(e -> e instanceof EnderDragon && e.isValid()).count();
-        if (ArcadePortRules.shouldSpawnTestDragon((int) dragonCount, now, session.dragonNextSpawnAt)) {
+        if (now >= session.dragonNextSpawnAt) {
+            session.dragonNextSpawnAt = now + ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS;
+            if (dragonCount < ArcadePortRules.DRAGONS_MAX_DRAGONS) {
             SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
             // Reborn only reads WorldData.GetDataLocs("RED"). It does not invent spawn
             // positions when a map has no RED locations.
@@ -4307,7 +4312,6 @@ public final class ArcadePortManager implements Listener {
                             + "No dragons will spawn until a valid source map is selected.");
                     session.dragonMissingSpawnWarned = true;
                 }
-                session.dragonNextSpawnAt = now + ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS;
             } else {
                 Location spawn = spawns.get(ThreadLocalRandom.current().nextInt(spawns.size())).clone();
                 EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
@@ -4319,8 +4323,8 @@ public final class ArcadePortManager implements Listener {
                 dragon.setRemoveWhenFarAway(false);
                 session.entities.add(dragon);
                 session.dragonTargetLocations.put(dragon.getUniqueId(), randomDragonSkyTarget(session));
-                session.dragonNextSpawnAt = now + ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS;
                 spawn.getWorld().playSound(spawn, Sound.ENTITY_ENDER_DRAGON_GROWL, 20.0F, 1.0F);
+            }
             }
         }
 
@@ -4375,8 +4379,7 @@ public final class ArcadePortManager implements Listener {
             }
             if (perkUpdate) {
                 Location itemLocation = item.getLocation();
-                item.getWorld().spawnParticle(Particle.FIREWORK, itemLocation, 1,
-                        0.08D, 0.08D, 0.08D, 0.0D);
+                renderDragonSparklerBurst(itemLocation);
             }
             if (!targetUpdate) continue;
             Location itemLocation = item.getLocation();
@@ -4752,6 +4755,20 @@ public final class ArcadePortManager implements Listener {
                 world.spawnParticle(Particle.END_ROD, location, 14, 0.45D, 0.4D, 0.45D, 0.02D);
             }
         }
+    }
+
+    private void renderDragonSparklerBurst(Location location) {
+        if (location == null || location.getWorld() == null) return;
+        Firework firework = location.getWorld().spawn(location, Firework.class);
+        FireworkMeta meta = firework.getFireworkMeta();
+        meta.clearEffects();
+        meta.addEffect(FireworkEffect.builder()
+                .with(FireworkEffect.Type.BURST)
+                .withColor(Color.YELLOW)
+                .build());
+        meta.setPower(0);
+        firework.setFireworkMeta(meta);
+        firework.detonate();
     }
 
     private void updateDragonBarrageCharge(Session session, Player player, long now) {
@@ -7699,11 +7716,6 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().set(path + "knockouts",
                         plugin.getConfig().getInt(path + "knockouts", 0) + 1);
             }
-            if (session.type == ArcadePortGame.DRAGONS) {
-                plugin.getConfig().set(path + "sparklez",
-                        plugin.getConfig().getInt(path + "sparklez", 0)
-                                + session.dragonSparklezThrows.getOrDefault(id, 0));
-            }
             boolean won = winnerId != null && (winnerId.equals(id)
                     || (session.type == ArcadePortGame.BOMB_LOBBERS && session.alive.contains(id)
                         && session.teams.getOrDefault(id, -2) == winningTeam));
@@ -9568,7 +9580,9 @@ public final class ArcadePortManager implements Listener {
                 sparkler.setVelocity(direction.multiply(0.8D).setY(direction.getY() * 0.8D + 0.1D));
                 session.entities.add(sparkler);
                 session.dragonSparklerItems.add(sparkler.getUniqueId());
-                session.dragonSparklezThrows.merge(id, 1, Integer::sum);
+                String sparklezPath = localStatsPath(id, "dragons") + "sparklez";
+                plugin.getConfig().set(sparklezPath, plugin.getConfig().getInt(sparklezPath, 0) + 1);
+                plugin.saveConfig(); // SparklezStatTracker records each ThrowSparklerEvent immediately.
                 player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.8F, 1.2F);
                 return;
             }
