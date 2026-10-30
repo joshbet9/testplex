@@ -119,7 +119,7 @@ public final class ArcadeCatalog {
                 win("falling-stars", "Falling Stars", "A narrow star shower descends onto the platform")));
 
         register(game("monster-maze", "Monster Maze", "ROTTEN_FLESH", "Reach the active Safe Pad while mobs pursue each stage.",
-                GameDefinition.PortStatus.READY_FOR_TEST,
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(lineMulti("mob-sets", "Mob Forms", "Enable multiple mob forms independently for the round.", "CREEPER_HEAD",
                         single("creeper", "Creeper", "Creeper form"),
                         single("skeleton", "Skeleton", "Skeleton form"),
