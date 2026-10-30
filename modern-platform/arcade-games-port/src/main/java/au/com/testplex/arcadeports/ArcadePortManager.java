@@ -6419,6 +6419,24 @@ public final class ArcadePortManager implements Listener {
                 0.25D, 0.35D, 0.25D, 0.04D);
     }
 
+    private void applyGladiatorEnvironmentalDamage(Session session, Player target, double damage, String reason) {
+        if (active != session || target == null || !Double.isFinite(damage) || damage <= 0.0D) return;
+        Integer pair = session.gladiatorPairs.get(target.getUniqueId());
+        if (pair == null || session.gladiatorResolvedPairs.contains(pair)) return;
+        long fightStartsAt = session.gladiatorFightStartsAtByPair.getOrDefault(pair, Long.MAX_VALUE);
+        if (System.currentTimeMillis() < fightStartsAt || target.getNoDamageTicks() > 0) return;
+        target.setNoDamageTicks(10);
+        if (target.getHealth() <= damage) {
+            eliminate(session, target, null, reason);
+            return;
+        }
+        target.setHealth(target.getHealth() - damage);
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 0.85F);
+        target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                target.getLocation().clone().add(0.0D, 1.0D, 0.0D), 4,
+                0.22D, 0.3D, 0.22D, 0.03D);
+    }
+
     private void handleGladiatorElimination(Session session, Player victim, Player killer, String reason) {
         UUID victimId = victim.getUniqueId();
         Integer pair = session.gladiatorPairs.get(victimId);
@@ -6434,7 +6452,9 @@ public final class ArcadePortManager implements Listener {
             }
         }
         Player opponent = opponentId == null ? null : session.players.get(opponentId);
-        if (killer == null || !killer.isOnline() || !killer.getUniqueId().equals(opponentId)) killer = opponent;
+        boolean creditedPlayerKill = killer != null && killer.isOnline()
+                && killer.getUniqueId().equals(opponentId);
+        if (!creditedPlayerKill) killer = opponent;
         if (killer == null || !killer.isOnline()) {
             session.alive.remove(victimId);
             session.gladiatorPairs.remove(victimId);
@@ -6450,11 +6470,13 @@ public final class ArcadePortManager implements Listener {
         session.gladiatorFightStartsAtByPair.remove(pair);
         session.gladiatorRoundStartedAtByPair.remove(pair);
         session.gladiatorNextPoisonAtByPair.remove(pair);
-        session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
-        if (ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(killer.getHealth())) {
-            awardGladiatorsAchievement(killer, "not-even-close", "Not even close.");
+        if (creditedPlayerKill) {
+            session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+            if (ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(killer.getHealth())) {
+                awardGladiatorsAchievement(killer, "not-even-close", "Not even close.");
+            }
+            announceGladiatorKill(session, killer, victim);
         }
-        announceGladiatorKill(session, killer, victim);
 
         int losses = session.gladiatorLosses.merge(victimId, 1, Integer::sum);
         victim.leaveVehicle();
@@ -8739,17 +8761,21 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.GLADIATORS
                 && event.getEntity() instanceof Player gladiatorTarget
-                && session.players.containsKey(gladiatorTarget.getUniqueId())
-                && event instanceof EntityDamageByEntityEvent gladiatorDamage) {
-            Entity damager = gladiatorDamage.getDamager();
-            Player attacker = damager instanceof Player direct ? direct
-                    : damager instanceof Projectile projectile
-                        && projectile.getShooter() instanceof Player shooter ? shooter : null;
+                && session.players.containsKey(gladiatorTarget.getUniqueId())) {
             double finalDamage = event.getFinalDamage();
             event.setCancelled(true);
-            if (attacker != null && session.alive.contains(attacker.getUniqueId())
-                    && session.alive.contains(gladiatorTarget.getUniqueId())) {
-                applyGladiatorDamage(session, attacker, gladiatorTarget, finalDamage, damager instanceof Projectile);
+            if (event instanceof EntityDamageByEntityEvent gladiatorDamage) {
+                Entity damager = gladiatorDamage.getDamager();
+                Player attacker = damager instanceof Player direct ? direct
+                        : damager instanceof Projectile projectile
+                            && projectile.getShooter() instanceof Player shooter ? shooter : null;
+                if (attacker != null && session.alive.contains(attacker.getUniqueId())
+                        && session.alive.contains(gladiatorTarget.getUniqueId())) {
+                    applyGladiatorDamage(session, attacker, gladiatorTarget, finalDamage, damager instanceof Projectile);
+                }
+            } else if (session.alive.contains(gladiatorTarget.getUniqueId())) {
+                String reason = event.getCause().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+                applyGladiatorEnvironmentalDamage(session, gladiatorTarget, finalDamage, reason);
             }
             return;
         }
