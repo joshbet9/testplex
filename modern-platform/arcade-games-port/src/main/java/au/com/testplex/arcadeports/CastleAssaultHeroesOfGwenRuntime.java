@@ -16,9 +16,12 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.EnderCrystal;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
+import org.bukkit.entity.Arrow;
+import org.bukkit.entity.Snowball;
 import org.bukkit.entity.TNTPrimed;
 import org.bukkit.entity.Wither;
 import org.bukkit.entity.Zombie;
@@ -29,16 +32,28 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.EntityShootBowEvent;
+import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerToggleSneakEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
@@ -94,6 +109,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final NamespacedKey shopRoleKey;
     private final NamespacedKey kingKey;
     private final NamespacedKey towerKey;
+    private final NamespacedKey heroSkillKey;
+    private final NamespacedKey heroProjectileTypeKey;
+    private final NamespacedKey heroProjectileOwnerKey;
     private final Map<Integer, KingState> kings = new HashMap<>();
     private final Map<UUID, Integer> playerGold = new HashMap<>();
     private final Map<UUID, ItemStack> carriedTntOldHelmet = new HashMap<>();
@@ -101,9 +119,25 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final List<CapturePointState> capturePoints = new ArrayList<>();
     private final Map<Integer, Wither> withers = new HashMap<>();
     private final Map<Integer, Boolean> witherDamageable = new HashMap<>();
+    private final Map<Integer, Location> witherHomes = new HashMap<>();
+    private final Map<Integer, List<Location>> witherBoundaries = new HashMap<>();
+    private final Map<Integer, UUID> witherTargets = new HashMap<>();
+    private final Map<Integer, Long> witherNextEarthquakeAt = new HashMap<>();
+    private final Set<FallingBlock> witherDebris = new HashSet<>();
     private final List<Location> objectiveTntSpawns = new ArrayList<>();
     private final List<Block> castleChests = new ArrayList<>();
     private final Map<UUID, Integer> castleKillStreaks = new HashMap<>();
+    private final Map<UUID, String> castleAssaultPlayerKits = new HashMap<>();
+    private final Map<UUID, Long> castleArcherNextArrowAt = new HashMap<>();
+    private final Map<UUID, Long> castleDemolitionistNextTntAt = new HashMap<>();
+    private final Map<UUID, String> selectedHeroesOfGwen = new HashMap<>();
+    private final Map<UUID, Map<String, Long>> heroSkillReadyAt = new HashMap<>();
+    private final Map<UUID, Integer> heroTntArrowCharges = new HashMap<>();
+    private final Map<UUID, Long> heroAmmoNextAt = new HashMap<>();
+    private final Map<UUID, Long> heroEnderBladeEndsAt = new HashMap<>();
+    private final Map<UUID, ItemStack> heroEnderBladeOriginalSword = new HashMap<>();
+    private final Map<UUID, Long> heroInfinityEndsAt = new HashMap<>();
+    private final Map<UUID, Integer> heroInfinityOriginalEnchant = new HashMap<>();
     private final List<StoreEntry> storeEntries = new ArrayList<>();
     private final Map<UUID, StoreHolder> openStores = new HashMap<>();
 
@@ -144,6 +178,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         this.shopRoleKey = new NamespacedKey(plugin, "heroes-gwen-store-role");
         this.kingKey = new NamespacedKey(plugin, "castle-king-team");
         this.towerKey = new NamespacedKey(plugin, "heroes-gwen-tower");
+        this.heroSkillKey = new NamespacedKey(plugin, "heroes-gwen-skill");
+        this.heroProjectileTypeKey = new NamespacedKey(plugin, "heroes-gwen-projectile-type");
+        this.heroProjectileOwnerKey = new NamespacedKey(plugin, "heroes-gwen-projectile-owner");
         for (Player player : participants) {
             this.players.put(player.getUniqueId(), player);
             this.activePlayers.add(player.getUniqueId());
@@ -301,6 +338,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (maxHealth != null) maxHealth.setBaseValue(275.0D);
         wither.setHealth(275.0D);
         wither.setAI(false);
+        wither.setGravity(false);
         wither.setInvulnerable(false);
         wither.setSilent(true);
         wither.setRemoveWhenFarAway(false);
@@ -310,6 +348,139 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         entities.add(wither);
         withers.put(team, wither);
         witherDamageable.put(team, false);
+        witherHomes.put(team, location.clone());
+        String boundaryMarker = team == 0 ? "ORANGE" : "LIGHT_BLUE";
+        List<Location> boundary = new ArrayList<>(map.dataLocations(boundaryMarker).stream()
+                .map(Location::clone).toList());
+        if (boundary.size() >= 3) {
+            double centerX = boundary.stream().mapToDouble(Location::getX).average().orElse(0.0D);
+            double centerZ = boundary.stream().mapToDouble(Location::getZ).average().orElse(0.0D);
+            boundary.sort(java.util.Comparator.comparingDouble(point ->
+                    Math.atan2(point.getZ() - centerZ, point.getX() - centerX)));
+        }
+        witherBoundaries.put(team, boundary);
+        witherNextEarthquakeAt.put(team, System.currentTimeMillis() + ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS);
+    }
+
+    private void updateMobaWithers(long now) {
+        for (int team = 0; team < 2; team++) {
+            final int ownerTeam = team;
+            Wither wither = withers.get(team);
+            Location home = witherHomes.get(team);
+            if (wither == null || !wither.isValid() || home == null) continue;
+
+            Player target = witherTargets.containsKey(team) ? players.get(witherTargets.get(team)) : null;
+            if (!isValidWitherTarget(team, target)) {
+                target = activeMatchPlayers().stream()
+                        .filter(player -> isValidWitherTarget(ownerTeam, player))
+                        .min(java.util.Comparator.comparingDouble(player ->
+                                player.getLocation().distanceSquared(home)))
+                        .orElse(null);
+                if (target == null) witherTargets.remove(team);
+                else witherTargets.put(team, target.getUniqueId());
+            }
+
+            Location goal = target == null ? home : target.getLocation();
+            moveWitherDirectly(wither, goal, target == null
+                    ? ArcadePortRules.HEROES_OF_GWEN_WITHER_HOME_SPEED : ArcadePortRules.HEROES_OF_GWEN_WITHER_TARGET_SPEED);
+            if (target != null) {
+                long nextAttack = witherNextEarthquakeAt.getOrDefault(team, now);
+                if (now >= nextAttack) {
+                    earthquakeWither(team, wither);
+                    witherNextEarthquakeAt.put(team, now + ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS);
+                }
+            }
+        }
+    }
+
+    private boolean isValidWitherTarget(int team, Player target) {
+        return target != null && target.isOnline() && activePlayers.contains(target.getUniqueId())
+                && teams.getOrDefault(target.getUniqueId(), -1) == 1 - team
+                && isInsideWitherBoundary(team, target.getLocation());
+    }
+
+    private boolean isInsideWitherBoundary(int team, Location location) {
+        List<Location> points = witherBoundaries.getOrDefault(team, List.of());
+        if (points.size() < 3) return false;
+        double x = location.getX();
+        double z = location.getZ();
+        boolean inside = false;
+        for (int i = 0, j = points.size() - 1; i < points.size(); j = i++) {
+            double xi = points.get(i).getX();
+            double zi = points.get(i).getZ();
+            double xj = points.get(j).getX();
+            double zj = points.get(j).getZ();
+            boolean crosses = (zi > z) != (zj > z)
+                    && x < (xj - xi) * (z - zi) / ((zj - zi) == 0.0D ? 0.000001D : zj - zi) + xi;
+            if (crosses) inside = !inside;
+        }
+        return inside;
+    }
+
+    private void moveWitherDirectly(Wither wither, Location goal, double sourceSpeed) {
+        Location current = wither.getLocation();
+        Vector direction = goal.toVector().subtract(current.toVector());
+        if (direction.lengthSquared() < 4.0D) return;
+        current.setDirection(direction);
+        current.add(direction.normalize().multiply(ArcadePortRules.heroesOfGwenWitherStepPerTick(sourceSpeed)));
+        wither.teleport(current);
+        wither.setVelocity(new Vector());
+    }
+
+    private void earthquakeWither(int team, Wither wither) {
+        Location center = wither.getLocation();
+        for (Entity entity : world.getNearbyEntities(center, ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS,
+                ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS, ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS)) {
+            if (!(entity instanceof Player player) || !activePlayers.contains(player.getUniqueId())
+                    || teams.getOrDefault(player.getUniqueId(), -1) == team) continue;
+            double distance = Math.min(center.distance(player.getLocation()),
+                    center.distance(player.getEyeLocation()));
+            if (distance >= ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS) continue;
+            double damage = ArcadePortRules.heroesOfGwenWitherEarthquakeDamage(distance);
+            if (player.getHealth() <= damage) {
+                hooks.eliminate(player, null, "was struck by the enemy Wither's Earthquake");
+            } else {
+                player.setHealth(player.getHealth() - damage);
+            }
+            Vector knockback = player.getLocation().toVector().subtract(center.toVector());
+            if (knockback.lengthSquared() > 0.001D) {
+                player.setVelocity(knockback.normalize().setY(1.0D));
+            }
+        }
+
+        int radius = (int) ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS;
+        int minY = Math.max(world.getMinHeight(), center.getBlockY() - radius);
+        int maxY = Math.min(world.getMaxHeight() - 1, center.getBlockY() + radius);
+        for (int x = center.getBlockX() - radius; x <= center.getBlockX() + radius; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = center.getBlockZ() - radius; z <= center.getBlockZ() + radius; z++) {
+                    Block block = world.getBlockAt(x, y, z);
+                    if (block.getType().isAir() || !block.getRelative(BlockFace.UP).getType().isAir()
+                            || block.getLocation().distanceSquared(center) > radius * radius
+                            || ThreadLocalRandom.current().nextDouble() > 0.1D) continue;
+                    FallingBlock debris = world.spawnFallingBlock(
+                            block.getLocation().add(0.5D, 1.0D, 0.5D), block.getBlockData());
+                    debris.setHurtEntities(false);
+                    debris.setDropItem(false);
+                    Vector trajectory = debris.getLocation().toVector().subtract(center.toVector());
+                    if (trajectory.lengthSquared() > 0.001D) {
+                        debris.setVelocity(trajectory.normalize().multiply(0.25D)
+                                .setY(0.7D + ThreadLocalRandom.current().nextDouble()));
+                    }
+                    witherDebris.add(debris);
+                }
+            }
+        }
+        world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 1.0F, 0.7F);
+        world.spawnParticle(Particle.EXPLOSION, center, 2, 0.4D, 0.3D, 0.4D, 0.02D);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onWitherDebrisLand(EntityChangeBlockEvent event) {
+        if (event.getEntity() instanceof FallingBlock falling && witherDebris.remove(falling)) {
+            event.setCancelled(true);
+            falling.remove();
+        }
     }
 
     private Location findTowerCrystalBase(Location location) {
@@ -515,6 +686,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void tickCastleAssault(long now) {
+        refillCastleArcherArrows(now);
         if (objectiveItem != null && objectiveItem.isValid() && activeObjectiveSpawn != null) {
             objectiveItem.teleport(activeObjectiveSpawn);
             objectiveItem.setVelocity(new Vector());
@@ -602,6 +774,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void tickHeroesOfGwen(long now) {
+        updateMobaWithers(now);
+        updateHeroesOfGwenAbilities(now);
         if (now >= nextGoldAt) {
             for (Player player : activeMatchPlayers()) addGold(player, 20, "Passive gold");
             for (CapturePointState point : capturePoints) {
@@ -644,29 +818,101 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             double chance = ThreadLocalRandom.current().nextDouble();
             double subChance = ThreadLocalRandom.current().nextDouble();
             ItemStack loot;
+            // Match CastleAssault.fillChest() thresholds: ranged 30%, potions 20%, rods/gaps 10%, misc 40%.
             if (chance <= 0.30D) {
                 loot = ThreadLocalRandom.current().nextBoolean()
-                        ? new ItemStack(Material.EGG, 3 + ThreadLocalRandom.current().nextInt(3))
-                        : new ItemStack(Material.ARROW, 8 + ThreadLocalRandom.current().nextInt(9));
+                        ? new ItemStack(Material.EGG, ThreadLocalRandom.current().nextInt(3, 6))
+                        : new ItemStack(Material.ARROW, ThreadLocalRandom.current().nextInt(8, 17));
             } else if (chance <= 0.50D) {
-                loot = subChance <= 0.45D
-                        ? new ItemStack(Material.GOLDEN_APPLE)
-                        : new ItemStack(Material.POTION);
+                if (subChance <= 0.45D) {
+                    loot = castlePotion(Material.POTION, PotionEffectType.REGENERATION, 900, 0,
+                            "Regeneration Potion");
+                } else if (ThreadLocalRandom.current().nextBoolean()) {
+                    loot = castlePotion(Material.POTION, PotionEffectType.SPEED, 3600, 0, "Speed Potion");
+                } else {
+                    loot = castlePotion(Material.SPLASH_POTION, PotionEffectType.REGENERATION, 22 * 20, 1,
+                            "Splash Regeneration II Potion");
+                }
             } else if (chance <= 0.60D) {
                 loot = ThreadLocalRandom.current().nextBoolean()
-                        ? new ItemStack(Material.FISHING_ROD)
-                        : new ItemStack(Material.GOLDEN_APPLE);
+                        ? castleUnbreakableRod()
+                        : namedItem(Material.GOLDEN_APPLE, ChatColor.LIGHT_PURPLE + "Golden Applegate",
+                                "Castle Assault chest reward.");
             } else {
-                loot = switch (ThreadLocalRandom.current().nextInt(4)) {
-                    case 0 -> new ItemStack(Material.ENDER_PEARL);
-                    case 1 -> new ItemStack(Material.WATER_BUCKET);
-                    case 2 -> new ItemStack(Material.FLINT_AND_STEEL);
-                    default -> new ItemStack(Material.SNOWBALL, 16);
-                };
+                int weighted = ThreadLocalRandom.current().nextInt(9);
+                loot = weighted < 2 ? new ItemStack(Material.ENDER_PEARL)
+                        : weighted < 4 ? new ItemStack(Material.WATER_BUCKET)
+                        : weighted < 6 ? castleFlintAndSteel(4, false)
+                        : new ItemStack(Material.SNOWBALL, 16);
             }
             inventory.setItem(slot, loot);
         }
         chest.update(true, false);
+    }
+
+    private static ItemStack namedItem(Material material, String name, String lore, int amount) {
+        ItemStack item = namedItem(material, name, lore);
+        item.setAmount(Math.max(1, Math.min(item.getMaxStackSize(), amount)));
+        return item;
+    }
+
+    private ItemStack castlePotion(Material material, PotionEffectType effect, int durationTicks,
+            int amplifier, String displayName) {
+        ItemStack item = new ItemStack(material);
+        PotionMeta meta = (PotionMeta) item.getItemMeta();
+        meta.addCustomEffect(new PotionEffect(effect, durationTicks, amplifier), true);
+        meta.setDisplayName(ChatColor.LIGHT_PURPLE + displayName);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack castleUnbreakableRod() {
+        ItemStack item = new ItemStack(Material.FISHING_ROD);
+        ItemMeta meta = item.getItemMeta();
+        meta.setUnbreakable(true);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private boolean isCastleKitItem(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null || !meta.hasLore()) return false;
+        return meta.getLore().stream().map(ChatColor::stripColor).anyMatch(lore ->
+                lore != null && ("Kit Item".equalsIgnoreCase(lore.trim())
+                        || "Castle Assault kit item".equalsIgnoreCase(lore.trim())));
+    }
+
+    private ItemStack castleFlintAndSteel(int remainingUses, boolean kitItem) {
+        ItemStack item = new ItemStack(Material.FLINT_AND_STEEL);
+        ItemMeta meta = item.getItemMeta();
+        if (meta instanceof Damageable damageable) {
+            int maximum = Material.FLINT_AND_STEEL.getMaxDurability();
+            damageable.setDamage(Math.max(0, maximum - Math.max(1, Math.min(maximum, remainingUses))));
+        }
+        meta.setDisplayName(ChatColor.GOLD + "Flint and Steel");
+        meta.setLore(List.of(ChatColor.GRAY + (kitItem ? "Kit Item" : "Limited-use chest item")));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack castleEnchantedBook(Enchantment enchantment, int level, String name) {
+        ItemStack item = new ItemStack(Material.ENCHANTED_BOOK);
+        EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
+        meta.addStoredEnchant(enchantment, level, true);
+        meta.setDisplayName(ChatColor.LIGHT_PURPLE + name);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack castleArmour(Material material, Enchantment enchantment, int level) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        if (enchantment != null && level > 0) meta.addEnchant(enchantment, level, true);
+        meta.setUnbreakable(true);
+        meta.setLore(List.of(ChatColor.GRAY + "Castle Assault kit item"));
+        item.setItemMeta(meta);
+        return item;
     }
 
     private void spawnObjectiveTnt() {
@@ -715,6 +961,69 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onCastleKitTntDrop(PlayerDropItemEvent event) {
+        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT) return;
+        Player player = event.getPlayer();
+        String kit = castleAssaultPlayerKits.get(player.getUniqueId());
+        ItemStack dropped = event.getItemDrop().getItemStack();
+        boolean lockedTnt = "demolitionist".equals(kit) && dropped.getType() == Material.TNT;
+        boolean lockedArrow = "archer".equals(kit) && isCastleFletchedArrow(dropped);
+        boolean lockedKitItem = kit != null && isCastleKitItem(dropped);
+        if (!lockedTnt && !lockedArrow && !lockedKitItem) return;
+        event.setCancelled(true);
+        player.sendMessage(ChatColor.RED + (lockedTnt ? "You cannot drop your Throwing TNT."
+                : lockedArrow ? "You cannot drop your Fletched Arrows." : "You cannot drop a kit item."));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onCastleKitInventoryClick(InventoryClickEvent event) {
+        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT
+                || !(event.getWhoClicked() instanceof Player player)) return;
+        String kit = castleAssaultPlayerKits.get(player.getUniqueId());
+        boolean demolitionist = "demolitionist".equals(kit);
+        boolean archer = "archer".equals(kit);
+        ItemStack current = event.getCurrentItem();
+        ItemStack cursor = event.getCursor();
+        ItemStack hotbarItem = event.getHotbarButton() >= 0
+                ? player.getInventory().getItem(event.getHotbarButton()) : null;
+        boolean kitItemInChest = event.getView().getTopInventory().getType()
+                == org.bukkit.event.inventory.InventoryType.CHEST
+                && (isCastleKitItem(current) || isCastleKitItem(cursor) || isCastleKitItem(hotbarItem));
+        if (kitItemInChest) {
+            event.setCancelled(true);
+            return;
+        }
+        if (!demolitionist && !archer) return;
+        boolean movesLockedItem = demolitionist
+                && ((current != null && current.getType() == Material.TNT)
+                    || (cursor != null && cursor.getType() == Material.TNT));
+        movesLockedItem |= archer && (isCastleFletchedArrow(current) || isCastleFletchedArrow(cursor));
+        if (!movesLockedItem && hotbarItem != null) {
+            movesLockedItem = demolitionist && hotbarItem.getType() == Material.TNT
+                    || archer && isCastleFletchedArrow(hotbarItem);
+        }
+        if (movesLockedItem) event.setCancelled(true);
+    }
+
+    private boolean isCastleFletchedArrow(ItemStack item) {
+        if (item == null || item.getType() != Material.ARROW || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName() && meta.getDisplayName().contains("Fletched Arrow");
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onCastleKitDeath(PlayerDeathEvent event) {
+        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT) return;
+        Player player = event.getEntity();
+        String kit = castleAssaultPlayerKits.get(player.getUniqueId());
+        if ("demolitionist".equals(kit)) {
+            event.getDrops().removeIf(item -> item != null && item.getType() == Material.TNT);
+        } else if ("archer".equals(kit)) {
+            event.getDrops().removeIf(this::isCastleFletchedArrow);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInteract(PlayerInteractEvent event) {
         if (stopped || event.getHand() == null || event.getHand().name().equals("OFF_HAND")) return;
         Player player = event.getPlayer();
@@ -730,19 +1039,136 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 event.setCancelled(true);
                 throwPlayerTnt(player);
             }
-        } else if (game == ArcadePortGame.HEROES_OF_GWEN
-                && event.getAction().isRightClick() && event.getItem() != null
-                && event.getItem().getType() == Material.GOLD_INGOT) {
-            event.setCancelled(true);
-            openStore(player);
+        } else if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            if (event.getItem() != null && heroSkillId(event.getItem()) != null) {
+                event.setCancelled(true);
+                activateHeroesOfGwenSkill(player, heroSkillId(event.getItem()));
+                return;
+            }
+            if (event.getAction().isRightClick() && event.getItem() != null
+                    && event.getItem().getType() == Material.GOLD_INGOT) {
+                event.setCancelled(true);
+                openStore(player);
+            }
         }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onHeroesOfGwenSkillDrop(PlayerDropItemEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
+        Player player = event.getPlayer();
+        ItemStack skill = player.getInventory().getItem(3);
+        String id = heroSkillId(skill);
+        if (!"hattori.ender_blade".equals(id) && !"devon.infinity".equals(id)) return;
+        event.setCancelled(true);
+        activateHeroesOfGwenSkill(player, id);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onHeroesOfGwenSneak(PlayerToggleSneakEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN || !event.isSneaking()) return;
+        Player player = event.getPlayer();
+        if (!"devon".equals(selectedHeroesOfGwen.get(player.getUniqueId()))) return;
+        ItemStack skill = player.getInventory().getItem(2);
+        if (!"devon.hunters_boost".equals(heroSkillId(skill))) return;
+        activateHeroesOfGwenSkill(player, "devon.hunters_boost");
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onHeroesOfGwenBowShoot(EntityShootBowEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN
+                || !(event.getEntity() instanceof Player player)) return;
+        String hero = selectedHeroesOfGwen.get(player.getUniqueId());
+        if (!"devon".equals(hero)) return;
+        if (heroTntArrowCharges.getOrDefault(player.getUniqueId(), 0) > 0
+                && event.getProjectile() instanceof Arrow arrow) {
+            markHeroProjectile(arrow, player, "devon.tnt_arrow");
+            int remaining = heroTntArrowCharges.get(player.getUniqueId()) - 1;
+            if (remaining <= 0) {
+                heroTntArrowCharges.remove(player.getUniqueId());
+                setHeroSkillCooldown(player, "devon.tnt_infusion", 17_000L);
+                giveHeroesOfGwenSkillItem(player, 1, "devon.tnt_infusion", Material.TNT,
+                        "TNT Infusion", "Infuse your next three arrows with TNT.");
+            } else {
+                heroTntArrowCharges.put(player.getUniqueId(), remaining);
+                ItemStack skill = player.getInventory().getItem(1);
+                if (skill != null && heroSkillId(skill) != null) skill.setAmount(remaining);
+            }
+        }
+        if (heroInfinityEndsAt.getOrDefault(player.getUniqueId(), 0L) > System.currentTimeMillis()
+                && event.getProjectile() instanceof Arrow arrow) {
+            markHeroProjectile(arrow, player, "devon.infinity_arrow");
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onHeroesOfGwenProjectileDamage(EntityDamageByEntityEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
+        Entity damager = event.getDamager();
+        if (damager instanceof Snowball snowball) {
+            String type = snowball.getPersistentDataContainer().get(heroProjectileTypeKey, PersistentDataType.STRING);
+            if (!"hattori.shuriken".equals(type)) return;
+            Player owner = heroProjectileOwner(snowball);
+            if (owner == null || !(event.getEntity() instanceof Player target)
+                    || teams.getOrDefault(owner.getUniqueId(), -1) == teams.getOrDefault(target.getUniqueId(), -2)) return;
+            event.setDamage(3.0D);
+            return;
+        }
+        if (damager instanceof Arrow arrow) {
+            String type = arrow.getPersistentDataContainer().get(heroProjectileTypeKey, PersistentDataType.STRING);
+            if (!"devon.infinity_arrow".equals(type)) return;
+            Player owner = heroProjectileOwner(arrow);
+            if (owner != null && event.getEntity() instanceof Player target
+                    && teams.getOrDefault(owner.getUniqueId(), -1) != teams.getOrDefault(target.getUniqueId(), -2)) {
+                target.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 3 * 20, 0, true, true, true));
+            }
+            return;
+        }
+        if (!(damager instanceof Player attacker)) return;
+        if (heroEnderBladeEndsAt.getOrDefault(attacker.getUniqueId(), 0L) <= System.currentTimeMillis()) return;
+        if (teams.getOrDefault(attacker.getUniqueId(), -1) == teams.getOrDefault(event.getEntity().getUniqueId(), -2)) return;
+        ItemStack held = attacker.getInventory().getItemInMainHand();
+        if (held != null && held.getType() == Material.DIAMOND_SWORD
+                && held.hasItemMeta() && held.getItemMeta().hasDisplayName()
+                && held.getItemMeta().getDisplayName().contains("ENDER BLADE")) {
+            event.setDamage(event.getDamage() + 9.0D);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onHeroesOfGwenProjectileHit(ProjectileHitEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
+        Projectile projectile = event.getEntity();
+        String type = projectile.getPersistentDataContainer().get(heroProjectileTypeKey, PersistentDataType.STRING);
+        if (!"devon.tnt_arrow".equals(type)) return;
+        Player owner = heroProjectileOwner(projectile);
+        if (owner == null) return;
+        Location center = projectile.getLocation();
+        world.spawnParticle(Particle.EXPLOSION, center, 3, 0.25D, 0.25D, 0.25D, 0.02D);
+        world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 1.1F);
+        ItemStack bow = owner.getInventory().getItem(0);
+        double damageAtCenter = 10.0D + (bow == null ? 0.0D : bow.getEnchantmentLevel(Enchantment.POWER) * 2.5D);
+        for (Entity entity : world.getNearbyEntities(center, 5.0D, 5.0D, 5.0D)) {
+            if (!(entity instanceof Player target) || target.equals(owner)
+                    || !activePlayers.contains(target.getUniqueId())
+                    || teams.getOrDefault(target.getUniqueId(), -1) == teams.getOrDefault(owner.getUniqueId(), -2)) continue;
+            double distance = Math.min(center.distance(target.getLocation()), center.distance(target.getEyeLocation()));
+            if (distance >= 5.0D) continue;
+            double falloff = 1.0D - distance / 5.0D;
+            double damage = damageAtCenter * falloff;
+            if (target.getHealth() <= damage) hooks.eliminate(target, owner, "was hit by a TNT-infused arrow");
+            else target.damage(damage, owner);
+            Vector knockback = target.getLocation().toVector().subtract(center.toVector());
+            if (knockback.lengthSquared() > 0.001D) target.setVelocity(knockback.normalize().multiply(0.8D * falloff).setY(0.25D));
+        }
+        projectile.remove();
     }
 
     private void detonateObjectiveTnt(Player carrier) {
         restoreCarrierHelmet(carrier);
         objectiveCarrier = null;
         objectiveCarryStartedAt = 0L;
-        resolveCastleExplosion(carrier.getLocation().clone(), carrier, true, 4.0D);
+        resolveCastleExplosion(carrier.getLocation().clone(), carrier, true, castleTntRadius(carrier));
         carrier.sendMessage(ChatColor.GOLD + "Objective TNT detonated!");
     }
 
@@ -773,9 +1199,72 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             owner = Bukkit.getPlayer(UUID.fromString(ownerValue));
         } catch (IllegalArgumentException ignored) {
         }
-        if (owner != null && owner.isOnline()) resolveCastleExplosion(tnt.getLocation(), owner, false, 4.0D);
+        if (owner != null && owner.isOnline()) resolveCastleExplosion(tnt.getLocation(), owner, false, castleTntRadius(owner));
         entities.remove(tnt);
         tnt.remove();
+    }
+
+    private double castleTntRadius(Player owner) {
+        return 4.0D + ("demolitionist".equals(castleAssaultPlayerKits.get(owner.getUniqueId())) ? 3.0D : 0.0D);
+    }
+
+    private void refillCastleArcherArrows(long now) {
+        refillCastleDemolitionistTnt(now);
+        for (UUID id : new ArrayList<>(activePlayers)) {
+            if (!"archer".equals(castleAssaultPlayerKits.get(id))) continue;
+            Player player = players.get(id);
+            if (player == null || !player.isOnline()) continue;
+            long next = castleArcherNextArrowAt.getOrDefault(id, now);
+            if (now < next) continue;
+            int amount = 0;
+            for (ItemStack item : player.getInventory().getContents()) {
+                if (isCastleFletchedArrow(item)) amount += item.getAmount();
+            }
+            if (amount < ArcadePortRules.CASTLE_ASSAULT_ARCHER_MAX_ARROWS) {
+                player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
+                        "Replenished by the Archer kit."));
+                player.updateInventory();
+            }
+            castleArcherNextArrowAt.put(id, now + ArcadePortRules.CASTLE_ASSAULT_ARCHER_REFILL_MILLIS);
+        }
+    }
+
+    private void refillCastleDemolitionistTnt(long now) {
+        for (UUID id : new ArrayList<>(activePlayers)) {
+            if (!"demolitionist".equals(castleAssaultPlayerKits.get(id))) continue;
+            Player player = players.get(id);
+            if (player == null || !player.isOnline()) continue;
+            long next = castleDemolitionistNextTntAt.getOrDefault(id, now);
+            if (now < next) continue;
+            int current = 0;
+            for (ItemStack item : player.getInventory().getContents()) {
+                if (item != null && item.getType() == Material.TNT) current += item.getAmount();
+            }
+            if (current < ArcadePortRules.CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT) {
+                player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT",
+                        "Replenished by the Demolitionist kit."));
+                player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0F, 1.0F);
+                player.updateInventory();
+            }
+            castleDemolitionistNextTntAt.put(id, now + ArcadePortRules.CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS);
+        }
+    }
+
+    private int castleBlastProtectionEpf(Player player) {
+        int epf = 0;
+        for (ItemStack armour : player.getInventory().getArmorContents()) {
+            if (armour != null) epf += armour.getEnchantmentLevel(Enchantment.BLAST_PROTECTION) * 2;
+        }
+        return Math.min(20, epf);
+    }
+
+    private int castleHighestBlastProtection(Player player) {
+        int highest = 0;
+        for (ItemStack armour : player.getInventory().getArmorContents()) {
+            if (armour != null) highest = Math.max(highest,
+                    armour.getEnchantmentLevel(Enchantment.BLAST_PROTECTION));
+        }
+        return highest;
     }
 
     private void resolveCastleExplosion(Location center, Player owner, boolean objective, double radius) {
@@ -789,11 +1278,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             double distance = target.getLocation().distance(center);
             if (distance > radius) continue;
             double damage = 10.0D * Math.max(0.0D, 1.0D - distance / radius);
+            damage *= ArcadePortRules.castleAssaultBlastDamageMultiplier(castleBlastProtectionEpf(target));
             if (damage <= 0.0D) continue;
             if (target.getHealth() <= damage) hooks.eliminate(target, owner, "was caught in a Castle Assault TNT blast");
             else target.setHealth(target.getHealth() - damage);
             Vector direction = target.getLocation().toVector().subtract(center.toVector());
-            if (direction.lengthSquared() > 0.001D) target.setVelocity(direction.normalize().multiply(0.8D).setY(0.35D));
+            if (direction.lengthSquared() > 0.001D) {
+                double knockback = ArcadePortRules.castleAssaultBlastKnockbackMultiplier(
+                        castleHighestBlastProtection(target));
+                target.setVelocity(direction.normalize().multiply(0.8D * knockback)
+                        .setY(0.35D * knockback));
+            }
         }
         if (!objective) return;
         KingState enemyKing = kings.get(1 - attackingTeam);
@@ -1068,27 +1563,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void openStore(Player player) {
-        StoreHolder holder = new StoreHolder(player.getUniqueId(), null);
-        Inventory inventory = Bukkit.createInventory(holder, 27, ChatColor.DARK_GREEN + "Heroes of Gwen Store");
-        holder.inventory = inventory;
-        String[] roles = {"Assassin", "Warrior", "Mage", "Hunter"};
-        Material[] icons = {Material.GOLDEN_SWORD, Material.IRON_SWORD, Material.POTION, Material.BOW};
-        for (int i = 0; i < roles.length; i++) {
-            String role = roles[i];
-            ItemStack option = new ItemStack(icons[i]);
-            ItemMeta meta = option.getItemMeta();
-            meta.setDisplayName(ChatColor.GREEN + role + " Upgrades");
-            long count = storeEntries.stream().filter(entry -> entry.role.equals(role)).count();
-            meta.setLore(List.of(ChatColor.GRAY + "Browse the legacy " + role + " store.",
-                    ChatColor.WHITE + String.valueOf(count) + " source items",
-                    ChatColor.YELLOW + "Mixed Arcade prices are half cost."));
-            meta.getPersistentDataContainer().set(shopRoleKey, PersistentDataType.STRING, role);
-            option.setItemMeta(meta);
-            inventory.setItem(10 + i * 2, option);
-        }
-        openStores.put(player.getUniqueId(), holder);
-        player.openInventory(inventory);
-        updateGoldActionBar(player);
+        String hero = selectedHeroesOfGwen.getOrDefault(player.getUniqueId(), "hattori");
+        String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
+        openStore(player, role == null ? "Assassin" : role);
     }
 
     private void openStore(Player player, String role) {
@@ -1178,7 +1655,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         } else if (materialName.endsWith("_SWORD")) {
             player.getInventory().setItem(0, reward);
         } else if (entry.material == Material.BOW) {
-            player.getInventory().setItem(1, reward);
+            player.getInventory().setItem(0, reward);
         } else {
             player.getInventory().addItem(reward);
         }
@@ -1310,6 +1787,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     void onPlayerEliminated(Player player) {
         if (player == null) return;
         UUID id = player.getUniqueId();
+        if (game == ArcadePortGame.CASTLE_ASSAULT) {
+            castleKillStreaks.remove(id);
+            castleArcherNextArrowAt.remove(id);
+            castleDemolitionistNextTntAt.remove(id);
+        }
         activePlayers.remove(id);
         StoreHolder store = openStores.remove(id);
         if (store != null && player.isOnline()
@@ -1342,13 +1824,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         int team = teams.getOrDefault(killer.getUniqueId(), -1);
         if (team < 0) return;
         int streak = castleKillStreaks.merge(killer.getUniqueId(), 1, Integer::sum);
+        killer.setLevel(killer.getLevel() + 1);
         killer.getInventory().addItem(namedItem(Material.GOLDEN_APPLE, ChatColor.LIGHT_PURPLE + "Golden Applegate",
                 "Kill reward from Castle Assault."));
+        giveCastleKillStreakReward(killer, castleAssaultPlayerKits.getOrDefault(killer.getUniqueId(), "fighter"), streak);
         if (streak > 0 && streak % 2 == 0) {
             announce(ChatColor.GREEN + killer.getName() + " is on a " + streak + " player kill streak!");
         }
         if (objectiveKillsEnabled == 0) return;
-        if (team < 0) return;
         int kills = team == 0 ? ++castleKillCountRed : ++castleKillCountBlue;
         if (kills % 20 != 0) return;
         KingState enemy = kings.get(1 - team);
@@ -1359,6 +1842,429 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         List<EnderCrystal> activeCrystals = enemy.crystals.stream().filter(Entity::isValid).toList();
         if (activeCrystals.isEmpty()) return;
         destroyCastleCrystal(enemy, activeCrystals.get(ThreadLocalRandom.current().nextInt(activeCrystals.size())), killer);
+    }
+
+    private void giveCastleKillStreakReward(Player player, String kit, int streak) {
+        if (streak < 2 || streak > 8 || streak % 2 != 0) return;
+        switch (kit) {
+            case "alchemist" -> {
+                if (streak == 2) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                        PotionEffectType.SLOWNESS, 90 * 20, 0, "Splash Slowness Potion"));
+                else if (streak == 4) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                        PotionEffectType.WEAKNESS, 90 * 20, 0, "Splash Weakness Potion"));
+                else if (streak == 6) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                        PotionEffectType.INSTANT_DAMAGE, 1, 1, "Splash Harming II Potion"),
+                        castlePotion(Material.SPLASH_POTION, PotionEffectType.INSTANT_DAMAGE, 1, 1,
+                                "Splash Harming II Potion"),
+                        castlePotion(Material.SPLASH_POTION, PotionEffectType.INSTANT_DAMAGE, 1, 1,
+                                "Splash Harming II Potion"),
+                        castlePotion(Material.SPLASH_POTION, PotionEffectType.INSTANT_DAMAGE, 1, 1,
+                                "Splash Harming II Potion"));
+                else player.getInventory().addItem(castlePotion(Material.POTION,
+                        PotionEffectType.REGENERATION, 10 * 20, 2, "Regeneration III Potion"));
+            }
+            case "archer" -> {
+                if (streak == 2) player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 8));
+                else if (streak == 4) player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 12));
+                else if (streak == 6) player.getInventory().addItem(castleEnchantedBook(Enchantment.PUNCH, 1, "Punch I"));
+                else {
+                    player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 32),
+                            castleEnchantedBook(Enchantment.FLAME, 1, "Flame I"));
+                }
+            }
+            case "demolitionist" -> {
+                if (streak == 2) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 2));
+                else if (streak == 4) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 3));
+                else if (streak == 6) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 4));
+                else player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 5),
+                        castleFlintAndSteel(30, true));
+            }
+            case "tank" -> {
+                if (streak == 2) player.getInventory().addItem(namedItem(Material.GOLDEN_APPLE,
+                        ChatColor.LIGHT_PURPLE + "Golden Applegate", "Kill-streak reward."));
+                else if (streak == 4) player.getInventory().addItem(castlePotion(Material.POTION,
+                        PotionEffectType.REGENERATION, 22 * 20, 1, "Regeneration II Potion"));
+                else if (streak == 6) player.getInventory().addItem(castlePotion(Material.POTION,
+                        PotionEffectType.RESISTANCE, 90 * 20, 0, "Resistance Potion"));
+                else player.getInventory().addItem(castleEnchantedBook(Enchantment.THORNS, 2, "Thorns II"));
+            }
+            default -> {
+                if (streak == 2) player.getInventory().addItem(namedItem(Material.GOLDEN_APPLE,
+                        ChatColor.LIGHT_PURPLE + "Golden Applegate", "Kill-streak reward."));
+                else if (streak == 4) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                        PotionEffectType.INSTANT_HEALTH, 1, 1, "Splash Healing II Potion"));
+                else if (streak == 6) player.getInventory().addItem(castlePotion(Material.POTION,
+                        PotionEffectType.SPEED, 90 * 20, 1, "Speed II Potion"));
+                else player.getInventory().addItem(castleEnchantedBook(Enchantment.FIRE_ASPECT, 1, "Fire Aspect I"));
+            }
+        }
+    }
+
+    void giveCastleAssaultKit(Player player, String requestedKit) {
+        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT || player == null
+                || !players.containsKey(player.getUniqueId())) return;
+        String kit = ArcadePortRules.normalizeCastleAssaultKit(requestedKit);
+        if (kit == null) kit = "fighter";
+        castleAssaultPlayerKits.put(player.getUniqueId(), kit);
+        long kitAppliedAt = System.currentTimeMillis();
+        if ("archer".equals(kit)) {
+            castleArcherNextArrowAt.put(player.getUniqueId(),
+                    kitAppliedAt + ArcadePortRules.CASTLE_ASSAULT_ARCHER_REFILL_MILLIS);
+        } else {
+            castleArcherNextArrowAt.remove(player.getUniqueId());
+        }
+        if ("demolitionist".equals(kit)) {
+            castleDemolitionistNextTntAt.put(player.getUniqueId(), kitAppliedAt + ArcadePortRules.CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS);
+        } else {
+            castleDemolitionistNextTntAt.remove(player.getUniqueId());
+        }
+        for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) {
+            player.removePotionEffect(effect.getType());
+        }
+        player.getInventory().clear();
+        player.getInventory().setArmorContents(new ItemStack[4]);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 8 * 20, 4));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 8 * 20, 3));
+
+        ItemStack sword = new ItemStack(Material.DIAMOND_SWORD);
+        ItemMeta swordMeta = sword.getItemMeta();
+        swordMeta.setUnbreakable(true);
+        swordMeta.setLore(List.of(ChatColor.GRAY + "Castle Assault kit item"));
+        sword.setItemMeta(swordMeta);
+        player.getInventory().setItem(0, sword);
+
+        boolean demolitionist = "demolitionist".equals(kit);
+        player.getInventory().setHelmet(castleArmour(Material.DIAMOND_HELMET,
+                demolitionist ? Enchantment.BLAST_PROTECTION : null, demolitionist ? 4 : 0));
+        player.getInventory().setChestplate(castleArmour(Material.IRON_CHESTPLATE,
+                demolitionist ? Enchantment.BLAST_PROTECTION : "tank".equals(kit) ? Enchantment.PROTECTION : null,
+                demolitionist ? 4 : "tank".equals(kit) ? 1 : 0));
+        player.getInventory().setLeggings(castleArmour(Material.IRON_LEGGINGS,
+                demolitionist ? Enchantment.BLAST_PROTECTION : null, demolitionist ? 4 : 0));
+        player.getInventory().setBoots(castleArmour(Material.DIAMOND_BOOTS,
+                demolitionist ? Enchantment.BLAST_PROTECTION : null, demolitionist ? 4 : 0));
+
+        switch (kit) {
+            case "alchemist" -> {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 100_000, 0));
+                ItemStack speed = castlePotion(Material.POTION, PotionEffectType.SPEED,
+                        3 * 60 * 20, 0, "Speed Potion");
+                ItemMeta speedMeta = speed.getItemMeta();
+                speedMeta.setLore(List.of(ChatColor.GRAY + "Kit Item"));
+                speed.setItemMeta(speedMeta);
+                player.getInventory().setItem(1, speed);
+            }
+            case "archer" -> {
+                ItemStack bow = new ItemStack(Material.BOW);
+                ItemMeta bowMeta = bow.getItemMeta();
+                bowMeta.setUnbreakable(true);
+                bowMeta.setLore(List.of(ChatColor.GRAY + "Kit Item"));
+                bow.setItemMeta(bowMeta);
+                player.getInventory().setItem(1, bow);
+                player.getInventory().setItem(2, namedItem(Material.ARROW, "Fletched Arrow",
+                        "Automatically supplied by the Archer kit.", 10));
+            }
+            case "demolitionist" -> {
+                player.getInventory().setItem(1, castleFlintAndSteel(4, true));
+                player.getInventory().setItem(2, namedItem(Material.TNT, "Throwing TNT",
+                        "Left-click to throw.", 2));
+            }
+            case "fighter" -> player.getInventory().setItem(1, namedItem(Material.GOLDEN_APPLE,
+                    ChatColor.LIGHT_PURPLE + "Golden Applegate", "Fighter kit item."));
+            case "tank" -> { /* The source Tank relies on its armour and kit passives. */ }
+            default -> { }
+        }
+        player.updateInventory();
+    }
+
+    void setHeroesOfGwenHero(Player player, String requestedHero) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN || player == null
+                || !players.containsKey(player.getUniqueId())) return;
+        String hero = ArcadePortRules.normalizeHeroesOfGwenHero(requestedHero);
+        if (hero == null) hero = "hattori";
+        String previous = selectedHeroesOfGwen.put(player.getUniqueId(), hero);
+        if (!hero.equals(previous)) giveHeroesOfGwenLoadout(player, hero);
+        String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
+        player.sendActionBar(ChatColor.GOLD + "Hero: " + ArcadePortRules.heroesOfGwenHeroDisplayName(hero)
+                + ChatColor.GRAY + " | " + ChatColor.YELLOW + role + " Gold Upgrades");
+    }
+
+    private void giveHeroesOfGwenLoadout(Player player, String hero) {
+        UUID id = player.getUniqueId();
+        heroTntArrowCharges.remove(id);
+        heroEnderBladeEndsAt.remove(id);
+        heroEnderBladeOriginalSword.remove(id);
+        heroInfinityEndsAt.remove(id);
+        heroInfinityOriginalEnchant.remove(id);
+        player.getInventory().clear();
+        player.getInventory().setArmorContents(new ItemStack[4]);
+        player.getInventory().setItem(8, namedItem(Material.GOLD_INGOT,
+                ChatColor.GOLD + "Open Gold Upgrades", "Right-click to open your role shop."));
+        switch (hero) {
+            case "hattori" -> {
+                player.getInventory().setItem(0, namedItem(Material.WOODEN_SWORD,
+                        ChatColor.GREEN + "Sword", "Basic Hattori weapon."));
+                giveHeroesOfGwenSkillItem(player, 1, "hattori.shuriken", Material.SNOWBALL,
+                        "Shuriken", "Fires three damaging snowballs.");
+                giveHeroesOfGwenSkillItem(player, 2, "hattori.ninja_dash", Material.FEATHER,
+                        "Ninja Dash", "Dash up to ten blocks and damage enemies in your path.");
+                giveHeroesOfGwenSkillItem(player, 3, "hattori.ender_blade", Material.NETHER_STAR,
+                        "Ender Blade", "Use the Ender Blade for seven seconds.");
+            }
+            case "devon" -> {
+                ItemStack bow = new ItemStack(Material.BOW);
+                ItemMeta bowMeta = bow.getItemMeta();
+                bowMeta.setUnbreakable(true);
+                bowMeta.setDisplayName(ChatColor.GREEN + "Bow");
+                bow.setItemMeta(bowMeta);
+                player.getInventory().setItem(0, bow);
+                giveHeroesOfGwenSkillItem(player, 1, "devon.tnt_infusion", Material.TNT,
+                        "TNT Infusion", "Your next three arrows explode on impact.");
+                giveHeroesOfGwenSkillItem(player, 2, "devon.hunters_boost", Material.FEATHER,
+                        "Hunters Boost", "Gain Speed II and Jump Boost I for three seconds.");
+                giveHeroesOfGwenSkillItem(player, 3, "devon.infinity", Material.NETHER_STAR,
+                        "Infinity", "Seven seconds of homing arrows and Wither.");
+                player.getInventory().setItem(7, namedItem(Material.ARROW,
+                        ChatColor.YELLOW + "Hunting Arrow", "Replenished every three seconds."));
+                player.getInventory().getItem(7).setAmount(3);
+                heroAmmoNextAt.put(id, System.currentTimeMillis() + 3_000L);
+            }
+            default -> {
+                String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
+                Material primary = "Hunter".equals(role) ? Material.BOW
+                        : "Mage".equals(role) ? Material.BLAZE_POWDER : Material.WOODEN_SWORD;
+                player.getInventory().setItem(0, namedItem(primary,
+                        ChatColor.GREEN + ArcadePortRules.heroesOfGwenHeroDisplayName(hero) + " Weapon",
+                        "Hero abilities for this hero are still being ported."));
+            }
+        }
+        player.updateInventory();
+    }
+
+    private void giveHeroesOfGwenSkillItem(Player player, int slot, String id, Material material,
+            String displayName, String description) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(ChatColor.GREEN + displayName);
+        meta.setLore(List.of(ChatColor.GRAY + description, ChatColor.YELLOW + "Right-click to activate."));
+        meta.setUnbreakable(true);
+        meta.getPersistentDataContainer().set(heroSkillKey, PersistentDataType.STRING, id);
+        item.setItemMeta(meta);
+        player.getInventory().setItem(slot, item);
+    }
+
+    private String heroSkillId(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return null;
+        return item.getItemMeta().getPersistentDataContainer().get(heroSkillKey, PersistentDataType.STRING);
+    }
+
+    private void setHeroSkillCooldown(Player player, String skill, long durationMillis) {
+        heroSkillReadyAt.computeIfAbsent(player.getUniqueId(), ignored -> new HashMap<>())
+                .put(skill, System.currentTimeMillis() + durationMillis);
+    }
+
+    private boolean isHeroSkillReady(Player player, String skill) {
+        return heroSkillReadyAt.getOrDefault(player.getUniqueId(), Map.of())
+                .getOrDefault(skill, 0L) <= System.currentTimeMillis();
+    }
+
+    private void activateHeroesOfGwenSkill(Player player, String skill) {
+        if (player == null || !player.isOnline() || !activePlayers.contains(player.getUniqueId())) return;
+        if (!isHeroSkillReady(player, skill)) {
+            long remain = heroSkillReadyAt.getOrDefault(player.getUniqueId(), Map.of())
+                    .getOrDefault(skill, 0L) - System.currentTimeMillis();
+            player.sendActionBar(ChatColor.RED + skill.substring(skill.indexOf('.') + 1).replace('_', ' ')
+                    + " ready in " + Math.max(1L, (remain + 999L) / 1000L) + "s");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        switch (skill) {
+            case "hattori.shuriken" -> {
+                setHeroSkillCooldown(player, skill, 1_500L);
+                for (int i = 0; i < 3; i++) {
+                    final long delay = i * 4L;
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        if (!player.isOnline() || !activePlayers.contains(id)) return;
+                        Snowball snowball = player.launchProjectile(Snowball.class);
+                        markHeroProjectile(snowball, player, "hattori.shuriken");
+                    }, delay);
+                }
+                player.playSound(player.getLocation(), Sound.ENTITY_SNOWBALL_THROW, 1.0F, 1.3F);
+            }
+            case "hattori.ninja_dash" -> {
+                setHeroSkillCooldown(player, skill, 7_000L);
+                performHattoriDash(player);
+            }
+            case "hattori.ender_blade" -> {
+                ItemStack sword = player.getInventory().getItem(0);
+                heroEnderBladeOriginalSword.put(id, sword == null ? null : sword.clone());
+                ItemStack enderBlade = namedItem(Material.DIAMOND_SWORD,
+                        ChatColor.GREEN + "ENDER BLADE", "Hattori ultimate weapon.");
+                ItemMeta meta = enderBlade.getItemMeta();
+                meta.setUnbreakable(true);
+                enderBlade.setItemMeta(meta);
+                player.getInventory().setItem(0, enderBlade);
+                player.getInventory().setHeldItemSlot(0);
+                heroEnderBladeEndsAt.put(id, System.currentTimeMillis() + 7_000L);
+                setHeroSkillCooldown(player, skill, 67_000L);
+                player.sendMessage(ChatColor.LIGHT_PURPLE + "Hattori activated Ender Blade!");
+                player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.8F);
+            }
+            case "devon.tnt_infusion" -> {
+                heroTntArrowCharges.put(id, 3);
+                ItemStack skillItem = player.getInventory().getItem(1);
+                if (skillItem != null) skillItem.setAmount(3);
+                player.sendMessage(ChatColor.GOLD + "Your next three arrows are infused with TNT.");
+                player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.2F);
+            }
+            case "devon.hunters_boost" -> {
+                setHeroSkillCooldown(player, skill, 10_000L);
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 3 * 20, 1, true, true, true));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 3 * 20, 0, true, true, true));
+                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8F, 1.5F);
+            }
+            case "devon.infinity" -> activateDevonInfinity(player);
+            default -> player.sendMessage(ChatColor.YELLOW + "That hero ability is not yet available.");
+        }
+    }
+
+    private void performHattoriDash(Player player) {
+        Location origin = player.getEyeLocation();
+        Vector direction = player.getLocation().getDirection().normalize();
+        Location destination = player.getLocation().clone();
+        Set<UUID> hit = new HashSet<>();
+        double range = 10.0D;
+        for (double distance = 0.5D; distance <= range; distance += 0.5D) {
+            Location point = origin.clone().add(direction.clone().multiply(distance));
+            world.spawnParticle(Particle.CRIT, point, 3, 0.12D, 0.12D, 0.12D, 0.01D);
+            for (Entity entity : world.getNearbyEntities(point, 1.5D, 1.5D, 1.5D)) {
+                if (!(entity instanceof Player target) || target.equals(player)
+                        || !activePlayers.contains(target.getUniqueId())
+                        || teams.getOrDefault(target.getUniqueId(), -1) == teams.getOrDefault(player.getUniqueId(), -2)
+                        || !hit.add(target.getUniqueId())) continue;
+                target.damage(8.0D, player);
+                Vector push = target.getLocation().toVector().subtract(player.getLocation().toVector());
+                if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(0.7D).setY(0.25D));
+            }
+            Block feet = point.getBlock();
+            if (!feet.isPassable() && distance > 1.0D) break;
+            destination = point.clone().subtract(0.0D, 1.6D, 0.0D);
+        }
+        destination.setYaw(player.getLocation().getYaw());
+        destination.setPitch(player.getLocation().getPitch());
+        if (destination.getBlock().isPassable() && destination.clone().add(0, 1, 0).getBlock().isPassable()) {
+            player.teleport(destination);
+        } else {
+            player.teleport(player.getLocation().clone().add(direction.multiply(1.0D)));
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 1.2F);
+    }
+
+    private void activateDevonInfinity(Player player) {
+        UUID id = player.getUniqueId();
+        ItemStack bow = player.getInventory().getItem(0);
+        if (bow == null || bow.getType() != Material.BOW) {
+            player.sendMessage(ChatColor.RED + "You need your bow to activate Infinity.");
+            return;
+        }
+        heroInfinityOriginalEnchant.put(id, bow.getEnchantmentLevel(Enchantment.INFINITY));
+        if (!bow.containsEnchantment(Enchantment.INFINITY)) bow.addUnsafeEnchantment(Enchantment.INFINITY, 1);
+        ItemStack ammo = player.getInventory().getItem(7);
+        if (ammo == null || ammo.getType() != Material.ARROW) {
+            player.getInventory().setItem(7, namedItem(Material.ARROW, ChatColor.YELLOW + "Hunting Arrow", "Temporary Infinity ammunition."));
+        } else if (ammo.getAmount() < 3) {
+            ammo.setAmount(ammo.getAmount() + 1);
+        }
+        heroInfinityEndsAt.put(id, System.currentTimeMillis() + 7_000L);
+        setHeroSkillCooldown(player, "devon.infinity", 67_000L);
+        player.sendMessage(ChatColor.LIGHT_PURPLE + "Infinity activated: homing arrows and Wither for seven seconds.");
+        player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.8F);
+    }
+
+    private void markHeroProjectile(Projectile projectile, Player owner, String type) {
+        projectile.getPersistentDataContainer().set(heroProjectileTypeKey, PersistentDataType.STRING, type);
+        projectile.getPersistentDataContainer().set(heroProjectileOwnerKey, PersistentDataType.STRING,
+                owner.getUniqueId().toString());
+    }
+
+    private Player heroProjectileOwner(Projectile projectile) {
+        String owner = projectile.getPersistentDataContainer().get(heroProjectileOwnerKey, PersistentDataType.STRING);
+        if (owner == null) return null;
+        try {
+            Player player = Bukkit.getPlayer(UUID.fromString(owner));
+            return player != null && player.isOnline() ? player : null;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private void updateHeroesOfGwenAbilities(long now) {
+        for (Map.Entry<UUID, Long> entry : new HashMap<>(heroEnderBladeEndsAt).entrySet()) {
+            if (now < entry.getValue()) continue;
+            Player player = players.get(entry.getKey());
+            if (player != null && player.isOnline()) {
+                ItemStack original = heroEnderBladeOriginalSword.remove(entry.getKey());
+                player.getInventory().setItem(0, original == null ? namedItem(Material.WOODEN_SWORD,
+                        ChatColor.GREEN + "Sword", "Basic Hattori weapon.") : original);
+                player.updateInventory();
+            }
+            heroEnderBladeEndsAt.remove(entry.getKey());
+        }
+        for (Map.Entry<UUID, Long> entry : new HashMap<>(heroInfinityEndsAt).entrySet()) {
+            if (now < entry.getValue()) continue;
+            Player player = players.get(entry.getKey());
+            if (player != null && player.isOnline()) {
+                ItemStack bow = player.getInventory().getItem(0);
+                int original = heroInfinityOriginalEnchant.getOrDefault(entry.getKey(), 0);
+                if (bow != null && bow.getType() == Material.BOW) {
+                    bow.removeEnchantment(Enchantment.INFINITY);
+                    if (original > 0) bow.addUnsafeEnchantment(Enchantment.INFINITY, original);
+                }
+                player.updateInventory();
+            }
+            heroInfinityEndsAt.remove(entry.getKey());
+            heroInfinityOriginalEnchant.remove(entry.getKey());
+        }
+        for (UUID id : new ArrayList<>(activePlayers)) {
+            Player player = players.get(id);
+            if (player == null || !player.isOnline()) continue;
+            if ("devon".equals(selectedHeroesOfGwen.get(id))) {
+                long nextAmmo = heroAmmoNextAt.getOrDefault(id, now + 3_000L);
+                if (now >= nextAmmo) {
+                    ItemStack ammo = player.getInventory().getItem(7);
+                    int count = ammo != null && ammo.getType() == Material.ARROW ? ammo.getAmount() : 0;
+                    if (count < 3) {
+                        if (ammo == null || ammo.getType() != Material.ARROW) {
+                            player.getInventory().setItem(7, namedItem(Material.ARROW,
+                                    ChatColor.YELLOW + "Hunting Arrow", "Replenished by Devon's kit."));
+                        } else ammo.setAmount(count + 1);
+                        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.5F, 1.3F);
+                    }
+                    heroAmmoNextAt.put(id, now + 3_000L);
+                }
+            }
+            if (heroInfinityEndsAt.getOrDefault(id, 0L) > now) {
+                for (Entity entity : world.getNearbyEntities(player.getLocation(), 32.0D, 32.0D, 32.0D)) {
+                    if (!(entity instanceof Arrow arrow)
+                            || !"devon.infinity_arrow".equals(arrow.getPersistentDataContainer()
+                                    .get(heroProjectileTypeKey, PersistentDataType.STRING))) continue;
+                    Player owner = heroProjectileOwner(arrow);
+                    if (owner == null || !owner.getUniqueId().equals(id)) continue;
+                    Player target = activeMatchPlayers().stream()
+                            .filter(candidate -> !candidate.equals(player)
+                                    && teams.getOrDefault(candidate.getUniqueId(), -1)
+                                            != teams.getOrDefault(id, -2)
+                                    && candidate.getLocation().distanceSquared(arrow.getLocation()) <= 36.0D)
+                            .min(java.util.Comparator.comparingDouble(candidate ->
+                                    candidate.getLocation().distanceSquared(arrow.getLocation())))
+                            .orElse(null);
+                    if (target != null) {
+                        Vector homing = target.getEyeLocation().toVector().subtract(arrow.getLocation().toVector());
+                        if (homing.lengthSquared() > 0.001D) arrow.setVelocity(homing.normalize().multiply(1.5D));
+                    }
+                }
+            }
+        }
     }
 
     void stop() {
@@ -1379,7 +2285,26 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         openStores.clear();
         entities.clear();
+        for (FallingBlock debris : new HashSet<>(witherDebris)) {
+            if (debris != null && debris.isValid()) debris.remove();
+        }
+        witherDebris.clear();
+        witherTargets.clear();
+        witherHomes.clear();
+        witherBoundaries.clear();
+        witherNextEarthquakeAt.clear();
         castleKillStreaks.clear();
+        heroSkillReadyAt.clear();
+        heroTntArrowCharges.clear();
+        heroAmmoNextAt.clear();
+        heroEnderBladeEndsAt.clear();
+        heroEnderBladeOriginalSword.clear();
+        heroInfinityEndsAt.clear();
+        heroInfinityOriginalEnchant.clear();
+        castleAssaultPlayerKits.clear();
+        castleArcherNextArrowAt.clear();
+        castleDemolitionistNextTntAt.clear();
+        selectedHeroesOfGwen.clear();
     }
 
     private static final class KingState {

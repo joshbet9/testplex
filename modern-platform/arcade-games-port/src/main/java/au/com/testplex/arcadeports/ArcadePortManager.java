@@ -45,6 +45,7 @@ import org.bukkit.entity.Creature;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.WitherSkull;
 import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EnderPearl;
 import org.bukkit.entity.Display;
@@ -87,6 +88,7 @@ import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
+import io.papermc.paper.event.entity.EntityKnockbackEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.EntityTargetEvent;
@@ -206,6 +208,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> gladiatorLobbyVotes = new HashMap<>();
     private final Map<UUID, String> dragonsKitPreferences = new HashMap<>();
     private final Map<UUID, String> dragonEscapeKitPreferences = new HashMap<>();
+    private final Map<UUID, String> skyWarsKitPreferences = new HashMap<>();
     private final Map<UUID, String> turfWarsKitPreferences = new HashMap<>();
     /** Packet-thread-safe entity-ID lookup for the optional Bacon client hit bridge. */
     private final Map<Integer, UUID> baconAvatarOwnersByEntityId = new ConcurrentHashMap<>();
@@ -835,6 +838,50 @@ public final class ArcadePortManager implements Listener {
         } else player.sendMessage(ChatColor.GREEN + "Runner kit set to " + kit + " for your next test.");
     }
 
+    public void selectCastleAssaultKit(Player player, String requestedKit) {
+        if (player == null) return;
+        String kit = ArcadePortRules.normalizeCastleAssaultKit(requestedKit);
+        if (kit == null) {
+            player.sendMessage(ChatColor.YELLOW + "Castle Assault kits: alchemist, archer, demolitionist, fighter, tank.");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        castleAssaultKitPreferences.put(id, kit);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.CASTLE_ASSAULT
+                && session.players.containsKey(id) && session.alive.contains(id)
+                && session.variantRuntime != null) {
+            session.variantRuntime.giveCastleAssaultKit(player, kit);
+            player.sendMessage(ChatColor.GREEN + "Castle Assault kit changed to " + kit + ".");
+        } else {
+            player.sendMessage(ChatColor.GREEN + "Castle Assault kit set to " + kit + " for your next game.");
+        }
+    }
+
+    public void selectHeroesOfGwenHero(Player player, String requestedHero) {
+        if (player == null) return;
+        String hero = ArcadePortRules.normalizeHeroesOfGwenHero(requestedHero);
+        if (hero == null) {
+            player.sendMessage(ChatColor.YELLOW + "Heroes of Gwen heroes: Hattori, Devon, Anath, Dana, Biff, Larissa, Bardolf, Rowena, Ivy, Bob Ross.");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        heroesOfGwenHeroPreferences.put(id, hero);
+        String display = ArcadePortRules.heroesOfGwenHeroDisplayName(hero);
+        String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.HEROES_OF_GWEN
+                && session.players.containsKey(id) && session.variantRuntime != null) {
+            session.variantRuntime.setHeroesOfGwenHero(player, hero);
+            player.sendMessage(ChatColor.GREEN + "Heroes of Gwen hero set to " + display + " (" + role + "). "
+                    + ChatColor.YELLOW + "Hero abilities are still being ported; your current combat loadout is unchanged.");
+        } else {
+            player.sendMessage(ChatColor.GREEN + "Heroes of Gwen hero set to " + display
+                    + " (" + role + ") for your next game.");
+        }
+    }
+
+
     public void selectDeathTagRunnerKit(Player player, String requestedKit) {
         if (player == null) return;
         String kit = requestedKit == null ? "" : requestedKit.toLowerCase(java.util.Locale.ROOT)
@@ -1215,8 +1262,12 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "Unknown game id. Use /arcadeport help for the available IDs.");
             return;
         }
-        if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
-            player.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
+        if (mixedArcadeVariant && type != ArcadePortGame.SKY_WARS && !supportsMixedArcadeVariant(type)) {
+            player.sendMessage(ChatColor.RED + "That Mixed Arcade variant is not available for this game.");
+            return;
+        }
+        if (type == ArcadePortGame.SKY_WARS && !mixedArcadeVariant) {
+            player.sendMessage(ChatColor.RED + "Use /arcadeport join skywars-mixed for the 16-player Mixed Arcade rules.");
             return;
         }
         if (!isGameEnabled(type)) {
@@ -1233,8 +1284,9 @@ public final class ArcadePortManager implements Listener {
                     + " is already counting down. Wait for that round to start before queueing another game.");
             return;
         }
-        String key = queueKey(type, mixedArcadeVariant);
-        LinkedHashMap<UUID, Player> targetQueue = queues.computeIfAbsent(key, ignored -> new LinkedHashMap<>());
+
+        String queueId = queueKey(type, mixedArcadeVariant);
+        LinkedHashMap<UUID, Player> targetQueue = queues.computeIfAbsent(queueId, ignored -> new LinkedHashMap<>());
         int queuedPlayers = (int) targetQueue.values().stream()
                 .filter(queued -> queued != null && queued.isOnline()
                         && !queued.getUniqueId().equals(player.getUniqueId())).count();
@@ -1243,11 +1295,11 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "SkyWars Mixed Arcade is full (16/16 players).");
             return;
         }
+
         lobby.ensurePlayerInLobby(player);
-        for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(player.getUniqueId());
+        for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) existingQueue.remove(player.getUniqueId());
         if (type != ArcadePortGame.GLADIATORS) gladiatorLobbyVotes.remove(player.getUniqueId());
-        String key = queueKey(type, mixedArcadeVariant);
-        queues.computeIfAbsent(key, ignored -> new LinkedHashMap<>()).put(player.getUniqueId(), player);
+        queues.computeIfAbsent(queueId, ignored -> new LinkedHashMap<>()).put(player.getUniqueId(), player);
         String variantName = mixedArcadeVariant ? " (Mixed Arcade)" : "";
         String nextAction = manualStartCountdown != null && manualStartType == type
                 ? "The existing start countdown is already running."
@@ -1860,7 +1912,6 @@ public final class ArcadePortManager implements Listener {
                 String selectedKit = skyWarsKitPreferences.getOrDefault(player.getUniqueId(), "ice");
                 session.skyWarsKits.put(player.getUniqueId(), selectedKit);
                 session.skyWarsKitReadyAt.put(player.getUniqueId(), 0L);
-                if ("air".equals(selectedKit)) session.skyWarsSafeLocations.put(player.getUniqueId(), spawn.clone());
                 if ("earth".equals(selectedKit)) session.skyWarsNextDirtAt.put(player.getUniqueId(), now + 1_000L);
             }
             if (type == ArcadePortGame.RUNNER) {
@@ -1886,6 +1937,10 @@ public final class ArcadePortManager implements Listener {
                 session.dragonNextArrowAt.put(playerId, now + ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
             }
             Location spawn = spawns.get(i % spawns.size()).clone();
+            if (type == ArcadePortGame.SKY_WARS
+                    && "air".equals(session.skyWarsKits.get(player.getUniqueId()))) {
+                session.skyWarsSafeLocations.put(player.getUniqueId(), spawn.clone());
+            }
             if (type == ArcadePortGame.WITHER_ASSAULT && teamId == 1) spawn.setY(session.witherAssaultSpawnY);
             if (type == ArcadePortGame.MILK_THE_COW) session.milkRespawnSpawns.put(player.getUniqueId(), spawn.clone());
             if (type == ArcadePortGame.DRAGON_ESCAPE) {
@@ -4140,14 +4195,19 @@ public final class ArcadePortManager implements Listener {
     private void giveKit(Session session, Player player) {
         player.getInventory().clear();
         switch (session.type) {
-            case CASTLE_ASSAULT:
-                player.getInventory().addItem(new ItemStack(Material.IRON_SWORD),
-                        new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 16),
-                        new ItemStack(Material.TNT, 2));
-                player.getInventory().setChestplate(new ItemStack(Material.IRON_CHESTPLATE));
-                player.getInventory().setLeggings(new ItemStack(Material.IRON_LEGGINGS));
-                player.getInventory().setBoots(new ItemStack(Material.IRON_BOOTS));
+            case CASTLE_ASSAULT: {
+                String kit = castleAssaultKitPreferences.getOrDefault(player.getUniqueId(), "fighter");
+                if (session.variantRuntime != null && session.variantRuntime.isReady()) {
+                    session.variantRuntime.giveCastleAssaultKit(player, kit);
+                } else {
+                    player.getInventory().addItem(new ItemStack(Material.DIAMOND_SWORD));
+                    player.getInventory().setHelmet(new ItemStack(Material.DIAMOND_HELMET));
+                    player.getInventory().setChestplate(new ItemStack(Material.IRON_CHESTPLATE));
+                    player.getInventory().setLeggings(new ItemStack(Material.IRON_LEGGINGS));
+                    player.getInventory().setBoots(new ItemStack(Material.DIAMOND_BOOTS));
+                }
                 break;
+            }
             case HEROES_OF_GWEN:
                 player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
                         new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 8),
@@ -4155,6 +4215,10 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().setChestplate(new ItemStack(Material.LEATHER_CHESTPLATE));
                 player.getInventory().setLeggings(new ItemStack(Material.LEATHER_LEGGINGS));
                 player.getInventory().setBoots(new ItemStack(Material.LEATHER_BOOTS));
+                if (session.variantRuntime != null && session.variantRuntime.isReady()) {
+                    session.variantRuntime.setHeroesOfGwenHero(player,
+                            heroesOfGwenHeroPreferences.getOrDefault(player.getUniqueId(), "hattori"));
+                }
                 break;
             case SNEAKY_ASSASSINS:
                 sneakyAssassins.giveKit(player);
@@ -4434,6 +4498,59 @@ public final class ArcadePortManager implements Listener {
         player.setAllowFlight(false);
         player.setFlying(false);
         player.updateInventory();
+    }
+
+    private ItemStack skyWarsKitItem(Material material, String title, String lore, boolean glowing) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GREEN + title);
+            meta.setLore(List.of(ChatColor.GRAY + lore));
+            if (glowing) {
+                meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+                meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            }
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private boolean isSkyWarsTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta.hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+    }
+
+    private Player nearestSkyWarsTarget(Session session, Player player) {
+        return alivePlayers(session).stream()
+                .filter(target -> !target.getUniqueId().equals(player.getUniqueId()))
+                .min(java.util.Comparator.comparingDouble(target ->
+                        target.getLocation().distanceSquared(player.getLocation())))
+                .orElse(null);
+    }
+
+    private void updateSkyWarsCompass(Session session) {
+        if (session.ticks % 5 != 0) return;
+        for (Player player : session.players.values()) {
+            if (player == null || !player.isOnline() || player.getWorld() != session.world) continue;
+            Player target = nearestSkyWarsTarget(session, player);
+            if (target == null) continue;
+            if (!player.getInventory().contains(Material.COMPASS)) {
+                player.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
+                        "Tracks the nearest living player. Left-click to spectate when eliminated."));
+            }
+            player.setCompassTarget(target.getLocation());
+            if (isSkyWarsTrackingCompass(player.getInventory().getItemInMainHand())) {
+                double distance = Math.sqrt(player.getLocation().distanceSquared(target.getLocation()));
+                double height = target.getLocation().getY() - player.getLocation().getY();
+                player.sendActionBar(ChatColor.WHITE + "Nearest Target: " + ChatColor.YELLOW + target.getName()
+                        + ChatColor.WHITE + " | Distance: " + ChatColor.YELLOW
+                        + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                        + ChatColor.WHITE + " | Height: " + ChatColor.YELLOW
+                        + String.format(java.util.Locale.ROOT, "%.1f", height));
+            }
+        }
     }
 
     private void updateQuiverKit(Session session, long now) {
@@ -6081,6 +6198,7 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         session.ticks++;
         updateSourceWaterDamage(session, now);
+        boolean sheepQuestUpdatedBeforeTimeout = false;
         if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) sneakyAssassins.tick();
         if (session.endsAt > 0L && now >= session.endsAt) {
             if (session.type == ArcadePortGame.SHEEP_QUEST) {
@@ -9337,6 +9455,7 @@ public final class ArcadePortManager implements Listener {
             passenger.leaveVehicle();
             if (passenger instanceof Sheep sheep) {
                 session.sheepCarriers.remove(sheep);
+            session.sheepHolders.remove(sheep);
                 session.sheepHolders.remove(sheep);
                 int owner = session.sheepOwners.getOrDefault(sheep, -1);
                 sheep.setColor(owner >= 0 ? sheepTeamDyeColor(owner) : DyeColor.WHITE);
@@ -9651,6 +9770,7 @@ public final class ArcadePortManager implements Listener {
                 session.sheepHolders.remove(sheep);
                 session.sheepHomes.remove(sheep);
                 session.sheep.remove(sheep);
+                session.sheepHolders.remove(sheep);
                 session.sheepOwners.remove(sheep);
                 continue;
             }
@@ -10062,6 +10182,12 @@ public final class ArcadePortManager implements Listener {
                     + " Y" + sheepQuestTeamCount(session, 3);
             case SPLEEF -> "snowballs " + inventoryCount(player, Material.SNOWBALL);
             case SNEAKY_ASSASSINS -> sneakyAssassins.statusText(id);
+            case SKY_WARS -> (session.skyWarsLive ? "alive " : "starting ")
+                    + session.alive.size() + " | TNT " + inventoryCount(player, Material.TNT);
+            case MILK_THE_COW -> "milk " + scoreFor(session, id) + "/" + MilkCowRules.SCORE_TO_WIN
+                    + (session.teams.getOrDefault(id, 0) == 1 ? " | COW" : " | FARMER");
+            case WITHER_ASSAULT -> (session.teams.getOrDefault(id, 0) == 1 ? "WITHER" : "HUMAN")
+                    + " | " + Math.max(0, (int) ((session.endsAt - System.currentTimeMillis()) / 1_000L)) + "s";
             case TURF_WARS -> (session.turfCombat ? "COMBAT" : "BUILD") + " | R:"
                     + turfWarsRemainingLines(session, 0) + " B:" + turfWarsRemainingLines(session, 1);
             case DRAW_MY_THING -> session.drawCurrentDrawer == null ? "waiting for next drawing"
@@ -18820,7 +18946,10 @@ public final class ArcadePortManager implements Listener {
 
     private enum MasterBuildersPhase { BUILDING, REVIEW }
 
+    private record SkyWarsCrumbleCandidate(Block block, double distanceSquared, long sequence) { }
+
     private static final class Session {
+        final Map<Block, Long> evolutionWebs = new HashMap<>();
         final ArcadePortGame type;
         final World world;
         final Map<UUID, Player> players = new LinkedHashMap<>();

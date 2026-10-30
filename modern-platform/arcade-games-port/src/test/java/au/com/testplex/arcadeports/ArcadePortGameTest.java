@@ -129,8 +129,8 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheTwentyMechanicsGamesAndIntegratedMonsterMazeModule() {
-        assertEquals(20, ArcadePortGame.values().length);
+    @Test void exposesTheTwentyThreeMechanicsGamesAndIntegratedMonsterMazeModule() {
+        assertEquals(23, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -142,6 +142,9 @@ class ArcadePortGameTest {
         assertEquals(ArcadePortGame.DRAW_MY_THING, ArcadePortGame.fromId("Draw My Thing"));
         assertEquals(ArcadePortGame.MASTER_BUILDERS, ArcadePortGame.fromId("master_builders"));
         assertEquals(ArcadePortGame.SNEAKY_ASSASSINS, ArcadePortGame.fromId("sneaky-assassins"));
+        assertEquals(ArcadePortGame.SKY_WARS, ArcadePortGame.fromId("skywars"));
+        assertEquals(ArcadePortGame.MILK_THE_COW, ArcadePortGame.fromId("milk-the-cow"));
+        assertEquals(ArcadePortGame.WITHER_ASSAULT, ArcadePortGame.fromId("wither-assault"));
     }
 
     @Test void normalizesSpacesAndUnderscoresInTestCommands() {
@@ -610,6 +613,13 @@ class ArcadePortGameTest {
 
     @Test void originalMapCatalogEmbedsFourteenSourceWorldsAndLeavesUnmappedGamesExplicitlyUnmapped() {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BACON_BRAWL));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.CASTLE_ASSAULT));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.HEROES_OF_GWEN));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAW_MY_THING));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SKY_WARS));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MILK_THE_COW));
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.WITHER_ASSAULT).isEmpty());
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS).isEmpty());
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BOMB_LOBBERS));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DEATH_TAG));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGON_ESCAPE));

@@ -18,9 +18,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private ArcadeMapSelectionMenu mapMenu;
 
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
-    private static final java.util.List<String> READY_FOR_TEST_GAME_IDS =
-            java.util.List.of("death-tag", "one-in-the-quiver");
-    private static final String PLAYABLE_GAMES_REVISION = "ready-only-20261031-v1";
+    private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of("death-tag", "one-in-the-quiver");
+    private static final String PLAYABLE_GAMES_REVISION = "ready-only-20261031-strict-v3";
 
     @Override
     public void onEnable() {

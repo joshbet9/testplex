@@ -284,6 +284,28 @@ public final class ArcadeCatalog {
                 win("beacon-crown", "Beacon Crown", "Captured beacons form a crown around the victor."),
                 win("wither-fall", "Wither Fall", "The defeated Wither fades behind the winning team.")));
 
+        register(game("milk-the-cow", "Milk the Cow", "MILK_BUCKET",
+                "Collect milk for your team, protect the herd and use Cow charge and body-slam abilities.",
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, List.of(),
+                win("dairy-champion", "Dairy Champion", "The winning farmer is celebrated above the dairy arena")));
+
+        register(game("wither-assault", "Wither Assault", "WITHER_SKELETON_SKULL",
+                "Defend your team and control the Wither Assault objective using source-derived movement rules.",
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, List.of(),
+                win("wither-victory", "Wither Victory", "The surviving team stands above the defeated Wither")));
+
+        register(game("skywars", "SkyWars Mixed", "TNT",
+                "Fast 16-player Mixed Arcade free-for-all: loot your island, throw TNT and survive the collapse.",
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                List.of(line("sky-combat-signature", "Sky Combat Signature",
+                        "A visible identity for throwable TNT and fast island collapse.", "TNT",
+                        single("tnt-burst", "TNT Burst", "A bright TNT burst with smoke and ember sparks."),
+                        single("skyfall", "Skyfall", "A short wind ring marks the explosion path."),
+                        single("island-collapse", "Island Collapse", "A block-shatter cue marks the island crumble."))),
+                win("sky-island", "Sky Island", "The winner is raised above a floating island."),
+                win("last-survivor", "Last Survivor", "A beacon shines over the last player standing."),
+                win("skyfall-crown", "Skyfall Crown", "A floating crown of cloud and TNT frames the winner.")));
+
         register(game("turf-wars", "Turf Wars", "BOW", "Win ranged combat and control the central turf.",
                 GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("arrow-mark", "Arrow Mark", "A block-impact mark that follows the player's team palette.", "TARGET",

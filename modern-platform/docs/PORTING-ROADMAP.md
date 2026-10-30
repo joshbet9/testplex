@@ -40,3 +40,38 @@ For each game: confirm Game Panel entry; lobby/arena transfer; round start/reset
 2. **Snake** — validate steering/movement, tail spacing/collisions, slime growth, kit timers, item-box contacts/roulette, wall hits, disconnects and cleanup.
 3. **Other 14 games** — compare each rough modern mechanics loop against the existing Reborn source, repair API/round/map discrepancies and only then add further mechanics.
 4. After gameplay loops are accepted, go line-by-line through each game's cosmetic line and distinct win effect, rendering and testing each. Keep legacy/global cosmetics separate where they are intentionally shared.
+
+## Complete 26-game programme register (31 October 2026)
+
+The overall programme tracks 26 titles/variants: **24 shared Arcade catalogue games**, the separately packaged **Wizards** module, and the planned **Speed Builders Arcade** variant. Speed Builders currently has no implementation branch or runtime code; it is tracked as planned work rather than represented by a non-functional placeholder.
+
+| # | Game | Current implementation state | Test access |
+|---:|---|---|---|
+| 1 | Bacon Brawl | Mechanics in progress | Disabled |
+| 2 | Bomb Lobbers | Mechanics in progress | Disabled |
+| 3 | Death Tag | Acceptance-ready | Enabled |
+| 4 | Dragon Escape | Mechanics in progress | Disabled |
+| 5 | Dragons (Solo) | Mechanics in progress | Disabled |
+| 6 | Evolution | Mechanics in progress | Disabled |
+| 7 | Gladiators | Mechanics implemented; runtime acceptance still required | Disabled |
+| 8 | Micro Battles | Mechanics in progress | Disabled |
+| 9 | Monster Maze | Embedded in Testplex Arcade lifecycle; mechanics in progress | Disabled |
+| 10 | One in the Quiver | Acceptance-ready | Enabled |
+| 11 | Paintball | Mechanics in progress | Disabled |
+| 12 | Runner | Mechanics in progress | Disabled |
+| 13 | Sheep Quest | Mechanics in progress | Disabled |
+| 14 | Snake | Separate modern module; mechanics in progress | Disabled |
+| 15 | Spleef | Mechanics in progress | Disabled |
+| 16 | Turf Wars | Mechanics in progress | Disabled |
+| 17 | Draw My Thing | Mechanics in progress; large-lobby turn scaling present | Disabled |
+| 18 | Master Builders | Mechanics in progress; plot/review work present | Disabled |
+| 19 | Castle Assault | Mechanics in progress | Disabled |
+| 20 | Heroes of Gwen | Mechanics in progress | Disabled |
+| 21 | Sneaky Assassins | Mechanics in progress; no archived source map | Disabled |
+| 22 | SkyWars Mixed | Mechanics-first 16-player port integrated | Disabled |
+| 23 | Milk the Cow | Mechanics-first port integrated | Disabled |
+| 24 | Wither Assault | Mechanics-first port integrated; generated test arena | Disabled |
+| 25 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
+| 26 | Speed Builders Arcade | Planned; implementation not started | Not available |
+
+**Readiness rule:** only Death Tag and One in the Quiver are in the READY_FOR_TEST allow-list and enabled-games config. Catalogue presence and successful compilation do not automatically make a game available. Every other title remains disabled until source parity and isolated multi-client acceptance are completed.

@@ -2172,48 +2172,12 @@ public final class ArcadePortRules {
         return bodyNear || eyesNear;
     }
 
-    public static boolean isQuiverPerfectRun(int killStreak) {
-        return killStreak >= QUIVER_PERFECT_RUN_KILL_STREAK;
-    }
 
-    public static boolean isQuiverSpeedrunnerWin(long elapsedMillis) {
-        return elapsedMillis >= 0L && elapsedMillis < 90_000L;
-    }
 
-    public static boolean shouldAwardQuiverFistPunchKills(int kills) {
-        return kills >= 3;
-    }
 
-    public static double quiverBrawlerHealthAfterKill(double health, double maxHealth) {
-        if (!Double.isFinite(health) || !Double.isFinite(maxHealth) || maxHealth <= 0.0D) return 0.0D;
-        return Math.min(maxHealth, Math.max(0.0D, health) + 2.0D);
-    }
 
-    public static boolean isQuiverKillstreakAnnouncement(int killStreak) {
-        return killStreak == 3 || killStreak == 5 || killStreak == 7 || killStreak == 9
-                || killStreak == 11 || killStreak == 13 || killStreak == QUIVER_PERFECT_RUN_KILL_STREAK;
-    }
 
-    public static String quiverKillstreakTitle(int killStreak) {
-        return switch (killStreak) {
-            case 3 -> "TRIPLE KILL";
-            case 5 -> "MEGA KILL";
-            case 7 -> "MONSTER KILL";
-            case 9 -> "ULTRA KILL";
-            case 11 -> "UNSTOPPABLE";
-            case 13 -> "GODLIKE";
-            case QUIVER_PERFECT_RUN_KILL_STREAK -> "PERFECT RUN";
-            default -> null;
-        };
-    }
 
-    public static boolean isQuiverReboundImpactInRange(double bodyDistanceSquared, double eyeDistanceSquared) {
-        boolean bodyNear = Double.isFinite(bodyDistanceSquared) && bodyDistanceSquared >= 0.0D
-                && bodyDistanceSquared <= QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED;
-        boolean eyesNear = Double.isFinite(eyeDistanceSquared) && eyeDistanceSquared >= 0.0D
-                && eyeDistanceSquared <= QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED;
-        return bodyNear || eyesNear;
-    }
 
     public static boolean shouldQuiverArrowBounce(int remainingBounces) {
         return remainingBounces > 0;
@@ -2769,4 +2733,85 @@ public final class ArcadePortRules {
         if (redKills != blueKills) return redKills > blueKills ? 0 : 1;
         return -1;
     }
+
+    public static final long CASTLE_ASSAULT_ARCHER_REFILL_MILLIS = 6_000L;
+    public static final int CASTLE_ASSAULT_ARCHER_MAX_ARROWS = 10;
+    public static final long CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS = 10_000L;
+    public static final int CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT = 2;
+
+    public static final long HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS = 4_000L;
+    public static final double HEROES_OF_GWEN_WITHER_TARGET_SPEED = 4.0D;
+    public static final double HEROES_OF_GWEN_WITHER_HOME_SPEED = 6.0D;
+    public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS = 8.0D;
+    public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE = 4.0D;
+
+    /** Source MobaDirectAIMethod interprets speed as ticks per block, then divides by 20. */
+    public static double heroesOfGwenWitherStepPerTick(double sourceSpeed) {
+        return Math.max(0.0D, sourceSpeed) / 20.0D;
+    }
+
+    /** Source Earthquake damage scales with the radius proximity value (1 - distance / radius). */
+    public static double heroesOfGwenWitherEarthquakeDamage(double distanceFromBoss) {
+        double proximity = 1.0D - Math.max(0.0D, Math.min(
+                HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS, distanceFromBoss))
+                / HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS;
+        return HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE * (proximity + 0.5D);
+    }
+
+    /** Reborn caps blast protection EPF at 20 before applying its TNT damage multiplier. */
+    public static double castleAssaultBlastDamageMultiplier(int blastProtectionEpf) {
+        int epf = Math.max(0, Math.min(20, blastProtectionEpf));
+        return 1.0D - epf / 25.0D;
+    }
+
+    /** Reborn reduces blast knockback by 15% per level of the strongest armour piece. */
+    public static double castleAssaultBlastKnockbackMultiplier(int highestBlastProtectionLevel) {
+        return Math.max(0.0D, 1.0D - Math.max(0, highestBlastProtectionLevel) * 0.15D);
+    }
+
+    /** Normalise the five source Castle Assault kits for the test command and lobby selection. */
+    public static String normalizeCastleAssaultKit(String requested) {
+        if (requested == null) return null;
+        String value = requested.toLowerCase(java.util.Locale.ROOT).trim()
+                .replace('_', '-').replace(' ', '-');
+        if ("demo".equals(value) || "demolition".equals(value)) value = "demolitionist";
+        return switch (value) {
+            case "alchemist", "archer", "demolitionist", "fighter", "tank" -> value;
+            default -> null;
+        };
+    }
+
+    /** Canonical source Heroes of Gwen hero IDs, including the hidden Bob Ross hero. */
+    public static String normalizeHeroesOfGwenHero(String requested) {
+        if (requested == null) return null;
+        String value = requested.toLowerCase(java.util.Locale.ROOT).trim()
+                .replace('_', '-').replace(' ', '-');
+        if ("bob".equals(value) || "ross".equals(value) || "bobross".equals(value)) value = "bob-ross";
+        return switch (value) {
+            case "hattori", "devon", "anath", "dana", "biff", "larissa",
+                    "bardolf", "rowena", "ivy", "bob-ross" -> value;
+            default -> null;
+        };
+    }
+
+    /** Source hero-to-role mapping used to open the matching gold-upgrade shop. */
+    public static String heroesOfGwenHeroRole(String hero) {
+        String canonical = normalizeHeroesOfGwenHero(hero);
+        if (canonical == null) return null;
+        return switch (canonical) {
+            case "hattori", "bardolf" -> "Assassin";
+            case "devon", "rowena" -> "Hunter";
+            case "anath", "larissa", "bob-ross" -> "Mage";
+            case "dana", "biff", "ivy" -> "Warrior";
+            default -> null;
+        };
+    }
+
+    public static String heroesOfGwenHeroDisplayName(String hero) {
+        String canonical = normalizeHeroesOfGwenHero(hero);
+        if (canonical == null) return null;
+        return "bob-ross".equals(canonical) ? "Bob Ross"
+                : Character.toUpperCase(canonical.charAt(0)) + canonical.substring(1);
+    }
+
 }
