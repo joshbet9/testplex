@@ -130,6 +130,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> microKitPreferences = new HashMap<>();
     private final Map<UUID, String> quiverKitPreferences = new HashMap<>();
     private final Map<UUID, String> runnerKitPreferences = new HashMap<>();
+    private final Map<UUID, String> gladiatorLobbyVotes = new HashMap<>();
     private final Map<UUID, String> dragonsKitPreferences = new HashMap<>();
     private final Map<UUID, String> dragonEscapeKitPreferences = new HashMap<>();
     /** Packet-thread-safe entity-ID lookup for the optional Bacon client hit bridge. */
@@ -1617,30 +1618,43 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.GLADIATORS
                 || session.gladiatorVotingEndsAt <= System.currentTimeMillis()) return;
+        openGladiatorVoteMenu(player, session.gladiatorVotes, "Gladiators — PvP Vote", true);
+    }
+
+    private void openGladiatorLobbyVoteMenu(Player player) {
+        LinkedHashMap<UUID, Player> queue = queues.get(ArcadePortGame.GLADIATORS.id());
+        if (queue == null || !queue.containsKey(player.getUniqueId())) {
+            player.sendMessage(ChatColor.YELLOW + "Join the Gladiators lobby queue before voting.");
+            return;
+        }
+        openGladiatorVoteMenu(player, gladiatorLobbyVotes, "Gladiators Lobby — PvP Vote", false);
+    }
+
+    private void openGladiatorVoteMenu(Player player, Map<UUID, String> votes, String title, boolean allowHotbar) {
         GladiatorMenuHolder holder = new GladiatorMenuHolder(GladiatorMenuType.VOTE);
-        Inventory inventory = Bukkit.createInventory(holder, 27, "Gladiators — PvP Vote");
+        Inventory inventory = Bukkit.createInventory(holder, 27, title);
         holder.inventory = inventory;
         Material[] icons = {Material.BOW, Material.FISHING_ROD, Material.SHIELD, Material.SPLASH_POTION};
         GladiatorsMode[] modes = GladiatorsMode.values();
         int[] slots = {10, 12, 14, 16};
         for (int i = 0; i < modes.length; i++) {
             GladiatorsMode mode = modes[i];
-            int votes = (int) session.gladiatorVotes.values().stream()
-                    .filter(mode.id()::equals).count();
+            int count = (int) votes.values().stream().filter(mode.id()::equals).count();
             String details = switch (mode) {
                 case RODLESS -> "Bow available; fishing rod disabled.";
                 case BOWLESS -> "Fishing rod available; bow disabled.";
                 case MODERN -> "Sword, axe and shield. No bow or rod.";
                 case POT -> "Sword and healing potions. No bow or rod.";
             };
+            String mine = mode.id().equals(votes.get(player.getUniqueId())) ? " Your vote." : "";
             ItemStack option = gladiatorMenuItem(icons[i], mode.displayName(),
-                    details + " Current votes: " + votes, "vote", mode.id());
+                    details + " Votes: " + count + "." + mine, "vote", mode.id());
             inventory.setItem(slots[i], option);
         }
-        inventory.setItem(22, gladiatorMenuItem(Material.CHEST, "Hotbar Editor",
+        if (allowHotbar) inventory.setItem(22, gladiatorMenuItem(Material.CHEST, "Hotbar Editor",
                 "Rearrange your hotbar during the tournament.", "hotbar", null));
-        inventory.setItem(26, gladiatorMenuItem(Material.CLOCK, "Voting closes soon",
-                "Choose one combat ruleset. You may change your vote until the menu closes.", null, null));
+        inventory.setItem(26, gladiatorMenuItem(Material.CLOCK, "Voting",
+                "Choose one ruleset. Votes are visible to the lobby.", null, null));
         player.openInventory(inventory);
     }
 
@@ -1810,6 +1824,10 @@ public final class ArcadePortManager implements Listener {
 
     private void beginGladiatorVote(Session session) {
         session.gladiatorVotes.clear();
+        for (UUID id : session.players.keySet()) {
+            String vote = gladiatorLobbyVotes.remove(id);
+            if (GladiatorsMode.fromId(vote) != null) session.gladiatorVotes.put(id, vote);
+        }
         session.gladiatorMode = GladiatorsMode.RODLESS.id();
         session.gladiatorVotingEndsAt = System.currentTimeMillis() + 15_000L;
         announce(session, ChatColor.GOLD + "Gladiators vote: choose the PvP rules for this tournament.");
@@ -1818,19 +1836,25 @@ public final class ArcadePortManager implements Listener {
             player.closeInventory();
             player.getInventory().clear();
             player.setGameMode(GameMode.ADVENTURE);
+            if (!session.gladiatorVotes.containsKey(player.getUniqueId())) {
+                player.sendMessage(ChatColor.YELLOW + "You have not voted in the lobby yet — choose a ruleset now.");
+            }
             openGladiatorVoteMenu(player);
         }
+        long onlineVoters = session.players.values().stream()
+                .filter(player -> player != null && player.isOnline()).count();
+        if (session.gladiatorVotes.size() >= onlineVoters) resolveGladiatorVote(session);
     }
 
     public void openGladiatorVote(Player player) {
         Session session = active;
-        if (session == null || session.type != ArcadePortGame.GLADIATORS
-                || session.gladiatorVotingEndsAt <= System.currentTimeMillis()
-                || !session.players.containsKey(player.getUniqueId())) {
-            player.sendMessage(ChatColor.YELLOW + "The Gladiators vote is not currently open.");
+        if (session != null && session.type == ArcadePortGame.GLADIATORS
+                && session.gladiatorVotingEndsAt > System.currentTimeMillis()
+                && session.players.containsKey(player.getUniqueId())) {
+            openGladiatorVoteMenu(player);
             return;
         }
-        openGladiatorVoteMenu(player);
+        openGladiatorLobbyVoteMenu(player);
     }
 
     public void openGladiatorHotbarEditor(Player player) {
@@ -1851,8 +1875,23 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void voteGladiators(Session session, Player player, GladiatorsMode mode) {
-        if (active != session || session.gladiatorVotingEndsAt <= System.currentTimeMillis()
-                || !session.players.containsKey(player.getUniqueId()) || mode == null) return;
+        if (mode == null || player == null || !player.isOnline()) return;
+        if (session == null) {
+            LinkedHashMap<UUID, Player> queue = queues.get(ArcadePortGame.GLADIATORS.id());
+            if (queue == null || !queue.containsKey(player.getUniqueId())) return;
+            gladiatorLobbyVotes.put(player.getUniqueId(), mode.id());
+            player.closeInventory();
+            player.sendMessage(ChatColor.GREEN + "Lobby vote recorded: " + mode.displayName() + ".");
+            for (Player queued : queue.values()) {
+                if (queued != null && queued.isOnline() && !queued.getUniqueId().equals(player.getUniqueId())) {
+                    queued.sendMessage(ChatColor.GOLD + player.getName() + " voted " + mode.displayName() + ".");
+                }
+            }
+            return;
+        }
+        if (active != session || session.type != ArcadePortGame.GLADIATORS
+                || session.gladiatorVotingEndsAt <= System.currentTimeMillis()
+                || !session.players.containsKey(player.getUniqueId())) return;
         session.gladiatorVotes.put(player.getUniqueId(), mode.id());
         player.closeInventory();
         player.sendMessage(ChatColor.GREEN + "Vote recorded: " + mode.displayName() + ".");
@@ -6305,7 +6344,6 @@ public final class ArcadePortManager implements Listener {
                 attackerPair != null && session.gladiatorResolvedPairs.contains(attackerPair))) return;
         if (target.getNoDamageTicks() > 0) return;
         target.setNoDamageTicks(projectile ? 8 : 10);
-        session.scores.merge(attackerId, 0, Integer::sum);
         if (target.getHealth() <= damage) {
             target.getWorld().playSound(target.getLocation(),
                     projectile ? Sound.ENTITY_ARROW_HIT_PLAYER : Sound.ENTITY_PLAYER_ATTACK_STRONG,
@@ -6315,13 +6353,9 @@ public final class ArcadePortManager implements Listener {
         }
         target.setHealth(target.getHealth() - damage);
         Vector push = target.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0.0D);
-        if (projectile) {
-            Vector direction = attacker.getLocation().toVector().subtract(target.getLocation().toVector()).setY(0.0D);
-            if (direction.lengthSquared() > 0.001D) {
-                target.setVelocity(target.getVelocity().add(direction.normalize().multiply(0.18D)));
-            }
-        } else if (push.lengthSquared() > 0.001D) {
-            target.setVelocity(target.getVelocity().add(push.normalize().multiply(0.32D).setY(0.12D)));
+        if (push.lengthSquared() > 0.001D) {
+            target.setVelocity(target.getVelocity().add(push.normalize()
+                    .multiply(projectile ? 0.18D : 0.32D).setY(projectile ? 0.06D : 0.12D)));
         }
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
         target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
@@ -7865,6 +7899,7 @@ public final class ArcadePortManager implements Listener {
             if (player != null && player.isOnline()) lobby.sendToLobby(player);
         }
         queues.clear();
+        gladiatorLobbyVotes.clear();
         plugin.getLogger().info("Modern Arcade ports reset: " + reason);
     }
 
@@ -8573,8 +8608,9 @@ public final class ArcadePortManager implements Listener {
                         && projectile.getShooter() instanceof Player shooter ? shooter : null;
             if (attacker != null && session.alive.contains(attacker.getUniqueId())
                     && session.alive.contains(gladiatorTarget.getUniqueId())) {
+                double finalDamage = event.getFinalDamage();
                 event.setCancelled(true);
-                applyGladiatorDamage(session, attacker, gladiatorTarget, event.getFinalDamage(), damager instanceof Projectile);
+                applyGladiatorDamage(session, attacker, gladiatorTarget, finalDamage, damager instanceof Projectile);
             }
             return;
         }
@@ -10774,6 +10810,7 @@ public final class ArcadePortManager implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         UUID id = event.getPlayer().getUniqueId();
         for (Map<UUID, Player> queue : queues.values()) queue.remove(id);
+        gladiatorLobbyVotes.remove(id);
         Session session = active;
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
