@@ -6140,7 +6140,7 @@ public final class ArcadePortManager implements Listener {
                 continue;
             }
             Block below = player.getLocation().getBlock().getRelative(org.bukkit.block.BlockFace.DOWN);
-            if (!player.isOnGround() || below.getType() == Material.DRAGON_EGG) {
+            if (!player.isOnGround() || !below.getType().isSolid()) {
                 if (session.evolutionCharge.containsKey(id)) player.sendActionBar(ChatColor.YELLOW + "Land on solid ground to charge your evolution.");
                 continue;
             }
@@ -6284,6 +6284,24 @@ public final class ArcadePortManager implements Listener {
         player.removePotionEffect(PotionEffectType.SLOWNESS);
     }
 
+    private void interruptEvolutionForHit(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        if (!session.evolving.remove(id)) return;
+        // The form is committed at the form-change callback (44 ticks), before the
+        // cosmetic/lock animation finishes (140 ticks). Before that point, restore the
+        // evolution unlock so the player can retry; after it, keep the new form.
+        boolean transformationCommitted = !session.evolutionKillsAtAttempt.containsKey(id);
+        session.evolutionKillsAtAttempt.remove(id);
+        if (!transformationCommitted) session.evolutionAvailable.add(id);
+        session.evolutionLockedLocations.remove(id);
+        session.evolutionCharge.remove(id);
+        player.setExp(0.0F);
+        player.removePotionEffect(PotionEffectType.SLOWNESS);
+        cleanupEvolutionEggEffect(session, id);
+        player.sendTitle(ChatColor.RED + "EVOLUTION INTERRUPTED", ChatColor.YELLOW + "You were hit!", 0, 30, 8);
+        player.sendMessage(ChatColor.RED + "Your evolution was interrupted by an attack.");
+    }
+
     private void beginEvolution(Session session, Player player) {
         UUID id = player.getUniqueId();
         if (active != session || !session.alive.contains(id)
@@ -6392,7 +6410,10 @@ public final class ArcadePortManager implements Listener {
         if (active != session || attacker.equals(target) || !session.alive.contains(attacker.getUniqueId())
                 || !session.alive.contains(target.getUniqueId())) return;
         if (session.type == ArcadePortGame.EVOLUTION) {
-            if (session.evolving.contains(attacker.getUniqueId()) || session.evolving.contains(target.getUniqueId())) return;
+            if (session.evolving.contains(attacker.getUniqueId())) return;
+            if (session.evolving.contains(target.getUniqueId())) {
+                interruptEvolutionForHit(session, target);
+            }
             recordEvolutionDamage(session, target, attacker, System.currentTimeMillis());
             cancelEvolutionCharge(session, target);
         }
