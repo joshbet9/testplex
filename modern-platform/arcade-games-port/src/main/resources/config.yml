@@ -1,9 +1,10 @@
 # Isolated manual-acceptance candidates. Availability does not itself certify 100% in-game parity.
-# Dragon Escape is open for in-game acceptance now that Bomb Lobbers has passed.
+# Dragon Escape and Paintball are open for in-game acceptance after their current feature builds passed CI.
 enabled-games:
   - bacon-brawl
   - bomb-lobbers
   - dragon-escape
+  - paintball
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
