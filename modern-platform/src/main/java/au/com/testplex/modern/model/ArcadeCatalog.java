@@ -127,7 +127,7 @@ public final class ArcadeCatalog {
                 win("safe-pad-coronation", "Safe Pad Coronation", "The Safe Pad raises into a compact victory dais")));
 
         register(game("one-in-the-quiver", "One in the Quiver", "ARROW", "Land the decisive bow shot with one arrow at a time.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("arrow-flight", "Arrow Flight Signature", "A distinct arrow-flight trail and hit confirm.", "SPECTRAL_ARROW",
                         single("bullseye-dash", "Bullseye Dash", "A short target line follows the arrow."),
                         single("fletching-sparks", "Fletching Sparks", "Feather-shaped sparks mark the trajectory."),
