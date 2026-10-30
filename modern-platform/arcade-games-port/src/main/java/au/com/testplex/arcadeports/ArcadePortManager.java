@@ -3806,8 +3806,13 @@ public final class ArcadePortManager implements Listener {
                 || !session.skyWarsGuardianHomes.containsKey(event.getEntity().getUniqueId())) return;
         if (event.getCause() == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION
                 || event.getCause() == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION) {
-            // Legacy CustomDamageEvent replaces all explosion mitigation with a flat eight damage.
-            event.setDamage(8.0D);
+            // Legacy CustomDamageEvent ignores the Guardian's gold armour and applies exactly eight.
+            event.setCancelled(true);
+            if (event.getEntity() instanceof LivingEntity guardian && guardian.getHealth() <= 8.0D) {
+                guardian.setHealth(0.0D);
+            } else if (event.getEntity() instanceof LivingEntity guardian) {
+                guardian.setHealth(guardian.getHealth() - 8.0D);
+            }
         }
     }
 
@@ -13308,6 +13313,10 @@ public final class ArcadePortManager implements Listener {
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
         boolean wasAlive = session.alive.remove(id);
+        if (session.type == ArcadePortGame.SKY_WARS && wasAlive) {
+            // Source SoloSkywars enables QuitDropItems as well as DeathDropItems.
+            dropSkyWarsInventory(player);
+        }
         if (session.type == ArcadePortGame.DRAGONS && wasAlive) {
             session.dragonEliminationOrder.add(id);
             awardDragonSurvivalGems(session, id, System.currentTimeMillis());
