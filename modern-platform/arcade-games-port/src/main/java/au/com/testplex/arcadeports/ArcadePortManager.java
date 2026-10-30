@@ -6266,7 +6266,15 @@ public final class ArcadePortManager implements Listener {
             }
             player.sendMessage(ChatColor.RED + "Eliminated: " + reason + ".");
         }
-        if (killer != null && session.scores.containsKey(killer.getUniqueId())) session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+        if (killer != null && session.scores.containsKey(killer.getUniqueId())) {
+            int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+            if (session.type == ArcadePortGame.MICRO_BATTLES
+                    && ArcadePortRules.shouldAwardMicroBattlesAnnihilation(kills)) {
+                UUID killerId = killer.getUniqueId();
+                awardMicroBattlesAchievement(killer, MicroBattlesAchievement.ANNIHILATION.configKey(killerId),
+                        "Annihilation — 8 kills in one Micro Battles game.");
+            }
+        }
         if (session.type == ArcadePortGame.GLADIATORS) {
             Integer pair = session.gladiatorPairs.get(player.getUniqueId());
             if (pair != null) {
@@ -7152,6 +7160,15 @@ public final class ArcadePortManager implements Listener {
         plugin.saveConfig();
     }
 
+    private void awardMicroBattlesAchievement(Player player, String key, String description) {
+        if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        if (player != null && player.isOnline()) {
+            player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
+        }
+        plugin.saveConfig();
+    }
+
     private void awardBaconAchievement(Player player, String key, String description) {
         if (plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
@@ -7181,7 +7198,9 @@ public final class ArcadePortManager implements Listener {
                         plugin.getConfig().getInt(path + "knockouts", 0) + 1);
             }
             boolean won = winnerId != null && (winnerId.equals(id)
-                    || (session.type == ArcadePortGame.BOMB_LOBBERS && session.alive.contains(id)
+                    || ((session.type == ArcadePortGame.BOMB_LOBBERS
+                            || session.type == ArcadePortGame.MICRO_BATTLES)
+                        && session.alive.contains(id)
                         && session.teams.getOrDefault(id, -2) == winningTeam));
             if (won) {
                 plugin.getConfig().set(path + "wins",
@@ -7527,6 +7546,16 @@ public final class ArcadePortManager implements Listener {
                         (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
                         lore, "noop", null, null));
             }
+        } else if ("micro-battles".equals(gameId)) {
+            MicroBattlesAchievement achievement = MicroBattlesAchievement.ANNIHILATION;
+            boolean unlocked = plugin.getConfig().getBoolean(achievement.configKey(targetId), false);
+            List<String> lore = List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
+                    unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked",
+                    ChatColor.DARK_GRAY + "Local test-server achievement; not production Mineplex data.");
+            inventory.setItem(13, statsItem(
+                    unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                    (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
+                    lore, "noop", null, null));
         } else {
             int[] slots = {29, 30, 31, 32};
             int[] values = {played, wins, score, knockouts};
