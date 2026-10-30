@@ -17,13 +17,13 @@ The build uses Paper's official Maven repository and a version range for the cur
 - /arcadecosmetics — game-specific cosmetic lines and a separate win-effect selector.
 - /arcadetest status — administrative port-status summary.
 - player-preferences.yml — per-player, per-game, per-line preferences; separate from the legacy profile format.
-- All 16 Arcade games are catalogued with optional future concepts for cosmetic lines and win scenes; these are not current parity acceptance criteria.
+- All 18 Arcade games are catalogued with optional future concepts for cosmetic lines and win scenes; these are not current parity acceptance criteria.
 - `monster-maze-port/` builds `MonsterMazeModern.jar`, based on the 1.21 implementation in the separate MonsterMaze repository.
 - `snake-port/` builds `SnakeModern.jar`, a Paper-native mechanics-first port with an isolated arena.
-- `arcade-games-port/` builds `ArcadeMechanicsModern.jar`, first-pass game loops and dedicated test arenas for the other 14 games.
+- `arcade-games-port/` builds `ArcadeMechanicsModern.jar`, first-pass game loops and dedicated test arenas for the other 16 games, including Draw My Thing and Master Builders.
 - Game Details now routes to the correct module's Start / Test command when the associated module is installed.
 
-**Important:** the 14 prototype loops are intentionally rough starting points, not a claim of original Mineplex parity. All 16 games remain in progress until their mechanics have passed in-game acceptance. CI confirms compile/unit-level checks only. Cosmetic renderers, progression milestones, and win scenes are out of scope during this parity pass for every game except Monster Maze, where customisation is a core pillar and remains part of acceptance.
+**Important:** the 16 prototype loops are intentionally rough starting points, not a claim of original Mineplex parity. All 18 games remain in progress until their mechanics have passed in-game acceptance. CI confirms compile/unit-level checks only. Cosmetic renderers, progression milestones, and win scenes are out of scope during this parity pass for every game except Monster Maze, where customisation is a core pillar and remains part of acceptance.
 
 ## Isolation from 1.8
 
