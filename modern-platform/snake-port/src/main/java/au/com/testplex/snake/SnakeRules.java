@@ -72,6 +72,11 @@ public final class SnakeRules {
         return Double.isFinite(distanceSquared) && distanceSquared > 4.0D;
     }
 
+    /** Reborn leaves the mounted head collidable and ghosts all appended tail segments. */
+    public static boolean shouldGhostTailSegment(int segmentIndex) {
+        return segmentIndex > 0;
+    }
+
     public static boolean isAbilityItemInteraction(String actionName) {
         return actionName != null && !"PHYSICAL".equalsIgnoreCase(actionName);
     }
