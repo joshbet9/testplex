@@ -1770,6 +1770,19 @@ class ArcadePortGameTest {
         assertEquals(10, ArcadePortRules.DEATH_TAG_PARTICIPATION_REWARD_GEMS);
     }
 
+    @Test void deathTagChaserRespawnsUseTheSpawnFurthestFromTheNearestActivePlayer() {
+        assertEquals(1, ArcadePortRules.deathTagSafestRespawnSpawnIndex(
+                java.util.List.of(16.0D, 100.0D, 36.0D)));
+        assertEquals(0, ArcadePortRules.deathTagSafestRespawnSpawnIndex(
+                java.util.List.of(25.0D, 25.0D, 25.0D)));
+        assertEquals(0, ArcadePortRules.deathTagSafestRespawnSpawnIndex(
+                java.util.List.of(Double.POSITIVE_INFINITY, 64.0D)));
+        assertEquals(1, ArcadePortRules.deathTagSafestRespawnSpawnIndex(
+                java.util.Arrays.asList(Double.NaN, 4.0D, -1.0D)));
+        assertEquals(-1, ArcadePortRules.deathTagSafestRespawnSpawnIndex(java.util.List.of()));
+        assertEquals(-1, ArcadePortRules.deathTagSafestRespawnSpawnIndex(null));
+    }
+
     @Test void deployedArcadeAllowListExposesOnlyAcceptedGameIds() {
         java.util.List<String> enabled = java.util.List.of("bacon-brawl");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled("bacon-brawl", enabled));
