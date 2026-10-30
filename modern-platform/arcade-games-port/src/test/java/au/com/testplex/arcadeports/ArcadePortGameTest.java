@@ -315,6 +315,7 @@ class ArcadePortGameTest {
         assertEquals(2, ArcadePortRules.requiredDeathTagChasers(59_999L));
         assertEquals(3, ArcadePortRules.requiredDeathTagChasers(60_000L));
         assertEquals(1, ArcadePortRules.requiredDeathTagChasers(-1L));
+        assertEquals(30_000L, ArcadePortRules.DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS);
     }
 
     @Test void sourceWorldResetOnlyAcceptsReservedWorldNames() {
@@ -1329,6 +1330,19 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.monotonicDragonEscapeProgress(0, 1, 0));
     }
 
+    @Test void dragonEscapeRaceTimeGapUsesCourseDistanceAndSafeSpeed() {
+        assertEquals(2_000L,
+                ArcadePortRules.dragonEscapeCourseTimeGapMillis(25.0D, 15.0D, 5.0D));
+        assertEquals(0L,
+                ArcadePortRules.dragonEscapeCourseTimeGapMillis(10.0D, 15.0D, 5.0D));
+        assertEquals(0L,
+                ArcadePortRules.dragonEscapeCourseTimeGapMillis(Double.NaN, 15.0D, 5.0D));
+        assertEquals(0L,
+                ArcadePortRules.dragonEscapeCourseTimeGapMillis(25.0D, 15.0D, 0.0D));
+        assertEquals(3.0D, ArcadePortRules.DRAGON_ESCAPE_FINISH_RADIUS, 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED, 0.00001D);
+    }
+
     @Test void dragonEscapeRankingUsesCheckpointScoreThenDistanceToNextMarker() {
         assertEquals(-2.0D, ArcadePortRules.dragonEscapeRankScore(0, 2.0D), 0.00001D);
         assertEquals(9_997.0D, ArcadePortRules.dragonEscapeRankScore(1, 3.0D), 0.00001D);
@@ -1453,25 +1467,36 @@ class ArcadePortGameTest {
         assertEquals("0:00.000", ArcadePortRules.formatDragonEscapeDelta(0L));
     }
 
-    @Test void dragonEscapePersonalBestSplitsFollowAuthoredWaypointProgress() {
+    @Test void dragonEscapePersonalBestSplitsFollowEveryAuthoredRouteLeg() {
         assertEquals(0, ArcadePortRules.dragonEscapePbSegmentStartIndex(0, 4));
         assertEquals(1, ArcadePortRules.dragonEscapePbSegmentStartIndex(1, 4));
         assertEquals(2, ArcadePortRules.dragonEscapePbSegmentStartIndex(2, 4));
-        assertEquals(2, ArcadePortRules.dragonEscapePbSegmentStartIndex(3, 4),
-                "The last checkpoint still uses the final approach segment until the finish radius is reached");
-        assertEquals(-1, ArcadePortRules.dragonEscapePbSegmentStartIndex(0, 1));
+        assertEquals(3, ArcadePortRules.dragonEscapePbSegmentStartIndex(3, 4),
+                "The final checkpoint must use its own finish-radius split");
+        assertEquals(0, ArcadePortRules.dragonEscapePbSegmentStartIndex(0, 1));
+        assertEquals(-1, ArcadePortRules.dragonEscapePbSegmentStartIndex(0, 0));
 
+        // Four authored waypoints produce four timed legs and five split points:
+        // start, three subsequent checkpoint crossings, and finish.
         assertEquals(0L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 0, 4));
-        assertEquals(30_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 1, 4));
-        assertEquals(60_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 2, 4));
-        assertEquals(90_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 3, 4));
-        assertEquals(0L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 2, 1));
+        assertEquals(22_500L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 1, 4));
+        assertEquals(45_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 2, 4));
+        assertEquals(67_500L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 3, 4));
+        assertEquals(90_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 4, 4));
+        assertEquals(0L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 0, 0));
+        assertEquals(0L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 0, 1));
+        assertEquals(90_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 1, 1));
 
         assertEquals(27_500L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 50_000L, 0.25D));
         assertEquals(20_000L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 50_000L, -1.0D));
         assertEquals(50_000L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 50_000L, 2.0D));
         assertEquals(20_000L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 10_000L, 0.5D));
         assertEquals(20_000L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 50_000L, Double.NaN));
+
+        assertEquals(5.0D, ArcadePortRules.interpolateDragonEscapeCoordinate(0.0D, 10.0D, 0.5D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.interpolateDragonEscapeCoordinate(0.0D, 10.0D, -1.0D), 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.interpolateDragonEscapeCoordinate(0.0D, 10.0D, 2.0D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.interpolateDragonEscapeCoordinate(0.0D, 10.0D, Double.NaN), 0.00001D);
     }
 
     @Test void dragonEscapeRouteOnlyDeduplicatesCoincidentWaypoints() {
@@ -1687,6 +1712,27 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.deathTagRunnersReceiveSpeed(2, 6));
         assertFalse(ArcadePortRules.deathTagRunnersReceiveSpeed(0, 4));
         assertFalse(ArcadePortRules.deathTagRunnersReceiveSpeed(0, 0));
+    }
+
+    @Test void deathTagChasersKeepSpeedUntilRunnersCrossTheStrictQuarterThreshold() {
+        assertTrue(ArcadePortRules.deathTagChasersReceiveSpeed(1, 4));
+        assertTrue(ArcadePortRules.deathTagChasersReceiveSpeed(1, 5));
+        assertFalse(ArcadePortRules.deathTagChasersReceiveSpeed(2, 6));
+        assertFalse(ArcadePortRules.deathTagChasersReceiveSpeed(0, 4));
+    }
+
+    @Test void deathTagArcherUsesThreeTimesKnockbackAndAlphaHalvesIt() {
+        assertEquals(3.0D, ArcadePortRules.deathTagArcherArrowKnockbackMultiplier(false), 0.00001D);
+        assertEquals(1.5D, ArcadePortRules.deathTagArcherArrowKnockbackMultiplier(true), 0.00001D);
+        assertEquals(2, ArcadePortRules.DEATH_TAG_ARCHER_MAX_ARROWS);
+        assertEquals(2_000L, ArcadePortRules.DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS);
+    }
+
+    @Test void deathTagTraitorKnockbackUsesTheSourceFourHundredMillisecondRecharge() {
+        assertTrue(ArcadePortRules.deathTagTraitorKnockbackReady(1_000L, 0L));
+        assertFalse(ArcadePortRules.deathTagTraitorKnockbackReady(1_399L, 1_000L));
+        assertTrue(ArcadePortRules.deathTagTraitorKnockbackReady(1_400L, 1_000L));
+        assertEquals(400L, ArcadePortRules.DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS);
     }
 
     @Test void deathTagEndsWhenOneRunnerRemainsExceptInSmallTestLobbies() {
@@ -1986,11 +2032,11 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.teamWithBestTimeoutStanding(2, 2, 4, 4));
     }
 
-    @Test void deathTagLightsAlternateBetweenGoldAndWhiteWool() {
-        assertEquals(org.bukkit.Material.WHITE_WOOL,
+    @Test void deathTagLightsAlternateBetweenGoldAndBlackWool() {
+        assertEquals(org.bukkit.Material.BLACK_WOOL,
                 ArcadePortRules.deathTagNextLightMaterial(org.bukkit.Material.GOLD_BLOCK));
         assertEquals(org.bukkit.Material.GOLD_BLOCK,
-                ArcadePortRules.deathTagNextLightMaterial(org.bukkit.Material.WHITE_WOOL));
+                ArcadePortRules.deathTagNextLightMaterial(org.bukkit.Material.BLACK_WOOL));
         assertEquals(org.bukkit.Material.GOLD_BLOCK,
                 ArcadePortRules.deathTagNextLightMaterial(org.bukkit.Material.GLOWSTONE));
     }

@@ -10,12 +10,19 @@ import java.util.Collection;
  * needing a live Paper server.
  */
 public final class ArcadePortRules {
+    public static final long DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS = 30_000L;
+    public static final long DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS = 2_000L;
+    public static final int DEATH_TAG_ARCHER_MAX_ARROWS = 2;
+    public static final double DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER = 3.0D;
+    public static final long DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS = 400L;
     public static final int EVOLUTION_WIN_LEVEL = 5;
     public static final double DRAGON_ESCAPE_FINISH_X = 0.5D;
     public static final double DRAGON_ESCAPE_FINISH_Y = 64.0D;
     public static final double DRAGON_ESCAPE_FINISH_Z = 77.5D;
     public static final double DRAGON_ESCAPE_CHASE_SPEED = 0.2D;
     public static final double DRAGON_ESCAPE_BLOCK_RADIUS = 10.0D;
+    public static final double DRAGON_ESCAPE_FINISH_RADIUS = 3.0D;
+    public static final double DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED = 5.0D;
     /** Only discard effectively coincident markers; close BLACK markers are valid route steps. */
     public static final double DRAGON_ESCAPE_DUPLICATE_WAYPOINT_DISTANCE = 0.75D;
     public static final String[] DRAGON_ESCAPE_BEACON_COLORS = {
@@ -1384,7 +1391,8 @@ public final class ArcadePortRules {
         double dx = x - DRAGON_ESCAPE_FINISH_X;
         double dy = y - DRAGON_ESCAPE_FINISH_Y;
         double dz = z - DRAGON_ESCAPE_FINISH_Z;
-        return dx * dx + dy * dy + dz * dz < 9.0D;
+        return dx * dx + dy * dy + dz * dz
+                < DRAGON_ESCAPE_FINISH_RADIUS * DRAGON_ESCAPE_FINISH_RADIUS;
     }
 
     /** Reborn kills runners once Douglas's route progress has overtaken theirs. */
@@ -1438,6 +1446,15 @@ public final class ArcadePortRules {
         return waypointIndex * 10_000.0D - distanceToNextWaypoint;
     }
 
+    /** Convert a course-distance advantage to an estimated time gap for the live race display. */
+    public static long dragonEscapeCourseTimeGapMillis(
+            double leaderCourseDistance, double racerCourseDistance, double estimatedSpeed) {
+        if (!Double.isFinite(leaderCourseDistance) || !Double.isFinite(racerCourseDistance)
+                || !Double.isFinite(estimatedSpeed) || estimatedSpeed <= 0.0D) return 0L;
+        double distanceGap = Math.max(0.0D, leaderCourseDistance - racerCourseDistance);
+        return Math.max(0L, Math.round(distanceGap / estimatedSpeed * 1_000.0D));
+    }
+
     public static int monotonicDragonEscapeProgress(int previous, int candidate, int waypointCount) {
         if (waypointCount <= 0) return -1;
         return Math.min(waypointCount - 1, Math.max(0, Math.max(previous, candidate)));
@@ -1469,20 +1486,19 @@ public final class ArcadePortRules {
     }
 
     /**
-     * A split is recorded when the racer reaches that authored waypoint. Segment N therefore
-     * runs from waypoint N to N+1; the final waypoint has no following route segment.
+     * Split zero is the race start at waypoint zero. Split N is the finish after
+     * the final authored waypoint, so a runner at progress N-1 is still on segment N-1.
      */
     public static int dragonEscapePbSegmentStartIndex(int waypointIndex, int waypointCount) {
-        if (waypointCount <= 1 || waypointIndex < 0) return -1;
-        // While approaching the finish radius, keep measuring along the final route segment.
-        return Math.min(waypointCount - 2, waypointIndex);
+        if (waypointCount <= 0 || waypointIndex < 0) return -1;
+        return Math.min(waypointCount - 1, waypointIndex);
     }
 
-    /** Evenly distribute a legacy PB across authored waypoints when split data is unavailable. */
+    /** Evenly distribute a legacy PB over N route legs, including the final finish leg. */
     public static long dragonEscapeDefaultSplitMillis(long totalMillis, int splitIndex, int waypointCount) {
-        if (totalMillis <= 0L || waypointCount <= 1) return 0L;
-        int boundedIndex = Math.max(0, Math.min(waypointCount - 1, splitIndex));
-        return Math.round(totalMillis * (boundedIndex / (double) (waypointCount - 1)));
+        if (totalMillis <= 0L || waypointCount <= 0) return 0L;
+        int boundedIndex = Math.max(0, Math.min(waypointCount, splitIndex));
+        return Math.round(totalMillis * (boundedIndex / (double) waypointCount));
     }
 
     /** Interpolate a PB timestamp along one route segment, clamping invalid fractions safely. */
@@ -1491,6 +1507,12 @@ public final class ArcadePortRules {
         long to = Math.max(from, toMillis);
         double progress = Double.isFinite(fraction) ? Math.max(0.0D, Math.min(1.0D, fraction)) : 0.0D;
         return from + Math.round((to - from) * progress);
+    }
+
+    /** Interpolate one coordinate on a recorded PB ghost segment. */
+    public static double interpolateDragonEscapeCoordinate(double from, double to, double fraction) {
+        double progress = Double.isFinite(fraction) ? Math.max(0.0D, Math.min(1.0D, fraction)) : 0.0D;
+        return from + (to - from) * progress;
     }
 
     public static boolean shouldDragonEscapePlayerBeCaught(double dragonProgress, double playerProgress) {
@@ -1573,7 +1595,8 @@ public final class ArcadePortRules {
     }
 
     public static int requiredDeathTagChasers(long elapsedMillis) {
-        return elapsedMillis < 0L ? 1 : 1 + (int) (elapsedMillis / 30_000L);
+        return elapsedMillis < 0L ? 1
+                : 1 + (int) (elapsedMillis / DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS);
     }
 
     public static boolean shouldSpreadDeathTag(boolean attackerTagged, boolean targetTagged) {
@@ -1607,12 +1630,28 @@ public final class ArcadePortRules {
 
     /** Original Death Tag lights switch between gold blocks and white wool each second. */
     public static Material deathTagNextLightMaterial(Material current) {
-        return current == Material.GOLD_BLOCK ? Material.WHITE_WOOL : Material.GOLD_BLOCK;
+        // Original 1.8 marker uses wool data value 15, which maps to BLACK_WOOL.
+        return current == Material.GOLD_BLOCK ? Material.BLACK_WOOL : Material.GOLD_BLOCK;
     }
 
     /** Reborn's runner speed threshold is strictly greater than 25% chasers. */
     public static boolean deathTagRunnersReceiveSpeed(int chasers, int totalPlayers) {
         return totalPlayers > 0 && chasers >= 0 && (double) chasers / (double) totalPlayers > 0.25D;
+    }
+
+    /** Chasers retain their opening Speed I only until the runners earn their own Speed I. */
+    public static boolean deathTagChasersReceiveSpeed(int chasers, int totalPlayers) {
+        return chasers > 0 && !deathTagRunnersReceiveSpeed(chasers, totalPlayers);
+    }
+
+    /** Archer arrows have 300% of normal knockback; Alpha Chasers take half knockback. */
+    public static double deathTagArcherArrowKnockbackMultiplier(boolean alphaChaser) {
+        return DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER * deathTagKnockbackMultiplier(alphaChaser);
+    }
+
+    /** Reborn's Traitor knockback perk has a per-target 400 ms recharge. */
+    public static boolean deathTagTraitorKnockbackReady(long nowMillis, long lastUseMillis) {
+        return lastUseMillis <= 0L || nowMillis - lastUseMillis >= DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS;
     }
 
     /** Surviving runners have the Death Tag objective at timeout; chaser scores are only a fallback when none remain. */

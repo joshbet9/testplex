@@ -608,10 +608,9 @@ public final class ArcadePortManager implements Listener {
                 .replace('_', '-').replace(' ', '-');
         if (kit.startsWith("runner-")) kit = kit.substring("runner-".length());
         if (!Set.of("basher", "archer", "traitor", "null").contains(kit)) {
-            player.sendMessage(ChatColor.YELLOW + "Kits: rifle, sniper, shotgun, machine-gun, runner-basher, runner-archer, runner-traitor, runner-null.");
+            player.sendMessage(ChatColor.YELLOW + "Death Tag runner kits: basher, archer, traitor, null.");
             return;
         }
-        deathTagRunnerKitPreferences.put(player.getUniqueId(), kit);
         Session session = active;
         if (session != null && session.type == ArcadePortGame.DEATH_TAG
                 && session.players.containsKey(player.getUniqueId())) {
@@ -619,10 +618,12 @@ public final class ArcadePortManager implements Listener {
                 player.sendMessage(ChatColor.RED + "Chasers cannot switch back to a runner kit.");
                 return;
             }
+            deathTagRunnerKitPreferences.put(player.getUniqueId(), kit);
             session.deathTagRunnerKits.put(player.getUniqueId(), kit);
             giveDeathTagKit(session, player, false, false);
             player.sendMessage(ChatColor.GREEN + "Death Tag runner kit set to " + kit + ".");
         } else {
+            deathTagRunnerKitPreferences.put(player.getUniqueId(), kit);
             player.sendMessage(ChatColor.GREEN + "Death Tag runner kit set to " + kit + " for your next test.");
         }
     }
@@ -1056,6 +1057,7 @@ public final class ArcadePortManager implements Listener {
             if (type == ArcadePortGame.DRAGON_ESCAPE) {
                 UUID playerId = player.getUniqueId();
                 session.dragonEscapeRunSplitMillis.put(playerId, new HashMap<>(Map.of(0, 0L)));
+                session.dragonEscapeRunSplitLocations.put(playerId, new HashMap<>());
                 String kit = dragonEscapeKitPreferences.getOrDefault(playerId, "jumper");
                 session.dragonEscapeKits.put(playerId, kit);
                 session.dragonEscapeLeapUsesRemaining.put(playerId, ArcadePortRules.dragonEscapeLeapUses(kit));
@@ -1103,6 +1105,12 @@ public final class ArcadePortManager implements Listener {
                 session.dragonNextArrowAt.put(playerId, now + ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
             }
             Location spawn = spawns.get(i % spawns.size()).clone();
+            if (type == ArcadePortGame.DRAGON_ESCAPE) {
+                UUID dragonPlayerId = player.getUniqueId();
+                session.dragonEscapeStartLocations.put(dragonPlayerId, spawn.clone());
+                session.dragonEscapeRunSplitLocations.computeIfAbsent(
+                        dragonPlayerId, ignored -> new HashMap<>()).putIfAbsent(0, spawn.clone());
+            }
             if (type == ArcadePortGame.MICRO_BATTLES && !sourceMapWorlds.contains(type.id())) {
                 spawn = microTeamSpawn(teamId, i / 4, (participants.size() + 3) / 4);
             } else if (type == ArcadePortGame.TURF_WARS && !sourceMapWorlds.contains(type.id())) {
@@ -1157,7 +1165,8 @@ public final class ArcadePortManager implements Listener {
             if (participants.size() > 1) {
                 Player chaser = participants.get(ThreadLocalRandom.current().nextInt(participants.size()));
                 session.tagged.add(chaser.getUniqueId());
-                chaser.sendMessage(ChatColor.RED + "You are IT! Tag every runner.");
+                session.alphaChasers.add(chaser.getUniqueId());
+                chaser.sendMessage(ChatColor.RED + "You are the Alpha Chaser! Tag every runner.");
                 for (Player p : participants) if (p != chaser) p.sendMessage(ChatColor.GREEN + "Run! Avoid the tagged player.");
             } else {
                 // Solo mechanics test: use an isolated vanilla chaser so Death Tag is still interactive.
@@ -1169,7 +1178,7 @@ public final class ArcadePortManager implements Listener {
                 chaser.setRemoveWhenFarAway(false);
                 chaser.setTarget(runner);
                 session.entities.add(chaser);
-                runner.sendMessage(ChatColor.YELLOW + "Solo test: avoid the chaser; one hit ends the run.");
+                runner.sendMessage(ChatColor.YELLOW + "Solo practice: avoid the Chaser. Practice hits do not end your run.");
             }
         }
         if (type == ArcadePortGame.DEATH_TAG) {
@@ -1710,9 +1719,7 @@ public final class ArcadePortManager implements Listener {
                     alphaChaser ? "Alpha Chaser" : "Chaser",
                     alphaChaser ? "Deal 6 damage and resist 4 damage per attack." : "Deal 4 damage and resist 2 damage per attack."));
             player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 40, 4, false, false, true));
-            if (alphaChaser) {
-                player.addPotionEffect(new PotionEffect(PotionEffectType.STRENGTH, 40, 1, false, false, true));
-            }
+            // Source Alpha damage is fixed by PerkDamageSet(6); do not stack a modern Strength buff.
         } else {
             String kit = session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher");
             switch (kit) {
@@ -1745,7 +1752,7 @@ public final class ArcadePortManager implements Listener {
         for (Player player : alivePlayers(session)) {
             if (session.tagged.contains(player.getUniqueId())) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 40, 4, false, false, true));
-                if (!runnersHaveSpeed) {
+                if (ArcadePortRules.deathTagChasersReceiveSpeed((int) tagged, session.alive.size())) {
                     player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, false, false, true));
                 } else {
                     player.removePotionEffect(PotionEffectType.SPEED);
@@ -1760,16 +1767,34 @@ public final class ArcadePortManager implements Listener {
             if (!session.tagged.contains(player.getUniqueId())
                     && "archer".equals(session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher"))) {
                 Long lastArrow = session.deathTagLastArrowAt.get(player.getUniqueId());
-                if (lastArrow == null || now - lastArrow >= 2_000L) {
+                if (lastArrow == null || now - lastArrow >= ArcadePortRules.DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS) {
                     session.deathTagLastArrowAt.put(player.getUniqueId(), now);
                     int arrows = inventoryCount(player, Material.ARROW);
-                    if (arrows < 2) {
+                    if (arrows < ArcadePortRules.DEATH_TAG_ARCHER_MAX_ARROWS) {
                         player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow", "Replenished by the Archer kit."));
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.6F, 1.3F);
                     }
                 }
             }
         }
+    }
+
+    private void handleDeathTagSoloPracticeHit(Session session, Player target, Zombie chaser) {
+        if (active != session || target == null || !target.isOnline()
+                || !session.alive.contains(target.getUniqueId())) return;
+        long now = System.currentTimeMillis();
+        long readyAt = session.deathTagSoloChaserHitReadyAt.getOrDefault(target.getUniqueId(), 0L);
+        if (now < readyAt) return;
+        session.deathTagSoloChaserHitReadyAt.put(target.getUniqueId(), now + 1_500L);
+
+        double damage = ArcadePortRules.deathTagChaserDamage(false);
+        if (target.getHealth() <= damage) target.setHealth(target.getMaxHealth());
+        else target.setHealth(target.getHealth() - damage);
+
+        Vector away = target.getLocation().toVector().subtract(chaser.getLocation().toVector());
+        if (away.lengthSquared() > 0.001D) target.setVelocity(away.normalize().multiply(0.45D).setY(0.18D));
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 0.85F);
+        target.sendActionBar(ChatColor.YELLOW + "PRACTICE HIT " + ChatColor.GRAY + "| Your Death Tag run continues.");
     }
 
     private Location deathTagSoloChaserSpawn(Session session, Player runner) {
@@ -1796,11 +1821,25 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void makeDeathTagChaser(Session session, Player player, String reason) {
+        makeDeathTagChaser(session, player, reason, null);
+    }
+
+    private void makeDeathTagChaser(Session session, Player player, String reason, Player killer) {
         if (active != session || player == null || !session.alive.contains(player.getUniqueId())) return;
+
+        // A Chaser who is defeated remains a Chaser. Respawn that role rather than
+        // sending them through runner-to-Chaser conversion again.
+        if (session.tagged.contains(player.getUniqueId())) {
+            awardDeathTagKill(session, killer);
+            respawnDeathTagChaser(session, player);
+            return;
+        }
+
         boolean forcedAlpha = reason != null && reason.contains("forced by the time limit");
-        boolean newlyTagged = session.tagged.add(player.getUniqueId());
+        session.tagged.add(player.getUniqueId());
         if (forcedAlpha) session.alphaChasers.add(player.getUniqueId());
-        else if (newlyTagged) session.alphaChasers.remove(player.getUniqueId());
+        else session.alphaChasers.remove(player.getUniqueId());
+        awardDeathTagKill(session, killer);
         if (player.isOnline()) {
             if (player.getLocation().getY() < 59.0D) player.teleport(spawnFor(session, player));
             player.setGameMode(GameMode.SURVIVAL);
@@ -1810,14 +1849,76 @@ public final class ArcadePortManager implements Listener {
             player.setFireTicks(0);
             player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
             giveDeathTagKit(session, player, true, session.alphaChasers.contains(player.getUniqueId()));
-            if (newlyTagged) {
-                player.playSound(player.getLocation(), Sound.ENTITY_ZOMBIE_AMBIENT, 1.0F, 1.0F);
-                player.sendMessage(ChatColor.RED + "You are now a Chaser!");
-                session.world.spawnParticle(Particle.FLAME, player.getLocation().add(0.0D, 1.0D, 0.0D),
-                        18, 0.35D, 0.5D, 0.35D, 0.04D);
-            }
+            player.playSound(player.getLocation(), Sound.ENTITY_ZOMBIE_AMBIENT, 1.0F, 1.0F);
+            player.sendMessage(ChatColor.RED + (forcedAlpha ? "You are now an Alpha Chaser!" : "You are now a Chaser!"));
+            session.world.spawnParticle(Particle.FLAME, player.getLocation().add(0.0D, 1.0D, 0.0D),
+                    18, 0.35D, 0.5D, 0.35D, 0.04D);
         }
-        if (newlyTagged) announce(session, ChatColor.RED + player.getName() + ChatColor.GRAY + " became a Chaser (" + reason + ").");
+        announce(session, ChatColor.RED + player.getName() + ChatColor.GRAY + " became "
+                + (forcedAlpha ? "an Alpha Chaser" : "a Chaser") + " (" + reason + ").");
+    }
+
+    private void awardDeathTagKill(Session session, Player killer) {
+        if (killer == null || !killer.isOnline() || !session.scores.containsKey(killer.getUniqueId())) return;
+        int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+        killer.sendMessage(ChatColor.GREEN + "Death Tag kill! " + kills + " kills.");
+    }
+
+    private Location deathTagChaserRespawnSpawn(Session session, Player player) {
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (mapData != null && !mapData.spawnLocations().isEmpty()) {
+            List<Location> spawns = mapData.spawnLocations();
+            return spawns.get(ThreadLocalRandom.current().nextInt(spawns.size())).clone();
+        }
+        return spawnFor(session, player);
+    }
+
+    private void respawnDeathTagChaser(Session session, Player player) {
+        if (active != session || player == null || !player.isOnline()) return;
+        player.teleport(deathTagChaserRespawnSpawn(session, player));
+        player.leaveVehicle();
+        player.setGameMode(GameMode.SURVIVAL);
+        player.setHealth(player.getMaxHealth());
+        player.setFoodLevel(20);
+        player.setSaturation(20.0F);
+        player.setFireTicks(0);
+        player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+        giveDeathTagKit(session, player, true, session.alphaChasers.contains(player.getUniqueId()));
+        player.sendMessage(ChatColor.RED + "You respawned as a Chaser.");
+    }
+
+    private void handleDeathTagArcherArrowHit(Session session, Arrow arrow, Player shooter, Player target) {
+        UUID shooterId = shooter.getUniqueId();
+        UUID targetId = target.getUniqueId();
+        if (active != session || !session.alive.contains(shooterId) || !session.alive.contains(targetId)
+                || session.tagged.contains(shooterId)
+                || !"archer".equals(session.deathTagRunnerKits.getOrDefault(shooterId, "basher"))
+                || !session.tagged.contains(targetId)) return;
+
+        double baseDamage = session.deathTagProjectileDamage.getOrDefault(arrow.getUniqueId(),
+                ArcadePortRules.deathTagRunnerDamage("archer", true));
+        session.deathTagProjectileDamage.remove(arrow.getUniqueId());
+        double damage = ArcadePortRules.deathTagDamageAfterIronSkin(baseDamage,
+                session.alphaChasers.contains(targetId));
+        if (damage > 0.0D) {
+            if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
+                respawnDeathTagChaser(session, target);
+                awardDeathTagKill(session, shooter);
+                checkRoundEnd(session);
+                return;
+            }
+            target.setHealth(target.getHealth() - damage);
+            target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.05F);
+        }
+        Vector direction = arrow.getVelocity();
+        if (direction.lengthSquared() < 0.001D) {
+            direction = target.getLocation().toVector().subtract(shooter.getLocation().toVector());
+        }
+        if (direction.lengthSquared() > 0.001D) {
+            double multiplier = ArcadePortRules.deathTagArcherArrowKnockbackMultiplier(
+                    session.alphaChasers.contains(targetId));
+            target.setVelocity(direction.normalize().multiply(multiplier));
+        }
     }
 
     private void updateDeathTagChasers(Session session, long now) {
@@ -4317,10 +4418,15 @@ public final class ArcadePortManager implements Listener {
                 previousProgress, candidate, session.dragonEscapeWaypoints.size());
         session.dragonEscapePlayerProgress.put(id, progress);
         Map<Integer, Long> runSplits = session.dragonEscapeRunSplitMillis.computeIfAbsent(id, ignored -> new HashMap<>());
+        Map<Integer, Location> runSplitLocations = session.dragonEscapeRunSplitLocations.computeIfAbsent(
+                id, ignored -> new HashMap<>());
         runSplits.putIfAbsent(0, 0L);
+        Location runStart = session.dragonEscapeStartLocations.get(id);
+        if (runStart != null) runSplitLocations.putIfAbsent(0, runStart.clone());
         long elapsed = Math.max(0L, now - session.startedAt);
         for (int passed = previousProgress; passed < progress; passed++) {
             runSplits.putIfAbsent(passed + 1, elapsed);
+            runSplitLocations.putIfAbsent(passed + 1, player.getLocation().clone());
         }
         return progress;
     }
@@ -4707,7 +4813,8 @@ public final class ArcadePortManager implements Listener {
                             dragonIndex, location.distance(dragonNext));
                     session.dragonEscapePlayerRankScores.put(player.getUniqueId(), playerScore);
                     if (playerIndex == lastIndex && player.getLocation().distance(
-                            session.dragonEscapeWaypoints.get(lastIndex)) < 3.0D) {
+                            session.dragonEscapeWaypoints.get(lastIndex))
+                            < ArcadePortRules.DRAGON_ESCAPE_FINISH_RADIUS) {
                         recordDragonEscapeFinish(session, player, now);
                         finish(session, player, true);
                         return;
@@ -4779,9 +4886,35 @@ public final class ArcadePortManager implements Listener {
         plugin.getConfig().set(path + "time-ms", elapsed);
         plugin.getConfig().set(path + "map-resource", session.dragonEscapeMapResource);
         plugin.getConfig().set(path + "map-name", session.dragonEscapeMapName);
+        // Store each runner's actual GREEN start and exact finish so their PB ghost replays
+        // their own lane rather than the shared RED dragon marker.
+        Location runStart = session.dragonEscapeStartLocations.get(id);
+        if (runStart == null) runStart = session.dragonEscapeStartLocation;
+        if (runStart != null) {
+            plugin.getConfig().set(path + "start.x", runStart.getX());
+            plugin.getConfig().set(path + "start.y", runStart.getY());
+            plugin.getConfig().set(path + "start.z", runStart.getZ());
+        }
+        Location finishLocation = player.getLocation().clone();
+        plugin.getConfig().set(path + "finish.x", finishLocation.getX());
+        plugin.getConfig().set(path + "finish.y", finishLocation.getY());
+        plugin.getConfig().set(path + "finish.z", finishLocation.getZ());
+        Map<Integer, Location> splitLocations = session.dragonEscapeRunSplitLocations.computeIfAbsent(
+                id, ignored -> new HashMap<>());
+        if (runStart != null) splitLocations.putIfAbsent(0, runStart.clone());
+        splitLocations.put(session.dragonEscapeWaypoints.size(), finishLocation);
         plugin.getConfig().set(path + "splits", null);
         for (Map.Entry<Integer, Long> split : splits.entrySet()) {
             plugin.getConfig().set(path + "splits." + split.getKey(), split.getValue());
+        }
+        plugin.getConfig().set(path + "split-locations", null);
+        for (Map.Entry<Integer, Location> split : splitLocations.entrySet()) {
+            Location location = split.getValue();
+            if (location == null) continue;
+            String splitPath = path + "split-locations." + split.getKey();
+            plugin.getConfig().set(splitPath + ".x", location.getX());
+            plugin.getConfig().set(splitPath + ".y", location.getY());
+            plugin.getConfig().set(splitPath + ".z", location.getZ());
         }
         plugin.saveConfig();
         player.sendMessage(ChatColor.GOLD + "New Dragon Escape PB on " + session.dragonEscapeMapName + ": "
@@ -4799,56 +4932,179 @@ public final class ArcadePortManager implements Listener {
                 + ArcadePortRules.formatDragonEscapeDelta(delta);
     }
 
+    private Location dragonEscapePersonalBestStartLocation(
+            Session session, UUID playerId, String mapResource) {
+        String path = dragonEscapePbPath(playerId, mapResource);
+        if (!path.isEmpty()
+                && plugin.getConfig().contains(path + "start.x")
+                && plugin.getConfig().contains(path + "start.y")
+                && plugin.getConfig().contains(path + "start.z")) {
+            double x = plugin.getConfig().getDouble(path + "start.x");
+            double y = plugin.getConfig().getDouble(path + "start.y");
+            double z = plugin.getConfig().getDouble(path + "start.z");
+            if (Double.isFinite(x) && Double.isFinite(y) && Double.isFinite(z)) {
+                return new Location(session.world, x, y, z);
+            }
+        }
+        // Older PB records predate per-player starts. The current GREEN start is a
+        // better lane-compatible fallback than the shared RED Douglas spawn.
+        Location currentRunStart = session.dragonEscapeStartLocations.get(playerId);
+        if (currentRunStart != null) return currentRunStart.clone();
+        return session.dragonEscapeStartLocation == null
+                ? session.dragonEscapeWaypoints.get(0).clone()
+                : session.dragonEscapeStartLocation.clone();
+    }
+
+    private Location dragonEscapePersonalBestFinishLocation(
+            Session session, UUID playerId, String mapResource) {
+        String path = dragonEscapePbPath(playerId, mapResource);
+        if (path.isEmpty()
+                || !plugin.getConfig().contains(path + "finish.x")
+                || !plugin.getConfig().contains(path + "finish.y")
+                || !plugin.getConfig().contains(path + "finish.z")) return null;
+        double x = plugin.getConfig().getDouble(path + "finish.x");
+        double y = plugin.getConfig().getDouble(path + "finish.y");
+        double z = plugin.getConfig().getDouble(path + "finish.z");
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) return null;
+        return new Location(session.world, x, y, z);
+    }
+
+    private Location dragonEscapePersonalBestSplitLocation(
+            Session session, UUID playerId, String mapResource,
+            int splitIndex, Location fallback) {
+        String path = dragonEscapePbPath(playerId, mapResource)
+                + "split-locations." + splitIndex;
+        if (!plugin.getConfig().contains(path + ".x")
+                || !plugin.getConfig().contains(path + ".y")
+                || !plugin.getConfig().contains(path + ".z")) {
+            return fallback == null ? null : fallback.clone();
+        }
+        double x = plugin.getConfig().getDouble(path + ".x");
+        double y = plugin.getConfig().getDouble(path + ".y");
+        double z = plugin.getConfig().getDouble(path + ".z");
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
+            return fallback == null ? null : fallback.clone();
+        }
+        return new Location(session.world, x, y, z);
+    }
+
+    /**
+     * Split keys mark nearest-waypoint transitions: key 0 is the player's
+     * GREEN start, keys 1..N-1 are checkpoint transitions, and key N is finish.
+     * New PBs store the exact split positions; older PBs fall back to route midpoints.
+     */
+    private Location dragonEscapeSplitBoundaryLocation(
+            Session session, int splitIndex, Location startLocation, Location finishLocation) {
+        List<Location> route = session.dragonEscapeWaypoints;
+        int count = route.size();
+        if (count == 0) return null;
+        if (splitIndex <= 0) {
+            return startLocation == null ? route.get(0).clone() : startLocation.clone();
+        }
+        if (splitIndex >= count) {
+            return finishLocation == null ? route.get(count - 1).clone() : finishLocation.clone();
+        }
+        Location before = route.get(splitIndex - 1);
+        Location after = route.get(splitIndex);
+        return before.clone().add(
+                (after.getX() - before.getX()) * 0.5D,
+                (after.getY() - before.getY()) * 0.5D,
+                (after.getZ() - before.getZ()) * 0.5D);
+    }
+
+    private double dragonEscapeCourseDistance(Session session, Player player) {
+        List<Location> route = session.dragonEscapeWaypoints;
+        if (route.isEmpty()) return player.getLocation().getZ();
+        int count = route.size();
+        int progress = Math.max(0, Math.min(count - 1,
+                dragonEscapePlayerProgress(session, player)));
+        UUID playerId = player.getUniqueId();
+        Location runStart = session.dragonEscapeStartLocations.get(playerId);
+        if (runStart == null) runStart = session.dragonEscapeStartLocation;
+        Map<Integer, Location> liveSplitLocations =
+                session.dragonEscapeRunSplitLocations.getOrDefault(playerId, Map.of());
+        double distance = 0.0D;
+        for (int split = 0; split < progress; split++) {
+            Location fallbackFrom = dragonEscapeSplitBoundaryLocation(session, split, runStart, null);
+            Location fallbackTo = dragonEscapeSplitBoundaryLocation(session, split + 1, runStart, null);
+            Location from = liveSplitLocations.getOrDefault(split, fallbackFrom);
+            Location to = liveSplitLocations.getOrDefault(split + 1, fallbackTo);
+            distance += from.distance(to);
+        }
+        Location fallbackFrom = dragonEscapeSplitBoundaryLocation(session, progress, runStart, null);
+        Location fallbackTo = dragonEscapeSplitBoundaryLocation(session, progress + 1, runStart, null);
+        Location from = liveSplitLocations.getOrDefault(progress, fallbackFrom);
+        Location to = liveSplitLocations.getOrDefault(progress + 1, fallbackTo);
+        double segmentLength = from.distance(to);
+        if (segmentLength > 0.001D) {
+            double fraction = Math.max(0.0D, Math.min(1.0D,
+                    1.0D - player.getLocation().distance(to) / segmentLength));
+            distance += segmentLength * fraction;
+        }
+        return distance;
+    }
+
     private long dragonEscapeExpectedPbMillis(Session session, Player player, long totalPb) {
         int count = session.dragonEscapeWaypoints.size();
         if (count == 0) {
             double fraction = Math.max(0.0D, Math.min(1.0D, (player.getLocation().getZ() + 24.0D) / 104.0D));
             return Math.round(totalPb * fraction);
         }
+
         int progress = Math.max(0, Math.min(count - 1, dragonEscapePlayerProgress(session, player)));
         int segment = ArcadePortRules.dragonEscapePbSegmentStartIndex(progress, count);
-        // The last authored marker is the finish area; its split is the full PB time.
-        if (segment < 0) return Math.max(0L, totalPb);
-
-        Location from = session.dragonEscapeWaypoints.get(segment);
-        Location to = session.dragonEscapeWaypoints.get(segment + 1);
+        if (segment < 0) return 0L;
         Map<Integer, Long> splits = dragonEscapePersonalBestSplits(
                 player.getUniqueId(), session.dragonEscapeMapResource);
         long fromTime = splits.getOrDefault(segment,
                 ArcadePortRules.dragonEscapeDefaultSplitMillis(totalPb, segment, count));
         long toTime = splits.getOrDefault(segment + 1,
                 ArcadePortRules.dragonEscapeDefaultSplitMillis(totalPb, segment + 1, count));
+        Location start = dragonEscapePersonalBestStartLocation(
+                session, player.getUniqueId(), session.dragonEscapeMapResource);
+        Location finish = dragonEscapePersonalBestFinishLocation(
+                session, player.getUniqueId(), session.dragonEscapeMapResource);
+        Location from = dragonEscapePersonalBestSplitLocation(
+                session, player.getUniqueId(), session.dragonEscapeMapResource, segment,
+                dragonEscapeSplitBoundaryLocation(session, segment, start, finish));
+        Location to = dragonEscapePersonalBestSplitLocation(
+                session, player.getUniqueId(), session.dragonEscapeMapResource, segment + 1,
+                dragonEscapeSplitBoundaryLocation(session, segment + 1, start, finish));
         double segmentLength = from.distance(to);
         double fraction = segmentLength < 0.001D ? 0.0D
-                : Math.max(0.0D, Math.min(1.0D, 1.0D - player.getLocation().distance(to) / segmentLength));
+                : 1.0D - player.getLocation().distance(to) / segmentLength;
         return ArcadePortRules.interpolateDragonEscapeSplitMillis(fromTime, toTime, fraction);
     }
 
     private Location dragonEscapeGhostLocation(Session session, UUID playerId, long elapsed) {
-        if (session.dragonEscapeMapResource == null || session.dragonEscapeWaypoints.isEmpty()
-                || session.dragonEscapeStartLocation == null) return null;
+        if (session.dragonEscapeMapResource == null || session.dragonEscapeWaypoints.isEmpty()) return null;
         long pb = dragonEscapePersonalBestMillis(playerId, session.dragonEscapeMapResource);
         if (pb <= 0L || elapsed >= pb) return null;
         Map<Integer, Long> splits = dragonEscapePersonalBestSplits(playerId, session.dragonEscapeMapResource);
-        List<Location> route = session.dragonEscapeWaypoints;
-        int count = route.size();
-        for (int i = 0; i < count - 1; i++) {
-            long t0 = splits.getOrDefault(i,
-                    ArcadePortRules.dragonEscapeDefaultSplitMillis(pb, i, count));
-            long t1 = splits.getOrDefault(i + 1,
-                    ArcadePortRules.dragonEscapeDefaultSplitMillis(pb, i + 1, count));
-            if (t1 <= t0) t1 = t0 + 1L;
-            if (elapsed > t1) continue;
-            double fraction = Math.max(0.0D, Math.min(1.0D, (elapsed - t0) / (double) (t1 - t0)));
-            Location from = route.get(i);
-            Location to = route.get(i + 1);
-            return from.clone().add((to.getX() - from.getX()) * fraction,
-                    (to.getY() - from.getY()) * fraction,
-                    (to.getZ() - from.getZ()) * fraction);
+        int count = session.dragonEscapeWaypoints.size();
+        Location start = dragonEscapePersonalBestStartLocation(session, playerId, session.dragonEscapeMapResource);
+        Location finish = dragonEscapePersonalBestFinishLocation(session, playerId, session.dragonEscapeMapResource);
+        for (int segment = 0; segment < count; segment++) {
+            long fromTime = splits.getOrDefault(segment,
+                    ArcadePortRules.dragonEscapeDefaultSplitMillis(pb, segment, count));
+            long toTime = splits.getOrDefault(segment + 1,
+                    ArcadePortRules.dragonEscapeDefaultSplitMillis(pb, segment + 1, count));
+            if (toTime <= fromTime) toTime = fromTime + 1L;
+            if (elapsed > toTime) continue;
+            double fraction = Math.max(0.0D, Math.min(1.0D,
+                    (elapsed - fromTime) / (double) (toTime - fromTime)));
+            Location from = dragonEscapePersonalBestSplitLocation(
+                    session, playerId, session.dragonEscapeMapResource, segment,
+                    dragonEscapeSplitBoundaryLocation(session, segment, start, finish));
+            Location to = dragonEscapePersonalBestSplitLocation(
+                    session, playerId, session.dragonEscapeMapResource, segment + 1,
+                    dragonEscapeSplitBoundaryLocation(session, segment + 1, start, finish));
+            return new Location(session.world,
+                    ArcadePortRules.interpolateDragonEscapeCoordinate(from.getX(), to.getX(), fraction),
+                    ArcadePortRules.interpolateDragonEscapeCoordinate(from.getY(), to.getY(), fraction),
+                    ArcadePortRules.interpolateDragonEscapeCoordinate(from.getZ(), to.getZ(), fraction));
         }
-        // The stored final split is the finish time, so hold the ghost at the last marker
-        // for any small finish-radius interval rather than replaying the preceding segment.
-        return route.get(count - 1).clone();
+        return finish == null ? session.dragonEscapeWaypoints.get(count - 1).clone() : finish;
     }
 
     private Color dragonEscapeBeaconRgb(String color) {
@@ -4893,28 +5149,16 @@ public final class ArcadePortManager implements Listener {
     }
 
     private long dragonEscapeRaceGapMillis(Session session, Player leader, Player racer, long now) {
-        UUID leaderId = leader.getUniqueId(), racerId = racer.getUniqueId();
-        int leadProgress = dragonEscapePlayerProgress(session, leader);
-        int raceProgress = dragonEscapePlayerProgress(session, racer);
-        Map<Integer, Long> leadSplits = session.dragonEscapeRunSplitMillis.getOrDefault(leaderId, Map.of());
-        Map<Integer, Long> raceSplits = session.dragonEscapeRunSplitMillis.getOrDefault(racerId, Map.of());
-        int checkpointKey = Math.min(session.dragonEscapeWaypoints.size(), raceProgress + 1);
-        Long leadCrossing = leadSplits.get(checkpointKey);
-        if (leadProgress > raceProgress && leadCrossing != null && checkpointKey > 0
-                && checkpointKey - 1 < session.dragonEscapeWaypoints.size()) {
-            Location target = session.dragonEscapeWaypoints.get(checkpointKey - 1);
-            double segmentLength = checkpointKey == 1 || session.dragonEscapeWaypoints.size() == 1
-                    ? (session.dragonEscapeStartLocation == null ? 1.0D
-                        : Math.max(1.0D, session.dragonEscapeStartLocation.distance(target)))
-                    : Math.max(1.0D, session.dragonEscapeWaypoints.get(checkpointKey - 2).distance(target));
-            double remaining = racer.getLocation().distance(target);
-            double fractionRemaining = Math.max(0.0D, Math.min(1.0D, remaining / segmentLength));
-            return Math.max(0L, Math.round((now - session.startedAt - leadCrossing) * fractionRemaining));
+        if (leader == null || racer == null || !leader.isOnline() || !racer.isOnline()) return 0L;
+        if (session.dragonEscapeWaypoints.isEmpty()) {
+            double gap = Math.max(0.0D,
+                    leader.getLocation().getZ() - racer.getLocation().getZ());
+            return Math.round(gap / ArcadePortRules.DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED * 1_000.0D);
         }
-        Long leadAt = leadSplits.get(checkpointKey), racerAt = raceSplits.get(checkpointKey);
-        if (leadAt != null && racerAt != null) return Math.max(0L, Math.abs(racerAt - leadAt));
-        double distance = leader.getLocation().distance(racer.getLocation());
-        return Math.max(0L, Math.round(distance / 5.0D * 1_000.0D));
+        double leaderDistance = dragonEscapeCourseDistance(session, leader);
+        double racerDistance = dragonEscapeCourseDistance(session, racer);
+        return ArcadePortRules.dragonEscapeCourseTimeGapMillis(
+                leaderDistance, racerDistance, ArcadePortRules.DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED);
     }
 
     private void setupDragonEscapeRaceScoreboard(Session session) {
@@ -4935,11 +5179,11 @@ public final class ArcadePortManager implements Listener {
         for (Player player : session.players.values()) {
             if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
         }
-        updateDragonEscapeRaceScoreboard(session);
+        updateDragonEscapeRaceScoreboard(session, System.currentTimeMillis());
     }
 
-    /** Reborn shows the top 14 ranked racers, green while alive and red after elimination. */
-    private void updateDragonEscapeRaceScoreboard(Session session) {
+    /** Reborn shows the top 14 ranked racers; the modern sidebar also shows live race times. */
+    private void updateDragonEscapeRaceScoreboard(Session session, long now) {
         Scoreboard scoreboard = session.dragonEscapeScoreboard;
         Objective objective = session.dragonEscapeScoreboardObjective;
         if (scoreboard == null || objective == null || session.type != ArcadePortGame.DRAGON_ESCAPE) return;
@@ -4952,14 +5196,28 @@ public final class ArcadePortManager implements Listener {
         ranked.sort((left, right) -> Double.compare(
                 session.dragonEscapePlayerRankScores.get(right.getUniqueId()),
                 session.dragonEscapePlayerRankScores.get(left.getUniqueId())));
+        List<Player> liveOrder = dragonEscapeRaceOrder(session);
+        Player liveLeader = liveOrder.isEmpty() ? null : liveOrder.get(0);
+        long elapsed = Math.max(0L, now - session.startedAt);
         for (int i = 0; i < session.dragonEscapeScoreboardTeams.size(); i++) {
             Team line = session.dragonEscapeScoreboardTeams.get(i);
             String entry = session.dragonEscapeScoreboardEntries.get(i);
             if (i < ranked.size()) {
                 Player racer = ranked.get(i);
-                ChatColor colour = session.alive.contains(racer.getUniqueId()) ? ChatColor.GREEN : ChatColor.RED;
-                line.setPrefix(colour + racer.getName());
-                line.setSuffix("");
+                boolean alive = session.alive.contains(racer.getUniqueId());
+                ChatColor colour = alive ? ChatColor.GREEN : ChatColor.RED;
+                line.setPrefix(colour + "#" + (i + 1) + " " + racer.getName());
+                if (!alive) {
+                    line.setSuffix(ChatColor.DARK_RED + " OUT");
+                } else if (liveLeader != null
+                        && racer.getUniqueId().equals(liveLeader.getUniqueId())) {
+                    line.setSuffix(ChatColor.YELLOW + " " + ArcadePortRules.formatDragonEscapeTime(elapsed));
+                } else if (liveLeader != null) {
+                    long gap = dragonEscapeRaceGapMillis(session, liveLeader, racer, now);
+                    line.setSuffix(ChatColor.RED + " ~+" + ArcadePortRules.formatDragonEscapeTime(gap));
+                } else {
+                    line.setSuffix("");
+                }
                 objective.getScore(entry).setScore(14 - i);
             } else {
                 line.setPrefix("");
@@ -4990,7 +5248,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateDragonEscapeRaceUi(Session session, long now) {
-        if (session.ticks % 10 == 0) updateDragonEscapeRaceScoreboard(session);
+        if (session.ticks % 10 == 0) updateDragonEscapeRaceScoreboard(session, now);
         List<Player> order = dragonEscapeRaceOrder(session);
         if (order.isEmpty()) return;
         Player leader = order.get(0);
@@ -5014,7 +5272,7 @@ public final class ArcadePortManager implements Listener {
             } else {
                 long gap = dragonEscapeRaceGapMillis(session, leader, racer, now);
                 prefix = ChatColor.GRAY + "#" + (i + 1) + " " + ChatColor.WHITE + racer.getName()
-                        + ChatColor.RED + " +" + ArcadePortRules.formatDragonEscapeTime(gap);
+                        + ChatColor.RED + " ~+" + ArcadePortRules.formatDragonEscapeTime(gap);
             }
             String tabName = prefix.length() > 64 ? prefix.substring(0, 64) : prefix;
             if (!tabName.equals(racer.getPlayerListName())) racer.setPlayerListName(tabName);
@@ -5688,7 +5946,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1
                 && session.alive.contains(player.getUniqueId())) {
-            makeDeathTagChaser(session, player, reason);
+            makeDeathTagChaser(session, player, reason, killer);
             checkRoundEnd(session);
             return;
         }
@@ -6169,7 +6427,7 @@ public final class ArcadePortManager implements Listener {
                     double damage = ArcadePortRules.deathTagChaserDamage(
                             session.alphaChasers.contains(attacker.getUniqueId()));
                     if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
-                        makeDeathTagChaser(session, target, "was killed by a chaser");
+                        makeDeathTagChaser(session, target, "was killed by a chaser", attacker);
                         checkRoundEnd(session);
                     } else {
                         target.setHealth(target.getHealth() - damage);
@@ -6180,21 +6438,31 @@ public final class ArcadePortManager implements Listener {
                     double baseDamage = ArcadePortRules.deathTagRunnerDamage(kit, "projectile hit".equals(source));
                     double damage = ArcadePortRules.deathTagDamageAfterIronSkin(baseDamage,
                             session.alphaChasers.contains(target.getUniqueId()));
+                    boolean lethalHit = ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage);
                     if (damage > 0.0D) {
-                        if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
-                            makeDeathTagChaser(session, target, "was defeated by a runner");
+                        if (lethalHit) {
+                            respawnDeathTagChaser(session, target);
+                            awardDeathTagKill(session, attacker);
                         } else {
                             target.setHealth(target.getHealth() - damage);
                             target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.05F);
                         }
                     }
-                    if ("basher".equals(kit) && !"projectile hit".equals(source)) {
-                        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60, 2, false, false, true));
-                    } else if ("traitor".equals(kit) && !"projectile hit".equals(source)) {
-                        Vector knockbackDirection = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
-                        double multiplier = ArcadePortRules.deathTagKnockbackMultiplier(
-                                session.alphaChasers.contains(target.getUniqueId()));
-                        if (knockbackDirection.lengthSquared() > 0.001D) target.setVelocity(knockbackDirection.normalize().multiply(0.8D * multiplier).setY(0.1D));
+                    if (!lethalHit && "basher".equals(kit) && !"projectile hit".equals(source)) {
+                        target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 2, false, false, true));
+                    } else if (!lethalHit && "traitor".equals(kit) && !"projectile hit".equals(source)) {
+                        String cooldownKey = attacker.getUniqueId() + ":" + target.getUniqueId();
+                        long now = System.currentTimeMillis();
+                        long lastUse = session.deathTagTraitorKnockbackAt.getOrDefault(cooldownKey, 0L);
+                        if (ArcadePortRules.deathTagTraitorKnockbackReady(now, lastUse)) {
+                            session.deathTagTraitorKnockbackAt.put(cooldownKey, now);
+                            Vector knockbackDirection = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+                            double multiplier = ArcadePortRules.deathTagKnockbackMultiplier(
+                                    session.alphaChasers.contains(target.getUniqueId()));
+                            if (knockbackDirection.lengthSquared() > 0.001D) {
+                                target.setVelocity(knockbackDirection.normalize().multiply(0.8D * multiplier).setY(0.1D));
+                            }
+                        }
                     }
                 }
                 break;
@@ -8053,6 +8321,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (event.getEntity() instanceof Player target && session.players.containsKey(target.getUniqueId())) {
+            double incomingDamage = event.getFinalDamage();
             event.setCancelled(true);
             if (session.type == ArcadePortGame.DRAGON_ESCAPE
                     && event instanceof EntityDamageByEntityEvent dragonEscapeDamage) {
@@ -8068,6 +8337,11 @@ public final class ArcadePortManager implements Listener {
             }
             if (event instanceof EntityDamageByEntityEvent byEntity) {
                 Entity damager = byEntity.getDamager();
+                if (session.type == ArcadePortGame.DEATH_TAG && damager instanceof Projectile projectile
+                        && projectile.getShooter() instanceof Player shooter
+                        && session.players.containsKey(shooter.getUniqueId())) {
+                    session.deathTagProjectileDamage.put(projectile.getUniqueId(), incomingDamage);
+                }
                 if (session.type == ArcadePortGame.RUNNER && damager instanceof FallingBlock falling
                         && session.entities.contains(falling)) {
                     handleRunnerFallingBlockHit(session, falling, target);
@@ -8075,7 +8349,11 @@ public final class ArcadePortManager implements Listener {
                     handlePlayerHit(session, attacker, target, "melee");
                 } else if (session.type == ArcadePortGame.DEATH_TAG && damager instanceof Zombie zombie
                         && session.entities.contains(zombie)) {
-                    eliminate(session, target, null, "was tagged by the chaser");
+                    if (session.participantsAtStart <= 1) {
+                        handleDeathTagSoloPracticeHit(session, target, zombie);
+                    } else {
+                        eliminate(session, target, null, "was tagged by the chaser");
+                    }
                 }
             }
         }
@@ -8101,6 +8379,32 @@ public final class ArcadePortManager implements Listener {
             session.dragonMarksmanNextChargeAt.remove(id);
         }
     }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onDeathTagBowShoot(EntityShootBowEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.DEATH_TAG
+                || !(event.getEntity() instanceof Player player)
+                || player.getWorld() != session.world
+                || !session.alive.contains(player.getUniqueId())
+                || session.tagged.contains(player.getUniqueId())
+                || !"archer".equals(session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher"))
+                || !(event.getProjectile() instanceof Arrow arrow)) return;
+
+        boolean hasFletchedArrow = false;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item == null || item.getType() != Material.ARROW || !item.hasItemMeta()) continue;
+            ItemMeta meta = item.getItemMeta();
+            if (meta.hasDisplayName() && meta.getDisplayName().contains("Fletched Arrow")) {
+                hasFletchedArrow = true;
+                break;
+            }
+        }
+        if (!hasFletchedArrow) return;
+        session.deathTagFletchedArrows.add(arrow.getUniqueId());
+        session.entities.add(arrow);
+    }
+
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onQuiverBowShoot(EntityShootBowEvent event) {
@@ -8138,6 +8442,19 @@ public final class ArcadePortManager implements Listener {
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+
+        if (session.type == ArcadePortGame.DEATH_TAG
+                && event.getEntity() instanceof Arrow deathTagArrow
+                && session.deathTagFletchedArrows.remove(deathTagArrow.getUniqueId())) {
+            if (event.getHitEntity() instanceof Player target
+                    && deathTagArrow.getShooter() instanceof Player shooter) {
+                handleDeathTagArcherArrowHit(session, deathTagArrow, shooter, target);
+            }
+            session.deathTagProjectileDamage.remove(deathTagArrow.getUniqueId());
+            session.entities.remove(deathTagArrow);
+            deathTagArrow.remove();
+            return;
+        }
 
         if (session.type == ArcadePortGame.BOMB_LOBBERS
                 && "wind-projectile".equals(event.getEntity().getPersistentDataContainer()
@@ -10225,6 +10542,10 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> alphaChasers = new HashSet<>();
         final Map<UUID, String> deathTagRunnerKits = new HashMap<>();
         final Map<UUID, Long> deathTagLastArrowAt = new HashMap<>();
+        final Map<UUID, Long> deathTagSoloChaserHitReadyAt = new HashMap<>();
+        final Set<UUID> deathTagFletchedArrows = new HashSet<>();
+        final Map<UUID, Double> deathTagProjectileDamage = new HashMap<>();
+        final Map<String, Long> deathTagTraitorKnockbackAt = new HashMap<>();
         final Map<Block, BlockData> deathTagOriginalLightBlocks = new LinkedHashMap<>();
         long deathTagNextLightAt;
         final Map<UUID, String> baconKits = new HashMap<>();
@@ -10337,6 +10658,7 @@ public final class ArcadePortManager implements Listener {
         double dragonEscapeSpeedMultiplier = 1.0D;
         Location dragonEscapeLastDestructionLocation;
         final List<Location> dragonEscapeWaypoints = new ArrayList<>();
+        final Map<UUID, Location> dragonEscapeStartLocations = new HashMap<>();
         final Map<UUID, String> dragonEscapeKits = new HashMap<>();
         final Map<UUID, Integer> dragonEscapeLeapUsesRemaining = new HashMap<>();
         final Map<UUID, Long> dragonEscapeLeapReadyAt = new HashMap<>();
@@ -10367,6 +10689,7 @@ public final class ArcadePortManager implements Listener {
         final List<Team> dragonEscapeScoreboardTeams = new ArrayList<>();
         final List<String> dragonEscapeScoreboardEntries = new ArrayList<>();
         final Map<UUID, Map<Integer, Long>> dragonEscapeRunSplitMillis = new HashMap<>();
+        final Map<UUID, Map<Integer, Location>> dragonEscapeRunSplitLocations = new HashMap<>();
         final Map<Block, Long> runnerBlocks = new HashMap<>();
         final Map<Block, Material> runnerBlockMaterials = new HashMap<>();
         final Map<UUID, String> runnerKits = new HashMap<>();
