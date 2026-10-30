@@ -9876,7 +9876,8 @@ public final class ArcadePortManager implements Listener {
             {"bomb-lobbers", "Bomb Lobbers", "FIRE_CHARGE"},
             {"evolution", "Evolution", "SLIME_SPAWN_EGG"},
             {"monster-maze", "Monster Maze", "ROTTEN_FLESH"},
-            {"gladiators", "Gladiators", "IRON_SWORD"}
+            {"gladiators", "Gladiators", "IRON_SWORD"},
+            {"sneaky-assassins", "Sneaky Assassins", "VILLAGER_SPAWN_EGG"}
     };
 
     private static final List<String> DRAGON_ESCAPE_BEACON_COLOR_NAMES =
@@ -10270,6 +10271,41 @@ public final class ArcadePortManager implements Listener {
                                 unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
                         "noop", null, null));
             }
+        } else if ("sneaky-assassins".equals(gameId)) {
+            String achievementPath = "test-achievements.sneaky-assassins." + targetId + ".the-masters-master";
+            boolean unlocked = plugin.getConfig().getBoolean(achievementPath, false);
+            inventory.setItem(10, statsItem(
+                    unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                    (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ")
+                            + "The Master's Master",
+                    List.of(" ", ChatColor.GRAY + "Defeat an assassin with at least four power-ups while you have none.",
+                            " ", unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
+                    "noop", null, null));
+            int[] generalSlots = {29, 30, 31, 32};
+            int[] generalValues = {played, wins, score, knockouts};
+            String[] generalLabels = {"Games Played", "Wins", "Score / Kills", "Knockouts"};
+            for (int i = 0; i < generalValues.length; i++) {
+                int value = generalValues[i];
+                inventory.setItem(generalSlots[i], statsItem(
+                        value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (value > 0 ? ChatColor.GREEN : ChatColor.RED) + generalLabels[i],
+                        List.of(" ", ChatColor.GRAY + "Recorded locally: " + ChatColor.WHITE + value),
+                        "noop", null, null));
+            }
+            String statPath = "local-stats." + targetId + ".sneaky-assassins.";
+            String[] statIds = {"master-assassin", "i-see-you", "incompetence", "the-masters-master"};
+            String[] statNames = {"Master Assassin", "I See You", "Incompetence", "The Master's Master"};
+            Material[] statIcons = {Material.COMPASS, Material.DIAMOND, Material.VILLAGER_SPAWN_EGG, Material.NETHER_STAR};
+            int[] statSlots = {33, 34, 35, 36};
+            for (int i = 0; i < statIds.length; i++) {
+                int value = plugin.getConfig().getInt(statPath + statIds[i], 0);
+                inventory.setItem(statSlots[i], statsItem(
+                        value > 0 ? statIcons[i] : Material.GRAY_STAINED_GLASS_PANE,
+                        (value > 0 ? ChatColor.GREEN : ChatColor.RED) + statNames[i],
+                        List.of(" ", ChatColor.GRAY + "Times recorded: " + ChatColor.WHITE + value,
+                                ChatColor.DARK_GRAY + "Local source-style stat tracker."),
+                        "noop", null, null));
+            }
         } else {
             int[] slots = {29, 30, 31, 32};
             int[] values = {played, wins, score, knockouts};
@@ -10409,6 +10445,14 @@ public final class ArcadePortManager implements Listener {
                     .filter(slug -> plugin.getConfig().getBoolean(runnerAchievementKey(targetId, slug), false))
                     .count();
             lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/3");
+        } else if ("sneaky-assassins".equals(gameId)) {
+            boolean unlocked = plugin.getConfig().getBoolean(
+                    "test-achievements.sneaky-assassins." + targetId + ".the-masters-master", false);
+            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + (unlocked ? "1/1" : "0/1"));
+            String statPath = "local-stats." + targetId + ".sneaky-assassins.";
+            lore.add(ChatColor.GRAY + "Master Assassin: " + plugin.getConfig().getInt(statPath + "master-assassin", 0));
+            lore.add(ChatColor.GRAY + "I See You: " + plugin.getConfig().getInt(statPath + "i-see-you", 0));
+            lore.add(ChatColor.GRAY + "Incompetence: " + plugin.getConfig().getInt(statPath + "incompetence", 0));
         }
         if (!compact) lore.add(ChatColor.DARK_GRAY + "Stats recorded by the isolated test server.");
         else lore.add(ChatColor.RESET + "Click for more details!");
