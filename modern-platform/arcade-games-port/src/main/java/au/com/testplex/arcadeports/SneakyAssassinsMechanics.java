@@ -266,7 +266,8 @@ final class SneakyAssassinsMechanics {
         ItemStack item = new ItemStack(Material.INK_SAC, amount);
         ItemMeta meta = item.getItemMeta();
         meta.setDisplayName(ChatColor.GOLD + "Smoke Bomb");
-        meta.setLore(List.of(ChatColor.GRAY + "Right-click to cloak yourself and blind nearby players."));
+        meta.setLore(List.of(ChatColor.GRAY + "Right-click to cloak yourself for 1.2 seconds.",
+                ChatColor.GRAY + "Blinds nearby living entities for 3 seconds."));
         meta.getPersistentDataContainer().set(itemKey, PersistentDataType.STRING, "smoke-bomb");
         item.setItemMeta(meta);
         return item;
@@ -704,7 +705,7 @@ final class SneakyAssassinsMechanics {
                     world.spawnParticle(Particle.FIREWORK, effect, 2, 0.1D, 0.1D, 0.1D, 0.01D);
                 }
                 if (y <= 65.0D) {
-                    powerUp.item = world.spawn(powerUp.location.clone().add(0.5D, 1.2D, 0.5D), Skeleton.class);
+                    powerUp.item = world.spawn(powerUp.location.clone().add(0.5D, 0.5D, 0.5D), Skeleton.class);
                     powerUp.item.setAI(false);
                     powerUp.item.setSilent(true);
                     powerUp.item.setPersistent(true);
@@ -712,6 +713,9 @@ final class SneakyAssassinsMechanics {
                     powerUp.item.setCollidable(false);
                     powerUp.item.setInvulnerable(true);
                     powerUp.item.setInvisible(true);
+                    // The source replaces the centre beacon block with glass once the power-up lands.
+                    world.getBlockAt(powerUp.location.getBlockX(), 63, powerUp.location.getBlockZ())
+                            .setType(Material.GLASS, false);
                     EntityEquipment equipment = powerUp.item.getEquipment();
                     if (equipment != null) {
                         equipment.setChestplate(new ItemStack(Material.DIAMOND_CHESTPLATE));
@@ -722,6 +726,11 @@ final class SneakyAssassinsMechanics {
                 }
                 continue;
             }
+            Location orbit = powerUp.item.getLocation().clone();
+            double phase = powerUp.item.getTicksLived() / 4.0D;
+            orbit.add(Math.sin(phase), Math.cos(powerUp.item.getTicksLived() / 7.0D) + 1.0D,
+                    Math.cos(phase));
+            world.spawnParticle(Particle.HAPPY_VILLAGER, orbit, 1, 0.0D, 0.0D, 0.0D, 0.0D);
             for (Player player : players.values()) {
                 if (player == null || !player.isOnline() || !isAlive.test(player.getUniqueId())) continue;
                 if (powerUpCounts.getOrDefault(player.getUniqueId(), 0) >= 5) continue;
@@ -776,7 +785,7 @@ final class SneakyAssassinsMechanics {
         for (int dx = -1; dx <= 1; dx++) {
             for (int dz = -1; dz <= 1; dz++) {
                 for (int dy = 0; dy <= 1; dy++) {
-                    Block block = world.getBlockAt(location.getBlockX() + dx, 63 + dy,
+                    Block block = world.getBlockAt(location.getBlockX() + dx, 62 + dy,
                             location.getBlockZ() + dz);
                     powerUp.originalBlocks.put(block, block.getBlockData().clone());
                     Material material = dy == 0 ? Material.IRON_BLOCK
