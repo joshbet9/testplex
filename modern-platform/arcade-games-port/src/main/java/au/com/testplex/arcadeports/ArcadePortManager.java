@@ -823,48 +823,49 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private boolean isTurfWarsTerracotta(Material material) {
+        return material != null && material.name().endsWith("_TERRACOTTA");
+    }
+
     private int turfWarsTeamOnBlock(Block block) {
         if (block == null) return -1;
         Material type = block.getType();
-        if (type == Material.RED_TERRACOTTA || type == Material.RED_WOOL) return 0;
-        if (type == Material.BLUE_TERRACOTTA || type == Material.BLUE_WOOL) return 1;
+        if (type == Material.RED_TERRACOTTA) return 0;
+        if (type == Material.BLUE_TERRACOTTA) return 1;
         return -1;
     }
 
     /**
-     * Reborn resolves the block under the player's feet, checks an adjacent footprint
-     * when grounded over a gap, then descends until it finds one of the two turf colours.
+     * Mirrors TurfForts.Territory: start beneath the feet, look at adjacent clay/Wool
+     * when grounded over a gap, then descend through non-clay blocks until the first
+     * stained-clay surface. Wool is a footprint hint, never the territory colour itself.
      */
     private int turfWarsGroundTeam(Player player) {
         if (player == null || player.getWorld() == null) return -1;
-        Block below = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
-        int directTeam = turfWarsTeamOnBlock(below);
-        if (directTeam >= 0) return directTeam;
-
-        if (player.isOnGround() && (below.isPassable() || below.isLiquid())) {
-            Block closest = null;
-            double closestDistance = Double.POSITIVE_INFINITY;
+        Block ground = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
+        if (ground.isEmpty() && player.isOnGround()) {
+            Block adjacent = null;
+            double nearestDistance = Double.POSITIVE_INFINITY;
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
-                    Block candidate = below.getRelative(dx, 0, dz);
-                    if (turfWarsTeamOnBlock(candidate) < 0) continue;
+                    Block candidate = ground.getRelative(dx, 0, dz);
+                    if (!isTurfWarsTerracotta(candidate.getType()) && !isTurfWarsWool(candidate.getType())) continue;
                     double distance = dx * dx + dz * dz;
-                    if (distance < closestDistance) {
-                        closest = candidate;
-                        closestDistance = distance;
+                    if (distance < nearestDistance) {
+                        nearestDistance = distance;
+                        adjacent = candidate;
                     }
                 }
             }
-            int nearbyTeam = turfWarsTeamOnBlock(closest);
-            if (nearbyTeam >= 0) return nearbyTeam;
+            if (adjacent != null) ground = adjacent;
         }
 
         int minY = Math.max(0, player.getWorld().getMinHeight());
-        for (Block scan = below; scan.getY() >= minY; scan = scan.getRelative(BlockFace.DOWN)) {
-            int team = turfWarsTeamOnBlock(scan);
-            if (team >= 0) return team;
+        while (!isTurfWarsTerracotta(ground.getType()) && ground.getY() > minY) {
+            ground = ground.getRelative(BlockFace.DOWN);
         }
-        return -1;
+        if (!isTurfWarsTerracotta(ground.getType())) return -1;
+        return turfWarsTeamOnBlock(ground);
     }
 
     private int turfWarsNearestSpawnTeam(Session session, Location location) {
@@ -12195,11 +12196,14 @@ public final class ArcadePortManager implements Listener {
                 wool.setType(Material.AIR, false);
                 if (turfArrow.getShooter() instanceof Player shooter) {
                     shooter.playSound(shooter.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 0.7F, 1.5F);
+                    String base = localStatsPath(shooter.getUniqueId(), "turf-wars");
+                    if (woolType == Material.RED_WOOL || woolType == Material.BLUE_WOOL) {
+                        plugin.getConfig().set(base + "blocks-broken",
+                                plugin.getConfig().getInt(base + "blocks-broken", 0) + 1);
+                    }
                     if ("shredder".equals(session.turfWarsKits.getOrDefault(shooter.getUniqueId(), "marksman"))) {
-                        String shredderStat = "local-stats." + shooter.getUniqueId()
-                                + ".turf-wars.the-shreddinator";
-                        plugin.getConfig().set(shredderStat,
-                                plugin.getConfig().getInt(shredderStat, 0) + 1);
+                        plugin.getConfig().set(base + "the-shreddinator",
+                                plugin.getConfig().getInt(base + "the-shreddinator", 0) + 1);
                     }
                 }
                 session.world.playEffect(wool.getLocation(), Effect.STEP_SOUND, woolType);
