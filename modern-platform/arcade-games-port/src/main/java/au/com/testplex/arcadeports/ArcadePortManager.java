@@ -2118,6 +2118,11 @@ public final class ArcadePortManager implements Listener {
             player.setFoodLevel(20);
             player.setSaturation(20.0F);
             player.setFireTicks(0);
+            player.setFallDistance(0.0F);
+            player.setNoDamageTicks(0);
+            for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) {
+                player.removePotionEffect(effect.getType());
+            }
             player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
             giveGladiatorKit(session, player, matchTier);
             session.lastLocations.put(player.getUniqueId(), spawn.clone());
@@ -8026,6 +8031,8 @@ public final class ArcadePortManager implements Listener {
 
     private void checkPlayerArena(Session session, Player player) {
         if (!session.alive.contains(player.getUniqueId())) return;
+        if (session.type == ArcadePortGame.GLADIATORS
+                && !session.gladiatorPairs.containsKey(player.getUniqueId())) return;
         Location location = player.getLocation();
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(session.type.id());
         double voidThresholdY;
