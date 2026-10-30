@@ -106,7 +106,7 @@ public final class MobThemeManager implements Listener {
 
     private void schedulePadRefresh(final PadVisual pad, final Player viewer, long[] delays) {
         if (pad == null) return;
-        for (long delay : delays) Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+        for (long delay : delays) Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 if (pads.get(key(pad.center)) != pad) return;
                 if (viewer == null) refreshSafePad(pad.center);
@@ -192,7 +192,7 @@ public final class MobThemeManager implements Listener {
         if(a.getWorld().equals(b.getWorld())&&(a.getBlockX()>>4)==(b.getBlockX()>>4)&&(a.getBlockZ()>>4)==(b.getBlockZ()>>4))return;
         laterRefresh(e.getPlayer());
     }
-    private void laterRefresh(final Player p){Bukkit.getScheduler().runTaskLater(plugin,new Runnable(){public void run(){if(p.isOnline())refreshPlayerPads(p);}},2L);}
+    private void laterRefresh(final Player p){Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(),new Runnable(){public void run(){if(p.isOnline())refreshPlayerPads(p);}},2L);}
     private void paintPad(Player p,PadVisual pad) {
         World w=pad.center.getWorld();int cx=pad.center.getBlockX(),cz=pad.center.getBlockZ();
         BlockData tint=padMaterial(p).createBlockData();boolean mapDefault="map_default".equals(selected(p));
