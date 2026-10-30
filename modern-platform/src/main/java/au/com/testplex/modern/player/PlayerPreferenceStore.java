@@ -63,23 +63,30 @@ public final class PlayerPreferenceStore {
         if (line.getSelectionMode() == CosmeticLineDefinition.SelectionMode.SINGLE) {
             data.set(path, optionId);
         } else {
-            Set<String> selected = new LinkedHashSet<>(getSelected(player, game, line));
-            CosmeticOption selectedOption = line.getOptions().stream()
-                    .filter(option -> option.getId().equals(optionId)).findFirst().orElseThrow();
-            String group = selectedOption.getSelectionGroup();
-            if (group != null) {
-                // Equip exactly one choice within this group without disturbing
-                // the user's selections in the other groups on this same line.
-                selected.removeIf(existingId -> line.getOptions().stream()
-                        .anyMatch(option -> option.getId().equals(existingId)
-                                && group.equals(option.getSelectionGroup())));
-                selected.add(optionId);
-            } else if (!selected.add(optionId)) {
-                selected.remove(optionId);
-            }
-            data.set(path, new ArrayList<>(selected));
+            data.set(path, new ArrayList<>(selectionAfterChoice(
+                    line, getSelected(player, game, line), optionId)));
         }
         save();
+    }
+
+    static Set<String> selectionAfterChoice(
+            CosmeticLineDefinition line, Set<String> currentSelections, String optionId) {
+        CosmeticOption selectedOption = line.getOptions().stream()
+                .filter(option -> option.getId().equals(optionId)).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Option does not belong to " + line.getId()));
+        Set<String> selected = new LinkedHashSet<>(currentSelections);
+        String group = selectedOption.getSelectionGroup();
+        if (group != null) {
+            // Equip exactly one choice within this group without disturbing
+            // the user's selections in the other groups on this same line.
+            selected.removeIf(existingId -> line.getOptions().stream()
+                    .anyMatch(option -> option.getId().equals(existingId)
+                            && group.equals(option.getSelectionGroup())));
+            selected.add(optionId);
+        } else if (!selected.add(optionId)) {
+            selected.remove(optionId);
+        }
+        return selected;
     }
 
     public String getWinEffect(UUID player, GameDefinition game) {
