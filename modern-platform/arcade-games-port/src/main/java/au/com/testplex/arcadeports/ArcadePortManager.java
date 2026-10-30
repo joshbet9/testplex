@@ -29,6 +29,7 @@ import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Ageable;
 import org.bukkit.entity.Cow;
+import org.bukkit.entity.Creature;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.WitherSkull;
 import org.bukkit.entity.ArmorStand;
@@ -9749,7 +9750,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (session.type == ArcadePortGame.MILK_THE_COW) {
-            if (event.getEntity() instanceof Cow cow && session.entities.contains(cow)) {
+            if (event.getEntity() instanceof Creature) {
                 event.setCancelled(true);
                 return;
             }
@@ -9806,9 +9807,7 @@ public final class ArcadePortManager implements Listener {
                         && session.witherMinionOwners.containsKey(minion.getUniqueId())) {
                     witherAttacker = session.players.get(session.witherMinionOwners.get(minion.getUniqueId()));
                 } else return;
-                if (projectile instanceof Arrow && projectile.getShooter() instanceof Player) {
-                    event.setDamage(event.getDamage() * 0.75D);
-                }
+                if (projectile instanceof Arrow) event.setDamage(event.getDamage() * 0.75D);
             } else if (damager instanceof Skeleton minion
                     && session.witherMinionOwners.containsKey(minion.getUniqueId())) {
                 witherAttacker = session.players.get(session.witherMinionOwners.get(minion.getUniqueId()));
@@ -10225,7 +10224,8 @@ public final class ArcadePortManager implements Listener {
                 Location impact = revivalPotion.getLocation();
                 for (Map.Entry<UUID, Skeleton> entry : new ArrayList<>(session.witherOutCopies.entrySet())) {
                     Skeleton copy = entry.getValue();
-                    if (copy != null && copy.isValid() && copy.getLocation().distanceSquared(impact) <= 9.0D) {
+                    if (copy != null && copy.isValid()
+                            && copy.getLocation().clone().add(0.0D, 1.0D, 0.0D).distanceSquared(impact) <= 9.0D) {
                         reviveWitherHuman(session, thrower, entry.getKey());
                         break;
                     }
@@ -11108,6 +11108,8 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         player.playEffect(EntityEffect.HURT);
         player.setHealth(player.getMaxHealth());
+        player.setFlySpeed(0.1F);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 30, 0, false, false, false));
         player.setVelocity(new Vector(0.0D, 1.2D, 0.0D));
         player.setAllowFlight(true);
         player.setFlying(true);
@@ -11152,8 +11154,12 @@ public final class ArcadePortManager implements Listener {
         revived.setFireTicks(0);
         revived.setAllowFlight(false);
         revived.setFlying(false);
-        revived.removePotionEffect(PotionEffectType.INVISIBILITY);
         revived.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 100, 4, false, false, false));
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (active == session && revived.isOnline() && session.alive.contains(revivedId)) {
+                revived.removePotionEffect(PotionEffectType.INVISIBILITY);
+            }
+        }, 4L);
         session.alive.add(revivedId);
         session.lastLocations.put(revivedId, at.clone());
         revived.sendMessage(ChatColor.GREEN + "You have been revived by " + thrower.getName() + "!");
@@ -11162,6 +11168,18 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateWitherMinions(Session session, long now) {
+        for (UUID arrowId : new HashSet<>(session.witherFireArrows)) {
+            Entity entity = session.entities.stream().filter(candidate -> candidate.getUniqueId().equals(arrowId))
+                    .findFirst().orElse(null);
+            if (!(entity instanceof Arrow arrow) || !arrow.isValid() || arrow.isOnGround()
+                    || arrow.getTicksLived() > 60 || arrow.getLocation().getY() < 0) {
+                session.witherFireArrows.remove(arrowId);
+                session.entities.remove(entity);
+                if (entity != null && entity.isValid()) entity.remove();
+            } else if (arrow.getTicksLived() > 1) {
+                arrow.getWorld().spawnParticle(Particle.FLAME, arrow.getLocation(), 1, 0, 0, 0, 0);
+            }
+        }
         for (Map.Entry<UUID, Long> entry : new ArrayList<>(session.witherMinionCreatedAt.entrySet())) {
             UUID minionId = entry.getKey();
             Entity entity = session.entities.stream().filter(candidate -> candidate.getUniqueId().equals(minionId))
@@ -11308,8 +11326,12 @@ public final class ArcadePortManager implements Listener {
             } else if (wither.getExp() > 0.0F) {
                 wither.setExp(Math.max(0.0F, wither.getExp() - 0.05F));
                 for (int i = 0; i < 2; i++) {
+                    Vector shot = wither.getLocation().getDirection().clone().normalize();
+                    shot.add(new Vector(ThreadLocalRandom.current().nextDouble(-0.04D, 0.04D),
+                            ThreadLocalRandom.current().nextDouble(-0.04D, 0.04D),
+                            ThreadLocalRandom.current().nextDouble(-0.04D, 0.04D))).normalize();
                     Arrow arrow = wither.launchProjectile(Arrow.class);
-                    arrow.setVelocity(wither.getLocation().getDirection().normalize().multiply(2.0D));
+                    arrow.setVelocity(shot.multiply(2.0D));
                     session.witherFireArrows.add(arrow.getUniqueId());
                     session.entities.add(arrow);
                 }
@@ -11468,7 +11490,15 @@ public final class ArcadePortManager implements Listener {
                 damageMilkCowFarmer(session, target, cowPlayer, 3.0D);
                 Vector push = target.getLocation().toVector().subtract(cowPlayer.getLocation().toVector());
                 push.setY(0.45D);
-                if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(1.6D).setY(0.55D));
+                if (push.lengthSquared() > 0.001D) {
+                    Vector chargeDirection = cowPlayer.getLocation().getDirection().clone();
+                    chargeDirection.setY(0.0D);
+                    chargeDirection.add(push.clone().setY(0.0D)).setY(0.0D);
+                    double chargeScale = Math.max(0.0D, 1.0D - target.getLocation().distance(forward) / 2.0D);
+                    Vector chargeVelocity = chargeDirection.normalize().multiply(1.0D + 0.8D * chargeScale);
+                    chargeVelocity.setY(0.8D + 0.4D * chargeScale);
+                    target.setVelocity(chargeVelocity);
+                }
                 cowPlayer.getWorld().playSound(cowPlayer.getLocation(), Sound.ENTITY_COW_HURT, 0.7F, 1.1F);
                 if (active != session) return;
             }
@@ -13092,6 +13122,9 @@ public final class ArcadePortManager implements Listener {
                 Material material = block.getType();
                 if (material.isAir() || material == Material.BEDROCK || material == Material.IRON_BLOCK
                         || material == Material.BARRIER || material == Material.WATER || material == Material.LAVA) continue;
+                boolean nearSkeleton = session.entities.stream().anyMatch(entity -> entity instanceof Skeleton
+                        && entity.isValid() && entity.getLocation().distanceSquared(block.getLocation()) < 9.0D);
+                if (nearSkeleton) continue;
                 session.witherExplosionBlocks.putIfAbsent(block, block.getBlockData().clone());
                 block.setType(Material.AIR, false);
             }
