@@ -59,9 +59,13 @@ This is the manual runtime checklist for the isolated Mineplex Reborn test serve
 - Unequip it and confirm ordinary Evolution effects remain unchanged.
 
 ### Micro Battles
-- Equip two different palette themes on teammates or opponents.
-- Confirm the stained-glass dust trail matches each player's theme and is visible to the second client.
-- Confirm the game loop remains smooth and the effect stops after the player is eliminated.
+- Equip different middle-glass colours on two clients. Confirm each player sees their own selected glass colour only; the other client must retain its own colour or the default.
+- Move an alive player to each map edge. Within three blocks of the boundary, confirm a vertical particle cue appears at the nearby edge in that player's selected style and glass colour.
+- Confirm the border particles are sent only to the player who is approaching the edge; another client should not inherit that player's cosmetic colour.
+- Confirm a visible warning label floats above players while they are within three blocks of the boundary, and disappears when they move out of range, are eliminated, or the game ends.
+- Select Off for Border Particles. Confirm the particle cosmetic is disabled while the overhead gameplay warning remains.
+- Wait for the ten-second starting glass barrier to disappear. Confirm the tinted glass is removed normally and no stale warning indicators remain after the round.
+- Confirm the game loop remains smooth with multiple players near the boundary.
 
 ### Bomb Lobbers
 - With TNT selected, left- and right-click air, blocks, and another entity. Each input should throw exactly one TNT, consume exactly one item, and preserve team/friendly-fire rules.
