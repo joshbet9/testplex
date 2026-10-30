@@ -4535,44 +4535,101 @@ public final class ArcadePortManager implements Listener {
             spectator.sendMessage(ChatColor.YELLOW + "There are no living Dragons players to track.");
             return;
         }
-        int size = Math.max(9, Math.min(54, ((targets.size() + 8) / 9) * 9));
+
+        // Dragons is SoloGame: the original CompassPage uses one yellow Players
+        // team header, followed by eight player heads per row.
+        int rows = Math.max(3, 2 + (targets.size() + 7) / 8);
+        int size = Math.min(54, rows * 9);
         DragonCompassMenuHolder holder = new DragonCompassMenuHolder(spectator.getUniqueId());
-        Inventory inventory = Bukkit.createInventory(holder, size, "Spectator Menu");
-        holder.inventory = inventory;
-        for (int i = 0; i < Math.min(targets.size(), size); i++) {
-            Player target = targets.get(i);
+        holder.inventory = Bukkit.createInventory(holder, size, "Spectator Menu");
+        populateDragonsSpectatorMenu(session, spectator, holder);
+        spectator.openInventory(holder.inventory);
+    }
+
+    private boolean populateDragonsSpectatorMenu(
+            Session session, Player spectator, DragonCompassMenuHolder holder) {
+        List<Player> targets = alivePlayers(session).stream()
+                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        holder.inventory.clear();
+        holder.targetsBySlot.clear();
+        ItemStack teamHeader = new ItemStack(Material.YELLOW_WOOL);
+        ItemMeta teamMeta = teamHeader.getItemMeta();
+        teamMeta.setDisplayName(ChatColor.YELLOW + "Players");
+        teamMeta.setLore(List.of(" ", ChatColor.YELLOW + "Players Alive: " + ChatColor.WHITE + targets.size()));
+        teamHeader.setItemMeta(teamMeta);
+        holder.inventory.setItem(13, teamHeader);
+
+        int slot = 19;
+        for (Player target : targets) {
+            if (slot >= holder.inventory.getSize()) break;
             ItemStack head = new ItemStack(Material.PLAYER_HEAD);
             if (head.getItemMeta() instanceof SkullMeta skull) {
                 skull.setOwningPlayer(target);
-                skull.setDisplayName(ChatColor.AQUA + target.getName());
+                skull.setDisplayName(ChatColor.YELLOW + target.getName());
                 double distance = Math.sqrt(spectator.getLocation().distanceSquared(target.getLocation()));
                 double heightDifference = target.getLocation().getY() - spectator.getLocation().getY();
                 String kit = session.dragonKits.getOrDefault(target.getUniqueId(), "coward");
                 skull.setLore(List.of(" ",
                         ChatColor.YELLOW + "Kit: " + ChatColor.WHITE + kit,
-                        ChatColor.YELLOW + "Distance: " + ChatColor.WHITE + String.format(java.util.Locale.ROOT, "%.1f", distance),
-                        ChatColor.YELLOW + "Height Difference: " + ChatColor.WHITE + String.format(java.util.Locale.ROOT, "%.1f", heightDifference),
+                        ChatColor.YELLOW + "Distance: " + ChatColor.WHITE
+                                + String.format(java.util.Locale.ROOT, "%.1f", distance),
+                        ChatColor.YELLOW + "Height Difference: " + ChatColor.WHITE
+                                + String.format(java.util.Locale.ROOT, "%.1f", heightDifference),
                         " ", ChatColor.YELLOW + "Left Click " + ChatColor.RESET + "Teleport",
                         ChatColor.YELLOW + "Right Click " + ChatColor.RESET + "Spectate"));
                 head.setItemMeta(skull);
             }
-            inventory.setItem(i, head);
-            holder.targetsBySlot.put(i, target.getUniqueId());
+            holder.inventory.setItem(slot, head);
+            holder.targetsBySlot.put(slot, target.getUniqueId());
+            if ((slot + 2) % 9 == 0) slot += 4;
+            else slot++;
         }
-        spectator.openInventory(inventory);
+        return !targets.isEmpty();
     }
 
     private void updateDragonsSpectatorCompasses(Session session) {
-        List<Player> alive = alivePlayers(session);
-        if (alive.isEmpty()) return;
-        for (Player player : session.players.values()) {
-            if (player == null || !player.isOnline() || session.alive.contains(player.getUniqueId())) continue;
-            if (inventoryCount(player, Material.COMPASS) <= 0) continue;
-            Player target = alive.stream()
-                    .min(java.util.Comparator.comparingDouble(p ->
-                            p.getLocation().distanceSquared(player.getLocation())))
-                    .orElse(null);
-            if (target != null) player.setCompassTarget(target.getLocation());
+        long now = System.currentTimeMillis();
+        if (now >= session.dragonNextCompassUpdateAt) {
+            session.dragonNextCompassUpdateAt = now + 250L; // CompassModule uses UpdateType.FASTER.
+            List<Player> alive = alivePlayers(session);
+            if (!alive.isEmpty()) {
+                for (Player spectator : session.players.values()) {
+                    if (spectator == null || !spectator.isOnline()
+                            || session.alive.contains(spectator.getUniqueId())
+                            || inventoryCount(spectator, Material.COMPASS) <= 0) continue;
+                    Player target = alive.stream()
+                            .min(java.util.Comparator.comparingDouble(p ->
+                                    p.getLocation().distanceSquared(spectator.getLocation())))
+                            .orElse(null);
+                    if (target == null) continue;
+                    spectator.setCompassTarget(target.getLocation());
+                    if (isDragonsTrackingCompass(spectator.getInventory().getItemInMainHand())) {
+                        double distance = Math.sqrt(spectator.getLocation().distanceSquared(target.getLocation()));
+                        double height = target.getLocation().getY() - spectator.getLocation().getY();
+                        spectator.sendActionBar(ChatColor.WHITE + "" + ChatColor.BOLD + "Nearest Target: "
+                                + ChatColor.YELLOW + target.getName() + "    "
+                                + ChatColor.WHITE + ChatColor.BOLD + "Distance: "
+                                + ChatColor.YELLOW + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                                + "    " + ChatColor.WHITE + ChatColor.BOLD + "Height: "
+                                + ChatColor.YELLOW + String.format(java.util.Locale.ROOT, "%.1f", height));
+                    }
+                }
+            }
+        }
+
+        if (now >= session.dragonNextCompassMenuRefreshAt) {
+            session.dragonNextCompassMenuRefreshAt = now + 1_000L; // CompassMenu.refresh() uses UpdateType.SEC.
+            for (Player spectator : session.players.values()) {
+                if (spectator == null || !spectator.isOnline()
+                        || !(spectator.getOpenInventory().getTopInventory().getHolder()
+                                instanceof DragonCompassMenuHolder holder)
+                        || !holder.ownerId.equals(spectator.getUniqueId())) continue;
+                if (!populateDragonsSpectatorMenu(session, spectator, holder)) {
+                    spectator.closeInventory();
+                    spectator.sendMessage(ChatColor.YELLOW + "There are no living Dragons players to track.");
+                }
+            }
         }
     }
 
