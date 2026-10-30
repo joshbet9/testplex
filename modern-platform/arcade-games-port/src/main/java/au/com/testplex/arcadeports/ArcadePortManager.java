@@ -1901,6 +1901,7 @@ public final class ArcadePortManager implements Listener {
                 if (player != null && player.isOnline()) {
                     session.gladiatorLosses.put(player.getUniqueId(), 0);
                     session.gladiatorWinnerQueue.add(player.getUniqueId());
+                    player.setGameMode(GameMode.SPECTATOR);
                 }
             }
         } else {
@@ -6986,6 +6987,9 @@ public final class ArcadePortManager implements Listener {
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
         }
+        if (announceWinner && session.type == ArcadePortGame.GLADIATORS && winner != null) {
+            recordGladiatorsWinnerAchievements(session, winner);
+        }
         active = null;
         if (session.tickTask != null) session.tickTask.cancel();
         if (announceWinner && session.type == ArcadePortGame.BACON_BRAWL && winner != null) {
@@ -7071,7 +7075,8 @@ public final class ArcadePortManager implements Listener {
                 if ((session.type == ArcadePortGame.BACON_BRAWL
                         && isBaconCompassMenuTitle(player.getOpenInventory().getTitle()))
                         || (session.type == ArcadePortGame.BOMB_LOBBERS
-                        && isBombLobbersCompassMenuTitle(player.getOpenInventory().getTitle()))) {
+                        && isBombLobbersCompassMenuTitle(player.getOpenInventory().getTitle()))
+                        || player.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder) {
                     player.closeInventory();
                 }
                 snapshot.restore(player);
@@ -10671,7 +10676,8 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
-        session.alive.remove(id);
+        if (session.type == ArcadePortGame.GLADIATORS) forfeitGladiator(player, session);
+        else session.alive.remove(id);
         if (session.type == ArcadePortGame.BOMB_LOBBERS) updateBombLobbersMvpEligibility(session);
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             session.baconBrutusUntil.remove(id);
@@ -10691,10 +10697,6 @@ public final class ArcadePortManager implements Listener {
         PlayerSnapshot snapshot = session.snapshots.get(id);
         if (snapshot != null) pendingRestore.put(id, snapshot);
         if (session.type == ArcadePortGame.DEATH_TAG) session.tagged.remove(id);
-        if (session.type == ArcadePortGame.GLADIATORS) {
-            Integer pair = session.gladiatorPairs.get(id);
-            if (pair != null) session.gladiatorResolvedPairs.add(pair);
-        }
         session.respawning.remove(id);
         session.baconCompassMenuTargets.remove(id);
         session.players.remove(id);
@@ -10739,12 +10741,24 @@ public final class ArcadePortManager implements Listener {
         final Map<Block, Long> evolutionWebs = new HashMap<>();
         final Map<UUID, Integer> gladiatorPairs = new HashMap<>();
         final Set<Integer> gladiatorResolvedPairs = new HashSet<>();
+        final Map<Integer, Integer> gladiatorPairBrackets = new HashMap<>();
+        final Map<Integer, Long> gladiatorFightStartsAtByPair = new HashMap<>();
+        final Map<Integer, Long> gladiatorRoundStartedAtByPair = new HashMap<>();
+        final Map<Integer, Long> gladiatorNextPoisonAtByPair = new HashMap<>();
+        final Map<UUID, Integer> gladiatorLosses = new HashMap<>();
+        final List<UUID> gladiatorWinnerQueue = new ArrayList<>();
+        final List<UUID> gladiatorLoserQueue = new ArrayList<>();
+        final Set<UUID> gladiatorUsedBow = new HashSet<>();
+        final Set<UUID> gladiatorUsedRod = new HashSet<>();
+        final Map<UUID, String> gladiatorVotes = new HashMap<>();
         int gladiatorRound = -1;
         int gladiatorPairCount;
-        long gladiatorRoundStartedAt;
-        long gladiatorFightStartsAt;
-        long lastGladiatorPoisonAt;
-        long nextGladiatorRoundAt;
+        int gladiatorNextPairId;
+        int gladiatorWinnerArenaCursor;
+        int gladiatorLoserArenaCursor;
+        long gladiatorVotingEndsAt;
+        String gladiatorMode = "rodless";
+        boolean gladiatorWinnerBracketStarted;
         final Map<UUID, Integer> teams = new HashMap<>();
         final Set<UUID> tagged = new HashSet<>();
         final Set<UUID> alphaChasers = new HashSet<>();
