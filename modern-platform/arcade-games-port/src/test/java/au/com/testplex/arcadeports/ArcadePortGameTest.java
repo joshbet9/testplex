@@ -114,7 +114,7 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheFourteenGamesNotCoveredByDedicatedMechanicsModules() {
+    @Test void exposesTheSixteenGamesNotCoveredByDedicatedMechanicsModules() {
         assertEquals(16, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
