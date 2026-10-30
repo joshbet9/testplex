@@ -12579,6 +12579,28 @@ public final class ArcadePortManager implements Listener {
 
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onSheepQuestArcherBowShoot(EntityShootBowEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SHEEP_QUEST
+                || !(event.getEntity() instanceof Player player)
+                || !session.alive.contains(player.getUniqueId())
+                || !"archer".equals(session.sheepQuestKits.getOrDefault(player.getUniqueId(), "beserker"))
+                || !(event.getProjectile() instanceof Arrow arrow)) return;
+        UUID id = player.getUniqueId();
+        session.entities.add(arrow);
+        session.sheepArcherTrackedArrows.add(arrow.getUniqueId());
+        int charged = session.sheepArcherCharge.getOrDefault(id, 0);
+        session.sheepArcherCharge.remove(id);
+        session.sheepArcherLastChargeAt.remove(id);
+        player.setExp(0.0F);
+        if (charged > 0) {
+            session.sheepArcherVolleyRemaining.put(id, charged);
+            session.sheepArcherNextVolleyAt.put(id,
+                    System.currentTimeMillis() + ArcadePortRules.SHEEP_QUEST_ARCHER_BARRAGE_VOLLEY_INTERVAL_MILLIS);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onQuiverBowShoot(EntityShootBowEvent event) {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
@@ -12704,6 +12726,14 @@ public final class ArcadePortManager implements Listener {
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+
+        if (session.type == ArcadePortGame.SHEEP_QUEST
+                && event.getEntity() instanceof Arrow sheepQuestArrow
+                && session.sheepArcherTrackedArrows.remove(sheepQuestArrow.getUniqueId())) {
+            session.entities.remove(sheepQuestArrow);
+            sheepQuestArrow.remove();
+            return;
+        }
 
         if (session.type == ArcadePortGame.TURF_WARS
                 && event.getEntity() instanceof Arrow turfArrow
@@ -13070,6 +13100,23 @@ public final class ArcadePortManager implements Listener {
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
+        if (session.type == ArcadePortGame.SHEEP_QUEST && heldItem != null
+                && heldItem.getType() == Material.LEATHER_CHESTPLATE && heldItem.hasItemMeta()
+                && heldItem.getItemMeta().hasDisplayName()
+                && ChatColor.stripColor(heldItem.getItemMeta().getDisplayName()).contains("Team Armor")) {
+            event.setCancelled(true);
+            Bukkit.getScheduler().runTaskLater(plugin, player::updateInventory, 1L);
+            return;
+        }
+        if (session.type == ArcadePortGame.SHEEP_QUEST && !event.isCancelled()
+                && session.alive.contains(player.getUniqueId())
+                && "archer".equals(session.sheepQuestKits.getOrDefault(player.getUniqueId(), "beserker"))
+                && item == Material.BOW && event.getAction().isRightClick()
+                && player.getInventory().contains(Material.ARROW)) {
+            UUID id = player.getUniqueId();
+            session.sheepArcherCharge.putIfAbsent(id, 0);
+            session.sheepArcherLastChargeAt.putIfAbsent(id, System.currentTimeMillis());
+        }
         if (event.isCancelled()) {
             boolean forceGladiatorHotbar = session.type == ArcadePortGame.GLADIATORS
                     && event.getAction().isRightClick() && heldItem != null && heldItem.hasItemMeta()
@@ -13460,6 +13507,44 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.SHEEP_QUEST) {
+            Player carrier = event.getPlayer();
+            if (!session.alive.contains(carrier.getUniqueId())) return;
+            if (event.getRightClicked() instanceof Sheep sheep && session.sheep.contains(sheep)) {
+                ItemStack saddle = carrier.getInventory().getItemInMainHand();
+                if (saddle != null && saddle.getType() == Material.SADDLE) {
+                    event.setCancelled(true);
+                    if (pickUpSheepQuest(session, carrier, sheep, System.currentTimeMillis())) {
+                        carrier.sendMessage(ChatColor.GREEN + "Sheep picked up. Return it to your team's pen!");
+                    }
+                }
+                return;
+            }
+            if (event.getRightClicked() instanceof Player teammate
+                    && "brute".equals(session.sheepQuestKits.getOrDefault(carrier.getUniqueId(), "beserker"))) {
+                ItemStack held = carrier.getInventory().getItemInMainHand();
+                if (held == null || held.getType() != Material.SADDLE) return;
+                event.setCancelled(true);
+                if (!session.alive.contains(teammate.getUniqueId())
+                        || session.teams.getOrDefault(teammate.getUniqueId(), -2)
+                                != session.teams.getOrDefault(carrier.getUniqueId(), -1)
+                        || teammate.equals(carrier) || teammate.isInsideVehicle()
+                        || !teammate.getPassengers().isEmpty()) return;
+                long now = System.currentTimeMillis();
+                UUID carrierId = carrier.getUniqueId();
+                if (!ArcadePortRules.sheepQuestPickupReady(now,
+                        session.sheepNextPickupAt.getOrDefault(carrierId, 0L))) return;
+                Entity top = sheepQuestTopPassenger(carrier);
+                if (top != null && top.addPassenger(teammate)) {
+                    session.sheepNextPickupAt.put(carrierId,
+                            now + ArcadePortRules.SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS);
+                    carrier.playSound(carrier.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0F, 1.0F);
+                    teammate.sendMessage(ChatColor.YELLOW + carrier.getName() + " picked you up.");
+                }
+                return;
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.DEATH_TAG
                 && event.getRightClicked() instanceof ItemFrame) {
             event.setCancelled(true);
@@ -13807,10 +13892,45 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSheepQuestHeldSlotChange(PlayerItemHeldEvent event) {
+        Session session = active;
+        Player player = event.getPlayer();
+        if (session == null || session.type != ArcadePortGame.SHEEP_QUEST
+                || !session.alive.contains(player.getUniqueId())) return;
+        ItemStack next = player.getInventory().getItem(event.getNewSlot());
+        if (next != null && next.getType() == Material.SADDLE) return;
+        dropSheepFromCarrier(session, player, "changed held item");
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDrop(PlayerDropItemEvent event) {
         Session session = active;
-        if (session != null && session.players.containsKey(event.getPlayer().getUniqueId())) event.setCancelled(true);
+        if (session == null || !session.players.containsKey(event.getPlayer().getUniqueId())) return;
+        Player player = event.getPlayer();
+        if (session.type == ArcadePortGame.SHEEP_QUEST) {
+            ItemStack dropped = event.getItemDrop().getItemStack();
+            if (isSheepQuestFletchedArrow(dropped)
+                    || (dropped != null && dropped.getType() == Material.LEATHER_CHESTPLATE
+                        && dropped.hasItemMeta() && dropped.getItemMeta().hasDisplayName()
+                        && ChatColor.stripColor(dropped.getItemMeta().getDisplayName()).contains("Team Armor"))) {
+                event.setCancelled(true);
+                return;
+            }
+            if (!session.alive.contains(player.getUniqueId())) {
+                event.setCancelled(true);
+                return;
+            }
+            if ("brute".equals(session.sheepQuestKits.getOrDefault(player.getUniqueId(), "beserker"))
+                    && !player.getPassengers().isEmpty()) {
+                throwSheepQuestPassenger(session, player);
+                event.setCancelled(true);
+            } else {
+                dropSheepFromCarrier(session, player, "dropped an item");
+            }
+            return;
+        }
+        event.setCancelled(true);
     }
 
     private boolean isDragonProtectedKitItem(ItemStack item) {
@@ -14925,6 +15045,30 @@ public final class ArcadePortManager implements Listener {
             return true;
         }
         return false;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSheepQuestBerserkerJump(org.bukkit.event.player.PlayerToggleFlightEvent event) {
+        Player player = event.getPlayer();
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SHEEP_QUEST
+                || !session.alive.contains(player.getUniqueId())
+                || !"beserker".equals(session.sheepQuestKits.getOrDefault(player.getUniqueId(), "beserker"))) return;
+        UUID id = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        long readyAt = session.sheepBerserkerReadyAt.getOrDefault(id, 0L);
+        event.setCancelled(true);
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        if (now < readyAt) return;
+        session.sheepBerserkerReadyAt.put(id,
+                now + ArcadePortRules.SHEEP_QUEST_BESERKER_JUMP_COOLDOWN_MILLIS);
+        Vector velocity = player.getLocation().getDirection().normalize().multiply(1.2D);
+        velocity.setY(Math.max(0.2D, Math.min(1.2D, velocity.getY() + 0.55D)));
+        player.setVelocity(velocity);
+        player.setFallDistance(0.0F);
+        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.9F, 1.0F);
+        player.sendActionBar(ChatColor.GOLD + "Beserker Jump");
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
