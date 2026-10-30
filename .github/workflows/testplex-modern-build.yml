@@ -84,8 +84,18 @@ jobs:
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "name: ArcadeMechanicsModern"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
           unzip -p "$arcade_jar" config.yml | grep -Fxq "  - bacon-brawl"
-          ! unzip -p "$arcade_jar" config.yml | grep -Eq "^  - (bomb-lobbers|death-tag|dragon-escape|dragons|evolution|gladiators|micro-battles|one-in-the-quiver|paintball|runner|sheep-quest|spleef|turf-wars)$"
-          echo "All four modern Paper 26.3 plugin artifacts verified; only Bacon Brawl is enabled for live acceptance."
+          enabled_games="$(unzip -p "$arcade_jar" config.yml | awk '
+            /^enabled-games:[[:space:]]*$/ { in_enabled=1; next }
+            in_enabled && /^  - / { sub(/^  - /, ""); print; next }
+            in_enabled && /^[^ ]/ { exit }
+          ' | sort)"
+          expected_enabled_games="$(printf '%s\\n' bacon-brawl bomb-lobbers dragon-escape one-in-the-quiver | sort)"
+          if [[ "$enabled_games" != "$expected_enabled_games" ]]; then
+            echo "Unexpected enabled-games allow-list:" >&2
+            printf '%s\\n' "$enabled_games" >&2
+            exit 1
+          fi
+          echo "All four modern Paper 26.3 plugin artifacts verified; Bacon Brawl, Bomb Lobbers, Dragon Escape and One in the Quiver are available for isolated in-game acceptance."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
