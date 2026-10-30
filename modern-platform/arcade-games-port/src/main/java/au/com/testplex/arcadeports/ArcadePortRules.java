@@ -10,7 +10,7 @@ import java.util.Collection;
  * needing a live Paper server.
  */
 public final class ArcadePortRules {
-    public static final int EVOLUTION_WIN_LEVEL = 6;
+    public static final int EVOLUTION_WIN_LEVEL = 5;
     public static final double DRAGON_ESCAPE_FINISH_X = 0.5D;
     public static final double DRAGON_ESCAPE_FINISH_Y = 64.0D;
     public static final double DRAGON_ESCAPE_FINISH_Z = 77.5D;
@@ -1105,6 +1105,11 @@ public final class ArcadePortRules {
     public static final long EVOLUTION_RESPAWN_TICKS = 80L;
     public static final long EVOLUTION_FORM_CHANGE_TICKS = 44L;
     public static final long EVOLUTION_TOTAL_ANIMATION_TICKS = 140L;
+    public static final int EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION = 2;
+    public static final long EVOLUTION_PITY_CLOCK_MILLIS = 90_000L;
+    public static final long EVOLUTION_PITY_KILL_REDUCTION_MILLIS = 15_000L;
+    public static final long EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS = 7_500L;
+    public static final long EVOLUTION_ASSIST_WINDOW_MILLIS = 10_000L;
 
     public static int nextEvolutionLevel(int currentLevel, boolean wonEvolve) {
         int safeLevel = Math.max(0, Math.min(EVOLUTION_WIN_LEVEL, currentLevel));
@@ -1112,21 +1117,38 @@ public final class ArcadePortRules {
     }
 
     public static double evolutionMaxHealth(int level) {
-        return switch (Math.max(0, Math.min(5, level))) {
-            case 0 -> 40.0D; case 1 -> 36.0D; case 2 -> 32.0D;
-            case 3 -> 28.0D; case 4 -> 22.0D; default -> 16.0D;
+        return switch (Math.max(0, Math.min(4, level))) {
+            case 0 -> 40.0D; case 1 -> 36.0D; case 2 -> 28.0D;
+            case 3 -> 22.0D; default -> 16.0D;
         };
     }
 
     public static double evolutionMeleeDamage(int level) {
-        return switch (Math.max(0, Math.min(5, level))) {
-            case 0 -> 6.0D; case 1, 2 -> 5.0D; case 3, 4 -> 4.0D; default -> 3.0D;
+        return switch (Math.max(0, Math.min(4, level))) {
+            case 0 -> 6.0D; case 1 -> 5.0D; case 2, 3 -> 4.0D; default -> 3.0D;
         };
     }
 
     public static double evolutionChargePerTick(int killsThisLife) {
         int extraKills = Math.max(0, killsThisLife - 1);
         return Math.min(0.022D, 0.012D + 0.003D * extraKills);
+    }
+
+    public static long evolutionPityRemainingMillis(long pityDeadline, long now) {
+        return Math.max(0L, pityDeadline - now);
+    }
+
+    public static long reduceEvolutionPityDeadline(long pityDeadline, long now, long reductionMillis) {
+        return Math.max(now, pityDeadline - Math.max(0L, reductionMillis));
+    }
+
+    public static String formatEvolutionPityRemaining(long remainingMillis) {
+        long totalSeconds = (Math.max(0L, remainingMillis) + 999L) / 1_000L;
+        return String.format(java.util.Locale.ROOT, "%d:%02d", totalSeconds / 60L, totalSeconds % 60L);
+    }
+
+    public static boolean evolutionOverkillRequirementMet(int killsBeforeEvolution) {
+        return killsBeforeEvolution >= EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION;
     }
 
     public static boolean isEvolutionWinnerLevel(int level) {

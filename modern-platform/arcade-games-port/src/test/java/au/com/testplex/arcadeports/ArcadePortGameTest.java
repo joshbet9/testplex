@@ -1502,33 +1502,50 @@ class ArcadePortGameTest {
         assertEquals(3, ArcadePortRules.spleefProjectileClearRadius(true, 100.0D));
     }
 
-    @Test void evolutionStagesAdvanceOnlyAfterACompletedCrouchEvolutionAndPersistOnDeath() {
+    @Test void evolutionStagesAdvanceThroughFiveFormsAndPersistOnDeath() {
+        assertEquals(5, ArcadePortRules.EVOLUTION_WIN_LEVEL);
         assertEquals(1, ArcadePortRules.nextEvolutionLevel(0, true));
-        assertEquals(6, ArcadePortRules.nextEvolutionLevel(5, true));
-        assertEquals(6, ArcadePortRules.nextEvolutionLevel(6, true));
+        assertEquals(5, ArcadePortRules.nextEvolutionLevel(4, true));
+        assertEquals(5, ArcadePortRules.nextEvolutionLevel(5, true));
         assertEquals(2, ArcadePortRules.nextEvolutionLevel(2, false));
         assertEquals(0, ArcadePortRules.nextEvolutionLevel(0, false));
         assertEquals(0, ArcadePortRules.nextEvolutionLevel(-1, false));
-        assertFalse(ArcadePortRules.isEvolutionWinnerLevel(5));
-        assertTrue(ArcadePortRules.isEvolutionWinnerLevel(6));
+        assertFalse(ArcadePortRules.isEvolutionWinnerLevel(4));
+        assertTrue(ArcadePortRules.isEvolutionWinnerLevel(5));
         assertEquals(80L, ArcadePortRules.EVOLUTION_RESPAWN_TICKS);
         assertEquals(44L, ArcadePortRules.EVOLUTION_FORM_CHANGE_TICKS);
         assertEquals(140L, ArcadePortRules.EVOLUTION_TOTAL_ANIMATION_TICKS);
     }
 
-    @Test void evolutionUsesSourceFormHealthAndMeleeDamage() {
+    @Test void evolutionUsesFiveSourceFormsAndTheirMeleeDamage() {
         assertEquals(40.0D, ArcadePortRules.evolutionMaxHealth(0));
         assertEquals(36.0D, ArcadePortRules.evolutionMaxHealth(1));
-        assertEquals(32.0D, ArcadePortRules.evolutionMaxHealth(2));
-        assertEquals(28.0D, ArcadePortRules.evolutionMaxHealth(3));
-        assertEquals(22.0D, ArcadePortRules.evolutionMaxHealth(4));
+        assertEquals(28.0D, ArcadePortRules.evolutionMaxHealth(2));
+        assertEquals(22.0D, ArcadePortRules.evolutionMaxHealth(3));
+        assertEquals(16.0D, ArcadePortRules.evolutionMaxHealth(4));
         assertEquals(16.0D, ArcadePortRules.evolutionMaxHealth(5));
         assertEquals(6.0D, ArcadePortRules.evolutionMeleeDamage(0));
         assertEquals(5.0D, ArcadePortRules.evolutionMeleeDamage(1));
-        assertEquals(5.0D, ArcadePortRules.evolutionMeleeDamage(2));
+        assertEquals(4.0D, ArcadePortRules.evolutionMeleeDamage(2));
         assertEquals(4.0D, ArcadePortRules.evolutionMeleeDamage(3));
-        assertEquals(4.0D, ArcadePortRules.evolutionMeleeDamage(4));
+        assertEquals(3.0D, ArcadePortRules.evolutionMeleeDamage(4));
         assertEquals(3.0D, ArcadePortRules.evolutionMeleeDamage(5));
+    }
+
+    @Test void evolutionPityClockDecreasesForKillsAndAssistsAndOverkillRequiresTwoKills() {
+        assertEquals(90_000L, ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS);
+        assertEquals(15_000L, ArcadePortRules.EVOLUTION_PITY_KILL_REDUCTION_MILLIS);
+        assertEquals(7_500L, ArcadePortRules.EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS);
+        assertEquals(10_000L, ArcadePortRules.EVOLUTION_ASSIST_WINDOW_MILLIS);
+        assertEquals(75_000L, ArcadePortRules.reduceEvolutionPityDeadline(90_000L, 0L, 15_000L));
+        assertEquals(82_500L, ArcadePortRules.reduceEvolutionPityDeadline(90_000L, 0L, 7_500L));
+        assertEquals(0L, ArcadePortRules.reduceEvolutionPityDeadline(90_000L, 0L, 100_000L));
+        assertEquals(30_000L, ArcadePortRules.evolutionPityRemainingMillis(30_000L, 0L));
+        assertEquals(0L, ArcadePortRules.evolutionPityRemainingMillis(0L, 30_000L));
+        assertEquals("1:30", ArcadePortRules.formatEvolutionPityRemaining(90_000L));
+        assertEquals("0:01", ArcadePortRules.formatEvolutionPityRemaining(1L));
+        assertFalse(ArcadePortRules.evolutionOverkillRequirementMet(1));
+        assertTrue(ArcadePortRules.evolutionOverkillRequirementMet(2));
     }
 
     @Test void evolutionChargeAcceleratesWithKillsAndCapsAtTheSourceRate() {

@@ -23,6 +23,7 @@ import org.bukkit.block.BlockState;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Arrow;
+import org.bukkit.entity.BlockDisplay;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EnderPearl;
@@ -1044,8 +1045,12 @@ public final class ArcadePortManager implements Listener {
                 session.spleefNextArrowAt.put(playerId, now + ArcadePortRules.SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS);
             }
             if (type == ArcadePortGame.EVOLUTION) {
-                session.evolutionLevels.put(player.getUniqueId(), 0);
-                session.evolutionLifeKills.put(player.getUniqueId(), 0);
+                UUID evolutionId = player.getUniqueId();
+                session.evolutionLevels.put(evolutionId, 0);
+                session.evolutionLifeKills.put(evolutionId, 0);
+                session.evolutionPityUntil.put(evolutionId,
+                        System.currentTimeMillis() + ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS);
+                session.evolutionOverkillEligible.add(evolutionId);
             }
             if (type == ArcadePortGame.DRAGON_ESCAPE) {
                 UUID playerId = player.getUniqueId();
@@ -2828,7 +2833,6 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.SPLEEF) updateSpleef(session, now);
         if (session.type == ArcadePortGame.EVOLUTION) {
             updateEvolutionProgress(session, now);
-            updateEvolutionWebs(session, now);
         }
         if (session.type == ArcadePortGame.RUNNER) {
             // Reborn marks the whole standing footprint on every game tick, not only on movement events.
@@ -5469,7 +5473,7 @@ public final class ArcadePortManager implements Listener {
                     + Math.max(0, session.alive.size() - session.tagged.stream().filter(session.alive::contains).count());
             case DRAGON_ESCAPE -> dragonEscapeStatusText(session, player);
             case DRAGONS -> "dragons " + session.entities.stream().filter(EnderDragon.class::isInstance).count();
-            case EVOLUTION -> "stage " + (session.evolutionLevels.getOrDefault(id, 0) + 1) + "/6";
+            case EVOLUTION -> "stage " + (session.evolutionLevels.getOrDefault(id, 0) + 1) + "/5";
             case GLADIATORS -> {
                 String tier = switch (session.gladiatorRound) {
                     case 1 -> "yellow";
@@ -5704,12 +5708,16 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.EVOLUTION && player.isOnline()) {
             UUID victimId = player.getUniqueId();
+            long eliminationTime = System.currentTimeMillis();
+            recordEvolutionAssists(session, victimId, killer == null ? null : killer.getUniqueId(), eliminationTime);
             session.evolutionLifeKills.put(victimId, 0);
             session.evolutionAvailable.remove(victimId);
             session.evolutionCharge.remove(victimId);
             session.evolving.remove(victimId);
             session.evolutionLockedLocations.remove(victimId);
             session.evolutionWaterMessageAt.remove(victimId);
+            session.evolutionKillsAtAttempt.remove(victimId);
+            cleanupEvolutionEggEffect(session, victimId);
             player.setExp(0.0F);
             player.removePotionEffect(PotionEffectType.SLOWNESS);
             player.removePotionEffect(PotionEffectType.JUMP_BOOST);
@@ -5719,6 +5727,8 @@ public final class ArcadePortManager implements Listener {
                 int lifeKills = session.evolutionLifeKills.merge(killerId, 1, Integer::sum);
                 session.evolutionAvailable.add(killerId);
                 session.evolutionCharge.remove(killerId);
+                reduceEvolutionPity(session, killerId,
+                        ArcadePortRules.EVOLUTION_PITY_KILL_REDUCTION_MILLIS, eliminationTime);
                 killer.setExp(0.0F);
                 killer.removePotionEffect(PotionEffectType.SLOWNESS);
                 killer.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 60, 0, false, false, true));
@@ -5730,7 +5740,7 @@ public final class ArcadePortManager implements Listener {
             int victimLevel = session.evolutionLevels.getOrDefault(victimId, 0);
             session.respawning.add(victimId);
             player.setGameMode(GameMode.SPECTATOR);
-            player.sendMessage(ChatColor.RED + "Defeated. Respawning with evolution stage " + (victimLevel + 1) + " retained.");
+            player.sendMessage(ChatColor.RED + "Defeated. Respawning with evolution stage " + (victimLevel + 1) + "/5 retained.");
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 if (active != session || !player.isOnline()
                         || !session.respawning.remove(victimId)) return;
@@ -5766,7 +5776,7 @@ public final class ArcadePortManager implements Listener {
     private void giveEvolutionKit(Session session, Player player) {
         player.getInventory().clear();
         for (PotionEffect effect : player.getActivePotionEffects()) player.removePotionEffect(effect.getType());
-        int level = Math.max(0, Math.min(5, session.evolutionLevels.getOrDefault(player.getUniqueId(), 0)));
+        int level = Math.max(0, Math.min(4, session.evolutionLevels.getOrDefault(player.getUniqueId(), 0)));
         var maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
         if (maxHealth != null) maxHealth.setBaseValue(ArcadePortRules.evolutionMaxHealth(level));
         player.setHealth(player.getMaxHealth());
@@ -5782,15 +5792,10 @@ public final class ArcadePortManager implements Listener {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 1_200, 0, false, false, true));
                 break;
             case 2:
-                player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
-                        namedItem(Material.COBWEB, "Spider Web", "Right-click to place a temporary web.", 4));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 1_200, 0, false, false, true));
-                break;
-            case 3:
                 player.getInventory().addItem(new ItemStack(Material.IRON_SWORD),
                         namedItem(Material.TNT, "Creeper Charge", "Right-click to throw an explosive charge.", 3));
                 break;
-            case 4:
+            case 3:
                 player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
                         namedItem(Material.SLIME_BALL, "Slime Bounce", "Right-click to leap forward.", 3));
                 player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 1_200, 1, false, false, true));
@@ -5802,20 +5807,19 @@ public final class ArcadePortManager implements Listener {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 1_200, 1, false, false, true));
                 break;
         }
-        player.sendMessage(ChatColor.GREEN + "Evolution stage restored: " + (level + 1) + "/6.");
+        player.sendMessage(ChatColor.GREEN + "Evolution stage restored: " + (level + 1) + "/5.");
         player.updateInventory();
     }
 
     private void refreshEvolutionFormPerks(Session session, Player player) {
-        int level = Math.max(0, Math.min(5, session.evolutionLevels.getOrDefault(player.getUniqueId(), 0)));
+        int level = Math.max(0, Math.min(4, session.evolutionLevels.getOrDefault(player.getUniqueId(), 0)));
         PotionEffectType type;
         int amplifier;
         switch (level) {
             case 0 -> { type = PotionEffectType.RESISTANCE; amplifier = 0; }
             case 1 -> { type = PotionEffectType.FIRE_RESISTANCE; amplifier = 0; }
-            case 2 -> { type = PotionEffectType.SPEED; amplifier = 0; }
-            case 4 -> { type = PotionEffectType.JUMP_BOOST; amplifier = 1; }
-            case 5 -> { type = PotionEffectType.SPEED; amplifier = 1; }
+            case 3 -> { type = PotionEffectType.JUMP_BOOST; amplifier = 1; }
+            case 4 -> { type = PotionEffectType.SPEED; amplifier = 1; }
             default -> { return; }
         }
         PotionEffect current = player.getPotionEffect(type);
@@ -5828,15 +5832,32 @@ public final class ArcadePortManager implements Listener {
         if (active != session) return;
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
-            if (session.evolving.contains(id)) continue;
+            if (session.evolving.contains(id)) {
+                updateEvolutionEggEffect(session, player, now);
+                continue;
+            }
             refreshEvolutionFormPerks(session, player);
+            long pityDeadline = session.evolutionPityUntil.computeIfAbsent(id,
+                    ignored -> now + ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS);
+            if (now >= pityDeadline && session.evolutionAvailable.add(id)) {
+                player.sendMessage(ChatColor.GOLD + "Pity evolution ready! Hold sneak while grounded to evolve.");
+                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.9F, 1.25F);
+            }
             if (!session.evolutionAvailable.contains(id)) {
                 if (player.getExp() != 0.0F) player.setExp(0.0F);
+                if (session.ticks % 20L == 0L) {
+                    long remaining = ArcadePortRules.evolutionPityRemainingMillis(pityDeadline, now);
+                    player.sendActionBar(ChatColor.GOLD + "Pity evolution " + ChatColor.YELLOW
+                            + ArcadePortRules.formatEvolutionPityRemaining(remaining)
+                            + ChatColor.GRAY + " | kills & assists reduce the timer");
+                }
                 continue;
             }
             if (!player.isSneaking()) {
                 cancelEvolutionCharge(session, player);
-                if (now % 2_000L < 50L) player.sendActionBar(ChatColor.GREEN + "Kill an opponent, then hold sneak while grounded to evolve.");
+                if (now % 2_000L < 50L) {
+                    player.sendActionBar(ChatColor.GREEN + "Evolution ready — hold sneak while grounded.");
+                }
                 continue;
             }
             if (player.getLocation().getBlock().isLiquid()) {
@@ -5872,6 +5893,116 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void reduceEvolutionPity(Session session, UUID playerId, long reductionMillis, long now) {
+        long deadline = session.evolutionPityUntil.getOrDefault(playerId,
+                now + ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS);
+        long reduced = ArcadePortRules.reduceEvolutionPityDeadline(deadline, now, reductionMillis);
+        session.evolutionPityUntil.put(playerId, reduced);
+        Player player = session.players.get(playerId);
+        if (reduced <= now && session.evolutionAvailable.add(playerId)) {
+            if (player != null && player.isOnline()) {
+                player.sendMessage(ChatColor.GOLD + "Pity evolution ready! Hold sneak while grounded to evolve.");
+                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.9F, 1.25F);
+            }
+        } else if (player != null && player.isOnline() && !session.evolutionAvailable.contains(playerId)) {
+            player.sendActionBar(ChatColor.GOLD + "Pity evolution "
+                    + ArcadePortRules.formatEvolutionPityRemaining(reduced - now)
+                    + ChatColor.GRAY + " | kill/assist bonus");
+        }
+    }
+
+    private void recordEvolutionDamage(Session session, Player victim, Player attacker, long now) {
+        if (session == null || session.type != ArcadePortGame.EVOLUTION || victim == null || attacker == null) return;
+        UUID victimId = victim.getUniqueId();
+        UUID attackerId = attacker.getUniqueId();
+        if (victimId.equals(attackerId) || !session.players.containsKey(attackerId)) return;
+        session.evolutionDamageContributors.computeIfAbsent(victimId, ignored -> new HashMap<>())
+                .put(attackerId, now);
+    }
+
+    private void recordEvolutionAssists(Session session, UUID victimId, UUID killerId, long now) {
+        Map<UUID, Long> contributors = session.evolutionDamageContributors.remove(victimId);
+        if (contributors == null) return;
+        for (Map.Entry<UUID, Long> contribution : contributors.entrySet()) {
+            UUID contributorId = contribution.getKey();
+            if (contributorId == null || contributorId.equals(victimId) || contributorId.equals(killerId)
+                    || now - contribution.getValue() > ArcadePortRules.EVOLUTION_ASSIST_WINDOW_MILLIS
+                    || !session.players.containsKey(contributorId)) continue;
+            reduceEvolutionPity(session, contributorId,
+                    ArcadePortRules.EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS, now);
+            Player contributor = session.players.get(contributorId);
+            if (contributor != null && contributor.isOnline()) {
+                contributor.sendMessage(ChatColor.GREEN + "Evolution assist! Your pity timer was reduced by 7.5 seconds.");
+            }
+        }
+    }
+
+    private String evolutionEggVariant(UUID playerId) {
+        var cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        java.io.File cosmeticsFolder = cosmeticsPlugin == null
+                ? new java.io.File(plugin.getDataFolder().getParentFile(), "TestplexModernArcade")
+                : cosmeticsPlugin.getDataFolder();
+        java.io.File preferencesFile = new java.io.File(cosmeticsFolder, "player-preferences.yml");
+        if (!preferencesFile.isFile()) return "charged";
+        org.bukkit.configuration.file.YamlConfiguration preferences =
+                org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(preferencesFile);
+        String selected = preferences.getString("players." + playerId
+                + ".games.evolution.cosmetics.metamorphosis.selected", "charged");
+        return switch (selected == null ? "charged" : selected.toLowerCase(java.util.Locale.ROOT)) {
+            case "void", "nature" -> selected.toLowerCase(java.util.Locale.ROOT);
+            default -> "charged";
+        };
+    }
+
+    private void beginEvolutionEggEffect(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        cleanupEvolutionEggEffect(session, id);
+        BlockDisplay display = session.world.spawn(
+                player.getLocation().clone().add(0.0D, 1.15D, 0.0D), BlockDisplay.class);
+        display.setBlock(Material.DRAGON_EGG.createBlockData());
+        display.setInvulnerable(true);
+        display.setPersistent(false);
+        session.entities.add(display);
+        session.evolutionEggDisplays.put(id, display);
+        session.evolutionEggVariants.put(id, evolutionEggVariant(id));
+        session.evolutionEggNextParticleAt.put(id, 0L);
+    }
+
+    private void updateEvolutionEggEffect(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        if (now < session.evolutionEggNextParticleAt.getOrDefault(id, 0L)) return;
+        session.evolutionEggNextParticleAt.put(id, now + 250L);
+        Location centre = player.getLocation().clone().add(0.0D, 1.15D, 0.0D);
+        BlockDisplay display = session.evolutionEggDisplays.get(id);
+        if (display != null && display.isValid()) display.teleport(centre);
+        String variant = session.evolutionEggVariants.getOrDefault(id, "charged");
+        // World.spawnParticle broadcasts to everyone in this isolated game world.
+        switch (variant) {
+            case "void" -> {
+                session.world.spawnParticle(Particle.PORTAL, centre, 18, 0.45D, 0.55D, 0.45D, 0.18D);
+                session.world.spawnParticle(Particle.DRAGON_BREATH, centre, 5, 0.3D, 0.4D, 0.3D, 0.015D);
+            }
+            case "nature" -> {
+                session.world.spawnParticle(Particle.HAPPY_VILLAGER, centre, 8, 0.45D, 0.55D, 0.45D, 0.02D);
+                session.world.spawnParticle(Particle.COMPOSTER, centre, 5, 0.35D, 0.45D, 0.35D, 0.02D);
+            }
+            default -> {
+                session.world.spawnParticle(Particle.END_ROD, centre, 8, 0.4D, 0.55D, 0.4D, 0.04D);
+                session.world.spawnParticle(Particle.ELECTRIC_SPARK, centre, 6, 0.45D, 0.5D, 0.45D, 0.02D);
+            }
+        }
+    }
+
+    private void cleanupEvolutionEggEffect(Session session, UUID playerId) {
+        BlockDisplay display = session.evolutionEggDisplays.remove(playerId);
+        if (display != null) {
+            session.entities.remove(display);
+            if (display.isValid()) display.remove();
+        }
+        session.evolutionEggVariants.remove(playerId);
+        session.evolutionEggNextParticleAt.remove(playerId);
+    }
+
     private void cancelEvolutionCharge(Session session, Player player) {
         UUID id = player.getUniqueId();
         session.evolutionCharge.remove(id);
@@ -5886,8 +6017,10 @@ public final class ArcadePortManager implements Listener {
         if (active != session || !session.alive.contains(id)
                 || !session.evolutionAvailable.remove(id) || !session.evolving.add(id)) return;
         session.evolutionCharge.remove(id);
+        session.evolutionKillsAtAttempt.put(id, session.evolutionLifeKills.getOrDefault(id, 0));
         session.evolutionLifeKills.put(id, 0);
         session.evolutionLockedLocations.put(id, player.getLocation().clone());
+        beginEvolutionEggEffect(session, player);
         player.setExp(0.0F);
         player.setSneaking(false);
         player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
@@ -5904,8 +6037,17 @@ public final class ArcadePortManager implements Listener {
             if (!player.isOnline() || !session.alive.contains(id)) {
                 session.evolving.remove(id);
                 session.evolutionLockedLocations.remove(id);
+                session.evolutionKillsAtAttempt.remove(id);
+                cleanupEvolutionEggEffect(session, id);
                 return;
             }
+            int killsBeforeEvolution = session.evolutionKillsAtAttempt.getOrDefault(id, 0);
+            session.evolutionKillsAtAttempt.remove(id);
+            if (!ArcadePortRules.evolutionOverkillRequirementMet(killsBeforeEvolution)) {
+                session.evolutionOverkillEligible.remove(id);
+            }
+            session.evolutionPityUntil.put(id,
+                    System.currentTimeMillis() + ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS);
             int nextLevel = ArcadePortRules.nextEvolutionLevel(
                     session.evolutionLevels.getOrDefault(id, 0), true);
             session.evolutionLevels.put(id, nextLevel);
@@ -5916,12 +6058,13 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             giveEvolutionKit(session, player);
-            player.sendMessage(ChatColor.GREEN + "You evolved into stage " + (nextLevel + 1) + "/6.");
+            player.sendMessage(ChatColor.GREEN + "You evolved into stage " + (nextLevel + 1) + "/5.");
         }, ArcadePortRules.EVOLUTION_FORM_CHANGE_TICKS);
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (active != session || !session.evolving.remove(id)) return;
             session.evolutionLockedLocations.remove(id);
+            cleanupEvolutionEggEffect(session, id);
             if (!player.isOnline() || !session.alive.contains(id)) return;
             player.setGameMode(GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
@@ -5933,22 +6076,6 @@ public final class ArcadePortManager implements Listener {
             player.getWorld().spawnParticle(Particle.EXPLOSION, player.getLocation().add(0.0D, 1.0D, 0.0D),
                     1, 0.1D, 0.1D, 0.1D, 0.0D);
         }, ArcadePortRules.EVOLUTION_TOTAL_ANIMATION_TICKS);
-    }
-
-    private void updateEvolutionWebs(Session session, long now) {
-        java.util.Iterator<Map.Entry<Block, Long>> iterator = session.evolutionWebs.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<Block, Long> entry = iterator.next();
-            Block block = entry.getKey();
-            if (block == null || block.getType() != Material.COBWEB) {
-                iterator.remove();
-                continue;
-            }
-            if (now >= entry.getValue()) {
-                block.setType(Material.AIR, false);
-                iterator.remove();
-            }
-        }
     }
 
     /** Keep respawning team players on their own archived team spawns. */
@@ -5992,6 +6119,7 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(target.getUniqueId())) return;
         if (session.type == ArcadePortGame.EVOLUTION) {
             if (session.evolving.contains(attacker.getUniqueId()) || session.evolving.contains(target.getUniqueId())) return;
+            recordEvolutionDamage(session, target, attacker, System.currentTimeMillis());
             cancelEvolutionCharge(session, target);
         }
         if (session.type == ArcadePortGame.GLADIATORS) {
@@ -6070,7 +6198,7 @@ public final class ArcadePortManager implements Listener {
                 break;
             }
             case EVOLUTION: {
-                int level = Math.max(0, Math.min(5, session.evolutionLevels.getOrDefault(attacker.getUniqueId(), 0)));
+                int level = Math.max(0, Math.min(4, session.evolutionLevels.getOrDefault(attacker.getUniqueId(), 0)));
                 double damage = ArcadePortRules.evolutionMeleeDamage(level);
                 if (target.getHealth() <= damage) {
                     target.getWorld().playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 1.0F, 0.8F);
@@ -6356,6 +6484,9 @@ public final class ArcadePortManager implements Listener {
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
         }
+        if (announceWinner && session.type == ArcadePortGame.EVOLUTION && winner != null) {
+            recordEvolutionAchievements(session, winner);
+        }
         active = null;
         if (session.tickTask != null) session.tickTask.cancel();
         if (announceWinner && session.type == ArcadePortGame.BACON_BRAWL && winner != null) {
@@ -6419,8 +6550,16 @@ public final class ArcadePortManager implements Listener {
         session.paintballSaveMeLocations.clear();
         session.quiverArrowBounces.clear();
         session.quiverCloakedUntil.clear();
-        for (Block block : session.evolutionWebs.keySet()) if (block.getType() == Material.COBWEB) block.setType(Material.AIR, false);
-        session.evolutionWebs.clear();
+        for (BlockDisplay display : session.evolutionEggDisplays.values()) {
+            if (display != null && display.isValid()) display.remove();
+        }
+        session.evolutionEggDisplays.clear();
+        session.evolutionEggVariants.clear();
+        session.evolutionEggNextParticleAt.clear();
+        session.evolutionDamageContributors.clear();
+        session.evolutionPityUntil.clear();
+        session.evolutionKillsAtAttempt.clear();
+        session.evolutionOverkillEligible.clear();
         session.runnerBlocks.clear();
         cleanupBaconDisguiseNameTags(session);
         if (session.type == ArcadePortGame.BACON_BRAWL) {
@@ -6604,6 +6743,24 @@ public final class ArcadePortManager implements Listener {
                         "Master Bomber — won 30 Bomb Lobbers games.");
             }
         }
+    }
+
+    private void recordEvolutionAchievements(Session session, Player winner) {
+        UUID id = winner.getUniqueId();
+        if (session.evolutionOverkillEligible.contains(id)
+                && ArcadePortRules.isEvolutionWinnerLevel(session.evolutionLevels.getOrDefault(id, 0))) {
+            awardEvolutionAchievement(winner, EvolutionAchievement.OVERKILL.configKey(id),
+                    "Overkill — got 2 kills before each evolution.");
+        }
+    }
+
+    private void awardEvolutionAchievement(Player player, String key, String description) {
+        if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        if (player != null && player.isOnline()) {
+            player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
+        }
+        plugin.saveConfig();
     }
 
     private void awardBombLobbersAchievement(Player player, String key, String description) {
@@ -6988,6 +7145,14 @@ public final class ArcadePortManager implements Listener {
                         (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
                         lore, "noop", null, null));
             }
+        } else if ("evolution".equals(gameId)) {
+            EvolutionAchievement achievement = EvolutionAchievement.OVERKILL;
+            boolean unlocked = plugin.getConfig().getBoolean(achievement.configKey(targetId), false);
+            List<String> lore = List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
+                    unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked");
+            inventory.setItem(13, statsItem(unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                    (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
+                    lore, "noop", null, null));
         } else {
             int[] slots = {29, 30, 31, 32};
             int[] values = {played, wins, score, knockouts};
@@ -7093,6 +7258,10 @@ public final class ArcadePortManager implements Listener {
                     + "/" + BombLobbersAchievement.values().length);
             lore.add(ChatColor.GRAY + "TNT thrown: " + plugin.getConfig().getInt(path + "thrown", 0));
             lore.add(ChatColor.GRAY + "Direct hits: " + plugin.getConfig().getInt(path + "direct-hits", 0));
+        } else if ("evolution".equals(gameId)) {
+            long unlocked = plugin.getConfig().getBoolean(
+                    EvolutionAchievement.OVERKILL.configKey(targetId), false) ? 1L : 0L;
+            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/1");
         }
         if (!compact) lore.add(ChatColor.DARK_GRAY + "Stats recorded by the isolated test server.");
         else lore.add(ChatColor.RESET + "Click for more details!");
@@ -8384,7 +8553,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.EVOLUTION && item == Material.TNT
-                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 3
+                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 2
                 && event.getAction().isLeftClick()) {
             event.setCancelled(true);
             consumeHeld(player);
@@ -8413,28 +8582,14 @@ public final class ArcadePortManager implements Listener {
             fireball.setVelocity(player.getLocation().getDirection().multiply(0.75D));
             session.entities.add(fireball);
         } else if (session.type == ArcadePortGame.EVOLUTION
-                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 2 && item == Material.COBWEB) {
-            event.setCancelled(true);
-            Location placement = player.getLocation().clone().add(player.getLocation().getDirection().normalize().multiply(1.5D));
-            placement.setY(64.0D);
-            Block web = placement.getBlock();
-            if (web.getType().isAir()) {
-                web.setType(Material.COBWEB, false);
-                session.evolutionWebs.put(web, System.currentTimeMillis() + 3_000L);
-                consumeHeld(player);
-                player.sendMessage(ChatColor.WHITE + "Spider web placed!");
-            } else {
-                player.sendMessage(ChatColor.YELLOW + "There is no space to place a web.");
-            }
-        } else if (session.type == ArcadePortGame.EVOLUTION
-                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 4 && item == Material.SLIME_BALL) {
+                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 3 && item == Material.SLIME_BALL) {
             event.setCancelled(true);
             consumeHeld(player);
             player.setVelocity(player.getLocation().getDirection().multiply(1.15D).setY(0.85D));
             player.getWorld().spawnParticle(Particle.ITEM_SLIME, player.getLocation(), 12, 0.35D, 0.25D, 0.35D, 0.08D);
             player.playSound(player.getLocation(), Sound.ENTITY_SLIME_JUMP, 1.0F, 1.25F);
         } else if (session.type == ArcadePortGame.EVOLUTION
-                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 5 && item == Material.FEATHER) {
+                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 4 && item == Material.FEATHER) {
             event.setCancelled(true);
             if (inventoryCount(player, Material.EGG) <= 0) {
                 player.sendMessage(ChatColor.YELLOW + "You need an egg to use Egg Launch.");
@@ -9789,7 +9944,7 @@ public final class ArcadePortManager implements Listener {
         String bombPowerupType = session.bombPowerTypes.getOrDefault(bombId, "normal");
         boolean bombLobbersBlast = session.type == ArcadePortGame.BOMB_LOBBERS;
         boolean evolutionBlast = session.type == ArcadePortGame.EVOLUTION
-                && ownerId != null && session.evolutionLevels.getOrDefault(ownerId, 0) == 3;
+                && ownerId != null && session.evolutionLevels.getOrDefault(ownerId, 0) == 2;
         Player owner = ownerId == null ? null : session.players.get(ownerId);
         if (bombLobbersBlast && ArcadePortRules.shouldCancelBombLobbersExplosion(
                 owner != null && owner.isOnline(),
@@ -9994,7 +10149,13 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> evolving = new HashSet<>();
         final Map<UUID, Location> evolutionLockedLocations = new HashMap<>();
         final Map<UUID, Long> evolutionWaterMessageAt = new HashMap<>();
-        final Map<Block, Long> evolutionWebs = new HashMap<>();
+        final Map<UUID, Long> evolutionPityUntil = new HashMap<>();
+        final Map<UUID, Map<UUID, Long>> evolutionDamageContributors = new HashMap<>();
+        final Map<UUID, Integer> evolutionKillsAtAttempt = new HashMap<>();
+        final Set<UUID> evolutionOverkillEligible = new HashSet<>();
+        final Map<UUID, BlockDisplay> evolutionEggDisplays = new HashMap<>();
+        final Map<UUID, String> evolutionEggVariants = new HashMap<>();
+        final Map<UUID, Long> evolutionEggNextParticleAt = new HashMap<>();
         final Map<UUID, Integer> gladiatorPairs = new HashMap<>();
         final Set<Integer> gladiatorResolvedPairs = new HashSet<>();
         int gladiatorRound = -1;
