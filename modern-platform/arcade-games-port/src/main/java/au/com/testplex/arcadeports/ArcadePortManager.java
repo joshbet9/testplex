@@ -5181,7 +5181,10 @@ public final class ArcadePortManager implements Listener {
             }
             int score = session.scores.getOrDefault(id, 0);
             String specific = gameStatusText(session, p);
-            String timeText = session.endsAt > 0L ? seconds + "s" : "survive";
+            String timeText = session.type == ArcadePortGame.DRAGON_ESCAPE
+                    ? String.format(java.util.Locale.ROOT, "%.1fs",
+                            Math.max(0L, now - session.startedAt) / 1_000.0D)
+                    : session.endsAt > 0L ? seconds + "s" : "survive";
             if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
                 String pbDelta = dragonEscapePbDeltaText(session, p, now);
                 if (!pbDelta.isEmpty()) specific += (specific.isEmpty() ? "" : ChatColor.DARK_GRAY + " | ") + pbDelta;
