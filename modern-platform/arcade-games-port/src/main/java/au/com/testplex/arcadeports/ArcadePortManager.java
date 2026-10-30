@@ -3510,7 +3510,21 @@ public final class ArcadePortManager implements Listener {
                 break;
             }
             case "pig": {
-                long duration = ArcadePortRules.baconPigInvincibilityDurationMillis(charge);
+                long duration = ArcadePortRules.baconAbilityDurationMillis(charge);
+                session.baconCloakUntil.put(id, now + duration);
+                LivingEntity avatar = baconPlayerAvatar(session, id);
+                if (avatar != null) avatar.setInvisible(true);
+                player.getWorld().spawnParticle(Particle.SMOKE,
+                        player.getLocation().add(0.0D, 1.0D, 0.0D),
+                        Math.max(8, charge / 4), 0.35D, 0.5D, 0.35D, 0.02D);
+                player.getWorld().playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.8F, 1.6F);
+                player.sendMessage(ChatColor.GREEN + "Pig Cloak active for "
+                        + String.format(java.util.Locale.ROOT, "%.1f", duration / 1000.0D)
+                        + " seconds. Landing a hit or running out of time reveals you.");
+                break;
+            }
+            case "brutus-bacon": {
+                long duration = ArcadePortRules.baconAbilityDurationMillis(charge);
                 session.baconBrutusUntil.put(id, now + duration);
                 int ticks = (int) Math.max(1L, (duration + 49L) / 50L);
                 player.addPotionEffect(new PotionEffect(
@@ -3521,8 +3535,9 @@ public final class ArcadePortManager implements Listener {
                         player.getLocation().add(0.0D, 1.0D, 0.0D),
                         Math.max(8, charge / 3), 0.45D, 0.65D, 0.45D, 0.02D);
                 player.getWorld().playSound(player.getLocation(), Sound.ITEM_TOTEM_USE, 0.9F, 1.3F);
-                player.sendMessage(ChatColor.GREEN + "Invincibility active for "
-                        + String.format(java.util.Locale.ROOT, "%.1f", duration / 1000.0D) + " seconds.");
+                player.sendMessage(ChatColor.GREEN + "Brutus Guard active for "
+                        + String.format(java.util.Locale.ROOT, "%.1f", duration / 1000.0D)
+                        + " seconds. Frontal hits are blocked; a backstab breaks the guard.");
                 break;
             }
             default: {
@@ -4971,6 +4986,7 @@ public final class ArcadePortManager implements Listener {
             session.baconSlams.remove(playerId);
             session.baconSlamPowerPercent.remove(playerId);
             session.baconBrutusUntil.remove(playerId);
+            session.baconCloakUntil.remove(playerId);
             if (!session.alive.remove(playerId)) return;
             if (killer != null && session.scores.containsKey(killer.getUniqueId())) {
                 int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
@@ -5813,6 +5829,7 @@ public final class ArcadePortManager implements Listener {
         session.baconMeters.clear();
         session.baconAbilitiesUsed.clear();
         session.baconBrutusUntil.clear();
+        session.baconCloakUntil.clear();
         session.baconSlamPowerPercent.clear();
         session.baconBodySlamKills.clear();
         session.baconThreeForOneAwarded.clear();
@@ -8885,6 +8902,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BOMB_LOBBERS) updateBombLobbersMvpEligibility(session);
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             session.baconBrutusUntil.remove(id);
+            session.baconCloakUntil.remove(id);
             removeBaconBabyPig(session, id);
             removeBaconPlayerPig(session, id);
             restoreBaconPlayerVisibilityForOwner(session, id, player);
@@ -8969,6 +8987,7 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> baconThreeForOneAwarded = new HashSet<>();
         final Map<UUID, Long> baconSlams = new HashMap<>();
         final Map<UUID, Long> baconBrutusUntil = new HashMap<>();
+        final Map<UUID, Long> baconCloakUntil = new HashMap<>();
         final Map<UUID, Long> baconLastSwingAt = new HashMap<>();
         final Map<UUID, Long> baconHitFeedbackUntil = new HashMap<>();
         final Map<UUID, String> baconLastHitSource = new HashMap<>();
