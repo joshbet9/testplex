@@ -5,12 +5,14 @@ import java.util.Locale;
 
 public enum ArcadePortGame {
     BACON_BRAWL("bacon-brawl", "Bacon Brawl", Material.IRON_BLOCK),
+    CASTLE_ASSAULT("castle-assault", "Castle Assault", Material.COBBLESTONE),
     BOMB_LOBBERS("bomb-lobbers", "Bomb Lobbers", Material.SMOOTH_STONE),
     DEATH_TAG("death-tag", "Death Tag", Material.MOSS_BLOCK),
     DRAGON_ESCAPE("dragon-escape", "Dragon Escape", Material.STONE_BRICKS),
     DRAGONS("dragons", "Dragons", Material.STONE_BRICKS),
     EVOLUTION("evolution", "Evolution", Material.GRASS_BLOCK),
     GLADIATORS("gladiators", "Gladiators", Material.RED_SANDSTONE),
+    HEROES_OF_GWEN("heroes-of-gwen", "Heroes of Gwen", Material.PRISMARINE_BRICKS),
     MICRO_BATTLES("micro-battles", "Micro Battles", Material.LIGHT_BLUE_STAINED_GLASS),
     ONE_IN_THE_QUIVER("one-in-the-quiver", "One in the Quiver", Material.STONE_BRICKS),
     PAINTBALL("paintball", "Paintball", Material.LIME_TERRACOTTA),
