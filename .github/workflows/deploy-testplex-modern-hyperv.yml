@@ -151,7 +151,7 @@ jobs:
           source_dir="$RUNNER_TEMP/testplex-modern-artifact"
           stage_dir="$RUNNER_TEMP/testplex-modern-verified"
           mkdir -p "$stage_dir"
-          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar;
+          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
             matches="$(find "$source_dir" -type f -name "$jar" | wc -l | tr -d ' ')"
             [[ "$matches" == "1" ]] || { echo "Expected exactly one $jar in the selected artifact; got $matches." >&2; exit 1; }
             source_jar="$(find "$source_dir" -type f -name "$jar" -print -quit)"
