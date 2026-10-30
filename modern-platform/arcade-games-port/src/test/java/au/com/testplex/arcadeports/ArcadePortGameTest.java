@@ -209,6 +209,16 @@ class ArcadePortGameTest {
         assertEquals(3_000L, ArcadePortRules.QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
     }
 
+    @Test void quiverOnlyAllowsLegacyStainedGlassAndPanesToBreak() {
+        assertTrue(ArcadePortRules.isQuiverBreakableGlassMaterial("WHITE_STAINED_GLASS"));
+        assertTrue(ArcadePortRules.isQuiverBreakableGlassMaterial("RED_STAINED_GLASS_PANE"));
+        assertTrue(ArcadePortRules.isQuiverBreakableGlassMaterial("BLUE_STAINED_GLASS"));
+        assertFalse(ArcadePortRules.isQuiverBreakableGlassMaterial("GLASS"));
+        assertFalse(ArcadePortRules.isQuiverBreakableGlassMaterial("GLASS_PANE"));
+        assertFalse(ArcadePortRules.isQuiverBreakableGlassMaterial("STONE"));
+        assertFalse(ArcadePortRules.isQuiverBreakableGlassMaterial(null));
+    }
+
     @Test void quiverOnlyFinishesLastSurvivorAfterRespawnsHaveCleared() {
         assertTrue(ArcadePortRules.shouldFinishQuiverLastPlayer(1, 0, 2));
         assertFalse(ArcadePortRules.shouldFinishQuiverLastPlayer(1, 1, 2));
