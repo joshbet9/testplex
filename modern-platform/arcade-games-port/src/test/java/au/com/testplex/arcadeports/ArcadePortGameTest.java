@@ -1658,12 +1658,16 @@ class ArcadePortGameTest {
         assertEquals(6.0D, ArcadePortRules.deathTagRunnerDamage("basher", false));
         assertEquals(6.0D, ArcadePortRules.deathTagRunnerDamage("traitor", false));
         assertEquals(4.0D, ArcadePortRules.deathTagRunnerDamage("archer", true));
-        assertEquals(0.0D, ArcadePortRules.deathTagRunnerDamage("null", false));
+        assertEquals(1.0D, ArcadePortRules.deathTagRunnerDamage("null", false));
+        assertEquals(0.0D, ArcadePortRules.deathTagRunnerDamage("null", true));
         assertEquals(0.0D, ArcadePortRules.deathTagRunnerDamage("basher", true));
         assertEquals(4.0D, ArcadePortRules.deathTagDamageAfterIronSkin(6.0D, false));
         assertEquals(2.0D, ArcadePortRules.deathTagDamageAfterIronSkin(6.0D, true));
         assertEquals(0.0D, ArcadePortRules.deathTagDamageAfterIronSkin(4.0D, true));
         assertEquals(1.0D, ArcadePortRules.deathTagDamageAfterIronSkin(1.0D, true));
+        assertEquals(4.0D, ArcadePortRules.deathTagEnvironmentalDamageAfterIronSkin(6.0D, false, false));
+        assertEquals(2.0D, ArcadePortRules.deathTagEnvironmentalDamageAfterIronSkin(6.0D, true, false));
+        assertEquals(6.0D, ArcadePortRules.deathTagEnvironmentalDamageAfterIronSkin(6.0D, false, true));
         assertEquals(0.5D, ArcadePortRules.deathTagKnockbackMultiplier(true));
         assertEquals(1.0D, ArcadePortRules.deathTagKnockbackMultiplier(false));
     }

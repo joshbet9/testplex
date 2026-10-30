@@ -52,3 +52,8 @@ Dragon Escape has a source-comparison checklist for the PB ghost and live race t
 6. Repeat on a tight switchback map and with Warper to verify checkpoint progress remains monotonic without false shortcut eliminations; separately confirm Douglas's chase and Digger/Disruptor/Leap interactions do not corrupt split timing.
 
 The estimated time gaps use course distance at a fixed display pace; they are presentation estimates, not authoritative race timing. Build/unit checks do not replace live acceptance on the isolated Paper 26.3 server.
+
+
+#### Death Tag parity continuation
+
+The modern Death Tag port now resolves environmental damage with the legacy Iron Skin exclusions, gives the Null runner kit its perkless unarmed hit, and applies default melee knockback where the source perks do not suppress it. Every Archer arrow now follows the source 300% knockback hit path, including the final arrow in the inventory. Chasers use native Skeleton / Wither Skeleton visual proxies while the real player remains the combat entity; this is a server-side visual approximation, not a packet-level player disguise. Living players on both sides receive the source-style nearest-opponent Tracking Compass with distance and height feedback.

@@ -1582,8 +1582,8 @@ public final class ArcadePortRules {
 
     public static double deathTagRunnerDamage(String runnerKit, boolean projectile) {
         String kit = runnerKit == null ? "basher" : runnerKit.toLowerCase(java.util.Locale.ROOT);
-        if ("null".equals(kit)) return 0.0D;
         if (projectile) return "archer".equals(kit) ? 4.0D : 0.0D;
+        if ("null".equals(kit)) return 1.0D; // NullKit has no weapon or perks, but an unarmed hit still lands.
         return "basher".equals(kit) || "traitor".equals(kit) ? 6.0D : 0.0D;
     }
 
@@ -1591,6 +1591,12 @@ public final class ArcadePortRules {
     public static double deathTagDamageAfterIronSkin(double damage, boolean alphaChaser) {
         if (damage <= 1.0D) return damage;
         return Math.max(0.0D, damage - (alphaChaser ? 4.0D : 2.0D));
+    }
+
+    /** The legacy Iron Skin perk does not reduce fire-tick or one-point-and-lower damage. */
+    public static double deathTagEnvironmentalDamageAfterIronSkin(
+            double damage, boolean alphaChaser, boolean fireTick) {
+        return fireTick ? damage : deathTagDamageAfterIronSkin(damage, alphaChaser);
     }
 
     public static double deathTagKnockbackMultiplier(boolean alphaChaser) {
