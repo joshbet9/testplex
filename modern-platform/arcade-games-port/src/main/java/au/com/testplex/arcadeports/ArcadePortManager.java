@@ -515,6 +515,14 @@ public final class ArcadePortManager implements Listener {
         if (session != null && session.type == ArcadePortGame.SKY_WARS
                 && session.players.containsKey(player.getUniqueId())
                 && session.alive.contains(player.getUniqueId())) {
+            String previousKit = session.skyWarsKits.getOrDefault(player.getUniqueId(), "ice");
+            if ("metal".equals(previousKit) && !"metal".equals(kit)) {
+                PlayerSnapshot snapshot = session.snapshots.get(player.getUniqueId());
+                var maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
+                double baseHealth = snapshot == null ? 20.0D : snapshot.maxHealthBase;
+                if (maxHealth != null) maxHealth.setBaseValue(baseHealth);
+                if (player.getHealth() > baseHealth) player.setHealth(baseHealth);
+            }
             session.skyWarsKits.put(player.getUniqueId(), kit);
             session.skyWarsKitReadyAt.remove(player.getUniqueId());
             session.skyWarsIceBridgePaths.remove(player.getUniqueId());
@@ -4427,7 +4435,7 @@ public final class ArcadePortManager implements Listener {
             target.setFireTicks(100);
             target.damage(6.0D, player);
         }
-        for (double radius = 0.5D; radius <= 6.0D; radius += 0.5D) {
+        for (double radius = 0.0D; radius < 6.0D; radius += 0.5D) {
             for (int angle = 0; angle < 40; angle++) {
                 double theta = Math.PI * 2.0D * angle / 40.0D;
                 Location at = center.clone().add(Math.cos(theta) * radius, 0.0D,
@@ -4690,10 +4698,15 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void dropSkyWarsInventory(Player player) {
+        dropSkyWarsInventory(player, false);
+    }
+
+    private void dropSkyWarsInventory(Player player, boolean includeProtectedItems) {
         Location location = player.getLocation();
         for (ItemStack item : player.getInventory().getContents()) {
-            if (item != null && !item.getType().isAir() && !isSkyWarsTrackingCompass(item)
-                    && !isSkyWarsKitItem(active, player.getUniqueId(), item)) {
+            if (item != null && !item.getType().isAir()
+                    && (includeProtectedItems || (!isSkyWarsTrackingCompass(item)
+                        && !isSkyWarsKitItem(active, player.getUniqueId(), item)))) {
                 location.getWorld().dropItemNaturally(location, item.clone());
             }
         }
@@ -13528,7 +13541,7 @@ public final class ArcadePortManager implements Listener {
         boolean wasAlive = session.alive.remove(id);
         if (session.type == ArcadePortGame.SKY_WARS && wasAlive) {
             // Source SoloSkywars enables QuitDropItems as well as DeathDropItems.
-            dropSkyWarsInventory(player);
+            dropSkyWarsInventory(player, true);
         }
         if (session.type == ArcadePortGame.DRAGONS && wasAlive) {
             session.dragonEliminationOrder.add(id);
