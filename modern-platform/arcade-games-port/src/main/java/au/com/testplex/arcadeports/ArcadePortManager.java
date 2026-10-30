@@ -130,7 +130,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Mechanics-first modern prototypes for the 14 remaining Arcade games.
+ * Mechanics-first modern prototypes for the 15 remaining Arcade games.
  * Each game gets its own persistent test world and distinct baseline loop.
  * These implementations are deliberately marked in progress until parity and
  * live gameplay acceptance are done.
