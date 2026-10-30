@@ -21,6 +21,13 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 
 Each game gets its own separate modern test world, so arena generation/destruction does not use the live 1.8 Testplex world. Original Reborn map archives are embedded for Bacon Brawl, Bomb Lobbers, Death Tag, Dragon Escape, Dragons, Gladiators, Micro Battles, One in the Quiver, Paintball, Runner, Sheep Quest, Spleef and Turf Wars; these load into separate source-world folders and read WorldConfig.dat spawn groups and map bounds. Evolution remains generated because an Evolution map archive is not present in the source map catalogue.
 
+## Draw My Thing and Master Builders
+
+- **Draw My Thing:** every queued player receives one shuffled drawing turn on the bundled original Draw My Thing Stadium map. Lobbies up to 10 keep 30-second turns. Above 10 players, the turn duration is calculated from the five-minute game budget after reserving the existing three-second gaps between turns; hint reveal speed follows the shortened turn. The final drawer finishes without an unnecessary trailing intermission. Each guesser still has up to 10 guesses per turn.
+- **Master Builders:** up to 16 players receive separate plots in a generated 4×4 arena. The three-minute creative phase teleports each builder to their own plot and confines block placement/breaking to that plot. Building locks at the phase deadline; builds are then reviewed for eight seconds each with a 1–6 rating, with self-voting disabled. The arena reset clears the full allowed build height before the next match.
+
+Both remain mechanics-in-progress until source-parity review and live multi-client acceptance have passed. CI rule tests validate the timing budget and plot allocation; they do not certify in-game gameplay.
+
 ## Commands
 
 - `/gamepanel` → choose a supported game → **Start / Test**. The coordinator calls `/arcadeport play <game-id>`.
