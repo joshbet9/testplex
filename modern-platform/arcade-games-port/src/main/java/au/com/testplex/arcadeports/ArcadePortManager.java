@@ -1661,11 +1661,18 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void openGladiatorHotbarMenu(Player player) {
+        openGladiatorHotbarMenu(player, -1);
+    }
+
+    private void openGladiatorHotbarMenu(Player player, int selectedHotbarSlot) {
         GladiatorMenuHolder holder = new GladiatorMenuHolder(GladiatorMenuType.HOTBAR);
+        holder.selectedHotbarSlot = selectedHotbarSlot;
         Inventory inventory = Bukkit.createInventory(holder, 27, "Gladiators — Hotbar Editor");
         holder.inventory = inventory;
         inventory.setItem(4, gladiatorMenuItem(Material.WRITABLE_BOOK, "Hotbar Editor",
-                "Click one hotbar slot, then another to swap them.", null, null));
+                selectedHotbarSlot >= 0
+                        ? "Slot " + (selectedHotbarSlot + 1) + " selected. Choose another slot to swap."
+                        : "Click one hotbar slot, then another to swap them.", null, null));
         for (int i = 0; i < 9; i++) {
             ItemStack current = player.getInventory().getItem(i);
             ItemStack display = current == null || current.getType().isAir()
@@ -1673,10 +1680,11 @@ public final class ArcadePortManager implements Listener {
             ItemMeta meta = display.getItemMeta();
             if (meta != null) {
                 String oldName = meta.hasDisplayName() ? meta.getDisplayName() : display.getType().name();
-                meta.setDisplayName(ChatColor.YELLOW + "Slot " + (i + 1) + ": " + ChatColor.WHITE + oldName);
+                boolean selected = holder.selectedHotbarSlot == i;
+                meta.setDisplayName((selected ? ChatColor.GREEN + "✓ " : ChatColor.YELLOW)
+                        + "Slot " + (i + 1) + ": " + ChatColor.WHITE + oldName);
                 List<String> lore = new ArrayList<>();
-                lore.add(ChatColor.GRAY + (holder.selectedHotbarSlot == i
-                        ? "Selected — choose another slot." : "Click to select this slot."));
+                lore.add(ChatColor.GRAY + (selected ? "Selected — choose another slot." : "Click to select this slot."));
                 lore.add(ChatColor.DARK_GRAY + "Hotbar slot " + (i + 1));
                 meta.setLore(lore);
                 display.setItemMeta(meta);
@@ -9611,6 +9619,7 @@ public final class ArcadePortManager implements Listener {
                 if (selectedSlot < 0 || selectedSlot > 8) return;
                 if (holder.selectedHotbarSlot < 0) {
                     holder.selectedHotbarSlot = selectedSlot;
+                    openGladiatorHotbarMenu(player, selectedSlot);
                     player.sendActionBar(ChatColor.YELLOW + "Selected slot " + (selectedSlot + 1)
                             + " — choose the slot to swap with.");
                     return;
