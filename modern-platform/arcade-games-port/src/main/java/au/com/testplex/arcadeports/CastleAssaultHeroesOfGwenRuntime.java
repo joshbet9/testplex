@@ -82,11 +82,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private static final long MOBA_PASSIVE_GOLD_INTERVAL = 5_000L;
     private static final long MOBA_TOWER_UPDATE_INTERVAL = 1_000L;
     private static final long MOBA_CAPTURE_UPDATE_INTERVAL = 1_000L;
-    private static final long MOBA_WITHER_EARTHQUAKE_INTERVAL = 4_000L;
-    private static final double MOBA_WITHER_TARGET_SPEED = 4.0D;
-    private static final double MOBA_WITHER_HOME_SPEED = 6.0D;
-    private static final double MOBA_WITHER_EARTHQUAKE_RADIUS = 8.0D;
-    private static final double MOBA_WITHER_EARTHQUAKE_DAMAGE = 4.0D;
     private static final double MOBA_TOWER_RANGE_SQUARED = 100.0D;
     private static final double MOBA_CAPTURE_POINT_RANGE_SQUARED = 25.0D;
     private static final double MOBA_TOWER_DAMAGE = 3.0D;
@@ -339,7 +334,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String boundaryMarker = team == 0 ? "ORANGE" : "LIGHT_BLUE";
         List<Location> boundary = map.dataLocations(boundaryMarker).stream().map(Location::clone).toList();
         witherBoundaries.put(team, boundary);
-        witherNextEarthquakeAt.put(team, System.currentTimeMillis() + MOBA_WITHER_EARTHQUAKE_INTERVAL);
+        witherNextEarthquakeAt.put(team, System.currentTimeMillis() + ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS);
     }
 
     private void updateMobaWithers(long now) {
@@ -361,12 +356,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
             Location goal = target == null ? home : target.getLocation();
             moveWitherDirectly(wither, goal, target == null
-                    ? MOBA_WITHER_HOME_SPEED : MOBA_WITHER_TARGET_SPEED);
+                    ? ArcadePortRules.HEROES_OF_GWEN_WITHER_HOME_SPEED : ArcadePortRules.HEROES_OF_GWEN_WITHER_TARGET_SPEED);
             if (target != null) {
                 long nextAttack = witherNextEarthquakeAt.getOrDefault(team, now);
                 if (now >= nextAttack) {
                     earthquakeWither(team, wither);
-                    witherNextEarthquakeAt.put(team, now + MOBA_WITHER_EARTHQUAKE_INTERVAL);
+                    witherNextEarthquakeAt.put(team, now + ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS);
                 }
             }
         }
@@ -401,22 +396,21 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Vector direction = goal.toVector().subtract(current.toVector());
         if (direction.lengthSquared() < 4.0D) return;
         current.setDirection(direction);
-        current.add(direction.normalize().multiply(sourceSpeed / 20.0D));
+        current.add(direction.normalize().multiply(ArcadePortRules.heroesOfGwenWitherStepPerTick(sourceSpeed)));
         wither.teleport(current);
         wither.setVelocity(new Vector());
     }
 
     private void earthquakeWither(int team, Wither wither) {
         Location center = wither.getLocation();
-        for (Entity entity : world.getNearbyEntities(center, MOBA_WITHER_EARTHQUAKE_RADIUS,
-                MOBA_WITHER_EARTHQUAKE_RADIUS, MOBA_WITHER_EARTHQUAKE_RADIUS)) {
+        for (Entity entity : world.getNearbyEntities(center, ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS,
+                ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS, ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS)) {
             if (!(entity instanceof Player player) || !activePlayers.contains(player.getUniqueId())
                     || teams.getOrDefault(player.getUniqueId(), -1) == team) continue;
             double distance = Math.min(center.distance(player.getLocation()),
                     center.distance(player.getEyeLocation()));
-            if (distance >= MOBA_WITHER_EARTHQUAKE_RADIUS) continue;
-            double proximity = 1.0D - distance / MOBA_WITHER_EARTHQUAKE_RADIUS;
-            double damage = MOBA_WITHER_EARTHQUAKE_DAMAGE * (proximity + 0.5D);
+            if (distance >= ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS) continue;
+            double damage = ArcadePortRules.heroesOfGwenWitherEarthquakeDamage(distance);
             if (player.getHealth() <= damage) {
                 hooks.eliminate(player, null, "was struck by the enemy Wither's Earthquake");
             } else {
@@ -428,7 +422,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
         }
 
-        int radius = (int) MOBA_WITHER_EARTHQUAKE_RADIUS;
+        int radius = (int) ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS;
         int minY = Math.max(world.getMinHeight(), center.getBlockY() - radius);
         int maxY = Math.min(world.getMaxHeight() - 1, center.getBlockY() + radius);
         for (int x = center.getBlockX() - radius; x <= center.getBlockX() + radius; x++) {
