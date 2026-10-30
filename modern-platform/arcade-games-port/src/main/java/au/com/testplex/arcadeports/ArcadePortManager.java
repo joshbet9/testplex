@@ -1930,9 +1930,11 @@ public final class ArcadePortManager implements Listener {
     private void progressGladiators(Session session) {
         if (active != session || session.gladiatorVotingEndsAt > 0L) return;
 
-        if (session.gladiatorWinnerQueue.size() >= 2) {
-            if (!hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_WINNERS)
-                    && session.gladiatorWinnerBracketStarted) {
+        // Advance the winners' bracket only when every duel in its current stage is resolved.
+        // The loser's bracket is deliberately independent and continues pairing players in parallel.
+        if (!hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_WINNERS)
+                && session.gladiatorWinnerQueue.size() >= 2) {
+            if (session.gladiatorWinnerBracketStarted) {
                 session.gladiatorRound = ArcadePortRules.gladiatorsTierForRound(session.gladiatorRound + 1);
                 session.gladiatorWinnerArenaCursor = 0;
             }
@@ -1945,6 +1947,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
+        // Loser matches do not wait for winners' bracket matches to finish.
         while (session.gladiatorLoserQueue.size() >= 2) {
             UUID first = session.gladiatorLoserQueue.remove(0);
             UUID second = session.gladiatorLoserQueue.remove(0);
@@ -1960,6 +1963,12 @@ public final class ArcadePortManager implements Listener {
             announce(session, ChatColor.GOLD + "GRAND FINAL! " + ChatColor.YELLOW
                     + "The winners' champion faces the last player from the loser's bracket.");
             startGladiatorMatch(session, undefeated, challenger, GLADIATOR_BRACKET_FINAL);
+            return;
+        }
+        if (session.gladiatorWinnerQueue.size() == 1 && session.gladiatorLoserQueue.isEmpty()
+                && !hasOpenGladiatorMatches(session, -1)) {
+            Player winner = session.players.get(session.gladiatorWinnerQueue.remove(0));
+            if (winner != null && winner.isOnline()) finish(session, winner, true);
             return;
         }
         if (session.alive.size() <= 1) {
@@ -6281,6 +6290,45 @@ public final class ArcadePortManager implements Listener {
         checkRoundEnd(session);
     }
 
+    private void applyGladiatorDamage(Session session, Player attacker, Player target,
+            double damage, boolean projectile) {
+        if (active != session || attacker.equals(target) || !Double.isFinite(damage) || damage <= 0.0D) return;
+        UUID attackerId = attacker.getUniqueId();
+        UUID targetId = target.getUniqueId();
+        Integer attackerPair = session.gladiatorPairs.get(attackerId);
+        Integer targetPair = session.gladiatorPairs.get(targetId);
+        long startsAt = attackerPair == null ? Long.MAX_VALUE
+                : session.gladiatorFightStartsAtByPair.getOrDefault(attackerPair, Long.MAX_VALUE);
+        if (!ArcadePortRules.canGladiatorsFight(System.currentTimeMillis(), startsAt,
+                attackerPair == null ? -1 : attackerPair,
+                targetPair == null ? -2 : targetPair,
+                attackerPair != null && session.gladiatorResolvedPairs.contains(attackerPair))) return;
+        if (target.getNoDamageTicks() > 0) return;
+        target.setNoDamageTicks(projectile ? 8 : 10);
+        session.scores.merge(attackerId, 0, Integer::sum);
+        if (target.getHealth() <= damage) {
+            target.getWorld().playSound(target.getLocation(),
+                    projectile ? Sound.ENTITY_ARROW_HIT_PLAYER : Sound.ENTITY_PLAYER_ATTACK_STRONG,
+                    0.9F, 0.9F);
+            eliminate(session, target, attacker, "was defeated by " + attacker.getName());
+            return;
+        }
+        target.setHealth(target.getHealth() - damage);
+        Vector push = target.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0.0D);
+        if (projectile) {
+            Vector direction = attacker.getLocation().toVector().subtract(target.getLocation().toVector()).setY(0.0D);
+            if (direction.lengthSquared() > 0.001D) {
+                target.setVelocity(target.getVelocity().add(direction.normalize().multiply(0.18D)));
+            }
+        } else if (push.lengthSquared() > 0.001D) {
+            target.setVelocity(target.getVelocity().add(push.normalize().multiply(0.32D).setY(0.12D)));
+        }
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
+        target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                target.getLocation().clone().add(0.0D, 1.0D, 0.0D), 5,
+                0.25D, 0.35D, 0.25D, 0.04D);
+    }
+
     private void handleGladiatorElimination(Session session, Player victim, Player killer, String reason) {
         UUID victimId = victim.getUniqueId();
         Integer pair = session.gladiatorPairs.get(victimId);
@@ -6842,6 +6890,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void hitProjectile(Session session, Projectile projectile, Player shooter, Player target) {
+        if (session.type == ArcadePortGame.GLADIATORS) {
+            // Native projectile damage is handled once in onDamage so armor and protection
+            // reductions are preserved; the impact callback must not apply a second hit.
+            return;
+        }
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             if (session.baconHandledProjectiles.remove(projectile.getUniqueId())) return;
             handleBaconBrawlHit(session, shooter, target, "projectile hit",
@@ -8507,6 +8560,21 @@ public final class ArcadePortManager implements Listener {
             if (damage > 0.0D) {
                 if (dragonPlayer.getHealth() <= damage) eliminate(session, dragonPlayer, null, "fell");
                 else dragonPlayer.setHealth(dragonPlayer.getHealth() - damage);
+            }
+            return;
+        }
+        if (session.type == ArcadePortGame.GLADIATORS
+                && event.getEntity() instanceof Player gladiatorTarget
+                && session.players.containsKey(gladiatorTarget.getUniqueId())
+                && event instanceof EntityDamageByEntityEvent gladiatorDamage) {
+            Entity damager = gladiatorDamage.getDamager();
+            Player attacker = damager instanceof Player direct ? direct
+                    : damager instanceof Projectile projectile
+                        && projectile.getShooter() instanceof Player shooter ? shooter : null;
+            if (attacker != null && session.alive.contains(attacker.getUniqueId())
+                    && session.alive.contains(gladiatorTarget.getUniqueId())) {
+                event.setCancelled(true);
+                applyGladiatorDamage(session, attacker, gladiatorTarget, event.getFinalDamage(), damager instanceof Projectile);
             }
             return;
         }
