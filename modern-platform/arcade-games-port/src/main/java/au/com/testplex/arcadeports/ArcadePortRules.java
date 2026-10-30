@@ -25,6 +25,8 @@ public final class ArcadePortRules {
 
     public static final long CASTLE_ASSAULT_ARCHER_REFILL_MILLIS = 6_000L;
     public static final int CASTLE_ASSAULT_ARCHER_MAX_ARROWS = 10;
+    public static final long CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS = 10_000L;
+    public static final int CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT = 2;
 
     /** Reborn caps blast protection EPF at 20 before applying its TNT damage multiplier. */
     public static double castleAssaultBlastDamageMultiplier(int blastProtectionEpf) {
