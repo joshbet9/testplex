@@ -3737,13 +3737,6 @@ public final class ArcadePortManager implements Listener {
         player.getInventory().addItem(new ItemStack(wool, ArcadePortRules.TURF_WARS_BUILD_PHASE_WOOL));
     }
 
-    private void giveTurfWarsStartingWool(Session session, Player player) {
-        int team = session.teams.getOrDefault(player.getUniqueId(), -1);
-        if (team < 0) return;
-        Material wool = team == 0 ? Material.RED_WOOL : Material.LIGHT_BLUE_WOOL;
-        player.getInventory().addItem(new ItemStack(wool, ArcadePortRules.TURF_WARS_STARTING_WOOL));
-    }
-
     private void giveKit(Session session, Player player) {
         player.getInventory().clear();
         switch (session.type) {
@@ -3966,7 +3959,6 @@ public final class ArcadePortManager implements Listener {
                 if ("infiltrator".equals(kit)) {
                     player.getInventory().addItem(new ItemStack(Material.IRON_SWORD));
                 }
-                giveTurfWarsStartingWool(session, player);
                 break;
             }
         }
