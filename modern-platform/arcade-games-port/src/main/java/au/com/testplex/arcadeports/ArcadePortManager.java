@@ -180,7 +180,58 @@ public final class ArcadePortManager implements Listener {
 
     public List<Player> botTargets(World world, ArcadePortGame type) {
         if (!isActiveGame(world, type)) return List.of();
-        return alivePlayers(active);
+        if (type != ArcadePortGame.BACON_BRAWL) return alivePlayers(active);
+        // Pig Cloak removes the player from AI targeting just as invisibility should.
+        return alivePlayers(active).stream()
+                .filter(player -> !active.baconCloakUntil.containsKey(player.getUniqueId()))
+                .toList();
+    }
+
+    /**
+     * Resolve bot attacks using the same Bacon Brawl knockback and Brutus guard rules
+     * as a player attack. Test bots have no kill credit, but their hits still count as
+     * real incoming combat for fall attribution and defensive-kit testing.
+     */
+    public boolean applyBaconBrawlBotAttack(Location attackerLocation, Player target) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.BACON_BRAWL
+                || attackerLocation == null || attackerLocation.getWorld() != session.world
+                || target == null || !target.isOnline() || target.getWorld() != session.world
+                || !session.alive.contains(target.getUniqueId())) return false;
+
+        UUID targetId = target.getUniqueId();
+        long now = System.currentTimeMillis();
+        long brutusUntil = session.baconBrutusUntil.getOrDefault(targetId, 0L);
+        boolean brutusActive = brutusUntil > now;
+        boolean backstab = isBaconBrutusBackstab(target, attackerLocation);
+        if (ArcadePortRules.shouldBaconBrutusGuardHit(brutusActive, backstab)) {
+            target.sendActionBar(ChatColor.GOLD + "" + ChatColor.BOLD + "BRUTUS GUARD"
+                    + ChatColor.GRAY + " | frontal bot hit absorbed");
+            Location guard = target.getLocation().clone().add(0.0D, 1.0D, 0.0D);
+            target.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING, guard, 10,
+                    0.35D, 0.45D, 0.35D, 0.01D);
+            target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.8F, 1.5F);
+            return false;
+        }
+        if (brutusActive && backstab) {
+            endBaconBrutus(session, targetId, target);
+            target.sendActionBar(ChatColor.RED + "" + ChatColor.BOLD + "BRUTUS GUARD BROKEN!");
+            target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BREAK, 0.9F, 0.8F);
+        }
+
+        // Do not credit a previous human attacker for a later bot-caused fall.
+        session.baconLastDamager.remove(targetId);
+        session.baconLastDamagedAt.put(targetId, now);
+        session.baconLastHitSource.put(targetId, "bot");
+        Vector velocity = baconBrawlKnockbackVelocity(attackerLocation, target.getLocation(),
+                2.0D, session.baconKnockback, null, target.isOnGround());
+        target.setVelocity(velocity);
+        Location impact = target.getLocation().clone().add(0.0D, 1.0D, 0.0D);
+        target.getWorld().spawnParticle(Particle.CLOUD, impact, 10, 0.35D, 0.4D, 0.35D, 0.04D);
+        target.playEffect(EntityEffect.HURT);
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
+        target.sendActionBar(ChatColor.RED + "HIT BY TEST BOT");
+        return true;
     }
 
     public double baconBrawlKnockbackValue(World world) {
@@ -3705,6 +3756,14 @@ public final class ArcadePortManager implements Listener {
             attacker.setVelocity(baconBrawlKnockbackVelocity(target, attacker, 2.0D,
                     session.baconKnockback * ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER, null));
         }
+    }
+
+    private boolean isBaconBrutusBackstab(Player target, Location attackerLocation) {
+        Vector targetLook = target.getLocation().getDirection().setY(0.0D);
+        Vector fromTargetToAttacker = attackerLocation.toVector()
+                .subtract(target.getLocation().toVector()).setY(0.0D);
+        return ArcadePortRules.isBaconBrutusBackstab(targetLook.getX(), targetLook.getZ(),
+                fromTargetToAttacker.getX(), fromTargetToAttacker.getZ());
     }
 
     private boolean isBaconBrutusBackstab(Player target, Player attacker) {
