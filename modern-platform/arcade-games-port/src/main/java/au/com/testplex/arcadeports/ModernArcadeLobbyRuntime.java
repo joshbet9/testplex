@@ -992,6 +992,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     /** Called by the TNT sweep when a Bomb Lobbers test bot is struck directly. */
     public void showBombLobbersBotDirectHit(LivingEntity target, Player thrower, Location bombLocation) {
+        showBombLobbersBotDirectHit(target, thrower, bombLocation, false);
+    }
+
+    public void showBombLobbersBotDirectHit(LivingEntity target, Player thrower,
+            Location bombLocation, boolean fiery) {
         if (target == null || !target.isValid()) return;
         String key = target.getPersistentDataContainer().get(botKey,PersistentDataType.STRING);
         Bot bot = key == null ? null : bots.get(key);
@@ -1001,6 +1006,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 : target.getLocation().toVector().subtract(bombLocation.toVector());
         if (away.lengthSquared()<0.01D) away=new Vector(0,0,1);
         target.setVelocity(away.normalize().multiply(0.8D).setY(0.35D));
+        if (fiery) target.setFireTicks(100);
         if (thrower != null && thrower.isOnline()) {
             showBotImpact(bot,target,thrower,ChatColor.GOLD+"DIRECT HIT!",
                     ChatColor.GREEN+"DIRECT HIT!"+ChatColor.GRAY+" | "+bot.name);
@@ -1011,6 +1017,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     /** Apply a Bomb Lobbers blast impulse and impact feedback to an opposing test bot. */
     public void showBombLobbersBotBlastHit(LivingEntity target, Location blast, double impact) {
+        showBombLobbersBotBlastHit(target, blast, impact, false);
+    }
+
+    public void showBombLobbersBotBlastHit(LivingEntity target, Location blast, double impact, boolean fiery) {
         if (target == null || !target.isValid() || blast == null
                 || target.getWorld() != blast.getWorld() || impact <= 0.0D) return;
         String key = target.getPersistentDataContainer().get(botKey, PersistentDataType.STRING);
@@ -1018,6 +1028,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if (bot == null || !bot.inGame || bot.deployedGame != ArcadePortGame.BOMB_LOBBERS || bot.team < 0) return;
         Vector away = target.getEyeLocation().toVector().subtract(blast.toVector());
         target.setVelocity(ArcadePortRules.bombLobbersExplosionVelocity(target.getVelocity(), away, impact));
+        if (fiery) target.setFireTicks(100);
         showBotImpact(bot, target, null, null, null);
     }
 

@@ -70,6 +70,10 @@ public final class ArcadePortRules {
     }
     public static final long BACON_FLASH_FRIED_MAX_WIN_MILLIS = 60_000L;
     public static final long BOMB_LOBBERS_ASSIST_WINDOW_MILLIS = 10_000L;
+    public static final long BOMB_LOBBERS_POWERUP_FIRST_SPAWN_DELAY_MILLIS = 10_000L;
+    public static final double BOMB_LOBBERS_SUPER_TNT_EXPLOSION_RADIUS = 10.0D;
+    public static final double BOMB_LOBBERS_SUPER_TNT_MAX_DAMAGE = 65.0D;
+    public static final int BOMB_LOBBERS_POWERUP_SPEED_DURATION_TICKS = 240;
     public static final int BOMB_LOBBERS_ULTIMATE_KILLER_KILLS = 5;
     public static final int BOMB_LOBBERS_TWO_BIRDS_KILLS = 2;
     public static final int BOMB_LOBBERS_TEAM_PLAYER_ASSISTS = 5;
@@ -593,6 +597,43 @@ public final class ArcadePortRules {
         return ownerTeam >= 0 && targetTeam >= 0 && ownerTeam != targetTeam;
     }
 
+    /** More players in the match lobby produce more frequent power-up spawns. */
+    public static long bombLobbersPowerupSpawnIntervalMillis(int lobbyPlayers) {
+        int players = Math.max(1, lobbyPlayers);
+        if (players <= 2) return 30_000L;
+        if (players <= 4) return 25_000L;
+        if (players <= 8) return 20_000L;
+        if (players <= 12) return 15_000L;
+        return 12_000L;
+    }
+
+    /** Keep small matches readable while allowing more simultaneous drops in larger lobbies. */
+    public static int bombLobbersPowerupMaxActive(int lobbyPlayers) {
+        int players = Math.max(1, lobbyPlayers);
+        if (players <= 4) return 1;
+        if (players <= 8) return 2;
+        if (players <= 12) return 3;
+        return 4;
+    }
+
+    public static double bombLobbersExplosionRadius(String powerupType) {
+        return "super-tnt".equalsIgnoreCase(powerupType)
+                ? BOMB_LOBBERS_SUPER_TNT_EXPLOSION_RADIUS : BOMB_LOBBERS_EXPLOSION_RADIUS;
+    }
+
+    public static double bombLobbersExplosionMaxDamage(String powerupType) {
+        return "super-tnt".equalsIgnoreCase(powerupType)
+                ? BOMB_LOBBERS_SUPER_TNT_MAX_DAMAGE : BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE;
+    }
+
+    public static double bombLobbersDirectHitDamage(String powerupType) {
+        return "super-tnt".equalsIgnoreCase(powerupType) ? 15.0D : 10.0D;
+    }
+
+    public static boolean bombLobbersTntIgnites(String powerupType) {
+        return "fiery-tnt".equalsIgnoreCase(powerupType);
+    }
+
     /** Returns the opposing Bomb Lobbers side, or -1 when the supplied team is invalid. */
     public static int opposingBombLobbersTeam(int teamId) {
         return teamId == 0 ? 1 : teamId == 1 ? 0 : -1;
@@ -737,15 +778,20 @@ public final class ArcadePortRules {
      * Even zero exposure yields the vanilla minimum of 1 for an entity inside or on the radius.
      */
     public static double bombLobbersBlastDamage(double distanceToTarget, double exposure) {
+        return bombLobbersBlastDamage(distanceToTarget, exposure,
+                BOMB_LOBBERS_EXPLOSION_RADIUS, BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE);
+    }
+
+    public static double bombLobbersBlastDamage(double distanceToTarget, double exposure,
+            double radius, double maxDamage) {
         if (!Double.isFinite(distanceToTarget) || distanceToTarget < 0.0D
-                || distanceToTarget > BOMB_LOBBERS_EXPLOSION_RADIUS) return 0.0D;
+                || !Double.isFinite(radius) || radius <= 0.0D || distanceToTarget > radius
+                || !Double.isFinite(maxDamage) || maxDamage <= 0.0D) return 0.0D;
         double visible = Double.isFinite(exposure) ? Math.max(0.0D, Math.min(1.0D, exposure)) : 0.0D;
-        double impact = (1.0D - distanceToTarget / BOMB_LOBBERS_EXPLOSION_RADIUS) * visible;
-        double vanillaDamage = ((impact * impact + impact) / 2.0D)
-                * (8.0D * BOMB_LOBBERS_EXPLOSION_RADIUS) + 1.0D;
-        // In v1_8_R3 Explosion.a(), damageEntity receives (float) ((int) rawDamage).
+        double impact = (1.0D - distanceToTarget / radius) * visible;
+        double vanillaDamage = ((impact * impact + impact) / 2.0D) * (8.0D * radius) + 1.0D;
         int legacyIntegerDamage = (int) vanillaDamage;
-        return Math.min(legacyIntegerDamage, BOMB_LOBBERS_MAX_EXPLOSION_DAMAGE);
+        return Math.min(legacyIntegerDamage, maxDamage);
     }
 
     public static Material bombLobbersBlockAfterExplosion(Material material) {

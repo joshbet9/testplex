@@ -217,6 +217,31 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.areBombLobbersEnemies(1, ArcadePortRules.opposingBombLobbersTeam(1)));
     }
 
+    @Test void bombLobbersPowerupSpawnRateAndCapacityScaleWithLobbySize() {
+        assertEquals(30_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(1));
+        assertEquals(30_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(2));
+        assertEquals(25_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(4));
+        assertEquals(20_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(8));
+        assertEquals(15_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(12));
+        assertEquals(12_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(16));
+        assertEquals(1, ArcadePortRules.bombLobbersPowerupMaxActive(2));
+        assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(6));
+        assertEquals(3, ArcadePortRules.bombLobbersPowerupMaxActive(10));
+        assertEquals(4, ArcadePortRules.bombLobbersPowerupMaxActive(16));
+    }
+
+    @Test void bombLobbersSuperAndFieryTntHaveDistinctBlastEffects() {
+        assertEquals(8.0D, ArcadePortRules.bombLobbersExplosionRadius("normal"), 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.bombLobbersExplosionRadius("super-tnt"), 0.00001D);
+        assertEquals(50.0D, ArcadePortRules.bombLobbersExplosionMaxDamage("normal"), 0.00001D);
+        assertEquals(65.0D, ArcadePortRules.bombLobbersExplosionMaxDamage("super-tnt"), 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.bombLobbersDirectHitDamage("normal"), 0.00001D);
+        assertEquals(15.0D, ArcadePortRules.bombLobbersDirectHitDamage("super-tnt"), 0.00001D);
+        assertFalse(ArcadePortRules.bombLobbersTntIgnites("normal"));
+        assertTrue(ArcadePortRules.bombLobbersTntIgnites("fiery-tnt"));
+        assertEquals(65.0D, ArcadePortRules.bombLobbersBlastDamage(0.0D, 1.0D, 10.0D, 65.0D), 0.00001D);
+    }
+
     @Test void oneInTheQuiverNeedsTwentyKillsToWin() {
         assertFalse(ArcadePortRules.isQuiverWinnerScoreReached(0));
         assertFalse(ArcadePortRules.isQuiverWinnerScoreReached(19));
