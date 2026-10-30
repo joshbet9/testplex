@@ -624,7 +624,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if(nearest==null)return;
         if(e.getLocation().getY()<e.getWorld().getMinHeight()+8){if(b.arenaSpawn!=null)actor.teleport(b.arenaSpawn);return;}
         if(distance>4){Vector v=nearest.getLocation().toVector().subtract(e.getLocation().toVector()).setY(0);if(v.lengthSquared()>0.01){v.normalize().multiply(0.22);v.setY(actor.isOnGround()?0.15:actor.getVelocity().getY());actor.setVelocity(v);}}
-        else if(now>=b.nextAttackAt){Vector away=nearest.getLocation().toVector().subtract(e.getLocation().toVector()).setY(0);if(away.lengthSquared()<0.01)away=new Vector(0,0,1);nearest.setVelocity(away.normalize().multiply(Math.min(1.35,Math.max(0.65,manager.baconBrawlKnockbackValue(e.getWorld())))).setY(0.42));nearest.sendActionBar(ChatColor.RED+b.name+ChatColor.GRAY+" hit you!");nearest.getWorld().spawnParticle(particle(b.theme),nearest.getLocation().add(0,1,0),8,0.4,0.3,0.4,0.01);b.nextAttackAt=now+1400;}
+        else if (now >= b.nextAttackAt) {
+            boolean landed = manager.applyBaconBrawlBotAttack(e.getLocation(), nearest);
+            if (landed) {
+                nearest.getWorld().spawnParticle(particle(b.theme),
+                        nearest.getLocation().add(0, 1, 0), 8, 0.4, 0.3, 0.4, 0.01);
+            }
+            b.nextAttackAt = now + 1400L;
+        }
         e.getWorld().spawnParticle(particle(b.theme),e.getLocation().add(0,1,0),2,0.2,0.2,0.2,0.01);
     }
     private Particle particle(String theme) {
