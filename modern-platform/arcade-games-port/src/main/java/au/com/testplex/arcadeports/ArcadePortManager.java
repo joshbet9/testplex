@@ -4616,25 +4616,79 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void applyMicroBattlesHit(Session session, Player attacker, Player target, String source) {
-        if (active != session || !session.alive.contains(attacker.getUniqueId())
-                || !session.alive.contains(target.getUniqueId())) return;
-        boolean projectile = !"melee".equals(source);
+        applyMicroBattlesHit(session, attacker, target, source, null);
+    }
+
+    /** Resolve Reborn's DamageManager pipeline for Micro Battles rather than using fixed damage values. */
+    private void applyMicroBattlesHit(Session session, Player attacker, Player target,
+            String source, Projectile projectile) {
+        if (active != session || attacker == null || target == null || attacker.equals(target)
+                || !session.alive.contains(attacker.getUniqueId())
+                || !session.alive.contains(target.getUniqueId())
+                || session.teams.getOrDefault(attacker.getUniqueId(), -1)
+                        .equals(session.teams.getOrDefault(target.getUniqueId(), -2))) return;
+
+        boolean arrowHit = projectile instanceof Arrow;
+        double baseDamage = arrowHit
+                ? ArcadePortRules.microBattlesArrowDamage(projectile.getVelocity().length())
+                : ArcadePortRules.microBattlesMeleeDamage(attacker.getInventory().getItemInMainHand().getType());
         boolean fighter = "fighter".equals(session.microKits.getOrDefault(target.getUniqueId(), "archer"));
-        double damage = ArcadePortRules.microBattlesDamageAfterIronSkin(
-                ArcadePortRules.microBattlesHitDamage(projectile), fighter);
-        if (projectile) {
-            Vector push = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
-            if (push.lengthSquared() < 0.0001D) push = attacker.getLocation().getDirection();
-            target.setVelocity(push.normalize().multiply(1.6D).setY(0.35D));
+        // PerkIronSkin adds -0.5 to CustomDamageEvent before DamageManager's armour calculation.
+        double eventDamage = ArcadePortRules.microBattlesDamageAfterIronSkin(baseDamage, fighter);
+        var armorAttribute = target.getAttribute(Attribute.ARMOR);
+        double armorPoints = armorAttribute == null ? 0.0D : armorAttribute.getValue();
+        double finalDamage = ArcadePortRules.microBattlesDamageAfterArmor(eventDamage, armorPoints);
+
+        if (projectile != null || "melee".equals(source)) {
+            applyMicroBattlesKnockback(attacker, target, projectile, eventDamage);
         }
-        if (target.getHealth() <= damage) {
-            eliminate(session, target, attacker, "was eliminated in Micro Battles");
-            return;
+        if (finalDamage > 0.0D) {
+            if (target.getHealth() <= finalDamage) {
+                eliminate(session, target, attacker, "was eliminated in Micro Battles");
+                return;
+            }
+            target.setHealth(target.getHealth() - finalDamage);
         }
-        target.setHealth(target.getHealth() - damage);
+        target.playEffect(EntityEffect.HURT);
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
         target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0.0D, 1.0D, 0.0D),
                 5, 0.25D, 0.35D, 0.25D, 0.05D);
+    }
+
+    /**
+     * Mirrors DamageManager's log10 knockback and Micro's 1.6 multiplier.
+     * Arrow impacts use the projectile trajectory; melee uses attacker-to-target direction.
+     */
+    private void applyMicroBattlesKnockback(Player attacker, Player target,
+            Projectile projectile, double eventDamage) {
+        double knockback = ArcadePortRules.microBattlesKnockbackStrength(eventDamage);
+        if (knockback <= 0.0D) return;
+
+        Vector trajectory;
+        if (projectile != null) {
+            trajectory = projectile.getVelocity().clone().setY(0.0D);
+            double horizontalLength = trajectory.length();
+            if (horizontalLength <= 0.000001D) trajectory = new Vector(0.0D, 0.0D, 0.0D);
+            else trajectory.multiply(0.37D * knockback / horizontalLength);
+            trajectory.setY(0.06D);
+        } else {
+            trajectory = target.getLocation().toVector()
+                    .subtract(attacker.getLocation().toVector()).setY(0.0D);
+            if (trajectory.lengthSquared() <= 0.000001D) {
+                trajectory = attacker.getLocation().getDirection().setY(0.0D);
+            }
+            if (trajectory.lengthSquared() <= 0.000001D) return;
+            trajectory.normalize().multiply(0.6D * knockback);
+        }
+
+        if (trajectory.lengthSquared() <= 0.000001D) return;
+        double velocityStrength = 0.2D + trajectory.length() * 0.8D;
+        Vector velocity = trajectory.normalize().multiply(velocityStrength);
+        velocity.setY(Math.min(velocity.getY() + Math.abs(0.2D * knockback),
+                0.4D + (0.04D * knockback)));
+        if (target.isOnGround()) velocity.setY(velocity.getY() + 0.2D);
+        target.setFallDistance(0.0F);
+        target.setVelocity(velocity);
     }
 
     private void givePaintballKit(Session session, Player player, String kit) {
@@ -9808,7 +9862,10 @@ public final class ArcadePortManager implements Listener {
                         "One arrow per shot; earn another with each kill."));
             }
         } else if (session.type == ArcadePortGame.MICRO_BATTLES) {
-            handlePlayerHit(session, shooter, target, "arrow hit");
+            applyMicroBattlesHit(session, shooter, target, "arrow hit", projectile);
+            session.microFletchedArrows.remove(projectile.getUniqueId());
+            session.entities.remove(projectile);
+            projectile.remove();
         } else {
             handlePlayerHit(session, shooter, target, "projectile hit");
         }
