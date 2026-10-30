@@ -24,7 +24,7 @@ public final class MapThemeApplier {
 
     public void start() {
         if (task != null) return;
-        task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        task = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 applyIfReady();
                 applyCenterThemeIfNeeded();
