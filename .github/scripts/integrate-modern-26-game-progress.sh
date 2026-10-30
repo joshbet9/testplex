@@ -220,7 +220,7 @@ def extract(start_marker: str, end_marker: str) -> str:
         raise SystemExit(f"Could not extract SkyWars source block: {start_marker}")
     return sky[start:end]
 
-if "skyWarsKitPreferences" not in source:
+if "Map<UUID, String> skyWarsKitPreferences" not in source:
     anchor = "    private final Map<UUID, String> dragonEscapeKitPreferences = new HashMap<>();"
     if anchor not in source:
         raise SystemExit("Could not find kit-preference field anchor.")
@@ -264,6 +264,14 @@ spawn_replacement = spawn_line + """
                 session.skyWarsSafeLocations.put(player.getUniqueId(), spawn.clone());
             }"""
 source = source.replace(spawn_line, spawn_replacement, 1)
+
+
+if "private boolean isSkyWarsTrackingCompass(" not in source:
+    compass_identity = extract("    private boolean isSkyWarsTrackingCompass(", "    private Player nearestSkyWarsTarget(")
+    anchor = "    private void updateQuiverKit("
+    if anchor not in source:
+        raise SystemExit("Could not find compass identity helper insertion point.")
+    source = source.replace(anchor, compass_identity + anchor, 1)
 
 # Reconcile the shared Testplex queue with SkyWars' separate 16-player Mixed queue.
 queue_start = source.find("    public void queue(ArcadePortGame type, Player player, boolean quickStart, boolean mixedArcadeVariant) {")
@@ -361,6 +369,74 @@ update = update.replace("            int previousOwner = session.sheepOwners.get
 update = update.replace("            if (previousOwner != team) {\n",
                         "            if (previousOwner != team && (holderId == null || holderId.equals(carrierId))) {\n", 1)
 source = source[:update_start] + update + source[update_end:]
+
+
+# Carry the v6 rule helpers that the upgraded Castle/Heroes runtime requires.
+rules_path = Path("modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortRules.java")
+rules = rules_path.read_text()
+v6_rules = subprocess.check_output([
+    "git", "show",
+    "origin/feat/castle-assault-gwen-mixed-arcade-variants-20261030-v6:modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortRules.java"
+], text=True)
+rule_start = v6_rules.find("    public static final long CASTLE_ASSAULT_ARCHER_REFILL_MILLIS")
+rule_end = v6_rules.find("    /** Heroes of Gwen's Mixed Arcade store prices", rule_start)
+if rule_start < 0 or rule_end < 0:
+    raise SystemExit("Could not extract Heroes/Castle rule helpers from v6 source.")
+rule_block = v6_rules[rule_start:rule_end]
+required_rule_symbols = [
+    "CASTLE_ASSAULT_ARCHER_REFILL_MILLIS",
+    "HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS",
+    "heroesOfGwenWitherStepPerTick",
+    "castleAssaultBlastDamageMultiplier",
+    "normalizeCastleAssaultKit",
+    "normalizeHeroesOfGwenHero",
+    "heroesOfGwenHeroRole",
+    "heroesOfGwenHeroDisplayName",
+]
+missing_rule_symbols = [symbol for symbol in required_rule_symbols if symbol not in rules]
+if missing_rule_symbols:
+    closing = rules.rfind("}")
+    if closing < 0:
+        raise SystemExit("ArcadePortRules class closing brace not found.")
+    rules = rules[:closing] + "\n" + rule_block + rules[closing:]
+    rules_path.write_text(rules)
+
+# The v6 selection methods are missing from the newer manager even though their
+# command dispatch calls were merged. Bring over only those methods and state maps.
+v6_manager = subprocess.check_output([
+    "git", "show",
+    "origin/feat/castle-assault-gwen-mixed-arcade-variants-20261030-v6:modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortManager.java"
+], text=True)
+for field in [
+    "    private final Map<UUID, String> castleAssaultKitPreferences = new HashMap<>();",
+    "    private final Map<UUID, String> heroesOfGwenHeroPreferences = new HashMap<>();",
+]:
+    if field.split()[-2] not in source:
+        anchor = "    private final Map<UUID, String> paintballKitPreferences = new HashMap<>();"
+        if anchor not in source:
+            raise SystemExit("Could not find kit preference field insertion point.")
+        source = source.replace(anchor, anchor + "\n" + field, 1)
+
+if "    public void selectCastleAssaultKit(" not in source:
+    select_start = v6_manager.find("    public void selectCastleAssaultKit(")
+    hero_start = v6_manager.find("    public void selectHeroesOfGwenHero(", select_start)
+    methods_end = v6_manager.find("\n    public ", hero_start + 1)
+    if select_start < 0 or hero_start < 0 or methods_end < 0:
+        raise SystemExit("Could not extract Castle/Heroes kit selection methods.")
+    selection_methods = v6_manager[select_start:methods_end]
+    anchor = "    public void selectDeathTagRunnerKit("
+    if anchor not in source:
+        raise SystemExit("Could not find public kit-selection insertion point.")
+    source = source.replace(anchor, selection_methods + "\n\n" + anchor, 1)
+
+# Sheep Quest's final-tick/overtime flow uses this method-local guard at two
+# sites. Define it once at the top of tick(), after source damage updates.
+if "boolean sheepQuestUpdatedBeforeTimeout = false;" not in source:
+    tick_anchor = "        updateSourceWaterDamage(session, now);"
+    if tick_anchor not in source:
+        raise SystemExit("Could not find tick() updateSourceWaterDamage anchor.")
+    source = source.replace(tick_anchor,
+                            tick_anchor + "\n        boolean sheepQuestUpdatedBeforeTimeout = false;", 1)
 
 path.write_text(source)
 print("Reconciled SkyWars helper declarations, spawn placement, shared queue, and Sheep Quest holder cleanup.")
