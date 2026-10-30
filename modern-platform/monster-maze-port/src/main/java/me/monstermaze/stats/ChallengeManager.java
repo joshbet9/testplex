@@ -44,7 +44,6 @@ public final class ChallengeManager {
                     if (c == null || s == null) throw new IllegalStateException("invalid challenge response");
                     if (!c.week.equals(s.challenge.week) || c.number != s.challenge.number) throw new IllegalStateException("challenge changed while syncing");
                     challenge = c; rows = s.rows;
-                    Bukkit.getScheduler().runTask(plugin.getHostPlugin(), new Runnable() { @Override public void run() { if (plugin.getGameManager() != null) plugin.getGameManager().rerenderLeaderboardBoard(); } });
                 } catch (Exception e) { plugin.getLogger().warning("Weekly challenge sync failed: " + e.getMessage()); }
             }
         });
