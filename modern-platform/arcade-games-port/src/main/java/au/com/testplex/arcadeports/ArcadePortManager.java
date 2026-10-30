@@ -3409,6 +3409,24 @@ public final class ArcadePortManager implements Listener {
         checkRoundEnd(session);
     }
 
+    /** Reborn adds a 2x knockback multiplier to its standard projectile damage response. */
+    private void applyPaintballKnockback(Projectile projectile, Player target) {
+        if (projectile == null || target == null) return;
+        double knockback = Math.log10(2.0D) * 2.0D; // Paintball cancels base damage and adds exactly 2.
+        Vector trajectory = projectile.getVelocity().clone();
+        trajectory.setY(0.0D);
+        double length = trajectory.length();
+        if (!Double.isFinite(length) || length < 1.0E-6D) return;
+        trajectory.multiply(0.37D * knockback / length);
+        trajectory.setY(0.06D);
+        double velocity = 0.2D + trajectory.length() * 0.8D;
+        Vector push = trajectory.normalize().multiply(velocity);
+        push.setY(Math.min(0.4D + (0.04D * knockback), push.getY() + Math.abs(0.2D * knockback)));
+        if (target.isOnGround()) push.setY(Math.min(0.4D + (0.04D * knockback), push.getY() + 0.2D));
+        target.setFallDistance(0.0F);
+        target.setVelocity(push);
+    }
+
     private int applyPaintballHit(Session session, Player attacker, Player target, int paintAmount) {
         UUID targetId = target.getUniqueId();
         int before = session.paintPiecesRemaining.getOrDefault(targetId, 4);
@@ -6759,9 +6777,11 @@ public final class ArcadePortManager implements Listener {
             else session.paintballDeaths.merge(player.getUniqueId(), 1, Integer::sum);
             spawnPaintballSaveMeMarker(session, player, killer);
             player.setHealth(20.0D);
+            player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 30, 0, false, false, true), true);
             player.setGameMode(GameMode.SPECTATOR);
             player.setAllowFlight(true);
             player.setFlying(true);
+            player.setVelocity(new Vector(0.0D, 1.2D, 0.0D));
             player.sendMessage(ChatColor.RED + "Painted out! A teammate can throw a Water Bomb at your SAVE ME marker.");
             if (killer != null && session.alive.contains(killer.getUniqueId())) {
                 session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
@@ -7291,6 +7311,7 @@ public final class ArcadePortManager implements Listener {
         } else if (session.type == ArcadePortGame.PAINTBALL) {
             // Reborn paints the map for each projectile collision, including hits on players.
             paintPaintballBlockImpact(session, projectile);
+            applyPaintballKnockback(projectile, target);
             int paintAmount = session.paintProjectileDamage.getOrDefault(projectile.getUniqueId(), 1);
             session.paintProjectileDamage.remove(projectile.getUniqueId());
             session.paintProjectileTeams.remove(projectile.getUniqueId());
