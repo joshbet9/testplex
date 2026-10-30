@@ -17,7 +17,7 @@ class ArcadeCatalogTest {
     void eachGameHasItsOwnCosmeticLinesAndWinEffects() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         for (GameDefinition game : catalog.getGames()) {
-            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders").contains(game.getId());
+            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "castle-assault", "heroes-of-gwen").contains(game.getId());
             assertEquals(gameplayFirstPort, game.getCosmeticLines().isEmpty(),
                     game.getId() + " cosmetic lines should remain optional during this gameplay-first port");
             assertTrue(game.getWinEffects().size() >= (gameplayFirstPort ? 1 : 3),
