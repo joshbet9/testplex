@@ -19,7 +19,7 @@ public final class MMUtilityCommandListener implements Listener {
     public MMUtilityCommandListener(MonsterMazePlugin plugin) {
         this.plugin = plugin;
         this.debug = new MMDebugCommand(plugin);
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        plugin.getServer().getPluginManager().registerEvents(this, plugin.getHostPlugin());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -73,7 +73,7 @@ public final class MMUtilityCommandListener implements Listener {
             player.removeMetadata(BuildBypassListener.METADATA, plugin);
             player.sendMessage(ChatColor.YELLOW + "Monster Maze build bypass " + ChatColor.RED + "DISABLED" + ChatColor.YELLOW + ".");
         } else {
-            player.setMetadata(BuildBypassListener.METADATA, new FixedMetadataValue(plugin, true));
+            player.setMetadata(BuildBypassListener.METADATA, new FixedMetadataValue(plugin.getHostPlugin(), true));
             player.sendMessage(ChatColor.YELLOW + "Monster Maze build bypass " + ChatColor.GREEN + "ENABLED" + ChatColor.YELLOW + ". Use Creative to edit the active arena.");
         }
     }
