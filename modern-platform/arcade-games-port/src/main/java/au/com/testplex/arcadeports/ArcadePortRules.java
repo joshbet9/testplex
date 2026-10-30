@@ -1647,10 +1647,10 @@ public final class ArcadePortRules {
                 || materialName.endsWith("_STAINED_GLASS_PANE");
     }
 
-    /** Last-survivor completion must wait for any one-second Quiver respawns. */
+    /** Reborn checks for a sole remaining live player immediately after awarding a kill. */
     public static boolean shouldFinishQuiverLastPlayer(int alivePlayers, int respawningPlayers,
                                                         int participantsAtStart) {
-        return participantsAtStart > 1 && alivePlayers == 1 && respawningPlayers == 0;
+        return participantsAtStart > 1 && alivePlayers == 1;
     }
 
     /** Reborn's Ground Pound scales horizontal knockback from 0 at range to 0.8 at point-blank. */
