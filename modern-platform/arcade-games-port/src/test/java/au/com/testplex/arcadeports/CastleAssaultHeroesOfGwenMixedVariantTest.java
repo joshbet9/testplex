@@ -61,6 +61,36 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void castleAssaultNormalisesAllFiveSourceKitsAndAliases() {
+        assertEquals("alchemist", ArcadePortRules.normalizeCastleAssaultKit("Alchemist"));
+        assertEquals("archer", ArcadePortRules.normalizeCastleAssaultKit("archer"));
+        assertEquals("demolitionist", ArcadePortRules.normalizeCastleAssaultKit("Demo"));
+        assertEquals("demolitionist", ArcadePortRules.normalizeCastleAssaultKit("demolitionist"));
+        assertEquals("fighter", ArcadePortRules.normalizeCastleAssaultKit("Fighter"));
+        assertEquals("tank", ArcadePortRules.normalizeCastleAssaultKit("tank"));
+        assertNull(ArcadePortRules.normalizeCastleAssaultKit("ninja"));
+        assertNull(ArcadePortRules.normalizeCastleAssaultKit(null));
+    }
+
+    @Test
+    void heroesOfGwenExposesAllTenSourceHeroesAndTheirOriginalRoles() {
+        assertEquals("Assassin", ArcadePortRules.heroesOfGwenHeroRole("Hattori"));
+        assertEquals("Hunter", ArcadePortRules.heroesOfGwenHeroRole("Devon"));
+        assertEquals("Mage", ArcadePortRules.heroesOfGwenHeroRole("Anath"));
+        assertEquals("Warrior", ArcadePortRules.heroesOfGwenHeroRole("Dana"));
+        assertEquals("Warrior", ArcadePortRules.heroesOfGwenHeroRole("Biff"));
+        assertEquals("Mage", ArcadePortRules.heroesOfGwenHeroRole("Larissa"));
+        assertEquals("Assassin", ArcadePortRules.heroesOfGwenHeroRole("Bardolf"));
+        assertEquals("Hunter", ArcadePortRules.heroesOfGwenHeroRole("Rowena"));
+        assertEquals("Warrior", ArcadePortRules.heroesOfGwenHeroRole("Ivy"));
+        assertEquals("Mage", ArcadePortRules.heroesOfGwenHeroRole("Bob Ross"));
+        assertEquals("bob-ross", ArcadePortRules.normalizeHeroesOfGwenHero("bob"));
+        assertEquals("Bob Ross", ArcadePortRules.heroesOfGwenHeroDisplayName("bobross"));
+        assertNull(ArcadePortRules.normalizeHeroesOfGwenHero("Gwen"));
+        assertNull(ArcadePortRules.heroesOfGwenHeroRole(null));
+    }
+
+    @Test
     void bothGamesResolveTheirOriginalSourceMapFoldersAndIds() {
         assertEquals(ArcadePortGame.CASTLE_ASSAULT, ArcadePortGame.fromId("castle-assault"));
         assertEquals(ArcadePortGame.HEROES_OF_GWEN, ArcadePortGame.fromId("Heroes of Gwen"));
