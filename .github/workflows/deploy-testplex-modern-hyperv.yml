@@ -10,7 +10,7 @@ on:
         required: true
         type: boolean
       source_run_id:
-        description: Successful Testplex Modern Paper 26.3 build run ID (uploads all four modern JARs)
+        description: Successful Testplex Modern Paper 26.3 build run ID (uploads all five modern JARs)
         required: true
         type: string
   workflow_dispatch:
@@ -21,7 +21,7 @@ on:
         type: boolean
         default: false
       source_run_id:
-        description: Successful Testplex Modern Paper 26.3 build run ID (uploads all four modern JARs)
+        description: Successful Testplex Modern Paper 26.3 build run ID (uploads all five modern JARs)
         required: true
         type: string
         default: "40819650403"
@@ -152,7 +152,7 @@ jobs:
           source_dir="$RUNNER_TEMP/testplex-modern-artifact"
           stage_dir="$RUNNER_TEMP/testplex-modern-verified"
           mkdir -p "$stage_dir"
-          for jar in TestplexModernArcade.jar MonsterMazeModern.jar SnakeModern.jar ArcadeMechanicsModern.jar; do
+          for jar in TestplexModernArcade.jar MonsterMazeModern.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
             matches="$(find "$source_dir" -type f -name "$jar" | wc -l | tr -d ' ')"
             [[ "$matches" == "1" ]] || { echo "Expected exactly one $jar in the selected artifact; got $matches." >&2; exit 1; }
             source_jar="$(find "$source_dir" -type f -name "$jar" -print -quit)"
@@ -174,7 +174,7 @@ jobs:
           tar -tzf "$stage_dir/MonsterMazeMaps.tar.gz" >/dev/null
           (cd "$stage_dir" && sha256sum *.jar MonsterMazeMaps.tar.gz MonsterMazeMapsSource.txt > SHA256SUMS)
           echo "stage_dir=$stage_dir" >> "$GITHUB_OUTPUT"
-          echo "Verified four modern JARs ($SOURCE_SHA) and seven Monster Maze source worlds ($map_source_sha)"
+          echo "Verified five modern JARs ($SOURCE_SHA) and seven Monster Maze source worlds ($map_source_sha)"
 
       - name: Validate isolated target and automatically stop competing services
         id: remote-preflight
@@ -371,6 +371,7 @@ jobs:
             "$STAGE_DIR/TestplexModernArcade.jar" \
             "$STAGE_DIR/MonsterMazeModern.jar" \
             "$STAGE_DIR/SnakeModern.jar" \
+            "$STAGE_DIR/WizardsModern.jar" \
             "$STAGE_DIR/MonsterMazeMapsSource.txt" \
             "${world_chunks[@]}" \
             "${arcade_chunks[@]}" \
@@ -431,7 +432,7 @@ jobs:
 
           [[ "$BUILD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid source build SHA." >&2; exit 1; }
           [[ "$ACCEPT_EULA" == "true" ]] || { echo "Minecraft EULA acknowledgement missing." >&2; exit 1; }
-          for jar in TestplexModernArcade.jar MonsterMazeModern.jar SnakeModern.jar ArcadeMechanicsModern.jar; do
+          for jar in TestplexModernArcade.jar MonsterMazeModern.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
             sudo -n test -s "$UPLOAD_DIR/$jar"
           done
           sudo -n test -s "$UPLOAD_DIR/MonsterMazeMaps.tar.gz"
@@ -528,9 +529,9 @@ jobs:
           done
 
           sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
-          # Install the platform catalogue, Monster Maze (whose core feedback/nameplate features are in this port),
-          # and the Arcade mechanics module. Bacon Brawl, Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball, Runner and Spleef are enabled for live acceptance; all other games remain gated.
-          for jar in TestplexModernArcade.jar MonsterMazeModern.jar ArcadeMechanicsModern.jar; do
+          # Install the platform catalogue, Monster Maze, the Arcade mechanics bundle and the separate Wizards survival port.
+          # Wizards builds its own isolated test arena and never requests a server resource pack.
+          for jar in TestplexModernArcade.jar MonsterMazeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
           done
           sudo -n rm -f "$SERVER_DIR/plugins/SnakeModern.jar"
