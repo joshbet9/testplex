@@ -127,24 +127,19 @@ public class GameManager implements Listener {
         // A live round's arena world is part of its player/entity isolation boundary.
         if (loc == null || loc.getWorld() == null || isRunning()) return;
         this.center = loc.clone();
-        // Empty world + small pre-game lobby box only
-        mazeGenerator.buildLobby(center);
-        // Kit NPCs in lobby while idle
-        if (state == GameState.IDLE) {
-            kitManager.clearSelectors();
-            kitManager.spawnSelectors(mazeGenerator.getLobbyCenter());
-            refreshLeaderboardBoard();
-        }
+        // Testplex owns the only lobby. Store only the arena origin here.
+        mazeGenerator.setArenaCenter(center);
+        kitManager.clearSelectors();
+        leaderboardBoard.clear(List.of());
     }
 
     /** Call on enable: void spawn becomes lobby center. */
     public void bootstrapLobby(Location voidSpawn) {
         if (voidSpawn == null) return;
         this.center = voidSpawn.clone();
-        mazeGenerator.buildLobby(center);
+        mazeGenerator.setArenaCenter(center);
         kitManager.clearSelectors();
-        kitManager.spawnSelectors(mazeGenerator.getLobbyCenter());
-        refreshLeaderboardBoard();
+        leaderboardBoard.clear(List.of());
     }
 
     public Location getLobbySpawn() {
@@ -158,32 +153,10 @@ public class GameManager implements Listener {
         return null;
     }
 
+    /** Compatibility bridge: all player lobby returns belong to Testplex Arcade. */
     public void sendToLobby(Player player) {
-        if (center == null) {
-            // Should have been bootstrapped; last resort
-            return;
-        }
-        if (state == GameState.IDLE || state == GameState.ENDING) {
-            player.teleport(getLobbySpawn());
-            player.setGameMode(GameMode.SURVIVAL);
-            player.setCollidable(true);
-            kitManager.resetPlayerState(player);
-            player.getInventory().clear();
-            // Ensure NPCs exist
-            if (state == GameState.IDLE) {
-                kitManager.spawnSelectors(mazeGenerator.getLobbyCenter());
-            }
-            player.sendMessage(ChatColor.GOLD + "Monster Maze lobby");
-            player.sendMessage(ChatColor.YELLOW + "Pick a kit (villagers or /mm kit), then an admin runs /mm start");
-            // Open kit GUI shortly after TP
-            final Player p = player;
-            Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
-                @Override public void run() {
-                    if (p.isOnline() && state == GameState.IDLE) {
-                        kitManager.openSelector(p);
-                    }
-                }
-            }, 10L);
+        if (player != null && player.isOnline()) {
+            plugin.getHostPlugin().returnPlayerToArcadeLobby(player);
         }
     }
     public Location getCenter() { return center; }
@@ -269,7 +242,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
         // MazeGenerator needs its own center + lobby before generate
         if (mazeGenerator.getCenter() == null) {
-            mazeGenerator.buildLobby(center);
+            mazeGenerator.setArenaCenter(center);
         }
 
         cleanupEntities();
@@ -334,7 +307,8 @@ public void startGame(Location preferCenter, int requestedPattern) {
                     p.teleport(center.clone().add(0.5, 1, 0.5));
                 }
 
-                kitManager.spawnSelectors(mazeGenerator.getLobbyCenter());
+                // Kit selection remains a gameplay GUI; there are no lobby NPCs or
+                // a separate Monster Maze lobby in Testplex.
                 for (Player p : getAlivePlayers()) {
                     kitManager.openSelector(p);
                     p.sendMessage(ChatColor.YELLOW + "Choose a kit! Click a villager or use the menu.");
@@ -484,7 +458,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         playersOnPad.clear();
         destroyAllPads();
         List<Player> arenaPlayers = getRoundPlayersForCleanup();
-        mazeGenerator.returnToLobby();
+        mazeGenerator.cleanup();
         scoreboard.clear(arenaPlayers);
 
         for (Player p : arenaPlayers) {
@@ -512,12 +486,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         state = GameState.IDLE;
         // Testplex owns the only player lobby. The standalone Monster Maze lobby
         // remains available only for isolated module tests.
-        if (!testplexManagedRound && center != null) {
-            kitManager.spawnSelectors(mazeGenerator.getLobbyCenter());
-            refreshLeaderboardBoard();
-            for (Player p : arenaPlayers) kitManager.openSelector(p);
-            broadcast(ChatColor.GREEN + "Back in lobby. Pick a kit, then /mm start");
-        } else if (testplexManagedRound) {
+        if (testplexManagedRound) {
             for (Player p : arenaPlayers) {
                 if (p.isOnline()) p.sendMessage(ChatColor.GREEN + "Monster Maze finished. Returned to the Testplex Arcade lobby.");
             }
