@@ -4380,6 +4380,12 @@ public final class ArcadePortManager implements Listener {
     private void updateDragonEscapeResources(Session session, long now) {
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
+            // Reborn's GameFlagManager continuously enforces HungerSet=20 and
+            // restores saturation on the fast update; don't let long runs drain food.
+            if (session.ticks % 10 == 0) {
+                player.setFoodLevel(20);
+                player.setSaturation(1.0F);
+            }
             if (!"disruptor".equals(session.dragonEscapeKits.getOrDefault(id, "jumper"))) continue;
             long nextAt = session.dragonEscapeNextTntAt.getOrDefault(id,
                     now + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
