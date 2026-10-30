@@ -4398,8 +4398,9 @@ public final class ArcadePortManager implements Listener {
         return true;
     }
 
-    private List<Block> skyWarsIceBridgePath(Location location, int length, Set<Block> shared) {
+    private List<Block> skyWarsIceBridgePath(Location location, int length) {
         List<Block> result = new ArrayList<>();
+        Set<Block> unique = new HashSet<>();
         Location path = location.clone().subtract(0.0D, 1.0D, 0.0D);
         Vector direction = path.getDirection();
         double horizontalLength = Math.sqrt(direction.getX() * direction.getX()
@@ -4417,29 +4418,36 @@ public final class ArcadePortManager implements Listener {
             Block block = path.getBlock();
             Material type = block.getType();
             if (type == Material.ICE) continue;
-            if ((type.isAir() || type == Material.SNOW) && shared.add(block)) result.add(block);
+            if ((type.isAir() || type == Material.SNOW) && unique.add(block)) result.add(block);
         }
         return result;
     }
 
     private void processSkyWarsIceBridgePaths(Session session, long now) {
-        Iterator<Map.Entry<UUID, List<Block>>> paths = session.skyWarsIceBridgePaths.entrySet().iterator();
+        Iterator<Map.Entry<UUID, List<List<Block>>>> paths = session.skyWarsIceBridgePaths.entrySet().iterator();
         while (paths.hasNext()) {
-            Map.Entry<UUID, List<Block>> entry = paths.next();
-            List<Block> pending = entry.getValue();
-            if (pending.isEmpty()) {
-                paths.remove();
-                continue;
+            Map.Entry<UUID, List<List<Block>>> entry = paths.next();
+            List<List<Block>> lanes = entry.getValue();
+            Iterator<List<Block>> laneIterator = lanes.iterator();
+            while (laneIterator.hasNext()) {
+                List<Block> pending = laneIterator.next();
+                if (pending.isEmpty()) {
+                    laneIterator.remove();
+                    continue;
+                }
+                // Source PerkIceBridge advances every IcePathData once per tick:
+                // three independent lanes therefore place up to three blocks per tick.
+                Block block = pending.remove(0);
+                Material original = block.getType();
+                if (!original.isAir() && original != Material.SNOW) continue;
+                if (block.equals(session.skyWarsGeneratorBase)) continue;
+                session.skyWarsIceBridgeOriginals.putIfAbsent(block, block.getBlockData().clone());
+                block.setType(Material.ICE, false);
+                enqueueSkyWarsCrumbleBlock(session, block);
+                session.skyWarsIceBridgeExpiresAt.put(block, now + 4_000L);
+                block.getWorld().playEffect(block.getLocation(), Effect.STEP_SOUND, Material.ICE);
             }
-            Block block = pending.remove(0);
-            Material original = block.getType();
-            if (!original.isAir() && original != Material.SNOW) continue;
-            if (block.equals(session.skyWarsGeneratorBase)) continue;
-            session.skyWarsIceBridgeOriginals.putIfAbsent(block, block.getBlockData().clone());
-            block.setType(Material.ICE, false);
-            enqueueSkyWarsCrumbleBlock(session, block);
-            session.skyWarsIceBridgeExpiresAt.put(block, now + 4_000L);
-            block.getWorld().playEffect(block.getLocation(), Effect.STEP_SOUND, Material.ICE);
+            if (lanes.isEmpty()) paths.remove();
         }
     }
 
@@ -4449,19 +4457,20 @@ public final class ArcadePortManager implements Listener {
         player.setVelocity(new Vector(0.0D, 0.5D, 0.0D));
         player.playSound(player.getLocation(), Sound.BLOCK_GLASS_PLACE, 0.9F, 1.5F);
         Location origin = player.getLocation().clone();
-        Set<Block> unique = new HashSet<>();
-        List<Block> blocks = new ArrayList<>();
+        List<List<Block>> lanes = new ArrayList<>(3);
         if (Math.abs(origin.getDirection().getX()) > Math.abs(origin.getDirection().getZ())) {
-            blocks.addAll(skyWarsIceBridgePath(origin.clone().add(0.0D, 0.0D, 1.0D), 16, unique));
-            blocks.addAll(skyWarsIceBridgePath(origin.clone().add(0.0D, 0.0D, -1.0D), 16, unique));
+            lanes.add(skyWarsIceBridgePath(origin.clone().add(0.0D, 0.0D, 1.0D), 16));
+            lanes.add(skyWarsIceBridgePath(origin.clone().add(0.0D, 0.0D, -1.0D), 16));
         } else {
-            blocks.addAll(skyWarsIceBridgePath(origin.clone().add(1.0D, 0.0D, 0.0D), 16, unique));
-            blocks.addAll(skyWarsIceBridgePath(origin.clone().add(-1.0D, 0.0D, 0.0D), 16, unique));
+            lanes.add(skyWarsIceBridgePath(origin.clone().add(1.0D, 0.0D, 0.0D), 16));
+            lanes.add(skyWarsIceBridgePath(origin.clone().add(-1.0D, 0.0D, 0.0D), 16));
         }
-        blocks.addAll(skyWarsIceBridgePath(origin, 16, unique));
-        blocks.sort(java.util.Comparator.comparingDouble(block ->
-                block.getLocation().add(0.5D, 0.5D, 0.5D).distance(origin)));
-        session.skyWarsIceBridgePaths.put(player.getUniqueId(), blocks);
+        lanes.add(skyWarsIceBridgePath(origin, 16));
+        for (List<Block> lane : lanes) {
+            lane.sort(java.util.Comparator.comparingDouble(block ->
+                    block.getLocation().add(0.5D, 0.5D, 0.5D).distance(origin)));
+        }
+        session.skyWarsIceBridgePaths.put(player.getUniqueId(), lanes);
         player.sendActionBar(ChatColor.AQUA + "Ice Bridge!");
     }
 
@@ -13907,7 +13916,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> skyWarsSpectatorTeleportAt = new HashMap<>();
         final Map<Block, Long> skyWarsIceBridgeExpiresAt = new HashMap<>();
         final Map<Block, BlockData> skyWarsIceBridgeOriginals = new HashMap<>();
-        final Map<UUID, List<Block>> skyWarsIceBridgePaths = new HashMap<>();
+        final Map<UUID, List<List<Block>>> skyWarsIceBridgePaths = new HashMap<>();
         final Map<UUID, UUID> skyWarsDirtProjectiles = new HashMap<>();
         final Map<UUID, UUID> skyWarsLastDamager = new HashMap<>();
         final Map<UUID, Long> skyWarsLastDamagedAt = new HashMap<>();
