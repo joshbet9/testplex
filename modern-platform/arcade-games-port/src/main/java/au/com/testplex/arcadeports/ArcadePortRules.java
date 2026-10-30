@@ -1379,17 +1379,60 @@ public final class ArcadePortRules {
         };
     }
 
-    /** WorldConfig pen markers describe the floor; the sheep's feet block is one block above it. */
+    /** Legacy SheepData compares the sheep's feet block directly with the DATA_LOCS pen blocks. */
     public static boolean sheepQuestInsidePenMarker(int sheepBlockX, int sheepFeetY, int sheepBlockZ,
-            int markerX, int markerFloorY, int markerZ) {
-        return sheepBlockX == markerX && sheepFeetY == markerFloorY + 1 && sheepBlockZ == markerZ;
+            int markerX, int markerY, int markerZ) {
+        return sheepBlockX == markerX && sheepFeetY == markerY && sheepBlockZ == markerZ;
     }
 
     public static final double SHEEP_QUEST_PLAYER_HIT_DAMAGE = 4.0D;
+    public static final double SHEEP_QUEST_THROWER_DAMAGE = 6.0D;
     public static final int SHEEP_QUEST_INITIAL_SHEEP = 4;
     public static final long SHEEP_QUEST_ROUND_MILLIS = 300_000L;
     public static final int SHEEP_QUEST_MAX_CARRY = 3;
     public static final long SHEEP_QUEST_SPAWN_INTERVAL_MILLIS = 20_000L;
+    public static final long SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS = 500L;
+    public static final double SHEEP_QUEST_PICKUP_RADIUS = 2.5D;
+    public static final long SHEEP_QUEST_BESERKER_JUMP_COOLDOWN_MILLIS = 8_000L;
+    public static final long SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS = 10_000L;
+    public static final long SHEEP_QUEST_ARCHER_FLETCHER_INTERVAL_MILLIS = 2_000L;
+    public static final int SHEEP_QUEST_ARCHER_MAX_ARROWS = 5;
+    public static final int SHEEP_QUEST_ARCHER_BARRAGE_MAX_ARROWS = 5;
+    public static final long SHEEP_QUEST_ARCHER_BARRAGE_INITIAL_CHARGE_MILLIS = 1_000L;
+    public static final long SHEEP_QUEST_ARCHER_BARRAGE_CHARGE_INTERVAL_MILLIS = 250L;
+    public static final long SHEEP_QUEST_ARCHER_BARRAGE_VOLLEY_INTERVAL_MILLIS = 50L;
+
+    public static String normalizeSheepQuestKit(String requestedKit) {
+        if (requestedKit == null || requestedKit.isBlank()) return null;
+        String kit = requestedKit.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        if (kit.startsWith("sheep-")) kit = kit.substring("sheep-".length());
+        return switch (kit) {
+            case "beserker", "berserker", "double-jump" -> "beserker";
+            case "archer" -> "archer";
+            case "brute", "thrower" -> "brute";
+            default -> null;
+        };
+    }
+
+    public static boolean sheepQuestPickupReady(long nowMillis, long nextReadyMillis) {
+        return nowMillis >= nextReadyMillis;
+    }
+
+    public static boolean sheepQuestIsTied(int[] teamCounts) {
+        if (teamCounts == null || teamCounts.length == 0) return true;
+        int best = Integer.MIN_VALUE;
+        int leaders = 0;
+        for (int count : teamCounts) {
+            if (count > best) {
+                best = count;
+                leaders = 1;
+            } else if (count == best) {
+                leaders++;
+            }
+        }
+        return leaders != 1;
+    }
 
     public static boolean canCarryAnotherSheep(int carriedCount) {
         return carriedCount >= 0 && carriedCount < SHEEP_QUEST_MAX_CARRY;
