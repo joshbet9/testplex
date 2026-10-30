@@ -6057,7 +6057,8 @@ public final class ArcadePortManager implements Listener {
                 break;
             case 2:
                 player.getInventory().addItem(new ItemStack(Material.IRON_SWORD),
-                        namedItem(Material.TNT, "Creeper Charge", "Left-click to throw an explosive charge.", 3));
+                        namedItem(Material.COAL, "Sulphur Bomb",
+                                "Right-click to throw a coal bomb. 3-second cooldown.", 1));
                 break;
             case 3:
                 player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
@@ -6861,7 +6862,8 @@ public final class ArcadePortManager implements Listener {
         session.evolutionEggDisplays.clear();
         session.evolutionEggVariants.clear();
         session.evolutionEggNextParticleAt.clear();
-        session.evolutionCreeperTnt.clear();
+        session.evolutionSulphurBombs.clear();
+        session.evolutionSulphurBombReadyAt.clear();
         session.evolutionDamageContributors.clear();
         session.evolutionPityUntil.clear();
         session.evolutionKillsAtAttempt.clear();
@@ -8183,17 +8185,11 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.EVOLUTION
                 && event instanceof EntityDamageByEntityEvent evolutionHit
-                && evolutionHit.getDamager() instanceof Player attacker
-                && session.players.containsKey(attacker.getUniqueId())
-                && session.alive.contains(attacker.getUniqueId())
-                && !session.evolving.contains(attacker.getUniqueId())
-                && session.evolutionLevels.getOrDefault(attacker.getUniqueId(), 0) == 2
-                && attacker.getInventory().getItemInMainHand() != null
-                && attacker.getInventory().getItemInMainHand().getType() == Material.TNT) {
-            // Attacking an entity with left-click dispatches a damage event rather than
-            // PlayerInteractEvent. Route the charge through the same launch handler.
+                && evolutionHit.getDamager() instanceof Snowball sulphurBomb
+                && session.evolutionSulphurBombs.contains(sulphurBomb.getUniqueId())) {
+            // The Snowball is only a visual carrier; damage is applied once in the
+            // impact handler so direct hits and splash share the same small-area rules.
             event.setCancelled(true);
-            throwEvolutionCreeperCharge(session, attacker);
             return;
         }
         if (session.type == ArcadePortGame.BOMB_LOBBERS
@@ -8479,6 +8475,17 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
 
+        if (session.type == ArcadePortGame.EVOLUTION
+                && event.getEntity() instanceof Snowball sulphurBomb
+                && session.evolutionSulphurBombs.remove(sulphurBomb.getUniqueId())) {
+            Player shooter = sulphurBomb.getShooter() instanceof Player player ? player : null;
+            Location impact = sulphurBomb.getLocation().clone();
+            session.entities.remove(sulphurBomb);
+            sulphurBomb.remove();
+            resolveEvolutionSulphurBomb(session, shooter, impact);
+            return;
+        }
+
         if (session.type == ArcadePortGame.DEATH_TAG
                 && event.getEntity() instanceof Arrow deathTagArrow
                 && session.deathTagFletchedArrows.remove(deathTagArrow.getUniqueId())) {
@@ -8712,14 +8719,8 @@ public final class ArcadePortManager implements Listener {
                 && !event.getAction().isRightClick();
         boolean dragonEscapeDisruptorLeftClick = session.type == ArcadePortGame.DRAGON_ESCAPE
                 && event.getAction() == Action.LEFT_CLICK_AIR;
-        boolean evolutionCreeperLeftClick = session.type == ArcadePortGame.EVOLUTION
-                && ArcadePortRules.canUseEvolutionCreeperCharge(
-                        session.evolutionLevels.getOrDefault(event.getPlayer().getUniqueId(), 0),
-                        event.getAction().isLeftClick(),
-                        event.getItem() != null && event.getItem().getType() == Material.TNT);
         if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick
-                && !baconNonRightClick && !dragonEscapeDisruptorLeftClick
-                && !evolutionCreeperLeftClick) return;
+                && !baconNonRightClick && !dragonEscapeDisruptorLeftClick) return;
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
         if (event.isCancelled()) {
@@ -8930,11 +8931,11 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.EVOLUTION
-                && ArcadePortRules.canUseEvolutionCreeperCharge(
+                && ArcadePortRules.canUseEvolutionSulphurBomb(
                         session.evolutionLevels.getOrDefault(player.getUniqueId(), 0),
-                        event.getAction().isLeftClick(), item == Material.TNT)) {
+                        event.getAction().isRightClick(), item == Material.COAL)) {
             event.setCancelled(true);
-            throwEvolutionCreeperCharge(session, player);
+            throwEvolutionSulphurBomb(session, player);
         } else if (session.type == ArcadePortGame.EVOLUTION
                 && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 1 && item == Material.FIRE_CHARGE) {
             event.setCancelled(true);
@@ -10062,7 +10063,6 @@ public final class ArcadePortManager implements Listener {
         session.bombPrimed.remove(bombId);
         session.bombDirectHitResolved.remove(bombId);
         session.bombKillsByTnt.remove(bombId);
-        session.evolutionCreeperTnt.remove(bombId);
     }
 
     private boolean isBombTouchingAnyBlock(TNTPrimed bomb) {
@@ -10111,29 +10111,61 @@ public final class ArcadePortManager implements Listener {
         player.sendActionBar(ChatColor.AQUA + "Wind Charge launched!");
     }
 
-    private boolean throwEvolutionCreeperCharge(Session session, Player player) {
+    private boolean throwEvolutionSulphurBomb(Session session, Player player) {
         if (session == null || active != session || session.type != ArcadePortGame.EVOLUTION
                 || player == null || !player.isOnline()
                 || !session.alive.contains(player.getUniqueId())
                 || session.evolving.contains(player.getUniqueId())) return false;
+        UUID playerId = player.getUniqueId();
         ItemStack held = player.getInventory().getItemInMainHand();
-        if (!ArcadePortRules.canUseEvolutionCreeperCharge(
-                session.evolutionLevels.getOrDefault(player.getUniqueId(), 0), true,
-                held != null && held.getType() == Material.TNT)) return false;
-        consumeHeld(player);
-        Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.0D));
-        TNTPrimed bomb = session.world.spawn(spawn, TNTPrimed.class);
-        bomb.setFuseTicks(ArcadePortRules.BOMB_LOBBERS_FUSE_TICKS);
-        Vector velocity = player.getLocation().getDirection().normalize().multiply(2.0D);
-        velocity.setY(velocity.getY() + 0.1D);
-        bomb.setVelocity(velocity);
-        session.entities.add(bomb);
-        session.bombOwners.put(bomb.getUniqueId(), player.getUniqueId());
-        session.evolutionCreeperTnt.add(bomb.getUniqueId());
-        session.bombLastLocations.put(bomb.getUniqueId(), spawn.clone());
-        session.bombCreatedAt.put(bomb.getUniqueId(), System.currentTimeMillis());
-        player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.1F);
+        if (!ArcadePortRules.canUseEvolutionSulphurBomb(
+                session.evolutionLevels.getOrDefault(playerId, 0), true,
+                held != null && held.getType() == Material.COAL)) return false;
+        long now = System.currentTimeMillis();
+        long readyAt = session.evolutionSulphurBombReadyAt.getOrDefault(playerId, 0L);
+        if (!ArcadePortRules.isEvolutionSulphurBombReady(now, readyAt)) {
+            player.sendActionBar(ChatColor.YELLOW + "Sulphur Bomb ready in "
+                    + ArcadePortRules.formatEvolutionPityRemaining(readyAt - now));
+            return false;
+        }
+        session.evolutionSulphurBombReadyAt.put(playerId,
+                ArcadePortRules.nextEvolutionSulphurBombReadyAt(now));
+        Snowball projectile = player.launchProjectile(Snowball.class);
+        projectile.setItem(new ItemStack(Material.COAL));
+        Vector velocity = player.getEyeLocation().getDirection().normalize()
+                .multiply(ArcadePortRules.EVOLUTION_SULPHUR_BOMB_SPEED);
+        projectile.setVelocity(velocity);
+        session.entities.add(projectile);
+        session.evolutionSulphurBombs.add(projectile.getUniqueId());
+        player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.8F, 0.75F);
+        player.sendActionBar(ChatColor.DARK_GRAY + "Sulphur Bomb launched");
         return true;
+    }
+
+    private void resolveEvolutionSulphurBomb(Session session, Player shooter, Location impact) {
+        if (session == null || active != session || session.type != ArcadePortGame.EVOLUTION
+                || shooter == null || !shooter.isOnline()
+                || !session.alive.contains(shooter.getUniqueId())
+                || impact == null || impact.getWorld() != session.world) return;
+        session.world.spawnParticle(Particle.EXPLOSION, impact, 1, 0.05D, 0.05D, 0.05D, 0.0D);
+        session.world.spawnParticle(Particle.SMOKE, impact, 10, 0.25D, 0.2D, 0.25D, 0.015D);
+        session.world.playSound(impact, Sound.ENTITY_GENERIC_EXPLODE, 0.7F, 1.5F);
+        long now = System.currentTimeMillis();
+        for (Player target : alivePlayers(session)) {
+            if (target.getUniqueId().equals(shooter.getUniqueId())) continue;
+            double distance = target.getLocation().distance(impact);
+            if (!ArcadePortRules.isEvolutionSulphurBombInRange(distance)) continue;
+            if (session.evolving.contains(target.getUniqueId())) interruptEvolutionForHit(session, target);
+            recordEvolutionDamage(session, target, shooter, now);
+            double damage = ArcadePortRules.EVOLUTION_SULPHUR_BOMB_DAMAGE;
+            if (target.getHealth() <= damage) {
+                eliminate(session, target, shooter, "was hit by " + shooter.getName() + "'s Sulphur Bomb");
+                if (active != session) return;
+            } else {
+                target.setHealth(target.getHealth() - damage);
+                target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.7F, 1.15F);
+            }
+        }
     }
 
     private boolean throwBombLobbersTnt(Session session, Player player) {
@@ -10334,8 +10366,6 @@ public final class ArcadePortManager implements Listener {
         int priorTntKills = session.bombKillsByTnt.getOrDefault(bombId, 0);
         String bombPowerupType = session.bombPowerTypes.getOrDefault(bombId, "normal");
         boolean bombLobbersBlast = session.type == ArcadePortGame.BOMB_LOBBERS;
-        boolean evolutionBlast = session.type == ArcadePortGame.EVOLUTION
-                && ownerId != null && session.evolutionCreeperTnt.contains(bombId);
         Player owner = ownerId == null ? null : session.players.get(ownerId);
         if (bombLobbersBlast && ArcadePortRules.shouldCancelBombLobbersExplosion(
                 owner != null && owner.isOnline(),
@@ -10351,12 +10381,10 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
-        if (ownerId != null && (bombLobbersBlast || evolutionBlast)) {
+        if (ownerId != null && bombLobbersBlast) {
             Location blast = bomb.getLocation().clone();
             Map<UUID, Double> blastExposure = new HashMap<>();
-            double bombBlastRadius = bombLobbersBlast
-                    ? ArcadePortRules.bombLobbersExplosionRadius(bombPowerupType)
-                    : ArcadePortRules.BOMB_LOBBERS_EXPLOSION_RADIUS;
+            double bombBlastRadius = ArcadePortRules.bombLobbersExplosionRadius(bombPowerupType);
             if (bombLobbersBlast) {
                 for (Player target : alivePlayers(session)) {
                     // Vanilla 1.8 evaluates explosion intensity at the entity's head position;
@@ -10388,58 +10416,33 @@ public final class ArcadePortManager implements Listener {
             removeBombTracking(session, bombId);
             session.entities.remove(bomb);
             bomb.remove();
-            if (bombLobbersBlast) {
-                renderBombLobbersExplosion(session, blast, owner, bombPowerupType);
-            } else {
-                session.world.spawnParticle(Particle.EXPLOSION_EMITTER, blast, 1);
-                session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
-            }
+            renderBombLobbersExplosion(session, blast, owner, bombPowerupType);
             int killsFromThisTnt = priorTntKills;
             for (Player target : alivePlayers(session)) {
-                // A Creeper blast can interrupt the vulnerable evolution animation just
-                // like melee and projectile hits.
-                if (evolutionBlast && session.evolving.contains(target.getUniqueId())) {
-                    interruptEvolutionForHit(session, target);
-                }
                 // Reborn applies its nearby-player explosion condition without team filtering.
                 double distance = target.getLocation().distance(blast);
-                double radius = bombLobbersBlast ? bombBlastRadius : 8.0D;
+                double radius = bombBlastRadius;
                 if (distance > radius) continue;
-                double exposure = bombLobbersBlast
-                        ? blastExposure.getOrDefault(target.getUniqueId(), 0.0D) : 1.0D;
+                double exposure = blastExposure.getOrDefault(target.getUniqueId(), 0.0D);
                 Vector away = target.getEyeLocation().toVector().subtract(blast.toVector());
-                if (bombLobbersBlast) {
-                    double impact = Math.max(0.0D,
-                            1.0D - distance / bombBlastRadius) * exposure;
-                    target.setVelocity(ArcadePortRules.bombLobbersExplosionVelocity(
-                            target.getVelocity(), away, impact));
-                } else {
-                    if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 1.0D, 0.0D);
-                    double force = 1.9D * (1.0D - distance / 8.0D);
-                    target.setVelocity(away.normalize().multiply(force)
-                            .setY(Math.max(0.25D, 0.65D - distance * 0.045D)));
-                }
+                double impact = Math.max(0.0D,
+                        1.0D - distance / bombBlastRadius) * exposure;
+                target.setVelocity(ArcadePortRules.bombLobbersExplosionVelocity(
+                        target.getVelocity(), away, impact));
                 target.getWorld().spawnParticle(Particle.CLOUD,
                         target.getLocation().add(0.0D, 1.0D, 0.0D),
                         12, 0.35D, 0.45D, 0.35D, 0.05D);
                 target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.2F);
-                double blastDamage = bombLobbersBlast
-                        ? ArcadePortRules.bombLobbersBlastDamage(distance, exposure, bombBlastRadius,
-                                ArcadePortRules.bombLobbersExplosionMaxDamage(bombPowerupType))
-                        : Math.max(0.0D, 10.0D * (1.0D - distance / 8.0D));
-                if (bombLobbersBlast) {
-                    blastDamage = bombLobbersDamageAfterArmor(target, blastDamage);
-                    if (ArcadePortRules.bombLobbersTntIgnites(bombPowerupType) && exposure > 0.05D) {
-                        target.setFireTicks(100);
-                    }
+                double blastDamage = ArcadePortRules.bombLobbersBlastDamage(
+                        distance, exposure, bombBlastRadius,
+                        ArcadePortRules.bombLobbersExplosionMaxDamage(bombPowerupType));
+                blastDamage = bombLobbersDamageAfterArmor(target, blastDamage);
+                if (ArcadePortRules.bombLobbersTntIgnites(bombPowerupType) && exposure > 0.05D) {
+                    target.setFireTicks(100);
                 }
                 if (blastDamage > 0.0D) {
-                    if (bombLobbersBlast) {
-                        session.bombPlayersDamaged.add(target.getUniqueId());
-                        recordBombLobbersDamage(session, target, ownerId, System.currentTimeMillis());
-                    } else if (evolutionBlast && owner != null && owner.isOnline()) {
-                        recordEvolutionDamage(session, target, owner, System.currentTimeMillis());
-                    }
+                    session.bombPlayersDamaged.add(target.getUniqueId());
+                    recordBombLobbersDamage(session, target, ownerId, System.currentTimeMillis());
                     if (target.getHealth() <= blastDamage) {
                         if (bombLobbersBlast && owner != null && owner.isOnline()
                                 && session.players.containsKey(ownerId) && !target.getUniqueId().equals(ownerId)) {
@@ -10499,6 +10502,7 @@ public final class ArcadePortManager implements Listener {
             session.evolutionPityUntil.remove(id);
             session.evolutionKillsAtAttempt.remove(id);
             session.evolutionOverkillEligible.remove(id);
+            session.evolutionSulphurBombReadyAt.remove(id);
             session.evolutionDamageContributors.remove(id);
             for (Map<UUID, Long> contributors : session.evolutionDamageContributors.values()) {
                 contributors.remove(id);
@@ -10577,7 +10581,8 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, BlockDisplay> evolutionEggDisplays = new HashMap<>();
         final Map<UUID, String> evolutionEggVariants = new HashMap<>();
         final Map<UUID, Long> evolutionEggNextParticleAt = new HashMap<>();
-        final Set<UUID> evolutionCreeperTnt = new HashSet<>();
+        final Set<UUID> evolutionSulphurBombs = new HashSet<>();
+        final Map<UUID, Long> evolutionSulphurBombReadyAt = new HashMap<>();
         final Map<UUID, Integer> gladiatorPairs = new HashMap<>();
         final Set<Integer> gladiatorResolvedPairs = new HashSet<>();
         int gladiatorRound = -1;
