@@ -7255,6 +7255,8 @@ public final class ArcadePortManager implements Listener {
                     + " A" + sheepQuestTeamCount(session, 1) + " G" + sheepQuestTeamCount(session, 2)
                     + " Y" + sheepQuestTeamCount(session, 3);
             case SPLEEF -> "snowballs " + inventoryCount(player, Material.SNOWBALL);
+            case SKY_WARS -> (session.skyWarsLive ? "alive " : "starting ")
+                    + session.alive.size() + " | TNT " + inventoryCount(player, Material.TNT);
             case TURF_WARS -> (session.turfCombat ? "COMBAT" : "BUILD") + " | turf " + session.turfFrontlineX;
         };
     }
