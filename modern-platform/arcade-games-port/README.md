@@ -107,3 +107,8 @@ Live acceptance still needs to check the three achievement thresholds, the 90-se
 4. Confirm slow-damage colour transitions do not play a break effect until the block is actually destroyed, and the original block material is used for the Ice Shards fragments.
 
 The catalogue and renderer contract are covered by unit tests. A passing build does not replace live two-client acceptance on Paper 26.3; Spleef remains `MECHANICS_IN_PROGRESS` until that check is completed.
+
+
+## Wither Assault: smoother movement
+
+Wither flight speed follows a continuous altitude curve. Near the spawn height, an eased transition blends the source hover speed into the altitude-based curve, while a per-tick rate limit prevents sudden changes during climbs and descents.

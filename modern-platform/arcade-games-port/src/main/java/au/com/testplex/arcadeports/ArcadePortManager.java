@@ -27,6 +27,10 @@ import org.bukkit.block.BlockState;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Arrow;
+import org.bukkit.entity.Ageable;
+import org.bukkit.entity.Cow;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.WitherSkull;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.EnderPearl;
@@ -72,6 +76,8 @@ import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerBucketFillEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -1047,8 +1053,9 @@ public final class ArcadePortManager implements Listener {
         session.endsAt = (type == ArcadePortGame.BACON_BRAWL
                 && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER)
                 || (type == ArcadePortGame.DRAGON_ESCAPE && !ArcadePortRules.DRAGON_ESCAPE_HAS_ROUND_TIMER)
-                || type == ArcadePortGame.DRAGONS
-                ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
+                || type == ArcadePortGame.DRAGONS || type == ArcadePortGame.MILK_THE_COW
+                ? 0L : now + (type == ArcadePortGame.WITHER_ASSAULT ? 300_000L
+                : type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 600_000L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
                 : type == ArcadePortGame.DEATH_TAG ? ArcadePortRules.DEATH_TAG_GAME_TIMEOUT_MILLIS
@@ -1136,6 +1143,18 @@ public final class ArcadePortManager implements Listener {
         }
         border.setDamageAmount(0.0D);
         List<Location> spawns = spawnLocations(type, participants.size());
+        Set<Integer> specialTeamSlots = new HashSet<>();
+        if (type == ArcadePortGame.MILK_THE_COW || type == ArcadePortGame.WITHER_ASSAULT) {
+            int specialCount = type == ArcadePortGame.MILK_THE_COW
+                    ? MilkCowRules.cowCountForPlayers(participants.size())
+                    : participants.size() > 1 ? Math.max(1, (int) Math.round(participants.size() * 0.25D)) : 0;
+            specialTeamSlots.addAll(randomPlayerSlots(participants.size(), specialCount));
+        }
+        if (type == ArcadePortGame.WITHER_ASSAULT) {
+            session.witherAssaultSpawnY = 76.0D;
+            session.witherAssaultYLimit = 76.0D;
+            session.witherAssaultAttackStartsAt = now + 15_000L;
+        }
         for (int i = 0; i < participants.size(); i++) {
             Player player = participants.get(i);
             PlayerSnapshot pendingSnapshot = pendingRestore.remove(player.getUniqueId());
@@ -1179,12 +1198,18 @@ public final class ArcadePortManager implements Listener {
             int teamCount = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST ? 4 : 2;
             boolean teamMode = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST
                     || type == ArcadePortGame.BOMB_LOBBERS || type == ArcadePortGame.PAINTBALL
-                    || type == ArcadePortGame.TURF_WARS;
+                    || type == ArcadePortGame.TURF_WARS || type == ArcadePortGame.MILK_THE_COW
+                    || type == ArcadePortGame.WITHER_ASSAULT;
             SourceMapCatalog.MapData selectedMap = sourceMapData.get(type.id());
-            int teamId = teamMode && selectedMap != null
-                    ? selectedMap.teamIndexForSpawn(i, teamCount)
+            int teamId = (type == ArcadePortGame.MILK_THE_COW || type == ArcadePortGame.WITHER_ASSAULT)
+                    ? (specialTeamSlots.contains(i) ? 1 : 0)
+                    : teamMode && selectedMap != null ? selectedMap.teamIndexForSpawn(i, teamCount)
                     : teamMode ? i % teamCount : i % 2;
             session.teams.put(player.getUniqueId(), teamId);
+            if (type == ArcadePortGame.WITHER_ASSAULT && teamId == 0) {
+                session.witherAssaultKits.put(player.getUniqueId(),
+                        switch (Math.floorMod(i, 3)) { case 1 -> "medic"; case 2 -> "editor"; default -> "archer"; });
+            }
             if (type == ArcadePortGame.BACON_BRAWL) {
                 UUID baconId = player.getUniqueId();
                 session.baconKits.put(baconId, baconKitPreferences.getOrDefault(baconId, "el-muchacho-pigo"));
@@ -1227,6 +1252,8 @@ public final class ArcadePortManager implements Listener {
                 session.dragonNextArrowAt.put(playerId, now + ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
             }
             Location spawn = spawns.get(i % spawns.size()).clone();
+            if (type == ArcadePortGame.WITHER_ASSAULT && teamId == 1) spawn.setY(session.witherAssaultSpawnY);
+            if (type == ArcadePortGame.MILK_THE_COW) session.milkRespawnSpawns.put(player.getUniqueId(), spawn.clone());
             if (type == ArcadePortGame.DRAGON_ESCAPE) {
                 UUID dragonPlayerId = player.getUniqueId();
                 session.dragonEscapeStartLocations.put(dragonPlayerId, spawn.clone());
@@ -1333,11 +1360,21 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.SHEEP_QUEST) {
             for (int i = 0; i < ArcadePortRules.SHEEP_QUEST_INITIAL_SHEEP; i++) spawnSheep(session);
         }
+        if (type == ArcadePortGame.MILK_THE_COW) spawnMilkCowMapAnimals(session);
+        if (type == ArcadePortGame.WITHER_ASSAULT) {
+            for (Player player : alivePlayers(session)) {
+                if (session.teams.getOrDefault(player.getUniqueId(), 0) == 1) {
+                    player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 300, 0, false, false, false));
+                }
+            }
+        }
         if (type == ArcadePortGame.DRAGONS) spawnTestDragons(session);
         if (type == ArcadePortGame.GLADIATORS && participants.size() > 1) {
             startGladiatorsRound(session, alivePlayers(session), true);
         }
         if (type == ArcadePortGame.MICRO_BATTLES) announce(session, ChatColor.AQUA + "Micro Battles: gather blocks; glass barriers drop after 10 seconds.");
+        if (type == ArcadePortGame.MILK_THE_COW) announce(session, ChatColor.YELLOW + "Farmers: milk the Cows and drink milk to score. First to 15 wins.");
+        if (type == ArcadePortGame.WITHER_ASSAULT) announce(session, ChatColor.GREEN + "Humans: survive for five minutes. Withers: eliminate every Human.");
         else announce(session, ChatColor.GOLD + type.displayName() + " started! This is a first-pass mechanics test.");
         if (type == ArcadePortGame.TURF_WARS) {
             long openingSeconds = ArcadePortRules.turfWarsInitialBuildPhaseMillis(mixedArcadeVariant) / 1_000L;
@@ -3589,6 +3626,8 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
         if (session.type == ArcadePortGame.GLADIATORS) updateGladiators(session, now);
+        if (session.type == ArcadePortGame.MILK_THE_COW) updateMilkCow(session, now);
+        if (session.type == ArcadePortGame.WITHER_ASSAULT) updateWitherAssault(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             enforceMicroBattlesHunger(session);
             updateMicroBattlesArrows(session, now);
@@ -6993,6 +7032,10 @@ public final class ArcadePortManager implements Listener {
                     + " Y" + sheepQuestTeamCount(session, 3);
             case SPLEEF -> "snowballs " + inventoryCount(player, Material.SNOWBALL);
             case TURF_WARS -> (session.turfCombat ? "COMBAT" : "BUILD") + " | turf " + session.turfFrontlineX;
+            case MILK_THE_COW -> "milk " + scoreFor(session, id) + "/" + MilkCowRules.SCORE_TO_WIN
+                    + (session.teams.getOrDefault(id, 0) == 1 ? " | COW" : " | FARMER");
+            case WITHER_ASSAULT -> (session.teams.getOrDefault(id, 0) == 1 ? "WITHER" : "HUMAN")
+                    + " | " + Math.max(0, (int) ((session.endsAt - System.currentTimeMillis()) / 1_000L)) + "s";
         };
     }
 
@@ -7014,6 +7057,20 @@ public final class ArcadePortManager implements Listener {
         if (session.alive.isEmpty()) {
             if (!ArcadePortRules.shouldFinishWhenNobodyIsAlive(session.alive.size(), session.respawning.size())) return;
             finish(session, null, true);
+            return;
+        }
+        if (session.type == ArcadePortGame.MILK_THE_COW && session.participantsAtStart > 1) {
+            long farmers = session.alive.stream().filter(id -> session.teams.getOrDefault(id, 0) == 0).count();
+            long cows = session.alive.stream().filter(id -> session.teams.getOrDefault(id, 0) == 1).count();
+            if (farmers == 0 && cows > 0) finish(session, bestTimeoutPlayerOnTeam(session, 1), true);
+            else if (cows == 0 && farmers > 0) updateMilkCow(session, System.currentTimeMillis());
+            return;
+        }
+        if (session.type == ArcadePortGame.WITHER_ASSAULT && session.participantsAtStart > 1) {
+            long humans = session.alive.stream().filter(id -> session.teams.getOrDefault(id, 0) == 0).count();
+            long withers = session.alive.stream().filter(id -> session.teams.getOrDefault(id, 0) == 1).count();
+            if (humans == 0 && withers > 0) finish(session, bestTimeoutPlayerOnTeam(session, 1), true);
+            else if (withers == 0 && humans > 0) updateWitherAssault(session, System.currentTimeMillis());
             return;
         }
         // Dragon Escape is a course race: one surviving racer is not a round winner.
@@ -7795,7 +7852,9 @@ public final class ArcadePortManager implements Listener {
             return ArcadePortRules.deathTagHasRunnerWinner(runners.size()) ? runners.get(0) : null;
         }
         int team = -1;
-        if (session.type == ArcadePortGame.TURF_WARS) {
+        if (session.type == ArcadePortGame.WITHER_ASSAULT) {
+            team = 0;
+        } else if (session.type == ArcadePortGame.TURF_WARS) {
             team = ArcadePortRules.turfWarsTimeoutLeader(session.turfFrontlineX,
                     session.turfInitialFrontlineX, timeoutTeamKills(session, 0), timeoutTeamKills(session, 1));
         } else if (session.type == ArcadePortGame.MICRO_BATTLES
@@ -7811,7 +7870,8 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.TURF_WARS
                 || session.type == ArcadePortGame.MICRO_BATTLES
                 || session.type == ArcadePortGame.PAINTBALL
-                || session.type == ArcadePortGame.BOMB_LOBBERS) {
+                || session.type == ArcadePortGame.BOMB_LOBBERS
+                || session.type == ArcadePortGame.WITHER_ASSAULT) {
             // These games use team objectives at timeout. If the team standings are tied,
             // don't override the draw with one player's personal score.
             return team < 0 ? null : bestTimeoutPlayerOnTeam(session, team);
