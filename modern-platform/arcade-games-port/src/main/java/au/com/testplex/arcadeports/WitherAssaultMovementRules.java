@@ -10,7 +10,7 @@ package au.com.testplex.arcadeports;
 public final class WitherAssaultMovementRules {
     public static final double MIN_FLY_SPEED = 0.01D;
     public static final double SPAWN_HOVER_SPEED = 0.016D;
-    public static final double MAX_FLY_SPEED = 0.8D;
+    public static final double MAX_FLY_SPEED = 1.0D;
     public static final double BASE_FLY_SPEED = 0.09D;
     public static final double SPEED_PER_Y_BLOCK = 0.006D;
     public static final double BLEND_START_BLOCKS = 2.0D;
