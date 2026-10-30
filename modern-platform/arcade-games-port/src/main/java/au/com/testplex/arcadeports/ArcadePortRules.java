@@ -1688,6 +1688,16 @@ public final class ArcadePortRules {
         return Math.max(0.0D, targetDistance) / 100.0D;
     }
 
+    /** Resolve a saved Quiver arrow-flight cosmetic, including the catalogue's default. */
+    public static String normalizeQuiverArrowFlightCosmetic(String requested) {
+        if (requested == null) return "bullseye-dash";
+        return switch (requested.trim().toLowerCase(java.util.Locale.ROOT)) {
+            case "fletching-sparks", "ricochet-rune", "bullseye-dash" ->
+                    requested.trim().toLowerCase(java.util.Locale.ROOT);
+            default -> "bullseye-dash";
+        };
+    }
+
     /** Leaper flight can be re-enabled only on landing, never during the launch frame. */
     public static boolean shouldRearmQuiverLeap(boolean onGround, boolean awaitingLanding, double verticalVelocity) {
         if (!onGround) return false;
