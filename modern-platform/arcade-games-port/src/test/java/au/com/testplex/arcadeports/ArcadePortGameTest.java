@@ -3,7 +3,6 @@ package au.com.testplex.arcadeports;
 import org.junit.jupiter.api.Test;
 import org.bukkit.Material;
 import org.bukkit.util.Vector;
-import org.bukkit.util.Vector;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
@@ -1913,59 +1912,19 @@ class ArcadePortGameTest {
                 ArcadePortRules.gladiatorsMilestoneConfigKey(player));
     }
 
-    @Test void gladiatorsVoteModesExposeTheCorrectClassicToolAvailability() {
-        assertTrue(GladiatorsMode.fromId("rodless").bowAvailable());
-        assertFalse(GladiatorsMode.fromId("rodless").rodAvailable());
-        assertTrue(GladiatorsMode.fromId("bowless").rodAvailable());
-        assertFalse(GladiatorsMode.fromId("bowless").bowAvailable());
-        assertFalse(GladiatorsMode.fromId("modern").hasClassicRangedTools());
-        assertFalse(GladiatorsMode.fromId("pot").hasClassicRangedTools());
-        assertNull(GladiatorsMode.fromId("not-a-mode"));
-    }
+    
 
-    @Test void gladiatorsChallengeAchievementRequiresAvailableClassicToolsAndNoUse() {
-        assertTrue(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(true, false, false));
-        assertFalse(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(true, true, false));
-        assertFalse(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(true, false, true));
-        assertFalse(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(false, false, false));
-    }
+    
 
-    @Test void gladiatorsFirstLossMovesToLowerBracketAndSecondLossEliminates() {
-        assertFalse(ArcadePortRules.shouldEliminateGladiatorAfterLoss(0));
-        assertFalse(ArcadePortRules.shouldEliminateGladiatorAfterLoss(1));
-        assertTrue(ArcadePortRules.shouldEliminateGladiatorAfterLoss(2));
-        assertTrue(ArcadePortRules.shouldEliminateGladiatorAfterLoss(3));
-    }
+    
 
-    @Test void gladiatorsLoserArenaContainsTheDuelFootprint() {
-        assertFalse(ArcadePortRules.isOutsideGladiatorsLoserArena(0.5D, 0.5D, 0.5D, 0.5D));
-        assertFalse(ArcadePortRules.isOutsideGladiatorsLoserArena(4.1D, -3.1D, 0.5D, 0.5D));
-        assertTrue(ArcadePortRules.isOutsideGladiatorsLoserArena(4.151D, 0.5D, 0.5D, 0.5D));
-        assertTrue(ArcadePortRules.isOutsideGladiatorsLoserArena(Double.NaN, 0.0D, 0.0D, 0.0D));
-    }
+    
 
-    @Test void gladiatorsSourceMapBoundsUseInclusiveWorldConfigBlockCoordinates() {
-        assertFalse(ArcadePortRules.isOutsideGladiatorsSourceMap(-0.5D, 10.5D, -1, 20, 0, 30));
-        assertFalse(ArcadePortRules.isOutsideGladiatorsSourceMap(20.999D, 30.999D, -1, 20, 0, 30));
-        assertTrue(ArcadePortRules.isOutsideGladiatorsSourceMap(-1.0D, 10.5D, -1, 20, 0, 30));
-        assertTrue(ArcadePortRules.isOutsideGladiatorsSourceMap(21.0D, 10.5D, -1, 20, 0, 30));
-    }
+    
 
-    @Test void gladiatorsHalfHeartAchievementUsesOneHealthPoint() {
-        assertTrue(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(1.0D));
-        assertTrue(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(0.5D));
-        assertFalse(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(1.01D));
-        assertFalse(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(0.0D));
-        assertFalse(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(Double.NaN));
-    }
+    
 
-    @Test void gladiatorsAchievementAndLoserBracketMilestoneKeysArePlayerScoped() {
-        java.util.UUID player = java.util.UUID.fromString("12345678-1234-1234-1234-123456789abc");
-        assertEquals("test-achievements.gladiators." + player + ".are-you-not-entertained",
-                ArcadePortRules.gladiatorsAchievementConfigKey(player, "Are You Not Entertained"));
-        assertEquals("test-milestones.gladiators." + player + ".silky-seconds",
-                ArcadePortRules.gladiatorsMilestoneConfigKey(player));
-    }
+    
 
     @Test void gladiatorsWaitFiveSecondsAndKeepCombatInsideTheCurrentDuel() {
         assertEquals(5_000L, ArcadePortRules.GLADIATOR_ROUND_COUNTDOWN_MILLIS);
@@ -2019,26 +1978,9 @@ class ArcadePortGameTest {
         assertEquals(10.0D, ArcadePortRules.DRAGONS_PARTICIPATION_GEMS, 0.00001D);
     }
 
-    @Test void dragonsSoloScoreboardMatchesSourceThresholds() {
-        assertEquals(0, ArcadePortRules.dragonsSoloScoreboardMode(14, 14));
-        assertEquals(0, ArcadePortRules.dragonsSoloScoreboardMode(14, 3));
-        assertEquals(1, ArcadePortRules.dragonsSoloScoreboardMode(15, 15));
-        assertEquals(1, ArcadePortRules.dragonsSoloScoreboardMode(25, 15));
-        assertEquals(2, ArcadePortRules.dragonsSoloScoreboardMode(16, 16));
-        assertEquals(2, ArcadePortRules.dragonsSoloScoreboardMode(40, 20));
-    }
+    
 
-    @Test void dragonsSoloSurvivalAndPlacementGemRulesMatchSource() {
-        assertEquals(0.0D, ArcadePortRules.dragonSurvivalGems(-1L), 0.00001D);
-        assertEquals(0.9999D, ArcadePortRules.dragonSurvivalGems(9_999L), 0.00001D);
-        assertEquals(1.0D, ArcadePortRules.dragonSurvivalGems(10_000L), 0.00001D);
-        assertEquals(12.5D, ArcadePortRules.dragonSurvivalGems(125_000L), 0.00001D);
-        assertEquals(20.0D, ArcadePortRules.dragonPlacementGemReward(1), 0.00001D);
-        assertEquals(15.0D, ArcadePortRules.dragonPlacementGemReward(2), 0.00001D);
-        assertEquals(10.0D, ArcadePortRules.dragonPlacementGemReward(3), 0.00001D);
-        assertEquals(0.0D, ArcadePortRules.dragonPlacementGemReward(4), 0.00001D);
-        assertEquals(10.0D, ArcadePortRules.DRAGONS_PARTICIPATION_GEMS, 0.00001D);
-    }
+    
 
     @Test void dragonContactHitsRespectPerPlayerCooldown() {
         assertTrue(ArcadePortRules.shouldApplyDragonContactHit(10_000L, 0L));
@@ -2104,63 +2046,15 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.canUseDragonSpectatorTeleport(2_999L, 3_000L));
     }
 
-    @Test void dragonsLeapMatchesSourceVectorAndGroundBoost() {
-        Vector grounded = ArcadePortRules.dragonsLeapVelocity(new Vector(0.0D, 0.0D, 1.0D), true);
-        assertEquals(0.0D, grounded.getX(), 0.00001D);
-        assertEquals(0.4D, grounded.getY(), 0.00001D);
-        assertEquals(1.2D, grounded.getZ(), 0.00001D);
-        Vector airborne = ArcadePortRules.dragonsLeapVelocity(new Vector(0.0D, 0.0D, 1.0D), false);
-        assertEquals(0.2D, airborne.getY(), 0.00001D);
-        Vector lookingUp = ArcadePortRules.dragonsLeapVelocity(new Vector(0.0D, 1.0D, 0.0D), true);
-        assertEquals(1.2D, lookingUp.getY(), 0.00001D);
-        assertEquals(0.0D, ArcadePortRules.dragonsLeapVelocity(new Vector(), true).length(), 0.00001D);
-    }
+    
 
-    @Test void dragonsContactKnockbackMatchesSourceTrajectoryAndGroundBoost() {
-        Vector grounded = ArcadePortRules.dragonsContactKnockback(new Vector(0.0D, 0.0D, 1.0D), true);
-        assertEquals(0.8D, grounded.getY(), 0.00001D);
-        assertEquals(1.0D, grounded.getZ(), 0.00001D);
-        Vector airborne = ArcadePortRules.dragonsContactKnockback(new Vector(0.0D, 0.0D, 1.0D), false);
-        assertEquals(0.6D, airborne.getY(), 0.00001D);
-    }
+    
 
-    @Test void dragonsDisableDirectAndProjectilePvpAndOnlyAllowEmeraldWorldItems() {
-        assertTrue(ArcadePortRules.shouldCancelDragonsPvp(true, false));
-        assertTrue(ArcadePortRules.shouldCancelDragonsPvp(false, true));
-        assertFalse(ArcadePortRules.shouldCancelDragonsPvp(false, false));
-        assertTrue(ArcadePortRules.shouldAllowDragonWorldItem(Material.EMERALD));
-        assertFalse(ArcadePortRules.shouldAllowDragonWorldItem(Material.ARROW));
-        assertFalse(ArcadePortRules.shouldAllowDragonWorldItem(Material.FIREWORK_ROCKET));
-    }
+    
 
-    @Test void dragonsFlareChargesAndLegacyAbilityRefreshValuesAreExplicit() {
-        assertEquals(1, ArcadePortRules.dragonsFlareCharges("coward"));
-        assertEquals(3, ArcadePortRules.dragonsFlareCharges("marksman"));
-        assertEquals(2, ArcadePortRules.dragonsFlareCharges("pyrotechnic"));
-        assertEquals(3, ArcadePortRules.dragonsFlareCharges("Dragons Marksman"));
-        assertEquals(0, ArcadePortRules.dragonsFlareCharges("unknown"));
-        assertEquals(1, ArcadePortRules.DRAGONS_MARKSMAN_START_ARROWS);
-        assertEquals(4, ArcadePortRules.DRAGONS_MARKSMAN_MAX_ARROWS);
-        assertEquals(4_000L, ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
-        assertEquals(2, ArcadePortRules.DRAGONS_MAX_SPARKLERS);
-        assertEquals(25_000L, ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS);
-    }
+    
 
-    @Test void dragonFlareExclusionUsesAHorizontalRadiusAndLimitedVerticalEnvelope() {
-        assertTrue(ArcadePortRules.isDragonFlareLocationProtected(0.0D, 0.0D));
-        assertTrue(ArcadePortRules.isDragonFlareLocationProtected(ArcadePortRules.DRAGONS_FLARE_RADIUS_SQUARED, 0.0D));
-        assertTrue(ArcadePortRules.isDragonFlareLocationProtected(100.0D, 24.0D));
-        assertFalse(ArcadePortRules.isDragonFlareLocationProtected(ArcadePortRules.DRAGONS_FLARE_RADIUS_SQUARED + 0.01D, 0.0D));
-        assertFalse(ArcadePortRules.isDragonFlareLocationProtected(1.0D, 24.01D));
-        assertFalse(ArcadePortRules.isDragonFlareLocationProtected(-1.0D, 0.0D));
-        assertFalse(ArcadePortRules.isDragonFlareLocationProtected(Double.NaN, 0.0D));
-        assertTrue(ArcadePortRules.isDragonFlareActive(5_999L, 6_000L));
-        assertFalse(ArcadePortRules.isDragonFlareActive(6_000L, 6_000L));
-        assertEquals(6_000L, ArcadePortRules.DRAGONS_FLARE_DURATION_MILLIS);
-        assertEquals(3_000L, ArcadePortRules.DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
-        assertTrue(ArcadePortRules.canUseDragonSpectatorTeleport(3_000L, 3_000L));
-        assertFalse(ArcadePortRules.canUseDragonSpectatorTeleport(2_999L, 3_000L));
-    }
+    
 
     @Test void dragonEscapeHasAThreeDimensionalFinishWaypoint() {
         assertEquals(77.5D, ArcadePortRules.DRAGON_ESCAPE_FINISH_Z);
