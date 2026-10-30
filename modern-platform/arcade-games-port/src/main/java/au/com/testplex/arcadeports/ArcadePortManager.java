@@ -40,6 +40,7 @@ import org.bukkit.entity.Sheep;
 import org.bukkit.entity.Snowball;
 import org.bukkit.entity.TNTPrimed;
 import org.bukkit.entity.ThrownPotion;
+import org.bukkit.entity.ThrownPotion;
 import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -58,6 +59,7 @@ import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
@@ -1618,7 +1620,7 @@ public final class ArcadePortManager implements Listener {
         GladiatorMenuHolder holder = new GladiatorMenuHolder(GladiatorMenuType.VOTE);
         Inventory inventory = Bukkit.createInventory(holder, 27, "Gladiators — PvP Vote");
         holder.inventory = inventory;
-        Material[] icons = {Material.FISHING_ROD, Material.BOW, Material.SHIELD, Material.SPLASH_POTION};
+        Material[] icons = {Material.BOW, Material.FISHING_ROD, Material.SHIELD, Material.SPLASH_POTION};
         GladiatorsMode[] modes = GladiatorsMode.values();
         int[] slots = {10, 12, 14, 16};
         for (int i = 0; i < modes.length; i++) {
@@ -1745,18 +1747,6 @@ public final class ArcadePortManager implements Listener {
             }
         }
         for (int i = 0; i < 9; i++) player.getInventory().setItem(i, ordered[i]);
-    }
-
-    private void useGladiatorHealingPotion(Player player, ItemStack item) {
-        if (item == null || player == null || !player.isOnline()) return;
-        double before = player.getHealth();
-        player.setHealth(Math.min(player.getMaxHealth(), before + 4.0D));
-        item.setAmount(item.getAmount() - 1);
-        player.getWorld().spawnParticle(Particle.HEART,
-                player.getLocation().clone().add(0.0D, 1.0D, 0.0D), 8, 0.35D, 0.45D, 0.35D, 0.02D);
-        player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_DRINK, 0.9F, 1.2F);
-        player.sendActionBar(ChatColor.LIGHT_PURPLE + "Potion used — +" + (int) (player.getHealth() - before) + " health");
-        player.updateInventory();
     }
 
     private String gladiatorKillMessageStyle(Player killer) {
@@ -2132,6 +2122,9 @@ public final class ArcadePortManager implements Listener {
                 ItemStack potions = namedItem(Material.SPLASH_POTION, "Healing Potions",
                         "Right-click to restore two hearts.", 5);
                 ItemMeta meta = potions.getItemMeta();
+                if (meta instanceof org.bukkit.inventory.meta.PotionMeta potionMeta) {
+                    potionMeta.setColor(Color.PURPLE);
+                }
                 meta.getPersistentDataContainer().set(gladiatorPotionKey, PersistentDataType.BYTE, (byte) 1);
                 potions.setItemMeta(meta);
                 player.getInventory().addItem(potions);
@@ -8600,7 +8593,7 @@ public final class ArcadePortManager implements Listener {
             if (mode == null || !mode.bowAvailable()) {
                 event.setCancelled(true);
                 player.sendMessage(ChatColor.YELLOW + "The voted Gladiators ruleset has no bow.");
-            } else {
+            } else if (!event.isCancelled()) {
                 session.gladiatorUsedBow.add(player.getUniqueId());
             }
             return;
@@ -8623,10 +8616,40 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "The voted Gladiators ruleset has no fishing rod.");
             return;
         }
-        session.gladiatorUsedRod.add(player.getUniqueId());
+        if (!event.isCancelled()) session.gladiatorUsedRod.add(player.getUniqueId());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onGladiatorPotionSplash(PotionSplashEvent event) {
+        Session session = active;
+        ThrownPotion potion = event.getPotion();
+        if (session == null || session.type != ArcadePortGame.GLADIATORS
+                || !(potion.getShooter() instanceof Player shooter)
+                || shooter.getWorld() != session.world) return;
+        ItemStack thrownItem = potion.getItem();
+        if (thrownItem == null || !thrownItem.hasItemMeta()
+                || !thrownItem.getItemMeta().getPersistentDataContainer()
+                        .has(gladiatorPotionKey, PersistentDataType.BYTE)) return;
+        Integer pair = session.gladiatorPairs.get(shooter.getUniqueId());
+        if (pair == null || session.gladiatorResolvedPairs.contains(pair)) return;
+        event.setCancelled(true);
+        Location splash = potion.getLocation();
+        for (Entity entity : splash.getWorld().getNearbyEntities(splash, 4.0D, 4.0D, 4.0D)) {
+            if (!(entity instanceof Player target) || !session.alive.contains(target.getUniqueId())
+                    || !Integer.valueOf(pair).equals(session.gladiatorPairs.get(target.getUniqueId()))) continue;
+            double distance = splash.distance(target.getLocation());
+            double intensity = Math.max(0.0D, 1.0D - distance / 4.0D);
+            double healing = 4.0D * intensity;
+            if (healing <= 0.0D) continue;
+            target.setHealth(Math.min(target.getMaxHealth(), target.getHealth() + healing));
+            target.getWorld().spawnParticle(Particle.HEART,
+                    target.getLocation().clone().add(0.0D, 1.0D, 0.0D), 6,
+                    0.3D, 0.4D, 0.3D, 0.02D);
+            target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.35F, 1.6F);
+        }
+    }
+
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
@@ -8855,14 +8878,7 @@ public final class ArcadePortManager implements Listener {
                 && !baconNonRightClick && !dragonEscapeDisruptorLeftClick) return;
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
-        if (session.type == ArcadePortGame.GLADIATORS && event.getAction().isRightClick()
-                && session.alive.contains(player.getUniqueId()) && heldItem != null
-                && heldItem.hasItemMeta()
-                && heldItem.getItemMeta().getPersistentDataContainer().has(gladiatorPotionKey, PersistentDataType.BYTE)) {
-            event.setCancelled(true);
-            useGladiatorHealingPotion(player, heldItem);
-            return;
-        }
+
         if (event.isCancelled()) {
             boolean forceBaconAbility = session.type == ArcadePortGame.BACON_BRAWL
                     && event.getAction().isRightClick() && heldItem != null
