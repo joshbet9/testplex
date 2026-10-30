@@ -3611,6 +3611,306 @@ public final class ArcadePortManager implements Listener {
         return item;
     }
 
+    private Location masterBuilderPlotCenter(World world, int slot) {
+        int n = Math.floorMod(slot, 16);
+        return new Location(world, -24 + (n % 4) * 16 + 0.5D, 64.0D,
+                -24 + (n / 4) * 16 + 0.5D);
+    }
+
+    private void buildMasterBuildersArena(World world) {
+        for (int x = -36; x <= 36; x++) for (int z = -36; z <= 36; z++)
+            for (int y = 62; y <= 100; y++) world.getBlockAt(x, y, z).setType(Material.AIR, false);
+        for (int slot = 0; slot < 16; slot++) {
+            Location c = masterBuilderPlotCenter(world, slot);
+            for (int x = c.getBlockX() - 5; x <= c.getBlockX() + 5; x++) {
+                for (int z = c.getBlockZ() - 5; z <= c.getBlockZ() + 5; z++) {
+                    world.getBlockAt(x, 63, z).setType(Material.GRASS_BLOCK, false);
+                    if (Math.abs(x - c.getBlockX()) == 5 || Math.abs(z - c.getBlockZ()) == 5)
+                        world.getBlockAt(x, 64, z).setType(Material.QUARTZ_BLOCK, false);
+                }
+            }
+        }
+    }
+
+    private boolean isInsideMasterBuilderPlot(Session session, UUID playerId, Block block) {
+        Integer slot = session.masterBuilderPlots.get(playerId);
+        if (slot == null || block == null || block.getWorld() != session.world) return false;
+        Location c = masterBuilderPlotCenter(session.world, slot);
+        return Math.abs(block.getX() - c.getBlockX()) < 5 && Math.abs(block.getZ() - c.getBlockZ()) < 5
+                && block.getY() >= 64 && block.getY() < 120;
+    }
+
+    private void prepareDrawMyThing(Session session, List<Player> participants) {
+        participants.forEach(p -> session.drawTurnOrder.add(p.getUniqueId()));
+        Collections.shuffle(session.drawTurnOrder);
+        SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.DRAW_MY_THING.id());
+        if (map != null) {
+            List<Location> red = map.dataLocations("RED");
+            if (!red.isEmpty()) session.drawDrawerLocation = red.get(0).clone();
+            List<Location> pink = map.dataLocations("PINK");
+            if (pink.size() >= 2) {
+                Location a = pink.get(0), b = pink.get(1);
+                int x1=Math.min(a.getBlockX(),b.getBlockX()), x2=Math.max(a.getBlockX(),b.getBlockX());
+                int y1=Math.min(a.getBlockY(),b.getBlockY()), y2=Math.max(a.getBlockY(),b.getBlockY());
+                int z1=Math.min(a.getBlockZ(),b.getBlockZ()), z2=Math.max(a.getBlockZ(),b.getBlockZ());
+                long volume=(long)(x2-x1+1)*(y2-y1+1)*(z2-z1+1);
+                if (volume > 0 && volume <= 4096) {
+                    for(int x=x1;x<=x2;x++) for(int y=y1;y<=y2;y++) for(int z=z1;z<=z2;z++) {
+                        Block block=session.world.getBlockAt(x,y,z);
+                        if(!block.getType().isAir()) session.drawCanvasBlocks.add(block);
+                    }
+                }
+            }
+            if (session.drawDrawerLocation == null && !map.spawnLocations().isEmpty())
+                session.drawDrawerLocation = map.spawnLocations().get(0).clone();
+        }
+        if (session.drawDrawerLocation == null)
+            session.drawDrawerLocation = session.world.getSpawnLocation().clone().add(0,2,0);
+        if (session.drawCanvasBlocks.isEmpty()) {
+            Location c=session.drawDrawerLocation.clone().add(0,0,8);
+            for(int x=-7;x<=7;x++) for(int y=0;y<10;y++) {
+                Block block=session.world.getBlockAt(c.getBlockX()+x,c.getBlockY()+y,c.getBlockZ());
+                block.setType(Material.WHITE_WOOL,false); session.drawCanvasBlocks.add(block);
+            }
+        }
+        resetDrawCanvas(session);
+    }
+
+    private void resetDrawCanvas(Session session) {
+        for(Block block:session.drawCanvasBlocks) if(block!=null && block.getWorld()==session.world)
+            block.setType(Material.WHITE_WOOL,false);
+    }
+
+    private String chooseDrawWord(Session session) {
+        List<String> words=new ArrayList<>(DRAW_MY_THING_WORDS);
+        words.removeAll(session.drawUsedWords);
+        if(words.isEmpty()){session.drawUsedWords.clear();words.addAll(DRAW_MY_THING_WORDS);}
+        String word=words.get(ThreadLocalRandom.current().nextInt(words.size()));
+        session.drawUsedWords.add(word);
+        return word;
+    }
+
+    private void giveDrawPaintPalette(Player drawer) {
+        drawer.getInventory().clear();
+        Material[] colours={Material.WHITE_WOOL,Material.ORANGE_WOOL,Material.MAGENTA_WOOL,
+                Material.LIGHT_BLUE_WOOL,Material.YELLOW_WOOL,Material.LIME_WOOL,
+                Material.PINK_WOOL,Material.GRAY_WOOL,Material.LIGHT_GRAY_WOOL};
+        for(int i=0;i<colours.length;i++)
+            drawer.getInventory().setItem(i,namedItem(colours[i],colours[i].name().replace("_WOOL","")+" Paint","Right-click canvas to paint."));
+    }
+
+    private void startNextDrawMyThingRound(Session session,long now) {
+        if(active!=session)return;
+        Player drawer=null;
+        while(session.drawTurnIndex<session.drawTurnOrder.size()){
+            UUID id=session.drawTurnOrder.get(session.drawTurnIndex++);
+            Player candidate=session.players.get(id);
+            if(candidate!=null && candidate.isOnline()){drawer=candidate;break;}
+        }
+        if(drawer==null){
+            Player winner=session.players.values().stream().filter(p->p!=null&&p.isOnline())
+                    .max(java.util.Comparator.comparingInt(p->session.scores.getOrDefault(p.getUniqueId(),0))).orElse(null);
+            finish(session,winner,true);return;
+        }
+        resetDrawCanvas(session);
+        session.drawCurrentDrawer=drawer.getUniqueId();
+        session.drawWord=chooseDrawWord(session);
+        session.drawCorrectGuessers.clear();session.drawGuessAttempts.clear();session.drawRevealedLetters.clear();
+        session.drawRoundStartedAt=now;session.drawRoundEndsAt=now+DRAW_MY_THING_ROUND_MILLIS;session.drawNextRoundAt=0L;
+        drawer.teleport(session.drawDrawerLocation);drawer.setAllowFlight(true);drawer.setFlying(true);drawer.setFlySpeed(0.12F);
+        giveDrawPaintPalette(drawer);
+        drawer.sendMessage(ChatColor.GREEN+"Your word is: "+ChatColor.YELLOW+session.drawWord);
+        announce(session,ChatColor.GOLD+drawer.getName()+" is drawing! Guess the word.");
+        for(Player p:session.players.values()) if(p!=null&&p.isOnline()&&!p.equals(drawer)){
+            p.getInventory().clear();p.sendMessage(ChatColor.YELLOW+"You have 10 guesses this round.");
+        }
+    }
+
+    private void finishDrawMyThingRound(Session session,long now) {
+        if(session.drawCurrentDrawer==null)return;
+        UUID drawerId=session.drawCurrentDrawer;
+        Player drawer=session.players.get(drawerId);
+        announce(session,ChatColor.GOLD+"Round ended. The word was "+ChatColor.YELLOW+session.drawWord+".");
+        if(drawer!=null&&drawer.isOnline()){
+            drawer.setFlying(false);drawer.setAllowFlight(false);drawer.setFlySpeed(0.1F);
+            Location start=session.drawStartLocations.get(drawerId);if(start!=null)drawer.teleport(start);
+        }
+        resetDrawCanvas(session);session.drawCurrentDrawer=null;session.drawWord=null;
+        session.drawRoundEndsAt=0L;session.drawNextRoundAt=now+DRAW_MY_THING_INTERMISSION_MILLIS;
+    }
+
+    private void updateDrawMyThing(Session session,long now) {
+        if(session.alive.isEmpty()){finish(session,null,true);return;}
+        if(session.drawCurrentDrawer==null){
+            if(session.drawNextRoundAt==0L||now>=session.drawNextRoundAt)startNextDrawMyThingRound(session,now);
+            return;
+        }
+        Player drawer=session.players.get(session.drawCurrentDrawer);
+        if((drawer==null||!drawer.isOnline())&&session.drawCorrectGuessers.isEmpty()){
+            finishDrawMyThingRound(session,now);return;
+        }
+        List<UUID> guessers=session.players.keySet().stream().filter(id->!id.equals(session.drawCurrentDrawer))
+                .filter(id->{Player p=session.players.get(id);return p!=null&&p.isOnline();}).toList();
+        boolean allGuessed=!guessers.isEmpty()&&guessers.stream().allMatch(session.drawCorrectGuessers::contains);
+        if(now>=session.drawRoundEndsAt||allGuessed){finishDrawMyThingRound(session,now);return;}
+        int letters=(int)session.drawWord.chars().filter(ch->ch!=' ').count();
+        int reveal=letters==0?0:(int)Math.floor(Math.max(0,now-session.drawRoundStartedAt)*(double)letters/(DRAW_MY_THING_ROUND_MILLIS*1.75D));
+        while(session.drawRevealedLetters.size()<reveal){
+            List<Integer> hidden=new ArrayList<>();
+            for(int i=0;i<session.drawWord.length();i++)
+                if(session.drawWord.charAt(i)!=' '&&!session.drawRevealedLetters.contains(i))hidden.add(i);
+            if(hidden.isEmpty())break;
+            session.drawRevealedLetters.add(hidden.get(ThreadLocalRandom.current().nextInt(hidden.size())));
+        }
+        long seconds=Math.max(0,(session.drawRoundEndsAt-now+999)/1000);
+        StringBuilder hint=new StringBuilder();
+        for(int i=0;i<session.drawWord.length();i++){
+            char ch=session.drawWord.charAt(i);
+            hint.append(ch==' '?"  ":session.drawRevealedLetters.contains(i)?ch+" ":"_ ");
+        }
+        if(drawer!=null&&drawer.isOnline())drawer.sendActionBar(Component.text("DRAW: "+session.drawWord+" | "+seconds+"s"));
+        for(Player p:session.players.values()){
+            if(p==null||!p.isOnline()||p.getUniqueId().equals(session.drawCurrentDrawer))continue;
+            if(session.drawCorrectGuessers.contains(p.getUniqueId()))p.sendActionBar(Component.text("Correct! Waiting for next round"));
+            else p.sendActionBar(Component.text(hint+" | "+seconds+"s | Guesses: "+
+                    Math.max(0,DRAW_MY_THING_MAX_GUESSES-session.drawGuessAttempts.getOrDefault(p.getUniqueId(),0))+"/10"));
+        }
+    }
+
+    private void processDrawMyThingGuess(Session session,UUID playerId,String raw) {
+        if(active!=session||session.drawCurrentDrawer==null||playerId.equals(session.drawCurrentDrawer))return;
+        Player player=session.players.get(playerId);
+        if(player==null||!player.isOnline()||session.drawCorrectGuessers.contains(playerId))return;
+        int used=session.drawGuessAttempts.getOrDefault(playerId,0);
+        if(used>=DRAW_MY_THING_MAX_GUESSES){player.sendMessage(ChatColor.RED+"No guesses remaining.");return;}
+        session.drawGuessAttempts.put(playerId,used+1);
+        String guess=raw==null?"":raw.toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[^a-z0-9 ]"," ").replaceAll("\\s+"," ").trim();
+        String answer=session.drawWord.toLowerCase(java.util.Locale.ROOT);
+        if(guess.equals(answer)){
+            boolean first=session.drawCorrectGuessers.isEmpty();
+            session.drawCorrectGuessers.add(playerId);session.scores.merge(playerId,first?3:1,Integer::sum);
+            if(first){Player d=session.players.get(session.drawCurrentDrawer);if(d!=null&&d.isOnline())session.scores.merge(d.getUniqueId(),2,Integer::sum);}
+            announce(session,ChatColor.GREEN+player.getName()+" guessed the word"+(first?" first!":"!"));
+        }else player.sendMessage(ChatColor.GRAY+"Not quite. "+(DRAW_MY_THING_MAX_GUESSES-used-1)+" guesses remain.");
+    }
+
+    private void handleDrawMyThingInteract(Session session,PlayerInteractEvent event) {
+        event.setCancelled(true);
+        if(!event.getAction().isRightClick()||session.drawCurrentDrawer==null||
+                !event.getPlayer().getUniqueId().equals(session.drawCurrentDrawer))return;
+        ItemStack held=event.getItem();
+        if(held==null||held.getType().isAir()||!held.getType().name().endsWith("_WOOL"))return;
+        Block target=event.getClickedBlock();
+        if(target==null)target=event.getPlayer().getTargetBlockExact(32);
+        if(target==null||!session.drawCanvasBlocks.contains(target))return;
+        target.setType(held.getType(),false);
+        session.world.playSound(target.getLocation(),Sound.BLOCK_WOOL_PLACE,0.5F,1.2F);
+    }
+
+    @EventHandler(priority=EventPriority.LOWEST)
+    public void onDrawMyThingChat(AsyncChatEvent event) {
+        Session session=active;
+        if(session==null||session.type!=ArcadePortGame.DRAW_MY_THING)return;
+        UUID id=event.getPlayer().getUniqueId();
+        if(!session.players.containsKey(id))return;
+        event.setCancelled(true);
+        if(id.equals(session.drawCurrentDrawer))return;
+        String message=PlainTextComponentSerializer.plainText().serialize(event.message());
+        Bukkit.getScheduler().runTask(plugin,()->processDrawMyThingGuess(session,id,message));
+    }
+
+    private void startMasterBuilders(Session session,long now) {
+        List<String> themes=List.of("Castle","Dragon","Treehouse","Robot","Pirate Ship","Underwater City",
+                "Volcano","Space Station","Farm","Haunted House","Rollercoaster","Zoo","Airplane",
+                "Lighthouse","Wizard Tower","Football Stadium");
+        session.masterBuilderTheme=themes.get(ThreadLocalRandom.current().nextInt(themes.size()));
+        session.masterBuilderPhase=MasterBuildersPhase.BUILDING;
+        session.masterBuilderBuildEndsAt=now+MASTER_BUILDERS_BUILD_MILLIS;
+        for(Player p:session.players.values())if(p!=null&&p.isOnline()){
+            p.getInventory().clear();p.setGameMode(GameMode.CREATIVE);
+            p.sendMessage(ChatColor.YELLOW+"Build: "+ChatColor.GOLD+session.masterBuilderTheme);
+        }
+    }
+
+    private void beginMasterBuildersReview(Session session,long now) {
+        if(active!=session)return;
+        session.masterBuilderPhase=MasterBuildersPhase.REVIEW;session.masterBuilderReviewIndex=0;
+        long count=session.masterBuilderReviewOrder.stream().filter(session.players::containsKey).count();
+        if(count<=1){
+            Player solo=session.players.values().stream().filter(p->p!=null&&p.isOnline()).findFirst().orElse(null);
+            finish(session,solo,true);return;
+        }
+        announce(session,ChatColor.GOLD+"Build time is over! Rate each build from 1 to 6.");
+        showNextMasterBuilderReview(session,now);
+    }
+
+    private void showNextMasterBuilderReview(Session session,long now) {
+        while(session.masterBuilderReviewIndex<session.masterBuilderReviewOrder.size()){
+            UUID targetId=session.masterBuilderReviewOrder.get(session.masterBuilderReviewIndex);
+            Player target=session.players.get(targetId);
+            if(target==null||!target.isOnline()){session.masterBuilderReviewIndex++;continue;}
+            session.masterBuilderCurrentTarget=targetId;
+            session.masterBuilderReviewEndsAt=now+MASTER_BUILDERS_REVIEW_MILLIS;
+            Location centre=masterBuilderPlotCenter(session.world,session.masterBuilderPlots.getOrDefault(targetId,0));
+            Location view=centre.clone().add(0,5,-12);view.setDirection(centre.toVector().subtract(view.toVector()));
+            Material[] ratings={Material.RED_CONCRETE,Material.ORANGE_CONCRETE,Material.YELLOW_CONCRETE,
+                    Material.LIME_CONCRETE,Material.LIGHT_BLUE_CONCRETE,Material.PURPLE_CONCRETE};
+            for(Player p:session.players.values()){
+                if(p==null||!p.isOnline())continue;
+                p.setGameMode(GameMode.ADVENTURE);p.getInventory().clear();p.teleport(view);
+                if(!p.getUniqueId().equals(targetId))for(int i=0;i<ratings.length;i++)
+                    p.getInventory().setItem(i,namedItem(ratings[i],(i+1)+" / 6","Right-click to rate this build."));
+                p.sendActionBar(Component.text("Reviewing "+target.getName()+" | Rate 1 to 6"));
+            }
+            announce(session,ChatColor.AQUA+"Reviewing "+target.getName()+"'s build.");
+            return;
+        }
+        finishMasterBuilders(session);
+    }
+
+    private void handleMasterBuildersVote(Session session,Player player,PlayerInteractEvent event) {
+        event.setCancelled(true);
+        if(!event.getAction().isRightClick()||session.masterBuilderCurrentTarget==null||
+                player.getUniqueId().equals(session.masterBuilderCurrentTarget))return;
+        ItemStack item=event.getItem();if(item==null)return;
+        int score=switch(item.getType()){
+            case RED_CONCRETE -> 1;case ORANGE_CONCRETE -> 2;case YELLOW_CONCRETE -> 3;
+            case LIME_CONCRETE -> 4;case LIGHT_BLUE_CONCRETE -> 5;case PURPLE_CONCRETE -> 6;default -> 0;
+        };
+        if(score==0)return;
+        session.masterBuilderVotes.computeIfAbsent(session.masterBuilderCurrentTarget,k->new HashMap<>())
+                .put(player.getUniqueId(),score);
+        player.sendActionBar(Component.text("Your rating: "+score+"/6"));
+    }
+
+    private void finishMasterBuilders(Session session) {
+        Player winner=null;double best=-1.0D;
+        for(Map.Entry<UUID,Integer> entry:session.masterBuilderPlots.entrySet()){
+            Map<UUID,Integer> votes=session.masterBuilderVotes.getOrDefault(entry.getKey(),Map.of());
+            if(votes.isEmpty())continue;
+            double average=votes.values().stream().mapToInt(Integer::intValue).average().orElse(0.0D);
+            session.scores.put(entry.getKey(),(int)Math.round(average*100.0D));
+            Player candidate=session.players.get(entry.getKey());
+            if(candidate!=null&&candidate.isOnline()&&average>best){best=average;winner=candidate;}
+        }
+        if(winner==null&&session.participantsAtStart==1)
+            winner=session.players.values().stream().filter(p->p!=null&&p.isOnline()).findFirst().orElse(null);
+        finish(session,winner,true);
+    }
+
+    private void updateMasterBuilders(Session session,long now) {
+        if(session.alive.isEmpty()){finish(session,null,true);return;}
+        if(session.masterBuilderPhase==MasterBuildersPhase.BUILDING){
+            long remain=Math.max(0,session.masterBuilderBuildEndsAt-now);
+            String timer=String.format(java.util.Locale.ROOT,"%d:%02d",remain/60000L,(remain/1000L)%60L);
+            for(Player p:alivePlayers(session))p.sendActionBar(Component.text("Theme: "+session.masterBuilderTheme+" | Build: "+timer));
+            if(now>=session.masterBuilderBuildEndsAt)beginMasterBuildersReview(session,now);
+        }else if(session.masterBuilderPhase==MasterBuildersPhase.REVIEW&&now>=session.masterBuilderReviewEndsAt){
+            session.masterBuilderReviewIndex++;showNextMasterBuilderReview(session,now);
+        }
+    }
+
     private void tick(Session session) {
         if (active != session) {
             session.tickTask.cancel();
