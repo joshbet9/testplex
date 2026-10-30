@@ -18,7 +18,17 @@
 - Gladiators is receiving a dedicated parity pass on `feat/gladiators-parity`: lobby PvP vote, in-duel hotbar editor, concurrent double-elimination brackets, per-duel timers, challenge achievements, lower-bracket win milestone and kill-message cosmetics. It remains disabled for live play until the branch builds and passes multiplayer acceptance.
 - Gladiators now has the lobby rules vote, in-duel hotbar editing, parallel double-elimination brackets, per-duel combat timers, two requested achievements, Silky Seconds tracking and player-selectable kill messages. It is an isolated 26.3 acceptance candidate; keep its catalogue status in progress until multiplayer sign-off.
 - All 16 entries remain marked MECHANICS_IN_PROGRESS; passing CI means compile/unit tests only, not that player experience has been accepted in-game.
-- New cosmetic lines and unique win scenes are still deferred.
+- New cosmetic lines are being added game-by-game; Micro Battles now has personal middle-glass and shared border-particle colour lines. Unique win scenes for the remaining games are still deferred.
+
+## Micro Battles parity checkpoint
+
+The modern port now mirrors these source behaviours at code level: Archer / Worker / Fighter loadouts; the 10-second starting glass barrier; the four-second own-island restriction; team-coloured, protected armour and slot-8 team badge; map crumble; hunger floor; team-safe damage and projectile knockback; block growth/flow prevention; sword-drop protection while allowing other ordinary drops; spectator tracking compass with opposing-team filtering, menu selection and the three-second teleport cooldown; four-team timeout standings (surviving team count first, team kills as the tiebreak, draw on an exact tie); the eight-kill Annihilation stat, Last Two mission progress (exactly two surviving teams), the Reborn melee/arrow raw-damage path, flat Fighter Iron Skin reduction, legacy armour calculation, projectile knockback and 15-second combat assists. Isolated-server stats persist kills, assists, damage taken/dealt, Annihilation counts and Last Two mission progress.
+
+Micro Battles cosmetics are now separately configurable in player preferences:
+- **Middle Glass Colour** changes the starting glass only for the owning player, using per-viewer block updates. Other players retain the normal map glass.
+- **Border Particle Colour** colours a vertical dust cue that is broadcast to nearby viewers. It appears for living players within three blocks of the nearest world-border face, at three heights, every four ticks. It is not tied to the temporary starting glass, so it remains available after that barrier is removed.
+
+Backend integration remains test-server-local because the isolated modern server does not run Mineplex's legacy mission/stat services. The local equivalents preserve the original trigger semantics and persist the corresponding stats. Four-team match flow, cosmetics, reconnect/cleanup and multi-client visibility still require live-server acceptance; this game remains MECHANICS_IN_PROGRESS.
 
 ## In-game acceptance
 
