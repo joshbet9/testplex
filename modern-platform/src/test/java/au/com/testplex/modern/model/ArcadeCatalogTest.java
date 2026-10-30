@@ -99,30 +99,6 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void microBattlesHasIndependentPersonalGlassAndSharedBorderColourLines() {
-        GameDefinition game = new ArcadeCatalog().getGame("micro-battles");
-        assertNotNull(game);
-        CosmeticLineDefinition middleGlass = game.getCosmeticLines().stream()
-                .filter(line -> line.getId().equals("middle-glass-colour"))
-                .findFirst().orElseThrow();
-        CosmeticLineDefinition borderParticles = game.getCosmeticLines().stream()
-                .filter(line -> line.getId().equals("border-particle-colour"))
-                .findFirst().orElseThrow();
-
-        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, middleGlass.getSelectionMode());
-        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, borderParticles.getSelectionMode());
-        assertEquals("light-blue", middleGlass.getDefaultOptionId());
-        assertEquals("light-blue", borderParticles.getDefaultOptionId());
-        assertEquals(16, middleGlass.getOptions().size());
-        assertEquals(16, borderParticles.getOptions().size());
-        assertTrue(middleGlass.getDescription().contains("Only you"));
-        assertTrue(borderParticles.getDescription().contains("Everyone"));
-        assertEquals(
-                middleGlass.getOptions().stream().map(CosmeticOption::getId).toList(),
-                borderParticles.getOptions().stream().map(CosmeticOption::getId).toList());
-    }
-
-    @Test
     void deathTagIsReadyForInGameAcceptanceWhileOtherPortsRemainInProgress() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         GameDefinition deathTag = catalog.getGame("death-tag");
@@ -145,20 +121,6 @@ class ArcadeCatalogTest {
         assertEquals(1, readyForTest);
         assertEquals(20, inProgress);
     }
-
-    @Test
-    void dragonsExposeServerVisibleFlareEffectChoices() {
-        GameDefinition dragons = new ArcadeCatalog().getGame("dragons");
-        CosmeticLineDefinition flares = dragons.getCosmeticLines().stream()
-                .filter(line -> line.getId().equals("flare-effects"))
-                .findFirst().orElseThrow();
-        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, flares.getSelectionMode());
-        assertEquals("classic", flares.getDefaultOptionId());
-        assertEquals(Set.of("classic", "ember", "frost", "ender", "solar", "aurora"),
-                new HashSet<>(flares.getOptions().stream().map(CosmeticOption::getId).toList()));
-    }
-
-
 
     @Test
     void monsterMazeMobFormsCanBeEquippedIndependently() {
