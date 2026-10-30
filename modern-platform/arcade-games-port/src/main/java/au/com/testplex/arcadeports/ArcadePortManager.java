@@ -2867,12 +2867,36 @@ public final class ArcadePortManager implements Listener {
     private void updateSourceWaterDamage(Session session, long now) {
         SourceMapCatalog.MapData map = sourceMapData.get(session.type.id());
         int damage = ArcadePortRules.sourceWorldWaterDamage(session.type, map == null ? "" : map.mapName());
-        if (damage <= 0 || now - session.lastWorldWaterDamageAt < 1_000L) return;
+        if (damage <= 0) return;
+
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+            // Reborn's GameFlagManager checks every player on its FASTER cadence
+            // and applies an independent 500ms Recharge per player.
+            for (Player player : new ArrayList<>(alivePlayers(session))) {
+                UUID id = player.getUniqueId();
+                long nextCheckAt = session.dragonEscapeWaterDamageNextAt.getOrDefault(id, 0L);
+                if (now < nextCheckAt) continue;
+                session.dragonEscapeWaterDamageNextAt.put(id,
+                        now + ArcadePortRules.DRAGON_ESCAPE_WATER_DAMAGE_INTERVAL_MILLIS);
+                Block feet = player.getLocation().getBlock();
+                Material lower = feet.getType();
+                Material upper = feet.getRelative(BlockFace.UP).getType();
+                if (lower != Material.WATER && upper != Material.WATER) continue;
+                if (player.getHealth() <= damage) {
+                    eliminate(session, player, null, "was lost to the water");
+                    if (active != session) return;
+                } else {
+                    player.setHealth(player.getHealth() - damage);
+                    player.playSound(player.getLocation(), Sound.ENTITY_GENERIC_SPLASH, 0.8F, 1.0F);
+                }
+            }
+            return;
+        }
+
+        if (now - session.lastWorldWaterDamageAt < 1_000L) return;
         session.lastWorldWaterDamageAt = now;
         for (Player player : new ArrayList<>(alivePlayers(session))) {
             if (!player.isOnline()) continue;
-            // Legacy UtilEnt.isInWater reads the entity's NMS inWater flag, which
-            // accounts for the bounding box, not just the feet/eye block cells.
             boolean inWater = player.isInWater();
             if (!inWater) continue;
             if (session.type == ArcadePortGame.BOMB_LOBBERS) session.bombPlayersDamaged.add(player.getUniqueId());
@@ -10018,6 +10042,7 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> dragonEscapeWarperUsed = new HashSet<>();
         final Map<UUID, Location> dragonEscapeSafeLocations = new HashMap<>();
         final Map<UUID, Long> dragonEscapeWarpedAt = new HashMap<>();
+        final Map<UUID, Long> dragonEscapeWaterDamageNextAt = new HashMap<>();
         final Map<UUID, Integer> dragonEscapeObservedWaypoint = new HashMap<>();
         final Map<UUID, Long> dragonEscapeDiggerNextUseAt = new HashMap<>();
         final Map<Block, BlockData> dragonEscapeTunnelBlocks = new HashMap<>();

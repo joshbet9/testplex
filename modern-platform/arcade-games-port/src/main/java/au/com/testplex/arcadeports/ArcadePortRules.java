@@ -461,6 +461,7 @@ public final class ArcadePortRules {
     public static final int DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS = 2_400;
     public static final double DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS = 1.5D;
     public static final long DRAGON_ESCAPE_WARPER_GRACE_MILLIS = 1_000L;
+    public static final long DRAGON_ESCAPE_WATER_DAMAGE_INTERVAL_MILLIS = 500L;
     public static final int DRAGON_ESCAPE_DISRUPTOR_MAX_TNT = 2;
     public static final long DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS = 8_000L;
     public static final long DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS = 8_000L;
