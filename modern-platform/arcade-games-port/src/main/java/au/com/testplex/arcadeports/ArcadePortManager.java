@@ -2888,20 +2888,20 @@ public final class ArcadePortManager implements Listener {
                 player.setFlying(false);
                 player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
                 switch (kit) {
-                    case "ice" -> player.getInventory().addItem(namedItem(Material.ICE,
-                            "Ice Bridge", "Right-click to rise and create a temporary ice bridge."));
+                    case "ice" -> player.getInventory().addItem(skyWarsKitItem(Material.ICE,
+                            "Ice Bridge", "Right-click to rise and create a temporary ice bridge.", false));
                     case "fire" -> {
-                        player.getInventory().addItem(namedItem(Material.BLAZE_ROD,
-                                "Fire Burst", "Right-click to ignite and damage nearby opponents."));
+                        player.getInventory().addItem(skyWarsKitItem(Material.BLAZE_ROD,
+                                "Fire Burst", "Right-click to ignite and damage nearby opponents.", false));
                         player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE,
                                 Integer.MAX_VALUE, 0, false, false, false));
                     }
-                    case "air" -> player.getInventory().addItem(namedItem(Material.ENDER_EYE,
-                            "Eye of Ender", "Right-click for a one-use teleport to your last safe location."));
+                    case "air" -> player.getInventory().addItem(skyWarsKitItem(Material.ENDER_EYE,
+                            "Eye of Ender", "Right-click for a one-use teleport to your last safe location.", false));
                     case "metal" -> {
                         player.getInventory().addItem(new ItemStack(Material.STONE_PICKAXE));
-                        player.getInventory().addItem(namedItem(Material.COMPARATOR,
-                                "Magnet", "Right-click to pull a metal-armoured opponent towards you."));
+                        player.getInventory().addItem(skyWarsKitItem(Material.COMPARATOR,
+                                "Magnet", "Right-click to pull a metal-armoured opponent towards you.", false));
                     }
                     case "earth" -> player.getInventory().addItem(new ItemStack(Material.WOODEN_SHOVEL));
                     default -> { }
@@ -3688,6 +3688,21 @@ public final class ArcadePortManager implements Listener {
         return item;
     }
 
+    private ItemStack skyWarsKitItem(Material material, String title, String lore, boolean glowing) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GREEN + title);
+            meta.setLore(List.of(ChatColor.GRAY + lore));
+            if (glowing) {
+                meta.addEnchant(Enchantment.UNBREAKING, 1, true);
+                meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
+            }
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
     private void prepareSkyWarsMap(Session session) {
         SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.SKY_WARS.id());
         if (map == null) return;
@@ -4269,15 +4284,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private ItemStack createSkyWarsThrowableDirt() {
-        ItemStack dirt = namedItem(Material.DIRT, "Throwable Dirt",
-                "Right-click to throw dirt and knock back an opponent.");
-        ItemMeta meta = dirt.getItemMeta();
-        if (meta != null) {
-            meta.addEnchant(Enchantment.UNBREAKING, 1, true);
-            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
-            dirt.setItemMeta(meta);
-        }
-        return dirt;
+        return skyWarsKitItem(Material.DIRT, "Throwable Dirt",
+                "Right-click to throw dirt and knock back an opponent.", true);
     }
 
     private void updateSkyWarsKits(Session session, long now) {
@@ -12296,6 +12304,13 @@ public final class ArcadePortManager implements Listener {
         if (isSkyWarsKitItem(session, player.getUniqueId(), event.getOldCursor())
                 || event.getNewItems().values().stream()
                         .anyMatch(item -> isSkyWarsKitItem(session, player.getUniqueId(), item))) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onSkyWarsCompassMenuDrag(InventoryDragEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof SkyWarsCompassMenuHolder) {
             event.setCancelled(true);
         }
     }
