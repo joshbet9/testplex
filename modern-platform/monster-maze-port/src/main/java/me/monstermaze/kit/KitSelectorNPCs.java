@@ -39,9 +39,9 @@ public class KitSelectorNPCs implements Listener {
         this.plugin = plugin;
         this.game = game;
         this.gui = existingGui;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
 
-        Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 if (game.getState() != GameState.IDLE && game.getState() != GameState.STARTING) return;
                 for (LivingEntity e : npcs) {
@@ -61,7 +61,7 @@ public class KitSelectorNPCs implements Listener {
         Location loc = center.clone();
         loc.setY(center.getY());
         Villager v = (Villager) loc.getWorld().spawnEntity(loc, EntityType.VILLAGER);
-        v.setMetadata(NPC_METADATA, new FixedMetadataValue(plugin, true));
+        v.setMetadata(NPC_METADATA, new FixedMetadataValue(plugin.getHostPlugin(), true));
         v.setCustomName(NPC_NAME);
         v.setCustomNameVisible(true);
         v.setProfession(Villager.Profession.LIBRARIAN);
