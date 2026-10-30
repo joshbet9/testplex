@@ -115,7 +115,6 @@ public class KitManager implements Listener {
     private enum VisMode { VISIBLE, INVISIBLE, TRANSPARENT }
 
     private KitGUI gui;
-    private KitSelectorNPCs npcs;
 
     public KitManager(MonsterMazePlugin plugin, GameManager game, me.monstermaze.util.GameScoreboard scoreboard) {
         this.plugin = plugin;
@@ -124,7 +123,6 @@ public class KitManager implements Listener {
         Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
 
         this.gui = new KitGUI(plugin, game, this);
-        this.npcs = new KitSelectorNPCs(plugin, game, this, gui);
 
         // Slowball constructor tick (every 2 seconds = PerkConstructor rate)
         Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
@@ -151,14 +149,6 @@ public class KitManager implements Listener {
 
     public void openSelector(Player player) {
         gui.open(player);
-    }
-
-    public void spawnSelectors(org.bukkit.Location center) {
-        npcs.spawnAt(center);
-    }
-
-    public void clearSelectors() {
-        npcs.clear();
     }
 
     public KitType getKit(Player player) {
