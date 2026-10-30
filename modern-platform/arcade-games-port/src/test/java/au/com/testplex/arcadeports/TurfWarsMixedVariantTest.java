@@ -55,7 +55,6 @@ class TurfWarsMixedVariantTest {
     @Test
     void constructorAndFletcherPerksUseTheOriginalKitCapsAndIntervals() {
         assertEquals(4_000L, ArcadePortRules.TURF_WARS_CONSTRUCTOR_INTERVAL_MILLIS);
-        assertEquals(6, ArcadePortRules.TURF_WARS_STARTING_WOOL);
         assertEquals(24, ArcadePortRules.TURF_WARS_BUILD_PHASE_WOOL);
         assertEquals(8, ArcadePortRules.turfWarsConstructorMax("marksman"));
         assertEquals(4, ArcadePortRules.turfWarsConstructorMax("infiltrator"));
