@@ -8519,18 +8519,34 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (player.isOnline()) {
-            player.setGameMode(GameMode.SPECTATOR);
-            if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
-                player.teleport(dragonEscapeSpectatorLocation(session));
-            } else if (session.type == ArcadePortGame.DRAGONS) {
-                session.dragonMarksmanCharge.remove(player.getUniqueId());
-                session.dragonMarksmanNextChargeAt.remove(player.getUniqueId());
-                session.dragonMarksmanFiring.remove(player.getUniqueId());
-                session.dragonWaterDamageNextAt.remove(player.getUniqueId());
+            if (session.type == ArcadePortGame.SKY_WARS) {
+                // Keep eliminated players in an interact-capable spectator state so their
+                // Tracking Compass can still open the target menu and teleport.
+                player.setGameMode(GameMode.ADVENTURE);
+                player.setAllowFlight(true);
+                player.setFlying(true);
+                player.setCollidable(false);
+                player.setInvulnerable(true);
+                player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,
+                        Integer.MAX_VALUE, 0, false, false, false));
                 player.getInventory().clear();
-                player.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
-                        "Points to the nearest survivor. Left-click to spectate them."));
-                updateDragonsSpectatorCompasses(session);
+                player.getInventory().addItem(skyWarsKitItem(Material.COMPASS, "Tracking Compass",
+                        "Points to the nearest survivor. Left-click to teleport; right-click for the spectator menu.", false));
+                updateSkyWarsCompass(session);
+            } else {
+                player.setGameMode(GameMode.SPECTATOR);
+                if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+                    player.teleport(dragonEscapeSpectatorLocation(session));
+                } else if (session.type == ArcadePortGame.DRAGONS) {
+                    session.dragonMarksmanCharge.remove(player.getUniqueId());
+                    session.dragonMarksmanNextChargeAt.remove(player.getUniqueId());
+                    session.dragonMarksmanFiring.remove(player.getUniqueId());
+                    session.dragonWaterDamageNextAt.remove(player.getUniqueId());
+                    player.getInventory().clear();
+                    player.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
+                            "Points to the nearest survivor. Left-click to spectate them."));
+                    updateDragonsSpectatorCompasses(session);
+                }
             }
             player.sendMessage(ChatColor.RED + "Eliminated: " + reason + ".");
         }
@@ -12419,9 +12435,14 @@ public final class ArcadePortManager implements Listener {
             }
             spectator.closeInventory();
             if (event.isRightClick()) {
+                spectator.setGameMode(GameMode.SPECTATOR);
                 spectator.setSpectatorTarget(target);
             } else {
                 spectator.setSpectatorTarget(null);
+                spectator.setGameMode(GameMode.ADVENTURE);
+                spectator.setAllowFlight(true);
+                spectator.setFlying(true);
+                spectator.setCollidable(false);
                 spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
                 spectator.setCompassTarget(target.getLocation());
             }
