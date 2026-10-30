@@ -219,9 +219,9 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isQuiverBreakableGlassMaterial(null));
     }
 
-    @Test void quiverOnlyFinishesLastSurvivorAfterRespawnsHaveCleared() {
+    @Test void quiverFinishesOnLastLivePlayerImmediatelyAfterKill() {
         assertTrue(ArcadePortRules.shouldFinishQuiverLastPlayer(1, 0, 2));
-        assertFalse(ArcadePortRules.shouldFinishQuiverLastPlayer(1, 1, 2));
+        assertTrue(ArcadePortRules.shouldFinishQuiverLastPlayer(1, 1, 4));
         assertFalse(ArcadePortRules.shouldFinishQuiverLastPlayer(2, 0, 2));
         assertFalse(ArcadePortRules.shouldFinishQuiverLastPlayer(1, 0, 1));
     }
