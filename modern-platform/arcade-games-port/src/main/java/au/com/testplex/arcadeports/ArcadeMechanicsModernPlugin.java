@@ -35,6 +35,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             getConfig().set("enabled-games", enabled);
             getConfig().set("acceptance-games-revision", acceptanceRevision);
         }
+        java.util.List<String> enabledGames = new java.util.ArrayList<>(getConfig().getStringList("enabled-games"));
+        if (!enabledGames.contains("monster-maze")) enabledGames.add(0, "monster-maze");
+        getConfig().set("enabled-games", enabledGames);
         saveConfig();
         monsterMaze = new MonsterMazePlugin(this);
         monsterMaze.enable();
@@ -74,6 +77,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
     public void returnPlayerToArcadeLobby(Player player) {
         if (manager != null && player != null && player.isOnline()) manager.returnPlayerToLobby(player);
+    }
+    public void stopMonsterMazeRound(String reason) {
+        if (manager != null) manager.stop(reason == null ? "Monster Maze stopped" : reason);
     }
 
     @Override
