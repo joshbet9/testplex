@@ -2172,9 +2172,47 @@ public final class ArcadePortRules {
         return bodyNear || eyesNear;
     }
 
-    public static boolean isQuiverReboundTargetInRange(double distanceSquared) {
-        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
-                && distanceSquared <= QUIVER_REBOUND_MAX_DISTANCE_SQUARED;
+    public static boolean isQuiverPerfectRun(int killStreak) {
+        return killStreak >= QUIVER_PERFECT_RUN_KILL_STREAK;
+    }
+
+    public static boolean isQuiverSpeedrunnerWin(long elapsedMillis) {
+        return elapsedMillis >= 0L && elapsedMillis < 90_000L;
+    }
+
+    public static boolean shouldAwardQuiverFistPunchKills(int kills) {
+        return kills >= 3;
+    }
+
+    public static double quiverBrawlerHealthAfterKill(double health, double maxHealth) {
+        if (!Double.isFinite(health) || !Double.isFinite(maxHealth) || maxHealth <= 0.0D) return 0.0D;
+        return Math.min(maxHealth, Math.max(0.0D, health) + 2.0D);
+    }
+
+    public static boolean isQuiverKillstreakAnnouncement(int killStreak) {
+        return killStreak == 3 || killStreak == 5 || killStreak == 7 || killStreak == 9
+                || killStreak == 11 || killStreak == 13 || killStreak == QUIVER_PERFECT_RUN_KILL_STREAK;
+    }
+
+    public static String quiverKillstreakTitle(int killStreak) {
+        return switch (killStreak) {
+            case 3 -> "TRIPLE KILL";
+            case 5 -> "MEGA KILL";
+            case 7 -> "MONSTER KILL";
+            case 9 -> "ULTRA KILL";
+            case 11 -> "UNSTOPPABLE";
+            case 13 -> "GODLIKE";
+            case QUIVER_PERFECT_RUN_KILL_STREAK -> "PERFECT RUN";
+            default -> null;
+        };
+    }
+
+    public static boolean isQuiverReboundImpactInRange(double bodyDistanceSquared, double eyeDistanceSquared) {
+        boolean bodyNear = Double.isFinite(bodyDistanceSquared) && bodyDistanceSquared >= 0.0D
+                && bodyDistanceSquared <= QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED;
+        boolean eyesNear = Double.isFinite(eyeDistanceSquared) && eyeDistanceSquared >= 0.0D
+                && eyeDistanceSquared <= QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED;
+        return bodyNear || eyesNear;
     }
 
     public static boolean shouldQuiverArrowBounce(int remainingBounces) {
