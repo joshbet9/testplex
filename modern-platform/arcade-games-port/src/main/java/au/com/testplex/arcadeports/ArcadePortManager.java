@@ -3713,8 +3713,8 @@ public final class ArcadePortManager implements Listener {
         }
 
         if (session.skyWarsLive && session.skyWarsTntGenerator != null && now >= session.skyWarsNextTntAt) {
-            ItemStack tnt = namedItem(Material.TNT, ChatColor.GOLD + "Throwable TNT",
-                    ChatColor.GRAY + "Right-click to throw at opponents.");
+            ItemStack tnt = namedItem(Material.TNT, "Throwable TNT",
+                    "Right-click to throw at opponents.");
             tnt.setAmount(SkyWarsMixedArcadeRules.TNT_PER_DROP);
             session.world.dropItemNaturally(session.skyWarsTntGenerator.clone(), tnt);
             session.skyWarsNextTntAt = now + SkyWarsMixedArcadeRules.TNT_GENERATOR_INTERVAL_MILLIS;
