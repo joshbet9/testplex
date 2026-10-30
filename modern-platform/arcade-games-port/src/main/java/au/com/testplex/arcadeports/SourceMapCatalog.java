@@ -41,6 +41,7 @@ public final class SourceMapCatalog {
             case SHEEP_QUEST -> "maps/sheep-quest.zip";
             case SPLEEF -> "maps/spleef.zip";
             case TURF_WARS -> "maps/turf-wars.zip";
+            case DRAW_MY_THING -> "source-maps/Draw My Thing/Draw_Stadium.zip";
             default -> null;
         };
     }
