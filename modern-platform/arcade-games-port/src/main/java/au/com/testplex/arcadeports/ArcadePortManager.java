@@ -4950,11 +4950,11 @@ public final class ArcadePortManager implements Listener {
         for (Player player : session.players.values()) {
             if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
         }
-        updateDragonEscapeRaceScoreboard(session);
+        updateDragonEscapeRaceScoreboard(session, System.currentTimeMillis());
     }
 
-    /** Reborn shows the top 14 ranked racers, green while alive and red after elimination. */
-    private void updateDragonEscapeRaceScoreboard(Session session) {
+    /** Reborn shows the top 14 ranked racers; the modern sidebar also shows live race times. */
+    private void updateDragonEscapeRaceScoreboard(Session session, long now) {
         Scoreboard scoreboard = session.dragonEscapeScoreboard;
         Objective objective = session.dragonEscapeScoreboardObjective;
         if (scoreboard == null || objective == null || session.type != ArcadePortGame.DRAGON_ESCAPE) return;
@@ -4967,14 +4967,28 @@ public final class ArcadePortManager implements Listener {
         ranked.sort((left, right) -> Double.compare(
                 session.dragonEscapePlayerRankScores.get(right.getUniqueId()),
                 session.dragonEscapePlayerRankScores.get(left.getUniqueId())));
+        List<Player> liveOrder = dragonEscapeRaceOrder(session);
+        Player liveLeader = liveOrder.isEmpty() ? null : liveOrder.get(0);
+        long elapsed = Math.max(0L, now - session.startedAt);
         for (int i = 0; i < session.dragonEscapeScoreboardTeams.size(); i++) {
             Team line = session.dragonEscapeScoreboardTeams.get(i);
             String entry = session.dragonEscapeScoreboardEntries.get(i);
             if (i < ranked.size()) {
                 Player racer = ranked.get(i);
-                ChatColor colour = session.alive.contains(racer.getUniqueId()) ? ChatColor.GREEN : ChatColor.RED;
-                line.setPrefix(colour + racer.getName());
-                line.setSuffix("");
+                boolean alive = session.alive.contains(racer.getUniqueId());
+                ChatColor colour = alive ? ChatColor.GREEN : ChatColor.RED;
+                line.setPrefix(colour + "#" + (i + 1) + " " + racer.getName());
+                if (!alive) {
+                    line.setSuffix(ChatColor.DARK_RED + " OUT");
+                } else if (liveLeader != null
+                        && racer.getUniqueId().equals(liveLeader.getUniqueId())) {
+                    line.setSuffix(ChatColor.YELLOW + " " + ArcadePortRules.formatDragonEscapeTime(elapsed));
+                } else if (liveLeader != null) {
+                    long gap = dragonEscapeRaceGapMillis(session, liveLeader, racer, now);
+                    line.setSuffix(ChatColor.RED + " +" + ArcadePortRules.formatDragonEscapeTime(gap));
+                } else {
+                    line.setSuffix("");
+                }
                 objective.getScore(entry).setScore(14 - i);
             } else {
                 line.setPrefix("");
@@ -5005,7 +5019,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void updateDragonEscapeRaceUi(Session session, long now) {
-        if (session.ticks % 10 == 0) updateDragonEscapeRaceScoreboard(session);
+        if (session.ticks % 10 == 0) updateDragonEscapeRaceScoreboard(session, now);
         List<Player> order = dragonEscapeRaceOrder(session);
         if (order.isEmpty()) return;
         Player leader = order.get(0);
