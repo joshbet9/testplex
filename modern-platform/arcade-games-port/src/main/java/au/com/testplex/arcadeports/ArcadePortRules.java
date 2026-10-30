@@ -1658,6 +1658,11 @@ public final class ArcadePortRules {
         return Double.isFinite(winnerHealth) && winnerHealth > 0.0D && winnerHealth <= 1.0001D;
     }
 
+    /** A second tournament loss removes a player; the first loss only moves them to the lower bracket. */
+    public static boolean shouldEliminateGladiatorAfterLoss(int totalLosses) {
+        return totalLosses >= 2;
+    }
+
     public static String gladiatorsAchievementConfigKey(java.util.UUID playerId, String achievementId) {
         String safeId = achievementId == null ? "" : achievementId.toLowerCase(java.util.Locale.ROOT)
                 .replaceAll("[^a-z0-9-]+", "-").replaceAll("^-+|-+$", "");
