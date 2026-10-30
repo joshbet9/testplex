@@ -4701,7 +4701,8 @@ public final class ArcadePortManager implements Listener {
                             dragonIndex, location.distance(dragonNext));
                     session.dragonEscapePlayerRankScores.put(player.getUniqueId(), playerScore);
                     if (playerIndex == lastIndex && player.getLocation().distance(
-                            session.dragonEscapeWaypoints.get(lastIndex)) < 3.0D) {
+                            session.dragonEscapeWaypoints.get(lastIndex))
+                            < ArcadePortRules.DRAGON_ESCAPE_FINISH_RADIUS) {
                         recordDragonEscapeFinish(session, player, now);
                         finish(session, player, true);
                         return;
@@ -4773,6 +4774,10 @@ public final class ArcadePortManager implements Listener {
         plugin.getConfig().set(path + "time-ms", elapsed);
         plugin.getConfig().set(path + "map-resource", session.dragonEscapeMapResource);
         plugin.getConfig().set(path + "map-name", session.dragonEscapeMapName);
+        // Preserve the exact finish position so the PB ghost can replay its final leg too.
+        plugin.getConfig().set(path + "finish.x", player.getLocation().getX());
+        plugin.getConfig().set(path + "finish.y", player.getLocation().getY());
+        plugin.getConfig().set(path + "finish.z", player.getLocation().getZ());
         plugin.getConfig().set(path + "splits", null);
         for (Map.Entry<Integer, Long> split : splits.entrySet()) {
             plugin.getConfig().set(path + "splits." + split.getKey(), split.getValue());
@@ -4793,6 +4798,65 @@ public final class ArcadePortManager implements Listener {
                 + ArcadePortRules.formatDragonEscapeDelta(delta);
     }
 
+    private Location dragonEscapePersonalBestFinishLocation(
+            Session session, UUID playerId, String mapResource) {
+        String path = dragonEscapePbPath(playerId, mapResource);
+        if (path.isEmpty()
+                || !plugin.getConfig().contains(path + "finish.x")
+                || !plugin.getConfig().contains(path + "finish.y")
+                || !plugin.getConfig().contains(path + "finish.z")) return null;
+        double x = plugin.getConfig().getDouble(path + "finish.x");
+        double y = plugin.getConfig().getDouble(path + "finish.y");
+        double z = plugin.getConfig().getDouble(path + "finish.z");
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) return null;
+        return new Location(session.world, x, y, z);
+    }
+
+    /**
+     * Split keys mark nearest-waypoint transitions: key 0 is the start marker,
+     * keys 1..N-1 are midpoints between adjacent authored markers, and key N
+     * is the recorded finish position (or the last marker for an older PB).
+     */
+    private Location dragonEscapeSplitBoundaryLocation(
+            Session session, int splitIndex, Location finishLocation) {
+        List<Location> route = session.dragonEscapeWaypoints;
+        int count = route.size();
+        if (count == 0) return null;
+        if (splitIndex <= 0) return route.get(0).clone();
+        if (splitIndex >= count) {
+            return finishLocation == null ? route.get(count - 1).clone() : finishLocation.clone();
+        }
+        Location before = route.get(splitIndex - 1);
+        Location after = route.get(splitIndex);
+        return before.clone().add(
+                (after.getX() - before.getX()) * 0.5D,
+                (after.getY() - before.getY()) * 0.5D,
+                (after.getZ() - before.getZ()) * 0.5D);
+    }
+
+    private double dragonEscapeCourseDistance(Session session, Player player) {
+        List<Location> route = session.dragonEscapeWaypoints;
+        if (route.isEmpty()) return player.getLocation().getZ();
+        int count = route.size();
+        int progress = Math.max(0, Math.min(count - 1,
+                dragonEscapePlayerProgress(session, player)));
+        double distance = 0.0D;
+        for (int split = 0; split < progress; split++) {
+            Location from = dragonEscapeSplitBoundaryLocation(session, split, null);
+            Location to = dragonEscapeSplitBoundaryLocation(session, split + 1, null);
+            distance += from.distance(to);
+        }
+        Location from = dragonEscapeSplitBoundaryLocation(session, progress, null);
+        Location to = dragonEscapeSplitBoundaryLocation(session, progress + 1, null);
+        double segmentLength = from.distance(to);
+        if (segmentLength > 0.001D) {
+            double fraction = Math.max(0.0D, Math.min(1.0D,
+                    1.0D - player.getLocation().distance(to) / segmentLength));
+            distance += segmentLength * fraction;
+        }
+        return distance;
+    }
+
     private long dragonEscapeExpectedPbMillis(Session session, Player player, long totalPb) {
         int count = session.dragonEscapeWaypoints.size();
         if (count == 0) {
@@ -4803,44 +4867,29 @@ public final class ArcadePortManager implements Listener {
         int progress = Math.max(0, Math.min(count - 1, dragonEscapePlayerProgress(session, player)));
         int segment = ArcadePortRules.dragonEscapePbSegmentStartIndex(progress, count);
         if (segment < 0) return 0L;
-
         Map<Integer, Long> splits = dragonEscapePersonalBestSplits(
                 player.getUniqueId(), session.dragonEscapeMapResource);
         long fromTime = splits.getOrDefault(segment,
                 ArcadePortRules.dragonEscapeDefaultSplitMillis(totalPb, segment, count));
         long toTime = splits.getOrDefault(segment + 1,
                 ArcadePortRules.dragonEscapeDefaultSplitMillis(totalPb, segment + 1, count));
-
-        double fraction;
-        if (segment < count - 1) {
-            // Normal leg: interpolate from the current authored waypoint to the next one.
-            Location from = session.dragonEscapeWaypoints.get(segment);
-            Location to = session.dragonEscapeWaypoints.get(segment + 1);
-            double segmentLength = from.distance(to);
-            fraction = segmentLength < 0.001D ? 0.0D
-                    : 1.0D - player.getLocation().distance(to) / segmentLength;
-        } else {
-            // Final leg: Reborn finishes inside a three-block radius of the last marker.
-            // Keep the PB delta moving through that finish radius rather than freezing at
-            // the last checkpoint or jumping to the full PB before the finish is reached.
-            double distanceToFinish = player.getLocation().distance(
-                    session.dragonEscapeWaypoints.get(count - 1));
-            fraction = 1.0D - distanceToFinish / 3.0D;
-        }
+        Location finish = dragonEscapePersonalBestFinishLocation(
+                session, player.getUniqueId(), session.dragonEscapeMapResource);
+        Location from = dragonEscapeSplitBoundaryLocation(session, segment, finish);
+        Location to = dragonEscapeSplitBoundaryLocation(session, segment + 1, finish);
+        double segmentLength = from.distance(to);
+        double fraction = segmentLength < 0.001D ? 0.0D
+                : 1.0D - player.getLocation().distance(to) / segmentLength;
         return ArcadePortRules.interpolateDragonEscapeSplitMillis(fromTime, toTime, fraction);
     }
 
     private Location dragonEscapeGhostLocation(Session session, UUID playerId, long elapsed) {
-        if (session.dragonEscapeMapResource == null || session.dragonEscapeWaypoints.isEmpty()
-                || session.dragonEscapeStartLocation == null) return null;
+        if (session.dragonEscapeMapResource == null || session.dragonEscapeWaypoints.isEmpty()) return null;
         long pb = dragonEscapePersonalBestMillis(playerId, session.dragonEscapeMapResource);
         if (pb <= 0L || elapsed >= pb) return null;
         Map<Integer, Long> splits = dragonEscapePersonalBestSplits(playerId, session.dragonEscapeMapResource);
-        List<Location> route = session.dragonEscapeWaypoints;
-        int count = route.size();
-
-        // Splits are keyed 0 at the start, 1..N-1 at authored route progress,
-        // and N at the finish. Render every corresponding leg in that same order.
+        int count = session.dragonEscapeWaypoints.size();
+        Location finish = dragonEscapePersonalBestFinishLocation(session, playerId, session.dragonEscapeMapResource);
         for (int segment = 0; segment < count; segment++) {
             long fromTime = splits.getOrDefault(segment,
                     ArcadePortRules.dragonEscapeDefaultSplitMillis(pb, segment, count));
@@ -4848,22 +4897,15 @@ public final class ArcadePortManager implements Listener {
                     ArcadePortRules.dragonEscapeDefaultSplitMillis(pb, segment + 1, count));
             if (toTime <= fromTime) toTime = fromTime + 1L;
             if (elapsed > toTime) continue;
-
-            if (segment == count - 1) {
-                // The final PB split is the finish trigger inside the last marker's
-                // radius. Keep the ghost on that final marker for this short leg.
-                return route.get(count - 1).clone();
-            }
-
             double fraction = Math.max(0.0D, Math.min(1.0D,
                     (elapsed - fromTime) / (double) (toTime - fromTime)));
-            Location from = route.get(segment);
-            Location to = route.get(segment + 1);
+            Location from = dragonEscapeSplitBoundaryLocation(session, segment, finish);
+            Location to = dragonEscapeSplitBoundaryLocation(session, segment + 1, finish);
             return from.clone().add((to.getX() - from.getX()) * fraction,
                     (to.getY() - from.getY()) * fraction,
                     (to.getZ() - from.getZ()) * fraction);
         }
-        return route.get(count - 1).clone();
+        return finish == null ? session.dragonEscapeWaypoints.get(count - 1).clone() : finish;
     }
 
     private Color dragonEscapeBeaconRgb(String color) {
@@ -4908,28 +4950,16 @@ public final class ArcadePortManager implements Listener {
     }
 
     private long dragonEscapeRaceGapMillis(Session session, Player leader, Player racer, long now) {
-        UUID leaderId = leader.getUniqueId(), racerId = racer.getUniqueId();
-        int leadProgress = dragonEscapePlayerProgress(session, leader);
-        int raceProgress = dragonEscapePlayerProgress(session, racer);
-        Map<Integer, Long> leadSplits = session.dragonEscapeRunSplitMillis.getOrDefault(leaderId, Map.of());
-        Map<Integer, Long> raceSplits = session.dragonEscapeRunSplitMillis.getOrDefault(racerId, Map.of());
-        int checkpointKey = Math.min(session.dragonEscapeWaypoints.size(), raceProgress + 1);
-        Long leadCrossing = leadSplits.get(checkpointKey);
-        if (leadProgress > raceProgress && leadCrossing != null && checkpointKey > 0
-                && checkpointKey - 1 < session.dragonEscapeWaypoints.size()) {
-            Location target = session.dragonEscapeWaypoints.get(checkpointKey - 1);
-            double segmentLength = checkpointKey == 1 || session.dragonEscapeWaypoints.size() == 1
-                    ? (session.dragonEscapeStartLocation == null ? 1.0D
-                        : Math.max(1.0D, session.dragonEscapeStartLocation.distance(target)))
-                    : Math.max(1.0D, session.dragonEscapeWaypoints.get(checkpointKey - 2).distance(target));
-            double remaining = racer.getLocation().distance(target);
-            double fractionRemaining = Math.max(0.0D, Math.min(1.0D, remaining / segmentLength));
-            return Math.max(0L, Math.round((now - session.startedAt - leadCrossing) * fractionRemaining));
+        if (leader == null || racer == null || !leader.isOnline() || !racer.isOnline()) return 0L;
+        if (session.dragonEscapeWaypoints.isEmpty()) {
+            double gap = Math.max(0.0D,
+                    leader.getLocation().getZ() - racer.getLocation().getZ());
+            return Math.round(gap / ArcadePortRules.DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED * 1_000.0D);
         }
-        Long leadAt = leadSplits.get(checkpointKey), racerAt = raceSplits.get(checkpointKey);
-        if (leadAt != null && racerAt != null) return Math.max(0L, Math.abs(racerAt - leadAt));
-        double distance = leader.getLocation().distance(racer.getLocation());
-        return Math.max(0L, Math.round(distance / 5.0D * 1_000.0D));
+        double leaderDistance = dragonEscapeCourseDistance(session, leader);
+        double racerDistance = dragonEscapeCourseDistance(session, racer);
+        return ArcadePortRules.dragonEscapeCourseTimeGapMillis(
+                leaderDistance, racerDistance, ArcadePortRules.DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED);
     }
 
     private void setupDragonEscapeRaceScoreboard(Session session) {
