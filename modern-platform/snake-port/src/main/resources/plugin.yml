@@ -9,7 +9,7 @@ softdepend:
 commands:
   snake:
     description: Join and test Snake
-    usage: /snake <join|start|kit|status|leave|stop>
+    usage: /snake <join|start|kit|status|maps|map|stats|leave|stop>
 permissions:
   testplex.snake.admin:
     description: Allows resetting the modern Snake test game

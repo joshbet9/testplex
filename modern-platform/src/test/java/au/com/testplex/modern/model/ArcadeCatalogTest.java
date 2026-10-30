@@ -120,6 +120,19 @@ class ArcadeCatalogTest {
     }
 
     @Test
+    void snakeUsesOneCombinedCosmeticLineForBodyPaletteAndAbilityVisuals() {
+        GameDefinition snake = new ArcadeCatalog().getGame("snake");
+        assertEquals(1, snake.getCosmeticLines().size());
+        CosmeticLineDefinition line = snake.getCosmeticLines().get(0);
+        assertEquals("snake-style", line.getId());
+        assertEquals(CosmeticLineDefinition.SelectionMode.MULTI, line.getSelectionMode());
+        for (String group : Set.of("snake-type", "colour-theme", "ability-visuals")) {
+            assertTrue(line.getOptions().stream().anyMatch(option -> group.equals(option.getSelectionGroup())),
+                    "Snake cosmetic group missing: " + group);
+        }
+    }
+
+    @Test
     void allGameLookupsAreCaseInsensitive() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         assertNotNull(catalog.getGame("SNAKE"));

@@ -134,6 +134,24 @@ class SnakeRulesTest {
         assertFalse(SnakeRules.shouldConsumeHazardOnContact(true));
     }
 
+    @Test void sourceIdleRuleUsesTwoBlocksOfProgressWithinTwoSeconds() {
+        assertTrue(SnakeRules.hasMovedForIdleCheck(4.001D));
+        assertFalse(SnakeRules.hasMovedForIdleCheck(4.0D));
+        assertFalse(SnakeRules.shouldEliminateForIdle(4.001D, 2_500L));
+        assertFalse(SnakeRules.shouldEliminateForIdle(4.0D, 1_999L));
+        assertTrue(SnakeRules.shouldEliminateForIdle(4.0D, 2_000L));
+        assertEquals(2_000L, SnakeRules.IDLE_TIMEOUT_MILLIS);
+    }
+
+    @Test void sourceSnakeAchievementThresholdsMatchTheLegacyStatTrackers() {
+        assertTrue(SnakeRules.shouldAwardCannibal(6));
+        assertFalse(SnakeRules.shouldAwardCannibal(5));
+        assertTrue(SnakeRules.shouldAwardChooChoo(60));
+        assertFalse(SnakeRules.shouldAwardChooChoo(59));
+        assertTrue(SnakeRules.shouldAwardSlimySheep(20));
+        assertFalse(SnakeRules.shouldAwardSlimySheep(19));
+    }
+
     @Test void yawAndRadianWrappingKeepAnglesInExpectedRanges() {
         assertEquals(-170.0F, SnakeRules.wrapYaw(190.0F), 0.0001F);
         assertEquals(Math.PI / 2.0D, SnakeRules.wrapRadians(5.0D * Math.PI / 2.0D), 0.000001D);
