@@ -1,0 +1,73 @@
+name: Wizards Modern 26.3
+
+on:
+  pull_request:
+    paths:
+      - "modern-platform/wizards-port/**"
+      - ".github/workflows/wizards-modern-build.yml"
+  push:
+    branches:
+      - feat/wizards-resourcepackless-26.3-20261030
+      - feat/testplex-modern-26.3-platform
+    paths:
+      - "modern-platform/wizards-port/**"
+      - ".github/workflows/wizards-modern-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-wizards:
+    name: Build WizardsModern and run spell/rules tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: modern-platform/wizards-port/pom.xml
+
+      - name: Build Wizards 26.3 and run tests
+        run: mvn --batch-mode --no-transfer-progress -f modern-platform/wizards-port/pom.xml clean verify
+
+      - name: Verify plugin metadata and packaged classes
+        shell: bash
+        run: |
+          set -euo pipefail
+          jar_file="modern-platform/wizards-port/target/WizardsModern.jar"
+          test -s "$jar_file"
+          jar tf "$jar_file" | grep -Fxq "plugin.yml"
+          jar tf "$jar_file" | grep -Fxq "au/com/testplex/wizards/WizardsModernPlugin.class"
+          jar tf "$jar_file" | grep -Fxq "au/com/testplex/wizards/WizardsGameManager.class"
+          jar tf "$jar_file" | grep -Fxq "au/com/testplex/wizards/WizardsSpell.class"
+          unzip -p "$jar_file" plugin.yml | grep -Fxq "name: WizardsModern"
+          unzip -p "$jar_file" plugin.yml | grep -Fxq "api-version: '26.3'"
+          echo "WizardsModern is packaged for Paper 26.3 without a resource-pack dependency."
+
+      - name: Upload WizardsModern test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: testplex-wizards-modern-26.3
+          path: modern-platform/wizards-port/target/WizardsModern.jar
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write Wizards build summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## WizardsModern — Paper 26.3"
+            echo
+            echo "- Runtime baseline: Java 25 / Paper 26.3"
+            echo "- Resource pack: not required, downloaded or prompted for"
+            echo "- Status: mechanics-in-progress; not a full-parity or READY_FOR_TEST sign-off"
+            echo "- The isolated artifact is build-only; this workflow does not deploy to Hyper-V."
+          } >> "$GITHUB_STEP_SUMMARY"
