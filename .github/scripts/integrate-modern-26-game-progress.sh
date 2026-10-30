@@ -13,7 +13,10 @@ for branch in \
   feat/skywars-mixed-arcade-26.3-20261030 \
   feat/milk-cow-wither-assault-26.3 \
   feat/castle-assault-gwen-mixed-arcade-variants-20261030-v6 \
-  feat/sheep-quest-parity-20261030-rebased; do
+  feat/sheep-quest-parity-20261030-rebased \
+  feat/dmt-round-scaling-master-builders-20261030-jb1 \
+  feat/micro-battles-parity-current-20261030 \
+  feat/evolution-parity-20261030; do
   echo "Integrating $branch"
   git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"
   if ! git merge-base --is-ancestor "origin/$branch" HEAD; then
@@ -837,5 +840,7 @@ if ! git diff --cached --quiet; then
   git commit -m "Integrate reconciled 26-game modern Arcade progress"
 fi
 git status --short
-git push origin "HEAD:refs/heads/$INTEGRATION_BRANCH"
+git fetch origin "refs/heads/$INTEGRATION_BRANCH:refs/remotes/origin/$INTEGRATION_BRANCH" || true
+remote_sha="$(git rev-parse refs/remotes/origin/$INTEGRATION_BRANCH 2>/dev/null || true)"
+git push --force-with-lease="refs/heads/$INTEGRATION_BRANCH:$remote_sha" origin "HEAD:refs/heads/$INTEGRATION_BRANCH"
 echo "Validated integration branch pushed at $(git rev-parse HEAD)"
