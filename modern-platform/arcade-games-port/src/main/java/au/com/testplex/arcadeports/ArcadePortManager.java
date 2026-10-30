@@ -3578,16 +3578,27 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         UUID attackerId = attacker.getUniqueId();
         UUID targetId = target.getUniqueId();
-        long targetInvincibleUntil = session.baconBrutusUntil.getOrDefault(targetId, 0L);
-        if (ArcadePortRules.isBaconInvincibilityActive(now, targetInvincibleUntil)) {
-            attacker.sendActionBar(ChatColor.RED + "BLOCKED " + ChatColor.GRAY + "| target is invincible");
-            target.sendActionBar(ChatColor.GOLD + "INVINCIBLE"
-                    + ChatColor.WHITE + " | " + ChatColor.GREEN
-                    + Math.max(0L, (targetInvincibleUntil - now + 999L) / 1_000L) + "s");
+        long brutusUntil = session.baconBrutusUntil.getOrDefault(targetId, 0L);
+        boolean brutusActive = brutusUntil > now;
+        boolean backstab = isBaconBrawlBackstab(target, attacker);
+        if (ArcadePortRules.shouldBaconBrutusGuardHit(brutusActive, backstab)) {
+            attacker.sendActionBar(ChatColor.RED + "GUARD BLOCKED");
+            target.sendActionBar(ChatColor.GOLD + ChatColor.BOLD + "BRUTUS GUARD"
+                    + ChatColor.GRAY + " | frontal hit absorbed");
             target.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING,
-                    target.getLocation().add(0.0D, 1.0D, 0.0D), 8, 0.35D, 0.45D, 0.35D, 0.01D);
-            target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.7F, 1.5F);
+                    target.getLocation().add(0.0D, 1.0D, 0.0D), 10, 0.35D, 0.45D, 0.35D, 0.01D);
+            target.getWorld().spawnParticle(Particle.CRIT,
+                    target.getLocation().add(0.0D, 1.0D, 0.0D), 8, 0.25D, 0.35D, 0.25D, 0.03D);
+            target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.8F, 1.5F);
             return;
+        }
+        if (brutusActive && backstab) {
+            endBaconBrutus(session, targetId, target);
+            target.sendActionBar(ChatColor.RED + ChatColor.BOLD + "BRUTUS GUARD BROKEN!");
+            target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BREAK, 0.9F, 0.8F);
+        }
+        if (session.baconCloakUntil.containsKey(attackerId)) {
+            endBaconCloak(session, attackerId, attacker);
         }
         session.baconLastDamager.put(targetId, attackerId);
         session.baconLastDamagedAt.put(targetId, now);
@@ -3610,15 +3621,9 @@ public final class ArcadePortManager implements Listener {
             knockbackMultiplier *= ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER
                     * ArcadePortRules.baconBodySlamMeterMultiplier(charge);
         }
-        if ("pig".equals(kit) && "melee".equals(source)) {
-            Vector targetLook = target.getLocation().getDirection().setY(0.0D);
-            Vector fromTargetToAttacker = attacker.getLocation().toVector()
-                    .subtract(target.getLocation().toVector()).setY(0.0D);
-            if (ArcadePortRules.isBaconBrawlBackstab(targetLook.getX(), targetLook.getZ(),
-                    fromTargetToAttacker.getX(), fromTargetToAttacker.getZ())) {
-                knockbackMultiplier *= ArcadePortRules.baconBrawlKnockbackMultiplier(true);
-                target.playSound(target.getLocation(), Sound.ENTITY_PIG_DEATH, 1.0F, 2.0F);
-            }
+        if ("pig".equals(kit) && "melee".equals(source) && backstab) {
+            knockbackMultiplier *= ArcadePortRules.baconBrawlKnockbackMultiplier(true);
+            target.playSound(target.getLocation(), Sound.ENTITY_PIG_DEATH, 1.0F, 2.0F);
         }
         target.setVelocity(baconBrawlKnockbackVelocity(attacker, target, rawDamage,
                 knockbackMultiplier, projectileVelocity));
@@ -3649,6 +3654,14 @@ public final class ArcadePortManager implements Listener {
             attacker.setVelocity(baconBrawlKnockbackVelocity(target, attacker, 2.0D,
                     session.baconKnockback * ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER, null));
         }
+    }
+
+    private boolean isBaconBrawlBackstab(Player target, Player attacker) {
+        Vector targetLook = target.getLocation().getDirection().setY(0.0D);
+        Vector fromTargetToAttacker = attacker.getLocation().toVector()
+                .subtract(target.getLocation().toVector()).setY(0.0D);
+        return ArcadePortRules.isBaconBrawlBackstab(targetLook.getX(), targetLook.getZ(),
+                fromTargetToAttacker.getX(), fromTargetToAttacker.getZ());
     }
 
     /** Port DamageManager's logarithmic base and UtilAction's strength, vertical cap and ground boost. */
@@ -7146,19 +7159,6 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && event.getEntity() instanceof Player baconTarget
                 && session.players.containsKey(baconTarget.getUniqueId())) {
-            long invincibleUntil = session.baconBrutusUntil.getOrDefault(baconTarget.getUniqueId(), 0L);
-            if (ArcadePortRules.isBaconInvincibilityActive(System.currentTimeMillis(), invincibleUntil)) {
-                event.setCancelled(true);
-                baconTarget.sendActionBar(ChatColor.GOLD + "INVINCIBLE");
-                if (event instanceof EntityDamageByEntityEvent byEntity) {
-                    Entity damager = byEntity.getDamager();
-                    Player attacker = damager instanceof Player direct ? direct
-                            : damager instanceof Projectile projectile
-                                    && projectile.getShooter() instanceof Player shooter ? shooter : null;
-                    if (attacker != null) attacker.sendActionBar(ChatColor.RED + "BLOCKED");
-                }
-                return;
-            }
             if (ArcadePortRules.shouldSuppressBaconBlastHealthDamage(
                     true, session.baconBlastExplosionDepth > 0, event.getCause())) {
                 event.setCancelled(true);
