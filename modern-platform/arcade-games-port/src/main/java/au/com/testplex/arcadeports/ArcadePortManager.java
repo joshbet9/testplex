@@ -4757,20 +4757,26 @@ public final class ArcadePortManager implements Listener {
 
     private List<Player> dragonEscapeRaceOrder(Session session) {
         List<Player> racers = new ArrayList<>(alivePlayers(session));
-        racers.sort((left, right) -> {
-            int leftProgress = dragonEscapePlayerProgress(session, left);
-            int rightProgress = dragonEscapePlayerProgress(session, right);
-            if (leftProgress != rightProgress) return Integer.compare(rightProgress, leftProgress);
-            int last = session.dragonEscapeWaypoints.size() - 1;
-            if (last >= 0) {
-                double ld = left.getLocation().distance(session.dragonEscapeWaypoints.get(Math.min(last, leftProgress)));
-                double rd = right.getLocation().distance(session.dragonEscapeWaypoints.get(Math.min(last, rightProgress)));
-                int byDistance = Double.compare(ld, rd);
-                if (byDistance != 0) return byDistance;
-            }
-            return left.getName().compareToIgnoreCase(right.getName());
-        });
+        if (!session.dragonEscapeWaypoints.isEmpty()) {
+            racers.sort((left, right) -> {
+                double leftScore = session.dragonEscapePlayerRankScores.getOrDefault(
+                        left.getUniqueId(), dragonEscapeFallbackRankScore(session, left));
+                double rightScore = session.dragonEscapePlayerRankScores.getOrDefault(
+                        right.getUniqueId(), dragonEscapeFallbackRankScore(session, right));
+                return Double.compare(rightScore, leftScore);
+            });
+        } else {
+            racers.sort((left, right) -> Integer.compare(
+                    right.getLocation().getBlockZ(), left.getLocation().getBlockZ()));
+        }
         return racers;
+    }
+
+    private double dragonEscapeFallbackRankScore(Session session, Player player) {
+        int progress = dragonEscapePlayerProgress(session, player);
+        int next = Math.min(session.dragonEscapeWaypoints.size() - 1, Math.max(0, progress + 1));
+        return ArcadePortRules.dragonEscapeRankScore(
+                progress, player.getLocation().distance(session.dragonEscapeWaypoints.get(next)));
     }
 
     private long dragonEscapeRaceGapMillis(Session session, Player leader, Player racer, long now) {
