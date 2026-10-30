@@ -897,15 +897,19 @@ final class SneakyAssassinsMechanics {
         applyDamage(target, damage, attacker, "was defeated");
     }
 
+    void projectileMissed(org.bukkit.entity.Projectile projectile) {
+        if (projectile != null) pendingProjectileDamage.remove(projectile.getUniqueId());
+    }
+
     void handleProjectileHit(org.bukkit.entity.Projectile projectile, Player shooter, Player target) {
         if (projectile == null || shooter == null || target == null
                 || !players.containsKey(shooter.getUniqueId())
                 || !players.containsKey(target.getUniqueId())
                 || !isAlive.test(shooter.getUniqueId()) || !isAlive.test(target.getUniqueId())) return;
-        double damage = pendingProjectileDamage.remove(projectile.getUniqueId()) == null
+        Double recordedDamage = pendingProjectileDamage.remove(projectile.getUniqueId());
+        double damage = recordedDamage == null || recordedDamage <= 0.0D
                 ? Math.max(2.0D, projectile.getVelocity().length() * 2.0D)
-                : pendingProjectileDamage.remove(projectile.getUniqueId());
-        if (damage <= 0.0D) damage = Math.max(2.0D, projectile.getVelocity().length() * 2.0D);
+                : recordedDamage;
         cloakUntil.remove(shooter.getUniqueId());
         Villager proxy = disguises.get(shooter.getUniqueId());
         if (proxy != null && proxy.isValid()) proxy.setInvisible(false);
