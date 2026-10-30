@@ -1442,8 +1442,9 @@ public final class ArcadePortRules {
      * runs from waypoint N to N+1; the final waypoint has no following route segment.
      */
     public static int dragonEscapePbSegmentStartIndex(int waypointIndex, int waypointCount) {
-        return waypointCount > 1 && waypointIndex >= 0 && waypointIndex < waypointCount - 1
-                ? waypointIndex : -1;
+        if (waypointCount <= 1 || waypointIndex < 0) return -1;
+        // While approaching the finish radius, keep measuring along the final route segment.
+        return Math.min(waypointCount - 2, waypointIndex);
     }
 
     /** Evenly distribute a legacy PB across authored waypoints when split data is unavailable. */
