@@ -11629,6 +11629,11 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> quiverGroundPoundReadyAt = new HashMap<>();
         long lastSpleefHungerAt;
         final Set<Block> microBarrierBlocks = new HashSet<>();
+        Scoreboard dragonScoreboard;
+        Objective dragonScoreboardObjective;
+        Team dragonAliveScoreboardTeam;
+        Team dragonDeadScoreboardTeam;
+        long dragonNextScoreboardUpdateAt;
         final Map<String, Long> dragonContactCooldowns = new HashMap<>();
         final List<DragonFlareZone> dragonFlareZones = new ArrayList<>();
         final Set<UUID> dragonSurvivalGemsPaid = new HashSet<>();
