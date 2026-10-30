@@ -7736,6 +7736,45 @@ public final class ArcadePortManager implements Listener {
                             ChatColor.GRAY + "Your above-hotbar PB delta always remains visible.",
                             ChatColor.RESET + (canEditSelf ? "Click to toggle." : "This controls your own display.")),
                     "toggle-dragon-ghost", null, gameId));
+        } else if ("gladiators".equals(gameId)) {
+            String[] ids = {"are-you-not-entertained", "not-even-close"};
+            String[] names = {"Are you not entertained?", "Not even close."};
+            String[] requirements = {
+                    "Win a game without using a bow or a rod in a ruleset where one is available.",
+                    "Win a duel with half a heart remaining."
+            };
+            int[] slots = {10, 12};
+            int unlocked = 0;
+            for (int i = 0; i < ids.length; i++) {
+                boolean earned = plugin.getConfig().getBoolean(
+                        ArcadePortRules.gladiatorsAchievementConfigKey(targetId, ids[i]), false);
+                if (earned) unlocked++;
+                inventory.setItem(slots[i], statsItem(
+                        earned ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (earned ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + names[i],
+                        List.of(" ", ChatColor.GRAY + requirements[i], " ",
+                                earned ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
+                        "noop", null, null));
+            }
+            String milestonePath = ArcadePortRules.gladiatorsMilestoneConfigKey(targetId);
+            int bracketWins = plugin.getConfig().getInt(milestonePath, 0);
+            inventory.setItem(14, statsItem(Material.GOLD_INGOT,
+                    ChatColor.LIGHT_PURPLE + "Silky Seconds — Loser Bracket Wins",
+                    List.of(" ", ChatColor.GRAY + "Loser-bracket duel victories: " + ChatColor.WHITE + bracketWins,
+                            ChatColor.GRAY + "Every victory in the loser's bracket increases this milestone.",
+                            " ", ChatColor.DARK_GRAY + "Milestone progress is saved per player."),
+                    "noop", null, null));
+            int[] statSlots = {29, 30, 31, 32};
+            int[] values = {played, wins, score, knockouts};
+            String[] labels = {"Games Played", "Wins", "Score / Kills", "Knockouts"};
+            for (int i = 0; i < values.length; i++) {
+                int value = values[i];
+                inventory.setItem(statSlots[i], statsItem(
+                        value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (value > 0 ? ChatColor.GREEN : ChatColor.RED) + labels[i],
+                        List.of(" ", ChatColor.GRAY + "Recorded by this local test server: " + ChatColor.WHITE + value),
+                        "noop", null, null));
+            }
         } else if ("bomb-lobbers".equals(gameId)) {
             int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16, 17};
             BombLobbersAchievement[] achievements = BombLobbersAchievement.values();
@@ -7846,6 +7885,15 @@ public final class ArcadePortManager implements Listener {
                     .count();
             lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked
                     + "/" + BaconBrawlAchievement.values().length);
+        } else if ("gladiators".equals(gameId)) {
+            long unlocked = java.util.stream.Stream.of("are-you-not-entertained", "not-even-close")
+                    .filter(id -> plugin.getConfig().getBoolean(
+                            ArcadePortRules.gladiatorsAchievementConfigKey(targetId, id), false))
+                    .count();
+            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/2");
+            lore.add(ChatColor.LIGHT_PURPLE + "Silky Seconds: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(ArcadePortRules.gladiatorsMilestoneConfigKey(targetId), 0)
+                    + " loser-bracket wins");
         } else if ("bomb-lobbers".equals(gameId)) {
             long unlocked = java.util.Arrays.stream(BombLobbersAchievement.values())
                     .filter(achievement -> plugin.getConfig().getBoolean(achievement.configKey(targetId), false))
