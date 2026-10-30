@@ -1117,6 +1117,10 @@ public final class ArcadePortRules {
     public static final long EVOLUTION_PITY_KILL_REDUCTION_MILLIS = 15_000L;
     public static final long EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS = 7_500L;
     public static final long EVOLUTION_ASSIST_WINDOW_MILLIS = 10_000L;
+    public static final long EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS = 3_000L;
+    public static final double EVOLUTION_SULPHUR_BOMB_SPEED = 1.2D;
+    public static final double EVOLUTION_SULPHUR_BOMB_RADIUS = 2.5D;
+    public static final double EVOLUTION_SULPHUR_BOMB_DAMAGE = 4.0D;
 
     public static int nextEvolutionLevel(int currentLevel, boolean wonEvolve) {
         int safeLevel = Math.max(0, Math.min(EVOLUTION_WIN_LEVEL, currentLevel));
@@ -1159,8 +1163,20 @@ public final class ArcadePortRules {
                 Math.max(0, killsSinceLastEvolution) + 1);
     }
 
-    public static boolean canUseEvolutionCreeperCharge(int stage, boolean leftClick, boolean holdingTnt) {
-        return stage == 2 && leftClick && holdingTnt;
+    public static boolean canUseEvolutionSulphurBomb(int stage, boolean rightClick, boolean holdingCoal) {
+        return stage == 2 && rightClick && holdingCoal;
+    }
+
+    public static boolean isEvolutionSulphurBombReady(long now, long readyAt) {
+        return now >= readyAt;
+    }
+
+    public static long nextEvolutionSulphurBombReadyAt(long now) {
+        return now + EVOLUTION_SULPHUR_BOMB_COOLDOWN_MILLIS;
+    }
+
+    public static boolean isEvolutionSulphurBombInRange(double distance) {
+        return Double.isFinite(distance) && distance >= 0.0D && distance <= EVOLUTION_SULPHUR_BOMB_RADIUS;
     }
 
     public static boolean evolutionOverkillRequirementMet(int killsBeforeEvolution) {
