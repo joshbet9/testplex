@@ -9756,6 +9756,7 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             if (!session.alive.contains(witherTarget.getUniqueId())) return;
             int targetTeam = session.teams.getOrDefault(witherTarget.getUniqueId(), 0);
+            Entity damager = event instanceof EntityDamageByEntityEvent byEntity ? byEntity.getDamager() : null;
             if (targetTeam == 1) {
                 if (damager instanceof Arrow arrow && session.witherBlindArrows.remove(arrow.getUniqueId())) {
                     witherTarget.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 80, 0, false, false, false));
@@ -11326,7 +11327,7 @@ public final class ArcadePortManager implements Listener {
         player.getWorld().playSound(player.getLocation(), Sound.ENTITY_WITHER_SHOOT, 0.8F, 1.0F);
     }
 
-    private boolean isQuiverBreakableGlass(Material material) {
+    private Set<Integer> randomPlayerSlots(int playerCount, int selectedCount) {
         if (playerCount <= 0 || selectedCount <= 0) return Set.of();
         List<Integer> slots = new ArrayList<>();
         for (int i = 0; i < playerCount; i++) slots.add(i);
