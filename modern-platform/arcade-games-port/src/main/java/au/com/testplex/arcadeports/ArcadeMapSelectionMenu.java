@@ -36,7 +36,71 @@ public final class ArcadeMapSelectionMenu implements Listener {
     }
 
     public void openMapSelection(Player player, ArcadePortGame game) {
+        if (game == ArcadePortGame.MONSTER_MAZE) {
+            openMonsterMazeMapSelection(player, 0);
+            return;
+        }
         openMapSelection(player, game, 0);
+    }
+
+    /** Monster Maze maps are physical source worlds owned by its in-process game module. */
+    private void openMonsterMazeMapSelection(Player player, int requestedPage) {
+        if (!(plugin instanceof ArcadeMechanicsModernPlugin arcade)
+                || arcade.getMonsterMazeModule() == null
+                || arcade.getMonsterMazeModule().getMapManager() == null) {
+            player.sendMessage(ChatColor.RED + "Monster Maze map data is not loaded by Testplex Arcade.");
+            return;
+        }
+        me.monstermaze.world.MapManager mapManager = arcade.getMonsterMazeModule().getMapManager();
+        List<String> maps = mapManager.knownMaps();
+        Inventory inventory = Bukkit.createInventory(null, 54, TITLE);
+        ItemStack back = createItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
+                ChatColor.GRAY + "Return to the Testplex Set Game page.");
+        mark(back, "back", ArcadePortGame.MONSTER_MAZE, null);
+        inventory.setItem(4, back);
+
+        if (maps.isEmpty()) {
+            inventory.setItem(22, createItem(Material.BARRIER, ChatColor.RED + "No Maps Defined",
+                    ChatColor.GRAY + "Monster Maze has no maps in its bundled maps.yml."));
+            player.openInventory(inventory);
+            return;
+        }
+
+        int pageCount = Math.max(1, (maps.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+        int page = Math.max(0, Math.min(requestedPage, pageCount - 1));
+        String selected = mapManager.getActiveMap();
+        int start = page * PAGE_SIZE;
+        int end = Math.min(maps.size(), start + PAGE_SIZE);
+        int slot = FIRST_MAP_SLOT;
+        for (int index = start; index < end; index++) {
+            String map = maps.get(index);
+            boolean isSelected = map.equalsIgnoreCase(selected);
+            boolean available = mapManager.isAvailable(map);
+            ItemStack item = createItem(available ? Material.PAPER : Material.BARRIER,
+                    (isSelected ? ChatColor.GREEN + "✓ " : ChatColor.YELLOW.toString())
+                            + map.replace('-', ' '),
+                    ChatColor.GRAY + "Source: Monster Maze",
+                    available ? ChatColor.YELLOW + "Left-click to select this installed map."
+                            : ChatColor.RED + "Map world is not installed.",
+                    isSelected ? ChatColor.GREEN + "Currently selected" : ChatColor.DARK_GRAY + map);
+            mark(item, "select-map", ArcadePortGame.MONSTER_MAZE, map);
+            inventory.setItem(slot++, item);
+        }
+
+        inventory.setItem(49, createItem(Material.MAP,
+                ChatColor.AQUA + "Page " + (page + 1) + "/" + pageCount,
+                ChatColor.GRAY.toString() + maps.size() + " Monster Maze maps defined."));
+        if (page > 0) {
+            ItemStack previous = createItem(Material.ARROW, ChatColor.YELLOW + "Previous Page");
+            markPage(previous, "previous-page", ArcadePortGame.MONSTER_MAZE, page - 1);
+            inventory.setItem(45, previous);
+        }
+        if (page + 1 < pageCount) {
+            ItemStack next = createItem(Material.ARROW, ChatColor.YELLOW + "Next Page");
+            markPage(next, "next-page", ArcadePortGame.MONSTER_MAZE, page + 1);
+            inventory.setItem(53, next);
+        }
+        player.openInventory(inventory);
     }
 
     private void openMapSelection(Player player, ArcadePortGame game, int requestedPage) {
@@ -115,7 +179,30 @@ public final class ArcadeMapSelectionMenu implements Listener {
             player.performCommand("setgame");
         } else if ("previous-page".equals(action) || "next-page".equals(action)) {
             Integer page = meta.getPersistentDataContainer().get(pageKey, PersistentDataType.INTEGER);
-            if (game != null && page != null) openMapSelection(player, game, page);
+            if (game == ArcadePortGame.MONSTER_MAZE && page != null) {
+                openMonsterMazeMapSelection(player, page);
+            } else if (game != null && page != null) {
+                openMapSelection(player, game, page);
+            }
+        } else if ("select-map".equals(action) && game == ArcadePortGame.MONSTER_MAZE && resource != null
+                && plugin instanceof ArcadeMechanicsModernPlugin arcade
+                && arcade.getMonsterMazeModule() != null) {
+            me.monstermaze.MonsterMazePlugin module = arcade.getMonsterMazeModule();
+            if (!module.getMapManager().setActiveMap(resource)) {
+                player.sendMessage(ChatColor.RED + "That Monster Maze map is unavailable on this test server.");
+                return;
+            }
+            org.bukkit.Location center = module.getMapManager().defaultCenter();
+            if (center == null) {
+                player.sendMessage(ChatColor.RED + "The selected Monster Maze map could not be loaded.");
+                return;
+            }
+            module.getGameManager().setCenter(center);
+            module.getGameManager().getMonsterManager().setMobType(module.getMapManager().activeMob());
+            player.performCommand("arcadeport lobby monster-maze");
+            player.sendMessage(ChatColor.GREEN + "Selected Monster Maze map "
+                    + resource.replace('-', ' ') + " for Testplex Arcade.");
+            player.performCommand("setgame");
         } else if ("select-map".equals(action) && game != null && resource != null
                 && SourceMapCatalog.mapsFor(plugin, game).stream()
                         .anyMatch(map -> map.resource().equals(resource))) {
