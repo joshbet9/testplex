@@ -8941,9 +8941,12 @@ public final class ArcadePortManager implements Listener {
                         && isBaconCompassMenuTitle(player.getOpenInventory().getTitle()))
                         || (session.type == ArcadePortGame.BOMB_LOBBERS
                         && isBombLobbersCompassMenuTitle(player.getOpenInventory().getTitle()))
+                        || (session.type == ArcadePortGame.SPLEEF
+                        && player.getOpenInventory().getTopInventory().getHolder() instanceof SpleefCompassMenuHolder)
                         || player.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder) {
                     player.closeInventory();
                 }
+                if (session.type == ArcadePortGame.SPLEEF) player.setCompassTarget(null);
                 snapshot.restore(player);
                 // Ended rounds always return testers to the actual Arcade lobby spawn,
                 // even when their restored snapshot is already inside the lobby world.
