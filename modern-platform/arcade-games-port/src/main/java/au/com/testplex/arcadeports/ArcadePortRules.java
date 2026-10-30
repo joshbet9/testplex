@@ -1660,7 +1660,7 @@ public final class ArcadePortRules {
 
     public static String gladiatorsAchievementConfigKey(java.util.UUID playerId, String achievementId) {
         String safeId = achievementId == null ? "" : achievementId.toLowerCase(java.util.Locale.ROOT)
-                .replaceAll("[^a-z0-9-]", "");
+                .replaceAll("[^a-z0-9-]+", "-").replaceAll("^-+|-+$", "");
         return "test-achievements.gladiators." + playerId + "." + safeId;
     }
 
