@@ -83,9 +83,15 @@ jobs:
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadePortManager.class"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "name: ArcadeMechanicsModern"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
-          unzip -p "$arcade_jar" config.yml | grep -Fxq "  - bacon-brawl"
-          ! unzip -p "$arcade_jar" config.yml | grep -Eq "^  - (bomb-lobbers|death-tag|dragon-escape|dragons|evolution|gladiators|micro-battles|one-in-the-quiver|paintball|runner|sheep-quest|spleef|turf-wars)$"
-          echo "All four modern Paper 26.3 plugin artifacts verified; only Bacon Brawl is enabled for live acceptance."
+          arcade_config="$(unzip -p "$arcade_jar" config.yml)"
+          for game in bacon-brawl bomb-lobbers dragon-escape dragons; do
+            printf '%s\n' "$arcade_config" | grep -Fxq "  - $game"
+          done
+          if printf '%s\n' "$arcade_config" | grep -Eq "^  - (death-tag|evolution|gladiators|micro-battles|one-in-the-quiver|paintball|runner|sheep-quest|spleef|turf-wars)$"; then
+            echo "An unaccepted Arcade prototype was enabled unexpectedly." >&2
+            exit 1
+          fi
+          echo "All four modern Paper 26.3 plugin artifacts verified; Bacon Brawl, Bomb Lobbers, Dragon Escape and Dragons are enabled for live acceptance."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4

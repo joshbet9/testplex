@@ -1640,6 +1640,35 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldApplyDragonContactHit(11_500L, 11_500L));
     }
 
+    @Test void dragonsFlareChargesAndLegacyAbilityRefreshValuesAreExplicit() {
+        assertEquals(1, ArcadePortRules.dragonsFlareCharges("coward"));
+        assertEquals(3, ArcadePortRules.dragonsFlareCharges("marksman"));
+        assertEquals(2, ArcadePortRules.dragonsFlareCharges("pyrotechnic"));
+        assertEquals(3, ArcadePortRules.dragonsFlareCharges("Dragons Marksman"));
+        assertEquals(0, ArcadePortRules.dragonsFlareCharges("unknown"));
+        assertEquals(1, ArcadePortRules.DRAGONS_MARKSMAN_START_ARROWS);
+        assertEquals(4, ArcadePortRules.DRAGONS_MARKSMAN_MAX_ARROWS);
+        assertEquals(4_000L, ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
+        assertEquals(2, ArcadePortRules.DRAGONS_MAX_SPARKLERS);
+        assertEquals(25_000L, ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS);
+    }
+
+    @Test void dragonFlareExclusionUsesAHorizontalRadiusAndLimitedVerticalEnvelope() {
+        assertTrue(ArcadePortRules.isDragonFlareLocationProtected(0.0D, 0.0D));
+        assertTrue(ArcadePortRules.isDragonFlareLocationProtected(ArcadePortRules.DRAGONS_FLARE_RADIUS_SQUARED, 0.0D));
+        assertTrue(ArcadePortRules.isDragonFlareLocationProtected(100.0D, 24.0D));
+        assertFalse(ArcadePortRules.isDragonFlareLocationProtected(ArcadePortRules.DRAGONS_FLARE_RADIUS_SQUARED + 0.01D, 0.0D));
+        assertFalse(ArcadePortRules.isDragonFlareLocationProtected(1.0D, 24.01D));
+        assertFalse(ArcadePortRules.isDragonFlareLocationProtected(-1.0D, 0.0D));
+        assertFalse(ArcadePortRules.isDragonFlareLocationProtected(Double.NaN, 0.0D));
+        assertTrue(ArcadePortRules.isDragonFlareActive(5_999L, 6_000L));
+        assertFalse(ArcadePortRules.isDragonFlareActive(6_000L, 6_000L));
+        assertEquals(6_000L, ArcadePortRules.DRAGONS_FLARE_DURATION_MILLIS);
+        assertEquals(3_000L, ArcadePortRules.DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
+        assertTrue(ArcadePortRules.canUseDragonSpectatorTeleport(3_000L, 3_000L));
+        assertFalse(ArcadePortRules.canUseDragonSpectatorTeleport(2_999L, 3_000L));
+    }
+
     @Test void dragonEscapeHasAThreeDimensionalFinishWaypoint() {
         assertEquals(77.5D, ArcadePortRules.DRAGON_ESCAPE_FINISH_Z);
         assertFalse(ArcadePortRules.isDragonEscapeFinishReached(4.0D, 64.0D, 77.5D));
