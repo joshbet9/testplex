@@ -233,6 +233,14 @@ public final class ArcadePortManager implements Listener {
         if (player != null && player.isOnline()) lobby.sendToLobby(player);
     }
 
+    public void restoreMonsterMazeKitPreference(Player player) {
+        if (player == null || monsterMazeModule == null || monsterMazeModule.getGameManager() == null) return;
+        String selected = plugin.getConfig().getString(
+                "lobby-kit-preferences." + player.getUniqueId() + ".monster-maze", "jumper");
+        me.monstermaze.kit.KitType kit = me.monstermaze.kit.KitType.byName(selected);
+        if (kit != null) monsterMazeModule.getGameManager().getKitManager().setKit(player, kit);
+    }
+
     private boolean monsterMazeRunning() {
         return monsterMazeModule != null && monsterMazeModule.isGameRunning();
     }
@@ -512,6 +520,27 @@ public final class ArcadePortManager implements Listener {
     public void selectKit(Player player, String requestedKit) {
         if (player == null || requestedKit == null) return;
         String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        boolean monsterMazeLobby = "monster-maze".equals(
+                plugin.getConfig().getString("lobby-selected-game", "bacon-brawl"));
+        if (monsterMazeLobby || monsterMazeRunning()) {
+            me.monstermaze.kit.KitType mazeKit = me.monstermaze.kit.KitType.byName(value);
+            if (mazeKit != null) {
+                if (monsterMazeRunning()) {
+                    player.sendMessage(ChatColor.RED + "Monster Maze kits are locked once the round starts.");
+                    return;
+                }
+                if (monsterMazeModule == null || monsterMazeModule.getGameManager() == null) {
+                    player.sendMessage(ChatColor.RED + "Monster Maze is not loaded by Testplex Arcade.");
+                    return;
+                }
+                monsterMazeModule.getGameManager().getKitManager().setKit(player, mazeKit);
+                plugin.getConfig().set("lobby-kit-preferences." + player.getUniqueId() + ".monster-maze", mazeKit.name().toLowerCase(java.util.Locale.ROOT));
+                plugin.saveConfig();
+                lobby.refreshPlayerScoreboard(player);
+                player.sendMessage(ChatColor.GREEN + "Selected " + mazeKit.display + " for Monster Maze.");
+                return;
+            }
+        }
         Session running = active;
         if (running != null && running.players.containsKey(player.getUniqueId())) {
             switch (running.type) {
