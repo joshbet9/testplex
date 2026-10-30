@@ -9964,6 +9964,52 @@ public final class ArcadePortManager implements Listener {
                                         + achievement.displayName(),
                                 lore, "noop", null, null));
             }
+        } else if ("snake".equals(gameId)) {
+            String[] ids = {"Cannibal", "ChooChoo", "SlimySheep"};
+            String[] names = {"Cannibal", "Choo Choo", "Slimy Sheep"};
+            String[] requirements = {
+                    "Get six kills in one Snake game.",
+                    "Grow your tail to at least 60 sheep segments.",
+                    "Eat 20 green slime pickups in one Snake game."
+            };
+            int[] achievementSlots = {10, 12, 14};
+            for (int i = 0; i < ids.length; i++) {
+                boolean unlocked = plugin.getConfig().getBoolean(path + "achievements." + ids[i], false);
+                inventory.setItem(achievementSlots[i], statsItem(
+                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + names[i],
+                        List.of(" ", ChatColor.GRAY + requirements[i], " ",
+                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
+                        "noop", null, null));
+            }
+            int lifetimeKills = plugin.getConfig().getInt(path + "lifetime-kills", 0);
+            int lifetimeSlimes = plugin.getConfig().getInt(path + "lifetime-slimes", 0);
+            int bestTail = plugin.getConfig().getInt(path + "best-tail-length", 0);
+            inventory.setItem(30, statsItem(Material.IRON_SWORD, ChatColor.GOLD + "Lifetime Kills",
+                    List.of(" ", ChatColor.GRAY + "Snake tail eliminations: " + ChatColor.WHITE + lifetimeKills),
+                    "noop", null, null));
+            inventory.setItem(32, statsItem(Material.SLIME_BALL, ChatColor.GREEN + "Slimes Eaten",
+                    List.of(" ", ChatColor.GRAY + "Green slime upgrades: " + ChatColor.WHITE + lifetimeSlimes),
+                    "noop", null, null));
+            inventory.setItem(34, statsItem(Material.SHEEP_SPAWN_EGG, ChatColor.AQUA + "Best Tail Length",
+                    List.of(" ", ChatColor.GRAY + "Longest Snake: " + ChatColor.WHITE + bestTail,
+                            ChatColor.GRAY + "Reborn Choo Choo milestone: 60 segments."),
+                    "noop", null, null));
+            int[] statSlots = {29, 31, 33};
+            int[] values = {played, wins, score};
+            String[] labels = {"Games Played", "Wins", "Score / Kills"};
+            for (int i = 0; i < values.length; i++) {
+                int value = values[i];
+                inventory.setItem(statSlots[i], statsItem(
+                        value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (value > 0 ? ChatColor.GREEN : ChatColor.RED) + labels[i],
+                        List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: " + ChatColor.WHITE + value),
+                        "noop", null, null));
+            }
+            inventory.setItem(35, statsItem(knockouts > 0 ? Material.SKELETON_SKULL : Material.BONE,
+                    ChatColor.GRAY + "Knockouts",
+                    List.of(" ", ChatColor.GRAY + "Times eliminated: " + ChatColor.WHITE + knockouts),
+                    "noop", null, null));
         } else if ("dragons".equals(gameId)) {
             int sparklez = plugin.getConfig().getInt(path + "sparklez", 0);
             double testGems = plugin.getConfig().getDouble(path + "test-gems", 0.0D)
