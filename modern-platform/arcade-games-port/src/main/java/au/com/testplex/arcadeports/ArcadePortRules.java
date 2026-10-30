@@ -1264,6 +1264,24 @@ public final class ArcadePortRules {
     public static final long PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS = 250L;
     public static final double PAINTBALL_SAVE_ME_RADIUS = 3.0D;
 
+    /** Reborn Paintball team zero is Frost/AQUA; team one is Nether/RED. */
+    public static boolean isPaintballRedTeam(int team) { return team == 1; }
+
+    public static Color paintballTeamColor(int team) {
+        return isPaintballRedTeam(team) ? Color.RED : Color.AQUA;
+    }
+
+    /** Paint only the wool and hard-clay surfaces that Reborn recolours on impact. */
+    public static Material paintballPaintedBlock(Material original, int team) {
+        if (original == null) return null;
+        String name = original.name();
+        if (name.endsWith("_WOOL")) return isPaintballRedTeam(team) ? Material.RED_WOOL : Material.LIGHT_BLUE_WOOL;
+        if (name.equals("TERRACOTTA") || name.endsWith("_TERRACOTTA")) {
+            return isPaintballRedTeam(team) ? Material.RED_TERRACOTTA : Material.LIGHT_BLUE_TERRACOTTA;
+        }
+        return null;
+    }
+
     /** Reborn's Machine Gun fires on an 80 ms gate; this slower heat gain allows 48 shots per full bar. */
     public static final int PAINTBALL_MACHINE_GUN_SHOTS_PER_HEAT_CYCLE = 48;
     public static final double PAINTBALL_MACHINE_GUN_MAX_HEAT = 0.999D;
