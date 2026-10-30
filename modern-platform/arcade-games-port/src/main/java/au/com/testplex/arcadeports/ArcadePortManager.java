@@ -807,6 +807,205 @@ public final class ArcadePortManager implements Listener {
         return material != null && material.name().endsWith("_WOOL");
     }
 
+    private void cacheTurfWarsTeamSpawnCentres(Session session, SourceMapCatalog.MapData map) {
+        session.turfTeamSpawnCentres.clear();
+        for (int team = 0; team < 2; team++) {
+            List<Location> markers = map == null ? List.of() : map.teamSpawnLocationsForTeam(team, 2);
+            if (markers.isEmpty()) markers = List.of(turfWarsSpawn(session.world, team, 0, 1));
+            double x = 0.0D, y = 0.0D, z = 0.0D;
+            for (Location marker : markers) {
+                x += marker.getX();
+                y += marker.getY();
+                z += marker.getZ();
+            }
+            session.turfTeamSpawnCentres.put(team, new Location(session.world,
+                    x / markers.size(), y / markers.size(), z / markers.size()));
+        }
+    }
+
+    private int turfWarsTeamOnBlock(Block block) {
+        if (block == null) return -1;
+        Material type = block.getType();
+        if (type == Material.RED_TERRACOTTA || type == Material.RED_WOOL) return 0;
+        if (type == Material.BLUE_TERRACOTTA || type == Material.BLUE_WOOL) return 1;
+        return -1;
+    }
+
+    /**
+     * Reborn resolves the block under the player's feet, checks an adjacent footprint
+     * when grounded over a gap, then descends until it finds one of the two turf colours.
+     */
+    private int turfWarsGroundTeam(Player player) {
+        if (player == null || player.getWorld() == null) return -1;
+        Block below = player.getLocation().getBlock().getRelative(BlockFace.DOWN);
+        int directTeam = turfWarsTeamOnBlock(below);
+        if (directTeam >= 0) return directTeam;
+
+        if (player.isOnGround() && (below.isPassable() || below.isLiquid())) {
+            Block closest = null;
+            double closestDistance = Double.POSITIVE_INFINITY;
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    Block candidate = below.getRelative(dx, 0, dz);
+                    if (turfWarsTeamOnBlock(candidate) < 0) continue;
+                    double distance = dx * dx + dz * dz;
+                    if (distance < closestDistance) {
+                        closest = candidate;
+                        closestDistance = distance;
+                    }
+                }
+            }
+            int nearbyTeam = turfWarsTeamOnBlock(closest);
+            if (nearbyTeam >= 0) return nearbyTeam;
+        }
+
+        int minY = Math.max(0, player.getWorld().getMinHeight());
+        for (Block scan = below; scan.getY() >= minY; scan = scan.getRelative(BlockFace.DOWN)) {
+            int team = turfWarsTeamOnBlock(scan);
+            if (team >= 0) return team;
+        }
+        return -1;
+    }
+
+    private int turfWarsNearestSpawnTeam(Session session, Location location) {
+        if (session == null || location == null) return -1;
+        int nearest = -1;
+        double nearestDistance = Double.POSITIVE_INFINITY;
+        for (Map.Entry<Integer, Location> entry : session.turfTeamSpawnCentres.entrySet()) {
+            Location centre = entry.getValue();
+            if (centre == null || centre.getWorld() != session.world) continue;
+            double distance = centre.distanceSquared(location);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearest = entry.getKey();
+            }
+        }
+        return nearest;
+    }
+
+    private void updateTurfWarsTerritory(Session session, long now) {
+        if (active != session) return;
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            int team = session.teams.getOrDefault(id, -1);
+            if (team != 0 && team != 1) continue;
+
+            int groundTeam = turfWarsGroundTeam(player);
+            if (groundTeam == team) {
+                session.turfInfiltration.remove(id);
+                player.removePotionEffect(PotionEffectType.SLOWNESS);
+                continue;
+            }
+
+            boolean infiltrator = "infiltrator".equals(session.turfWarsKits.getOrDefault(id, "marksman"));
+            if (groundTeam >= 0 && groundTeam != team) {
+                if (infiltrator && session.turfCombat) {
+                    TurfWarsInfiltration state = session.turfInfiltration.computeIfAbsent(
+                            id, ignored -> new TurfWarsInfiltration(now));
+                    while (now - state.lastSecondAt >= 1_000L) {
+                        state.lastSecondAt += 1_000L;
+                        state.seconds++;
+                        if (state.seconds > 15) {
+                            String statPath = "local-stats." + id + ".turf-wars.behind-enemy-lines";
+                            plugin.getConfig().set(statPath, plugin.getConfig().getInt(statPath, 0) + 1);
+                        }
+                    }
+                    long slowInterval = state.hasKilled
+                            ? ArcadePortRules.TURF_WARS_INFIlTRATOR_KILL_SLOW_INTERVAL_MILLIS
+                            : ArcadePortRules.TURF_WARS_INFIlTRATOR_SLOW_INTERVAL_MILLIS;
+                    if (now - state.lastSlowAt >= slowInterval) {
+                        state.lastSlowAt = now;
+                        state.slowLevel++;
+                    }
+                    if (state.slowLevel >= 0) {
+                        player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                                40, state.slowLevel, false, false, true));
+                    }
+                    continue;
+                }
+
+                session.turfInfiltration.remove(id);
+                player.removePotionEffect(PotionEffectType.SLOWNESS);
+                long nextKnockback = session.turfKnockbackNextAt.getOrDefault(id, 0L);
+                if (now >= nextKnockback) {
+                    Location spawn = session.turfTeamSpawnCentres.get(team);
+                    Vector away = spawn == null ? new Vector(0.0D, 0.0D, 0.0D)
+                            : spawn.toVector().subtract(player.getLocation().toVector()).setY(0.0D);
+                    if (away.lengthSquared() > 0.001D) {
+                        player.setVelocity(away.normalize().multiply(2.0D).setY(0.8D));
+                    }
+                    player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_BASS, 0.8F, 0.8F);
+                    player.sendMessage(ChatColor.RED + "You cannot walk on the enemy's turf!");
+                    session.turfKnockbackNextAt.put(id,
+                            now + ArcadePortRules.TURF_WARS_TERRITORY_KNOCKBACK_COOLDOWN_MILLIS);
+                }
+                continue;
+            }
+
+            session.turfInfiltration.remove(id);
+            player.removePotionEffect(PotionEffectType.SLOWNESS);
+            int nearestSpawnTeam = turfWarsNearestSpawnTeam(session, player.getLocation());
+            if (nearestSpawnTeam < 0 || nearestSpawnTeam == team) continue;
+            long nextDamage = session.turfSpawnDamageNextAt.getOrDefault(id, 0L);
+            if (now < nextDamage) continue;
+            session.turfSpawnDamageNextAt.put(id,
+                    now + ArcadePortRules.TURF_WARS_SPAWN_DAMAGE_COOLDOWN_MILLIS);
+            double damage = session.turfCombat ? 2.0D : 500.0D;
+            if (player.getHealth() <= damage) {
+                respawnTurfWarsPlayer(session, player, null, "was lost outside their team's turf", false);
+                if (active != session) return;
+            } else {
+                player.setHealth(player.getHealth() - damage);
+                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 0.7F);
+            }
+        }
+    }
+
+    private void respawnTurfWarsPlayer(Session session, Player target, Player killer,
+            String reason, boolean advanceForKill) {
+        if (active != session || target == null || !session.alive.contains(target.getUniqueId())) return;
+        UUID targetId = target.getUniqueId();
+        // Register the pending respawn before eliminate() runs EndCheck.
+        session.respawning.add(targetId);
+        session.turfInfiltration.remove(targetId);
+        target.removePotionEffect(PotionEffectType.SLOWNESS);
+        eliminate(session, target, killer, reason);
+        if (active != session) return;
+        if (advanceForKill && killer != null && session.alive.contains(killer.getUniqueId())) {
+            TurfWarsInfiltration state = session.turfInfiltration.get(killer.getUniqueId());
+            if (state != null) {
+                state.hasKilled = true;
+                state.lastSlowAt = System.currentTimeMillis();
+            }
+            advanceTurfWars(session, killer);
+            if (active != session) return;
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (active != session || !target.isOnline()
+                    || !session.players.containsKey(targetId) || !session.respawning.remove(targetId)) return;
+            int playerIndex = new ArrayList<>(session.players.keySet()).indexOf(targetId);
+            int slots = Math.max(1, (session.players.size() + 1) / 2);
+            Location spawn = turfWarsSpawn(session, session.teams.getOrDefault(targetId, 0),
+                    Math.max(0, playerIndex / 2), slots);
+            target.teleport(spawn);
+            target.setGameMode(GameMode.SURVIVAL);
+            target.setHealth(target.getMaxHealth());
+            target.setFoodLevel(20);
+            target.setSaturation(20.0F);
+            target.setFireTicks(0);
+            target.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+            session.alive.add(targetId);
+            session.lastLocations.put(targetId, spawn.clone());
+            session.turfKnockbackNextAt.put(targetId, System.currentTimeMillis()
+                    + ArcadePortRules.TURF_WARS_TERRITORY_KNOCKBACK_COOLDOWN_MILLIS);
+            session.turfSpawnDamageNextAt.put(targetId, System.currentTimeMillis()
+                    + ArcadePortRules.TURF_WARS_SPAWN_DAMAGE_COOLDOWN_MILLIS);
+            giveKit(session, target);
+            target.sendMessage(ChatColor.GREEN + "Respawned in your team's fort.");
+            checkTurfWarsObjectiveEnd(session);
+        }, ArcadePortRules.TURF_WARS_RESPAWN_DELAY_TICKS);
+    }
+
     public void selectTurfWarsKit(Player player, String requestedKit) {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeTurfWarsKit(requestedKit);
@@ -1283,6 +1482,7 @@ public final class ArcadePortManager implements Listener {
         session.turfFrontlineX = session.turfInitialFrontlineX;
         if (type == ArcadePortGame.TURF_WARS) {
             initializeTurfWarsMap(session, turfSourceMap);
+            cacheTurfWarsTeamSpawnCentres(session, turfSourceMap);
             for (Player player : participants) {
                 UUID playerId = player.getUniqueId();
                 String kit = turfWarsKitPreferences.getOrDefault(playerId, "marksman");
@@ -3386,6 +3586,8 @@ public final class ArcadePortManager implements Listener {
     private void updateTurfWars(Session session, long now) {
         if (active != session) return;
         updateTurfWarsBarrages(session, now);
+        if (session.ticks % 3 == 0) updateTurfWarsTerritory(session, now);
+        if (active != session) return;
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
             String kit = session.turfWarsKits.getOrDefault(id, "marksman");
@@ -9095,30 +9297,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
-        UUID targetId = target.getUniqueId();
-        eliminate(session, target, attacker, "was defeated in Turf Wars");
-        if (active != session) return;
-        session.respawning.add(targetId);
-        advanceTurfWars(session, attacker);
-        if (active != session) return;
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (active != session || !target.isOnline()
-                    || !session.players.containsKey(targetId) || !session.respawning.remove(targetId)) return;
-            int playerIndex = new ArrayList<>(session.players.keySet()).indexOf(targetId);
-            int slots = Math.max(1, (session.players.size() + 1) / 2);
-            Location spawn = turfWarsSpawn(session, session.teams.getOrDefault(targetId, 0),
-                    Math.max(0, playerIndex / 2), slots);
-            target.teleport(spawn);
-            target.setGameMode(GameMode.SURVIVAL);
-            target.setHealth(target.getMaxHealth());
-            target.setFoodLevel(20);
-            target.setSaturation(20.0F);
-            target.setFireTicks(0);
-            session.alive.add(targetId);
-            session.lastLocations.put(targetId, spawn.clone());
-            giveKit(session, target);
-            target.sendMessage(ChatColor.GREEN + "Respawned. Every kill moves the turf line.");
-        }, 80L);
+        respawnTurfWarsPlayer(session, target, attacker,
+                "was defeated in Turf Wars", true);
     }
 
     private void advanceTurfWars(Session session, Player attacker) {
@@ -14406,6 +14586,18 @@ public final class ArcadePortManager implements Listener {
             session.dragonEliminationOrder.add(id);
             awardDragonSurvivalGems(session, id, System.currentTimeMillis());
         }
+        if (session.type == ArcadePortGame.TURF_WARS) {
+            session.turfWarsKits.remove(id);
+            session.turfConstructorNextAt.remove(id);
+            session.turfArrowNextAt.remove(id);
+            session.turfKnockbackNextAt.remove(id);
+            session.turfSpawnDamageNextAt.remove(id);
+            session.turfInfiltration.remove(id);
+            session.turfBarrageCharges.remove(id);
+            session.turfBarrageNextChargeAt.remove(id);
+            session.turfBarrageRemaining.remove(id);
+            session.turfBarrageFiring.remove(id);
+        }
         if (session.type == ArcadePortGame.DRAGONS) {
             session.dragonMarksmanCharge.remove(id);
             session.dragonMarksmanNextChargeAt.remove(id);
@@ -14453,6 +14645,18 @@ public final class ArcadePortManager implements Listener {
             if (!lobby.isLobbyWorld(player.getWorld())) lobby.sendToLobby(player);
             else lobby.ensurePanelItem(player);
         });
+    }
+
+    private static final class TurfWarsInfiltration {
+        int seconds;
+        int slowLevel = -1;
+        long lastSecondAt;
+        long lastSlowAt;
+        boolean hasKilled;
+        TurfWarsInfiltration(long now) {
+            lastSecondAt = now;
+            lastSlowAt = now;
+        }
     }
 
     private record PaintballProjectileVisual(Projectile projectile, String style, Color teamColor) {
@@ -14644,7 +14848,11 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> spleefLastHungerGainAt = new HashMap<>();
         final Map<UUID, Long> spleefNextArrowAt = new HashMap<>();
         final Map<UUID, String> turfWarsKits = new HashMap<>();
+        final Map<Integer, Location> turfTeamSpawnCentres = new HashMap<>();
         final Map<UUID, Long> turfConstructorNextAt = new HashMap<>();
+        final Map<UUID, Long> turfKnockbackNextAt = new HashMap<>();
+        final Map<UUID, Long> turfSpawnDamageNextAt = new HashMap<>();
+        final Map<UUID, TurfWarsInfiltration> turfInfiltration = new HashMap<>();
         final Map<UUID, Long> turfArrowNextAt = new HashMap<>();
         final Map<UUID, Integer> turfBarrageCharges = new HashMap<>();
         final Map<UUID, Long> turfBarrageNextChargeAt = new HashMap<>();
