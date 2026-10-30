@@ -11,6 +11,7 @@ import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
+import org.bukkit.block.Chest;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.EnderCrystal;
@@ -101,6 +102,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<Integer, Wither> withers = new HashMap<>();
     private final Map<Integer, Boolean> witherDamageable = new HashMap<>();
     private final List<Location> objectiveTntSpawns = new ArrayList<>();
+    private final List<Block> castleChests = new ArrayList<>();
+    private final Map<UUID, Integer> castleKillStreaks = new HashMap<>();
     private final List<StoreEntry> storeEntries = new ArrayList<>();
     private final Map<UUID, StoreHolder> openStores = new HashMap<>();
 
@@ -108,6 +111,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private Location activeObjectiveSpawn;
     private UUID objectiveCarrier;
     private long objectiveRespawnAt;
+    private long objectiveCarryStartedAt;
+    private long nextChestRefillAt;
     private long nextGoldAt;
     private long nextStructureUpdateAt;
     private long nextCapturePointUpdateAt;
@@ -153,6 +158,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             Bukkit.getPluginManager().registerEvents(this, plugin);
             long now = System.currentTimeMillis();
             objectiveRespawnAt = now + objectiveDelay();
+            nextChestRefillAt = now + 120_000L;
             nextGoldAt = now + MOBA_PASSIVE_GOLD_INTERVAL;
             nextStructureUpdateAt = now + MOBA_TOWER_UPDATE_INTERVAL;
             plugin.getLogger().info("Prepared " + game.displayName() + (mixedArcade ? " Mixed Arcade" : "")
@@ -182,6 +188,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         spawnCrystals(0, redCrystals);
         spawnCrystals(1, blueCrystals);
         tnt.forEach(location -> objectiveTntSpawns.add(location.clone()));
+        for (Location location : map.dataLocations("BROWN")) {
+            Block block = location.getBlock();
+            rememberBlock(block);
+            block.setType(Material.CHEST, false);
+            castleChests.add(block);
+            fillCastleChest(block);
+        }
         return true;
     }
 
@@ -509,6 +522,21 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (objectiveItem == null && objectiveCarrier == null && now >= objectiveRespawnAt) {
             spawnObjectiveTnt();
         }
+        if (objectiveCarrier != null) {
+            Player carrier = players.get(objectiveCarrier);
+            if (carrier == null || !carrier.isOnline()) {
+                objectiveCarrier = null;
+                objectiveCarryStartedAt = 0L;
+            } else if (now - objectiveCarryStartedAt >= CASTLE_NORMAL_TNT_DELAY
+                    || isAtEnemyCrystal(carrier)) {
+                detonateObjectiveTnt(carrier);
+            }
+        }
+        if (now >= nextChestRefillAt) {
+            for (Block chest : castleChests) fillCastleChest(chest);
+            nextChestRefillAt = now + 120_000L;
+            announce(ChatColor.GREEN + "Castle Assault chests have refilled!");
+        }
         for (KingState king : kings.values()) {
             if (king.entity != null && king.entity.isValid()) {
                 king.entity.teleport(king.location);
@@ -597,6 +625,50 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         checkTeamDeparture();
     }
 
+    private boolean isAtEnemyCrystal(Player carrier) {
+        int team = teams.getOrDefault(carrier.getUniqueId(), -1);
+        KingState enemy = kings.get(1 - team);
+        if (team < 0 || enemy == null) return false;
+        return enemy.crystals.stream().anyMatch(crystal -> crystal != null && crystal.isValid()
+                && crystal.getLocation().distanceSquared(carrier.getLocation()) <= 9.0D);
+    }
+
+    private void fillCastleChest(Block block) {
+        if (block == null || (block.getType() != Material.CHEST && block.getType() != Material.TRAPPED_CHEST)) return;
+        if (!(block.getState() instanceof Chest chest)) return;
+        Inventory inventory = chest.getBlockInventory();
+        inventory.clear();
+        Set<Integer> slots = new HashSet<>();
+        while (slots.size() < 5) slots.add(ThreadLocalRandom.current().nextInt(inventory.getSize()));
+        for (int slot : slots) {
+            double chance = ThreadLocalRandom.current().nextDouble();
+            double subChance = ThreadLocalRandom.current().nextDouble();
+            ItemStack loot;
+            if (chance <= 0.30D) {
+                loot = ThreadLocalRandom.current().nextBoolean()
+                        ? new ItemStack(Material.EGG, 3 + ThreadLocalRandom.current().nextInt(3))
+                        : new ItemStack(Material.ARROW, 8 + ThreadLocalRandom.current().nextInt(9));
+            } else if (chance <= 0.50D) {
+                loot = subChance <= 0.45D
+                        ? new ItemStack(Material.GOLDEN_APPLE)
+                        : new ItemStack(Material.POTION);
+            } else if (chance <= 0.60D) {
+                loot = ThreadLocalRandom.current().nextBoolean()
+                        ? new ItemStack(Material.FISHING_ROD)
+                        : new ItemStack(Material.GOLDEN_APPLE);
+            } else {
+                loot = switch (ThreadLocalRandom.current().nextInt(4)) {
+                    case 0 -> new ItemStack(Material.ENDER_PEARL);
+                    case 1 -> new ItemStack(Material.WATER_BUCKET);
+                    case 2 -> new ItemStack(Material.FLINT_AND_STEEL);
+                    default -> new ItemStack(Material.SNOWBALL, 16);
+                };
+            }
+            inventory.setItem(slot, loot);
+        }
+        chest.update(true, false);
+    }
+
     private void spawnObjectiveTnt() {
         if (objectiveTntSpawns.isEmpty()) return;
         Location spawn = objectiveTntSpawns.get(ThreadLocalRandom.current().nextInt(objectiveTntSpawns.size())).clone();
@@ -623,7 +695,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         event.setCancelled(true);
         objectiveCarrier = player.getUniqueId();
-        objectiveRespawnAt = System.currentTimeMillis() + objectiveDelay();
+        objectiveCarryStartedAt = System.currentTimeMillis();
+        objectiveRespawnAt = objectiveCarryStartedAt + objectiveDelay();
         ItemStack helmet = player.getInventory().getHelmet();
         carriedTntOldHelmet.put(player.getUniqueId(), helmet == null ? null : helmet.clone());
         player.getInventory().setHelmet(namedItem(Material.TNT, ChatColor.RED + "Carrying Objective TNT",
@@ -668,6 +741,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private void detonateObjectiveTnt(Player carrier) {
         restoreCarrierHelmet(carrier);
         objectiveCarrier = null;
+        objectiveCarryStartedAt = 0L;
         resolveCastleExplosion(carrier.getLocation().clone(), carrier, true, 4.0D);
         carrier.sendMessage(ChatColor.GOLD + "Objective TNT detonated!");
     }
@@ -1243,9 +1317,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             player.closeInventory();
         }
         if (game == ArcadePortGame.CASTLE_ASSAULT && id.equals(objectiveCarrier)) {
-            restoreCarrierHelmet(player);
-            objectiveCarrier = null;
-            objectiveRespawnAt = System.currentTimeMillis() + objectiveDelay();
+            detonateObjectiveTnt(player);
         }
     }
 
@@ -1261,16 +1333,21 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         activePlayers.remove(id);
         openStores.remove(id);
         if (game == ArcadePortGame.CASTLE_ASSAULT && id.equals(objectiveCarrier)) {
-            carriedTntOldHelmet.remove(id);
-            objectiveCarrier = null;
-            objectiveRespawnAt = System.currentTimeMillis() + objectiveDelay();
+            detonateObjectiveTnt(player);
         }
     }
 
     void onPlayerKill(Player killer) {
         if (stopped || game != ArcadePortGame.CASTLE_ASSAULT || killer == null) return;
-        if (objectiveKillsEnabled == 0) return;
         int team = teams.getOrDefault(killer.getUniqueId(), -1);
+        if (team < 0) return;
+        int streak = castleKillStreaks.merge(killer.getUniqueId(), 1, Integer::sum);
+        killer.getInventory().addItem(namedItem(Material.GOLDEN_APPLE, ChatColor.LIGHT_PURPLE + "Golden Applegate",
+                "Kill reward from Castle Assault."));
+        if (streak > 0 && streak % 2 == 0) {
+            announce(ChatColor.GREEN + killer.getName() + " is on a " + streak + " player kill streak!");
+        }
+        if (objectiveKillsEnabled == 0) return;
         if (team < 0) return;
         int kills = team == 0 ? ++castleKillCountRed : ++castleKillCountBlue;
         if (kills % 20 != 0) return;
@@ -1302,6 +1379,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         openStores.clear();
         entities.clear();
+        castleKillStreaks.clear();
     }
 
     private static final class KingState {
