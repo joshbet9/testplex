@@ -934,6 +934,7 @@ public final class ArcadePortManager implements Listener {
         session.endsAt = (type == ArcadePortGame.BACON_BRAWL
                 && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER)
                 || (type == ArcadePortGame.DRAGON_ESCAPE && !ArcadePortRules.DRAGON_ESCAPE_HAS_ROUND_TIMER)
+                || type == ArcadePortGame.DRAGONS
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 600_000L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
@@ -4172,6 +4173,8 @@ public final class ArcadePortManager implements Listener {
             EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
             dragon.setAI(false);
             dragon.setGravity(false);
+            // Reborn dragons are visual hazards, not collidable living mobs.
+            dragon.setCollidable(false);
             dragon.setInvulnerable(true);
             dragon.setRemoveWhenFarAway(false);
             dragon.setCustomName(ChatColor.DARK_PURPLE + "Dragon");
@@ -4294,6 +4297,7 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
+        updateDragonsSpectatorCompasses(session);
     }
 
     private Location dragonSpectatorLocation(Session session) {
@@ -4351,6 +4355,34 @@ public final class ArcadePortManager implements Listener {
     private void setDragonTargetSky(Session session, EnderDragon dragon) {
         session.dragonTargetPlayers.remove(dragon.getUniqueId());
         session.dragonTargetLocations.put(dragon.getUniqueId(), randomDragonSkyTarget(session));
+    }
+
+    private boolean isDragonsTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta.hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+    }
+
+    private Player nearestDragonsSpectatorTarget(Session session, Player spectator) {
+        return alivePlayers(session).stream()
+                .min(java.util.Comparator.comparingDouble(target ->
+                        target.getLocation().distanceSquared(spectator.getLocation())))
+                .orElse(null);
+    }
+
+    private void updateDragonsSpectatorCompasses(Session session) {
+        List<Player> alive = alivePlayers(session);
+        if (alive.isEmpty()) return;
+        for (Player player : session.players.values()) {
+            if (player == null || !player.isOnline() || session.alive.contains(player.getUniqueId())) continue;
+            if (inventoryCount(player, Material.COMPASS) <= 0) continue;
+            Player target = alive.stream()
+                    .min(java.util.Comparator.comparingDouble(p ->
+                            p.getLocation().distanceSquared(player.getLocation())))
+                    .orElse(null);
+            if (target != null) player.setCompassTarget(target.getLocation());
+        }
     }
 
     private void pruneDragonFlareZones(Session session, long now) {
@@ -6290,6 +6322,11 @@ public final class ArcadePortManager implements Listener {
             player.setGameMode(GameMode.SPECTATOR);
             if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
                 player.teleport(dragonEscapeSpectatorLocation(session));
+            } else if (session.type == ArcadePortGame.DRAGONS) {
+                player.getInventory().clear();
+                player.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
+                        "Points to the nearest survivor. Left-click to spectate them."));
+                updateDragonsSpectatorCompasses(session);
             }
             player.sendMessage(ChatColor.RED + "Eliminated: " + reason + ".");
         }
@@ -6971,6 +7008,7 @@ public final class ArcadePortManager implements Listener {
         session.bombPlayersDamaged.clear();
         session.dragonContactCooldowns.clear();
         session.dragonFlareZones.clear();
+        session.dragonSparklezThrows.clear();
         session.paintProjectileDamage.clear();
         session.paintballLastShotAt.clear();
         session.paintballWaterBombLastThrowAt.clear();
@@ -7202,6 +7240,11 @@ public final class ArcadePortManager implements Listener {
             if (!session.alive.contains(id)) {
                 plugin.getConfig().set(path + "knockouts",
                         plugin.getConfig().getInt(path + "knockouts", 0) + 1);
+            }
+            if (session.type == ArcadePortGame.DRAGONS) {
+                plugin.getConfig().set(path + "sparklez",
+                        plugin.getConfig().getInt(path + "sparklez", 0)
+                                + session.dragonSparklezThrows.getOrDefault(id, 0));
             }
             boolean won = winnerId != null && (winnerId.equals(id)
                     || (session.type == ArcadePortGame.BOMB_LOBBERS && session.alive.contains(id)
@@ -7513,6 +7556,13 @@ public final class ArcadePortManager implements Listener {
                                         + achievement.displayName(),
                                 lore, "noop", null, null));
             }
+        } else if ("dragons".equals(gameId)) {
+            int sparklez = plugin.getConfig().getInt(path + "sparklez", 0);
+            inventory.setItem(33, statsItem(sparklez > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                    (sparklez > 0 ? ChatColor.GREEN : ChatColor.RED) + "Sparklez",
+                    List.of(" ", ChatColor.GRAY + "Pyro sparklers thrown: " + ChatColor.WHITE + sparklez,
+                            ChatColor.DARK_GRAY + "Recorded locally by this Testplex server."),
+                    "noop", null, null));
         } else if ("dragon-escape".equals(gameId)) {
             String resource = SourceMapCatalog.selectedResource(plugin, ArcadePortGame.DRAGON_ESCAPE);
             long personalBest = dragonEscapePersonalBestMillis(targetId, resource);
@@ -8912,6 +8962,19 @@ public final class ArcadePortManager implements Listener {
             }, 1L);
             return;
         }
+        if (session.type == ArcadePortGame.DRAGONS
+                && !session.alive.contains(player.getUniqueId())
+                && isDragonsTrackingCompass(heldItem)) {
+            event.setCancelled(true);
+            if (event.getAction().isLeftClick()) {
+                Player target = nearestDragonsSpectatorTarget(session, player);
+                if (target != null) {
+                    player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                    player.setCompassTarget(target.getLocation());
+                } else player.sendMessage(ChatColor.YELLOW + "There are no living Dragons players to track.");
+            } else player.sendMessage(ChatColor.GRAY + "The Tracking Compass points to the nearest living player; left-click to spectate them.");
+            return;
+        }
         if (!session.alive.contains(player.getUniqueId())) return;
         if (session.type == ArcadePortGame.BACON_BRAWL && isBaconMeterItem(heldItem)) {
             event.setCancelled(true);
@@ -8959,14 +9022,15 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.DRAGONS) {
             UUID id = player.getUniqueId();
             String kit = session.dragonKits.getOrDefault(id, "coward");
-            if (item == Material.FIREWORK_ROCKET && heldItem != null && heldItem.hasItemMeta()
+            if (item == Material.FIREWORK_ROCKET && event.getAction().isRightClick()
+                    && heldItem != null && heldItem.hasItemMeta()
                     && heldItem.getItemMeta().hasDisplayName()
                     && "Dragon Flare".equals(ChatColor.stripColor(heldItem.getItemMeta().getDisplayName()))) {
                 event.setCancelled(true);
                 activateDragonFlare(session, player, System.currentTimeMillis());
                 return;
             }
-            if ("coward".equals(kit) && item == Material.IRON_AXE) {
+            if ("coward".equals(kit) && item == Material.IRON_AXE && event.getAction().isRightClick()) {
                 event.setCancelled(true);
                 useDragonsLeap(session, player, System.currentTimeMillis());
                 return;
@@ -8984,6 +9048,7 @@ public final class ArcadePortManager implements Listener {
                 sparkler.setVelocity(direction.multiply(0.8D).setY(direction.getY() * 0.8D + 0.1D));
                 session.entities.add(sparkler);
                 session.dragonSparklerItems.add(sparkler.getUniqueId());
+                session.dragonSparklezThrows.merge(id, 1, Integer::sum);
                 player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.8F, 1.2F);
                 return;
             }
@@ -9430,6 +9495,7 @@ public final class ArcadePortManager implements Listener {
         if (!meta.hasDisplayName()) return false;
         String name = ChatColor.stripColor(meta.getDisplayName());
         return "Dragon Flare".equals(name) || "Throwing Sparkler".equals(name)
+                || "Tracking Compass".equals(name)
                 || (item.getType() == Material.ARROW && name.contains("Fletched Arrow"));
     }
 
@@ -10825,6 +10891,7 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> dragonMarksmanFiring = new HashSet<>();
         final Set<UUID> dragonTrackedArrows = new HashSet<>();
         final Set<UUID> dragonSparklerItems = new HashSet<>();
+        final Map<UUID, Integer> dragonSparklezThrows = new HashMap<>();
         final Map<UUID, Location> dragonTargetLocations = new HashMap<>();
         final Map<UUID, UUID> dragonTargetPlayers = new HashMap<>();
         Location dragonSpectatorLocation;
