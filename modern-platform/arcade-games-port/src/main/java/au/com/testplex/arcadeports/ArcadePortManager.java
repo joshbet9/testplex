@@ -1948,7 +1948,8 @@ public final class ArcadePortManager implements Listener {
         List<Player> roster = new ArrayList<>(session.players.values());
         int total = roster.size();
         int alive = session.alive.size();
-        if (total < 15) {
+        int mode = ArcadePortRules.dragonsSoloScoreboardMode(total, alive);
+        if (mode == 0) {
             int score = total;
             for (Player player : roster) {
                 if (player == null) continue;
@@ -1960,7 +1961,7 @@ public final class ArcadePortManager implements Listener {
                 }
                 objective.getScore(entry).setScore(score--);
             }
-        } else if (alive < 16) {
+        } else if (mode == 1) {
             int score = alive;
             for (Player player : roster) {
                 if (player == null || !session.alive.contains(player.getUniqueId())) continue;
@@ -4402,6 +4403,10 @@ public final class ArcadePortManager implements Listener {
             UUID id = player.getUniqueId();
             String kit = session.dragonKits.getOrDefault(id, "coward");
             if (perkUpdate) {
+                // GameFlagManager.PlayerHealthFoodUpdate enforces HungerSet=20
+                // and saturation=1 on UpdateType.FAST for each living player.
+                player.setFoodLevel(20);
+                player.setSaturation(1.0F);
                 if ("pyrotechnic".equals(kit)) {
                     long next = session.dragonNextSparklerAt.getOrDefault(id,
                             now + ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS);
@@ -7778,11 +7783,12 @@ public final class ArcadePortManager implements Listener {
     private void awardDragonSurvivalGems(Session session, UUID playerId, long outAt) {
         if (session.type != ArcadePortGame.DRAGONS || playerId == null
                 || !session.dragonSurvivalGemsPaid.add(playerId)) return;
-        double amount = Math.max(0L, outAt - session.startedAt) / 10_000.0D;
+        double amount = ArcadePortRules.dragonSurvivalGems(Math.max(0L, outAt - session.startedAt));
         if (amount <= 0.0D) return;
         String path = localStatsPath(playerId, "dragons");
         plugin.getConfig().set(path + "survival-gems",
                 plugin.getConfig().getDouble(path + "survival-gems", 0.0D) + amount);
+        plugin.saveConfig();
     }
 
     private void awardDragonTestGems(UUID playerId, double amount) {
@@ -7797,17 +7803,18 @@ public final class ArcadePortManager implements Listener {
         session.dragonEndGemsPaid = true;
         if (winner != null) awardDragonSurvivalGems(session, winner.getUniqueId(), System.currentTimeMillis());
 
-        List<UUID> placements = new ArrayList<>();
-        if (winner != null) placements.add(winner.getUniqueId());
-        for (int i = session.dragonEliminationOrder.size() - 1; i >= 0; i--) {
-            UUID id = session.dragonEliminationOrder.get(i);
-            if (!placements.contains(id)) placements.add(id);
-        }
-        // SoloGame.EndCheck: 20 / 15 / 10 placement gems and 10 participation gems.
-        // These are explicitly local Testplex values, not Mineplex account currency.
-        double[] placementRewards = {20.0D, 15.0D, 10.0D};
-        for (int i = 0; i < placements.size() && i < placementRewards.length; i++) {
-            awardDragonTestGems(placements.get(i), placementRewards[i]);
+        if (winner != null) {
+            List<UUID> placements = new ArrayList<>();
+            placements.add(winner.getUniqueId());
+            for (int i = session.dragonEliminationOrder.size() - 1; i >= 0; i--) {
+                UUID id = session.dragonEliminationOrder.get(i);
+                if (!placements.contains(id)) placements.add(id);
+            }
+            // SoloGame.EndCheck: 20 / 15 / 10 placement gems and 10 participation gems.
+            // These are explicitly local Testplex values, not Mineplex account currency.
+            for (int i = 0; i < placements.size(); i++) {
+                awardDragonTestGems(placements.get(i), ArcadePortRules.dragonPlacementGemReward(i + 1));
+            }
         }
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             Player participant = entry.getValue();
@@ -7823,6 +7830,11 @@ public final class ArcadePortManager implements Listener {
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             UUID id = entry.getKey();
             String path = localStatsPath(id, session.type.id());
+            if (session.type == ArcadePortGame.DRAGONS) {
+                double totalLocalGems = plugin.getConfig().getDouble(path + "test-gems", 0.0D)
+                        + plugin.getConfig().getDouble(path + "survival-gems", 0.0D);
+                plugin.getConfig().set(path + "total-gems", totalLocalGems);
+            }
             plugin.getConfig().set(path + "games-played",
                     plugin.getConfig().getInt(path + "games-played", 0) + 1);
             int score = Math.max(0, session.scores.getOrDefault(id, 0));
@@ -8163,7 +8175,8 @@ public final class ArcadePortManager implements Listener {
             }
         } else if ("dragons".equals(gameId)) {
             int sparklez = plugin.getConfig().getInt(path + "sparklez", 0);
-            double testGems = plugin.getConfig().getDouble(path + "test-gems", 0.0D);
+            double testGems = plugin.getConfig().getDouble(path + "test-gems", 0.0D)
+                    + plugin.getConfig().getDouble(path + "survival-gems", 0.0D);
             inventory.setItem(31, statsItem(testGems > 0.0D ? Material.EMERALD : Material.COAL,
                     ChatColor.GOLD + "Testplex Gems",
                     List.of(" ", ChatColor.GRAY + "Survival and placement rewards: "

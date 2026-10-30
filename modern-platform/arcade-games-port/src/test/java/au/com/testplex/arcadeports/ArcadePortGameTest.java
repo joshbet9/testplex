@@ -1642,6 +1642,27 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.allGladiatorPairsResolved(0, 0));
     }
 
+    @Test void dragonsSoloScoreboardMatchesSourceThresholds() {
+        assertEquals(0, ArcadePortRules.dragonsSoloScoreboardMode(14, 14));
+        assertEquals(0, ArcadePortRules.dragonsSoloScoreboardMode(14, 3));
+        assertEquals(1, ArcadePortRules.dragonsSoloScoreboardMode(15, 15));
+        assertEquals(1, ArcadePortRules.dragonsSoloScoreboardMode(25, 15));
+        assertEquals(2, ArcadePortRules.dragonsSoloScoreboardMode(16, 16));
+        assertEquals(2, ArcadePortRules.dragonsSoloScoreboardMode(40, 20));
+    }
+
+    @Test void dragonsSoloSurvivalAndPlacementGemRulesMatchSource() {
+        assertEquals(0.0D, ArcadePortRules.dragonSurvivalGems(-1L), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.dragonSurvivalGems(9_999L), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.dragonSurvivalGems(10_000L), 0.00001D);
+        assertEquals(12.5D, ArcadePortRules.dragonSurvivalGems(125_000L), 0.00001D);
+        assertEquals(20.0D, ArcadePortRules.dragonPlacementGemReward(1), 0.00001D);
+        assertEquals(15.0D, ArcadePortRules.dragonPlacementGemReward(2), 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.dragonPlacementGemReward(3), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.dragonPlacementGemReward(4), 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.DRAGONS_PARTICIPATION_GEMS, 0.00001D);
+    }
+
     @Test void dragonContactHitsRespectPerPlayerCooldown() {
         assertTrue(ArcadePortRules.shouldApplyDragonContactHit(10_000L, 0L));
         assertFalse(ArcadePortRules.shouldApplyDragonContactHit(10_000L, 11_500L));

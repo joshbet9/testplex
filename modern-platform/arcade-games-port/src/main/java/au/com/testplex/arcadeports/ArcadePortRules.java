@@ -377,6 +377,7 @@ public final class ArcadePortRules {
     public static final long DRAGONS_WATER_DAMAGE_INTERVAL_MILLIS = 500L;
     /** PerkBarrage fires queued arrows once per TICK (approximately 20 per second). */
     public static final long DRAGONS_BARRAGE_FIRE_INTERVAL_MILLIS = 50L;
+    public static final double DRAGONS_PARTICIPATION_GEMS = 10.0D;
     public static final double DRAGONS_FLARE_RADIUS = 24.0D;
     public static final double DRAGONS_FLARE_RADIUS_SQUARED = DRAGONS_FLARE_RADIUS * DRAGONS_FLARE_RADIUS;
     public static final double DRAGONS_FLARE_VERTICAL_RANGE = 24.0D;
@@ -549,6 +550,28 @@ public final class ArcadePortRules {
 
     public static boolean shouldAllowDragonWorldItem(Material material) {
         return material == Material.EMERALD;
+    }
+
+    /** SoloGame awards one survival gem per ten seconds alive. */
+    public static double dragonSurvivalGems(long survivedMillis) {
+        return Math.max(0L, survivedMillis) / 10_000.0D;
+    }
+
+    /** SoloGame end-of-round placement rewards, one-based. */
+    public static double dragonPlacementGemReward(int place) {
+        return switch (place) {
+            case 1 -> 20.0D;
+            case 2 -> 15.0D;
+            case 3 -> 10.0D;
+            default -> 0.0D;
+        };
+    }
+
+    /** SoloGame sidebar: 0=all alive/dead names, 1=alive names, 2=alive/dead counts. */
+    public static int dragonsSoloScoreboardMode(int totalPlayers, int alivePlayers) {
+        if (totalPlayers < 15) return 0;
+        if (alivePlayers < 16) return 1;
+        return 2;
     }
 
     /** Mirrors UtilAction.velocity(entity, facing, 1.2, false, 0, 0.2, 1.0, true). */
