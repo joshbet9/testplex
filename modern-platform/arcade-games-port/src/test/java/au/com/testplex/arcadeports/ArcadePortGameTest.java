@@ -288,6 +288,38 @@ class ArcadePortGameTest {
         assertEquals(1, ArcadePortRules.paintballSniperPaintDamage(-1.0D));
     }
 
+    @Test void paintballMachineGunNowAllowsFortyEightShotsBeforeOverheating() {
+        double heat = 0.0D;
+        for (int shot = 1; shot <= 48; shot++) {
+            assertTrue(ArcadePortRules.canFirePaintballMachineGun(heat),
+                    "Shot " + shot + " should still be allowed");
+            heat = ArcadePortRules.paintballMachineGunHeatAfterShot(heat);
+        }
+        assertFalse(ArcadePortRules.canFirePaintballMachineGun(heat),
+                "The next shot after 48 should be blocked until the gun cools");
+        assertEquals(48, ArcadePortRules.PAINTBALL_MACHINE_GUN_SHOTS_PER_HEAT_CYCLE);
+        assertEquals(80L, ArcadePortRules.PAINTBALL_MACHINE_GUN_FIRE_COOLDOWN_MILLIS);
+        assertEquals(250L, ArcadePortRules.PAINTBALL_MACHINE_GUN_COOL_RECHARGE_MILLIS);
+        assertEquals(0.0D, ArcadePortRules.coolPaintballMachineGunHeat(0.01D), 0.000001D);
+    }
+
+    @Test void paintballWeaponSkinsChangeTheVisibleHeldItemWithoutChangingKitIdentity() {
+        assertEquals(Material.IRON_HORSE_ARMOR,
+                ArcadePortRules.paintballWeaponMaterial("rifle", "chrome-marker"));
+        assertEquals(Material.STONE_HOE,
+                ArcadePortRules.paintballWeaponMaterial("sniper", "chrome-marker"));
+        assertEquals(Material.GOLDEN_HORSE_ARMOR,
+                ArcadePortRules.paintballWeaponMaterial("shotgun", "chrome-marker"));
+        assertEquals(Material.DIAMOND_HORSE_ARMOR,
+                ArcadePortRules.paintballWeaponMaterial("machine-gun", "chrome-marker"));
+        assertEquals(Material.CROSSBOW,
+                ArcadePortRules.paintballWeaponMaterial("rifle", "splatter-cannon"));
+        assertEquals(Material.CROSSBOW,
+                ArcadePortRules.paintballWeaponMaterial("sniper", "splatter-cannon"));
+        assertEquals(Material.BLAZE_ROD,
+                ArcadePortRules.paintballWeaponMaterial("machine-gun", "neon-suppressor"));
+    }
+
     @Test void respawningPlayersPreventPrematureRoundEnd() {
         assertFalse(ArcadePortRules.shouldFinishWhenNobodyIsAlive(0, 1));
         assertFalse(ArcadePortRules.shouldFinishWhenNobodyIsAlive(1, 0));
