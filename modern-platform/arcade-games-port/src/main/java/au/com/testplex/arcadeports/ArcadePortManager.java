@@ -1048,6 +1048,7 @@ public final class ArcadePortManager implements Listener {
                 UUID evolutionId = player.getUniqueId();
                 session.evolutionLevels.put(evolutionId, 0);
                 session.evolutionLifeKills.put(evolutionId, 0);
+                session.evolutionKillsSinceEvolution.put(evolutionId, 0);
                 session.evolutionPityUntil.put(evolutionId,
                         System.currentTimeMillis() + ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS);
                 session.evolutionOverkillEligible.add(evolutionId);
@@ -5725,6 +5726,9 @@ public final class ArcadePortManager implements Listener {
                 UUID killerId = killer.getUniqueId();
                 session.scores.merge(killerId, 1, Integer::sum);
                 int lifeKills = session.evolutionLifeKills.merge(killerId, 1, Integer::sum);
+                session.evolutionKillsSinceEvolution.put(killerId,
+                        ArcadePortRules.nextEvolutionOverkillKillCount(
+                                session.evolutionKillsSinceEvolution.getOrDefault(killerId, 0)));
                 session.evolutionAvailable.add(killerId);
                 session.evolutionCharge.remove(killerId);
                 reduceEvolutionPity(session, killerId,
@@ -6025,7 +6029,8 @@ public final class ArcadePortManager implements Listener {
         if (active != session || !session.alive.contains(id)
                 || !session.evolutionAvailable.remove(id) || !session.evolving.add(id)) return;
         session.evolutionCharge.remove(id);
-        session.evolutionKillsAtAttempt.put(id, session.evolutionLifeKills.getOrDefault(id, 0));
+        // Overkill tracks kills since the last successful transformation, not just this life.
+        session.evolutionKillsAtAttempt.put(id, session.evolutionKillsSinceEvolution.getOrDefault(id, 0));
         session.evolutionLifeKills.put(id, 0);
         session.evolutionLockedLocations.put(id, player.getLocation().clone());
         beginEvolutionEggEffect(session, player);
@@ -6051,6 +6056,7 @@ public final class ArcadePortManager implements Listener {
             }
             int killsBeforeEvolution = session.evolutionKillsAtAttempt.getOrDefault(id, 0);
             session.evolutionKillsAtAttempt.remove(id);
+            session.evolutionKillsSinceEvolution.put(id, 0);
             if (!ArcadePortRules.evolutionOverkillRequirementMet(killsBeforeEvolution)) {
                 session.evolutionOverkillEligible.remove(id);
             }
@@ -6567,6 +6573,7 @@ public final class ArcadePortManager implements Listener {
         session.evolutionDamageContributors.clear();
         session.evolutionPityUntil.clear();
         session.evolutionKillsAtAttempt.clear();
+        session.evolutionKillsSinceEvolution.clear();
         session.evolutionOverkillEligible.clear();
         session.runnerBlocks.clear();
         cleanupBaconDisguiseNameTags(session);
@@ -10154,6 +10161,8 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> paintProjectileDamage = new HashMap<>();
         final Map<UUID, Integer> evolutionLevels = new HashMap<>();
         final Map<UUID, Integer> evolutionLifeKills = new HashMap<>();
+        /** Kills earned since the player's last successful Evolution transformation. */
+        final Map<UUID, Integer> evolutionKillsSinceEvolution = new HashMap<>();
         final Set<UUID> evolutionAvailable = new HashSet<>();
         final Map<UUID, Float> evolutionCharge = new HashMap<>();
         final Set<UUID> evolving = new HashSet<>();
