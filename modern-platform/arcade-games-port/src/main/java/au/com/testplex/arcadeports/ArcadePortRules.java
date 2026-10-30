@@ -1467,8 +1467,33 @@ public final class ArcadePortRules {
         return bestAlive <= 0 || tied ? -1 : bestTeam;
     }
 
-    public static double microBattlesHitDamage(boolean projectile) {
-        return projectile ? 4.0D : 6.0D;
+    /** Reborn DamageManager scales arrow damage from the projectile speed. */
+    public static double microBattlesArrowDamage(double projectileSpeed) {
+        if (!Double.isFinite(projectileSpeed) || projectileSpeed <= 0.0D) return 0.0D;
+        return projectileSpeed * 3.0D;
+    }
+
+    /** Mirrors Reborn UtilGear weapon damage: sword/axe base 6, adjusted by material; other items deal 1. */
+    public static double microBattlesMeleeDamage(String materialName) {
+        String material = materialName == null ? "" : materialName.toUpperCase(java.util.Locale.ROOT);
+        if (!material.endsWith("_SWORD") && !material.endsWith("_AXE")) return 1.0D;
+        int damage = 6;
+        if (material.contains("WOOD")) damage -= 3;
+        else if (material.contains("STONE")) damage -= 2;
+        else if (material.contains("DIAMOND")) damage += 1;
+        return damage;
+    }
+
+    /** Reborn DamageManager armour formula: damage * (25 - armour points) / 25. */
+    public static double microBattlesDamageAfterArmor(double damage, double armourPoints) {
+        if (!Double.isFinite(damage) || !Double.isFinite(armourPoints) || damage <= 0.0D) return 0.0D;
+        double armour = Math.max(0.0D, Math.min(25.0D, armourPoints));
+        return damage * (25.0D - armour) / 25.0D;
+    }
+
+    /** Base logarithmic knockback with the Micro Battles projectile multiplier. */
+    public static double microBattlesArrowKnockback(double damage) {
+        return Math.log10(Math.max(damage, 2.0D)) * 1.6D;
     }
 
     public static int microBattlesMinimumFoodLevel(int foodLevel) {
