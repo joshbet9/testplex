@@ -1401,8 +1401,54 @@ public final class ArcadePortRules {
     }
 
 
+    /** Reborn's base GameTimeout for Paintball is twenty minutes. */
+    public static final long PAINTBALL_GAME_TIMEOUT_MILLIS = 1_200_000L;
     public static final long PAINTBALL_WATER_BOMB_COOLDOWN_MILLIS = 250L;
     public static final double PAINTBALL_SAVE_ME_RADIUS = 3.0D;
+
+    /** Reborn orders its teams Frost/AQUA first, then Nether/RED. */
+    public static boolean isPaintballRedTeam(int team) {
+        return team == 1;
+    }
+
+    public static Color paintballTeamColor(int team) {
+        return isPaintballRedTeam(team) ? Color.RED : Color.AQUA;
+    }
+
+    /** Reborn recolours wool and hard-clay surfaces when any paint projectile impacts. */
+    public static Material paintballPaintedBlock(Material original, int team) {
+        if (original == null) return null;
+        String name = original.name();
+        if (name.endsWith("_WOOL")) {
+            return isPaintballRedTeam(team) ? Material.RED_WOOL : Material.LIGHT_BLUE_WOOL;
+        }
+        if (name.equals("TERRACOTTA")
+                || (name.endsWith("_TERRACOTTA") && !name.endsWith("_GLAZED_TERRACOTTA"))) {
+            return isPaintballRedTeam(team) ? Material.RED_TERRACOTTA : Material.LIGHT_BLUE_TERRACOTTA;
+        }
+        return null;
+    }
+
+    /** Source win trackers award Speedrunner only when the winning team finishes within 30 seconds. */
+    public static boolean shouldAwardPaintballSpeedrunner(long elapsedMillis, boolean won) {
+        return won && elapsedMillis >= 0L && elapsedMillis < 30_000L;
+    }
+
+    /** Flawless Victory requires at least four starters and no player lost from the winning team. */
+    public static boolean shouldAwardPaintballFlawlessVictory(
+            int startingTeamPlayers, int survivingTeamPlayers, boolean won) {
+        return won && startingTeamPlayers >= 4 && survivingTeamPlayers == startingTeamPlayers;
+    }
+
+    /** Killing Spree starts at the fourth kill in a five-second chain. */
+    public static boolean shouldAwardPaintballKillingSpree(int consecutiveKills) {
+        return consecutiveKills >= 4;
+    }
+
+    /** Last Stand starts awarding at the third kill while only one teammate remains alive. */
+    public static boolean shouldAwardPaintballLastStand(int soloKills) {
+        return soloKills >= 3;
+    }
 
     /** Reborn's Machine Gun fires on an 80 ms gate; this slower heat gain allows 48 shots per full bar. */
     public static final int PAINTBALL_MACHINE_GUN_SHOTS_PER_HEAT_CYCLE = 48;
@@ -1457,12 +1503,6 @@ public final class ArcadePortRules {
 
     public static boolean isPaintballPlayerOut(int remainingPieces) {
         return remainingPieces <= 0;
-    }
-
-    public static final int PAINTBALL_WINNER_SCORE = 10;
-
-    public static boolean isPaintballWinnerScoreReached(int score) {
-        return score >= PAINTBALL_WINNER_SCORE;
     }
 
     public static double paintballHealthAfterHit(int remainingPieces) {
