@@ -208,6 +208,44 @@ public final class ArcadePortManager implements Listener {
         return new BaconBrawlBotHitResult(meter, timingMultiplier);
     }
 
+    /**
+     * Resolve a practice-bot hit through the same timed-hit, meter, backstab and knockback
+     * calculation as player-versus-player Bacon Brawl combat. The game is knockback-based:
+     * as with real players, a successful hit is not ordinary health damage.
+     */
+    public BaconBrawlBotHitResult applyBaconBrawlBotHit(Player attacker, LivingEntity target,
+            String botName, String targetKit, double rawDamage) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.BACON_BRAWL
+                || attacker == null || target == null || !target.isValid()
+                || target.getWorld() != session.world
+                || !session.alive.contains(attacker.getUniqueId())) {
+            return new BaconBrawlBotHitResult(-1, 1.0D);
+        }
+
+        BaconBrawlBotHitResult hit = recordBaconBrawlBotHit(attacker, botName, rawDamage);
+        if (hit.meter() < 0) return hit;
+
+        double multiplier = session.baconKnockback * hit.timingMultiplier();
+        String attackerKit = session.baconKits.getOrDefault(attacker.getUniqueId(), "el-muchacho-pigo");
+        Vector targetLook = target.getLocation().getDirection().setY(0.0D);
+        Vector fromTargetToAttacker = attacker.getLocation().toVector()
+                .subtract(target.getLocation().toVector()).setY(0.0D);
+        boolean backstab = ArcadePortRules.isBaconBrawlBackstab(targetLook.getX(), targetLook.getZ(),
+                fromTargetToAttacker.getX(), fromTargetToAttacker.getZ());
+        if ("pig".equals(attackerKit) && backstab) {
+            multiplier *= ArcadePortRules.BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER;
+        }
+        target.setNoDamageTicks(0);
+        target.setVelocity(baconBrawlKnockbackVelocity(
+                attacker.getLocation(), target.getLocation(), rawDamage, multiplier, null, target.isOnGround()));
+
+        if (session.baconCloakUntil.containsKey(attacker.getUniqueId())) {
+            endBaconCloak(session, attacker.getUniqueId(), attacker);
+        }
+        return hit;
+    }
+
     public static final class BaconBrawlBotHitResult {
         private final int meter;
         private final double timingMultiplier;
@@ -3667,15 +3705,21 @@ public final class ArcadePortManager implements Listener {
     /** Port DamageManager's logarithmic base and UtilAction's strength, vertical cap and ground boost. */
     private Vector baconBrawlKnockbackVelocity(Player source, Player target, double rawDamage,
             double knockbackMultipliers, Vector projectileVelocity) {
+        return baconBrawlKnockbackVelocity(source.getLocation(), target.getLocation(), rawDamage,
+                knockbackMultipliers, projectileVelocity, target.isOnGround());
+    }
+
+    private Vector baconBrawlKnockbackVelocity(Location source, Location target, double rawDamage,
+            double knockbackMultipliers, Vector projectileVelocity, boolean targetOnGround) {
         boolean projectile = projectileVelocity != null;
         Vector direction = projectile
                 ? projectileVelocity.clone().setY(0.0D)
-                : target.getLocation().toVector().subtract(source.getLocation().toVector()).setY(0.0D);
-        if (direction.lengthSquared() < 1.0E-5D) direction = source.getLocation().getDirection().setY(0.0D);
+                : target.toVector().subtract(source.toVector()).setY(0.0D);
+        if (direction.lengthSquared() < 1.0E-5D) direction = source.getDirection().setY(0.0D);
         if (direction.lengthSquared() < 1.0E-5D) direction = new Vector(0.0D, 0.0D, 1.0D);
         double strength = ArcadePortRules.baconBrawlVelocityStrength(rawDamage, knockbackMultipliers, projectile);
         double vertical = ArcadePortRules.baconBrawlVerticalVelocity(
-                rawDamage, knockbackMultipliers, projectile, target.isOnGround());
+                rawDamage, knockbackMultipliers, projectile, targetOnGround);
         return direction.normalize().multiply(strength).setY(vertical);
     }
 
