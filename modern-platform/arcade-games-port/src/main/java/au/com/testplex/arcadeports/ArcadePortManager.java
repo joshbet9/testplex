@@ -3622,7 +3622,8 @@ public final class ArcadePortManager implements Listener {
         long brutusUntil = session.baconBrutusUntil.getOrDefault(targetId, 0L);
         boolean brutusActive = brutusUntil > now;
         boolean backstab = isBaconBrawlBackstab(target, attacker);
-        if (ArcadePortRules.shouldBaconBrutusGuardHit(brutusActive, backstab)) {
+        boolean brutusBackstab = isBaconBrutusBackstab(target, attacker);
+        if (ArcadePortRules.shouldBaconBrutusGuardHit(brutusActive, brutusBackstab)) {
             attacker.sendActionBar(ChatColor.RED + "GUARD BLOCKED");
             target.sendActionBar(ChatColor.GOLD + "" + ChatColor.BOLD + "BRUTUS GUARD"
                     + ChatColor.GRAY + " | frontal hit absorbed");
@@ -3633,7 +3634,7 @@ public final class ArcadePortManager implements Listener {
             target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BLOCK, 0.8F, 1.5F);
             return;
         }
-        if (brutusActive && backstab) {
+        if (brutusActive && brutusBackstab) {
             endBaconBrutus(session, targetId, target);
             target.sendActionBar(ChatColor.RED + "" + ChatColor.BOLD + "BRUTUS GUARD BROKEN!");
             target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BREAK, 0.9F, 0.8F);
@@ -3695,6 +3696,14 @@ public final class ArcadePortManager implements Listener {
             attacker.setVelocity(baconBrawlKnockbackVelocity(target, attacker, 2.0D,
                     session.baconKnockback * ArcadePortRules.BACON_BODY_SLAM_KNOCKBACK_MULTIPLIER, null));
         }
+    }
+
+    private boolean isBaconBrutusBackstab(Player target, Player attacker) {
+        Vector targetLook = target.getLocation().getDirection().setY(0.0D);
+        Vector fromTargetToAttacker = attacker.getLocation().toVector()
+                .subtract(target.getLocation().toVector()).setY(0.0D);
+        return ArcadePortRules.isBaconBrutusBackstab(targetLook.getX(), targetLook.getZ(),
+                fromTargetToAttacker.getX(), fromTargetToAttacker.getZ());
     }
 
     private boolean isBaconBrawlBackstab(Player target, Player attacker) {
