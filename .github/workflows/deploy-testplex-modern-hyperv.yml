@@ -534,6 +534,30 @@ jobs:
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
           done
           sudo -n rm -f "$SERVER_DIR/plugins/SnakeModern.jar"
+          # This isolated acceptance instance must run Modern mode so QOL kit abilities (including Cryo Blitz) are available.
+          MM_CONFIG="$SERVER_DIR/plugins/MonsterMazeModern/config.yml"
+          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$SERVER_DIR/plugins/MonsterMazeModern"
+          if ! sudo -n test -f "$MM_CONFIG"; then
+            sudo -n unzip -p "$UPLOAD_DIR/MonsterMazeModern.jar" config.yml | sudo -n tee "$MM_CONFIG" >/dev/null
+          fi
+          set_mm_config() {
+            key="$1"
+            value="$2"
+            if sudo -n grep -q "^$key:" "$MM_CONFIG"; then
+              sudo -n sed -i "s|^$key:.*|$key: $value|" "$MM_CONFIG"
+            else
+              printf '%s: %s\n' "$key" "$value" | sudo -n tee -a "$MM_CONFIG" >/dev/null
+            fi
+          }
+          set_mm_config mode Modern
+          set_mm_config test-mode true
+          set_mm_config solo-mode false
+          set_mm_config record-runs false
+          set_mm_config debug true
+          sudo -n grep -Fxq "mode: Modern" "$MM_CONFIG" || {
+            echo "Monster Maze modern mode was not persisted; refusing to start an Original-mode test server." >&2
+            exit 1
+          }
           sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/SHA256SUMS" "$SERVER_DIR/.testplex-plugin-sha256sums"
           printf '%s\n' "$BUILD_SHA" | sudo -n tee "$SERVER_DIR/.testplex-modern-deployed-build" >/dev/null
           printf '%s\n' "$paper_build" | sudo -n tee "$SERVER_DIR/.testplex-paper-build" >/dev/null
