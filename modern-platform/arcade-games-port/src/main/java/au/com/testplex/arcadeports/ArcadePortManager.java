@@ -2869,6 +2869,9 @@ public final class ArcadePortManager implements Listener {
                 break;
             case SKY_WARS: {
                 String kit = session.skyWarsKits.getOrDefault(player.getUniqueId(), "ice");
+                if (!"fire".equals(kit)) player.removePotionEffect(PotionEffectType.FIRE_RESISTANCE);
+                player.setAllowFlight(false);
+                player.setFlying(false);
                 player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
                 switch (kit) {
                     case "ice" -> player.getInventory().addItem(namedItem(Material.ICE,
@@ -4126,12 +4129,13 @@ public final class ArcadePortManager implements Listener {
             if ("air".equals(kit)) {
                 if (player.isOnGround()) {
                     session.skyWarsSafeLocations.put(id, player.getLocation().clone());
-                    if (now >= session.skyWarsKitReadyAt.getOrDefault(id, 0L) && !player.getAllowFlight()) {
+                    if (session.skyWarsLive && now >= session.skyWarsKitReadyAt.getOrDefault(id, 0L)
+                            && !player.getAllowFlight()) {
                         player.setAllowFlight(true);
                         player.setFlying(false);
                     }
                 }
-            } else if ("metal".equals(kit) && now % 1000L < 50L) {
+            } else if ("metal".equals(kit) && session.ticks % 20 == 0) {
                 var maxHealth = player.getAttribute(Attribute.MAX_HEALTH);
                 if (maxHealth != null) {
                     double value = 20.0D + skyWarsMetalArmorPieces(player);
@@ -4218,6 +4222,7 @@ public final class ArcadePortManager implements Listener {
                     || block.equals(session.skyWarsGeneratorBase)) continue;
             session.skyWarsIceBridgeOriginals.putIfAbsent(block, block.getBlockData().clone());
             block.setType(Material.ICE, false);
+            enqueueSkyWarsCrumbleBlock(session, block);
             session.skyWarsIceBridgeExpiresAt.put(block, now + 4_000L);
         }
         player.sendActionBar(ChatColor.AQUA + "Ice Bridge!");
@@ -4308,7 +4313,7 @@ public final class ArcadePortManager implements Listener {
     public void onSkyWarsDoubleJump(PlayerToggleFlightEvent event) {
         Player player = event.getPlayer();
         Session session = active;
-        if (session == null || session.type != ArcadePortGame.SKY_WARS
+        if (session == null || session.type != ArcadePortGame.SKY_WARS || !session.skyWarsLive
                 || !session.players.containsKey(player.getUniqueId())
                 || !session.alive.contains(player.getUniqueId())
                 || !"air".equals(session.skyWarsKits.getOrDefault(player.getUniqueId(), "ice"))) return;
@@ -11284,6 +11289,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.SKY_WARS && event.getAction().isRightClick()
                 && session.skyWarsLive && session.alive.contains(player.getUniqueId())) {
+            if (isSkyWarsUsableBlock(event.getClickedBlock())) return;
             String kit = session.skyWarsKits.getOrDefault(player.getUniqueId(), "ice");
             Material ability = heldItem == null ? Material.AIR : heldItem.getType();
             if ("ice".equals(kit) && ability == Material.ICE) {
