@@ -43,7 +43,7 @@ public class MMCommand implements CommandExecutor {
                 final StringBuilder forwarded = new StringBuilder("mm");
                 for (String arg : args) forwarded.append(" ").append(arg);
                 final String replay = forwarded.toString();
-                org.bukkit.Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+                org.bukkit.Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
                     @Override public void run() {
                         if (player.isOnline() && gm.getCenter() != null
                                 && player.getWorld() == gm.getCenter().getWorld()) {
