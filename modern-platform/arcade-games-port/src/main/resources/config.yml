@@ -1,6 +1,7 @@
 # Isolated manual-acceptance candidates. Availability does not itself certify 100% in-game parity.
 # Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball and Runner are available as live-acceptance candidates.
 # Candidate availability is not a claim of complete live parity certification.
+# Sneaky Assassins is enabled for mechanics review; its original map archive is not in Reborn.
 enabled-games:
   - bacon-brawl
   - bomb-lobbers
@@ -8,6 +9,7 @@ enabled-games:
   - dragons
   - paintball
   - runner
+  - sneaky-assassins
   - gladiators
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
