@@ -1,0 +1,149 @@
+name: Testplex Modern Paper 26.3
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "modern-platform/**"
+      - ".github/workflows/testplex-modern-build.yml"
+      - ".github/workflows/deploy-testplex-modern-hyperv.yml"
+  pull_request:
+    paths:
+      - "modern-platform/**"
+      - ".github/workflows/testplex-modern-build.yml"
+      - ".github/workflows/deploy-testplex-modern-hyperv.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  build-modern-arcade:
+    name: Build and test Paper 26.3 plugin
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: |
+            modern-platform/pom.xml
+            modern-platform/snake-port/pom.xml
+            modern-platform/arcade-games-port/pom.xml
+
+      - name: Build and run catalogue tests
+        run: mvn --batch-mode --no-transfer-progress -f modern-platform/pom.xml clean verify
+
+      - name: Build Snake 26.3 port and run mechanics-rule tests
+        run: mvn --batch-mode --no-transfer-progress -f modern-platform/snake-port/pom.xml clean verify
+
+      - name: Build Arcade mechanics and the integrated Monster Maze module
+        run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
+
+      - name: Build the disabled Wizards 26.3 port and run spell-rule tests
+        run: mvn --batch-mode --no-transfer-progress -f modern-platform/wizards-port/pom.xml clean verify
+
+      - name: Verify modern plugin metadata and packaged classes
+        shell: bash
+        run: |
+          set -euo pipefail
+          jar_file="modern-platform/target/TestplexModernArcade.jar"
+          snake_jar="modern-platform/snake-port/target/SnakeModern.jar"
+          arcade_jar="modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar"
+          test -s "$jar_file"
+          test -s "$snake_jar"
+          test -s "$arcade_jar"
+          wizards_jar="modern-platform/wizards-port/target/WizardsModern.jar"
+          test -s "$wizards_jar"
+          jar tf "$wizards_jar" | grep -Fxq "plugin.yml"
+          jar tf "$wizards_jar" | grep -Fxq "au/com/testplex/wizards/WizardsModernPlugin.class"
+          unzip -p "$wizards_jar" plugin.yml | grep -Fxq "name: WizardsModern"
+          unzip -p "$wizards_jar" config.yml | grep -Fxq "enabled: false"
+          jar tf "$jar_file" | grep -Fxq "plugin.yml"
+          jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/TestplexModernArcade.class"
+          jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/model/ArcadeCatalog.class"
+          unzip -p "$jar_file" plugin.yml | grep -Fxq "api-version: '26.3'"
+          jar tf "$snake_jar" | grep -Fxq "plugin.yml"
+          jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeModernPlugin.class"
+          jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeRules.class"
+          unzip -p "$snake_jar" plugin.yml | grep -Fxq "name: SnakeModern"
+          unzip -p "$snake_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
+          jar tf "$arcade_jar" | grep -Fxq "plugin.yml"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadePortManager.class"
+          jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/MonsterMazePlugin.class"
+          jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/game/GameManager.class"
+          jar tf "$arcade_jar" | grep -Fxq "monster-maze/maps.yml"
+          jar tf "$arcade_jar" | grep -Fxq "monster-maze/config.yml"
+          ! jar tf "$arcade_jar" | grep -Fxq "monster-maze/plugin.yml"
+          ! jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/MonsterMazeStandalonePlugin.class"
+          ! jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/game/LobbyListener.class"
+          ! jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/world/VoidWorldManager.class"
+          unzip -p "$arcade_jar" plugin.yml | grep -Fxq "name: ArcadeMechanicsModern"
+          unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
+          ! unzip -p "$arcade_jar" plugin.yml | grep -Eq '^  games:'
+          jar tf "$arcade_jar" | grep -Fxq "source-maps/Draw My Thing/Draw_Stadium.zip"
+
+          # Guard the deployment path against the real standalone source artifact name.
+          deploy_workflow=".github/workflows/deploy-testplex-modern-hyperv.yml"
+          grep -Fq 'plugins/MonsterMazeStandalone' "$deploy_workflow"
+          grep -Fq 'MonsterMazeStandalone' "$deploy_workflow"
+          grep -Fq 'me.monstermaze.MonsterMazePlugin' "$deploy_workflow"
+          grep -Fq 'retired-monster-maze-plugins' "$deploy_workflow"
+          arcade_config="$(unzip -p "$arcade_jar" config.yml)"
+          enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config" | paste -sd, -)"
+          [[ "$enabled_ids" == "death-tag,one-in-the-quiver" ]] || {
+            echo "Only READY_FOR_TEST games may be enabled. Found: [$enabled_ids]" >&2
+            exit 1
+          }
+          snake_config="$(unzip -p "$snake_jar" config.yml)"
+          grep -Fxq "enabled: false" <<< "$snake_config"
+          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 24 shared Arcade catalogue games are packaged, Wizards is built as a separate module, Speed Builders Arcade is tracked as planned work, only Death Tag and One in the Quiver are enabled, and Snake and Wizards remain gated."
+
+      - name: Upload modern plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: testplex-modern-paper-26.3
+          path: |
+            modern-platform/target/TestplexModernArcade.jar
+            modern-platform/snake-port/target/SnakeModern.jar
+            modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar
+            modern-platform/wizards-port/target/WizardsModern.jar
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write build summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Testplex Modern Paper 26.3"
+            echo
+            echo "- Runtime/API baseline: Java 25 / Paper 26.3"
+            echo "- Separate from legacy Java 8 build and deployment"
+            echo "- Catalogue: 24 shared Arcade games (two READY_FOR_TEST, 22 MECHANICS_IN_PROGRESS)"
+            echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar, ArcadeMechanicsModern.jar and WizardsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
+            echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
+            echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
+            echo "- Gameplay ports: 24 shared Arcade catalogue entries are packaged; Wizards is a separate disabled module, and Speed Builders Arcade is planned but not implemented; unfinished ports remain unavailable for starting live games"
+            echo "- Playable allow-list: Death Tag and One in the Quiver only; all other catalogue entries, Snake and Wizards remain gated pending readiness promotion"
+            echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-modern-test-server:
+    name: Deploy successful integration build to isolated Paper 26.3 VM
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' }}
+    needs: build-modern-arcade
+    uses: ./.github/workflows/deploy-testplex-modern-hyperv.yml
+    with:
+      deploy_to_modern_test_server: true
+      source_run_id: ${{ format('{0}', github.run_id) }}
+    secrets: inherit
