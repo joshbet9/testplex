@@ -2961,19 +2961,28 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void showBaconHitFeedback(Session session, Player attacker, Player target, double timingMultiplier) {
+        // A critical is the only timed-hit state that gets an explicit hit popup.
+        // Ordinary/early/late hits remain represented by the live timing meter, not "hit/miss" labels.
+        if (timingMultiplier < 1.5D) return;
+
         long until = System.currentTimeMillis() + ArcadePortRules.BACON_HIT_FEEDBACK_MILLIS;
         session.baconHitFeedbackUntil.put(attacker.getUniqueId(), until);
         session.baconHitFeedbackUntil.put(target.getUniqueId(), until);
-        int percent = session.baconMeters.getOrDefault(attacker.getUniqueId(), 0);
-        String quality = timingMultiplier >= 1.5D ? ChatColor.GREEN + "TIMED HIT"
-                : timingMultiplier < 1.0D ? ChatColor.RED + "TOO FAST"
-                : ChatColor.YELLOW + "HIT";
-        attacker.sendActionBar(quality + ChatColor.WHITE + " | KB x"
-                + String.format(java.util.Locale.ROOT, "%.2f", timingMultiplier)
-                + ChatColor.GRAY + " | Meter " + ChatColor.GREEN + percent + "%");
-        target.sendActionBar(ChatColor.RED + "HIT BY " + attacker.getName()
-                + ChatColor.WHITE + " | KB x"
+        String flashy = ChatColor.GOLD + "✦ " + ChatColor.YELLOW + ChatColor.BOLD
+                + "FLASHY CRITICAL!" + ChatColor.GOLD + " ✦";
+        attacker.sendActionBar(flashy + ChatColor.WHITE + "  Knockback x"
                 + String.format(java.util.Locale.ROOT, "%.2f", timingMultiplier));
+        attacker.sendTitle("", flashy, 0, 18, 5);
+        target.sendActionBar(ChatColor.RED + "✦ CRITICAL HIT from "
+                + attacker.getName() + " ✦");
+        target.sendTitle("", flashy, 0, 18, 5);
+
+        org.bukkit.Location impact = target.getLocation().clone().add(0.0D, 1.0D, 0.0D);
+        target.getWorld().spawnParticle(Particle.CRIT, impact, 22, 0.45D, 0.45D, 0.45D, 0.15D);
+        target.getWorld().spawnParticle(Particle.ELECTRIC_SPARK, impact, 14, 0.35D, 0.45D, 0.35D, 0.08D);
+        target.getWorld().spawnParticle(Particle.FIREWORK, impact, 10, 0.25D, 0.35D, 0.25D, 0.04D);
+        attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 1.0F, 1.35F);
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_ATTACK_CRIT, 0.9F, 1.1F);
     }
 
     /**
