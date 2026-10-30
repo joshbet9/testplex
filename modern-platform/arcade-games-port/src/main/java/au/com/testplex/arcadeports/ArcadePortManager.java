@@ -4896,17 +4896,21 @@ public final class ArcadePortManager implements Listener {
         }
 
         long elapsed = Math.max(0L, now - lastHit);
-        int pointer = (int) Math.min(11L, elapsed * 12L / 1_500L);
+        // 15 ticks × 100 ms gives an exact visual critical segment at 500–900 ms.
+        int pointer = (int) Math.min(14L, elapsed / 100L);
+        boolean criticalWindow = ArcadePortRules.isBaconTimedCritical(elapsed);
         StringBuilder bar = new StringBuilder("[");
-        for (int i = 0; i < 12; i++) {
+        for (int i = 0; i < 15; i++) {
             if (i == pointer) {
-                bar.append(ChatColor.WHITE).append("▌");
-            } else if (i >= 4 && i <= 7) {
+                bar.append(criticalWindow ? ChatColor.GREEN : ChatColor.WHITE).append("▌");
+            } else if (i >= 5 && i <= 8) {
                 bar.append(ChatColor.GREEN).append("■");
-            } else if (i < 4) {
+            } else if (i < 5) {
                 bar.append(ChatColor.RED).append("■");
-            } else {
+            } else if (i <= 13) {
                 bar.append(ChatColor.YELLOW).append("■");
+            } else {
+                bar.append(ChatColor.GRAY).append("■");
             }
         }
         bar.append(ChatColor.GRAY).append("]");
