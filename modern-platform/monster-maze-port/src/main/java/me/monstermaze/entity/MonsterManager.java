@@ -74,7 +74,7 @@ public class MonsterManager {
         int starter = game.getMode().initialMonsterCount();
 
         final int[] spawned = {0};
-        spawnTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        spawnTask = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override
             public void run() {
                 if (game.getState() != GameState.STARTING && game.getState() != GameState.LIVE) {
@@ -89,7 +89,7 @@ public class MonsterManager {
             }
         }, 1L, 1L);
 
-        tickTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        tickTask = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override
             public void run() {
                 if (!game.isLive()) return;
