@@ -1,6 +1,14 @@
 # Modern Arcade mechanics prototypes (Paper 26.3)
 
-This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games outside the dedicated Monster Maze and Snake modules. It is a compatibility/work-in-progress layer intended to expose API and game-loop problems early; it is **not** a claim that all original Mineplex mechanics or maps have been faithfully ported yet.
+This plugin adds first-pass playable mechanics harnesses for the 15 Arcade games outside the dedicated Monster Maze and Snake modules. It is a compatibility/work-in-progress layer intended to expose API and game-loop problems early; it is **not** a claim that all original Mineplex mechanics or maps have been faithfully ported yet.
+
+## SkyWars — fast Mixed Arcade FFA
+
+SkyWars is registered as the isolated `skywars-mixed` variant for Paper 26.3. It uses the archived 1.8 SkyWars maps and authored player-island spawns, and accepts up to 16 players without modifying the legacy Solo SkyWars or Team SkyWars classes.
+
+The fast format uses a 5-second preparation window, an 8-minute round ceiling, a world-border close beginning 60 seconds after the fight starts (45-second shrink), and a shared throwable-TNT generator that supplies two TNT every 15 seconds. Island, connector and middle chests are populated from separate loot pools; sponge marker blocks are removed. Players can break/place ordinary blocks after the start, throw TNT with right-click, and drop their inventory on elimination. SkyWars is still a manual-acceptance candidate, not a claim of complete 1.8 parity.
+
+Join with `/arcadeport join skywars-mixed`, quick-start with `/arcadeport play skywars-mixed`, or start the queued lobby with `/arcadeport start skywars-mixed`. Choose an installed map with `/arcadeport maps skywars`.
 
 ## Games covered in this first pass
 
