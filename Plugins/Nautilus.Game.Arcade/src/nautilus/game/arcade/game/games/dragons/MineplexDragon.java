@@ -32,6 +32,13 @@ public class MineplexDragon
 	{
 		Location location = _entity.getLocation(), spectatorLocation = _host.GetSpectatorLocation();
 
+		// A flare invalidates the current player/location target immediately.
+		if (_host.isInFlareArea(getTarget()))
+		{
+			targetPlayer();
+			return;
+		}
+
 		// Too low (target fell into void?).
 		if (location.getY() < 10)
 		{
@@ -59,7 +66,7 @@ public class MineplexDragon
 
 	void targetPlayer()
 	{
-		Player player = UtilAlg.Random(_host.GetPlayers(true));
+		Player player = UtilAlg.Random(_host.getDragonTargetCandidates());
 
 		// No alive player found.
 		if (player == null)
@@ -72,6 +79,14 @@ public class MineplexDragon
 		}
 	}
 
+	void retargetIfInsideFlare()
+	{
+		if (_host.isInFlareArea(getTarget()))
+		{
+			targetPlayer();
+		}
+	}
+
 	void targetSky()
 	{
 		setTargetLocation(_host.GetSpectatorLocation().clone().add(UtilMath.rRange(-50, 50), UtilMath.rRange(20, 40), UtilMath.rRange(-50, 50)));
@@ -79,6 +94,12 @@ public class MineplexDragon
 
 	void targetSparkler(Location location)
 	{
+		// Flares suppress nearby sparkler lures as well as player targets.
+		if (_host.isInFlareArea(location))
+		{
+			return;
+		}
+
 		// Too far from sparkler to see
 		if (UtilMath.offsetSquared(location, _entity.getLocation()) > MAX_SPARKLER_DISTANCE)
 		{
