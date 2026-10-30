@@ -59,6 +59,18 @@ class ArcadeCatalogTest {
     }
 
     @Test
+    void dragonsExposeServerVisibleFlareEffectChoices() {
+        GameDefinition dragons = new ArcadeCatalog().getGame("dragons");
+        CosmeticLineDefinition flares = dragons.getCosmeticLines().stream()
+                .filter(line -> line.getId().equals("flare-effects"))
+                .findFirst().orElseThrow();
+        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, flares.getSelectionMode());
+        assertEquals("classic", flares.getDefaultOptionId());
+        assertEquals(Set.of("classic", "ember", "frost", "ender", "solar", "aurora"),
+                new HashSet<>(flares.getOptions().stream().map(CosmeticOption::getId).toList()));
+    }
+
+    @Test
     void monsterMazeMobFormsCanBeEquippedIndependently() {
         GameDefinition game = new ArcadeCatalog().getGame("monster-maze");
         CosmeticLineDefinition mobForms = game.getCosmeticLines().stream()
