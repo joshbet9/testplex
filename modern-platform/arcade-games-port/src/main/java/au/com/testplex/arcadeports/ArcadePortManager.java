@@ -2154,21 +2154,13 @@ public final class ArcadePortManager implements Listener {
                         sword = new ItemStack(Material.STONE_SWORD);
                         break;
                 }
-                // Adventure mode mirrors the source Quiver rules. Give the kit weapon only
-                // the stained-glass break predicate; the BlockBreak listener enforces it again.
-                Set<Material> breakableGlass = new HashSet<>();
-                for (Material candidate : Material.values()) {
-                    if (isQuiverBreakableGlass(candidate)) breakableGlass.add(candidate);
-                }
-                ItemMeta swordMeta = sword.getItemMeta();
-                if (swordMeta != null) {
-                    swordMeta.setCanDestroy(breakableGlass);
-                    sword.setItemMeta(swordMeta);
-                }
-                player.getInventory().setItem(ArcadePortRules.QUIVER_SWORD_SLOT, sword);
-                player.getInventory().setItem(ArcadePortRules.QUIVER_BOW_SLOT, new ItemStack(Material.BOW));
-                player.getInventory().setItem(ArcadePortRules.QUIVER_ARROW_SLOT, namedItem(Material.ARROW,
-                        "Super Arrow", "One arrow per shot; earn another with each kill."));
+                // Adventure mode mirrors the source Quiver rules. Each held kit item gets
+                // the same stained-glass break predicate; the BlockBreak listener enforces it again.
+                player.getInventory().setItem(ArcadePortRules.QUIVER_SWORD_SLOT, allowQuiverGlassBreaks(sword));
+                player.getInventory().setItem(ArcadePortRules.QUIVER_BOW_SLOT,
+                        allowQuiverGlassBreaks(new ItemStack(Material.BOW)));
+                player.getInventory().setItem(ArcadePortRules.QUIVER_ARROW_SLOT, allowQuiverGlassBreaks(
+                        namedItem(Material.ARROW, "Super Arrow", "One arrow per shot; earn another with each kill.")));
                 break;
             }
             case PAINTBALL:
@@ -2339,6 +2331,20 @@ public final class ArcadePortManager implements Listener {
         }
         target.setHealth(target.getHealth() - damage);
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
+    }
+
+    private ItemStack allowQuiverGlassBreaks(ItemStack item) {
+        if (item == null) return null;
+        Set<Material> breakableGlass = new HashSet<>();
+        for (Material candidate : Material.values()) {
+            if (isQuiverBreakableGlass(candidate)) breakableGlass.add(candidate);
+        }
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setCanDestroy(breakableGlass);
+            item.setItemMeta(meta);
+        }
+        return item;
     }
 
     private void tryQuiverRebound(Session session, Projectile projectile, Player shooter, Location impact) {
@@ -6995,8 +7001,8 @@ public final class ArcadePortManager implements Listener {
         int kills = session.scores.merge(attackerId, 1, Integer::sum);
         if (ArcadePortRules.quiverRegrantsArrowAfterKill()) {
             // Reborn adds one arrow for each kill; multiple melee kills can bank arrows.
-            attacker.getInventory().addItem(namedItem(Material.ARROW,
-                    "Super Arrow", "One arrow per shot; earn another with each kill."));
+            attacker.getInventory().addItem(allowQuiverGlassBreaks(namedItem(Material.ARROW,
+                    "Super Arrow", "One arrow per shot; earn another with each kill.")));
         }
         updateQuiverScoreboard(session);
         attacker.sendMessage(ChatColor.GREEN + "Quiver kill! " + kills + "/20.");
