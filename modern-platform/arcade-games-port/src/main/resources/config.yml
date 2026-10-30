@@ -8,6 +8,7 @@ enabled-games:
   - dragons
   - paintball
   - runner
+  - sneaky-assassins
   - gladiators
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
