@@ -1586,6 +1586,13 @@ public class Maze implements Listener
 			{
 				_host.Announce(F.main("Game", F.name(p.getName()) + " made it to the Safe Pad first!"));
 
+				// Keep the original first-arrival cue; add a softer broadcast ding with the announcement.
+				for (Player listener : _host.GetPlayers(false))
+				{
+					if (listener.getWorld() == p.getWorld())
+						listener.playSound(p.getLocation(), Sound.NOTE_PLING, 0.45f, 1.7f);
+				}
+
 				UtilTextMiddle.display("", C.cYellow + C.Bold + "You got to the Safe Pad first!", 5, 40, 5, p);
 				_host.AddGems(p, 7.5, "First Safe Pads", true, true);
 				p.playSound(p.getLocation(), Sound.SUCCESSFUL_HIT, 1.0f, 1.0f);
