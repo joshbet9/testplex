@@ -15,6 +15,7 @@
 - `MonsterMazeModern.jar`: mechanics-first import of the 1.21 standalone implementation, with production backend writes/heartbeats blocked by default.
 - `SnakeModern.jar`: independent mechanics-first port with its own test arena, sheep tails, slime food, kits, magma-cube item boxes and steering roulette.
 - `ArcadeMechanicsModern.jar`: first-pass, distinct mechanical loops for the other 14 games; separate generated arena per game. These are prototypes for rapid compatibility testing, not source-parity sign-off.
+- Gladiators is receiving a dedicated parity pass on `feat/gladiators-parity`: lobby PvP vote, in-duel hotbar editor, concurrent double-elimination brackets, per-duel timers, challenge achievements, lower-bracket win milestone and kill-message cosmetics. It remains disabled for live play until the branch builds and passes multiplayer acceptance.
 - All 16 entries remain marked MECHANICS_IN_PROGRESS; passing CI means compile/unit tests only, not that player experience has been accepted in-game.
 - New cosmetic lines and unique win scenes are still deferred.
 

@@ -21,11 +21,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         if (!getConfig().contains("enabled-games")) {
             getConfig().set("enabled-games", java.util.List.of("bacon-brawl"));
         }
-        String acceptanceRevision = "runner-acceptance-candidate-v1";
+        String acceptanceRevision = "gladiators-acceptance-candidate-v1";
         if (!acceptanceRevision.equals(getConfig().getString("acceptance-games-revision", ""))) {
             java.util.List<String> enabled = new java.util.ArrayList<>(getConfig().getStringList("enabled-games"));
             // Preserve prior acceptance candidates and any locally maintained allow-list entries.
-            for (String candidate : java.util.List.of("bomb-lobbers", "dragon-escape", "paintball", "runner")) {
+            for (String candidate : java.util.List.of("bomb-lobbers", "dragon-escape", "gladiators", "paintball", "runner")) {
                 if (!enabled.contains(candidate)) enabled.add(candidate);
             }
             getConfig().set("enabled-games", enabled);
