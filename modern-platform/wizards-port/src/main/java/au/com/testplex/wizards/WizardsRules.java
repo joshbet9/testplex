@@ -24,6 +24,38 @@ public final class WizardsRules {
 
     public static float initialMana() { return 0.0F; }
 
+    public static List<WizardsSpell> initialKnownSpells() {
+        return List.of(WizardsSpell.MANA_BOLT, WizardsSpell.WIZARDS_COMPASS);
+    }
+
+    public static int summonedWolfCount(int spellLevel) {
+        return Math.max(0, spellLevel) + 2;
+    }
+
+    public static int webShotCount(int spellLevel) {
+        return Math.max(0, spellLevel) * 2;
+    }
+
+    public static int trapRuneRange(int spellLevel) {
+        return Math.max(0, spellLevel) * 4 + 12;
+    }
+
+    public static double trapRuneSize(int spellLevel) {
+        return Math.max(0, spellLevel);
+    }
+
+    public static double trapRuneDamage(int spellLevel) {
+        return Math.max(0, spellLevel) * 2.0D + 3.0D;
+    }
+
+    public static double spectralArrowDamage(int spellLevel, double travelledBlocks) {
+        if (!Double.isFinite(travelledBlocks) || travelledBlocks < 0) return 0.0D;
+        return 6.0D + travelledBlocks / Math.max(1.0D, 7.0D - Math.max(1, spellLevel));
+    }
+
+    public static double manaBoltVelocity() { return 0.3D; }
+    public static double fireballVelocity() { return 0.14D; }
+
     public static float maximumMana(WizardsKit kit) {
         if (kit == null) throw new IllegalArgumentException("kit is required");
         return kit.maximumMana();

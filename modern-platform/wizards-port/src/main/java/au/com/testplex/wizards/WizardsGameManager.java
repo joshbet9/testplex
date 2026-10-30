@@ -977,7 +977,7 @@ public final class WizardsGameManager implements Listener {
                     SpectralArrowData data = spectralArrows.remove(projectile.getUniqueId());
                     if (data != null) {
                         double distance = data.origin.distance(victim.getLocation());
-                        event.setDamage(3.0D + distance / Math.max(1.0D, 7.0D - data.level));
+                        event.setDamage(WizardsRules.spectralArrowDamage(data.level, distance));
                     }
                 } else {
                     Double damage = projectile.getPersistentDataContainer().get(projectileDamageKey, PersistentDataType.DOUBLE);
@@ -1032,13 +1032,13 @@ public final class WizardsGameManager implements Listener {
             String ownerId = projectile.getPersistentDataContainer().get(projectileOwnerKey, PersistentDataType.STRING);
             Player owner = ownerId == null ? null : Bukkit.getPlayer(UUID.fromString(ownerId));
             Double damage = projectile.getPersistentDataContainer().get(projectileDamageKey, PersistentDataType.DOUBLE);
+            double explosionRadius = 4.0D + (damage == null ? 3.0D : Math.max(0.0D, (damage - 6.0D) * 0.3D));
             for (Player victim : alivePlayers()) {
                 if (owner == null || victim.equals(owner) || !victim.getWorld().equals(location.getWorld())) continue;
                 double distance = victim.getLocation().distance(location);
-                if (distance <= 4.5D) {
-                    double scaledDamage = (damage == null ? 6.0D : damage) * Math.max(0.2D, 1.0D - distance / 5.0D);
-                    victim.damage(scaledDamage, owner);
-                    victim.setFireTicks(Math.max(victim.getFireTicks(), 40 + (int) (damage == null ? 0 : damage * 10)));
+                if (distance <= explosionRadius) {
+                    victim.damage(damage == null ? 6.0D : damage, owner);
+                    victim.setFireTicks(Math.max(victim.getFireTicks(), 80));
                 }
             }
             location.getWorld().spawnParticle(Particle.FLAME, location, 32, 0.6D, 0.6D, 0.6D, 0.04D);
@@ -1495,7 +1495,7 @@ public final class WizardsGameManager implements Listener {
                         : clickedBlock.getRelative(org.bukkit.block.BlockFace.UP).getLocation();
                 if (!base.getBlock().isPassable()) base = caster.getLocation();
                 int spawned = 0;
-                for (int i = 0; i < level; i++) {
+                for (int i = 0; i < WizardsRules.summonedWolfCount(level); i++) {
                     Location spawn = base.clone().add((random.nextDouble() - 0.5D) * 1.2D, 0.0D,
                             (random.nextDouble() - 0.5D) * 1.2D);
                     Wolf wolf = spawn.getWorld().spawn(spawn, Wolf.class);
@@ -1518,7 +1518,7 @@ public final class WizardsGameManager implements Listener {
             }
             case WEB_SHOT: {
                 launchWebShot(caster);
-                for (int i = 1; i < level * 2 - 1; i++) {
+                for (int i = 1; i < WizardsRules.webShotCount(level); i++) {
                     final Player shooter = caster;
                     Bukkit.getScheduler().runTaskLater(plugin, () -> {
                         WizardState current = states.get(shooter.getUniqueId());
@@ -1538,7 +1538,8 @@ public final class WizardsGameManager implements Listener {
                 } else {
                     projectile = caster.launchProjectile(Snowball.class);
                 }
-                projectile.setVelocity(direction.multiply(spell == WizardsSpell.MANA_BOLT ? 1.8D : 1.35D));
+                projectile.setVelocity(direction.multiply(spell == WizardsSpell.MANA_BOLT
+                        ? WizardsRules.manaBoltVelocity() : WizardsRules.fireballVelocity()));
                 projectile.getPersistentDataContainer().set(projectileKey, PersistentDataType.STRING, spell.id());
                 projectile.getPersistentDataContainer().set(projectileOwnerKey, PersistentDataType.STRING, caster.getUniqueId().toString());
                 projectile.getPersistentDataContainer().set(anvilLevelKey, PersistentDataType.INTEGER, level);
@@ -1884,7 +1885,7 @@ public final class WizardsGameManager implements Listener {
     }
 
     private boolean placeTrapRune(Player caster, int level, Block clickedBlock) {
-        Block target = clickedBlock != null ? clickedBlock : caster.getTargetBlockExact(level * 4 + 4);
+        Block target = clickedBlock != null ? clickedBlock : caster.getTargetBlockExact(WizardsRules.trapRuneRange(level));
         if (target == null || !target.getType().isSolid()) {
             caster.sendMessage(ChatColor.RED + "Trap Rune needs a solid floor within " + (level * 4 + 4) + " blocks.");
             return false;
@@ -1894,7 +1895,7 @@ public final class WizardsGameManager implements Listener {
             caster.sendMessage(ChatColor.RED + "Trap Rune cannot be drawn on that surface.");
             return false;
         }
-        double size = Math.max(1.0D, level * 0.8D);
+        double size = WizardsRules.trapRuneSize(level);
         trapRunes.add(new TrapRuneData(caster.getUniqueId(), centre, level, size, System.currentTimeMillis()));
         caster.getWorld().playSound(centre, Sound.BLOCK_AMETHYST_BLOCK_CHIME, 0.8F, 0.55F);
         caster.sendMessage(ChatColor.LIGHT_PURPLE + "Trap Rune drawn. It arms after five seconds.");
@@ -1958,7 +1959,7 @@ public final class WizardsGameManager implements Listener {
     private void detonateTrapRune(TrapRuneData rune, Player owner) {
         Location centre = rune.centre;
         double radius = rune.size * 1.2D;
-        double maxDamage = rune.level * 4.0D + 6.0D;
+        double maxDamage = WizardsRules.trapRuneDamage(rune.level);
         centre.getWorld().spawnParticle(Particle.EXPLOSION, centre, 2, 0.3D, 0.15D, 0.3D, 0.0D);
         centre.getWorld().spawnParticle(Particle.SMOKE, centre, 36, radius / 1.5D, 0.25D, radius / 1.5D, 0.08D);
         centre.getWorld().playSound(centre, Sound.ENTITY_WITHER_SHOOT, 1.0F, 0.9F);
@@ -2005,7 +2006,7 @@ public final class WizardsGameManager implements Listener {
             if (nearest != null) {
                 Vector steer = nearest.getLocation().clone().add(0.0D, 1.0D, 0.0D).toVector()
                         .subtract(bolt.getLocation().toVector()).normalize();
-                bolt.setVelocity(currentDirection.add(steer.multiply(0.08D)).normalize().multiply(1.8D));
+                bolt.setVelocity(currentDirection.add(steer.multiply(0.01D)).normalize().multiply(WizardsRules.manaBoltVelocity()));
             }
             bolt.getWorld().spawnParticle(Particle.END_ROD, bolt.getLocation(), 1, 0.02D, 0.02D, 0.02D, 0.0D);
         }
@@ -2296,17 +2297,7 @@ public final class WizardsGameManager implements Listener {
             maximumMana = WizardsRules.maximumMana(kit);
             mana = WizardsRules.initialMana();
             wandCount = WizardsRules.startingWands(kit);
-            known.put(WizardsSpell.MANA_BOLT, 1);
-            known.put(WizardsSpell.WIZARDS_COMPASS, 1);
-            // Reborn's Mage kit receives two random starter spell levels. Only
-            // spells already implemented in this first modern milestone are rolled.
-            if (kit == WizardsKit.MAGE) {
-                List<WizardsSpell> candidates = new ArrayList<>(WizardsSpell.implementedSpells());
-                candidates.remove(WizardsSpell.MANA_BOLT);
-                candidates.remove(WizardsSpell.WIZARDS_COMPASS);
-                java.util.Collections.shuffle(candidates, random);
-                for (int i = 0; i < Math.min(2, candidates.size()); i++) known.put(candidates.get(i), 1);
-            }
+            for (WizardsSpell spell : WizardsRules.initialKnownSpells()) known.put(spell, 1);
         }
     }
 
