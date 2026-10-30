@@ -3621,7 +3621,7 @@ public final class ArcadePortManager implements Listener {
         boolean backstab = isBaconBrawlBackstab(target, attacker);
         if (ArcadePortRules.shouldBaconBrutusGuardHit(brutusActive, backstab)) {
             attacker.sendActionBar(ChatColor.RED + "GUARD BLOCKED");
-            target.sendActionBar(ChatColor.GOLD + ChatColor.BOLD + "BRUTUS GUARD"
+            target.sendActionBar(ChatColor.GOLD + "" + ChatColor.BOLD + "BRUTUS GUARD"
                     + ChatColor.GRAY + " | frontal hit absorbed");
             target.getWorld().spawnParticle(Particle.TOTEM_OF_UNDYING,
                     target.getLocation().add(0.0D, 1.0D, 0.0D), 10, 0.35D, 0.45D, 0.35D, 0.01D);
@@ -3632,7 +3632,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (brutusActive && backstab) {
             endBaconBrutus(session, targetId, target);
-            target.sendActionBar(ChatColor.RED + ChatColor.BOLD + "BRUTUS GUARD BROKEN!");
+            target.sendActionBar(ChatColor.RED + "" + ChatColor.BOLD + "BRUTUS GUARD BROKEN!");
             target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BREAK, 0.9F, 0.8F);
         }
         if (session.baconCloakUntil.containsKey(attackerId)) {
@@ -4880,7 +4880,7 @@ public final class ArcadePortManager implements Listener {
 
         String state;
         if (ArcadePortRules.isBaconTimedCritical(elapsed)) {
-            state = ChatColor.GREEN + ChatColor.BOLD + "CRITICAL NOW";
+            state = ChatColor.GREEN + "" + ChatColor.BOLD + "CRITICAL NOW";
         } else if (elapsed < ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS) {
             state = ChatColor.RED + "wait " + (ArcadePortRules.BACON_TIMED_HIT_GOOD_MIN_MILLIS - elapsed) + "ms";
         } else if (elapsed <= ArcadePortRules.BACON_TIMED_HIT_LATE_MAX_MILLIS) {
