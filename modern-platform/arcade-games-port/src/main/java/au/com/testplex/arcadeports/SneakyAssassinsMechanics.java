@@ -88,6 +88,7 @@ final class SneakyAssassinsMechanics {
     private final Map<UUID, Item> revealerProjectiles = new HashMap<>();
     private final Map<UUID, UUID> revealerOwners = new HashMap<>();
     private final Map<UUID, Location> revealerLastLocations = new HashMap<>();
+    private final Map<UUID, Double> pendingProjectileDamage = new HashMap<>();
     private final List<PowerUp> powerUps = new ArrayList<>();
     private final Map<UUID, Integer> powerUpCounts = new HashMap<>();
     private final Map<UUID, Long> masterCompassUpdateAt = new HashMap<>();
@@ -859,6 +860,11 @@ final class SneakyAssassinsMechanics {
         double damage = Math.max(0.0D, event.getFinalDamage());
         if (event instanceof EntityDamageByEntityEvent byEntity) {
             Entity damager = byEntity.getDamager();
+            if (damager instanceof org.bukkit.entity.Projectile projectile
+                    && projectile.getShooter() instanceof Player) {
+                pendingProjectileDamage.put(projectile.getUniqueId(), Math.max(0.0D, event.getFinalDamage()));
+                return;
+            }
             if (damager instanceof Player direct) {
                 attacker = direct;
                 if (!direct.equals(target) && direct.getInventory().getItemInMainHand() != null) {
@@ -889,6 +895,23 @@ final class SneakyAssassinsMechanics {
         }
         if (damage <= 0.0D) return;
         applyDamage(target, damage, attacker, "was defeated");
+    }
+
+    void handleProjectileHit(org.bukkit.entity.Projectile projectile, Player shooter, Player target) {
+        if (projectile == null || shooter == null || target == null
+                || !players.containsKey(shooter.getUniqueId())
+                || !players.containsKey(target.getUniqueId())
+                || !isAlive.test(shooter.getUniqueId()) || !isAlive.test(target.getUniqueId())) return;
+        double damage = pendingProjectileDamage.remove(projectile.getUniqueId()) == null
+                ? Math.max(2.0D, projectile.getVelocity().length() * 2.0D)
+                : pendingProjectileDamage.remove(projectile.getUniqueId());
+        if (damage <= 0.0D) damage = Math.max(2.0D, projectile.getVelocity().length() * 2.0D);
+        cloakUntil.remove(shooter.getUniqueId());
+        Villager proxy = disguises.get(shooter.getUniqueId());
+        if (proxy != null && proxy.isValid()) proxy.setInvisible(false);
+        shooter.removePotionEffect(PotionEffectType.INVISIBILITY);
+        applyDamage(target, damage, shooter, "was defeated by " + shooter.getName());
+        projectile.remove();
     }
 
     private void applyDamage(Player target, double damage, Player attacker, String reason) {
@@ -961,6 +984,7 @@ final class SneakyAssassinsMechanics {
             if (entity != null && entity.isValid()) entity.remove();
         }
         for (UUID id : new ArrayList<>(revealerProjectiles.keySet())) removeRevealerProjectile(id);
+        pendingProjectileDamage.clear();
         npcIds.clear();
         bribes.clear();
         npcNextAttackAt.clear();
