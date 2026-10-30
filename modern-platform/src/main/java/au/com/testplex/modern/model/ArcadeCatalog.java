@@ -7,7 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Modern catalogue for all 16 Arcade games. Each game owns its own cosmetic
+ * Modern catalogue for all 19 catalogued Arcade games. Each game owns its own cosmetic
  * lines and win-scene choices; actual render/gameplay handlers are added with
  * each port rather than pretending global cosmetics are game-specific.
  */
@@ -240,6 +240,13 @@ public final class ArcadeCatalog {
                 win("turf-monument", "Turf Monument", "A team monument rises out of captured turf."),
                 win("stadium-finale", "Stadium Finale", "Stadium lights sweep towards the winning team."),
                 win("banner-wave", "Banner Wave", "A moving wall of team banners celebrates the winner")));
+
+        register(game("sneaky-assassins", "Sneaky Assassins", "VILLAGER_SPAWN_EGG",
+                "Stay disguised as a villager, collect power-ups and be the last assassin alive.",
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                List.of(),
+                win("last-assassin-standing", "Last Assassin Standing",
+                        "A simple survivor podium; no additional game-specific cosmetics are claimed yet.")));
     }
 
     private void register(GameDefinition definition) {
