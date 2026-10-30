@@ -237,7 +237,7 @@ public final class MenuService implements Listener {
         int index = 0;
         for (GameDefinition game : catalog.getGames()) {
             if (index >= slots.length) break;
-            boolean ready = "bacon-brawl".equals(game.getId())
+            boolean ready = ("bacon-brawl".equals(game.getId()) || "monster-maze".equals(game.getId()))
                     && Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern");
             ItemStack item = makeItem(ready ? icon(game.getIcon()) : Material.BARRIER,
                     (ready ? ChatColor.GREEN : ChatColor.RED) + game.getName(),
@@ -274,7 +274,7 @@ public final class MenuService implements Listener {
         int index = 0;
         for (GameDefinition game : catalog.getGames()) {
             if (index >= legacyGameSlots.length) break;
-            boolean ready = "bacon-brawl".equals(game.getId())
+            boolean ready = ("bacon-brawl".equals(game.getId()) || "monster-maze".equals(game.getId()))
                     && Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern");
             ItemStack item = makeItem(icon(game.getIcon()),
                     (ready ? ChatColor.GREEN : ChatColor.WHITE) + game.getName(),
@@ -700,10 +700,7 @@ public final class MenuService implements Listener {
         } else if ("launch-game".equals(action) && game != null) {
             String enginePlugin = null;
             String startCommand = null;
-            if ("monster-maze".equals(game.getId())) {
-                enginePlugin = "MonsterMazeModern";
-                startCommand = "mm start";
-            } else if ("snake".equals(game.getId())) {
+            if ("snake".equals(game.getId())) {
                 enginePlugin = "SnakeModern";
                 startCommand = "snake start";
             } else {
@@ -764,7 +761,7 @@ public final class MenuService implements Listener {
     private boolean isMechanicsPortGame(String gameId) {
         return List.of("bacon-brawl", "bomb-lobbers", "death-tag", "dragon-escape", "dragons",
                 "evolution", "gladiators", "micro-battles", "one-in-the-quiver", "paintball",
-                "runner", "sheep-quest", "spleef", "turf-wars", "draw-my-thing", "master-builders").contains(gameId);
+                "runner", "sheep-quest", "spleef", "turf-wars", "draw-my-thing", "master-builders", "monster-maze").contains(gameId);
     }
 
     private boolean isCohost(Player player) {
