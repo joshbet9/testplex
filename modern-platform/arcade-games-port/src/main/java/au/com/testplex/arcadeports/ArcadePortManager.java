@@ -2363,11 +2363,12 @@ public final class ArcadePortManager implements Listener {
 
         Location struckLocation = struckPlayer.getLocation();
         double distance = struckLocation.distance(nextTarget.getLocation());
-        Vector trajectory = nextTarget.getLocation().toVector().subtract(struckLocation.toVector());
-        if (trajectory.lengthSquared() < 0.001D) return;
-        trajectory.normalize().add(new Vector(0.0D,
+        Vector launchDirection = nextTarget.getLocation().toVector().subtract(struckLocation.toVector());
+        if (launchDirection.lengthSquared() < 0.001D) return;
+        launchDirection.normalize();
+        Vector trajectory = launchDirection.clone().add(new Vector(0.0D,
                 ArcadePortRules.quiverReboundVerticalArc(distance), 0.0D));
-        Location origin = struckPlayer.getEyeLocation().clone().add(trajectory.clone().normalize());
+        Location origin = struckPlayer.getEyeLocation().clone().add(launchDirection);
         Arrow rebound = session.world.spawnArrow(origin, trajectory,
                 (float) ArcadePortRules.quiverReboundPower(distance), 0.0F);
         rebound.setShooter(shooter);
