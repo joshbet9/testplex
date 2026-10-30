@@ -31,4 +31,4 @@ Right-click a wand to open the spell selector. Left-click a spell in the selecto
 
 ## Status and outstanding parity
 
-This is a mechanics-in-progress test port, not READY_FOR_TEST and not a 100% parity claim. The initial milestone still needs live multi-client acceptance and further source comparison. Outstanding work includes source-accurate endgame meteor/lightning pressure, complete map parity, kit/gear balancing, damage/armour comparison, multiplayer acceptance, and repeated disconnect/reconnect/round-cleanup validation.
+This is a mechanics-in-progress test port, not READY_FOR_TEST and not a 100% parity claim. The initial milestone still needs live multi-client acceptance and further source comparison. Source-timed endgame warnings, escalating meteor/lightning strikes and the twenty-minute sudden-death rule are now implemented. Endgame terrain removal remains opt-in (`destructive-endgame-blocks: true`) so repeat test runs do not permanently damage the generated arena. Remaining work is full map parity, kit/gear balancing, damage/armour comparison, multiplayer acceptance, and repeated disconnect/reconnect/round-cleanup validation.

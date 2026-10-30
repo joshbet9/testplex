@@ -9,6 +9,11 @@ public final class WizardsRules {
     public static final int BASE_MANA_BOOK_CONVERSION = 50;
     public static final int FULL_WAND_CONVERSION = 100;
     public static final int GAME_PACE_MINUTES[] = {2, 4, 6, 8, 9};
+    public static final int ENDGAME_START_MINUTES = 10;
+    public static final int SUDDEN_DEATH_MINUTES = 20;
+    public static final int ENDGAME_INITIAL_STRIKE_MILLIS = 6_000;
+    public static final int ENDGAME_MIN_STRIKE_MILLIS = 750;
+    public static final int ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS = 2;
 
     private WizardsRules() {}
 
@@ -52,6 +57,18 @@ public final class WizardsRules {
     public static double manaProgress(float mana, float maximum) {
         if (maximum <= 0 || !Float.isFinite(mana) || !Float.isFinite(maximum)) return 0.0D;
         return Math.max(0.0D, Math.min(1.0D, mana / maximum));
+    }
+
+    public static int nextEndgameStrikeInterval(int currentMillis) {
+        return Math.max(ENDGAME_MIN_STRIKE_MILLIS,
+                currentMillis - ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS);
+    }
+
+    public static double endgameDamage(double size, double distance) {
+        if (!Double.isFinite(size) || !Double.isFinite(distance) || size <= 0 || distance < 0) return 0.0D;
+        double radius = 4.0D * size;
+        if (distance >= radius) return 0.0D;
+        return 6.0D * size * (1.0D - distance / radius);
     }
 
     public static List<Integer> gamePaceMinutes() {

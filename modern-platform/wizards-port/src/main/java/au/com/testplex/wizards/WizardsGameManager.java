@@ -62,6 +62,7 @@ import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -88,6 +89,7 @@ public final class WizardsGameManager implements Listener {
     private final NamespacedKey projectileDamageKey;
     private final NamespacedKey projectileOwnerKey;
     private final NamespacedKey anvilLevelKey;
+    private final NamespacedKey meteorKey;
     private final LinkedHashMap<UUID, Player> queue = new LinkedHashMap<>();
     private final Map<UUID, WizardsKit> selectedKits = new HashMap<>();
     private final Map<UUID, WizardState> states = new LinkedHashMap<>();
@@ -101,6 +103,7 @@ public final class WizardsGameManager implements Listener {
     private final Map<UUID, ManaBoltData> manaBolts = new HashMap<>();
     private final List<TrapRuneData> trapRunes = new ArrayList<>();
     private final List<BukkitTask> spellTasks = new ArrayList<>();
+    private final Map<UUID, MeteorData> endgameMeteors = new HashMap<>();
     private final List<Location> chests = new ArrayList<>();
     private final Random random = new Random();
 
@@ -111,6 +114,16 @@ public final class WizardsGameManager implements Listener {
     private int tick;
     private int startingPlayerCount;
     private int paceStep;
+    private boolean endgameStarted;
+    private boolean suddenDeathTriggered;
+    private int endgameType;
+    private int endgameMessageCounter;
+    private int nextEndgameStrikeMillis = WizardsRules.ENDGAME_INITIAL_STRIKE_MILLIS;
+    private long lastEndgameStrikeAt;
+    private long lastEndgameMoanAt;
+    private double endgameAccuracy;
+    private float endgameSize = 1.5F;
+    private float meteorSpeed = 0.05F;
 
     public WizardsGameManager(WizardsModernPlugin plugin) {
         this.plugin = plugin;
@@ -122,6 +135,7 @@ public final class WizardsGameManager implements Listener {
         projectileDamageKey = new NamespacedKey(plugin, "spell-damage");
         projectileOwnerKey = new NamespacedKey(plugin, "spell-owner");
         anvilLevelKey = new NamespacedKey(plugin, "anvil-level");
+        meteorKey = new NamespacedKey(plugin, "endgame-meteor-size");
         arena = createArena();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         tickTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
@@ -263,6 +277,17 @@ public final class WizardsGameManager implements Listener {
         tick = 0;
         paceStep = 0;
         startingPlayerCount = entrants.size();
+        endgameStarted = false;
+        suddenDeathTriggered = false;
+        endgameType = random.nextInt(2);
+        endgameMessageCounter = 0;
+        nextEndgameStrikeMillis = WizardsRules.ENDGAME_INITIAL_STRIKE_MILLIS;
+        lastEndgameStrikeAt = 0L;
+        lastEndgameMoanAt = 0L;
+        endgameAccuracy = 0.0D;
+        endgameSize = 1.5F;
+        meteorSpeed = 0.05F;
+        endgameMeteors.clear();
         states.clear();
         for (int i = 0; i < entrants.size(); i++) {
             Player player = entrants.get(i);
@@ -368,6 +393,8 @@ public final class WizardsGameManager implements Listener {
         tickSummonedWolves();
         tickManaBolts();
         tickTrapRunes();
+        tickEndgame();
+        tickEndgameMeteors();
         expireTemporaryBlocks();
         long elapsed = System.currentTimeMillis() - startedAt;
 
@@ -393,6 +420,241 @@ public final class WizardsGameManager implements Listener {
                 updateWandLabels(player, state);
             }
         }
+    }
+
+    private void tickEndgame() {
+        if (!running || startedAt <= 0L) return;
+        long now = System.currentTimeMillis();
+        long elapsed = now - startedAt;
+
+        if (!endgameStarted && elapsed >= WizardsRules.ENDGAME_START_MINUTES * 60_000L) {
+            endgameStarted = true;
+            endgameMessageCounter = 0;
+            nextEndgameStrikeMillis = WizardsRules.ENDGAME_INITIAL_STRIKE_MILLIS;
+            lastEndgameStrikeAt = 0L;
+            lastEndgameMoanAt = now;
+        }
+
+        if (endgameStarted) {
+            long phaseElapsed = elapsed - WizardsRules.ENDGAME_START_MINUTES * 60_000L;
+            if (endgameMessageCounter <= 6) {
+                long warningSecond = phaseElapsed / 1000L;
+                if (warningSecond >= endgameMessageCounter) {
+                    announceEndgameWarning(endgameMessageCounter);
+                    if (endgameMessageCounter == 6 && arena != null) arena.setTime(15_000L);
+                    endgameMessageCounter++;
+                }
+            } else {
+                nextEndgameStrikeMillis = WizardsRules.nextEndgameStrikeInterval(nextEndgameStrikeMillis);
+                if (lastEndgameStrikeAt == 0L || now - lastEndgameStrikeAt >= nextEndgameStrikeMillis) {
+                    lastEndgameStrikeAt = now;
+                    if (endgameType == 0) makeEndgameMeteor();
+                    else makeEndgameLightning();
+                }
+                if (now - lastEndgameMoanAt >= 5_000L + random.nextInt(8_000)) {
+                    Sound sound = random.nextBoolean() ? Sound.ENTITY_GHAST_AMBIENT : Sound.ENTITY_GHAST_SCREAM;
+                    for (Player player : Bukkit.getOnlinePlayers()) {
+                        player.playSound(player.getLocation(), sound, 0.7F, random.nextFloat() / 10.0F);
+                    }
+                    lastEndgameMoanAt = now;
+                }
+            }
+        }
+
+        if (!suddenDeathTriggered && elapsed >= WizardsRules.SUDDEN_DEATH_MINUTES * 60_000L) {
+            suddenDeathTriggered = true;
+            applySuddenDeath();
+        }
+    }
+
+    private void announceEndgameWarning(int index) {
+        String message;
+        if (endgameType == 0) {
+            message = switch (index) {
+                case 0 -> "Broken is the cage, the skies scream with rage!";
+                case 2 -> "The ground trembles with fear, your doom is here!";
+                case 4 -> "Where the wizards stand, meteors strike the land!";
+                case 6 -> "Fight to the death! Fight with your dying breath!";
+                default -> null;
+            };
+        } else {
+            message = switch (index) {
+                case 0 -> "Storm rumbles through the sky, birds fly high!";
+                case 2 -> "Lightning strikes the earth, terror given birth!";
+                case 4 -> "Lightning flickering through the air, doom is here!";
+                case 6 -> "Fight to the death! Fight with your dying breath!";
+                default -> null;
+            };
+        }
+        if (message != null) {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                player.sendMessage(ChatColor.YELLOW.toString() + ChatColor.BOLD + message);
+            }
+        }
+        if (index == 6 && arena != null) {
+            arena.setStorm(false);
+            arena.setThundering(endgameType == 1);
+        }
+    }
+
+    private Location getEndgameLocation() {
+        List<Player> alive = alivePlayers();
+        if (alive.isEmpty() || arena == null) return null;
+
+        int chance = random.nextInt(50) + 3;
+        int accuracy = Math.max((int) (chance - endgameAccuracy * chance), 1);
+        endgameAccuracy += 0.0001D;
+        for (int attempt = 0; attempt < 50; attempt++) {
+            Player target = alive.get(random.nextInt(alive.size()));
+            Location targetLocation = target.getLocation();
+            int x = targetLocation.getBlockX() + random.nextInt(accuracy * 2) - accuracy;
+            int z = targetLocation.getBlockZ() + random.nextInt(accuracy * 2) - accuracy;
+            Block highest = arena.getHighestBlockAt(x, z);
+            Location location = highest.getLocation().add(0.5D, 0.0D, 0.5D);
+            if (location.getBlockY() > 0 && location.getBlock().getType().isSolid()) return location;
+        }
+        return null;
+    }
+
+    private void makeEndgameLightning() {
+        Location location = getEndgameLocation();
+        if (location == null) return;
+        World world = location.getWorld();
+        world.strikeLightningEffect(location);
+        world.playSound(location, Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 2.5F,
+                0.8F + random.nextFloat() * 0.5F);
+        world.playSound(location, Sound.ENTITY_GENERIC_EXPLODE, 1.2F,
+                0.9F + random.nextFloat() / 3.0F);
+        world.spawnParticle(Particle.ELECTRIC_SPARK, location.clone().add(0.0D, 1.0D, 0.0D),
+                45, 1.3D, 1.0D, 1.3D, 0.12D);
+        world.spawnParticle(Particle.FLASH, location, 2, 0.3D, 0.2D, 0.3D, 0.0D);
+
+        double radius = 4.0D * endgameSize;
+        double baseDamage = 6.0D * endgameSize;
+        for (Player victim : alivePlayers()) {
+            if (!victim.getWorld().equals(world)) continue;
+            double distance = victim.getLocation().distance(location);
+            if (distance >= radius) continue;
+            double damage = baseDamage * (1.0D - distance / radius);
+            if (damage > 0.0D) victim.damage(damage);
+        }
+        if (plugin.getConfig().getBoolean("destructive-endgame-blocks", false)) {
+            destroyEndgameBlocks(location, 3.0D * endgameSize, 20);
+        }
+    }
+
+    private void makeEndgameMeteor() {
+        Location target = getEndgameLocation();
+        if (target == null) return;
+
+        meteorSpeed += 0.002F;
+        endgameSize = Math.min(10.0F, endgameSize + 0.04F);
+        Vector fromTarget = new Vector(random.nextDouble() - 0.5D, 0.8D,
+                random.nextDouble() - 0.5D).normalize();
+        Location spawn = target.clone()
+                .add((random.nextDouble() - 0.5D) * 7.0D, 0.0D,
+                        (random.nextDouble() - 0.5D) * 7.0D)
+                .add(fromTarget.clone().multiply(40.0D));
+
+        Fireball meteor = spawn.getWorld().spawn(spawn, Fireball.class);
+        meteor.setIsIncendiary(false);
+        meteor.setYield(0.0F);
+        meteor.setBounce(false);
+        meteor.setVelocity(fromTarget.multiply(-(0.04D + ((meteorSpeed - 0.05D) / 2.0D))));
+        meteor.getPersistentDataContainer().set(meteorKey, PersistentDataType.DOUBLE, (double) endgameSize);
+        endgameMeteors.put(meteor.getUniqueId(), new MeteorData((double) endgameSize));
+        ownedEntities.add(meteor.getUniqueId());
+        spawn.getWorld().playSound(spawn, Sound.ENTITY_GHAST_SHOOT, 1.2F, 0.6F);
+    }
+
+    private void tickEndgameMeteors() {
+        if (endgameMeteors.isEmpty()) return;
+        for (Map.Entry<UUID, MeteorData> entry : new ArrayList<>(endgameMeteors.entrySet())) {
+            Entity entity = Bukkit.getEntity(entry.getKey());
+            if (!(entity instanceof Fireball meteor) || !meteor.isValid()) {
+                endgameMeteors.remove(entry.getKey());
+                ownedEntities.remove(entry.getKey());
+                continue;
+            }
+            MeteorData data = entry.getValue();
+            meteor.getWorld().spawnParticle(Particle.FLAME, meteor.getLocation(), 3,
+                    0.18D, 0.18D, 0.18D, 0.02D);
+            meteor.getWorld().spawnParticle(Particle.SMOKE, meteor.getLocation(), 2,
+                    0.13D, 0.13D, 0.13D, 0.01D);
+            if (++data.ticks % 6 == 0) {
+                meteor.getWorld().playSound(meteor.getLocation(), Sound.ENTITY_CAT_HISS, 1.0F, 0.6F);
+            }
+        }
+    }
+
+    private void handleEndgameMeteorImpact(Fireball meteor) {
+        MeteorData data = endgameMeteors.remove(meteor.getUniqueId());
+        double size = data == null
+                ? meteor.getPersistentDataContainer().getOrDefault(meteorKey, PersistentDataType.DOUBLE, 1.5D)
+                : data.size;
+        Location impact = meteor.getLocation();
+        World world = impact.getWorld();
+        if (world == null) return;
+
+        double radius = 4.0D * size;
+        double baseDamage = 6.0D * size;
+        world.spawnParticle(Particle.EXPLOSION, impact, 3, 0.7D, 0.5D, 0.7D, 0.02D);
+        world.spawnParticle(Particle.FLAME, impact, 42, 1.0D, 0.7D, 1.0D, 0.06D);
+        world.spawnParticle(Particle.CLOUD, impact, 35, 0.9D, 0.5D, 0.9D, 0.08D);
+        world.playSound(impact, Sound.ENTITY_GENERIC_EXPLODE, 2.0F, 0.7F);
+        for (Player victim : alivePlayers()) {
+            if (!victim.getWorld().equals(world)) continue;
+            double distance = victim.getLocation().distance(impact);
+            if (distance >= radius) continue;
+            double damage = baseDamage * (1.0D - distance / radius);
+            if (damage > 0.0D) victim.damage(damage);
+        }
+        if (plugin.getConfig().getBoolean("destructive-endgame-blocks", false)) {
+            destroyEndgameBlocks(impact, 1.4D * size, 20);
+        }
+        ownedEntities.remove(meteor.getUniqueId());
+        meteor.remove();
+        Bukkit.getScheduler().runTaskLater(plugin, this::checkWinner, 2L);
+    }
+
+    private void destroyEndgameBlocks(Location centre, double radius, int maximumBlocks) {
+        World world = centre.getWorld();
+        if (world == null) return;
+        List<Block> candidates = new ArrayList<>();
+        int extent = Math.max(1, (int) Math.ceil(radius));
+        for (int x = -extent; x <= extent; x++) {
+            for (int y = -extent; y <= extent; y++) {
+                for (int z = -extent; z <= extent; z++) {
+                    Block block = world.getBlockAt(centre.getBlockX() + x,
+                            centre.getBlockY() + y, centre.getBlockZ() + z);
+                    if (block.getType().isAir() || block.getType() == Material.BEDROCK
+                            || block.getState() instanceof InventoryHolder
+                            || block.getState() instanceof TileState) continue;
+                    if (block.getLocation().add(0.5D, 0.5D, 0.5D).distance(centre) <= radius) candidates.add(block);
+                }
+            }
+        }
+        java.util.Collections.shuffle(candidates, random);
+        int removed = 0;
+        for (Block block : candidates) {
+            if (removed >= maximumBlocks) break;
+            world.spawnParticle(Particle.BLOCK, block.getLocation().add(0.5D, 0.5D, 0.5D),
+                    6, 0.25D, 0.25D, 0.25D, 0.05D, block.getBlockData());
+            block.setType(Material.AIR, false);
+            removed++;
+        }
+    }
+
+    private void applySuddenDeath() {
+        List<Player> players = alivePlayers();
+        if (players.size() <= 1) return;
+        players.sort(Comparator.comparingDouble(Player::getHealth).reversed());
+        for (int i = 0; i < players.size() - 1; i++) {
+            Player player = players.get(i);
+            player.sendMessage(ChatColor.RED.toString() + ChatColor.BOLD + "The final magic consumes all but one wizard!");
+            player.damage(9999.0D);
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, this::checkWinner, 2L);
     }
 
     private List<Player> alivePlayers() {
@@ -740,6 +1002,11 @@ public final class WizardsGameManager implements Listener {
     @EventHandler
     public void onProjectileHit(ProjectileHitEvent event) {
         Projectile projectile = event.getEntity();
+        if (projectile instanceof Fireball meteor
+                && meteor.getPersistentDataContainer().has(meteorKey, PersistentDataType.DOUBLE)) {
+            handleEndgameMeteorImpact(meteor);
+            return;
+        }
         String spell = projectile.getPersistentDataContainer().get(projectileKey, PersistentDataType.STRING);
         if (spell == null) return;
         Location location = projectile.getLocation();
@@ -1855,6 +2122,7 @@ public final class WizardsGameManager implements Listener {
         }
         for (UUID id : new ArrayList<>(manaBars.keySet())) removeManaBar(id);
         restoreAllTemporaryBlocks();
+        endgameMeteors.clear();
         for (BukkitTask task : spellTasks) if (task != null && !task.isCancelled()) task.cancel();
         spellTasks.clear();
         spectralArrows.clear();
@@ -2077,6 +2345,12 @@ public final class WizardsGameManager implements Listener {
             this.size = size;
             this.createdAt = createdAt;
         }
+    }
+
+    private static final class MeteorData {
+        private final double size;
+        private int ticks;
+        private MeteorData(double size) { this.size = size; }
     }
 
     private record PlayerSnapshot(Location location, ItemStack[] contents, ItemStack[] armour,

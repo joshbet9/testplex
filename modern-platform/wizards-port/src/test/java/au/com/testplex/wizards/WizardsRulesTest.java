@@ -59,4 +59,29 @@ class WizardsRulesTest {
     void gamePaceSurgesFollowTheHistoricalMinuteMilestones() {
         assertEquals(java.util.List.of(2, 4, 6, 8, 9), WizardsRules.gamePaceMinutes());
     }
+
+    @Test
+    void endgameUsesOriginalTenAndTwentyMinuteMilestones() {
+        assertEquals(10, WizardsRules.ENDGAME_START_MINUTES);
+        assertEquals(20, WizardsRules.SUDDEN_DEATH_MINUTES);
+        assertEquals(6_000, WizardsRules.ENDGAME_INITIAL_STRIKE_MILLIS);
+        assertEquals(750, WizardsRules.ENDGAME_MIN_STRIKE_MILLIS);
+    }
+
+    @Test
+    void endgameStrikeIntervalTightensDownTo750Milliseconds() {
+        assertEquals(5_998, WizardsRules.nextEndgameStrikeInterval(6_000));
+        assertEquals(5_000, WizardsRules.nextEndgameStrikeInterval(5_002));
+        assertEquals(750, WizardsRules.nextEndgameStrikeInterval(751));
+        assertEquals(750, WizardsRules.nextEndgameStrikeInterval(750));
+        assertEquals(750, WizardsRules.nextEndgameStrikeInterval(100));
+    }
+
+    @Test
+    void endgameDamageFallsLinearlyToZeroAtFourTimesItsSize() {
+        assertEquals(9.0D, WizardsRules.endgameDamage(1.5D, 0.0D), 0.0001D);
+        assertEquals(4.5D, WizardsRules.endgameDamage(1.5D, 3.0D), 0.0001D);
+        assertEquals(0.0D, WizardsRules.endgameDamage(1.5D, 6.0D), 0.0001D);
+        assertEquals(0.0D, WizardsRules.endgameDamage(1.5D, -1.0D), 0.0001D);
+    }
 }

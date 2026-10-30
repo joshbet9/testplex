@@ -11,3 +11,5 @@ kits:
 destructive-spells: false
 # Napalm's temporary fire blocks are restored automatically.
 temporary-spell-fire: true
+# Endgame hits players, but terrain removal is disabled by default for reusable test arenas.
+destructive-endgame-blocks: false
