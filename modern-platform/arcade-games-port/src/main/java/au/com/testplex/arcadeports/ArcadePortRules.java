@@ -1389,6 +1389,11 @@ public final class ArcadePortRules {
         return killsThisGame >= MICRO_BATTLES_ANNIHILATION_KILLS;
     }
 
+    /** The Reborn Last2Tracker grants mission progress when exactly two teams remain alive. */
+    public static boolean shouldAwardMicroBattlesLastTwo(int aliveTeams) {
+        return aliveTeams == 2;
+    }
+
     /** Stable local test-server key; production Mineplex achievement storage remains separate. */
     public static String microBattlesAchievementConfigKey(java.util.UUID playerId, String achievementSlug) {
         if (playerId == null || achievementSlug == null
