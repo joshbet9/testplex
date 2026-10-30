@@ -383,6 +383,7 @@ public final class ArcadePortRules {
     public static final double MICRO_BATTLES_BORDER_PARTICLE_DISTANCE = 3.0D;
     public static final int MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS = 4;
     public static final int MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS = 3;
+    public static final int MICRO_BATTLES_ANNIHILATION_KILLS = 8;
     public static final String MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR = "light-blue";
 
     private ArcadePortRules() {
@@ -1383,6 +1384,18 @@ public final class ArcadePortRules {
      * Choose from every Micro Battles team, using survivors first and team kills as
      * a tiebreak. A true tie returns -1 rather than incorrectly favouring teams 0/1.
      */
+    /** Isolated equivalent of the source KillsWithinGameStatTracker(8, "Annihilation"). */
+    public static boolean shouldAwardMicroBattlesAnnihilation(int killsThisGame) {
+        return killsThisGame >= MICRO_BATTLES_ANNIHILATION_KILLS;
+    }
+
+    /** Stable local test-server key; production Mineplex achievement storage remains separate. */
+    public static String microBattlesAchievementConfigKey(java.util.UUID playerId, String achievementSlug) {
+        if (playerId == null || achievementSlug == null
+                || !achievementSlug.matches("[a-z0-9-]+")) return "";
+        return "test-achievements.micro-battles." + playerId + "." + achievementSlug;
+    }
+
     public static int microBattlesTimeoutTeam(int[] aliveByTeam, int[] killsByTeam) {
         if (aliveByTeam == null || killsByTeam == null || aliveByTeam.length < 2
                 || aliveByTeam.length != killsByTeam.length) return -1;
