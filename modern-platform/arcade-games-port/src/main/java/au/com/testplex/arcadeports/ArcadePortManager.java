@@ -4338,8 +4338,13 @@ public final class ArcadePortManager implements Listener {
             if (target != null) {
                 target.damage(1.0D, owner);
                 Vector knockback = dirt.getVelocity().clone();
-                if (knockback.lengthSquared() < 0.001D) knockback = target.getLocation().toVector().subtract(owner.getLocation().toVector());
-                if (knockback.lengthSquared() > 0.001D) target.setVelocity(knockback.normalize().multiply(1.4D).setY(0.5D));
+                if (knockback.lengthSquared() < 0.001D) {
+                    knockback = target.getLocation().toVector().subtract(owner.getLocation().toVector());
+                }
+                if (knockback.lengthSquared() > 0.001D) {
+                    knockback.normalize().setY(0.5D).multiply(1.0D);
+                    target.setVelocity(knockback);
+                }
                 target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.3F);
                 dirt.remove();
                 session.entities.remove(dirt);
@@ -4457,9 +4462,9 @@ public final class ArcadePortManager implements Listener {
         player.teleport(safe.clone().add(0.0D, 2.0D, 0.0D));
         player.setFallDistance(0.0F);
         player.setVelocity(new Vector(0.0D, 0.2D, 0.0D));
-        player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.9F);
+        player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.0F);
         player.getWorld().spawnParticle(Particle.WITCH, player.getEyeLocation(), 10,
-                0.4D, 0.4D, 0.4D, 0.05D);
+                0.5D, 0.5D, 0.5D, 0.5D);
     }
 
     private Player skyWarsPlayerInSight(Session session, Player player, double range) {
@@ -4523,10 +4528,13 @@ public final class ArcadePortManager implements Listener {
         }
         player.setAllowFlight(false);
         player.setFlying(false);
-        Vector direction = player.getLocation().getDirection().normalize();
-        player.setVelocity(direction.multiply(1.0D).setY(0.85D));
+        Vector direction = player.getLocation().getDirection().normalize().multiply(1.0D);
+        direction.setY(direction.getY() + 0.2D);
+        if (direction.getY() > 1.0D) direction.setY(1.0D);
+        if (player.isOnGround()) direction.setY(direction.getY() + 0.2D);
+        player.setVelocity(direction);
         player.setFallDistance(0.0F);
-        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_ENDER_EYE_LAUNCH, 0.8F, 1.4F);
+        player.getWorld().playEffect(player.getLocation(), Effect.BLAZE_SHOOT, 0);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
