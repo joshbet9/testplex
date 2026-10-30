@@ -1172,7 +1172,7 @@ public final class ArcadePortManager implements Listener {
                 chaser.setRemoveWhenFarAway(false);
                 chaser.setTarget(runner);
                 session.entities.add(chaser);
-                runner.sendMessage(ChatColor.YELLOW + "Solo test: avoid the chaser; one hit ends the run.");
+                runner.sendMessage(ChatColor.YELLOW + "Solo practice: avoid the Chaser. Practice hits do not end your run.");
             }
         }
         if (type == ArcadePortGame.DEATH_TAG) {
@@ -1771,6 +1771,24 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
+    }
+
+    private void handleDeathTagSoloPracticeHit(Session session, Player target, Zombie chaser) {
+        if (active != session || target == null || !target.isOnline()
+                || !session.alive.contains(target.getUniqueId())) return;
+        long now = System.currentTimeMillis();
+        long readyAt = session.deathTagSoloChaserHitReadyAt.getOrDefault(target.getUniqueId(), 0L);
+        if (now < readyAt) return;
+        session.deathTagSoloChaserHitReadyAt.put(target.getUniqueId(), now + 1_500L);
+
+        double damage = ArcadePortRules.deathTagChaserDamage(false);
+        if (target.getHealth() <= damage) target.setHealth(target.getMaxHealth());
+        else target.setHealth(target.getHealth() - damage);
+
+        Vector away = target.getLocation().toVector().subtract(chaser.getLocation().toVector());
+        if (away.lengthSquared() > 0.001D) target.setVelocity(away.normalize().multiply(0.45D).setY(0.18D));
+        target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 0.85F);
+        target.sendActionBar(ChatColor.YELLOW + "PRACTICE HIT " + ChatColor.GRAY + "| Your Death Tag run continues.");
     }
 
     private Location deathTagSoloChaserSpawn(Session session, Player runner) {
@@ -6267,8 +6285,9 @@ public final class ArcadePortManager implements Listener {
                     double baseDamage = ArcadePortRules.deathTagRunnerDamage(kit, "projectile hit".equals(source));
                     double damage = ArcadePortRules.deathTagDamageAfterIronSkin(baseDamage,
                             session.alphaChasers.contains(target.getUniqueId()));
+                    boolean lethalHit = ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage);
                     if (damage > 0.0D) {
-                        if (ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
+                        if (lethalHit) {
                             respawnDeathTagChaser(session, target);
                             awardDeathTagKill(session, attacker);
                         } else {
@@ -6276,11 +6295,9 @@ public final class ArcadePortManager implements Listener {
                             target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.05F);
                         }
                     }
-                    if ("basher".equals(kit) && !"projectile hit".equals(source)
-                            && !ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
+                    if (!lethalHit && "basher".equals(kit) && !"projectile hit".equals(source)) {
                         target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 2, false, false, true));
-                    } else if ("traitor".equals(kit) && !"projectile hit".equals(source)
-                            && !ArcadePortRules.deathTagHitIsLethal(target.getHealth(), damage)) {
+                    } else if (!lethalHit && "traitor".equals(kit) && !"projectile hit".equals(source)) {
                         String cooldownKey = attacker.getUniqueId() + ":" + target.getUniqueId();
                         long now = System.currentTimeMillis();
                         long lastUse = session.deathTagTraitorKnockbackAt.getOrDefault(cooldownKey, 0L);
@@ -8136,7 +8153,11 @@ public final class ArcadePortManager implements Listener {
                     handlePlayerHit(session, attacker, target, "melee");
                 } else if (session.type == ArcadePortGame.DEATH_TAG && damager instanceof Zombie zombie
                         && session.entities.contains(zombie)) {
-                    eliminate(session, target, null, "was tagged by the chaser");
+                    if (session.participantsAtStart <= 1) {
+                        handleDeathTagSoloPracticeHit(session, target, zombie);
+                    } else {
+                        eliminate(session, target, null, "was tagged by the chaser");
+                    }
                 }
             }
         }
@@ -10295,6 +10316,7 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> alphaChasers = new HashSet<>();
         final Map<UUID, String> deathTagRunnerKits = new HashMap<>();
         final Map<UUID, Long> deathTagLastArrowAt = new HashMap<>();
+        final Map<UUID, Long> deathTagSoloChaserHitReadyAt = new HashMap<>();
         final Set<UUID> deathTagFletchedArrows = new HashSet<>();
         final Map<UUID, Double> deathTagProjectileDamage = new HashMap<>();
         final Map<String, Long> deathTagTraitorKnockbackAt = new HashMap<>();
