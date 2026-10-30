@@ -1990,7 +1990,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void progressGladiators(Session session) {
-        if (active != session || session.gladiatorVotingEndsAt > 0L) return;
+        if (active != session || session.gladiatorVotingEndsAt > 0L
+                || session.participantsAtStart < 2) return;
 
         // Advance the winners' bracket only when every duel in its current stage is resolved.
         // The loser's bracket is deliberately independent and continues pairing players in parallel.
