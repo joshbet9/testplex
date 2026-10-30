@@ -691,6 +691,7 @@ public final class ArcadePortManager implements Listener {
         }
         lobby.ensurePlayerInLobby(player);
         for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(player.getUniqueId());
+        if (type != ArcadePortGame.GLADIATORS) gladiatorLobbyVotes.remove(player.getUniqueId());
         queues.computeIfAbsent(type.id(), ignored -> new LinkedHashMap<>()).put(player.getUniqueId(), player);
         String nextAction = manualStartCountdown != null && manualStartType == type
                 ? "The existing start countdown is already running."
@@ -698,6 +699,7 @@ public final class ArcadePortManager implements Listener {
                 : "An operator/player can use /arcadeport start " + type.id() + ".";
         player.sendMessage(ChatColor.GREEN + "Queued for " + type.displayName() + ". " + nextAction);
         if (quickStart) scheduleQuickStart(type);
+        if (type == ArcadePortGame.GLADIATORS) openGladiatorLobbyVoteMenu(player);
     }
 
     private void scheduleQuickStart(ArcadePortGame type) {
@@ -1690,8 +1692,7 @@ public final class ArcadePortManager implements Listener {
         GladiatorMenuHolder holder = new GladiatorMenuHolder(GladiatorMenuType.KILL_MESSAGES);
         Inventory inventory = Bukkit.createInventory(holder, 27, "Gladiators — Kill Messages");
         holder.inventory = inventory;
-        String current = plugin.getConfig().getString(
-                "players." + player.getUniqueId() + ".games.gladiators.kill-message", "classic");
+        String current = gladiatorKillMessageStyle(player);
         String[][] options = {
                 {"classic", "Classic", "was defeated by"},
                 {"sent-to-sand", "Sent to the Sand", "was sent to the sand by"},
@@ -1761,6 +1762,26 @@ public final class ArcadePortManager implements Listener {
             }
         }
         for (int i = 0; i < 9; i++) player.getInventory().setItem(i, ordered[i]);
+    }
+
+    private void saveGladiatorKillMessageStyle(Player player, String value) {
+        if (player == null || value == null) return;
+        plugin.getConfig().set("players." + player.getUniqueId()
+                + ".games.gladiators.kill-message", value);
+        plugin.saveConfig();
+        Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (cosmeticsPlugin == null) return;
+        Path preferences = cosmeticsPlugin.getDataFolder().toPath().resolve("player-preferences.yml");
+        YamlConfiguration data = Files.isRegularFile(preferences)
+                ? YamlConfiguration.loadConfiguration(preferences.toFile()) : new YamlConfiguration();
+        data.set("players." + player.getUniqueId()
+                + ".games.gladiators.cosmetics.kill-message.selected", value);
+        try {
+            Files.createDirectories(preferences.getParent());
+            data.save(preferences.toFile());
+        } catch (java.io.IOException exception) {
+            plugin.getLogger().warning("Could not save Gladiators kill-message preference: " + exception.getMessage());
+        }
     }
 
     private String gladiatorKillMessageStyle(Player killer) {
@@ -9622,9 +9643,7 @@ public final class ArcadePortManager implements Listener {
                 String value = clicked.getItemMeta().getPersistentDataContainer()
                         .get(gladiatorMenuValueKey, PersistentDataType.STRING);
                 if ("kill-message".equals(action) && value != null) {
-                    plugin.getConfig().set("players." + player.getUniqueId()
-                            + ".games.gladiators.kill-message", value);
-                    plugin.saveConfig();
+                    saveGladiatorKillMessageStyle(player, value);
                     player.sendMessage(ChatColor.GREEN + "Gladiators kill message equipped.");
                     openGladiatorKillMessageMenu(player);
                 }
