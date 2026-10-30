@@ -2131,6 +2131,7 @@ public final class ArcadePortManager implements Listener {
         }
 
         boolean forcedAlpha = reason != null && reason.contains("forced by the time limit");
+        if (!forcedAlpha) session.deathTagDeathsByPlayer.merge(player.getUniqueId(), 1, Integer::sum);
         session.tagged.add(player.getUniqueId());
         if (forcedAlpha) session.alphaChasers.add(player.getUniqueId());
         else session.alphaChasers.remove(player.getUniqueId());
@@ -2192,6 +2193,7 @@ public final class ArcadePortManager implements Listener {
 
     private void respawnDeathTagChaser(Session session, Player player) {
         if (active != session || player == null || !player.isOnline()) return;
+        session.deathTagDeathsByPlayer.merge(player.getUniqueId(), 1, Integer::sum);
         player.teleport(deathTagChaserRespawnSpawn(session, player));
         player.leaveVehicle();
         player.setGameMode(GameMode.ADVENTURE);
@@ -7523,6 +7525,16 @@ public final class ArcadePortManager implements Listener {
                         plugin.getConfig().getInt(path + "wins", 0) + 1);
             }
             if (session.type == ArcadePortGame.DEATH_TAG) {
+                int roundKills = Math.max(0, session.scores.getOrDefault(id, 0));
+                int roundDeaths = Math.max(0, session.deathTagDeathsByPlayer.getOrDefault(id, 0));
+                int previousScore = Math.max(0, plugin.getConfig().getInt(path + "score", 0) - score);
+                int totalKills = plugin.getConfig().getInt(path + "kills", previousScore) + roundKills;
+                int totalDeaths = plugin.getConfig().getInt(path + "deaths", 0) + roundDeaths;
+                plugin.getConfig().set(path + "kills", totalKills);
+                plugin.getConfig().set(path + "deaths", totalDeaths);
+                plugin.getConfig().set(path + "kill-death-ratio",
+                        ArcadePortRules.deathTagKillDeathRatio(totalKills, totalDeaths));
+
                 int comeAtMeBro = session.deathTagComeAtMeBroAwards.getOrDefault(id, 0);
                 if (comeAtMeBro > 0) {
                     plugin.getConfig().set(path + "come-at-me-bro",
@@ -7964,6 +7976,14 @@ public final class ArcadePortManager implements Listener {
         lore.add(ChatColor.GRAY + "Wins: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "wins", 0));
         lore.add(ChatColor.GRAY + "Score / Kills: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "score", 0));
         lore.add(ChatColor.GRAY + "Knockouts: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "knockouts", 0));
+        if ("death-tag".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Deaths: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "deaths", 0));
+            lore.add(ChatColor.GRAY + "K/D Ratio: " + ChatColor.WHITE
+                    + String.format(java.util.Locale.ROOT, "%.2f",
+                    plugin.getConfig().getDouble(path + "kill-death-ratio", 0.0D)));
+            lore.add(ChatColor.GRAY + "Come At Me Bro: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "come-at-me-bro", 0));
+        }
         if ("bacon-brawl".equals(gameId)) {
             long unlocked = java.util.Arrays.stream(BaconBrawlAchievement.values())
                     .filter(achievement -> plugin.getConfig().getBoolean(achievement.configKey(targetId), false))
@@ -11093,6 +11113,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> deathTagRunnerTrailStyles = new HashMap<>();
         final Map<UUID, Integer> deathTagChaserKillsByPlayer = new HashMap<>();
         final Map<UUID, Integer> deathTagComeAtMeBroAwards = new HashMap<>();
+        final Map<UUID, Integer> deathTagDeathsByPlayer = new HashMap<>();
         final Map<UUID, Long> deathTagLastArrowAt = new HashMap<>();
         final Map<UUID, Long> deathTagSoloChaserHitReadyAt = new HashMap<>();
         final Set<UUID> deathTagFletchedArrows = new HashSet<>();
