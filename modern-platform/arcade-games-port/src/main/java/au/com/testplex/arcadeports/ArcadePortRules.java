@@ -1420,7 +1420,8 @@ public final class ArcadePortRules {
         if (name.endsWith("_WOOL")) {
             return isPaintballRedTeam(team) ? Material.RED_WOOL : Material.LIGHT_BLUE_WOOL;
         }
-        if (name.equals("TERRACOTTA") || name.endsWith("_TERRACOTTA")) {
+        if (name.equals("TERRACOTTA")
+                || (name.endsWith("_TERRACOTTA") && !name.endsWith("_GLAZED_TERRACOTTA"))) {
             return isPaintballRedTeam(team) ? Material.RED_TERRACOTTA : Material.LIGHT_BLUE_TERRACOTTA;
         }
         return null;
