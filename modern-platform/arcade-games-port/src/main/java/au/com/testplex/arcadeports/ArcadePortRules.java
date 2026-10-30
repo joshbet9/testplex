@@ -2122,6 +2122,12 @@ public final class ArcadePortRules {
         return totalLosses >= 2;
     }
 
+    /** Lower-bracket rounds wait for the current winners' stage and lower stage to finish. */
+    public static boolean canStartGladiatorsLoserStage(
+            boolean winnersStageReady, boolean loserStageOpen, int queuedPlayers) {
+        return winnersStageReady && !loserStageOpen && queuedPlayers >= 2;
+    }
+
     public static final double GLADIATORS_LOSER_ARENA_HALF_WIDTH = 3.65D;
 
     public static boolean isOutsideGladiatorsLoserArena(
