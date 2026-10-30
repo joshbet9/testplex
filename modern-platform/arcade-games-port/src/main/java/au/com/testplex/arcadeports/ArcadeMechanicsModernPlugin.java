@@ -72,6 +72,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     }
 
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
+    public void returnPlayerToArcadeLobby(Player player) {
+        if (manager != null && player != null && player.isOnline()) manager.returnPlayerToLobby(player);
+    }
 
     @Override
     public void onDisable() {
