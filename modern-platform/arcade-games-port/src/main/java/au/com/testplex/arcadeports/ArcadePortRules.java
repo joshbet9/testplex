@@ -428,6 +428,17 @@ public final class ArcadePortRules {
     public static final double SPLEEF_DEFAULT_KNOCKBACK = 0.3D;
     public static final double SPLEEF_BRAWLER_KNOCKBACK = 0.6D;
     public static final long SPLEEF_SMASHER_COOLDOWN_MILLIS = 250L;
+
+    /** Reborn PerkLeap: forward power 1.2, Y +0.2, max Y 1.2, plus a 0.2 ground boost. */
+    public static Vector spleefLeapVelocity(Vector facing, boolean grounded) {
+        if (facing == null || !Double.isFinite(facing.getX()) || !Double.isFinite(facing.getY())
+                || !Double.isFinite(facing.getZ()) || facing.lengthSquared() <= 1.0E-12D) {
+            return new Vector(0.0D, 0.0D, 0.0D);
+        }
+        Vector velocity = facing.clone().normalize().multiply(1.2D);
+        velocity.setY(Math.min(1.2D, velocity.getY() + 0.2D + (grounded ? 0.2D : 0.0D)));
+        return velocity;
+    }
     public static final long TURF_WARS_GAME_TIMEOUT_MILLIS = 900_000L;
     public static final long TURF_WARS_INITIAL_BUILD_PHASE_MILLIS = 40_000L;
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
