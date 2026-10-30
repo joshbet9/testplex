@@ -1453,19 +1453,25 @@ class ArcadePortGameTest {
         assertEquals("0:00.000", ArcadePortRules.formatDragonEscapeDelta(0L));
     }
 
-    @Test void dragonEscapePersonalBestSplitsFollowAuthoredWaypointProgress() {
+    @Test void dragonEscapePersonalBestSplitsFollowEveryAuthoredRouteLeg() {
         assertEquals(0, ArcadePortRules.dragonEscapePbSegmentStartIndex(0, 4));
         assertEquals(1, ArcadePortRules.dragonEscapePbSegmentStartIndex(1, 4));
         assertEquals(2, ArcadePortRules.dragonEscapePbSegmentStartIndex(2, 4));
-        assertEquals(2, ArcadePortRules.dragonEscapePbSegmentStartIndex(3, 4),
-                "The last checkpoint still uses the final approach segment until the finish radius is reached");
-        assertEquals(-1, ArcadePortRules.dragonEscapePbSegmentStartIndex(0, 1));
+        assertEquals(3, ArcadePortRules.dragonEscapePbSegmentStartIndex(3, 4),
+                "The final checkpoint must use its own finish-radius split");
+        assertEquals(0, ArcadePortRules.dragonEscapePbSegmentStartIndex(0, 1));
+        assertEquals(-1, ArcadePortRules.dragonEscapePbSegmentStartIndex(0, 0));
 
+        // Four authored waypoints produce four timed legs and five split points:
+        // start, three subsequent checkpoint crossings, and finish.
         assertEquals(0L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 0, 4));
-        assertEquals(30_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 1, 4));
-        assertEquals(60_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 2, 4));
-        assertEquals(90_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 3, 4));
-        assertEquals(0L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 2, 1));
+        assertEquals(22_500L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 1, 4));
+        assertEquals(45_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 2, 4));
+        assertEquals(67_500L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 3, 4));
+        assertEquals(90_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 4, 4));
+        assertEquals(0L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 0, 0));
+        assertEquals(0L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 0, 1));
+        assertEquals(90_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 1, 1));
 
         assertEquals(27_500L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 50_000L, 0.25D));
         assertEquals(20_000L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 50_000L, -1.0D));
