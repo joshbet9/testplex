@@ -926,6 +926,14 @@ public final class SourceMapCatalog {
         public List<Location> customLocations(String name) {
             return copyLocations(customLocations.get(name == null ? "" : name.toUpperCase(java.util.Locale.ROOT)));
         }
+        /** All authored custom marker groups, copied so match runtimes cannot mutate map metadata. */
+        public Map<String, List<Location>> customLocationGroups() {
+            Map<String, List<Location>> copy = new LinkedHashMap<>();
+            for (Map.Entry<String, List<Location>> entry : customLocations.entrySet()) {
+                copy.put(entry.getKey(), copyLocations(entry.getValue()));
+            }
+            return Map.copyOf(copy);
+        }
         private List<Location> copyLocations(List<Location> values) {
             return values == null ? new ArrayList<>() : new ArrayList<>(values);
         }
