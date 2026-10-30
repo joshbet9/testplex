@@ -208,7 +208,16 @@ class ArcadePortGameTest {
         assertEquals(1.0D, ArcadePortRules.quiverGroundPoundHorizontalMultiplier(-1.0D), 0.00001D);
     }
 
-    @Test void oneInTheQuiverNeedsTwentyKillsToWin() {
+    @Test void bombLobbersTestBotsAreAssignedToTheOpposingTeam() {
+        assertEquals(1, ArcadePortRules.opposingBombLobbersTeam(0));
+        assertEquals(0, ArcadePortRules.opposingBombLobbersTeam(1));
+        assertEquals(-1, ArcadePortRules.opposingBombLobbersTeam(-1));
+        assertEquals(-1, ArcadePortRules.opposingBombLobbersTeam(2));
+        assertTrue(ArcadePortRules.areBombLobbersEnemies(0, ArcadePortRules.opposingBombLobbersTeam(0)));
+        assertTrue(ArcadePortRules.areBombLobbersEnemies(1, ArcadePortRules.opposingBombLobbersTeam(1)));
+    }
+
+    @Test void oneInTheQuiverNeedsTwentyKillsToWin()
         assertFalse(ArcadePortRules.isQuiverWinnerScoreReached(0));
         assertFalse(ArcadePortRules.isQuiverWinnerScoreReached(19));
         assertTrue(ArcadePortRules.isQuiverWinnerScoreReached(20));

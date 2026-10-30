@@ -593,6 +593,11 @@ public final class ArcadePortRules {
         return ownerTeam >= 0 && targetTeam >= 0 && ownerTeam != targetTeam;
     }
 
+    /** Returns the opposing Bomb Lobbers side, or -1 when the supplied team is invalid. */
+    public static int opposingBombLobbersTeam(int teamId) {
+        return teamId == 0 ? 1 : teamId == 1 ? 0 : -1;
+    }
+
     /**
      * Legacy Minecraft armour reduction with zero toughness:
      * effective armour = min(20, max(armour / 5, armour - damage / 2)).

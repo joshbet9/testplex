@@ -2,6 +2,7 @@ package au.com.testplex.arcadeports;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Color;
 import org.bukkit.DyeColor;
 import org.bukkit.EntityEffect;
 import org.bukkit.Location;
@@ -17,6 +18,7 @@ import org.bukkit.entity.Mob;
 import org.bukkit.entity.Pig;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Sheep;
+import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
@@ -31,6 +33,7 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
@@ -41,6 +44,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 /** Legacy-style kit/team lobby pads, cosmetics demo showcase and Bacon Brawl NPC test bots. */
 public final class ModernArcadeLobbyRuntime implements Listener {
@@ -570,16 +574,77 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private boolean removeBot(String n){Bot b=bots.remove(key(n));if(b==null)return false;if(b.actor!=null&&b.actor.isValid())b.actor.remove();plugin.getConfig().set("test-bots."+b.key,null);plugin.saveConfig();refreshDisplays();return true;}
     private void saveBot(Bot b){String p="test-bots."+b.key+".";plugin.getConfig().set(p+"name",b.name);plugin.getConfig().set(p+"theme",b.theme);plugin.getConfig().set(p+"form",b.form);plugin.getConfig().set(p+"kit",b.kit);plugin.saveConfig();}
     private void replaceBotEntity(Bot b){if(b.actor!=null&&b.actor.isValid())b.actor.remove();Location at=b.actorLocation==null||b.actorLocation.getWorld()!=lobby.ensureWorld()?lobby.spawnLocation().add(0,-3,8):b.actorLocation.clone();spawnBotEntity(b,at,b.inGame&&b.deployedGame!=null&&manager.isActiveGame(at.getWorld(),b.deployedGame));}
-    private void spawnBotEntity(Bot b,Location at,boolean inGame){
-        if(at==null||at.getWorld()==null)return;LivingEntity actor;
-        if("pink-sheep".equals(b.form)){Sheep sheep=at.getWorld().spawn(at,Sheep.class);sheep.setColor(DyeColor.PINK);actor=sheep;}else actor=at.getWorld().spawn(at,Pig.class);
-        // Keep the entity damageable at the Paper level so melee attacks reach EntityDamageByEntityEvent.
-        // onBotDamage cancels all damage and applies controlled Bacon Brawl knockback instead.
-        actor.setInvulnerable(false);actor.setRemoveWhenFarAway(false);actor.setPersistent(false);actor.setSilent(true);actor.setCustomNameVisible(true);actor.setCollidable(false);
-        actor.getPersistentDataContainer().set(botKey,PersistentDataType.STRING,b.key);actor.getPersistentDataContainer().set(themeKey,PersistentDataType.STRING,b.theme);actor.getPersistentDataContainer().set(formKey,PersistentDataType.STRING,b.form);
-        if(actor instanceof Mob mob)mob.setAI(false);b.actor=actor;b.actorLocation=at.clone();b.inGame=inGame;b.arenaSpawn=at.clone();refreshBotAppearance(b);
+    private void spawnBotEntity(Bot b, Location at, boolean inGame) {
+        if (at == null || at.getWorld() == null) return;
+        LivingEntity actor;
+        if (inGame && b.deployedGame == ArcadePortGame.BOMB_LOBBERS) {
+            Zombie zombie = at.getWorld().spawn(at, Zombie.class);
+            zombie.setBaby(false);
+            zombie.setCanPickupItems(false);
+            actor = zombie;
+            equipBombLobbersBot(zombie, b.team);
+        } else if ("pink-sheep".equals(b.form)) {
+            Sheep sheep = at.getWorld().spawn(at, Sheep.class);
+            sheep.setColor(DyeColor.PINK);
+            actor = sheep;
+        } else {
+            actor = at.getWorld().spawn(at, Pig.class);
+        }
+        // NPCs stay damageable so Bukkit emits EntityDamageByEntityEvent; this listener
+        // cancels vanilla damage and applies the correct game's test-dummy response.
+        actor.setInvulnerable(false);
+        actor.setRemoveWhenFarAway(false);
+        actor.setPersistent(false);
+        actor.setSilent(true);
+        actor.setCustomNameVisible(true);
+        actor.setCollidable(false);
+        actor.getPersistentDataContainer().set(botKey, PersistentDataType.STRING, b.key);
+        actor.getPersistentDataContainer().set(themeKey, PersistentDataType.STRING, b.theme);
+        actor.getPersistentDataContainer().set(formKey, PersistentDataType.STRING, b.form);
+        if (actor instanceof Mob mob) mob.setAI(false);
+        b.actor = actor;
+        b.actorLocation = at.clone();
+        b.inGame = inGame;
+        b.arenaSpawn = at.clone();
+        refreshBotAppearance(b);
     }
-    private void refreshBotAppearance(Bot b){if(b.actor==null||!b.actor.isValid())return;if(b.actor instanceof Sheep s)s.setColor(DyeColor.PINK);if(b.actor instanceof LivingEntity living)living.setCollidable(false);b.actor.setInvulnerable(false);b.actor.setCustomName(ChatColor.GOLD+b.name+ChatColor.GRAY+" ["+pretty(b.theme)+"]");b.actor.setCustomNameVisible(true);b.actor.getPersistentDataContainer().set(themeKey,PersistentDataType.STRING,b.theme);b.actor.getPersistentDataContainer().set(formKey,PersistentDataType.STRING,b.form);b.actor.getPersistentDataContainer().set(botKey,PersistentDataType.STRING,b.key);}
+
+    private void equipBombLobbersBot(Zombie zombie, int team) {
+        var equipment = zombie.getEquipment();
+        if (equipment == null) return;
+        Color teamColor = team == 1 ? Color.AQUA : Color.RED;
+        equipment.setHelmet(new ItemStack(Material.PLAYER_HEAD));
+        equipment.setChestplate(dyedBombLobbersArmour(Material.LEATHER_CHESTPLATE, teamColor));
+        equipment.setLeggings(dyedBombLobbersArmour(Material.LEATHER_LEGGINGS, teamColor));
+        equipment.setBoots(dyedBombLobbersArmour(Material.LEATHER_BOOTS, teamColor));
+    }
+
+    private ItemStack dyedBombLobbersArmour(Material material, Color color) {
+        ItemStack item = new ItemStack(material);
+        if (item.getItemMeta() instanceof LeatherArmorMeta meta) {
+            meta.setColor(color);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private void refreshBotAppearance(Bot b) {
+        if (b.actor == null || !b.actor.isValid()) return;
+        if (b.actor instanceof Sheep sheep) sheep.setColor(DyeColor.PINK);
+        if (b.actor instanceof Zombie zombie) equipBombLobbersBot(zombie, b.team);
+        if (b.actor instanceof LivingEntity living) living.setCollidable(false);
+        b.actor.setInvulnerable(false);
+        String name = ChatColor.GOLD + b.name + ChatColor.GRAY + " [" + pretty(b.theme) + "]";
+        if (b.inGame && b.deployedGame == ArcadePortGame.BOMB_LOBBERS) {
+            ChatColor teamColor = b.team == 1 ? ChatColor.AQUA : ChatColor.RED;
+            name = teamColor + b.name + ChatColor.GRAY + (b.team == 1 ? " [BLUE BOT]" : " [RED BOT]");
+        }
+        b.actor.setCustomName(name);
+        b.actor.setCustomNameVisible(true);
+        b.actor.getPersistentDataContainer().set(themeKey, PersistentDataType.STRING, b.theme);
+        b.actor.getPersistentDataContainer().set(formKey, PersistentDataType.STRING, b.form);
+        b.actor.getPersistentDataContainer().set(botKey, PersistentDataType.STRING, b.key);
+    }
     private void openBotCosmetics(Player p,Bot b){
         Inventory inv=Bukkit.createInventory(null,27,BOT_MENU_PREFIX+b.key);int[] slots={10,11,12,13,14,15};
         for(int i=0;i<THEMES.length;i++){String theme=THEMES[i];ItemStack it=item(themeMaterial(theme),(b.theme.equals(theme)?ChatColor.GREEN+"✓ ":ChatColor.WHITE)+pretty(theme),ChatColor.GRAY+"Theme particle preview",b.theme.equals(theme)?ChatColor.GREEN+"Selected":ChatColor.YELLOW+"Click to equip");mark(it,"theme:"+theme,b.key);inv.setItem(slots[i],it);}
@@ -674,14 +739,62 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         return targets;
     }
 
-    public void deployBots(ArcadePortGame game,List<Location> spawns){
-        if(game==null||spawns.isEmpty()){returnBotsToLobby();return;}int index=0;
-        for(Bot b:bots.values()){Location target=spawns.get(index++%spawns.size()).clone();target.add(index%2==0?3:-3,0,index%3==0?2:-2);
-            if(b.actor==null||!b.actor.isValid())spawnBotEntity(b,target,true);else b.actor.teleport(target);
-            b.inGame=true;b.deployedGame=game;b.arenaSpawn=target.clone();b.actorLocation=target.clone();refreshBotAppearance(b);}
+    public void deployBots(ArcadePortGame game, List<Location> spawns) {
+        deployBots(game, spawns, -1);
     }
-    public void returnBotsToLobby(){Location base=lobby.spawnLocation();if(base==null)return;int index=0;
-        for(Bot b:bots.values()){Location home=base.clone().add(index++*1.6D-3,-3,8);if(b.actor==null||!b.actor.isValid())spawnBotEntity(b,home,false);else{b.actor.teleport(home);b.actor.setVelocity(new Vector());if(b.actor instanceof Mob mob)mob.setAI(false);}b.inGame=false;b.deployedGame=null;b.actorLocation=home.clone();b.arenaSpawn=null;refreshBotAppearance(b);}
+
+    public void deployBots(ArcadePortGame game, List<Location> spawns, int bombLobbersTeam) {
+        if (game == null || spawns == null || spawns.isEmpty()) {
+            returnBotsToLobby();
+            return;
+        }
+        int index = 0;
+        for (Bot bot : bots.values()) {
+            Location target = spawns.get(index % spawns.size()).clone();
+            if (game != ArcadePortGame.BOMB_LOBBERS) {
+                target.add(index % 2 == 0 ? 3 : -3, 0, index % 3 == 0 ? 2 : -2);
+            }
+            index++;
+            bot.inGame = true;
+            bot.deployedGame = game;
+            bot.team = game == ArcadePortGame.BOMB_LOBBERS ? bombLobbersTeam : -1;
+            boolean correctEntity = game == ArcadePortGame.BOMB_LOBBERS
+                    ? bot.actor instanceof Zombie : !(bot.actor instanceof Zombie);
+            if (bot.actor == null || !bot.actor.isValid() || !correctEntity) {
+                if (bot.actor != null && bot.actor.isValid()) bot.actor.remove();
+                spawnBotEntity(bot, target, true);
+            } else {
+                bot.actor.teleport(target);
+            }
+            bot.arenaSpawn = target.clone();
+            bot.actorLocation = target.clone();
+            refreshBotAppearance(bot);
+        }
+    }
+
+    public void returnBotsToLobby() {
+        Location base = lobby.spawnLocation();
+        if (base == null) return;
+        int index = 0;
+        for (Bot bot : bots.values()) {
+            Location home = base.clone().add(index++ * 1.6D - 3, -3, 8);
+            boolean needsLobbyForm = bot.actor == null || !bot.actor.isValid()
+                    || bot.actor instanceof Zombie;
+            bot.inGame = false;
+            bot.deployedGame = null;
+            bot.team = -1;
+            if (needsLobbyForm) {
+                if (bot.actor != null && bot.actor.isValid()) bot.actor.remove();
+                spawnBotEntity(bot, home, false);
+            } else {
+                bot.actor.teleport(home);
+                bot.actor.setVelocity(new Vector());
+                if (bot.actor instanceof Mob mob) mob.setAI(false);
+            }
+            bot.actorLocation = home.clone();
+            bot.arenaSpawn = null;
+            refreshBotAppearance(bot);
+        }
     }
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
     public void onBotDamage(EntityDamageEvent e){
@@ -699,20 +812,20 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         Bot b=bots.get(key);
         if(b==null||!b.inGame||b.deployedGame==null
                 ||!manager.isActiveGame(entity.getWorld(),b.deployedGame))return;
-        if (b.deployedGame == ArcadePortGame.BOMB_LOBBERS
-                && be.getDamager() instanceof Player clicker) {
-            ItemStack held = clicker.getInventory().getItemInMainHand();
-            if (manager.wasRecentBombLobbersThrow(clicker)
+        if (b.deployedGame == ArcadePortGame.BOMB_LOBBERS) {
+            ItemStack held = attacker.getInventory().getItemInMainHand();
+            if (manager.wasRecentBombLobbersThrow(attacker)
                     || (held != null && (held.getType() == Material.TNT || held.getType() == Material.LEVER))) {
-                // The click is a Bomb Lobbers control, not a melee hit. TNT feedback
-                // is rendered by the projectile sweep when it actually reaches the bot.
+                // TNT/kit interactions are handled by the projectile and ability paths.
                 return;
             }
+            applyBombLobbersBotMeleeHit(b, actor, attacker);
+            return;
         }
-        if(b.deployedGame==ArcadePortGame.BACON_BRAWL) {
-            applyBotHit(b,actor,attacker,e.getDamage());
+        if (b.deployedGame == ArcadePortGame.BACON_BRAWL) {
+            applyBotHit(b, actor, attacker, e.getDamage());
         } else {
-            showBotImpact(b,actor,attacker,ChatColor.YELLOW+"HIT!",ChatColor.GREEN+"Hit bot "+b.name);
+            showBotImpact(b, actor, attacker, ChatColor.YELLOW + "HIT!", ChatColor.GREEN + "Hit bot " + b.name);
         }
     }
     /** Fallback for clients/plugins that suppress the normal entity-damage event for NPC targets. */
@@ -729,8 +842,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
 
     private void registerBotHitFromSwing(Player attacker) {
-        if (attacker == null || !attacker.isOnline()
-                || !manager.isActiveGame(attacker.getWorld(), ArcadePortGame.BACON_BRAWL)) return;
+        if (attacker == null || !attacker.isOnline()) return;
+        boolean baconMatch = manager.isActiveGame(attacker.getWorld(), ArcadePortGame.BACON_BRAWL);
+        boolean bombLobbersMatch = manager.isActiveGame(attacker.getWorld(), ArcadePortGame.BOMB_LOBBERS);
+        if (!baconMatch && !bombLobbersMatch) return;
+        if (bombLobbersMatch) {
+            ItemStack held = attacker.getInventory().getItemInMainHand();
+            if (held != null && (held.getType() == Material.TNT || held.getType() == Material.LEVER)) return;
+        }
         long now = System.currentTimeMillis();
         java.util.UUID id = attacker.getUniqueId();
         if (now - lastBotSwingAtByAttacker.getOrDefault(id, 0L) < 100L
@@ -770,15 +889,44 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         lastBotSwingAtByAttacker.put(id, now);
         LivingEntity target = actor;
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            boolean stillBaconMatch = baconMatch
+                    && manager.isActiveGame(target.getWorld(), ArcadePortGame.BACON_BRAWL);
+            boolean stillBombLobbersMatch = bombLobbersMatch
+                    && manager.isActiveGame(target.getWorld(), ArcadePortGame.BOMB_LOBBERS);
             if (!attacker.isOnline() || !target.isValid()
                     || target.getWorld() != attacker.getWorld()
-                    || !manager.isActiveGame(target.getWorld(), ArcadePortGame.BACON_BRAWL)
+                    || (!stillBaconMatch && !stillBombLobbersMatch)
                     || System.currentTimeMillis() - lastBotHitAtByAttacker.getOrDefault(id, 0L) < 250L
                     || attacker.getLocation().distanceSquared(target.getLocation()) > 20.25D
                     || !attacker.hasLineOfSight(target)) return;
-            bot.inGame = true;
-            applyBotHit(bot, target, attacker, 2.0D);
+            if (bot.deployedGame == ArcadePortGame.BOMB_LOBBERS && stillBombLobbersMatch) {
+                applyBombLobbersBotMeleeHit(bot, target, attacker);
+            } else if (bot.deployedGame == ArcadePortGame.BACON_BRAWL && stillBaconMatch) {
+                applyBotHit(bot, target, attacker, 2.0D);
+            }
         }, 1L);
+    }
+
+    private void applyBombLobbersBotMeleeHit(Bot bot, LivingEntity actor, Player attacker) {
+        if (bot == null || actor == null || attacker == null
+                || !manager.isBombLobbersEnemyBot(attacker, actor)) {
+            if (attacker != null && attacker.isOnline()) {
+                attacker.sendActionBar(ChatColor.RED + "That bot is on your team.");
+            }
+            return;
+        }
+        long now = System.currentTimeMillis();
+        UUID attackerId = attacker.getUniqueId();
+        if (now - lastBotHitAtByAttacker.getOrDefault(attackerId, 0L) < 180L) return;
+        Vector away = actor.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0.0D);
+        if (away.lengthSquared() < 0.001D) away = attacker.getLocation().getDirection().setY(0.0D).multiply(-1.0D);
+        if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 0.0D, 1.0D);
+        actor.setNoDamageTicks(0);
+        actor.setVelocity(away.normalize().multiply(0.72D).setY(0.32D));
+        bot.knockbackUntil = now + 450L;
+        lastBotHitAtByAttacker.put(attackerId, now);
+        showBotImpact(bot, actor, attacker, ChatColor.YELLOW + "HIT!",
+                ChatColor.GREEN + "Hit opposing Bomb Lobbers bot " + bot.name);
     }
 
     private void applyBotHit(Bot bot, LivingEntity actor, Player attacker, double rawDamage) {
@@ -816,7 +964,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         Location impact = actor.getLocation().clone().add(0, 1, 0);
         actor.getWorld().spawnParticle(Particle.CRIT, impact, 8, 0.28, 0.35, 0.28, 0.04);
         actor.getWorld().spawnParticle(particle(bot.theme), impact, 12, 0.4, 0.4, 0.4, 0.02);
-        Sound hurt = actor instanceof Pig ? Sound.ENTITY_PIG_HURT : Sound.ENTITY_SHEEP_HURT;
+        Sound hurt = actor instanceof Pig ? Sound.ENTITY_PIG_HURT
+                : actor instanceof Sheep ? Sound.ENTITY_SHEEP_HURT
+                : actor instanceof Zombie ? Sound.ENTITY_ZOMBIE_HURT : Sound.ENTITY_PLAYER_HURT;
         actor.getWorld().playSound(actor.getLocation(), hurt, 1.0F, 1.0F);
         if (attacker != null && attacker.isOnline() && actionbar != null && !actionbar.isBlank()) {
             attacker.sendActionBar(actionbar);
@@ -830,6 +980,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 if (label.isValid() && !label.isDead()) label.remove();
             }, 16L);
         }
+    }
+
+    public boolean isBombLobbersEnemyBot(LivingEntity target, int attackingTeam) {
+        if (target == null || !target.isValid()) return false;
+        String botId = target.getPersistentDataContainer().get(botKey, PersistentDataType.STRING);
+        Bot bot = botId == null ? null : bots.get(botId);
+        return bot != null && bot.inGame && bot.deployedGame == ArcadePortGame.BOMB_LOBBERS
+                && bot.team >= 0 && ArcadePortRules.areBombLobbersEnemies(attackingTeam, bot.team);
     }
 
     /** Called by the TNT sweep when a Bomb Lobbers test bot is struck directly. */
@@ -851,10 +1009,22 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         }
     }
 
+    /** Apply a Bomb Lobbers blast impulse and impact feedback to an opposing test bot. */
+    public void showBombLobbersBotBlastHit(LivingEntity target, Location blast, double impact) {
+        if (target == null || !target.isValid() || blast == null
+                || target.getWorld() != blast.getWorld() || impact <= 0.0D) return;
+        String key = target.getPersistentDataContainer().get(botKey, PersistentDataType.STRING);
+        Bot bot = key == null ? null : bots.get(key);
+        if (bot == null || !bot.inGame || bot.deployedGame != ArcadePortGame.BOMB_LOBBERS || bot.team < 0) return;
+        Vector away = target.getEyeLocation().toVector().subtract(blast.toVector());
+        target.setVelocity(ArcadePortRules.bombLobbersExplosionVelocity(target.getVelocity(), away, impact));
+        showBotImpact(bot, target, null, null, null);
+    }
+
     public void shutdown(){if(task!=null)task.cancel();returnBotsToLobby();for(Entity e:new ArrayList<>(showcase))if(e!=null&&e.isValid())e.remove();for(Entity e:new ArrayList<>(kitNpcs))if(e!=null&&e.isValid())e.remove();if(teamNpc!=null&&teamNpc.isValid())teamNpc.remove();}
 
     private final class Bot{
-        final String key,name;String theme,form,kit;Entity actor;Location actorLocation,arenaSpawn;boolean inGame;ArcadePortGame deployedGame;long nextAttackAt,knockbackUntil;
+        final String key,name;String theme,form,kit;Entity actor;Location actorLocation,arenaSpawn;boolean inGame;ArcadePortGame deployedGame;int team=-1;long nextAttackAt,knockbackUntil;
         Bot(String key,String name,String theme,String form,String kit){this.key=key;this.name=name;this.theme=List.of(THEMES).contains(theme)?theme:"porky";this.form="pink-sheep".equals(form)?"pink-sheep":"pig";this.kit=ArcadePortRules.normalizeBaconBrawlKit(kit)==null?"el-muchacho-pigo":kit;}
     }
 }

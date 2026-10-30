@@ -178,6 +178,16 @@ public final class ArcadePortManager implements Listener {
         return active != null && active.type == type && active.world == world;
     }
 
+    public boolean isBombLobbersEnemyBot(Player attacker, LivingEntity target) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.BOMB_LOBBERS
+                || attacker == null || target == null || !attacker.isOnline()
+                || attacker.getWorld() != session.world || target.getWorld() != session.world
+                || !session.alive.contains(attacker.getUniqueId())) return false;
+        int attackerTeam = session.teams.getOrDefault(attacker.getUniqueId(), -1);
+        return lobbyRuntime.isBombLobbersEnemyBot(target, attackerTeam);
+    }
+
     public List<Player> botTargets(World world, ArcadePortGame type) {
         if (!isActiveGame(world, type)) return List.of();
         if (type != ArcadePortGame.BACON_BRAWL) return alivePlayers(active);
@@ -1004,7 +1014,6 @@ public final class ArcadePortManager implements Listener {
         }
         border.setDamageAmount(0.0D);
         List<Location> spawns = spawnLocations(type, participants.size());
-        lobbyRuntime.deployBots(type, spawns);
         for (int i = 0; i < participants.size(); i++) {
             Player player = participants.get(i);
             PlayerSnapshot pendingSnapshot = pendingRestore.remove(player.getUniqueId());
@@ -1107,6 +1116,26 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.BOMB_LOBBERS) {
             cacheBombLobbersTeamSpawnCentres(session);
             updateBombLobbersMvpEligibility(session);
+            int playerTeam = participants.isEmpty() ? 0
+                    : session.teams.getOrDefault(participants.get(0).getUniqueId(), 0);
+            int botTeam = ArcadePortRules.opposingBombLobbersTeam(playerTeam);
+            SourceMapCatalog.MapData bombMap = sourceMapData.get(type.id());
+            List<Location> botSpawns = bombMap == null
+                    ? List.of() : bombMap.teamSpawnLocationsForTeam(botTeam, 2);
+            if (botSpawns.isEmpty()) {
+                Location humanSpawn = participants.isEmpty() ? spawns.get(0)
+                        : session.lastLocations.getOrDefault(participants.get(0).getUniqueId(), spawns.get(0));
+                double centerX = bombMap != null && bombMap.hasBounds() ? bombMap.centerX() : 0.0D;
+                double centerZ = bombMap != null && bombMap.hasBounds() ? bombMap.centerZ() : 0.0D;
+                Location mirrored = humanSpawn.clone();
+                mirrored.setX(centerX * 2.0D - humanSpawn.getX());
+                mirrored.setZ(centerZ * 2.0D - humanSpawn.getZ());
+                mirrored.setYaw(humanSpawn.getYaw() + 180.0F);
+                botSpawns = List.of(mirrored);
+            }
+            lobbyRuntime.deployBots(type, botSpawns, botTeam);
+        } else {
+            lobbyRuntime.deployBots(type, spawns, -1);
         }
         if (type == ArcadePortGame.BACON_BRAWL) {
             // Player snapshots already hold their pre-match scoreboards at this point.
@@ -8566,7 +8595,9 @@ public final class ArcadePortManager implements Listener {
             if (ArcadePortRules.shouldCheckBombLobbersDirectHit(
                     session.bombDirectHitResolved.contains(bombId))) {
                 for (LivingEntity candidate : lobbyRuntime.botTargets(session.world, ArcadePortGame.BOMB_LOBBERS)) {
-                    if (candidate == null || !candidate.isValid()) continue;
+                    if (candidate == null || !candidate.isValid()
+                            || !lobbyRuntime.isBombLobbersEnemyBot(candidate,
+                                    session.teams.getOrDefault(ownerId, -1))) continue;
                     double hitDistanceSquared = ArcadePortRules.bombLobbersDirectHitDistanceSquared(
                             previous, entitySweepEnd, candidate.getBoundingBox());
                     if (ArcadePortRules.shouldResolveBombLobbersDirectHitBeforeBlock(
@@ -8682,6 +8713,75 @@ public final class ArcadePortManager implements Listener {
             Location point = previous.clone().add(direction.clone().multiply(offset)).add(0.0D, 0.5D, 0.0D);
             session.world.spawnParticle(Particle.DUST, point, 2,
                     spread, spread, spread, speed, dust);
+        }
+    }
+
+    private void renderBombLobbersExplosion(Session session, Location blast, Player owner) {
+        if (session == null || blast == null || blast.getWorld() != session.world) return;
+        World world = session.world;
+
+        // The cancelled native explosion normally provides this large emitter. Restore
+        // the natural blast first, then layer the player's selected TNT impact cosmetic.
+        world.spawnParticle(Particle.EXPLOSION_EMITTER, blast, 1);
+        world.spawnParticle(Particle.FLAME, blast, 56, 0.95D, 0.7D, 0.95D, 0.08D);
+        world.spawnParticle(Particle.CLOUD, blast, 36, 0.9D, 0.65D, 0.9D, 0.12D);
+        world.spawnParticle(Particle.SMOKE, blast, 26, 0.75D, 0.55D, 0.75D, 0.05D);
+        world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.5F, 0.88F);
+
+        String cosmetic = "turtle-shell";
+        org.bukkit.plugin.Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (owner != null && cosmeticsPlugin != null && cosmeticsPlugin.isEnabled()) {
+            java.io.File preferencesFile = new java.io.File(
+                    cosmeticsPlugin.getDataFolder(), "player-preferences.yml");
+            if (preferencesFile.isFile()) {
+                org.bukkit.configuration.file.YamlConfiguration preferences =
+                        org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(preferencesFile);
+                String path = "players." + owner.getUniqueId()
+                        + ".games.bomb-lobbers.cosmetics.tnt-impact.selected";
+                cosmetic = preferences.getString(path, "turtle-shell");
+            }
+        }
+        if (!List.of("turtle-shell", "starburst-tnt", "pixel-crater").contains(cosmetic)) {
+            cosmetic = "turtle-shell";
+        }
+
+        if ("turtle-shell".equals(cosmetic)) {
+            Particle.DustOptions shellDust = new Particle.DustOptions(Color.fromRGB(75, 190, 135), 1.8F);
+            Particle.DustOptions rimDust = new Particle.DustOptions(Color.fromRGB(210, 245, 190), 1.1F);
+            for (int i = 0; i < 28; i++) {
+                double angle = (Math.PI * 2.0D * i) / 28.0D;
+                Location point = blast.clone().add(Math.cos(angle) * 1.55D,
+                        0.18D + Math.sin(angle * 3.0D) * 0.12D,
+                        Math.sin(angle) * 1.55D);
+                world.spawnParticle(Particle.DUST, point, 3, 0.04D, 0.08D, 0.04D, 0.01D, shellDust);
+                world.spawnParticle(Particle.DUST, point.clone().add(0.0D, 0.22D, 0.0D),
+                        1, 0.02D, 0.02D, 0.02D, 0.01D, rimDust);
+                world.spawnParticle(Particle.ELECTRIC_SPARK, point, 1, 0.02D, 0.04D, 0.02D, 0.01D);
+            }
+        } else if ("starburst-tnt".equals(cosmetic)) {
+            Particle.DustOptions starDust = new Particle.DustOptions(Color.fromRGB(255, 205, 65), 1.8F);
+            for (int ray = 0; ray < 12; ray++) {
+                double angle = (Math.PI * 2.0D * ray) / 12.0D;
+                for (int step = 1; step <= 4; step++) {
+                    Location point = blast.clone().add(Math.cos(angle) * step * 0.48D,
+                            0.15D + step * 0.1D, Math.sin(angle) * step * 0.48D);
+                    world.spawnParticle(Particle.FIREWORK, point, 3, 0.07D, 0.07D, 0.07D, 0.02D);
+                    world.spawnParticle(Particle.DUST, point, 2, 0.05D, 0.05D, 0.05D, 0.01D, starDust);
+                }
+            }
+        } else {
+            Particle.DustOptions craterDust = new Particle.DustOptions(Color.fromRGB(255, 95, 35), 1.7F);
+            Particle.DustOptions emberDust = new Particle.DustOptions(Color.fromRGB(255, 185, 65), 1.1F);
+            for (int x = -3; x <= 3; x++) {
+                for (int z = -3; z <= 3; z++) {
+                    if (Math.max(Math.abs(x), Math.abs(z)) != 3) continue;
+                    Location point = blast.clone().add(x * 0.52D, 0.12D, z * 0.52D);
+                    world.spawnParticle(Particle.DUST, point, 4, 0.03D, 0.04D, 0.03D, 0.01D, craterDust);
+                    world.spawnParticle(Particle.FLAME, point, 2, 0.02D, 0.05D, 0.02D, 0.01D);
+                }
+            }
+            world.spawnParticle(Particle.LAVA, blast, 12, 0.65D, 0.1D, 0.65D, 0.0D);
+            world.spawnParticle(Particle.DUST, blast, 18, 0.6D, 0.08D, 0.6D, 0.01D, emberDust);
         }
     }
 
@@ -8974,8 +9074,12 @@ public final class ArcadePortManager implements Listener {
             removeBombTracking(session, bombId);
             session.entities.remove(bomb);
             bomb.remove();
-            session.world.spawnParticle(Particle.EXPLOSION, blast, 1, 0.0D, 0.0D, 0.0D, 0.0D);
-            session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
+            if (bombLobbersBlast) {
+                renderBombLobbersExplosion(session, blast, owner);
+            } else {
+                session.world.spawnParticle(Particle.EXPLOSION_EMITTER, blast, 1);
+                session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
+            }
             int killsFromThisTnt = priorTntKills;
             for (Player target : alivePlayers(session)) {
                 // Reborn applies its nearby-player explosion condition without team filtering.
@@ -9025,6 +9129,17 @@ public final class ArcadePortManager implements Listener {
                     } else {
                         target.setHealth(target.getHealth() - blastDamage);
                     }
+                }
+            }
+            if (bombLobbersBlast) {
+                int ownerTeam = session.teams.getOrDefault(ownerId, -1);
+                for (LivingEntity botTarget : lobbyRuntime.botTargets(session.world, ArcadePortGame.BOMB_LOBBERS)) {
+                    if (!lobbyRuntime.isBombLobbersEnemyBot(botTarget, ownerTeam)) continue;
+                    double distance = botTarget.getLocation().distance(blast);
+                    if (distance > ArcadePortRules.BOMB_LOBBERS_EXPLOSION_RADIUS) continue;
+                    double impact = Math.max(0.0D,
+                            1.0D - distance / ArcadePortRules.BOMB_LOBBERS_EXPLOSION_RADIUS);
+                    lobbyRuntime.showBombLobbersBotBlastHit(botTarget, blast, impact);
                 }
             }
             return;
