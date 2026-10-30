@@ -3,6 +3,7 @@ package au.com.testplex.snake;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.DyeColor;
+import org.bukkit.EntityEffect;
 import org.bukkit.GameMode;
 import org.bukkit.GameRule;
 import org.bukkit.Location;
@@ -602,7 +603,7 @@ public final class SnakeGameManager implements Listener {
                 slime.setSize(2);
                 slime.setAI(false);
                 slime.setGravity(false);
-                slime.setSilent(true);
+                slime.setSilent(false);
                 slime.setRemoveWhenFarAway(false);
                 foods.add(slime);
                 return;
@@ -622,12 +623,11 @@ public final class SnakeGameManager implements Listener {
             for (SnakeState state : snakes.values()) {
                 if (!state.alive || !state.player.isOnline()) continue;
                 if (SnakeRules.isFoodCollected(slime.getLocation().distanceSquared(state.player.getLocation()))) {
-                    grow(state, 2);
+                    grow(state, 2, true);
                     state.slimesEaten++;
                     stats.recordSlime(state.player, state.slimesEaten);
                     Bukkit.getPluginManager().callEvent(new SlimeUpgradeEvent(state.player));
                     stats.recordTailLength(state.player, state.segments.size());
-                    state.player.playSound(state.player.getLocation(), Sound.ENTITY_GENERIC_EAT, 1.0F, 1.0F);
                     state.player.sendMessage(ChatColor.GREEN + "Slime eaten! Snake length: " + state.segments.size());
                     slime.remove();
                     iterator.remove();
@@ -640,6 +640,10 @@ public final class SnakeGameManager implements Listener {
     }
 
     private void grow(SnakeState state, int amount) {
+        grow(state, amount, false);
+    }
+
+    private void grow(SnakeState state, int amount, boolean playGrowSound) {
         if (!state.alive || state.segments.isEmpty()) return;
         for (int n = 0; n < amount; n++) {
             Sheep last = state.segments.get(state.segments.size() - 1);
@@ -654,6 +658,10 @@ public final class SnakeGameManager implements Listener {
             // keep them visible, but remove their entity collision. The initial head remains collidable.
             body.setCollidable(false);
             state.segments.add(body);
+            if (playGrowSound) {
+                state.player.getWorld().playSound(state.player.getLocation(),
+                        Sound.ENTITY_GENERIC_EAT, 2.0F, 1.0F);
+            }
             Bukkit.getPluginManager().callEvent(new TailGrowEvent(state.player, state.segments.size()));
             if (state.segments.size() > state.maxTailLength) {
                 state.maxTailLength = state.segments.size();
@@ -667,7 +675,7 @@ public final class SnakeGameManager implements Listener {
         sheep.setColor(color);
         sheep.setAI(false);
         sheep.setGravity(false);
-        sheep.setSilent(true);
+        sheep.setSilent(false);
         sheep.setInvulnerable(true);
         sheep.setRemoveWhenFarAway(false);
         return sheep;
@@ -889,6 +897,9 @@ public final class SnakeGameManager implements Listener {
                     Sheep segment = otherState.segments.get(i);
                     if (!segment.isValid()) continue;
                     if (SnakeRules.isTailCollision(head.distanceSquared(segment.getLocation()))) {
+                        arena.spawnParticle(Particle.EXPLOSION,
+                                segment.getLocation().clone().add(0.0D, 1.0D, 0.0D), 1,
+                                0.0D, 0.0D, 0.0D, 0.0D);
                         eliminate(playerState, otherState == playerState ? null : otherState.player,
                                 otherState == playerState ? "hit your own tail" : "hit " + otherState.player.getName() + "'s tail");
                         hit = true;
@@ -915,6 +926,9 @@ public final class SnakeGameManager implements Listener {
             state.rouletteTask = null;
         }
         restoreRouletteSlot(state);
+        for (Sheep segment : state.segments) {
+            if (segment != null && segment.isValid()) segment.playEffect(EntityEffect.HURT);
+        }
         removeSegments(state);
         if (state.player.isOnline()) {
             state.player.leaveVehicle();
