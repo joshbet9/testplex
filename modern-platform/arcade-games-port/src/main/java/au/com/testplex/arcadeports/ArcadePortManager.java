@@ -8063,8 +8063,8 @@ public final class ArcadePortManager implements Listener {
             } else {
                 SourceMapCatalog.MapData gladiatorMap = sourceMapData.get(session.type.id());
                 if (gladiatorMap != null && gladiatorMap.hasBounds()
-                        && (location.getX() < gladiatorMap.minX() || location.getX() > gladiatorMap.maxX()
-                        || location.getZ() < gladiatorMap.minZ() || location.getZ() > gladiatorMap.maxZ())) {
+                        && (location.getX() <= gladiatorMap.minX() || location.getX() >= gladiatorMap.maxX() + 1.0D
+                        || location.getZ() <= gladiatorMap.minZ() || location.getZ() >= gladiatorMap.maxZ() + 1.0D)) {
                     eliminate(session, player, null, "left the Gladiators arena");
                     return;
                 }
