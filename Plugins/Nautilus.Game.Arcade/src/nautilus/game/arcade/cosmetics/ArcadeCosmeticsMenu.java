@@ -179,8 +179,11 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                         setting("glass-colour", "Middle Glass Colour", Material.STAINED_GLASS,
                                 "Changes only the stained-glass barrier shown on your client. Other players see their own colour or the default.",
                                 "microbattles", false, "aqua", "ember", "forest", "royal", "sunset", "solar", "frost", "void"),
-                        setting("border-particles", "Border Particles", Material.FIREWORK,
-                                "Choose the vertical warning particles shown to you within three blocks of the map edge. Matching uses your middle-glass colour.",
+                        setting("border-colour", "Border Particle Colour", Material.REDSTONE,
+                                "Choose the colour of the vertical border-warning particle column. Leave unset to match your middle-glass colour.",
+                                null, false, COLOUR_OPTIONS),
+                        setting("border-particles", "Border Particle Style", Material.FIREWORK,
+                                "Choose the particle accent shown to you within three blocks of the map edge. Matching uses coloured dust; Spark and Soft add accents; Off hides the particles.",
                                 null, false, "matching", "spark", "soft", "off")));
 
         registerGame("monstermaze", "Monster Maze", Material.ROTTEN_FLESH, (short) 0,
