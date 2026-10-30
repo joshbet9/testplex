@@ -1858,9 +1858,18 @@ public final class ArcadePortManager implements Listener {
         killer.sendMessage(ChatColor.GREEN + "Death Tag kill! " + kills + " kills.");
     }
 
+    private Location deathTagChaserRespawnSpawn(Session session, Player player) {
+        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+        if (mapData != null && !mapData.spawnLocations().isEmpty()) {
+            List<Location> spawns = mapData.spawnLocations();
+            return spawns.get(ThreadLocalRandom.current().nextInt(spawns.size())).clone();
+        }
+        return spawnFor(session, player);
+    }
+
     private void respawnDeathTagChaser(Session session, Player player) {
         if (active != session || player == null || !player.isOnline()) return;
-        if (player.getLocation().getY() < 59.0D) player.teleport(spawnFor(session, player));
+        player.teleport(deathTagChaserRespawnSpawn(session, player));
         player.leaveVehicle();
         player.setGameMode(GameMode.SURVIVAL);
         player.setHealth(player.getMaxHealth());
