@@ -8,17 +8,17 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeCatalogTest {
     @Test
-    void registersAllTwentyOneArcadeGames() {
+    void registersAllTwentyFourArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(21, catalog.size());
-        assertEquals(21, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+        assertEquals(24, catalog.size());
+        assertEquals(24, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
     }
 
     @Test
     void eachGameHasItsOwnCosmeticLinesAndWinEffects() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         for (GameDefinition game : catalog.getGames()) {
-            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen").contains(game.getId());
+            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen", "milk-the-cow", "wither-assault").contains(game.getId());
             assertEquals(gameplayFirstPort, game.getCosmeticLines().isEmpty(),
                     game.getId() + " cosmetic lines should remain optional during this gameplay-first port");
             assertTrue(game.getWinEffects().size() >= (gameplayFirstPort ? 1 : 3),
@@ -118,7 +118,7 @@ class ArcadeCatalogTest {
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
         assertEquals(2, readyForTest);
-        assertEquals(19, inProgress);
+        assertEquals(22, inProgress);
     }
 
     @Test
@@ -157,6 +157,17 @@ class ArcadeCatalogTest {
                         .collect(java.util.stream.Collectors.toSet()));
         assertTrue(line.getOptions().stream()
                 .allMatch(option -> "signature".equals(option.getSelectionGroup())));
+    }
+
+    @Test
+    void newlyIntegratedGamesRemainInProgressUntilAcceptance() {
+        ArcadeCatalog catalog = new ArcadeCatalog();
+        for (String id : List.of("skywars", "milk-the-cow", "wither-assault")) {
+            GameDefinition game = catalog.getGame(id);
+            assertNotNull(game, id);
+            assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus(), id);
+            assertFalse(game.isReadyForTest(), id);
+        }
     }
 
     @Test

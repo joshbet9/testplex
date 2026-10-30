@@ -34,11 +34,20 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.BACON_BRAWL, "source-maps/Bacon Brawl/BaconBrawl_Castle.zip"));
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.MILK_THE_COW, "source-maps/Milk the Cow/Milk_BobsFarm.zip"));
+        assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.WITHER_ASSAULT, "source-maps/Milk the Cow/Milk_BobsFarm.zip"));
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.PAINTBALL, "source-maps/Super Paintball/SP_Arena.zip"));
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.SKY_WARS, "source-maps/Skywars/Skywars_Aquarius.zip"));
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.BACON_BRAWL, "maps/bacon-brawl.zip"),
                 "Pre-map-selector configurations using the legacy default resource remain valid");
 
+        assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.SKY_WARS, "source-maps/Bacon Brawl/BaconBrawl_Castle.zip"),
+                "SkyWars must not accept an archive from another game's folder");
         assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.BACON_BRAWL, "source-maps/Bomb Lobbers/Lobbers_Docks.zip"),
                 "A valid archive belonging to another game must not be accepted");
@@ -120,8 +129,8 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheTwentyMechanicsGamesAndIntegratedMonsterMazeModule() {
-        assertEquals(20, ArcadePortGame.values().length);
+    @Test void exposesTheTwentyThreeMechanicsGamesAndIntegratedMonsterMazeModule() {
+        assertEquals(23, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -133,6 +142,9 @@ class ArcadePortGameTest {
         assertEquals(ArcadePortGame.DRAW_MY_THING, ArcadePortGame.fromId("Draw My Thing"));
         assertEquals(ArcadePortGame.MASTER_BUILDERS, ArcadePortGame.fromId("master_builders"));
         assertEquals(ArcadePortGame.SNEAKY_ASSASSINS, ArcadePortGame.fromId("sneaky-assassins"));
+        assertEquals(ArcadePortGame.SKY_WARS, ArcadePortGame.fromId("skywars"));
+        assertEquals(ArcadePortGame.MILK_THE_COW, ArcadePortGame.fromId("milk-the-cow"));
+        assertEquals(ArcadePortGame.WITHER_ASSAULT, ArcadePortGame.fromId("wither-assault"));
     }
 
     @Test void normalizesSpacesAndUnderscoresInTestCommands() {
@@ -599,8 +611,15 @@ class ArcadePortGameTest {
         assertEquals(1, SourceMapCatalog.MapData.orderedRouteMarkers(start, null, 0.75D).size());
     }
 
-    @Test void originalMapCatalogEmbedsThirteenSourceWorldsAndLeavesEvolutionExplicitlyUnmapped() {
+    @Test void originalMapCatalogEmbedsFourteenSourceWorldsAndLeavesUnmappedGamesExplicitlyUnmapped() {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BACON_BRAWL));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.CASTLE_ASSAULT));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.HEROES_OF_GWEN));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAW_MY_THING));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SKY_WARS));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MILK_THE_COW));
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.WITHER_ASSAULT).isEmpty());
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS).isEmpty());
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BOMB_LOBBERS));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DEATH_TAG));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGON_ESCAPE));
@@ -614,7 +633,10 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SHEEP_QUEST));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SPLEEF));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.TURF_WARS));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MILK_THE_COW));
+        assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.WITHER_ASSAULT));
         assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.EVOLUTION));
+        assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.WITHER_ASSAULT));
     }
 
     @Test void oneInTheQuiverSourceKitsAndMeleeDamageAreExplicit() {
@@ -2357,6 +2379,34 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.canCarryAnotherSheep(-1));
     }
 
+    @Test void sheepQuestKitNamesMatchTheLegacyMenuAndAliases() {
+        assertEquals("beserker", ArcadePortRules.normalizeSheepQuestKit("Beserker"));
+        assertEquals("beserker", ArcadePortRules.normalizeSheepQuestKit("sheep-berserker"));
+        assertEquals("beserker", ArcadePortRules.normalizeSheepQuestKit("double jump"));
+        assertEquals("archer", ArcadePortRules.normalizeSheepQuestKit("sheep archer"));
+        assertEquals("brute", ArcadePortRules.normalizeSheepQuestKit("thrower"));
+        assertNull(ArcadePortRules.normalizeSheepQuestKit("fighter"));
+        assertNull(ArcadePortRules.normalizeSheepQuestKit(null));
+    }
+
+    @Test void sheepQuestPickupUsesLegacyRangeAndRecharge() {
+        assertEquals(2.5D, ArcadePortRules.SHEEP_QUEST_PICKUP_RADIUS, 0.00001D);
+        assertEquals(500L, ArcadePortRules.SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS);
+        assertTrue(ArcadePortRules.sheepQuestPickupReady(1_500L, 1_500L));
+        assertFalse(ArcadePortRules.sheepQuestPickupReady(1_499L, 1_500L));
+        assertEquals(8_000L, ArcadePortRules.SHEEP_QUEST_BESERKER_JUMP_COOLDOWN_MILLIS);
+    }
+
+    @Test void sheepQuestTiedFiveMinuteResultEntersLeadChangeOvertime() {
+        assertTrue(ArcadePortRules.sheepQuestIsTied(new int[]{4, 4, 1, 0}));
+        assertTrue(ArcadePortRules.sheepQuestIsTied(new int[]{2, 2, 2, 2}));
+        assertTrue(ArcadePortRules.sheepQuestIsTied(new int[]{0, 0, 0, 0}));
+        assertFalse(ArcadePortRules.sheepQuestIsTied(new int[]{5, 4, 4, 0}));
+        assertTrue(ArcadePortRules.sheepQuestIsTied(null));
+        assertEquals(10_000L, ArcadePortRules.SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS);
+        assertEquals(6.0D, ArcadePortRules.SHEEP_QUEST_THROWER_DAMAGE, 0.00001D);
+    }
+
     @Test void sheepQuestSlowsMoreAsPlayersCarryAdditionalSheep() {
         assertEquals(-1, ArcadePortRules.sheepQuestCarrySlownessAmplifier(0));
         assertEquals(0, ArcadePortRules.sheepQuestCarrySlownessAmplifier(1));
@@ -2384,11 +2434,11 @@ class ArcadePortGameTest {
         assertEquals("UNASSIGNED", ArcadePortRules.sheepQuestTeamPenMarker(4));
     }
 
-    @Test void sheepQuestPenMarkersMatchTheFloorOneBlockBelowSheepFeet() {
-        assertTrue(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -4, 10, 63, -4));
-        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 63, -4, 10, 63, -4));
-        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(11, 64, -4, 10, 63, -4));
-        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -3, 10, 63, -4));
+    @Test void sheepQuestPenMarkersMatchTheExactSourceDataLocations() {
+        assertTrue(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -4, 10, 64, -4));
+        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 65, -4, 10, 64, -4));
+        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(11, 64, -4, 10, 64, -4));
+        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -3, 10, 64, -4));
     }
 
     @Test void sheepQuestPlayerHitsDropSheepAndDealDamage() {

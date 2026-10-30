@@ -1,6 +1,18 @@
 # Modern Arcade mechanics prototypes (Paper 26.3)
 
-This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games outside the dedicated Monster Maze and Snake modules. It is a compatibility/work-in-progress layer intended to expose API and game-loop problems early; it is **not** a claim that all original Mineplex mechanics or maps have been faithfully ported yet.
+This plugin adds first-pass playable mechanics harnesses for the 15 Arcade games outside the dedicated Monster Maze and Snake modules. It is a compatibility/work-in-progress layer intended to expose API and game-loop problems early; it is **not** a claim that all original Mineplex mechanics or maps have been faithfully ported yet.
+
+## SkyWars — fast Mixed Arcade FFA
+
+SkyWars is registered as the isolated `skywars-mixed` variant for Paper 26.3. It uses the archived 1.8 SkyWars maps and authored player-island spawns, and accepts up to 16 players without modifying the legacy Solo SkyWars or Team SkyWars classes.
+
+The fast format uses a 5-second preparation window, an 8-minute live-round ceiling, a block-by-block distance-priority island crumble beginning 60 seconds after the fight starts, and a 45-second world-border close to 32 blocks. The shared generator holds two throwable TNT until collected, then recharges 15 seconds later. Throwable TNT keeps the source 60-tick fuse, 1.6 throw strength and 500 ms click recharge; left-click throws, right-click drops. Island, connector and middle chest pools use the original item families, weights, spawn probabilities and marker groups. The original RED-point Zombie Guardians are spawned with their 15-health gold-armour setup, tether, fire resistance and middle-loot death drop.
+
+The lobby kit selector exposes the five legacy SkyWars kits: Ice (temporary bridge), Fire (area burst), Air (Void Saver and double jump), Metal (armour scaling and Magnet) and Earth (recharging Throwable Dirt). A nearest-target compass is provided to alive players and remains usable by eliminated spectators.
+
+Join with `/arcadeport join skywars-mixed`, quick-start with `/arcadeport play skywars-mixed`, or start the queued lobby with `/arcadeport start skywars-mixed`. Choose an installed map with `/arcadeport maps skywars`.
+
+SkyWars remains a manual-acceptance candidate, not a claim of complete 1.8 parity. The port still needs local Maven compilation and in-game validation, including all archived maps, loot rolls, each kit under combat, guardian pathing/death rewards, TNT damage and disconnect cleanup.
 
 ## Games covered in this first pass
 
@@ -21,17 +33,26 @@ This plugin adds first-pass playable mechanics harnesses for the 14 Arcade games
 
 Each game gets its own separate modern test world, so arena generation/destruction does not use the live 1.8 Testplex world. Original Reborn map archives are embedded for Bacon Brawl, Bomb Lobbers, Death Tag, Dragon Escape, Dragons, Gladiators, Micro Battles, One in the Quiver, Paintball, Runner, Sheep Quest, Spleef and Turf Wars; these load into separate source-world folders and read WorldConfig.dat spawn groups and map bounds. Evolution remains generated because an Evolution map archive is not present in the source map catalogue.
 
+## Castle Assault and Heroes of Gwen — Mixed Arcade ports in progress
+
+Two additional Reborn games and their original archived map collections are registered in the Paper 26.3 mechanics module. Both remain **disabled in `enabled-games`** until source parity and live-server acceptance are complete.
+
+- **Castle Assault** (`castle-assault`) uses the original RED/BLUE King markers, PINK/LIGHT_BLUE sentry crystal markers, BLACK objective TNT pads and BROWN chest locations. Standard objective TNT respawn is 60 seconds; **Castle Assault Mixed Arcade** (`castle-assault-mixed` or `mixed-castle-assault`) uses 30 seconds. The modern runtime includes the King/crystal objective, carried TNT with source-style timed/proximity/death detonation, thrown TNT, kill-driven objective damage, King cages, crystal bases, chest refills, team combat and respawns. The five source kits (Alchemist, Archer, Demolitionist, Fighter and Tank) can be selected with `/arcadeport kit <kit>`; source starter gear, shared opening buffs, per-kit kill-streak rewards and chest loot are ported. Archer ammunition replenishes one arrow every six seconds up to ten and its fletched arrows cannot be dropped or transferred. Demolitionist TNT replenishes one every ten seconds up to two, cannot be dropped or transferred, and receives the source radius bonus. Kit gear is unbreakable and protected from dropping; chest rods are unbreakable. TNT damage and knockback apply the source blast-protection EPF cap and strongest-armour-piece reduction. Remaining work is map-by-map setup validation and live acceptance.
+- **Heroes of Gwen** (`heroes-of-gwen`) reads the original MOBA tower, base and POINT beacon markers. The runtime has tower tiers/guardians, capture beacons, gold income, team respawns and the 114-entry source role-shop catalogue. The ten source heroes (Hattori, Devon, Anath, Dana, Biff, Larissa, Bardolf, Rowena, Ivy and Bob Ross) can be selected with `/arcadeport kit <hero>`; the selected hero routes the Gold Upgrades item to that hero's source role shop (Assassin, Hunter, Mage or Warrior). Hero selection and role-shop routing are implemented, but the generic combat loadout remains unchanged: hero skill activation, ammo regeneration and shop item passive effects are outstanding. The Wither now moves within its source team boundary toward the nearest valid enemy player, returns to base when no target is available, and uses the source four-second Earthquake cadence, radius falloff, knockback and non-damaging falling-block debris. The current target search is player-only; source targeting of other living entities/minions is still outstanding. **Heroes of Gwen Mixed Arcade** (`heroes-of-gwen-mixed` or `mixed-heroes-of-gwen`) removes the central `TOWER <team> 1` markers in the archived Heros Valley map while retaining base-side `TOWER <team> 2` markers, and halves every displayed and charged shop price. Exact beacon visuals, source progression unlocks, hero abilities/passives and map-by-map live validation remain outstanding.
+
+Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Unit tests cover Castle Assault kit and perk rules, blast protection, Heroes of Gwen's ten-hero role mapping and Wither movement/Earthquake falloff, the 60s/30s objective TNT delay, half-cost calculation, archive registration and the central tower filter. These do not certify live in-game parity. Keep Castle Assault and Heroes of Gwen disabled until the remaining mechanics are accepted on the 26.3 test server.
+
 ## Commands
 
 - `/gamepanel` → choose a supported game → **Start / Test**. The coordinator calls `/arcadeport play <game-id>`.
 - `/arcadeport play <id>` — joins a quick-start window, giving others a few seconds to join.
 - `/arcadeport join <id>` then `/arcadeport start <id>` — queue a multi-player test.
 - `/arcadeport play turf-wars-mixed` or `/arcadeport join turf-wars-mixed` then `/arcadeport start turf-wars-mixed` — use the dedicated Mixed Arcade Turf Wars timings and double-column capture. This variant has its own queue and does not change standard `turf-wars`.
-- `/arcadeport kit <el-muchacho-pigo|mama-piggles|pig|mama-pig|sheep-pig|jumper|dragon-escape-jumper|dragon-escape-disruptor|dragon-escape-warper|dragon-escape-digger|disruptor|warper|digger|armorer|pitcher|waller|snowballer|brawler|archer|rifle|sniper|shotgun|machine-gun|runner-basher|runner-archer|runner-traitor|runner-null>` — choose a game kit before a test; Bacon Brawl kits lock at round start, so changes apply on the next test; legacy kit aliases remain accepted.
+- `/arcadeport kit <el-muchacho-pigo|mama-piggles|pig|mama-pig|sheep-pig|jumper|dragon-escape-jumper|dragon-escape-disruptor|dragon-escape-warper|dragon-escape-digger|disruptor|warper|digger|armorer|pitcher|waller|snowballer|brawler|archer|rifle|sniper|shotgun|machine-gun|runner-basher|runner-archer|runner-traitor|runner-null|alchemist|demolitionist|fighter|tank|hattori|devon|anath|dana|biff|larissa|bardolf|rowena|ivy|bob-ross>` — choose a game kit before a test; Castle Assault and Heroes of Gwen use their source kit/hero names; Bacon Brawl kits lock at round start, so changes apply on the next test; legacy aliases remain accepted.
 - `/arcadeport ghost <on|off|toggle>` — enable or hide your Dragon Escape translucent PB player ghost.
 - `/arcadeport status`, `/arcadeport stop` (operator only).
 
-Game IDs are: `bacon-brawl`, `bomb-lobbers`, `death-tag`, `dragon-escape`, `dragons`, `evolution`, `gladiators`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. The separate Mixed Arcade alias is `turf-wars-mixed` (`mixed-turf-wars` is also accepted).
+Game IDs are: `bacon-brawl`, `bomb-lobbers`, `castle-assault`, `death-tag`, `dragon-escape`, `dragons`, `draw-my-thing`, `evolution`, `gladiators`, `heroes-of-gwen`, `master-builders`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. Mixed Arcade aliases use `<game-id>-mixed` or `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Castle Assault and Heroes of Gwen remain disabled pending acceptance.
 
 ## Acceptance boundary
 
@@ -107,3 +128,8 @@ Live acceptance still needs to check the three achievement thresholds, the 90-se
 4. Confirm slow-damage colour transitions do not play a break effect until the block is actually destroyed, and the original block material is used for the Ice Shards fragments.
 
 The catalogue and renderer contract are covered by unit tests. A passing build does not replace live two-client acceptance on Paper 26.3; Spleef remains `MECHANICS_IN_PROGRESS` until that check is completed.
+
+
+## Wither Assault: smoother movement
+
+Wither flight speed follows a continuous altitude curve. Near the spawn height, an eased transition blends the source hover speed into the altitude-based curve, while a per-tick rate limit prevents sudden changes during climbs and descents.

@@ -1528,17 +1528,60 @@ public final class ArcadePortRules {
         };
     }
 
-    /** WorldConfig pen markers describe the floor; the sheep's feet block is one block above it. */
+    /** Legacy SheepData compares the sheep's feet block directly with the DATA_LOCS pen blocks. */
     public static boolean sheepQuestInsidePenMarker(int sheepBlockX, int sheepFeetY, int sheepBlockZ,
-            int markerX, int markerFloorY, int markerZ) {
-        return sheepBlockX == markerX && sheepFeetY == markerFloorY + 1 && sheepBlockZ == markerZ;
+            int markerX, int markerY, int markerZ) {
+        return sheepBlockX == markerX && sheepFeetY == markerY && sheepBlockZ == markerZ;
     }
 
     public static final double SHEEP_QUEST_PLAYER_HIT_DAMAGE = 4.0D;
+    public static final double SHEEP_QUEST_THROWER_DAMAGE = 6.0D;
     public static final int SHEEP_QUEST_INITIAL_SHEEP = 4;
     public static final long SHEEP_QUEST_ROUND_MILLIS = 300_000L;
     public static final int SHEEP_QUEST_MAX_CARRY = 3;
     public static final long SHEEP_QUEST_SPAWN_INTERVAL_MILLIS = 20_000L;
+    public static final long SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS = 500L;
+    public static final double SHEEP_QUEST_PICKUP_RADIUS = 2.5D;
+    public static final long SHEEP_QUEST_BESERKER_JUMP_COOLDOWN_MILLIS = 8_000L;
+    public static final long SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS = 10_000L;
+    public static final long SHEEP_QUEST_ARCHER_FLETCHER_INTERVAL_MILLIS = 2_000L;
+    public static final int SHEEP_QUEST_ARCHER_MAX_ARROWS = 5;
+    public static final int SHEEP_QUEST_ARCHER_BARRAGE_MAX_ARROWS = 5;
+    public static final long SHEEP_QUEST_ARCHER_BARRAGE_INITIAL_CHARGE_MILLIS = 1_000L;
+    public static final long SHEEP_QUEST_ARCHER_BARRAGE_CHARGE_INTERVAL_MILLIS = 250L;
+    public static final long SHEEP_QUEST_ARCHER_BARRAGE_VOLLEY_INTERVAL_MILLIS = 50L;
+
+    public static String normalizeSheepQuestKit(String requestedKit) {
+        if (requestedKit == null || requestedKit.isBlank()) return null;
+        String kit = requestedKit.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        if (kit.startsWith("sheep-")) kit = kit.substring("sheep-".length());
+        return switch (kit) {
+            case "beserker", "berserker", "double-jump" -> "beserker";
+            case "archer" -> "archer";
+            case "brute", "thrower" -> "brute";
+            default -> null;
+        };
+    }
+
+    public static boolean sheepQuestPickupReady(long nowMillis, long nextReadyMillis) {
+        return nowMillis >= nextReadyMillis;
+    }
+
+    public static boolean sheepQuestIsTied(int[] teamCounts) {
+        if (teamCounts == null || teamCounts.length == 0) return true;
+        int best = Integer.MIN_VALUE;
+        int leaders = 0;
+        for (int count : teamCounts) {
+            if (count > best) {
+                best = count;
+                leaders = 1;
+            } else if (count == best) {
+                leaders++;
+            }
+        }
+        return leaders != 1;
+    }
 
     public static boolean canCarryAnotherSheep(int carriedCount) {
         return carriedCount >= 0 && carriedCount < SHEEP_QUEST_MAX_CARRY;
@@ -1927,6 +1970,7 @@ public final class ArcadePortRules {
             case BOMB_LOBBERS -> mapName != null && mapName.equalsIgnoreCase("Intergalactic")
                     ? 18_000L : 6_000L;
             case SHEEP_QUEST -> 2_000L;
+            case SKY_WARS -> 0L;
             case DRAGON_ESCAPE -> mapName != null
                     && mapName.toLowerCase(java.util.Locale.ROOT).contains("hell") ? 16_000L : 12_000L;
             default -> 12_000L;
@@ -2128,10 +2172,12 @@ public final class ArcadePortRules {
         return bodyNear || eyesNear;
     }
 
-    public static boolean isQuiverReboundTargetInRange(double distanceSquared) {
-        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
-                && distanceSquared <= QUIVER_REBOUND_MAX_DISTANCE_SQUARED;
-    }
+
+
+
+
+
+
 
     public static boolean shouldQuiverArrowBounce(int remainingBounces) {
         return remainingBounces > 0;
@@ -2687,4 +2733,85 @@ public final class ArcadePortRules {
         if (redKills != blueKills) return redKills > blueKills ? 0 : 1;
         return -1;
     }
+
+    public static final long CASTLE_ASSAULT_ARCHER_REFILL_MILLIS = 6_000L;
+    public static final int CASTLE_ASSAULT_ARCHER_MAX_ARROWS = 10;
+    public static final long CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS = 10_000L;
+    public static final int CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT = 2;
+
+    public static final long HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS = 4_000L;
+    public static final double HEROES_OF_GWEN_WITHER_TARGET_SPEED = 4.0D;
+    public static final double HEROES_OF_GWEN_WITHER_HOME_SPEED = 6.0D;
+    public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS = 8.0D;
+    public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE = 4.0D;
+
+    /** Source MobaDirectAIMethod interprets speed as ticks per block, then divides by 20. */
+    public static double heroesOfGwenWitherStepPerTick(double sourceSpeed) {
+        return Math.max(0.0D, sourceSpeed) / 20.0D;
+    }
+
+    /** Source Earthquake damage scales with the radius proximity value (1 - distance / radius). */
+    public static double heroesOfGwenWitherEarthquakeDamage(double distanceFromBoss) {
+        double proximity = 1.0D - Math.max(0.0D, Math.min(
+                HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS, distanceFromBoss))
+                / HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS;
+        return HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE * (proximity + 0.5D);
+    }
+
+    /** Reborn caps blast protection EPF at 20 before applying its TNT damage multiplier. */
+    public static double castleAssaultBlastDamageMultiplier(int blastProtectionEpf) {
+        int epf = Math.max(0, Math.min(20, blastProtectionEpf));
+        return 1.0D - epf / 25.0D;
+    }
+
+    /** Reborn reduces blast knockback by 15% per level of the strongest armour piece. */
+    public static double castleAssaultBlastKnockbackMultiplier(int highestBlastProtectionLevel) {
+        return Math.max(0.0D, 1.0D - Math.max(0, highestBlastProtectionLevel) * 0.15D);
+    }
+
+    /** Normalise the five source Castle Assault kits for the test command and lobby selection. */
+    public static String normalizeCastleAssaultKit(String requested) {
+        if (requested == null) return null;
+        String value = requested.toLowerCase(java.util.Locale.ROOT).trim()
+                .replace('_', '-').replace(' ', '-');
+        if ("demo".equals(value) || "demolition".equals(value)) value = "demolitionist";
+        return switch (value) {
+            case "alchemist", "archer", "demolitionist", "fighter", "tank" -> value;
+            default -> null;
+        };
+    }
+
+    /** Canonical source Heroes of Gwen hero IDs, including the hidden Bob Ross hero. */
+    public static String normalizeHeroesOfGwenHero(String requested) {
+        if (requested == null) return null;
+        String value = requested.toLowerCase(java.util.Locale.ROOT).trim()
+                .replace('_', '-').replace(' ', '-');
+        if ("bob".equals(value) || "ross".equals(value) || "bobross".equals(value)) value = "bob-ross";
+        return switch (value) {
+            case "hattori", "devon", "anath", "dana", "biff", "larissa",
+                    "bardolf", "rowena", "ivy", "bob-ross" -> value;
+            default -> null;
+        };
+    }
+
+    /** Source hero-to-role mapping used to open the matching gold-upgrade shop. */
+    public static String heroesOfGwenHeroRole(String hero) {
+        String canonical = normalizeHeroesOfGwenHero(hero);
+        if (canonical == null) return null;
+        return switch (canonical) {
+            case "hattori", "bardolf" -> "Assassin";
+            case "devon", "rowena" -> "Hunter";
+            case "anath", "larissa", "bob-ross" -> "Mage";
+            case "dana", "biff", "ivy" -> "Warrior";
+            default -> null;
+        };
+    }
+
+    public static String heroesOfGwenHeroDisplayName(String hero) {
+        String canonical = normalizeHeroesOfGwenHero(hero);
+        if (canonical == null) return null;
+        return "bob-ross".equals(canonical) ? "Bob Ross"
+                : Character.toUpperCase(canonical.charAt(0)) + canonical.substring(1);
+    }
+
 }

@@ -41,6 +41,7 @@ public final class SourceMapCatalog {
             case SHEEP_QUEST -> "maps/sheep-quest.zip";
             case SPLEEF -> "maps/spleef.zip";
             case TURF_WARS -> "maps/turf-wars.zip";
+            case MILK_THE_COW -> "maps/milk-the-cow.zip";
             case DRAW_MY_THING -> "source-maps/Draw My Thing/Draw_Stadium.zip";
             default -> null;
         };
@@ -56,6 +57,7 @@ public final class SourceMapCatalog {
             case DEATH_TAG -> List.of("Death Tag");
             case DRAGON_ESCAPE -> List.of("Dragon Escape");
             case DRAGONS -> List.of("Dragons");
+            case EVOLUTION -> List.of();
             case GLADIATORS -> List.of("Gladiators");
             case HEROES_OF_GWEN -> List.of("Heroes of GWEN");
             case MICRO_BATTLES -> List.of("Micro Battle");
@@ -67,6 +69,9 @@ public final class SourceMapCatalog {
             case TURF_WARS -> List.of("Turf Wars");
             case DRAW_MY_THING -> List.of("Draw My Thing");
             case MASTER_BUILDERS -> List.of();
+            case SKY_WARS -> List.of("Skywars");
+            case MILK_THE_COW -> List.of("Milk the Cow");
+            case WITHER_ASSAULT -> List.of();
             default -> List.of();
         };
     }

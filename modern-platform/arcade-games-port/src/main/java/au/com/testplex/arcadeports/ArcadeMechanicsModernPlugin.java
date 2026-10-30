@@ -18,9 +18,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private ArcadeMapSelectionMenu mapMenu;
 
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
-    private static final java.util.List<String> READY_FOR_TEST_GAME_IDS =
-            java.util.List.of("death-tag", "one-in-the-quiver");
-    private static final String PLAYABLE_GAMES_REVISION = "ready-only-20261031-v1";
+    private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of("death-tag", "one-in-the-quiver");
+    private static final String PLAYABLE_GAMES_REVISION = "ready-only-20261031-strict-v3";
 
     @Override
     public void onEnable() {
@@ -152,6 +151,15 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         ArcadePortGame game = ArcadePortGame.fromId(baseId);
         return game == ArcadePortGame.TURF_WARS || game == ArcadePortGame.CASTLE_ASSAULT
                 || game == ArcadePortGame.HEROES_OF_GWEN ? game : null;
+    }
+
+    private boolean isMixedSkyWarsId(String requestedId) {
+        if (requestedId == null) return false;
+        String normalized = requestedId.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return normalized.equals("skywars") || normalized.equals("sky-wars")
+                || normalized.equals("skywars-mixed") || normalized.equals("sky-wars-mixed")
+                || normalized.equals("mixed-skywars") || normalized.equals("mixed-sky-wars");
     }
 
     @Override

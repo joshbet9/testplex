@@ -23,7 +23,10 @@ public enum ArcadePortGame {
     DRAW_MY_THING("draw-my-thing", "Draw My Thing", Material.WHITE_WOOL),
     MASTER_BUILDERS("master-builders", "Master Builders", Material.GRASS_BLOCK),
     MONSTER_MAZE("monster-maze", "Monster Maze", Material.ROTTEN_FLESH),
-    SNEAKY_ASSASSINS("sneaky-assassins", "Sneaky Assassins", Material.EMERALD_BLOCK);
+    SNEAKY_ASSASSINS("sneaky-assassins", "Sneaky Assassins", Material.EMERALD_BLOCK),
+    SKY_WARS("skywars", "SkyWars", Material.END_STONE_BRICKS),
+    MILK_THE_COW("milk-the-cow", "Milk the Cow", Material.GRASS_BLOCK),
+    WITHER_ASSAULT("wither-assault", "Wither Assault", Material.STONE_BRICKS);
 
     private final String id;
     private final String displayName;
