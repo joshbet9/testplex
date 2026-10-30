@@ -1216,7 +1216,7 @@ public final class ArcadePortManager implements Listener {
             if (type == ArcadePortGame.SPLEEF) {
                 UUID playerId = player.getUniqueId();
                 session.spleefKits.put(playerId, spleefKitPreferences.getOrDefault(playerId, "snowballer"));
-                session.spleefNextArrowAt.put(playerId, now + ArcadePortRules.SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS);
+                session.spleefNextArrowAt.put(playerId, now);
             }
             if (type == ArcadePortGame.EVOLUTION) {
                 session.evolutionLevels.put(player.getUniqueId(), 0);
@@ -3404,6 +3404,9 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().addItem(new ItemStack(Material.ARROW, 8));
                 break;
             case SPLEEF: {
+                // The Reborn Spleef constructor enables Night Vision for the full round.
+                player.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION,
+                        Integer.MAX_VALUE, 0, false, false, false));
                 String kit = session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer");
                 switch (kit) {
                     case "brawler":
@@ -3412,8 +3415,6 @@ public final class ArcadePortManager implements Listener {
                         break;
                     case "archer":
                         player.getInventory().addItem(new ItemStack(Material.BOW));
-                        player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
-                                "A replenishing Spleef arrow.", ArcadePortRules.SPLEEF_ARCHER_MAX_ARROWS));
                         break;
                     default:
                         player.getInventory().addItem(namedItem(Material.SNOWBALL, "Snowball",
@@ -8355,7 +8356,10 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.PAINTBALL && "melee".equals(source)) return;
         if (session.type == ArcadePortGame.TURF_WARS && !session.turfCombat) return;
         if (session.type == ArcadePortGame.DRAGONS) return; // PvP is disabled; use Pyro against dragons.
-        if (session.type == ArcadePortGame.SPLEEF) return; // Player combat is disabled; projectiles target the floor.
+        if (session.type == ArcadePortGame.SPLEEF) {
+            handleSpleefKnockback(session, attacker, target);
+            return;
+        }
 
         switch (session.type) {
             case BACON_BRAWL:
@@ -8596,6 +8600,10 @@ public final class ArcadePortManager implements Listener {
             } else {
                 handlePlayerHit(session, shooter, target, "projectile hit");
             }
+        } else if (session.type == ArcadePortGame.SPLEEF) {
+            // Reborn's PerkKnockback applies no damage; only the kit-specific impulse.
+            handleSpleefKnockback(session, shooter, target);
+            projectile.remove();
         } else if (session.type == ArcadePortGame.TURF_WARS) {
             handlePlayerHit(session, shooter, target, "projectile hit");
         } else if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
@@ -9169,6 +9177,11 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().set(path + "wins",
                         plugin.getConfig().getInt(path + "wins", 0) + 1);
             }
+            if (session.type == ArcadePortGame.SPLEEF) {
+                plugin.getConfig().set(path + "blocks-broken",
+                        plugin.getConfig().getInt(path + "blocks-broken", 0)
+                                + session.spleefBlocksBroken.getOrDefault(id, 0));
+            }
             if (session.type == ArcadePortGame.DEATH_TAG) {
                 int roundKills = Math.max(0, session.scores.getOrDefault(id, 0));
                 int roundDeaths = Math.max(0, session.deathTagDeathsByPlayer.getOrDefault(id, 0));
@@ -9198,6 +9211,21 @@ public final class ArcadePortManager implements Listener {
         private Inventory inventory;
 
         private DragonCompassMenuHolder(UUID ownerId) {
+            this.ownerId = ownerId;
+        }
+
+        @Override
+        public Inventory getInventory() {
+            return inventory;
+        }
+    }
+
+    private static final class SpleefCompassMenuHolder implements InventoryHolder {
+        private final UUID ownerId;
+        private final Map<Integer, UUID> targetsBySlot = new HashMap<>();
+        private Inventory inventory;
+
+        private SpleefCompassMenuHolder(UUID ownerId) {
             this.ownerId = ownerId;
         }
 
@@ -9630,6 +9658,13 @@ public final class ArcadePortManager implements Listener {
                         (value > 0 ? ChatColor.GREEN : ChatColor.RED) + labels[i], lore, "noop", null, null));
             }
         }
+        if ("spleef".equals(gameId)) {
+            inventory.setItem(33, statsItem(Material.SNOWBALL, ChatColor.AQUA + "Blocks Broken",
+                    List.of(" ", ChatColor.GRAY + "Blocks destroyed in Spleef: " + ChatColor.WHITE
+                            + plugin.getConfig().getInt(path + "blocks-broken", 0),
+                            ChatColor.DARK_GRAY + "Recorded locally by this Testplex server."),
+                    "noop", null, null));
+        }
         inventory.setItem(22, statsSummaryItem(Material.BOOK, ChatColor.BOLD + displayName + " Stats",
                 gameStatsLore(targetId, gameId, false)));
         inventory.setItem(4, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back", List.of(),
@@ -9708,6 +9743,10 @@ public final class ArcadePortManager implements Listener {
         lore.add(ChatColor.GRAY + "Wins: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "wins", 0));
         lore.add(ChatColor.GRAY + "Score / Kills: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "score", 0));
         lore.add(ChatColor.GRAY + "Knockouts: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "knockouts", 0));
+        if ("spleef".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Blocks Broken: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "blocks-broken", 0));
+        }
         if ("death-tag".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Deaths: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "deaths", 0));
             lore.add(ChatColor.GRAY + "K/D Ratio: " + ChatColor.WHITE
@@ -10162,11 +10201,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isSpleefProtectedBlock(Material material) {
-        return !isSpleefFloorBlock(material);
-    }
-
-    private boolean isSpleefFloorBlock(Material material) {
-        return ArcadePortRules.isSpleefFloorMaterial(material);
+        return ArcadePortRules.isSpleefProtectedMaterial(material);
     }
 
     private void restoreSpleefHunger(Session session, Player player, long now) {
@@ -10221,11 +10256,13 @@ public final class ArcadePortManager implements Listener {
                     eliminate(session, player, null, "starved");
                     if (active != session) return;
                 } else {
+                    player.sendMessage(ChatColor.RED + "Break blocks to restore hunger!");
                     player.setHealth(player.getHealth() - 1.0D);
                 }
             }
         }
         if (active != session) return;
+        updateSpleefSpectatorCompasses(session, now);
         for (Player player : alivePlayers(session)) {
             if (!"archer".equals(session.spleefKits.getOrDefault(player.getUniqueId(), "snowballer"))) continue;
             long nextAt = session.spleefNextArrowAt.getOrDefault(player.getUniqueId(),
@@ -10239,6 +10276,50 @@ public final class ArcadePortManager implements Listener {
             session.spleefNextArrowAt.put(player.getUniqueId(),
                     now + ArcadePortRules.SPLEEF_ARCHER_ARROW_INTERVAL_MILLIS);
         }
+    }
+
+    private void handleSpleefKnockback(Session session, Player attacker, Player target) {
+        if (active != session || session.type != ArcadePortGame.SPLEEF || attacker == null || target == null
+                || attacker.equals(target) || !session.alive.contains(attacker.getUniqueId())
+                || !session.alive.contains(target.getUniqueId())) return;
+        String key = attacker.getUniqueId() + ":" + target.getUniqueId();
+        long now = System.currentTimeMillis();
+        long last = session.spleefKnockbackAt.getOrDefault(key, 0L);
+        if (now - last < ArcadePortRules.SPLEEF_KNOCKBACK_COOLDOWN_MILLIS) return;
+        session.spleefKnockbackAt.put(key, now);
+        String kit = session.spleefKits.getOrDefault(attacker.getUniqueId(), "snowballer");
+        double power = "brawler".equals(kit) ? ArcadePortRules.SPLEEF_BRAWLER_KNOCKBACK
+                : ArcadePortRules.SPLEEF_DEFAULT_KNOCKBACK;
+        Vector direction = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
+        if (direction.lengthSquared() <= 0.000001D) return;
+        target.setVelocity(direction.normalize().multiply(power).setY(0.1D));
+        target.playEffect(EntityEffect.HURT);
+    }
+
+    /**
+     * Spleef snowballs can glance off the edge of a floor block. Reborn searches
+     * the surrounding 3x3x3 blocks and chooses the closest non-air block.
+     */
+    private Block spleefProjectileImpactBlock(Location impact) {
+        if (impact == null || impact.getWorld() == null) return null;
+        Block direct = impact.getBlock();
+        if (!direct.getType().isAir()) return direct;
+        Block nearest = null;
+        double nearestDistance = Double.MAX_VALUE;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    Block candidate = direct.getRelative(dx, dy, dz);
+                    if (candidate.getType().isAir()) continue;
+                    double distance = candidate.getLocation().add(0.5D, 0.5D, 0.5D).distanceSquared(impact);
+                    if (distance < nearestDistance) {
+                        nearest = candidate;
+                        nearestDistance = distance;
+                    }
+                }
+            }
+        }
+        return nearest;
     }
 
     private void useSpleefLeap(Session session, Player player, long now) {
@@ -10321,6 +10402,7 @@ public final class ArcadePortManager implements Listener {
      */
     private void breakSpleefBlock(Session session, Player breaker, Block block) {
         if (isSpleefProtectedBlock(block.getType())) return;
+        if (breaker != null) session.spleefBlocksBroken.merge(breaker.getUniqueId(), 1, Integer::sum);
         BlockData brokenData = block.getBlockData();
         Location center = block.getLocation().add(0.5D, 0.5D, 0.5D);
         block.setType(Material.AIR, false);
@@ -11098,17 +11180,17 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
-        if (session.type == ArcadePortGame.SPLEEF
+        if (session.type == ArcadePortGame.SPLEEF && event.getHitEntity() == null
                 && (event.getEntity() instanceof Snowball || event.getEntity() instanceof Arrow)
                 && event.getEntity() instanceof Projectile projectile
                 && projectile.getShooter() instanceof Player shooter
                 && session.alive.contains(shooter.getUniqueId())) {
-            Block center = event.getHitBlock();
-            if (center == null) {
-                center = projectile.getLocation().add(projectile.getVelocity().clone().multiply(0.8D)).getBlock();
-            }
+            Location impact = event.getHitBlock() == null
+                    ? projectile.getLocation().clone().add(projectile.getVelocity().clone().multiply(0.8D))
+                    : event.getHitBlock().getLocation().add(0.5D, 0.5D, 0.5D);
+            Block center = spleefProjectileImpactBlock(impact);
             long now = System.currentTimeMillis();
-            if (center.getWorld() == session.world && !isSpleefProtectedBlock(center.getType())) {
+            if (center != null && center.getWorld() == session.world && !isSpleefProtectedBlock(center.getType())) {
                 restoreSpleefHunger(session, shooter, now);
                 if (projectile instanceof Arrow arrow) {
                     double arrowSpeed = arrow.getVelocity().length();
@@ -11126,7 +11208,6 @@ public final class ArcadePortManager implements Listener {
                     }
                 } else {
                     fadeSpleefBlock(session, shooter, center, false);
-                    giveSpleefSnowball(session, shooter);
                 }
             }
             projectile.remove();
@@ -11748,12 +11829,10 @@ public final class ArcadePortManager implements Listener {
             event.setExpToDrop(0);
             return;
         }
-        if (session.type == ArcadePortGame.SPLEEF && !isSpleefProtectedBlock(event.getBlock().getType())
-                && session.alive.contains(event.getPlayer().getUniqueId())) {
+        if (session.type == ArcadePortGame.SPLEEF) {
             event.setDropItems(false);
             event.setExpToDrop(0);
             event.setCancelled(true);
-            handleSpleefBlockHit(session, event.getPlayer(), event.getBlock(), System.currentTimeMillis());
             return;
         }
         if (session.type == ArcadePortGame.MICRO_BATTLES
@@ -11789,9 +11868,12 @@ public final class ArcadePortManager implements Listener {
             useDragonEscapeDigger(session, event.getPlayer(), event.getBlock());
             return;
         }
-        if (session.type != ArcadePortGame.SPLEEF || isSpleefProtectedBlock(event.getBlock().getType())) return;
+        if (session.type != ArcadePortGame.SPLEEF) return;
+        // The original cancels all live block-damage events, including protected bedrock/lava.
         event.setCancelled(true);
-        handleSpleefBlockHit(session, event.getPlayer(), event.getBlock(), System.currentTimeMillis());
+        if (!isSpleefProtectedBlock(event.getBlock().getType())) {
+            handleSpleefBlockHit(session, event.getPlayer(), event.getBlock(), System.currentTimeMillis());
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -13468,6 +13550,10 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> spleefKits = new HashMap<>();
         final Map<UUID, Long> spleefLeapReadyAt = new HashMap<>();
         final Map<UUID, Long> spleefSmasherReadyAt = new HashMap<>();
+        final Map<String, Long> spleefKnockbackAt = new HashMap<>();
+        final Map<UUID, Integer> spleefBlocksBroken = new HashMap<>();
+        final Map<UUID, Long> spleefSpectateNextTeleportAt = new HashMap<>();
+        long spleefNextCompassUpdateAt;
         final Map<UUID, Long> spleefLastHungerGainAt = new HashMap<>();
         final Map<UUID, Long> spleefNextArrowAt = new HashMap<>();
         final Map<UUID, String> microKits = new HashMap<>();
