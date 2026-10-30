@@ -4451,13 +4451,23 @@ public final class ArcadePortManager implements Listener {
         for (ItemStack leftover : overflow.values()) player.getWorld().dropItemNaturally(dropLocation, leftover);
         remaining--;
         session.dragonEscapeDiggerUsesRemaining.put(id, remaining);
-        if (remaining == 0) {
-            player.getInventory().setItemInMainHand(null);
-        } else {
-            player.getInventory().setItemInMainHand(namedItem(Material.DIAMOND_PICKAXE, "Digger Pickaxe",
-                    "Left-click course blocks to recover and place as shortcuts (" + remaining + " digs left)."));
-        }
+        updateDragonEscapeDiggerPickaxe(player, remaining);
         player.playSound(dropLocation, Sound.BLOCK_STONE_BREAK, 0.75F, 1.2F);
+    }
+
+    /** Keep the Digger tool in its inventory slot; Reborn allowed tunnelling with it selected or not. */
+    private void updateDragonEscapeDiggerPickaxe(Player player, int remaining) {
+        for (int slot = 0; slot < player.getInventory().getSize(); slot++) {
+            ItemStack existing = player.getInventory().getItem(slot);
+            if (existing == null || existing.getType() != Material.DIAMOND_PICKAXE) continue;
+            if (remaining <= 0) {
+                player.getInventory().setItem(slot, null);
+            } else {
+                player.getInventory().setItem(slot, namedItem(Material.DIAMOND_PICKAXE, "Digger Pickaxe",
+                        "Left-click course blocks to recover and place as shortcuts (" + remaining + " digs left)."));
+            }
+            return;
+        }
     }
 
     private void scheduleDragonEscapeBlockRestore(Session session, BlockState previousState, BlockData expectedCurrent) {
@@ -8352,7 +8362,7 @@ public final class ArcadePortManager implements Listener {
                 || !session.alive.contains(event.getPlayer().getUniqueId())) return;
         if (session.type == ArcadePortGame.DRAGON_ESCAPE
                 && "digger".equals(session.dragonEscapeKits.getOrDefault(event.getPlayer().getUniqueId(), "jumper"))
-                && event.getPlayer().getInventory().getItemInMainHand().getType() == Material.DIAMOND_PICKAXE) {
+                && event.getPlayer().getInventory().contains(Material.DIAMOND_PICKAXE)) {
             event.setCancelled(true);
             useDragonEscapeDigger(session, event.getPlayer(), event.getBlock());
             return;
