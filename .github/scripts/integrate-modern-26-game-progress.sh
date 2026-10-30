@@ -669,6 +669,27 @@ if "sheepQuestUpdatedBeforeTimeout" in tick and "boolean sheepQuestUpdatedBefore
     tick = tick.replace(marker, marker + "\n        boolean sheepQuestUpdatedBeforeTimeout = false;", 1)
     source = source[:tick_start] + tick + source[tick_end:]
 
+# Preserve required Paper API imports for the Evolution egg displays / knockback hooks.
+if "import org.bukkit.entity.BlockDisplay;" not in source:
+    anchor = "import org.bukkit.entity.Block;"
+    if anchor not in source:
+        raise SystemExit("Could not find Bukkit Block entity import anchor.")
+    source = source.replace(anchor, anchor + "\nimport org.bukkit.entity.BlockDisplay;", 1)
+if "import io.papermc.paper.event.entity.EntityKnockbackEvent;" not in source:
+    anchor = "import org.bukkit.event.entity.EntityDamageEvent;"
+    if anchor not in source:
+        raise SystemExit("Could not find Bukkit entity damage event import anchor.")
+    source = source.replace(anchor, "import io.papermc.paper.event.entity.EntityKnockbackEvent;\n" + anchor, 1)
+
+# A later branch conflict discarded this existing session map while retaining its
+# update/cleanup methods. Restore the declaration without replacing Session state.
+if "final Map<Block, Long> evolutionWebs" not in source:
+    session_anchor = "    private static final class Session {"
+    if session_anchor not in source:
+        raise SystemExit("Could not find Arcade Session class declaration.")
+    source = source.replace(session_anchor, session_anchor + """
+        final Map<Block, Long> evolutionWebs = new HashMap<>();""", 1)
+
 path.write_text(source)
 print("Reconciled SkyWars helper declarations, spawn placement, shared queue, and Sheep Quest holder cleanup.")
 PY
@@ -756,6 +777,57 @@ for name in method_names:
     snippet = v6[method_start:method_end]
     anchor = "    /** Heroes of Gwen's Mixed Arcade store prices are half their standard cost. */"
     source = source.replace(anchor, snippet + "\n\n" + anchor, 1)
+
+# Evolution/Quiver branch commits overlap the current modern branch. Retain
+# the baseline implementation and remove only the duplicate exact signatures.
+duplicate_methods = [
+    "isQuiverPerfectRun",
+    "isQuiverSpeedrunnerWin",
+    "shouldAwardQuiverFistPunchKills",
+    "quiverBrawlerHealthAfterKill",
+    "isQuiverKillstreakAnnouncement",
+    "quiverKillstreakTitle",
+    "isQuiverReboundImpactInRange",
+]
+
+def method_signature_matches(text: str, method_name: str):
+    pattern = re.compile(
+        r"(?m)^[ \t]*public static [^\n;{]*\b" + re.escape(method_name) + r"\s*\(([^)]*)\)\s*\{"
+    )
+    return list(pattern.finditer(text))
+
+def method_body_end(text: str, opening_brace: int) -> int:
+    depth = 0
+    for index in range(opening_brace, len(text)):
+        if text[index] == "{":
+            depth += 1
+        elif text[index] == "}":
+            depth -= 1
+            if depth == 0:
+                return index + 1
+    raise SystemExit("Unbalanced Java method body while removing duplicate Quiver helper.")
+
+for method_name in duplicate_methods:
+    while True:
+        matches = method_signature_matches(source, method_name)
+        seen = {}
+        duplicate = None
+        for match in matches:
+            signature = re.sub(r"\s+", " ", match.group(1).strip())
+            if signature in seen:
+                duplicate = match
+            else:
+                seen[signature] = match
+        if duplicate is None:
+            break
+        start = duplicate.start()
+        brace = source.find("{", duplicate.end() - 1)
+        end = method_body_end(source, brace)
+        while end < len(source) and source[end] in " \t":
+            end += 1
+        if end < len(source) and source[end] == "\n":
+            end += 1
+        source = source[:start] + source[end:]
 
 path.write_text(source)
 print("Integrated Castle Assault and Heroes of Gwen source rule constants/helpers.")
