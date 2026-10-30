@@ -8164,8 +8164,6 @@ public final class ArcadePortManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    public void onQuiverBowShoot(EntityShootBowEvent event) {
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDeathTagBowShoot(EntityShootBowEvent event) {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.DEATH_TAG
@@ -8190,6 +8188,9 @@ public final class ArcadePortManager implements Listener {
         session.entities.add(arrow);
     }
 
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onQuiverBowShoot(EntityShootBowEvent event) {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
                 || !(event.getEntity() instanceof Player player)
