@@ -189,6 +189,7 @@ public final class ArcadePortManager implements Listener {
     public void removeFromQueues(Player player) {
         if (player == null) return;
         for (Map<UUID, Player> queued : queues.values()) queued.remove(player.getUniqueId());
+        gladiatorLobbyVotes.remove(player.getUniqueId());
     }
 
     public boolean isActiveGame(World world, ArcadePortGame type) {
@@ -1948,7 +1949,6 @@ public final class ArcadePortManager implements Listener {
             session.gladiatorRoundStartedAtByPair.clear();
             session.gladiatorNextPoisonAtByPair.clear();
             session.gladiatorWinnerBracketStarted = false;
-            session.gladiatorLoserBracketStarted = false;
             session.gladiatorWinnerArenaCursor = 0;
             session.gladiatorLoserArenaCursor = 0;
             session.gladiatorPairCount = 0;
@@ -1987,6 +1987,9 @@ public final class ArcadePortManager implements Listener {
                 && session.gladiatorWinnerQueue.size() >= 2) {
             if (session.gladiatorWinnerBracketStarted) {
                 session.gladiatorRound = ArcadePortRules.gladiatorsTierForRound(session.gladiatorRound + 1);
+                // Lower-bracket loadouts follow the current tournament tier, but only
+                // newly-created duels receive it; existing lower-bracket fights stay intact.
+                session.gladiatorLoserRound = session.gladiatorRound;
                 session.gladiatorWinnerArenaCursor = 0;
             }
             while (session.gladiatorWinnerQueue.size() >= 2) {
@@ -1998,19 +2001,16 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
-        // Loser matches do not wait for winners' bracket matches to finish,
-        // but their equipment tier advances on the loser's bracket's own cadence.
+        // Loser matches do not wait for winners' bracket matches to finish.
+        // Gear tier follows the current tournament stage, avoiding timer/order-dependent
+        // upgrades when losses arrive while an earlier lower-bracket duel is still running.
         if (!hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_LOSERS)
                 && session.gladiatorLoserQueue.size() >= 2) {
-            if (session.gladiatorLoserBracketStarted) {
-                session.gladiatorLoserRound = ArcadePortRules.gladiatorsTierForRound(session.gladiatorLoserRound + 1);
-                session.gladiatorLoserArenaCursor = 0;
-            }
+            session.gladiatorLoserArenaCursor = 0;
             while (session.gladiatorLoserQueue.size() >= 2) {
                 UUID first = session.gladiatorLoserQueue.remove(0);
                 UUID second = session.gladiatorLoserQueue.remove(0);
                 startGladiatorMatch(session, first, second, GLADIATOR_BRACKET_LOSERS);
-                session.gladiatorLoserBracketStarted = true;
                 if (active != session) return;
             }
         }
@@ -10992,7 +10992,6 @@ public final class ArcadePortManager implements Listener {
         int gladiatorLoserArenaCursor;
         long gladiatorVotingEndsAt;
         boolean gladiatorWinnerBracketStarted;
-        boolean gladiatorLoserBracketStarted;
         String gladiatorMode = "rodless";
         final Map<UUID, Integer> teams = new HashMap<>();
         final Set<UUID> tagged = new HashSet<>();
