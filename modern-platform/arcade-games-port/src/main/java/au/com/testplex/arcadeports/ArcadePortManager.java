@@ -2938,36 +2938,19 @@ public final class ArcadePortManager implements Listener {
         return ChatColor.GREEN + "█".repeat(filled) + ChatColor.DARK_GRAY + "░".repeat(10 - filled);
     }
 
+    /** The vanilla XP bar is the ability meter during Bacon Brawl. */
     private void updateBaconMeterItem(Session session, Player player) {
         if (session.type != ArcadePortGame.BACON_BRAWL || player == null || !player.isOnline()
                 || !session.alive.contains(player.getUniqueId())) return;
-        UUID id = player.getUniqueId();
-        int percent = session.baconMeters.getOrDefault(id, 0);
-        String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
-        String ability = switch (kit) {
-            case "mama-piggles" -> "Bacon Blast power";
-            case "pig" -> "Invincibility duration";
-            default -> "Body Slam strength";
-        };
-        String displayName = ChatColor.GOLD + "Ability Meter: " + percent + "%";
-        ItemStack current = player.getInventory().getItem(8);
-        if (isBaconMeterItem(current)
-                && current.getItemMeta() != null
-                && displayName.equals(current.getItemMeta().getDisplayName())) return;
-        ItemStack meter = new ItemStack(Material.NETHER_STAR);
-        ItemMeta meta = meter.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName(displayName);
-            meta.setLore(List.of(
-                    baconMeterBar(percent),
-                    ChatColor.GRAY + ability,
-                    ChatColor.YELLOW + "Charge by landing hits.",
-                    percent < ArcadePortRules.BACON_METER_MIN_ABILITY
-                            ? ChatColor.RED + "Need " + ArcadePortRules.BACON_METER_MIN_ABILITY + "% to activate."
-                            : ChatColor.GREEN + "Right-click with your axe to spend."));
-            meter.setItemMeta(meta);
-        }
-        player.getInventory().setItem(8, meter);
+        int percent = Math.max(0, Math.min(ArcadePortRules.BACON_METER_MAX,
+                session.baconMeters.getOrDefault(player.getUniqueId(), 0)));
+        float progress = percent / (float) ArcadePortRules.BACON_METER_MAX;
+        if (Math.abs(player.getExp() - progress) > 0.001F) player.setExp(progress);
+        if (player.getLevel() != percent) player.setLevel(percent);
+
+        // Remove the old slot-9 star if a tester is upgrading from an earlier plugin build.
+        ItemStack oldMeter = player.getInventory().getItem(8);
+        if (isBaconMeterItem(oldMeter)) player.getInventory().setItem(8, null);
     }
 
     private boolean isBaconMeterItem(ItemStack item) {
