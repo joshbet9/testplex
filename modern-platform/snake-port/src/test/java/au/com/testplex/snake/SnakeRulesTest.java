@@ -145,6 +145,14 @@ class SnakeRulesTest {
         assertFalse(SnakeRules.shouldConsumeHazardOnContact(true));
     }
 
+    @Test void sourcePrepareFreezeRunsForNineSecondsBeforeTheLivePhase() {
+        assertEquals(9_000L, SnakeRules.PREPARE_COUNTDOWN_MILLIS);
+        assertTrue(SnakeRules.isPreparing(0L, 9_000L));
+        assertTrue(SnakeRules.isPreparing(8_999L, 9_000L));
+        assertFalse(SnakeRules.isPreparing(9_000L, 9_000L));
+        assertFalse(SnakeRules.isPreparing(9_001L, 9_000L));
+    }
+
     @Test void sourceAbilityItemsTriggerOnEitherClickButNeverPhysicalActions() {
         assertTrue(SnakeRules.isAbilityItemInteraction("LEFT_CLICK_AIR"));
         assertTrue(SnakeRules.isAbilityItemInteraction("LEFT_CLICK_BLOCK"));
