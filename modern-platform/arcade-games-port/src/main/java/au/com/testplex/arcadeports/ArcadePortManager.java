@@ -724,6 +724,89 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void initializeTurfWarsMap(Session session, SourceMapCatalog.MapData map) {
+        if (map == null) return;
+        List<Location> turf = map.dataLocations("YELLOW");
+        List<Location> red = map.dataLocations("RED");
+        List<Location> redBase = map.dataLocations("PINK");
+        List<Location> blue = map.dataLocations("BLUE");
+        List<Location> blueBase = map.dataLocations("LIGHT_BLUE");
+        if (turf.isEmpty() || red.isEmpty() || redBase.isEmpty() || blue.isEmpty() || blueBase.isEmpty()) {
+            plugin.getLogger().warning("Turf Wars map " + map.mapName()
+                    + " is missing its YELLOW/RED/PINK/BLUE/LIGHT_BLUE objective markers; using the bounded fallback objective.");
+            return;
+        }
+        session.turfSurfaceLocations.clear();
+        for (Location location : turf) session.turfSurfaceLocations.add(location.clone());
+        session.turfRedFront = red.get(0).clone();
+        session.turfRedBase = redBase.get(0).clone();
+        session.turfBlueFront = blue.get(0).clone();
+        session.turfBlueBase = blueBase.get(0).clone();
+        session.turfAxisX = Integer.compare(session.turfRedFront.getBlockX(), session.turfBlueFront.getBlockX());
+        session.turfAxisZ = Integer.compare(session.turfRedFront.getBlockZ(), session.turfBlueFront.getBlockZ());
+        if (session.turfAxisX == 0 && session.turfAxisZ == 0) {
+            session.turfSurfaceLocations.clear();
+            plugin.getLogger().warning("Turf Wars map " + map.mapName()
+                    + " has overlapping RED/BLUE frontline markers; using the bounded fallback objective.");
+            return;
+        }
+        session.turfMarkerGeometry = true;
+        for (Location surface : session.turfSurfaceLocations) {
+            // Source ParseData colours ties blue: only a strictly closer red marker gets red turf.
+            boolean redSide = surface.distanceSquared(session.turfRedFront)
+                    < surface.distanceSquared(session.turfBlueFront);
+            surface.getBlock().setType(redSide ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA, false);
+        }
+        session.turfFrontlineX = session.turfRedFront.getBlockX();
+        session.turfInitialFrontlineX = session.turfFrontlineX;
+        plugin.getLogger().info("Loaded source Turf Wars objective markers for " + map.mapName()
+                + " (" + turf.size() + " turf blocks; axis " + session.turfAxisX + "/" + session.turfAxisZ + ").");
+    }
+
+    private int turfWarsRemainingLines(Session session, int team) {
+        if (session.turfMarkerGeometry) {
+            // Source getLines() uses X when the fronts differ on X, otherwise it uses Z.
+            if (session.turfAxisX != 0) {
+                return team == 0
+                        ? ArcadePortRules.turfWarsRemainingLines(session.turfRedFront.getBlockX(), session.turfRedBase.getBlockX())
+                        : ArcadePortRules.turfWarsRemainingLines(session.turfBlueFront.getBlockX(), session.turfBlueBase.getBlockX());
+            }
+            return team == 0
+                    ? ArcadePortRules.turfWarsRemainingLines(session.turfRedFront.getBlockZ(), session.turfRedBase.getBlockZ())
+                    : ArcadePortRules.turfWarsRemainingLines(session.turfBlueFront.getBlockZ(), session.turfBlueBase.getBlockZ());
+        }
+        if (team == 0) return Math.max(0, session.turfFrontlineMaxXExclusive - 1 - session.turfFrontlineX);
+        if (team == 1) return Math.max(0, session.turfFrontlineX - session.turfFrontlineMinX);
+        return Integer.MAX_VALUE;
+    }
+
+    private boolean turfWarsTeamPresent(Session session, int team) {
+        for (UUID id : session.alive) if (session.teams.getOrDefault(id, -1) == team) return true;
+        for (UUID id : session.respawning) if (session.teams.getOrDefault(id, -1) == team) return true;
+        return false;
+    }
+
+    private Player turfWarsWinnerOnTeam(Session session, int team) {
+        return alivePlayers(session).stream()
+                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), -1) == team)
+                .findFirst().orElse(null);
+    }
+
+    private void checkTurfWarsObjectiveEnd(Session session) {
+        if (active != session) return;
+        int redLines = turfWarsRemainingLines(session, 0);
+        int blueLines = turfWarsRemainingLines(session, 1);
+        if (redLines <= 0 || !turfWarsTeamPresent(session, 0)) {
+            finish(session, turfWarsWinnerOnTeam(session, 1), true);
+        } else if (blueLines <= 0 || !turfWarsTeamPresent(session, 1)) {
+            finish(session, turfWarsWinnerOnTeam(session, 0), true);
+        }
+    }
+
+    private boolean isTurfWarsWool(Material material) {
+        return material != null && material.name().endsWith("_WOOL");
+    }
+
     public void selectTurfWarsKit(Player player, String requestedKit) {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeTurfWarsKit(requestedKit);
@@ -1192,6 +1275,7 @@ public final class ArcadePortManager implements Listener {
                 session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive);
         session.turfFrontlineX = session.turfInitialFrontlineX;
         if (type == ArcadePortGame.TURF_WARS) {
+            initializeTurfWarsMap(session, turfSourceMap);
             for (Player player : participants) {
                 UUID playerId = player.getUniqueId();
                 session.turfWarsKits.put(playerId,
@@ -5711,9 +5795,12 @@ public final class ArcadePortManager implements Listener {
         if (now < session.turfPhaseEndsAt) return;
         session.turfCombat = !session.turfCombat;
         if (session.turfCombat) {
+            session.turfCombatRoundsStarted++;
             session.turfPhaseEndsAt = now + ArcadePortRules.turfWarsCombatPhaseMillis(session.mixedArcadeVariant);
-            String gainLabel = session.mixedArcadeVariant ? "two blocks" : "one block";
-            announce(session, ChatColor.RED + "Combat phase! Kills advance your team's turf by " + gainLabel + ".");
+            int gain = ArcadePortRules.turfWarsLinesPerKill(
+                    session.turfCombatRoundsStarted, session.mixedArcadeVariant);
+            announce(session, ChatColor.RED + "Combat phase! Each kill advances "
+                    + gain + (gain == 1 ? " line" : " lines") + " of turf.");
         } else {
             session.turfPhaseEndsAt = now + ArcadePortRules.turfWarsBuildPhaseMillis(session.mixedArcadeVariant);
             for (Player player : alivePlayers(session)) giveTurfWarsWool(session, player);
@@ -8030,7 +8117,8 @@ public final class ArcadePortManager implements Listener {
                     + " A" + sheepQuestTeamCount(session, 1) + " G" + sheepQuestTeamCount(session, 2)
                     + " Y" + sheepQuestTeamCount(session, 3);
             case SPLEEF -> "snowballs " + inventoryCount(player, Material.SNOWBALL);
-            case TURF_WARS -> (session.turfCombat ? "COMBAT" : "BUILD") + " | turf " + session.turfFrontlineX;
+            case TURF_WARS -> (session.turfCombat ? "COMBAT" : "BUILD") + " | R:"
+                    + turfWarsRemainingLines(session, 0) + " B:" + turfWarsRemainingLines(session, 1);
             case DRAW_MY_THING -> session.drawCurrentDrawer == null ? "waiting for next drawing"
                     : session.drawCurrentDrawer.equals(id) ? "drawing"
                     : session.drawCorrectGuessers.contains(id) ? "guessed correctly"
@@ -8082,6 +8170,10 @@ public final class ArcadePortManager implements Listener {
                         .orElse(null);
                 finish(session, winner, true);
             }
+            return;
+        }
+        if (session.type == ArcadePortGame.TURF_WARS && session.participantsAtStart > 1) {
+            checkTurfWarsObjectiveEnd(session);
             return;
         }
         if (session.type == ArcadePortGame.BACON_BRAWL) {
@@ -8881,9 +8973,9 @@ public final class ArcadePortManager implements Listener {
         UUID targetId = target.getUniqueId();
         eliminate(session, target, attacker, "was defeated in Turf Wars");
         if (active != session) return;
+        session.respawning.add(targetId);
         advanceTurfWars(session, attacker);
         if (active != session) return;
-        session.respawning.add(targetId);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (active != session || !target.isOnline()
                     || !session.players.containsKey(targetId) || !session.respawning.remove(targetId)) return;
@@ -8907,32 +8999,62 @@ public final class ArcadePortManager implements Listener {
     private void advanceTurfWars(Session session, Player attacker) {
         int team = session.teams.getOrDefault(attacker.getUniqueId(), -1);
         if (team != 0 && team != 1) return;
-        int oldFrontline = session.turfFrontlineX;
-        int nextFrontline = ArcadePortRules.advanceTurfFrontline(
-                oldFrontline, team, session.mixedArcadeVariant);
-        session.turfFrontlineX = nextFrontline;
-        Material turf = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
-        List<Integer> capturedColumns = ArcadePortRules.turfWarsCapturedColumns(
-                oldFrontline, nextFrontline, team,
-                session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive);
-        for (int paintedX : capturedColumns) {
-            for (int z = session.turfMinZ; z < session.turfMaxZExclusive; z++) {
-                session.world.getBlockAt(paintedX, session.turfFloorY, z).setType(turf, false);
-                for (int y = session.turfFloorY + 1; y <= session.turfFloorY + 5; y++) {
-                    Block structure = session.world.getBlockAt(paintedX, y, z);
-                    if (structure.getType() == Material.RED_WOOL || structure.getType() == Material.BLUE_WOOL) {
-                        structure.setType(Material.AIR, false);
+        int linesPerKill = ArcadePortRules.turfWarsLinesPerKill(
+                session.turfCombatRoundsStarted, session.mixedArcadeVariant);
+        if (session.turfMarkerGeometry) {
+            for (int line = 0; line < linesPerKill; line++) {
+                // The opponent's current frontline marks the strip being captured next.
+                Location boundary = (team == 0 ? session.turfBlueFront : session.turfRedFront).clone();
+                Material turf = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
+                for (Location tile : session.turfSurfaceLocations) {
+                    if (!ArcadePortRules.turfWarsTileOnMarkerLine(tile.getBlockX(), tile.getBlockZ(),
+                            boundary.getBlockX(), boundary.getBlockZ(), session.turfAxisX, session.turfAxisZ)) continue;
+                    Block floor = tile.getBlock();
+                    floor.setType(turf, false);
+                    // Source clears wool fort blocks one through five above each captured tile.
+                    for (int y = 1; y <= 5; y++) {
+                        Block fort = floor.getRelative(0, y, 0);
+                        if (isTurfWarsWool(fort.getType())) fort.setType(Material.AIR, false);
+                    }
+                }
+                // Both fronts move together by the source _xRed/_zRed vector.
+                int direction = team == 0 ? -1 : 1;
+                session.turfRedFront.add(session.turfAxisX * direction, 0.0D,
+                        session.turfAxisZ * direction);
+                session.turfBlueFront.add(session.turfAxisX * direction, 0.0D,
+                        session.turfAxisZ * direction);
+                session.turfFrontlineX = session.turfRedFront.getBlockX();
+                checkTurfWarsObjectiveEnd(session);
+                if (active != session) return;
+            }
+        } else {
+            // The fallback arena is a simple X-axis map; keep its opposing team directions.
+            int oldFrontline = session.turfFrontlineX;
+            int delta = team == 0 ? linesPerKill : -linesPerKill;
+            int nextFrontline = oldFrontline + delta;
+            session.turfFrontlineX = nextFrontline;
+            Material turf = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
+            List<Integer> capturedColumns = ArcadePortRules.turfWarsCapturedColumns(
+                    oldFrontline, nextFrontline, team,
+                    session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive);
+            for (int paintedX : capturedColumns) {
+                for (int z = session.turfMinZ; z < session.turfMaxZExclusive; z++) {
+                    Block floor = session.world.getBlockAt(paintedX, session.turfFloorY, z);
+                    floor.setType(turf, false);
+                    for (int y = 1; y <= 5; y++) {
+                        Block fort = floor.getRelative(0, y, 0);
+                        if (isTurfWarsWool(fort.getType())) fort.setType(Material.AIR, false);
                     }
                 }
             }
+            checkTurfWarsObjectiveEnd(session);
+            if (active != session) return;
         }
-        if (ArcadePortRules.isTurfWarsWinningLine(nextFrontline, team,
-                session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive)) {
-            finish(session, attacker, true);
-            return;
+        if (active == session) {
+            announce(session, (team == 0 ? ChatColor.RED + "Red" : ChatColor.BLUE + "Blue")
+                    + ChatColor.WHITE + " captured turf. Remaining lines - Red: "
+                    + turfWarsRemainingLines(session, 0) + ", Blue: " + turfWarsRemainingLines(session, 1) + ".");
         }
-        announce(session, (team == 0 ? ChatColor.RED + "Red" : ChatColor.BLUE + "Blue")
-                + ChatColor.WHITE + " advanced the turf line to " + nextFrontline + ".");
     }
 
     private void scoreQuiverKill(Session session, Player attacker, Player target) {
@@ -9044,8 +9166,11 @@ public final class ArcadePortManager implements Listener {
         }
         int team = -1;
         if (session.type == ArcadePortGame.TURF_WARS) {
-            team = ArcadePortRules.turfWarsTimeoutLeader(session.turfFrontlineX,
-                    session.turfInitialFrontlineX, timeoutTeamKills(session, 0), timeoutTeamKills(session, 1));
+            team = session.turfMarkerGeometry
+                    ? ArcadePortRules.turfWarsLeadingTeam(turfWarsRemainingLines(session, 0),
+                            turfWarsRemainingLines(session, 1), timeoutTeamKills(session, 0), timeoutTeamKills(session, 1))
+                    : ArcadePortRules.turfWarsTimeoutLeader(session.turfFrontlineX,
+                            session.turfInitialFrontlineX, timeoutTeamKills(session, 0), timeoutTeamKills(session, 1));
         } else if (session.type == ArcadePortGame.MICRO_BATTLES
                 || session.type == ArcadePortGame.PAINTBALL
                 || session.type == ArcadePortGame.BOMB_LOBBERS) {
@@ -14401,6 +14526,15 @@ public final class ArcadePortManager implements Listener {
         long startedAt;
          boolean microBarrierActive;
         final boolean mixedArcadeVariant;
+        final List<Location> turfSurfaceLocations = new ArrayList<>();
+        Location turfRedFront;
+        Location turfRedBase;
+        Location turfBlueFront;
+        Location turfBlueBase;
+        int turfAxisX;
+        int turfAxisZ;
+        boolean turfMarkerGeometry;
+        int turfCombatRoundsStarted;
         boolean turfCombat;
         long turfPhaseEndsAt;
         int turfFrontlineX = -1;
