@@ -44,6 +44,8 @@ import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.event.block.Action;
@@ -1676,8 +1678,8 @@ public final class ArcadePortManager implements Listener {
                 "players." + player.getUniqueId() + ".games.gladiators.kill-message", "classic");
         String[][] options = {
                 {"classic", "Classic", "was defeated by"},
-                {"sand", "Sent to the Sand", "was sent to the sand by"},
-                {"oath", "Broken Oath", "'s challenge was ended by"},
+                {"sent-to-sand", "Sent to the Sand", "was sent to the sand by"},
+                {"broken-oath", "Broken Oath", "'s challenge was ended by"},
                 {"outclassed", "Outclassed", "was no match for"}
         };
         Material[] icons = {Material.IRON_SWORD, Material.SAND, Material.SHIELD, Material.CROSSBOW};
@@ -1757,12 +1759,27 @@ public final class ArcadePortManager implements Listener {
         player.updateInventory();
     }
 
-    private void announceGladiatorKill(Session session, Player killer, Player victim) {
-        String style = plugin.getConfig().getString(
+    private String gladiatorKillMessageStyle(Player killer) {
+        Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (cosmeticsPlugin != null) {
+            Path preferences = cosmeticsPlugin.getDataFolder().toPath().resolve("player-preferences.yml");
+            if (Files.isRegularFile(preferences)) {
+                YamlConfiguration data = YamlConfiguration.loadConfiguration(preferences.toFile());
+                String selected = data.getString("players." + killer.getUniqueId()
+                        + ".games.gladiators.cosmetics.kill-message.selected");
+                if (selected != null && !selected.isBlank()) return selected;
+            }
+        }
+        String fallback = plugin.getConfig().getString(
                 "players." + killer.getUniqueId() + ".games.gladiators.kill-message", "classic");
-        String message = switch (style == null ? "classic" : style) {
-            case "sand" -> ChatColor.GRAY + victim.getName() + " was sent to the sand by " + ChatColor.GOLD + killer.getName();
-            case "oath" -> ChatColor.GRAY + victim.getName() + "'s challenge was ended by " + ChatColor.GOLD + killer.getName();
+        return fallback == null ? "classic" : fallback;
+    }
+
+    private void announceGladiatorKill(Session session, Player killer, Player victim) {
+        String style = gladiatorKillMessageStyle(killer);
+        String message = switch (style) {
+            case "sent-to-sand" -> ChatColor.GRAY + victim.getName() + " was sent to the sand by " + ChatColor.GOLD + killer.getName();
+            case "broken-oath" -> ChatColor.GRAY + victim.getName() + "'s challenge was ended by " + ChatColor.GOLD + killer.getName();
             case "outclassed" -> ChatColor.GRAY + victim.getName() + " was no match for " + ChatColor.GOLD + killer.getName();
             default -> ChatColor.GRAY + victim.getName() + " was defeated by " + ChatColor.GOLD + killer.getName();
         };
@@ -6302,7 +6319,7 @@ public final class ArcadePortManager implements Listener {
         session.gladiatorRoundStartedAtByPair.remove(pair);
         session.gladiatorNextPoisonAtByPair.remove(pair);
         session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
-        if (killer.getHealth() <= 1.0001D) {
+        if (ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(killer.getHealth())) {
             awardGladiatorsAchievement(killer, "not-even-close", "Not even close.");
         }
         announceGladiatorKill(session, killer, victim);
