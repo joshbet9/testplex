@@ -2186,11 +2186,13 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.turfWarsTimeoutLeader(119, 119, 4, 4));
     }
 
-    @Test void turfWarsUsesDifferentArrowAndMeleeDamage() {
-        assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage(true, false), 0.00001D);
-        assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage(true, true), 0.00001D);
-        assertEquals(6.0D, ArcadePortRules.turfWarsHitDamage(false, false), 0.00001D);
-        assertEquals(12.0D, ArcadePortRules.turfWarsHitDamage(false, true), 0.00001D);
+    @Test void turfWarsUsesKitSpecificProjectileAndMeleeDamage() {
+        assertEquals(500.0D, ArcadePortRules.turfWarsHitDamage("marksman", true, false), 0.00001D);
+        assertEquals(500.0D, ArcadePortRules.turfWarsHitDamage("infiltrator", true, true), 0.00001D);
+        assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage("shredder", true, false), 0.00001D);
+        assertEquals(9.0D, ArcadePortRules.turfWarsHitDamage("shredder", true, true), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.turfWarsHitDamage("marksman", false, false), 0.00001D);
+        assertEquals(12.0D, ArcadePortRules.turfWarsHitDamage("infiltrator", false, true), 0.00001D);
     }
 
     @Test void paintballHealthTracksRemainingArmourPieces() {
