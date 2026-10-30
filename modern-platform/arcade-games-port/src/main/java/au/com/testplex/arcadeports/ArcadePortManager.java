@@ -4152,6 +4152,8 @@ public final class ArcadePortManager implements Listener {
         dragon.setAI(false);
         dragon.setGravity(false);
         dragon.setInvulnerable(true);
+        // Reborn marks Douglas as a ghost: visible and harmless, without player/entity collision.
+        dragon.setCollidable(false);
         dragon.setRemoveWhenFarAway(false);
         dragon.setCustomName(ChatColor.YELLOW + "Douglas the Dragon");
         dragon.setCustomNameVisible(true);
