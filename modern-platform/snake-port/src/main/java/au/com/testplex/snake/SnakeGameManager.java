@@ -443,6 +443,12 @@ public final class SnakeGameManager implements Listener {
         nextFoodAt = now + 1_000L;
         nextGrowAt = now + 1_000L;
         nextHazardAt = now + FIRST_HAZARD_DELAY_MS;
+        // The 9-second PrepareFreeze period is not counted as player inactivity.
+        for (SnakeState state : snakes.values()) {
+            if (!state.alive || state.segments.isEmpty()) continue;
+            state.lastMovementLocation = state.segments.get(0).getLocation().clone();
+            state.lastMovementAt = now;
+        }
         announce(ChatColor.AQUA + "Snake is best played in 3rd Person! (Press F5)");
         announce(ChatColor.GOLD + "Hazards and the steering roulette ramp up as the round goes on!");
     }
