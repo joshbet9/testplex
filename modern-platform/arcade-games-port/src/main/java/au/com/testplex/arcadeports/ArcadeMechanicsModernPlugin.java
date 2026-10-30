@@ -1,5 +1,6 @@
 package au.com.testplex.arcadeports;
 
+import me.monstermaze.MonsterMazePlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
@@ -13,6 +14,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements CommandExecutor, Listener {
     private ArcadePortManager manager;
+    private MonsterMazePlugin monsterMaze;
     private ArcadeMapSelectionMenu mapMenu;
 
     @Override
@@ -34,7 +36,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             getConfig().set("acceptance-games-revision", acceptanceRevision);
         }
         saveConfig();
+        monsterMaze = new MonsterMazePlugin(this);
+        monsterMaze.enable();
         manager = new ArcadePortManager(this);
+        manager.setMonsterMazeModule(monsterMaze);
         mapMenu = new ArcadeMapSelectionMenu(this);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
@@ -66,9 +71,12 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 + ". Other mechanics prototypes stay locked until they pass parity acceptance.");
     }
 
+    public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
+
     @Override
     public void onDisable() {
         if (manager != null) manager.shutdown();
+        if (monsterMaze != null) monsterMaze.shutdown();
     }
 
     /** Public bridge for standalone games whose mechanics live in a separate plugin JAR. */
