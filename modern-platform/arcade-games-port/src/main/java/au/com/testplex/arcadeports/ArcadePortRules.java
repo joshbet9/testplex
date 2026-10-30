@@ -23,6 +23,51 @@ public final class ArcadePortRules {
                 : CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS;
     }
 
+    /** Normalise the five source Castle Assault kits for the test command and lobby selection. */
+    public static String normalizeCastleAssaultKit(String requested) {
+        if (requested == null) return null;
+        String value = requested.toLowerCase(java.util.Locale.ROOT).trim()
+                .replace('_', '-').replace(' ', '-');
+        if ("demo".equals(value) || "demolition".equals(value)) value = "demolitionist";
+        return switch (value) {
+            case "alchemist", "archer", "demolitionist", "fighter", "tank" -> value;
+            default -> null;
+        };
+    }
+
+    /** Canonical source Heroes of Gwen hero IDs, including the hidden Bob Ross hero. */
+    public static String normalizeHeroesOfGwenHero(String requested) {
+        if (requested == null) return null;
+        String value = requested.toLowerCase(java.util.Locale.ROOT).trim()
+                .replace('_', '-').replace(' ', '-');
+        if ("bob".equals(value) || "ross".equals(value) || "bobross".equals(value)) value = "bob-ross";
+        return switch (value) {
+            case "hattori", "devon", "anath", "dana", "biff", "larissa",
+                    "bardolf", "rowena", "ivy", "bob-ross" -> value;
+            default -> null;
+        };
+    }
+
+    /** Source hero-to-role mapping used to open the matching gold-upgrade shop. */
+    public static String heroesOfGwenHeroRole(String hero) {
+        String canonical = normalizeHeroesOfGwenHero(hero);
+        if (canonical == null) return null;
+        return switch (canonical) {
+            case "hattori", "bardolf" -> "Assassin";
+            case "devon", "rowena" -> "Hunter";
+            case "anath", "larissa", "bob-ross" -> "Mage";
+            case "dana", "biff", "ivy" -> "Warrior";
+            default -> null;
+        };
+    }
+
+    public static String heroesOfGwenHeroDisplayName(String hero) {
+        String canonical = normalizeHeroesOfGwenHero(hero);
+        if (canonical == null) return null;
+        return "bob-ross".equals(canonical) ? "Bob Ross"
+                : Character.toUpperCase(canonical.charAt(0)) + canonical.substring(1);
+    }
+
     /** Heroes of Gwen's Mixed Arcade store prices are half their standard cost. */
     public static int heroesOfGwenStoreItemCost(int standardCost, boolean mixedArcadeVariant) {
         if (standardCost < 0) throw new IllegalArgumentException("Store item cost cannot be negative.");
