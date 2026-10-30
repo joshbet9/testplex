@@ -99,27 +99,26 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void deathTagIsReadyForInGameAcceptanceWhileOtherPortsRemainInProgress() {
+    void onlyDeathTagAndOneInTheQuiverAreReadyForInGameAcceptance() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        GameDefinition deathTag = catalog.getGame("death-tag");
-        assertNotNull(deathTag);
-        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, deathTag.getPortStatus());
-        assertTrue(deathTag.isReadyForTest());
+        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver");
 
         for (GameDefinition game : catalog.getGames()) {
-            if (game.getId().equals("death-tag")) continue;
-            assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus(),
-                    game.getId() + " must remain in progress until its gameplay parity is validated");
-            assertFalse(game.isReadyForTest());
+            if (readyIds.contains(game.getId())) {
+                assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus(),
+                        game.getId() + " is explicitly cleared for in-game testing");
+                assertTrue(game.isReadyForTest());
+            } else {
+                assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus(),
+                        game.getId() + " must remain gated until its gameplay parity is validated");
+                assertFalse(game.isReadyForTest());
+            }
         }
-        long readyForTest = catalog.getGames().stream()
-                .filter(GameDefinition::isReadyForTest)
-                .count();
+        long readyForTest = catalog.getGames().stream().filter(GameDefinition::isReadyForTest).count();
         long inProgress = catalog.getGames().stream()
-                .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS)
-                .count();
-        assertEquals(1, readyForTest);
-        assertEquals(20, inProgress);
+                .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
+        assertEquals(2, readyForTest);
+        assertEquals(19, inProgress);
     }
 
     @Test

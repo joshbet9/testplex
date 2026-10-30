@@ -209,7 +209,6 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey statsGameKey;
     private final NamespacedKey bombPowerupKey;
     private final NamespacedKey microTeamItemKey;
-    private final NamespacedKey microTeamItemKey;
     private final NamespacedKey gladiatorMenuActionKey;
     private final NamespacedKey gladiatorMenuValueKey;
     private final NamespacedKey gladiatorPotionKey;
@@ -225,7 +224,6 @@ public final class ArcadePortManager implements Listener {
         this.statsCategoryKey = new NamespacedKey(plugin, "stats-category");
         this.statsGameKey = new NamespacedKey(plugin, "stats-game");
         this.bombPowerupKey = new NamespacedKey(plugin, "bomb-lobbers-powerup");
-        this.microTeamItemKey = new NamespacedKey(plugin, "micro-team-item");
         this.microTeamItemKey = new NamespacedKey(plugin, "micro-team-item");
         this.gladiatorMenuActionKey = new NamespacedKey(plugin, "gladiators-menu-action");
         this.gladiatorMenuValueKey = new NamespacedKey(plugin, "gladiators-menu-value");

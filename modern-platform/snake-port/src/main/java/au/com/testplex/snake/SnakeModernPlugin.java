@@ -9,10 +9,16 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SnakeModernPlugin extends JavaPlugin implements CommandExecutor {
     private SnakeGameManager game;
+    private static final boolean READY_FOR_TEST = false;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        if (!READY_FOR_TEST || !getConfig().getBoolean("enabled", false)) {
+            getLogger().info("SnakeModern is installed but disabled; it is not cleared for in-game testing yet.");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
         game = new SnakeGameManager(this);
         if (!game.isAvailable()) {
             getLogger().severe("SnakeModern could not load an original Snake map with valid TEAM_SPAWNS. Disabling the plugin.");

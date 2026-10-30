@@ -1,23 +1,11 @@
-# Isolated manual-acceptance candidates. Availability does not itself certify 100% in-game parity.
-# Draw My Thing and Master Builders are available as modern Arcade-format prototypes.
-# Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball, Runner and Spleef are available as live-acceptance candidates.
-# Candidate availability is not a claim of complete live parity certification.
-# Sneaky Assassins remains disabled until its generated arena passes multi-client acceptance and a source map is available.
-# Candidate availability is not a claim of complete live parity certification.
-# Candidate availability is not a claim of complete live parity certification.
+# All 21 catalogue games and their mechanics are packaged in ArcadeMechanicsModern.jar.
+# Only games marked READY_FOR_TEST in ArcadeCatalog may be started in the isolated server.
+# The other 19 ports remain installed but unavailable until their parity/acceptance gate is cleared.
 enabled-games:
-  - monster-maze
-  - bacon-brawl
-  - bomb-lobbers
-  - dragon-escape
-  - dragons
-  - dragons
-  - paintball
-  - runner
-  - gladiators
-  - spleef
-  - draw-my-thing
-  - master-builders
+  - death-tag
+  - one-in-the-quiver
+
+lobby-selected-game: death-tag
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:

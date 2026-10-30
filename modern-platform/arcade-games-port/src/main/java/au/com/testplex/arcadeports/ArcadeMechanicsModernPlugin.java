@@ -17,28 +17,33 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private MonsterMazePlugin monsterMaze;
     private ArcadeMapSelectionMenu mapMenu;
 
+    // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
+    private static final java.util.List<String> READY_FOR_TEST_GAME_IDS =
+            java.util.List.of("death-tag", "one-in-the-quiver");
+    private static final String PLAYABLE_GAMES_REVISION = "ready-only-20261031-v1";
+
+    @Override
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        if (!getConfig().contains("enabled-games")) {
-            getConfig().set("enabled-games", java.util.List.of("bacon-brawl"));
-        }
-        String acceptanceRevision = "draw-master-builders-paper-26.3-v3";
-        if (!acceptanceRevision.equals(getConfig().getString("acceptance-games-revision", ""))) {
-            java.util.List<String> enabled = new java.util.ArrayList<>(getConfig().getStringList("enabled-games"));
-            // Preserve prior acceptance candidates and any locally maintained allow-list entries.
-            for (String candidate : java.util.List.of("bomb-lobbers", "dragon-escape", "paintball", "runner", "dragons",
-                    "gladiators", "spleef", "draw-my-thing", "master-builders")) {
-                if (!enabled.contains(candidate)) enabled.add(candidate);
-            }
-            if (!enabled.contains("dragons")) enabled.add("dragons");
-            getConfig().set("enabled-games", enabled);
-            getConfig().set("acceptance-games-revision", acceptanceRevision);
+
+        // Replace the previous broad acceptance list once, then enforce the reviewed
+        // READY_FOR_TEST allow-list on every startup so old VM configs cannot re-enable WIP games.
+        if (!PLAYABLE_GAMES_REVISION.equals(getConfig().getString("playable-games-revision", ""))) {
+            getConfig().set("enabled-games", new java.util.ArrayList<>(READY_FOR_TEST_GAME_IDS));
+            getConfig().set("playable-games-revision", PLAYABLE_GAMES_REVISION);
         }
         java.util.List<String> enabledGames = new java.util.ArrayList<>(getConfig().getStringList("enabled-games"));
-        if (!enabledGames.contains("monster-maze")) enabledGames.add(0, "monster-maze");
+        enabledGames.removeIf(gameId -> !READY_FOR_TEST_GAME_IDS.contains(gameId));
+        enabledGames = new java.util.ArrayList<>(new java.util.LinkedHashSet<>(enabledGames));
         getConfig().set("enabled-games", enabledGames);
+
+        String selectedLobbyGame = getConfig().getString("lobby-selected-game", "death-tag");
+        if (!enabledGames.contains(selectedLobbyGame)) {
+            getConfig().set("lobby-selected-game", enabledGames.isEmpty() ? "death-tag" : enabledGames.get(0));
+        }
         saveConfig();
+
         monsterMaze = new MonsterMazePlugin(this);
         monsterMaze.enable();
         manager = new ArcadePortManager(this);
@@ -55,27 +60,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
             });
         }
-        if (getCommand("arcadeport") == null) {
-            getLogger().severe("Missing /arcadeport command metadata.");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
-        }
+        getCommand("stats").setExecutor(this);
         getCommand("arcadeport").setExecutor(this);
-        if (getCommand("stats") == null) {
-            getLogger().severe("Missing /stats command metadata.");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
-        }
-        getCommand("stats").setExecutor((sender, command, label, args) -> {
-            if (!(sender instanceof Player player)) {
-                sender.sendMessage("This command must be used in-game.");
-                return true;
-            }
-            manager.openStats(player, args.length == 0 ? null : args[0]);
-            return true;
-        });
-        getLogger().info("ArcadeMechanicsModern loaded. Cleared in-game test games: " + manager.enabledGamesLabel()
-                + ". Other mechanics prototypes stay locked until they pass parity acceptance.");
+        getServer().getPluginManager().registerEvents(this, this);
     }
 
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }

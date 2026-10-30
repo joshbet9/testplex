@@ -80,11 +80,46 @@ jobs:
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
           jar tf "$arcade_jar" | grep -Fxq "source-maps/Draw My Thing/Draw_Stadium.zip"
           arcade_config="$(unzip -p "$arcade_jar" config.yml)"
-          for candidate in bacon-brawl bomb-lobbers dragon-escape dragons gladiators paintball runner spleef draw-my-thing master-builders; do
-            grep -Fxq "  - $candidate" <<< "$arcade_config"
-          done
-          ! grep -Eq "^  - (death-tag|evolution|micro-battles|one-in-the-quiver|sheep-quest|turf-wars)$" <<< "$arcade_config"
-          echo "All three modern Paper 26.3 Bukkit plugins verified; Draw My Thing includes its no-resource-pack Stadium map, and all ten enabled Arcade candidates are present."
+          enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config")"
+          expected_enabled_ids=
+
+      - name: Upload modern plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: testplex-modern-paper-26.3
+          path: |
+            modern-platform/target/TestplexModernArcade.jar
+            modern-platform/snake-port/target/SnakeModern.jar
+            modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Write build summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Testplex Modern Paper 26.3"
+            echo
+            echo "- Runtime/API baseline: Java 25 / Paper 26.3"
+            echo "- Separate from legacy Java 8 build and deployment"
+            echo "- Catalogue: 21 Arcade games (two READY_FOR_TEST, 19 MECHANICS_IN_PROGRESS)"
+            echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar and ArcadeMechanicsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
+            echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
+            echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
+            echo "- Gameplay ports: all 21 catalogue entries are packaged; unfinished ports remain installed but unavailable for starting live games"
+            echo "- Playable allow-list: Death Tag and One in the Quiver only; all other 19 catalogue entries and Snake remain gated pending readiness promotion"
+            echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+death-tag\none-in-the-quiver'
+          [[ "$enabled_ids" == "$expected_enabled_ids" ]] || {
+            echo "Only READY_FOR_TEST games may be enabled. Found: [$enabled_ids]" >&2
+            exit 1
+          }
+          snake_config="$(unzip -p "$snake_jar" config.yml)"
+          grep -Fxq "enabled: false" <<< "$snake_config"
+          echo "All three modern Paper 26.3 Bukkit plugins verified; 21 Arcade catalogue games are packaged, only Death Tag and One in the Quiver are enabled, and Snake remains gated."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
@@ -115,3 +150,12 @@ jobs:
             echo "- Server deploy: a separate workflow-run handler deploys only the latest successful push artifact from feat/testplex-modern-26.3-platform; later source pushes no longer cancel an in-flight VM deployment"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  deploy-modern-test-server:
+    name: Deploy successful integration build to isolated Paper 26.3 VM
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' }}
+    needs: build-modern-arcade
+    uses: ./.github/workflows/deploy-testplex-modern-hyperv.yml
+    with:
+      deploy_to_modern_test_server: true
+      source_run_id: ${{ format('{0}', github.run_id) }}
+    secrets: inherit
