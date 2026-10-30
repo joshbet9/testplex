@@ -8390,6 +8390,7 @@ public final class ArcadePortManager implements Listener {
             Player thrower = session.players.get(entry.getValue());
             for (Player target : alivePlayers(session)) {
                 if (target.getUniqueId().equals(entry.getValue())
+                        || (thrown instanceof Player thrownPlayer && thrownPlayer.equals(target))
                         || target.getLocation().distanceSquared(thrown.getLocation()) > 1.44D) continue;
                 if (sheepCarriedBy(session, target.getUniqueId()) > 0) {
                     if (thrower != null && thrower.isOnline()) recordSheepQuestStat(thrower.getUniqueId(), "animal-rescue");
