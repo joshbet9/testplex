@@ -8048,11 +8048,11 @@ public final class ArcadePortManager implements Listener {
 
     private void checkPlayerArena(Session session, Player player) {
         if (!session.alive.contains(player.getUniqueId())) return;
+        Location location = player.getLocation();
         if (session.type == ArcadePortGame.GLADIATORS) {
             Integer pair = session.gladiatorPairs.get(player.getUniqueId());
             if (pair == null) return;
             int bracket = session.gladiatorPairBrackets.getOrDefault(pair, GLADIATOR_BRACKET_WINNERS);
-            Location location = player.getLocation();
             if (bracket == GLADIATOR_BRACKET_LOSERS) {
                 Location center = session.gladiatorArenaCentersByPair.get(pair);
                 if (center != null && (Math.abs(location.getX() - center.getX()) > 3.65D
@@ -8070,7 +8070,6 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
-        Location location = player.getLocation();
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(session.type.id());
         double voidThresholdY;
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
