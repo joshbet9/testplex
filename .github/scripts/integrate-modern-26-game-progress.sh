@@ -672,6 +672,7 @@ PY
 
 python3 - <<'PY'
 from pathlib import Path
+import re
 import subprocess
 
 path = Path("modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortRules.java")
