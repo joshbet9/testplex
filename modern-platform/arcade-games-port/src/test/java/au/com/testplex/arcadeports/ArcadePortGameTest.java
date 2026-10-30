@@ -1723,6 +1723,13 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.deathTagChasersReceiveSpeed(0, 4));
     }
 
+    @Test void deathTagKillDeathRatioMatchesSourceChatStats() {
+        assertEquals(0.0D, ArcadePortRules.deathTagKillDeathRatio(0, 0), 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.deathTagKillDeathRatio(5, 0), 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.deathTagKillDeathRatio(6, 3), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.deathTagKillDeathRatio(-2, 5), 0.00001D);
+    }
+
     @Test void deathTagRunnerSpeedIsAnIrreversibleUnlockAfterTheFirstThresholdCrossing() {
         assertFalse(ArcadePortRules.deathTagRunnerSpeedUnlocked(false, 1, 4));
         assertTrue(ArcadePortRules.deathTagRunnerSpeedUnlocked(false, 2, 6));
