@@ -4568,16 +4568,13 @@ public final class ArcadePortManager implements Listener {
     private Location randomDragonSkyTarget(Session session) {
         Location center = session.dragonSpectatorLocation == null
                 ? session.world.getSpawnLocation() : session.dragonSpectatorLocation;
-        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
         for (int attempt = 0; attempt < 24; attempt++) {
-            double x = center.getX() + ThreadLocalRandom.current().nextDouble(-50.0D, 51.0D);
-            double z = center.getZ() + ThreadLocalRandom.current().nextDouble(-50.0D, 51.0D);
-            if (mapData != null && mapData.hasBounds()) {
-                x = ArcadePortRules.clampDragonSkyTargetCoordinate(x, mapData.minX(), mapData.maxX());
-                z = ArcadePortRules.clampDragonSkyTargetCoordinate(z, mapData.minZ(), mapData.maxZ());
-            }
-            Location candidate = new Location(session.world, x,
-                    center.getY() + ThreadLocalRandom.current().nextDouble(20.0D, 41.0D), z);
+            // MineplexDragon.targetSky uses UtilMath.rRange: inclusive integer offsets
+            // of -50..50 horizontally and 20..40 vertically, with no map-bound clamping.
+            double x = center.getX() + ThreadLocalRandom.current().nextInt(-50, 51);
+            double y = center.getY() + ThreadLocalRandom.current().nextInt(20, 41);
+            double z = center.getZ() + ThreadLocalRandom.current().nextInt(-50, 51);
+            Location candidate = new Location(session.world, x, y, z);
             if (!isDragonLocationProtected(session, candidate, System.currentTimeMillis())) return candidate;
         }
         // If overlapping flares cover the floor, place the sky target above their vertical envelope.
