@@ -76,7 +76,7 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
             long ready = catalog.getGames().stream().filter(game -> game.isReadyForTest()).count();
             sender.sendMessage(ChatColor.GRAY + "Ready for in-game testing: " + ready);
             sender.sendMessage(ChatColor.GRAY + "All 16 games remain mechanics-in-progress; 14 first-pass ports are available when ArcadeMechanicsModern is installed.");
-            sender.sendMessage(ChatColor.GRAY + "Cosmetic selections currently save to player profiles; visual hooks are not claimed complete.");
+            sender.sendMessage(ChatColor.GRAY + "Live cosmetic renderers: Spleef Block Break Signature and Paintball Weapon & Pellet Identity; other game renderers remain in progress.");
         });
 
         getLogger().info("Modern Arcade platform enabled: " + catalog.size()
@@ -130,7 +130,7 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
     /**
      * Small runtime bridge for game-specific renderers in the optional
      * ArcadeMechanicsModern plugin. The group keeps independently selected
-     * Paintball weapon and pellet cosmetics on a single menu line.
+     * Paintball weapon/pellet choices and the Spleef block-break signature.
      */
     public String getSelectedCosmeticOption(UUID playerId, String gameId, String selectionGroup) {
         if (playerId == null || gameId == null || selectionGroup == null || catalog == null || preferences == null) {
