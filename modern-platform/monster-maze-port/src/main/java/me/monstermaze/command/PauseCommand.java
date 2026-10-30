@@ -53,7 +53,7 @@ public class PauseCommand implements CommandExecutor, Listener {
         } catch (Exception e) {
             throw new IllegalStateException("Unable to initialise Monster Maze pause support", e);
         }
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
     }
 
     @Override
@@ -90,7 +90,7 @@ public class PauseCommand implements CommandExecutor, Listener {
     }
 
     private void resume(CommandSender sender) {
-        resumeTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        resumeTask = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             int seconds = RESUME_COUNTDOWN_SECONDS;
 
             @Override
