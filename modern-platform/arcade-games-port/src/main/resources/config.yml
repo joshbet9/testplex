@@ -1,5 +1,6 @@
 # Isolated manual-acceptance candidates. Availability does not itself certify 100% in-game parity.
-# Bomb Lobbers, Dragon Escape, Dragons, Paintball and Runner are available as live-acceptance candidates.
+# Draw My Thing and Master Builders are available as modern Arcade-format prototypes.
+# Candidate availability is not a claim of complete live parity certification.
 # Candidate availability is not a claim of complete live parity certification.
 enabled-games:
   - bacon-brawl
@@ -8,6 +9,8 @@ enabled-games:
   - dragons
   - paintball
   - runner
+  - draw-my-thing
+  - master-builders
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
