@@ -8850,7 +8850,6 @@ public final class ArcadePortManager implements Listener {
             if (killer != null && session.alive.contains(killer.getUniqueId())) {
                 session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
                 killer.sendMessage(ChatColor.GREEN + "Paintball elimination!");
-                checkWinnerForScore(session, killer);
             }
             checkRoundEnd(session);
             return;
@@ -9327,11 +9326,6 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void checkWinnerForScore(Session session, Player player) {
-        if (session.type == ArcadePortGame.PAINTBALL
-                && ArcadePortRules.isPaintballWinnerScoreReached(
-                        session.scores.getOrDefault(player.getUniqueId(), 0))) {
-            finish(session, player, true);
-        }
         if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
                 && ArcadePortRules.isQuiverWinnerScoreReached(session.scores.getOrDefault(player.getUniqueId(), 0))) {
             finish(session, player, true);
