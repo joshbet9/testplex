@@ -2654,7 +2654,8 @@ public final class ArcadePortManager implements Listener {
                 session.microGlassColours.getOrDefault(playerId, ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR));
         Set<Block> personalBlocks = new HashSet<>();
         for (Block barrier : session.microBarrierBlocks) {
-            if (microBarrierTeam(session, barrier) != team || !barrier.getChunk().isLoaded()) continue;
+            if (microBarrierTeam(session, barrier) != team
+                    || !session.world.isChunkLoaded(barrier.getX() >> 4, barrier.getZ() >> 4)) continue;
             player.sendBlockChange(barrier.getLocation(), glass.createBlockData());
             personalBlocks.add(barrier);
         }
@@ -2666,7 +2667,8 @@ public final class ArcadePortManager implements Listener {
         Set<Block> personalBlocks = session.microPersonalGlassBlocks.remove(player.getUniqueId());
         if (personalBlocks == null) return;
         for (Block block : personalBlocks) {
-            if (block != null && block.getWorld() == session.world && block.getChunk().isLoaded()) {
+            if (block != null && block.getWorld() == session.world
+                    && session.world.isChunkLoaded(block.getX() >> 4, block.getZ() >> 4)) {
                 player.sendBlockChange(block.getLocation(), block.getBlockData());
             }
         }
@@ -2731,7 +2733,7 @@ public final class ArcadePortManager implements Listener {
     private Player nearestMicroSpectateTarget(Session session, Player spectator) {
         int spectatorTeam = session.teams.getOrDefault(spectator.getUniqueId(), -1);
         return alivePlayers(session).stream()
-                .filter(target -> target.getUniqueId() != spectator.getUniqueId())
+                .filter(target -> !target.getUniqueId().equals(spectator.getUniqueId()))
                 .filter(target -> session.teams.getOrDefault(target.getUniqueId(), -1) != spectatorTeam)
                 .min(java.util.Comparator.comparingDouble(target -> target.getLocation().distanceSquared(spectator.getLocation())))
                 .orElse(null);
@@ -8759,7 +8761,8 @@ public final class ArcadePortManager implements Listener {
         boolean dragonEscapeDisruptorLeftClick = session.type == ArcadePortGame.DRAGON_ESCAPE
                 && event.getAction() == Action.LEFT_CLICK_AIR;
         boolean microCompassLeftClick = session.type == ArcadePortGame.MICRO_BATTLES
-                && event.getAction().isLeftClick();
+                && !session.alive.contains(event.getPlayer().getUniqueId())
+                && isMicroTrackingCompass(event.getItem()) && event.getAction().isLeftClick();
         if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick
                 && !baconNonRightClick && !dragonEscapeDisruptorLeftClick && !microCompassLeftClick) return;
         Player player = event.getPlayer();
@@ -10785,7 +10788,6 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Set<Block>> microPersonalGlassBlocks = new HashMap<>();
         final Map<UUID, Map<Integer, UUID>> microCompassMenuTargets = new HashMap<>();
         final Map<UUID, Long> microSpectateNextTeleportAt = new HashMap<>();
-        long microNextCompassUpdateAt;
         final Map<UUID, Long> microNextArrowAt = new HashMap<>();
         final Set<UUID> microFletchedArrows = new HashSet<>();
         final Set<Block> microCrumbleBlocks = new HashSet<>();
