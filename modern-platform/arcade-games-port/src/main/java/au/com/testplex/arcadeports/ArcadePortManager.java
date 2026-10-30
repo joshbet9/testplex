@@ -8160,6 +8160,20 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
+        if (session.type == ArcadePortGame.EVOLUTION
+                && event instanceof EntityDamageByEntityEvent evolutionHit
+                && evolutionHit.getDamager() instanceof Player attacker
+                && session.players.containsKey(attacker.getUniqueId())
+                && session.alive.contains(attacker.getUniqueId())
+                && !session.evolving.contains(attacker.getUniqueId())
+                && session.evolutionLevels.getOrDefault(attacker.getUniqueId(), 0) == 2
+                && attacker.getInventory().getItemInMainHand().getType() == Material.TNT) {
+            // Attacking an entity with left-click dispatches a damage event rather than
+            // PlayerInteractEvent. Route the charge through the same launch handler.
+            event.setCancelled(true);
+            throwEvolutionCreeperCharge(session, attacker);
+            return;
+        }
         if (session.type == ArcadePortGame.BOMB_LOBBERS
                 && event.getEntity() instanceof Player bombTarget
                 && session.players.containsKey(bombTarget.getUniqueId())) {
@@ -8898,21 +8912,7 @@ public final class ArcadePortManager implements Listener {
                         session.evolutionLevels.getOrDefault(player.getUniqueId(), 0),
                         event.getAction().isLeftClick(), item == Material.TNT)) {
             event.setCancelled(true);
-            consumeHeld(player);
-            Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.0D));
-            TNTPrimed bomb = session.world.spawn(spawn, TNTPrimed.class);
-            bomb.setFuseTicks(ArcadePortRules.BOMB_LOBBERS_FUSE_TICKS);
-            double pitchVelocity = "pitcher".equals(session.bombLobbersKits.get(player.getUniqueId()))
-                    ? ArcadePortRules.bombLobbersPitchVelocity(session.bombPitchLevels.getOrDefault(player.getUniqueId(), 2))
-                    : 2.0D;
-            Vector velocity = player.getLocation().getDirection().normalize().multiply(pitchVelocity);
-            velocity.setY(velocity.getY() + 0.1D);
-            bomb.setVelocity(velocity);
-            session.entities.add(bomb);
-            session.bombOwners.put(bomb.getUniqueId(), player.getUniqueId());
-            session.evolutionCreeperTnt.add(bomb.getUniqueId());
-            session.bombLastLocations.put(bomb.getUniqueId(), spawn.clone());
-            session.bombCreatedAt.put(bomb.getUniqueId(), System.currentTimeMillis());
+            throwEvolutionCreeperCharge(session, player);
         } else if (session.type == ArcadePortGame.EVOLUTION
                 && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 1 && item == Material.FIRE_CHARGE) {
             event.setCancelled(true);
@@ -10087,6 +10087,31 @@ public final class ArcadePortManager implements Listener {
         session.entities.add(gust);
         player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.9F, 0.8F);
         player.sendActionBar(ChatColor.AQUA + "Wind Charge launched!");
+    }
+
+    private boolean throwEvolutionCreeperCharge(Session session, Player player) {
+        if (session == null || active != session || session.type != ArcadePortGame.EVOLUTION
+                || player == null || !player.isOnline()
+                || !session.alive.contains(player.getUniqueId())
+                || session.evolving.contains(player.getUniqueId())) return false;
+        ItemStack held = player.getInventory().getItemInMainHand();
+        if (!ArcadePortRules.canUseEvolutionCreeperCharge(
+                session.evolutionLevels.getOrDefault(player.getUniqueId(), 0), true,
+                held != null && held.getType() == Material.TNT)) return false;
+        consumeHeld(player);
+        Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.0D));
+        TNTPrimed bomb = session.world.spawn(spawn, TNTPrimed.class);
+        bomb.setFuseTicks(ArcadePortRules.BOMB_LOBBERS_FUSE_TICKS);
+        Vector velocity = player.getLocation().getDirection().normalize().multiply(2.0D);
+        velocity.setY(velocity.getY() + 0.1D);
+        bomb.setVelocity(velocity);
+        session.entities.add(bomb);
+        session.bombOwners.put(bomb.getUniqueId(), player.getUniqueId());
+        session.evolutionCreeperTnt.add(bomb.getUniqueId());
+        session.bombLastLocations.put(bomb.getUniqueId(), spawn.clone());
+        session.bombCreatedAt.put(bomb.getUniqueId(), System.currentTimeMillis());
+        player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.1F);
+        return true;
     }
 
     private boolean throwBombLobbersTnt(Session session, Player player) {
