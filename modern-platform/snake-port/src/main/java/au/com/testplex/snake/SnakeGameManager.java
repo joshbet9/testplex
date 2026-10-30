@@ -1172,18 +1172,20 @@ public final class SnakeGameManager implements Listener {
         ItemStack item = event.getItem();
         if (item == null || item.getType().isAir()) return;
         Material material = item.getType();
+        if (!SnakeRules.isKitAbilityItem(state.kit, material.name())) return;
+
+        // Kit items are game controls, not normal food/usable items. Cancel them even
+        // while the one-second ability cooldown is active so cookies are not eaten.
+        event.setCancelled(true);
         long now = System.currentTimeMillis();
         if (now < state.abilityCooldownUntil) return;
+        consumeMainHand(event.getPlayer());
 
         if (material == Material.FEATHER && "speed".equals(state.kit)) {
-            event.setCancelled(true);
-            consumeMainHand(event.getPlayer());
             state.speedUntil = now + 2_000L;
             state.abilityCooldownUntil = now + 1_000L;
             event.getPlayer().sendMessage(ChatColor.YELLOW + "Speed boost!");
         } else if (material == Material.COOKIE && "reverse".equals(state.kit)) {
-            event.setCancelled(true);
-            consumeMainHand(event.getPlayer());
             event.getPlayer().leaveVehicle();
             Collections.reverse(state.segments);
             List<Location> reversedPath = new ArrayList<>();
@@ -1197,8 +1199,6 @@ public final class SnakeGameManager implements Listener {
             state.abilityCooldownUntil = now + 1_000L;
             event.getPlayer().sendMessage(ChatColor.LIGHT_PURPLE + "Reverse!");
         } else if (material == Material.NETHER_STAR && "invulnerable".equals(state.kit)) {
-            event.setCancelled(true);
-            consumeMainHand(event.getPlayer());
             state.invulnerableUntil = now + 2_000L;
             state.abilityCooldownUntil = now + 1_000L;
             event.getPlayer().sendMessage(ChatColor.AQUA + "Super Snake: tail collisions ignored briefly.");
