@@ -8852,6 +8852,12 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (player.isOnline()) {
+            if (session.type == ArcadePortGame.MICRO_BATTLES) {
+                removeMicroBorderWarning(session, player.getUniqueId());
+                restoreMicroMiddleGlassCosmetic(session, player);
+                player.getInventory().clear();
+                giveMicroTrackingCompass(player);
+            }
             // Reborn's CompassModule expects Arcade spectators (Adventure), not vanilla free-camera Spectator mode.
             player.setGameMode(session.type == ArcadePortGame.SPLEEF ? GameMode.ADVENTURE : GameMode.SPECTATOR);
             if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
@@ -8868,7 +8874,15 @@ public final class ArcadePortManager implements Listener {
             }
             player.sendMessage(ChatColor.RED + "Eliminated: " + reason + ".");
         }
-        if (killer != null && session.scores.containsKey(killer.getUniqueId())) session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+        if (killer != null && session.scores.containsKey(killer.getUniqueId())) {
+            int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+            if (session.type == ArcadePortGame.MICRO_BATTLES
+                    && ArcadePortRules.shouldAwardMicroBattlesAnnihilation(kills)) {
+                UUID killerId = killer.getUniqueId();
+                awardMicroBattlesAchievement(killer, MicroBattlesAchievement.ANNIHILATION.configKey(killerId),
+                        "Annihilation — 8 kills in one Micro Battles game.");
+            }
+        }
         if (session.type == ArcadePortGame.GLADIATORS) {
             Integer pair = session.gladiatorPairs.get(player.getUniqueId());
             if (pair != null) {
@@ -9648,8 +9662,18 @@ public final class ArcadePortManager implements Listener {
                             turfWarsRemainingLines(session, 1), timeoutTeamKills(session, 0), timeoutTeamKills(session, 1))
                     : ArcadePortRules.turfWarsTimeoutLeader(session.turfFrontlineX,
                             session.turfInitialFrontlineX, timeoutTeamKills(session, 0), timeoutTeamKills(session, 1));
-        } else if (session.type == ArcadePortGame.MICRO_BATTLES
-                || session.type == ArcadePortGame.PAINTBALL
+        } else if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            int[] aliveByTeam = new int[4];
+            int[] killsByTeam = new int[4];
+            for (UUID id : session.alive) {
+                int playerTeam = session.teams.getOrDefault(id, -1);
+                if (playerTeam >= 0 && playerTeam < aliveByTeam.length) aliveByTeam[playerTeam]++;
+            }
+            for (int playerTeam = 0; playerTeam < killsByTeam.length; playerTeam++) {
+                killsByTeam[playerTeam] = timeoutTeamKills(session, playerTeam);
+            }
+            team = ArcadePortRules.microBattlesTimeoutTeam(aliveByTeam, killsByTeam);
+        } else if (session.type == ArcadePortGame.PAINTBALL
                 || session.type == ArcadePortGame.BOMB_LOBBERS) {
             int teamZeroAlive = (int) session.alive.stream()
                     .filter(id -> session.teams.getOrDefault(id, -1) == 0).count();
@@ -9723,6 +9747,10 @@ public final class ArcadePortManager implements Listener {
             recordDeathTagRewards(session);
         }
         recordLocalStats(session, winner, announceWinner);
+        if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            removeAllMicroBorderWarnings(session);
+            for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
+        }
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
         }
@@ -9833,6 +9861,8 @@ public final class ArcadePortManager implements Listener {
                         && isBaconCompassMenuTitle(player.getOpenInventory().getTitle()))
                         || (session.type == ArcadePortGame.BOMB_LOBBERS
                         && isBombLobbersCompassMenuTitle(player.getOpenInventory().getTitle()))
+                        || (session.type == ArcadePortGame.MICRO_BATTLES
+                        && isMicroCompassMenuTitle(player.getOpenInventory().getTitle()))
                         || (session.type == ArcadePortGame.SPLEEF
                         && player.getOpenInventory().getTopInventory().getHolder() instanceof SpleefCompassMenuHolder)
                         || player.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder) {
@@ -10576,6 +10606,20 @@ public final class ArcadePortManager implements Listener {
                                 (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ")
                                         + achievement.displayName(),
                                 lore, "noop", null, null));
+            }
+        } else if ("micro-battles".equals(gameId)) {
+            MicroBattlesAchievement[] achievements = MicroBattlesAchievement.values();
+            int[] achievementSlots = {12, 13};
+            for (int i = 0; i < achievements.length; i++) {
+                MicroBattlesAchievement achievement = achievements[i];
+                boolean unlocked = plugin.getConfig().getBoolean(achievement.configKey(targetId), false);
+                List<String> lore = List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
+                        unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked",
+                        ChatColor.DARK_GRAY + "Local test-server equivalent; not production Mineplex data.");
+                inventory.setItem(achievementSlots[i], statsItem(
+                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
+                        lore, "noop", null, null));
             }
         } else if ("snake".equals(gameId)) {
             String[] ids = {"Cannibal", "ChooChoo", "SlimySheep"};
@@ -12650,11 +12694,40 @@ public final class ArcadePortManager implements Listener {
         boolean spleefCompassLeftClick = session.type == ArcadePortGame.SPLEEF
                 && !session.alive.contains(event.getPlayer().getUniqueId())
                 && isSpleefTrackingCompass(event.getItem()) && event.getAction().isLeftClick();
+        boolean microCompassLeftClick = session.type == ArcadePortGame.MICRO_BATTLES
+                && !session.alive.contains(event.getPlayer().getUniqueId())
+                && isMicroTrackingCompass(event.getItem()) && event.getAction().isLeftClick();
         if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick
                 && !baconNonRightClick && !dragonEscapeDisruptorLeftClick
-                && !dragonsSparklerLeftClick && !spleefCompassLeftClick) return;
+                && !dragonsSparklerLeftClick && !spleefCompassLeftClick && !microCompassLeftClick) return;
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
+        if (session.type == ArcadePortGame.MICRO_BATTLES && isMicroTeamLockedItem(heldItem)
+                && event.getAction().isRightClick()) {
+            event.setCancelled(true);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (player.isOnline()) player.updateInventory();
+            }, 1L);
+            return;
+        }
+        if (session.type == ArcadePortGame.MICRO_BATTLES
+                && !session.alive.contains(player.getUniqueId()) && isMicroTrackingCompass(heldItem)) {
+            event.setCancelled(true);
+            if (event.getAction().isRightClick()) {
+                openMicroCompassMenu(session, player);
+            } else if (event.getAction().isLeftClick()) {
+                long now = System.currentTimeMillis();
+                long readyAt = session.microSpectateNextTeleportAt.getOrDefault(player.getUniqueId(), 0L);
+                if (now < readyAt) return;
+                Player target = nearestMicroSpectateTarget(session, player);
+                if (target != null) {
+                    player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                    player.setCompassTarget(target.getLocation());
+                    session.microSpectateNextTeleportAt.put(player.getUniqueId(), now + 3_000L);
+                } else player.sendMessage(ChatColor.YELLOW + "There are no living opponents to track.");
+            }
+            return;
+        }
         if (event.isCancelled()) {
             boolean forceGladiatorHotbar = session.type == ArcadePortGame.GLADIATORS
                     && event.getAction().isRightClick() && heldItem != null && heldItem.hasItemMeta()
@@ -12679,7 +12752,11 @@ public final class ArcadePortManager implements Listener {
                     && !session.alive.contains(player.getUniqueId())
                     && isSpleefTrackingCompass(heldItem)
                     && (event.getAction().isRightClick() || event.getAction().isLeftClick());
-            if (!forceGladiatorHotbar && !forceBaconAbility && !forceBombControlClick && !forceSpleefCompass) return;
+            boolean forceMicroCompass = session.type == ArcadePortGame.MICRO_BATTLES
+                    && !session.alive.contains(player.getUniqueId()) && isMicroTrackingCompass(heldItem)
+                    && (event.getAction().isRightClick() || event.getAction().isLeftClick());
+            if (!forceGladiatorHotbar && !forceBaconAbility && !forceBombControlClick
+                    && !forceSpleefCompass && !forceMicroCompass) return;
         }
         if (session.type == ArcadePortGame.GLADIATORS
                 && session.alive.contains(player.getUniqueId())
@@ -12727,6 +12804,24 @@ public final class ArcadePortManager implements Listener {
                 } else {
                     player.sendMessage(ChatColor.YELLOW + "There are no living Spleef players to track.");
                 }
+            }
+            return;
+        }
+        if (session.type == ArcadePortGame.MICRO_BATTLES
+                && !session.alive.contains(player.getUniqueId()) && isMicroTrackingCompass(heldItem)) {
+            event.setCancelled(true);
+            if (event.getAction().isRightClick()) {
+                openMicroCompassMenu(session, player);
+            } else if (event.getAction().isLeftClick()) {
+                long now = System.currentTimeMillis();
+                long readyAt = session.microSpectateNextTeleportAt.getOrDefault(player.getUniqueId(), 0L);
+                if (now < readyAt) return;
+                Player target = nearestMicroSpectateTarget(session, player);
+                if (target != null) {
+                    player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                    player.setCompassTarget(target.getLocation());
+                    session.microSpectateNextTeleportAt.put(player.getUniqueId(), now + 3_000L);
+                } else player.sendMessage(ChatColor.YELLOW + "There are no living opponents to track.");
             }
             return;
         }
@@ -13396,7 +13491,42 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDrop(PlayerDropItemEvent event) {
         Session session = active;
-        if (session != null && session.players.containsKey(event.getPlayer().getUniqueId())) event.setCancelled(true);
+        if (session == null || !session.players.containsKey(event.getPlayer().getUniqueId())) return;
+        if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            ItemStack dropped = event.getItemDrop().getItemStack();
+            boolean sword = dropped != null && dropped.getType().name().endsWith("_SWORD");
+            if (sword || isMicroTeamLockedItem(dropped) || isMicroTrackingCompass(dropped)) event.setCancelled(true);
+            return;
+        }
+        event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMicroTeamArmorMove(InventoryClickEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.MICRO_BATTLES
+                || !session.players.containsKey(event.getWhoClicked().getUniqueId())) return;
+        ItemStack hotbarSwap = null;
+        if (event.getWhoClicked() instanceof Player player && event.getHotbarButton() >= 0) {
+            hotbarSwap = player.getInventory().getItem(event.getHotbarButton());
+        }
+        if (isMicroTeamLockedItem(event.getCurrentItem())
+                || isMicroTeamLockedItem(event.getCursor())
+                || isMicroTeamLockedItem(hotbarSwap)) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMicroBlockGrow(BlockGrowEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.MICRO_BATTLES
+                && event.getBlock().getWorld() == session.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMicroBlockFlow(BlockFromToEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.MICRO_BATTLES
+                && event.getBlock().getWorld() == session.world) event.setCancelled(true);
     }
 
     private boolean isDragonProtectedKitItem(ItemStack item) {
@@ -13450,6 +13580,46 @@ public final class ArcadePortManager implements Listener {
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         Session currentSession = active;
+        if (currentSession != null && currentSession.type == ArcadePortGame.MICRO_BATTLES
+                && isMicroCompassMenuTitle(event.getView().getTitle())) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof Player spectator)) return;
+            int slot = event.getRawSlot();
+            if (slot < 0 || slot >= event.getView().getTopInventory().getSize()) return;
+            Map<Integer, UUID> targets = currentSession.microCompassMenuTargets.get(spectator.getUniqueId());
+            UUID targetId = targets == null ? null : targets.get(slot);
+            if (targetId == null) return;
+            Player target = currentSession.players.get(targetId);
+            currentSession.microCompassMenuTargets.remove(spectator.getUniqueId());
+            spectator.closeInventory();
+            if (target == null || !target.isOnline() || !currentSession.alive.contains(targetId)) {
+                spectator.sendMessage(ChatColor.YELLOW + "That opponent is no longer available.");
+                return;
+            }
+            if (event.isRightClick()) {
+                spectator.setSpectatorTarget(target);
+            } else {
+                long now = System.currentTimeMillis();
+                long readyAt = currentSession.microSpectateNextTeleportAt.getOrDefault(spectator.getUniqueId(), 0L);
+                if (now < readyAt) return;
+                spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                currentSession.microSpectateNextTeleportAt.put(spectator.getUniqueId(), now + 3_000L);
+            }
+            spectator.setCompassTarget(target.getLocation());
+            return;
+        }
+        if (currentSession != null && currentSession.type == ArcadePortGame.MICRO_BATTLES
+                && event.getWhoClicked() instanceof Player microPlayer
+                && currentSession.players.containsKey(microPlayer.getUniqueId())) {
+            ItemStack hotbarSwap = event.getHotbarButton() < 0 ? null
+                    : microPlayer.getInventory().getItem(event.getHotbarButton());
+            if (isMicroTeamLockedItem(event.getCurrentItem())
+                    || isMicroTeamLockedItem(event.getCursor())
+                    || isMicroTeamLockedItem(hotbarSwap)) {
+                event.setCancelled(true);
+                return;
+            }
+        }
         if (currentSession != null && currentSession.type == ArcadePortGame.SPLEEF
                 && (isSpleefFletchedArrow(event.getCurrentItem())
                         || isSpleefFletchedArrow(event.getCursor()))) {
@@ -14755,6 +14925,10 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
+        if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            removeMicroBorderWarning(session, id);
+            restoreMicroMiddleGlassCosmetic(session, player);
+        }
         boolean wasAlive;
         if (session.type == ArcadePortGame.GLADIATORS) {
             forfeitGladiator(player, session);
@@ -15012,6 +15186,13 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> turfBarrageFiring = new HashSet<>();
         final Set<UUID> turfTrackedArrows = new HashSet<>();
         final Map<UUID, String> microKits = new HashMap<>();
+        final Map<UUID, String> microGlassColours = new HashMap<>();
+        final Map<UUID, String> microBorderColours = new HashMap<>();
+        final Map<UUID, Set<Block>> microPersonalGlassBlocks = new HashMap<>();
+        final Map<UUID, TextDisplay> microBorderWarnings = new HashMap<>();
+        boolean microLastTwoAwarded;
+        final Map<UUID, Map<Integer, UUID>> microCompassMenuTargets = new HashMap<>();
+        final Map<UUID, Long> microSpectateNextTeleportAt = new HashMap<>();
         final Map<UUID, Long> microNextArrowAt = new HashMap<>();
         final Set<UUID> microFletchedArrows = new HashSet<>();
         final Set<Block> microCrumbleBlocks = new HashSet<>();
