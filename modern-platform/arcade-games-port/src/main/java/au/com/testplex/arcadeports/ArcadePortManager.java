@@ -3075,14 +3075,35 @@ public final class ArcadePortManager implements Listener {
             avatar.teleport(owner.getLocation());
         }
         avatar.setRotation(owner.getLocation().getYaw(), 0.0F);
-        Long invincibleUntil = session.baconBrutusUntil.get(ownerId);
-        boolean invincible = invincibleUntil != null
-                && ArcadePortRules.isBaconInvincibilityActive(now, invincibleUntil);
-        avatar.setGlowing(invincible);
-        if (invincible && session.ticks % 4 == 0) {
+        avatar.setCollidable(false);
+        Long cloakUntil = session.baconCloakUntil.get(ownerId);
+        boolean cloaked = cloakUntil != null && now < cloakUntil;
+        avatar.setInvisible(cloaked);
+        Long brutusUntil = session.baconBrutusUntil.get(ownerId);
+        boolean brutusGuard = brutusUntil != null && now < brutusUntil;
+        avatar.setGlowing(brutusGuard);
+        if (brutusGuard && session.ticks % 4 == 0) {
             session.world.spawnParticle(Particle.TOTEM_OF_UNDYING,
                     avatar.getLocation().add(0.0D, 0.5D, 0.0D), 2, 0.25D, 0.25D, 0.25D, 0.01D);
         }
+    }
+
+    private void endBaconCloak(Session session, UUID ownerId, Player owner) {
+        session.baconCloakUntil.remove(ownerId);
+        LivingEntity avatar = baconPlayerAvatar(session, ownerId);
+        if (avatar != null) avatar.setInvisible(false);
+        if (owner != null && owner.isOnline()) {
+            owner.playSound(owner.getLocation(), Sound.BLOCK_FIRE_EXTINGUISH, 0.65F, 1.25F);
+        }
+    }
+
+    private void endBaconBrutus(Session session, UUID ownerId, Player owner) {
+        session.baconBrutusUntil.remove(ownerId);
+        if (owner != null && owner.isOnline()) {
+            owner.removePotionEffect(PotionEffectType.RESISTANCE);
+        }
+        LivingEntity avatar = baconPlayerAvatar(session, ownerId);
+        if (avatar != null) avatar.setGlowing(false);
     }
 
     private LivingEntity baconPlayerAvatar(Session session, UUID ownerId) {
@@ -3119,13 +3140,10 @@ public final class ArcadePortManager implements Listener {
             if (invisible == null || invisible.getDuration() < 20) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 40, 0, false, false, false));
             }
-            Long invincibleUntil = session.baconBrutusUntil.get(id);
-            if (invincibleUntil != null && now >= invincibleUntil) {
-                session.baconBrutusUntil.remove(id);
-                player.removePotionEffect(PotionEffectType.RESISTANCE);
-                LivingEntity avatar = baconPlayerAvatar(session, id);
-                if (avatar != null) avatar.setGlowing(false);
-            }
+            Long brutusUntil = session.baconBrutusUntil.get(id);
+            if (brutusUntil != null && now >= brutusUntil) endBaconBrutus(session, id, player);
+            Long cloakUntil = session.baconCloakUntil.get(id);
+            if (cloakUntil != null && now >= cloakUntil) endBaconCloak(session, id, player);
             updateBaconPlayerPig(session, player, now);
             updateBaconMeterItem(session, player);
             if ("mama-piggles".equals(kit)) {
