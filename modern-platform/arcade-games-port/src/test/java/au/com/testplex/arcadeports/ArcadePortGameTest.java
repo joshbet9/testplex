@@ -512,6 +512,33 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldRemoveQuiverInvisibilityOnHit(false, true));
         assertEquals(10_000L, ArcadePortRules.QUIVER_GROUND_POUND_COOLDOWN_MILLIS);
         assertEquals(1_200L, ArcadePortRules.QUIVER_NINJA_VANISH_MILLIS);
+        assertEquals(20, ArcadePortRules.QUIVER_PERFECT_RUN_KILL_STREAK);
+        assertFalse(ArcadePortRules.isQuiverPerfectRun(19));
+        assertTrue(ArcadePortRules.isQuiverPerfectRun(20));
+        assertEquals("TRIPLE KILL", ArcadePortRules.quiverKillstreakTitle(3));
+        assertEquals("PERFECT RUN", ArcadePortRules.quiverKillstreakTitle(20));
+        assertNull(ArcadePortRules.quiverKillstreakTitle(4));
+        assertTrue(ArcadePortRules.isQuiverKillstreakAnnouncement(13));
+        assertFalse(ArcadePortRules.isQuiverKillstreakAnnouncement(14));
+        assertFalse(ArcadePortRules.isQuiverSpeedrunnerWin(-1L));
+        assertTrue(ArcadePortRules.isQuiverSpeedrunnerWin(89_999L));
+        assertFalse(ArcadePortRules.isQuiverSpeedrunnerWin(90_000L));
+        assertFalse(ArcadePortRules.shouldAwardQuiverFistPunchKills(2));
+        assertTrue(ArcadePortRules.shouldAwardQuiverFistPunchKills(3));
+        assertEquals(12.0D, ArcadePortRules.quiverBrawlerHealthAfterKill(10.0D, 20.0D), 0.00001D);
+        assertEquals(20.0D, ArcadePortRules.quiverBrawlerHealthAfterKill(19.0D, 20.0D), 0.00001D);
+    }
+
+    @Test void quiverAchievementSetMatchesTheUpdatedRequirements() {
+        assertEquals(4, QuiverAchievement.values().length);
+        assertEquals("The Perfect Game", QuiverAchievement.THE_PERFECT_GAME.displayName());
+        assertEquals("Achieve a Perfect Run killstreak in a game.",
+                QuiverAchievement.THE_PERFECT_GAME.requirement());
+        assertEquals("Win a game by getting 20 kills without using archery.",
+                QuiverAchievement.WHATS_A_BOW.requirement());
+        assertEquals("Win a game in under 1:30.", QuiverAchievement.SPEEDRUNNER.requirement());
+        assertEquals("Get 3 kills with fist/bow punch.",
+                QuiverAchievement.THATS_NOT_A_SWORD.requirement());
     }
 
     @Test void dragonsSourceKitsSpawnLoopSparklerAndFallRulesAreExplicit() {
@@ -1562,6 +1589,19 @@ class ArcadePortGameTest {
         assertEquals(15_000L, ArcadePortRules.EVOLUTION_PITY_KILL_REDUCTION_MILLIS);
         assertEquals(7_500L, ArcadePortRules.EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS);
         assertEquals(10_000L, ArcadePortRules.EVOLUTION_ASSIST_WINDOW_MILLIS);
+        assertEquals(7_000L, ArcadePortRules.EVOLUTION_GOLEM_SLAM_COOLDOWN_MILLIS);
+        assertEquals(6.0D, ArcadePortRules.EVOLUTION_GOLEM_SLAM_RADIUS);
+        assertEquals(16.0D, ArcadePortRules.EVOLUTION_GOLEM_SLAM_DAMAGE);
+        assertEquals(5_000L, ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_COOLDOWN_MILLIS);
+        assertEquals(1_000L, ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_DURATION_MILLIS);
+        assertEquals(50L, ArcadePortRules.EVOLUTION_BLAZE_FLAMETHROWER_TICK_MILLIS);
+        assertEquals(1.6D, ArcadePortRules.EVOLUTION_BLAZE_FLAME_SPEED);
+        assertEquals(7_000L, ArcadePortRules.EVOLUTION_SLIME_SLAM_COOLDOWN_MILLIS);
+        assertEquals(2.0D, ArcadePortRules.EVOLUTION_SLIME_SLAM_RADIUS);
+        assertEquals(8.0D, ArcadePortRules.EVOLUTION_SLIME_SLAM_DAMAGE);
+        assertEquals(0.6D, ArcadePortRules.EVOLUTION_CHICKEN_DOUBLE_JUMP_HORIZONTAL);
+        assertEquals(0.6D, ArcadePortRules.EVOLUTION_CHICKEN_DOUBLE_JUMP_VERTICAL);
+        assertEquals(2.0D, ArcadePortRules.EVOLUTION_EGG_DAMAGE);
         assertEquals(75_000L, ArcadePortRules.reduceEvolutionPityDeadline(90_000L, 0L, 15_000L));
         assertEquals(82_500L, ArcadePortRules.reduceEvolutionPityDeadline(90_000L, 0L, 7_500L));
         assertEquals(0L, ArcadePortRules.reduceEvolutionPityDeadline(90_000L, 0L, 100_000L));
