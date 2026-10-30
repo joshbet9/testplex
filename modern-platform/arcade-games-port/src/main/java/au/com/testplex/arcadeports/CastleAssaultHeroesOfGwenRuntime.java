@@ -548,7 +548,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     Block block = king.location.clone().add(x, y, z).getBlock();
                     Material type = block.getType();
                     if (!beaconsAlive) {
-                        if (type == Material.IRON_BARS || type == Material.IRON_BLOCK) {
+                        if (type != Material.AIR) {
                             rememberBlock(block);
                             block.setType(Material.AIR, false);
                         }
