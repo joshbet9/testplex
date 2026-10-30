@@ -209,6 +209,13 @@ class ArcadePortGameTest {
         assertEquals(3_000L, ArcadePortRules.QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
     }
 
+    @Test void quiverOnlyFinishesLastSurvivorAfterRespawnsHaveCleared() {
+        assertTrue(ArcadePortRules.shouldFinishQuiverLastPlayer(1, 0, 2));
+        assertFalse(ArcadePortRules.shouldFinishQuiverLastPlayer(1, 1, 2));
+        assertFalse(ArcadePortRules.shouldFinishQuiverLastPlayer(2, 0, 2));
+        assertFalse(ArcadePortRules.shouldFinishQuiverLastPlayer(1, 0, 1));
+    }
+
     @Test void quiverGroundPoundUsesSourceRadialImpulse() {
         assertEquals(1.0D, ArcadePortRules.quiverGroundPoundHorizontalMultiplier(0.0D), 0.00001D);
         assertEquals(0.5D, ArcadePortRules.quiverGroundPoundHorizontalMultiplier(4.0D), 0.00001D);
