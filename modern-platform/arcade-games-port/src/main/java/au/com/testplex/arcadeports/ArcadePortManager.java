@@ -6417,7 +6417,7 @@ public final class ArcadePortManager implements Listener {
         victim.sendMessage(ChatColor.RED + "Defeated in the " + (bracket == GLADIATOR_BRACKET_LOSERS
                 ? "loser's bracket" : bracket == GLADIATOR_BRACKET_FINAL ? "grand final" : "winners' bracket") + ".");
         if (bracket == GLADIATOR_BRACKET_FINAL) {
-            if (losses >= 2) {
+            if (ArcadePortRules.shouldEliminateGladiatorAfterLoss(losses)) {
                 session.alive.remove(victimId);
                 announce(session, ChatColor.GOLD + killer.getName() + " has won the Gladiators double-elimination tournament!");
                 finish(session, killer, true);
@@ -6443,8 +6443,14 @@ public final class ArcadePortManager implements Listener {
             killer.getInventory().clear();
             killer.sendMessage(ChatColor.GREEN + "You advanced in the winners' bracket.");
         } else {
-            session.alive.remove(victimId);
-            victim.sendMessage(ChatColor.RED + "Second loss — you are eliminated from Gladiators.");
+            if (ArcadePortRules.shouldEliminateGladiatorAfterLoss(losses)) {
+                session.alive.remove(victimId);
+                victim.sendMessage(ChatColor.RED + "Second loss — you are eliminated from Gladiators.");
+            } else {
+                // Defensive recovery: a loser's-bracket competitor must retain their final life.
+                session.gladiatorLoserQueue.add(victimId);
+                victim.sendMessage(ChatColor.LIGHT_PURPLE + "You still have one life remaining.");
+            }
             session.gladiatorLoserQueue.add(killer.getUniqueId());
             killer.setGameMode(GameMode.SPECTATOR);
             killer.getInventory().clear();
