@@ -5856,7 +5856,13 @@ public final class ArcadePortManager implements Listener {
             if (!player.isSneaking()) {
                 cancelEvolutionCharge(session, player);
                 if (now % 2_000L < 50L) {
-                    player.sendActionBar(ChatColor.GREEN + "Evolution ready — hold sneak while grounded.");
+                    long pityRemaining = ArcadePortRules.evolutionPityRemainingMillis(pityDeadline, now);
+                    String pityStatus = pityRemaining > 0L
+                            ? "Pity " + ArcadePortRules.formatEvolutionPityRemaining(pityRemaining)
+                            : "Pity ready";
+                    player.sendActionBar(ChatColor.GREEN + "Evolution ready"
+                            + ChatColor.GOLD + " | " + pityStatus
+                            + ChatColor.GRAY + " — hold sneak while grounded.");
                 }
                 continue;
             }

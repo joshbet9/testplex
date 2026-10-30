@@ -78,9 +78,9 @@ public final class ArcadeCatalog {
                 List.of(line("metamorphosis", "Dragon Egg Variants",
                         "Choose the dragon egg and its evolving particle sequence; effects are visible to everyone in the game.",
                         "DRAGON_EGG",
-                        single("charged", "Charged Dragon Egg", "Electric sparks and luminous energy spiral around the egg."),
-                        single("void", "Void Dragon Egg", "Portal and dragon-breath particles spiral around the egg."),
-                        single("nature", "Nature Dragon Egg", "Green motes and pollen bloom around the egg."))),
+                        single("shell-fragments", "Charged Dragon Egg", "Electric sparks and luminous energy spiral around the egg."),
+                        single("void-unfold", "Void Dragon Egg", "Portal and dragon-breath particles spiral around the egg."),
+                        single("nature-bloom", "Nature Dragon Egg", "Green motes and pollen bloom around the egg."))),
                 win("summit-nest", "Summit Nest", "The winner is framed by a nest at the summit."),
                 win("evolution-tree", "Evolution Tree", "A branching evolutionary tree grows behind the winner."),
                 win("gene-helix", "Gene Helix", "A double helix spirals into the sky")));
