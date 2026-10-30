@@ -124,6 +124,7 @@ class ArcadePortGameTest {
         }
         assertNull(ArcadePortGame.fromId("monster-maze"));
         assertNull(ArcadePortGame.fromId("snake"));
+        assertEquals(ArcadePortGame.SNEAKY_ASSASSINS, ArcadePortGame.fromId("sneaky-assassins"));
     }
 
     @Test void normalizesSpacesAndUnderscoresInTestCommands() {
