@@ -312,9 +312,8 @@ final class SneakyAssassinsMechanics {
 
     private void updateHud(long now) {
         long revealRemaining = Math.max(0L, nextGlobalRevealAt - now);
-        int seconds = globalRevealEndsAt > 0L
-                ? (int) Math.max(0L, (globalRevealEndsAt - now + 999L) / 1_000L)
-                : (int) ((revealRemaining + 999L) / 1_000L);
+        int seconds = globalRevealEndsAt > now
+                ? 0 : (int) ((revealRemaining + 999L) / 1_000L);
         updateScoreboard(seconds);
         for (UUID id : players.keySet()) {
             Player player = players.get(id);
@@ -717,6 +716,7 @@ final class SneakyAssassinsMechanics {
             }
             for (Player player : players.values()) {
                 if (player == null || !player.isOnline() || !isAlive.test(player.getUniqueId())) continue;
+                if (powerUpCounts.getOrDefault(player.getUniqueId(), 0) >= 5) continue;
                 if (player.getLocation().distanceSquared(powerUp.item.getLocation()) <= 1.0D) {
                     collectPowerUp(player);
                     removePowerUp(powerUp);
