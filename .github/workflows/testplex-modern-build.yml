@@ -112,11 +112,11 @@ jobs:
             echo
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
-            echo "- Catalogue: 16 Arcade games"
+            echo "- Catalogue: 18 Arcade games"
             echo "- Built artifacts: TestplexModernArcade.jar, MonsterMazeModern.jar, SnakeModern.jar and ArcadeMechanicsModern.jar"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: Monster Maze and Snake plus 14 mechanics-first prototypes; in-game validation still required"
+            echo "- Gameplay ports: Monster Maze and Snake plus 16 mechanics-first prototypes, including Draw My Thing and Master Builders; in-game validation still required"
             echo "- Deployment acceptance: Monster Maze plugin will be installed with the platform; the eight explicitly approved Arcade candidates (Bacon Brawl, Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball, Runner, Spleef) are enabled; Snake remains gated"
             echo "- Server deploy: successful pushes to feat/testplex-modern-26.3-platform automatically invoke the isolated Hyper-V deploy job; pull requests and manual build-only runs do not deploy"
           } >> "$GITHUB_STEP_SUMMARY"
