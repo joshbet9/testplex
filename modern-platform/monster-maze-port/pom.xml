@@ -6,8 +6,8 @@
     <groupId>au.com.testplex</groupId>
     <artifactId>testplex-modern-monster-maze</artifactId>
     <version>0.1.0-SNAPSHOT</version>
-    <name>Testplex Modern Monster Maze</name>
-    <description>Monster Maze 1.21 gameplay implementation adapted for the independent Paper 26.3 test platform.</description>
+    <name>Testplex Modern Monster Maze Game Module</name>
+    <description>Monster Maze gameplay source compiled into the Testplex ArcadeMechanicsModern plugin for Paper 26.3; not a standalone Bukkit plugin.</description>
     <packaging>jar</packaging>
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
@@ -22,7 +22,7 @@
         <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>5.12.2</version><scope>test</scope></dependency>
     </dependencies>
     <build>
-        <finalName>MonsterMazeModern</finalName>
+        <finalName>MonsterMazeGameModule</finalName>
         <plugins>
             <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.1</version><configuration><release>25</release></configuration></plugin>
             <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-resources-plugin</artifactId><version>3.3.1</version></plugin>
