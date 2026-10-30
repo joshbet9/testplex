@@ -1251,7 +1251,11 @@ class ArcadePortGameTest {
         assertEquals(0, ArcadePortRules.dragonEscapeLeapUses("digger"));
         assertEquals(6, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
         assertEquals(2, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_MAX_TNT);
-        assertEquals(10_000L, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
+        assertEquals(8_000L, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
+        assertEquals(8_000L, ArcadePortRules.DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS);
+        assertEquals(40, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS);
+        assertEquals(2.0D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS, 0.00001D);
+        assertEquals(0.5D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y, 0.00001D);
     }
 
     @Test void sourceMapFallThresholdUsesVerticalBoundsInsteadOfFixedY58() {
@@ -1304,11 +1308,26 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(Double.NaN, 0.0D, 1.0D));
     }
 
-    @Test void dragonEscapeDisruptorRechargeStartsWhenTntIsThrown() {
-        assertEquals(10_000L, ArcadePortRules.dragonEscapeNextTntChargeAt(0L));
-        assertEquals(25_000L, ArcadePortRules.dragonEscapeNextTntChargeAt(15_000L));
+    @Test void dragonEscapeDisruptorRechargesAtTheSourceEightSecondRate() {
+        assertEquals(8_000L, ArcadePortRules.dragonEscapeNextTntChargeAt(0L));
+        assertEquals(23_000L, ArcadePortRules.dragonEscapeNextTntChargeAt(15_000L));
         assertEquals(ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS,
                 ArcadePortRules.dragonEscapeNextTntChargeAt(-1_000L) - (-1_000L));
+    }
+
+    @Test void dragonEscapeDisruptorMineArmsThenTriggersOnlyForNearbyOpponents() {
+        assertFalse(ArcadePortRules.shouldTriggerDragonEscapeDisruptor(39, 0.5D, false));
+        assertFalse(ArcadePortRules.shouldTriggerDragonEscapeDisruptor(40, 2.01D, false));
+        assertFalse(ArcadePortRules.shouldTriggerDragonEscapeDisruptor(80, 1.0D, true));
+        assertFalse(ArcadePortRules.shouldTriggerDragonEscapeDisruptor(80, Double.NaN, false));
+        assertTrue(ArcadePortRules.shouldTriggerDragonEscapeDisruptor(40, 2.0D, false));
+    }
+
+    @Test void dragonEscapeGreenDataMarkerControlsDouglasSpeedMultiplier() {
+        assertEquals(1.0D, ArcadePortRules.dragonEscapeSpeedMultiplier(100.0D), 0.00001D);
+        assertEquals(1.25D, ArcadePortRules.dragonEscapeSpeedMultiplier(125.0D), 0.00001D);
+        assertEquals(0.75D, ArcadePortRules.dragonEscapeSpeedMultiplier(75.0D), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.dragonEscapeSpeedMultiplier(Double.NaN), 0.00001D);
     }
 
     @Test void dragonEscapePersonalBestKeysAndRaceTimesAreStable() {

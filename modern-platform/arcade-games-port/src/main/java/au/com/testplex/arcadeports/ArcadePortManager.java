@@ -4105,6 +4105,11 @@ public final class ArcadePortManager implements Listener {
         session.dragonEscapeMapResource = SourceMapCatalog.selectedResource(plugin, ArcadePortGame.DRAGON_ESCAPE);
         if (mapData != null) {
             session.dragonEscapeMapName = mapData.mapName();
+            List<Location> speedMarkers = mapData.dataLocations("GREEN");
+            if (!speedMarkers.isEmpty()) {
+                session.dragonEscapeSpeedMultiplier =
+                        ArcadePortRules.dragonEscapeSpeedMultiplier(speedMarkers.get(0).getX());
+            }
             List<Location> starts = mapData.dataLocations("RED");
             List<Location> sourceRoute = mapData.dataLocations("BLACK");
             if (!starts.isEmpty() && !sourceRoute.isEmpty()) {
@@ -4125,13 +4130,29 @@ public final class ArcadePortManager implements Listener {
         dragon.setRemoveWhenFarAway(false);
         dragon.setCustomName(ChatColor.YELLOW + "Douglas the Dragon");
         dragon.setCustomNameVisible(true);
-        dragon.setVelocity(new Vector(0.0D, 0.0D, ArcadePortRules.DRAGON_ESCAPE_CHASE_SPEED));
+        Location firstTarget = session.dragonEscapeWaypoints.isEmpty()
+                ? spawn.clone().add(0.0D, 0.0D, 8.0D)
+                : session.dragonEscapeWaypoints.get(0).clone();
+        Vector initialDirection = firstTarget.toVector().subtract(spawn.toVector()).normalize();
+        Location initialLocation = dragon.getLocation();
+        initialLocation.setPitch(dragonEscapePitch(initialDirection));
+        dragon.teleport(initialLocation);
+        session.dragonEscapeDragonLocation = initialLocation.clone();
+        session.dragonEscapeDragonVelocity = dragon.getLocation().getDirection().setY(0.0D).normalize();
+        session.dragonEscapeDragonPitch = dragonEscapePitch(dragon.getLocation().getDirection());
         session.dragonEscapeDragon = dragon;
         session.entities.add(dragon);
     }
 
     private void useDragonEscapeLeap(Session session, Player player) {
         UUID id = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        long readyAt = session.dragonEscapeLeapReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            player.sendActionBar(ChatColor.YELLOW + "Leap recharging: "
+                    + String.format(java.util.Locale.ROOT, "%.1f", (readyAt - now) / 1000.0D) + "s");
+            return;
+        }
         int remaining = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, 0);
         if (remaining <= 0) {
             player.sendMessage(ChatColor.YELLOW + "You have used all of your leaps.");
@@ -4139,14 +4160,21 @@ public final class ArcadePortManager implements Listener {
         }
         remaining--;
         session.dragonEscapeLeapUsesRemaining.put(id, remaining);
+        session.dragonEscapeLeapReadyAt.put(id, now + ArcadePortRules.DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS);
+        player.setExp(Math.max(0.0F, Math.min(0.99F,
+                remaining / (float) Math.max(1, ArcadePortRules.dragonEscapeLeapUses(
+                        session.dragonEscapeKits.getOrDefault(id, "jumper"))))));
         if (remaining == 0) {
             player.getInventory().setItemInMainHand(null);
         } else {
             player.getInventory().setItemInMainHand(namedItem(Material.IRON_AXE, "Leap",
                     "Right-click to leap forward (" + remaining + " uses remaining)."));
         }
-        Vector direction = player.getLocation().getDirection().normalize();
-        player.setVelocity(direction.multiply(1.0D).setY(0.45D));
+        Vector direction = player.getLocation().getDirection().normalize().multiply(1.0D);
+        direction.setY(direction.getY() + 0.2D);
+        if (player.isOnGround()) direction.setY(direction.getY() + 0.2D);
+        if (direction.getY() > 1.0D) direction.setY(1.0D);
+        player.setVelocity(direction);
         player.setFallDistance(0.0F);
         player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 16,
                 0.35D, 0.3D, 0.35D, 0.05D);
@@ -4207,13 +4235,14 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         consumeHeld(player);
-        session.dragonEscapeNextTntAt.put(player.getUniqueId(),
-                ArcadePortRules.dragonEscapeNextTntChargeAt(System.currentTimeMillis()));
         Vector direction = player.getEyeLocation().getDirection().normalize();
         Location spawn = player.getEyeLocation().add(direction.clone().multiply(0.8D));
-        TNTPrimed mine = session.world.spawn(spawn, TNTPrimed.class);
-        mine.setFuseTicks(12_000);
-        mine.setVelocity(direction.multiply(0.8D).setY(direction.getY() * 0.65D + 0.1D));
+        Item mine = session.world.dropItem(spawn, new ItemStack(Material.TNT));
+        mine.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+        mine.setPickupDelay(Integer.MAX_VALUE);
+        mine.setInvulnerable(true);
+        mine.setCustomName(ChatColor.RED + "Disruptor Mine");
+        mine.setCustomNameVisible(true);
         session.entities.add(mine);
         session.dragonEscapeMineOwners.put(mine.getUniqueId(), player.getUniqueId());
         player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.15F);
@@ -4227,8 +4256,8 @@ public final class ArcadePortManager implements Listener {
                     now + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
             if (now < nextAt) continue;
             if (inventoryCount(player, Material.TNT) < ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_MAX_TNT) {
-                player.getInventory().addItem(namedItem(Material.TNT, "Mini Explosive",
-                        "Right-click to throw a trip mine; recharges every 10 seconds."));
+                player.getInventory().addItem(namedItem(Material.TNT, "Disruptor",
+                        "Stationary trip mine; triggers nearby opponents after 2 seconds."));
                 player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.4F, 1.2F);
             }
             session.dragonEscapeNextTntAt.put(id,
@@ -4238,16 +4267,29 @@ public final class ArcadePortManager implements Listener {
 
     private void updateDragonEscapeMines(Session session) {
         for (Entity entity : new ArrayList<>(session.entities)) {
-            if (!(entity instanceof TNTPrimed mine) || !mine.isValid()) continue;
+            if (!(entity instanceof Item mine)) continue;
             UUID ownerId = session.dragonEscapeMineOwners.get(mine.getUniqueId());
             if (ownerId == null) continue;
+            if (!mine.isValid()) {
+                session.dragonEscapeMineOwners.remove(mine.getUniqueId());
+                session.entities.remove(mine);
+                continue;
+            }
             for (Player target : alivePlayers(session)) {
-                if (target.getUniqueId().equals(ownerId)) continue;
-                if (target.getLocation().distanceSquared(mine.getLocation()) <= 1.25D) {
-                    mine.setFuseTicks(0);
-                    target.sendActionBar(ChatColor.RED + "A mini explosive was triggered!");
-                    break;
-                }
+                boolean sameOwner = target.getUniqueId().equals(ownerId);
+                double distance = target.getLocation().distance(mine.getLocation());
+                if (!ArcadePortRules.shouldTriggerDragonEscapeDisruptor(
+                        mine.getTicksLived(), distance, sameOwner)) continue;
+                session.dragonEscapeMineOwners.remove(mine.getUniqueId());
+                session.entities.remove(mine);
+                mine.remove();
+                target.setVelocity(new Vector(0.0D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y, 0.0D));
+                target.setFallDistance(0.0F);
+                target.playEffect(EntityEffect.HURT);
+                target.setSprinting(false);
+                target.getWorld().playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1.0F, 2.0F);
+                target.sendActionBar(ChatColor.RED + "A Disruptor mine launched you!");
+                break;
             }
         }
     }
@@ -4300,32 +4342,65 @@ public final class ArcadePortManager implements Listener {
         player.playSound(dropLocation, Sound.BLOCK_STONE_BREAK, 0.75F, 1.2F);
     }
 
-    private void detonateDragonEscapeMine(Session session, EntityExplodeEvent event, TNTPrimed mine) {
-        UUID ownerId = session.dragonEscapeMineOwners.remove(mine.getUniqueId());
-        event.blockList().clear();
-        event.setCancelled(true);
-        Location blast = mine.getLocation().clone();
-        session.entities.remove(mine);
-        mine.remove();
-        session.world.spawnParticle(Particle.EXPLOSION, blast, 1, 0.0D, 0.0D, 0.0D, 0.0D);
-        session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 1.5F);
-        for (Player target : alivePlayers(session)) {
-            if (ownerId != null && target.getUniqueId().equals(ownerId)) continue;
-            double distanceSquared = target.getLocation().distanceSquared(blast);
-            if (distanceSquared > 16.0D) continue;
-            double distance = Math.sqrt(distanceSquared);
-            Vector away = target.getLocation().toVector().subtract(blast.toVector());
-            if (away.lengthSquared() < 0.001D) away = new Vector(0.0D, 1.0D, 0.0D);
-            double force = 1.4D * Math.max(0.25D, 1.0D - distance / 4.5D);
-            target.setVelocity(away.normalize().multiply(force)
-                    .setY(Math.max(0.35D, 0.7D - distance * 0.08D)));
-            target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 20, 1, false, false, true));
-            target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation(), 10,
-                    0.3D, 0.3D, 0.3D, 0.04D);
-        }
+    private float dragonEscapePitch(Vector vector) {
+        if (vector == null || !Double.isFinite(vector.getX())
+                || !Double.isFinite(vector.getY()) || !Double.isFinite(vector.getZ())
+                || vector.lengthSquared() < 1.0E-12D) return 0.0F;
+        double horizontal = Math.sqrt(vector.getX() * vector.getX() + vector.getZ() * vector.getZ());
+        double pitch = Math.toDegrees(Math.atan(horizontal / vector.getY()));
+        if (vector.getY() <= 0.0D) pitch += 90.0D;
+        else pitch -= 90.0D;
+        if (pitch == 180.0D) pitch = 0.0D;
+        return (float) pitch;
     }
 
-    /** Paper-native approximation of Reborn's DragonEscapeData.Move + radius-10 block explosion. */
+    private float dragonEscapeYaw(Vector vector) {
+        if (vector == null || !Double.isFinite(vector.getX()) || !Double.isFinite(vector.getZ())
+                || vector.lengthSquared() < 1.0E-12D) return 0.0F;
+        double yaw = Math.toDegrees(Math.atan((-vector.getX()) / vector.getZ()));
+        if (vector.getZ() < 0.0D) yaw += 180.0D;
+        return (float) yaw;
+    }
+
+    private Location moveDragonEscapeDragon(Session session, Location target) {
+        EnderDragon dragon = session.dragonEscapeDragon;
+        if (dragon == null || !dragon.isValid() || target == null || target.getWorld() != session.world) {
+            return dragon == null ? null : dragon.getLocation();
+        }
+        Location location = session.dragonEscapeDragonLocation == null
+                ? dragon.getLocation().clone() : session.dragonEscapeDragonLocation.clone();
+        Vector velocity = session.dragonEscapeDragonVelocity == null
+                ? location.getDirection().setY(0.0D).normalize()
+                : session.dragonEscapeDragonVelocity.clone();
+        float pitch = session.dragonEscapeDragonPitch;
+        double distanceToTarget = target.distance(location);
+        float desiredPitch = distanceToTarget < 1.0E-6D ? pitch
+                : dragonEscapePitch(target.toVector().subtract(location.toVector()));
+        if (desiredPitch < pitch) pitch -= 0.05F;
+        if (desiredPitch > pitch) pitch += 0.05F;
+        pitch = Math.max(-0.5F, Math.min(0.5F, pitch));
+
+        Vector desired = target.toVector().subtract(location.toVector()).setY(0.0D);
+        if (desired.lengthSquared() > 1.0E-12D) desired.normalize();
+        Vector currentFlat = velocity.clone().setY(0.0D);
+        if (currentFlat.lengthSquared() > 1.0E-12D) currentFlat.normalize();
+        desired.subtract(currentFlat).multiply(0.2D);
+        velocity.add(desired);
+        if (velocity.lengthSquared() > 1.0E-12D) velocity.normalize();
+
+        double speed = ArcadePortRules.DRAGON_ESCAPE_CHASE_SPEED * session.dragonEscapeSpeedMultiplier;
+        location.add(velocity.clone().multiply(speed));
+        location.add(0.0D, -pitch, 0.0D);
+        location.setPitch(-pitch);
+        location.setYaw(180.0F + dragonEscapeYaw(velocity));
+        session.dragonEscapeDragonVelocity = velocity;
+        session.dragonEscapeDragonPitch = pitch;
+        session.dragonEscapeDragonLocation = location.clone();
+        dragon.teleport(location);
+        return location;
+    }
+
+    /** Paper recreation of Reborn's DragonEscapeData.Move plus the radius-10 destruction. */
     private void updateDragonEscapeChase(Session session) {
         EnderDragon dragon = session.dragonEscapeDragon;
         if (active != session || dragon == null || !dragon.isValid() || dragon.isDead()) return;
@@ -4338,12 +4413,7 @@ public final class ArcadePortManager implements Listener {
             session.dragonEscapeDragonProgress = dragonIndex;
             Location target = session.dragonEscapeWaypoints.get(
                     Math.min(session.dragonEscapeWaypoints.size() - 1, dragonIndex + 1));
-            Vector desired = target.toVector().subtract(location.toVector());
-            if (desired.lengthSquared() > 1.0E-4D) {
-                dragon.setVelocity(desired.normalize().multiply(0.2D));
-            } else {
-                dragon.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
-            }
+            location = moveDragonEscapeDragon(session, target);
 
             // Reborn destroys a radius-10 sphere as the dragon moves. Do not scan the same area
             // every tick: update the sphere after the dragon has moved at least half a block.
@@ -9265,11 +9335,6 @@ public final class ArcadePortManager implements Listener {
     public void onExplode(EntityExplodeEvent event) {
         Session session = active;
         if (session == null || event.getEntity() == null || event.getEntity().getWorld() != session.world) return;
-        if (session.type == ArcadePortGame.DRAGON_ESCAPE && event.getEntity() instanceof TNTPrimed mine
-                && session.dragonEscapeMineOwners.containsKey(mine.getUniqueId())) {
-            detonateDragonEscapeMine(session, event, mine);
-            return;
-        }
         if (!(event.getEntity() instanceof TNTPrimed bomb)) {
             event.blockList().clear();
             event.setCancelled(true);
@@ -9607,10 +9672,15 @@ public final class ArcadePortManager implements Listener {
         long dragonNextSpawnAt;
         final Map<UUID, Long> dragonLeapReadyAt = new HashMap<>();
         EnderDragon dragonEscapeDragon;
+        Location dragonEscapeDragonLocation;
+        Vector dragonEscapeDragonVelocity = new Vector(0.0D, 0.0D, 1.0D);
+        float dragonEscapeDragonPitch;
+        double dragonEscapeSpeedMultiplier = 1.0D;
         Location dragonEscapeLastDestructionLocation;
         final List<Location> dragonEscapeWaypoints = new ArrayList<>();
         final Map<UUID, String> dragonEscapeKits = new HashMap<>();
         final Map<UUID, Integer> dragonEscapeLeapUsesRemaining = new HashMap<>();
+        final Map<UUID, Long> dragonEscapeLeapReadyAt = new HashMap<>();
         final Map<UUID, Integer> dragonEscapeDiggerUsesRemaining = new HashMap<>();
         final Map<UUID, Long> dragonEscapeNextTntAt = new HashMap<>();
         final Set<UUID> dragonEscapeWarperUsed = new HashSet<>();
