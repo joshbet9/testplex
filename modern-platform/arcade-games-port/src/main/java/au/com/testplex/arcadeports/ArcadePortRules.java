@@ -14,6 +14,7 @@ public final class ArcadePortRules {
     /** DeathTag inherits the 20-minute timeout from the legacy Arcade Game base class. */
     public static final long DEATH_TAG_GAME_TIMEOUT_MILLIS = 1_200_000L;
     public static final int DEATH_TAG_FORCED_CHASER_REWARD_GEMS = 10;
+    public static final int DEATH_TAG_RUNNER_KILL_REWARD_GEMS = 4;
     public static final int DEATH_TAG_FIRST_PLACE_REWARD_GEMS = 15;
     public static final int DEATH_TAG_SECOND_PLACE_REWARD_GEMS = 10;
     public static final int DEATH_TAG_THIRD_PLACE_REWARD_GEMS = 5;
