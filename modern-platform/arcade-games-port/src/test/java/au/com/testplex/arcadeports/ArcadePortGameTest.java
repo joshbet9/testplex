@@ -1453,6 +1453,26 @@ class ArcadePortGameTest {
         assertEquals("0:00.000", ArcadePortRules.formatDragonEscapeDelta(0L));
     }
 
+    @Test void dragonEscapePersonalBestSplitsFollowAuthoredWaypointProgress() {
+        assertEquals(0, ArcadePortRules.dragonEscapePbSegmentStartIndex(0, 4));
+        assertEquals(1, ArcadePortRules.dragonEscapePbSegmentStartIndex(1, 4));
+        assertEquals(2, ArcadePortRules.dragonEscapePbSegmentStartIndex(2, 4));
+        assertEquals(-1, ArcadePortRules.dragonEscapePbSegmentStartIndex(3, 4));
+        assertEquals(-1, ArcadePortRules.dragonEscapePbSegmentStartIndex(0, 1));
+
+        assertEquals(0L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 0, 4));
+        assertEquals(30_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 1, 4));
+        assertEquals(60_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 2, 4));
+        assertEquals(90_000L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 3, 4));
+        assertEquals(0L, ArcadePortRules.dragonEscapeDefaultSplitMillis(90_000L, 2, 1));
+
+        assertEquals(27_500L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 50_000L, 0.25D));
+        assertEquals(20_000L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 50_000L, -1.0D));
+        assertEquals(50_000L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 50_000L, 2.0D));
+        assertEquals(20_000L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 10_000L, 0.5D));
+        assertEquals(20_000L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 50_000L, Double.NaN));
+    }
+
     @Test void dragonEscapeRouteOnlyDeduplicatesCoincidentWaypoints() {
         assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.0D));
         assertTrue(ArcadePortRules.isDuplicateDragonEscapeWaypoint(0.5D));
