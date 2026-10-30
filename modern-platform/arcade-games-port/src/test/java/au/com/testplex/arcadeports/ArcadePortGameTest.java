@@ -2283,6 +2283,39 @@ class ArcadePortGameTest {
         assertEquals("RED", ArcadePortRules.gladiatorsArenaMarkerGroup(4));
     }
 
+    @Test void drawMyThingRoundDurationScalesToTheFiveMinuteBudgetAboveTenPlayers() {
+        assertEquals(30_000L, ArcadePortRules.drawMyThingRoundMillis(1));
+        assertEquals(30_000L, ArcadePortRules.drawMyThingRoundMillis(10));
+        assertEquals(24_545L, ArcadePortRules.drawMyThingRoundMillis(11));
+        assertEquals(22_250L, ArcadePortRules.drawMyThingRoundMillis(12));
+        assertEquals(15_937L, ArcadePortRules.drawMyThingRoundMillis(16));
+
+        for (int players = 11; players <= 64; players++) {
+            long drawingMillis = players * ArcadePortRules.drawMyThingRoundMillis(players);
+            long intermissionMillis = (players - 1L) * ArcadePortRules.DRAW_MY_THING_INTERMISSION_MILLIS;
+            assertTrue(drawingMillis + intermissionMillis <= ArcadePortRules.DRAW_MY_THING_GAME_MILLIS,
+                    "DMT schedule exceeds five minutes for " + players + " players");
+        }
+    }
+
+    @Test void masterBuildersLimitsLobbySizeAndAllocatesSixteenDistinctPlots() {
+        assertFalse(ArcadePortRules.supportsMasterBuildersPlayerCount(0));
+        assertTrue(ArcadePortRules.supportsMasterBuildersPlayerCount(1));
+        assertTrue(ArcadePortRules.supportsMasterBuildersPlayerCount(16));
+        assertFalse(ArcadePortRules.supportsMasterBuildersPlayerCount(17));
+
+        Set<String> plots = new HashSet<>();
+        for (int plot = 0; plot < ArcadePortRules.MASTER_BUILDERS_MAX_BUILDERS; plot++) {
+            String centre = ArcadePortRules.masterBuildersPlotCenterX(plot) + ":"
+                    + ArcadePortRules.masterBuildersPlotCenterZ(plot);
+            assertTrue(plots.add(centre), "Master Builders plot centres must be unique");
+        }
+        assertEquals(ArcadePortRules.masterBuildersPlotCenterX(0),
+                ArcadePortRules.masterBuildersPlotCenterX(16), 0.00001D);
+        assertEquals(ArcadePortRules.masterBuildersPlotCenterZ(0),
+                ArcadePortRules.masterBuildersPlotCenterZ(16), 0.00001D);
+    }
+
     @Test void turfWarsTimeoutUsesTerritoryBeforeKills() {
         assertEquals(0, ArcadePortRules.turfWarsTimeoutLeader(0, 0, 99));
         assertEquals(0, ArcadePortRules.turfWarsTimeoutLeader(8, 0, 99));

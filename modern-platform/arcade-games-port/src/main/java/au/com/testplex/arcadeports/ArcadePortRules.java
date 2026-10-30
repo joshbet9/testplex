@@ -13,6 +13,40 @@ import java.util.List;
  * needing a live Paper server.
  */
 public final class ArcadePortRules {
+    public static final long DRAW_MY_THING_GAME_MILLIS = 300_000L;
+    public static final long DRAW_MY_THING_BASE_ROUND_MILLIS = 30_000L;
+    public static final long DRAW_MY_THING_INTERMISSION_MILLIS = 3_000L;
+    public static final int DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT = 10;
+    public static final int MASTER_BUILDERS_MAX_BUILDERS = 16;
+
+    /**
+     * Keeps the classic 30-second drawing turn for lobbies of ten or fewer.
+     * Larger lobbies divide the five-minute game budget across every player's
+     * turn and the three-second gaps between turns.
+     */
+    public static long drawMyThingRoundMillis(int playerCount) {
+        if (playerCount <= DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT) {
+            return DRAW_MY_THING_BASE_ROUND_MILLIS;
+        }
+        long turns = Math.max(1L, playerCount);
+        long intermissions = (turns - 1L) * DRAW_MY_THING_INTERMISSION_MILLIS;
+        long drawingBudget = Math.max(1L, DRAW_MY_THING_GAME_MILLIS - intermissions);
+        return Math.max(1L, drawingBudget / turns);
+    }
+
+    public static boolean supportsMasterBuildersPlayerCount(int playerCount) {
+        return playerCount >= 1 && playerCount <= MASTER_BUILDERS_MAX_BUILDERS;
+    }
+
+    public static double masterBuildersPlotCenterX(int plotIndex) {
+        int plot = Math.floorMod(plotIndex, MASTER_BUILDERS_MAX_BUILDERS);
+        return -24.0D + (plot % 4) * 16.0D + 0.5D;
+    }
+
+    public static double masterBuildersPlotCenterZ(int plotIndex) {
+        int plot = Math.floorMod(plotIndex, MASTER_BUILDERS_MAX_BUILDERS);
+        return -24.0D + (plot / 4) * 16.0D + 0.5D;
+    }
     public static final long DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS = 30_000L;
     /** DeathTag inherits the 20-minute timeout from the legacy Arcade Game base class. */
     public static final long DEATH_TAG_GAME_TIMEOUT_MILLIS = 1_200_000L;

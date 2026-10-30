@@ -145,8 +145,6 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class ArcadePortManager implements Listener {
     private static final int HALF_SIZE = 20;
     private static final long ROUND_MS = 180_000L;
-    private static final long DRAW_MY_THING_ROUND_MILLIS = 30_000L;
-    private static final long DRAW_MY_THING_INTERMISSION_MILLIS = 3_000L;
     private static final int DRAW_MY_THING_MAX_GUESSES = 10;
     private static final long MASTER_BUILDERS_BUILD_MILLIS = 180_000L;
     private static final long MASTER_BUILDERS_REVIEW_MILLIS = 8_000L;
@@ -1406,7 +1404,8 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
-        if (type == ArcadePortGame.MASTER_BUILDERS && participants.size() > 16) {
+        if (type == ArcadePortGame.MASTER_BUILDERS
+                && !ArcadePortRules.supportsMasterBuildersPlayerCount(participants.size())) {
             sender.sendMessage(ChatColor.RED + "Master Builders supports up to 16 builders (one per plot).");
             return;
         }
@@ -1854,7 +1853,13 @@ public final class ArcadePortManager implements Listener {
             setupDragonEscapeRaceScoreboard(session);
         }
         if (type == ArcadePortGame.DRAW_MY_THING) {
-            announce(session, ChatColor.AQUA + "Draw My Thing: every player draws once. Each 30-second round allows 10 guesses; timed hints appear during the round.");
+            String drawRoundDuration = session.players.size() > ArcadePortRules.DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT
+                    ? String.format(java.util.Locale.ROOT, "%.1f seconds", session.drawRoundDurationMillis / 1_000.0D)
+                    : "30 seconds";
+            String drawScaling = session.players.size() > ArcadePortRules.DRAW_MY_THING_FULL_ROUND_PLAYER_LIMIT
+                    ? " (scaled to fit the five-minute game)" : "";
+            announce(session, ChatColor.AQUA + "Draw My Thing: every player draws once. Each drawing round lasts "
+                    + drawRoundDuration + drawScaling + " and allows 10 guesses; timed hints appear during the round.");
         }
         if (type == ArcadePortGame.MASTER_BUILDERS) {
             announce(session, ChatColor.AQUA + "Master Builders: build " + ChatColor.YELLOW + session.masterBuilderTheme
@@ -4968,14 +4973,13 @@ public final class ArcadePortManager implements Listener {
     }
 
     private Location masterBuilderPlotCenter(World world, int slot) {
-        int n = Math.floorMod(slot, 16);
-        return new Location(world, -24 + (n % 4) * 16 + 0.5D, 64.0D,
-                -24 + (n / 4) * 16 + 0.5D);
+        return new Location(world, ArcadePortRules.masterBuildersPlotCenterX(slot), 64.0D,
+                ArcadePortRules.masterBuildersPlotCenterZ(slot));
     }
 
     private void buildMasterBuildersArena(World world) {
         for (int x = -36; x <= 36; x++) for (int z = -36; z <= 36; z++)
-            for (int y = 62; y <= 100; y++) world.getBlockAt(x, y, z).setType(Material.AIR, false);
+            for (int y = 62; y < 120; y++) world.getBlockAt(x, y, z).setType(Material.AIR, false);
         for (int slot = 0; slot < 16; slot++) {
             Location c = masterBuilderPlotCenter(world, slot);
             for (int x = c.getBlockX() - 5; x <= c.getBlockX() + 5; x++) {
@@ -4997,6 +5001,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void prepareDrawMyThing(Session session, List<Player> participants) {
+        session.drawRoundDurationMillis = ArcadePortRules.drawMyThingRoundMillis(participants.size());
         participants.forEach(p -> session.drawTurnOrder.add(p.getUniqueId()));
         Collections.shuffle(session.drawTurnOrder);
         SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.DRAW_MY_THING.id());
@@ -5072,7 +5077,7 @@ public final class ArcadePortManager implements Listener {
         session.drawCurrentDrawer=drawer.getUniqueId();
         session.drawWord=chooseDrawWord(session);
         session.drawCorrectGuessers.clear();session.drawGuessAttempts.clear();session.drawRevealedLetters.clear();
-        session.drawRoundStartedAt=now;session.drawRoundEndsAt=now+DRAW_MY_THING_ROUND_MILLIS;session.drawNextRoundAt=0L;
+        session.drawRoundStartedAt=now;session.drawRoundEndsAt=now+session.drawRoundDurationMillis;session.drawNextRoundAt=0L;
         drawer.teleport(session.drawDrawerLocation);drawer.setAllowFlight(true);drawer.setFlying(true);drawer.setFlySpeed(0.12F);
         giveDrawPaintPalette(drawer);
         drawer.sendMessage(ChatColor.GREEN+"Your word is: "+ChatColor.YELLOW+session.drawWord);
@@ -5092,7 +5097,11 @@ public final class ArcadePortManager implements Listener {
             Location start=session.drawStartLocations.get(drawerId);if(start!=null)drawer.teleport(start);
         }
         resetDrawCanvas(session);session.drawCurrentDrawer=null;session.drawWord=null;
-        session.drawRoundEndsAt=0L;session.drawNextRoundAt=now+DRAW_MY_THING_INTERMISSION_MILLIS;
+        session.drawRoundEndsAt=0L;
+        boolean hasRemainingDrawer = session.drawTurnOrder.subList(session.drawTurnIndex, session.drawTurnOrder.size())
+                .stream().map(session.players::get).anyMatch(p -> p != null && p.isOnline());
+        session.drawNextRoundAt = hasRemainingDrawer
+                ? now + ArcadePortRules.DRAW_MY_THING_INTERMISSION_MILLIS : now;
     }
 
     private void updateDrawMyThing(Session session,long now) {
@@ -5110,7 +5119,7 @@ public final class ArcadePortManager implements Listener {
         boolean allGuessed=!guessers.isEmpty()&&guessers.stream().allMatch(session.drawCorrectGuessers::contains);
         if(now>=session.drawRoundEndsAt||allGuessed){finishDrawMyThingRound(session,now);return;}
         int letters=(int)session.drawWord.chars().filter(ch->ch!=' ').count();
-        int reveal=letters==0?0:(int)Math.floor(Math.max(0,now-session.drawRoundStartedAt)*(double)letters/(DRAW_MY_THING_ROUND_MILLIS*1.75D));
+        int reveal=letters==0?0:(int)Math.floor(Math.max(0,now-session.drawRoundStartedAt)*(double)letters/(session.drawRoundDurationMillis*1.75D));
         while(session.drawRevealedLetters.size()<reveal){
             List<Integer> hidden=new ArrayList<>();
             for(int i=0;i<session.drawWord.length();i++)
@@ -5184,8 +5193,12 @@ public final class ArcadePortManager implements Listener {
         session.masterBuilderPhase=MasterBuildersPhase.BUILDING;
         session.masterBuilderBuildEndsAt=now+MASTER_BUILDERS_BUILD_MILLIS;
         for(Player p:session.players.values())if(p!=null&&p.isOnline()){
-            p.getInventory().clear();p.setGameMode(GameMode.CREATIVE);
-            p.sendMessage(ChatColor.YELLOW+"Build: "+ChatColor.GOLD+session.masterBuilderTheme);
+            p.getInventory().clear();
+            p.setGameMode(GameMode.CREATIVE);
+            Integer plotIndex=session.masterBuilderPlots.get(p.getUniqueId());
+            if(plotIndex!=null)p.teleport(masterBuilderPlotCenter(session.world,plotIndex));
+            p.sendMessage(ChatColor.YELLOW+"Build: "+ChatColor.GOLD+session.masterBuilderTheme
+                    +ChatColor.YELLOW+" | Your plot: "+(plotIndex==null?"unassigned":plotIndex+1));
         }
     }
 
@@ -5227,8 +5240,11 @@ public final class ArcadePortManager implements Listener {
 
     private void handleMasterBuildersVote(Session session,Player player,PlayerInteractEvent event) {
         event.setCancelled(true);
-        if(!event.getAction().isRightClick()||session.masterBuilderCurrentTarget==null||
-                player.getUniqueId().equals(session.masterBuilderCurrentTarget))return;
+        if(event.getHand()!=EquipmentSlot.HAND
+                ||session.masterBuilderPhase!=MasterBuildersPhase.REVIEW
+                ||System.currentTimeMillis()>=session.masterBuilderReviewEndsAt
+                ||!event.getAction().isRightClick()||session.masterBuilderCurrentTarget==null
+                ||player.getUniqueId().equals(session.masterBuilderCurrentTarget))return;
         ItemStack item=event.getItem();if(item==null)return;
         int score=switch(item.getType()){
             case RED_CONCRETE -> 1;case ORANGE_CONCRETE -> 2;case YELLOW_CONCRETE -> 3;
@@ -13601,6 +13617,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.MASTER_BUILDERS) {
             if (session.masterBuilderPhase == MasterBuildersPhase.BUILDING
+                    && System.currentTimeMillis() < session.masterBuilderBuildEndsAt
                     && session.alive.contains(event.getPlayer().getUniqueId())
                     && isInsideMasterBuilderPlot(session, event.getPlayer().getUniqueId(), event.getBlock())) {
                 event.setDropItems(false);
@@ -13693,6 +13710,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.MASTER_BUILDERS) {
             boolean allowed = session.masterBuilderPhase == MasterBuildersPhase.BUILDING
+                    && System.currentTimeMillis() < session.masterBuilderBuildEndsAt
                     && session.alive.contains(event.getPlayer().getUniqueId())
                     && isInsideMasterBuilderPlot(session, event.getPlayer().getUniqueId(), event.getBlockPlaced());
             if (!allowed) event.setCancelled(true);
@@ -15354,6 +15372,7 @@ public final class ArcadePortManager implements Listener {
         String drawWord;
         Location drawDrawerLocation;
         long drawRoundStartedAt;
+        long drawRoundDurationMillis;
         long drawRoundEndsAt;
         long drawNextRoundAt;
         int drawTurnIndex;
