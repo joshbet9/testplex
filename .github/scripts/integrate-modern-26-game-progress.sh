@@ -820,8 +820,39 @@ if "testplex-isolated-hyperv-server-v2-20261031" not in source:
     raise SystemExit("Failed to rotate the old Actions concurrency group.")
 if "28m ssh" not in source or "flock -n /var/lock/testplex-modern-deploy.lock" not in source:
     raise SystemExit("Failed to add bounded SSH and remote lock.")
+if "12m scp" not in source or "3m scp" not in source or "5m ssh" not in source:
+    raise SystemExit("Failed to bound upload SCP and preflight SSH stages.")
 path.write_text(source)
 print("Hardened deployment concurrency, SSH and external command deadlines.")
+PY
+
+python3 - <<'PY'
+from pathlib import Path
+import re
+
+plugin = Path("modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.java").read_text()
+match = re.search(r"READY_FOR_TEST_GAME_IDS\\s*=\\s*(?:java\\.util\\.)?List\\.of\\s*\\(([^)]*)\\)", plugin, re.S)
+if not match:
+    raise SystemExit("Could not read the runtime READY_FOR_TEST allow-list.")
+runtime_enabled = re.findall(r'"([^"]+)"', match.group(1))
+expected = ["death-tag", "one-in-the-quiver"]
+if runtime_enabled != expected:
+    raise SystemExit(f"Unexpected runtime ready allow-list: {runtime_enabled}; expected exactly {expected}")
+
+config_lines = Path("modern-platform/arcade-games-port/src/main/resources/config.yml").read_text().splitlines()
+try:
+    start = config_lines.index("enabled-games:") + 1
+except ValueError:
+    raise SystemExit("Missing enabled-games config section.")
+config_enabled = []
+for line in config_lines[start:]:
+    if line.startswith("  - "):
+        config_enabled.append(line[4:].strip())
+    elif line and not line.startswith(" ") and not line.startswith("#"):
+        break
+if config_enabled != expected:
+    raise SystemExit(f"Unexpected config enabled-games list: {config_enabled}; expected exactly {expected}")
+print("Verified the only enabled test games are Death Tag and One in the Quiver.")
 PY
 
 grep -q 'READY_FOR_TEST_GAME_IDS' modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.java
