@@ -34,11 +34,17 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.Damageable;
+import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
@@ -104,6 +110,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final List<Location> objectiveTntSpawns = new ArrayList<>();
     private final List<Block> castleChests = new ArrayList<>();
     private final Map<UUID, Integer> castleKillStreaks = new HashMap<>();
+    private final Map<UUID, String> castleAssaultPlayerKits = new HashMap<>();
+    private final Map<UUID, String> selectedHeroesOfGwen = new HashMap<>();
     private final List<StoreEntry> storeEntries = new ArrayList<>();
     private final Map<UUID, StoreHolder> openStores = new HashMap<>();
 
@@ -644,29 +652,76 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             double chance = ThreadLocalRandom.current().nextDouble();
             double subChance = ThreadLocalRandom.current().nextDouble();
             ItemStack loot;
+            // Match CastleAssault.generateLoot(): ranged 30%, potion 20%, rods/gaps 30%, misc 20%.
             if (chance <= 0.30D) {
                 loot = ThreadLocalRandom.current().nextBoolean()
-                        ? new ItemStack(Material.EGG, 3 + ThreadLocalRandom.current().nextInt(3))
-                        : new ItemStack(Material.ARROW, 8 + ThreadLocalRandom.current().nextInt(9));
+                        ? new ItemStack(Material.EGG, ThreadLocalRandom.current().nextInt(3, 6))
+                        : new ItemStack(Material.ARROW, ThreadLocalRandom.current().nextInt(8, 17));
             } else if (chance <= 0.50D) {
-                loot = subChance <= 0.45D
-                        ? new ItemStack(Material.GOLDEN_APPLE)
-                        : new ItemStack(Material.POTION);
+                if (subChance <= 0.45D) {
+                    loot = castlePotion(Material.POTION, PotionEffectType.REGENERATION, 900, 0,
+                            "Regeneration Potion");
+                } else if (ThreadLocalRandom.current().nextBoolean()) {
+                    loot = castlePotion(Material.POTION, PotionEffectType.SPEED, 3600, 0, "Speed Potion");
+                } else {
+                    loot = castlePotion(Material.SPLASH_POTION, PotionEffectType.INSTANT_HEALTH, 1, 0,
+                            "Splash Healing Potion");
+                }
             } else if (chance <= 0.60D) {
                 loot = ThreadLocalRandom.current().nextBoolean()
                         ? new ItemStack(Material.FISHING_ROD)
-                        : new ItemStack(Material.GOLDEN_APPLE);
+                        : namedItem(Material.GOLDEN_APPLE, ChatColor.LIGHT_PURPLE + "Golden Applegate",
+                                "Castle Assault chest reward.");
             } else {
-                loot = switch (ThreadLocalRandom.current().nextInt(4)) {
-                    case 0 -> new ItemStack(Material.ENDER_PEARL);
-                    case 1 -> new ItemStack(Material.WATER_BUCKET);
-                    case 2 -> new ItemStack(Material.FLINT_AND_STEEL);
-                    default -> new ItemStack(Material.SNOWBALL, 16);
-                };
+                int weighted = ThreadLocalRandom.current().nextInt(9);
+                loot = weighted < 2 ? new ItemStack(Material.ENDER_PEARL)
+                        : weighted < 4 ? new ItemStack(Material.WATER_BUCKET)
+                        : weighted < 6 ? castleFlintAndSteel(4, false)
+                        : new ItemStack(Material.SNOWBALL, 16);
             }
             inventory.setItem(slot, loot);
         }
         chest.update(true, false);
+    }
+
+    private ItemStack castlePotion(Material material, PotionEffectType effect, int durationTicks,
+            int amplifier, String displayName) {
+        ItemStack item = new ItemStack(material);
+        PotionMeta meta = (PotionMeta) item.getItemMeta();
+        meta.addCustomEffect(new PotionEffect(effect, durationTicks, amplifier), true);
+        meta.setDisplayName(ChatColor.LIGHT_PURPLE + displayName);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack castleFlintAndSteel(int remainingUses, boolean kitItem) {
+        ItemStack item = new ItemStack(Material.FLINT_AND_STEEL);
+        ItemMeta meta = item.getItemMeta();
+        if (meta instanceof Damageable damageable) {
+            int maximum = Material.FLINT_AND_STEEL.getMaxDurability();
+            damageable.setDamage(Math.max(0, maximum - Math.max(1, Math.min(maximum, remainingUses))));
+        }
+        meta.setDisplayName(ChatColor.GOLD + "Flint and Steel");
+        meta.setLore(List.of(ChatColor.GRAY + (kitItem ? "Kit Item" : "Limited-use chest item")));
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack castleEnchantedBook(Enchantment enchantment, int level, String name) {
+        ItemStack item = new ItemStack(Material.ENCHANTED_BOOK);
+        EnchantmentStorageMeta meta = (EnchantmentStorageMeta) item.getItemMeta();
+        meta.addStoredEnchant(enchantment, level, true);
+        meta.setDisplayName(ChatColor.LIGHT_PURPLE + name);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private ItemStack castleArmour(Material material, Enchantment enchantment, int level) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        if (enchantment != null && level > 0) meta.addEnchant(enchantment, level, true);
+        item.setItemMeta(meta);
+        return item;
     }
 
     private void spawnObjectiveTnt() {
@@ -742,7 +797,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         restoreCarrierHelmet(carrier);
         objectiveCarrier = null;
         objectiveCarryStartedAt = 0L;
-        resolveCastleExplosion(carrier.getLocation().clone(), carrier, true, 4.0D);
+        resolveCastleExplosion(carrier.getLocation().clone(), carrier, true, castleTntRadius(carrier));
         carrier.sendMessage(ChatColor.GOLD + "Objective TNT detonated!");
     }
 
@@ -773,9 +828,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             owner = Bukkit.getPlayer(UUID.fromString(ownerValue));
         } catch (IllegalArgumentException ignored) {
         }
-        if (owner != null && owner.isOnline()) resolveCastleExplosion(tnt.getLocation(), owner, false, 4.0D);
+        if (owner != null && owner.isOnline()) resolveCastleExplosion(tnt.getLocation(), owner, false, castleTntRadius(owner));
         entities.remove(tnt);
         tnt.remove();
+    }
+
+    private double castleTntRadius(Player owner) {
+        return 4.0D + ("demolitionist".equals(castleAssaultPlayerKits.get(owner.getUniqueId())) ? 3.0D : 0.0D);
     }
 
     private void resolveCastleExplosion(Location center, Player owner, boolean objective, double radius) {
@@ -1068,27 +1127,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void openStore(Player player) {
-        StoreHolder holder = new StoreHolder(player.getUniqueId(), null);
-        Inventory inventory = Bukkit.createInventory(holder, 27, ChatColor.DARK_GREEN + "Heroes of Gwen Store");
-        holder.inventory = inventory;
-        String[] roles = {"Assassin", "Warrior", "Mage", "Hunter"};
-        Material[] icons = {Material.GOLDEN_SWORD, Material.IRON_SWORD, Material.POTION, Material.BOW};
-        for (int i = 0; i < roles.length; i++) {
-            String role = roles[i];
-            ItemStack option = new ItemStack(icons[i]);
-            ItemMeta meta = option.getItemMeta();
-            meta.setDisplayName(ChatColor.GREEN + role + " Upgrades");
-            long count = storeEntries.stream().filter(entry -> entry.role.equals(role)).count();
-            meta.setLore(List.of(ChatColor.GRAY + "Browse the legacy " + role + " store.",
-                    ChatColor.WHITE + String.valueOf(count) + " source items",
-                    ChatColor.YELLOW + "Mixed Arcade prices are half cost."));
-            meta.getPersistentDataContainer().set(shopRoleKey, PersistentDataType.STRING, role);
-            option.setItemMeta(meta);
-            inventory.setItem(10 + i * 2, option);
-        }
-        openStores.put(player.getUniqueId(), holder);
-        player.openInventory(inventory);
-        updateGoldActionBar(player);
+        String hero = selectedHeroesOfGwen.getOrDefault(player.getUniqueId(), "hattori");
+        String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
+        openStore(player, role == null ? "Assassin" : role);
     }
 
     private void openStore(Player player, String role) {
@@ -1310,6 +1351,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     void onPlayerEliminated(Player player) {
         if (player == null) return;
         UUID id = player.getUniqueId();
+        if (game == ArcadePortGame.CASTLE_ASSAULT) castleKillStreaks.remove(id);
         activePlayers.remove(id);
         StoreHolder store = openStores.remove(id);
         if (store != null && player.isOnline()
@@ -1342,13 +1384,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         int team = teams.getOrDefault(killer.getUniqueId(), -1);
         if (team < 0) return;
         int streak = castleKillStreaks.merge(killer.getUniqueId(), 1, Integer::sum);
+        killer.setLevel(killer.getLevel() + 1);
         killer.getInventory().addItem(namedItem(Material.GOLDEN_APPLE, ChatColor.LIGHT_PURPLE + "Golden Applegate",
                 "Kill reward from Castle Assault."));
+        giveCastleKillStreakReward(killer, castleAssaultPlayerKits.getOrDefault(killer.getUniqueId(), "fighter"), streak);
         if (streak > 0 && streak % 2 == 0) {
             announce(ChatColor.GREEN + killer.getName() + " is on a " + streak + " player kill streak!");
         }
         if (objectiveKillsEnabled == 0) return;
-        if (team < 0) return;
         int kills = team == 0 ? ++castleKillCountRed : ++castleKillCountBlue;
         if (kills % 20 != 0) return;
         KingState enemy = kings.get(1 - team);
@@ -1359,6 +1402,133 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         List<EnderCrystal> activeCrystals = enemy.crystals.stream().filter(Entity::isValid).toList();
         if (activeCrystals.isEmpty()) return;
         destroyCastleCrystal(enemy, activeCrystals.get(ThreadLocalRandom.current().nextInt(activeCrystals.size())), killer);
+    }
+
+    private void giveCastleKillStreakReward(Player player, String kit, int streak) {
+        if (streak < 2 || streak > 8 || streak % 2 != 0) return;
+        switch (kit) {
+            case "alchemist" -> {
+                if (streak == 2) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                        PotionEffectType.SLOWNESS, 90 * 20, 0, "Splash Slowness Potion"));
+                else if (streak == 4) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                        PotionEffectType.WEAKNESS, 90 * 20, 0, "Splash Weakness Potion"));
+                else if (streak == 6) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                        PotionEffectType.INSTANT_DAMAGE, 1, 1, "Splash Harming II Potion"),
+                        castlePotion(Material.SPLASH_POTION, PotionEffectType.INSTANT_DAMAGE, 1, 1,
+                                "Splash Harming II Potion"),
+                        castlePotion(Material.SPLASH_POTION, PotionEffectType.INSTANT_DAMAGE, 1, 1,
+                                "Splash Harming II Potion"),
+                        castlePotion(Material.SPLASH_POTION, PotionEffectType.INSTANT_DAMAGE, 1, 1,
+                                "Splash Harming II Potion"));
+                else player.getInventory().addItem(castlePotion(Material.POTION,
+                        PotionEffectType.REGENERATION, 90 * 20, 2, "Regeneration III Potion"));
+            }
+            case "archer" -> {
+                if (streak == 2) player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 8));
+                else if (streak == 4) player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 12));
+                else if (streak == 6) player.getInventory().addItem(castleEnchantedBook(Enchantment.PUNCH, 1, "Punch I"));
+                else {
+                    player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 32),
+                            castleEnchantedBook(Enchantment.FLAME, 1, "Flame I"));
+                }
+            }
+            case "demolitionist" -> {
+                if (streak == 2) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 2));
+                else if (streak == 4) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 3));
+                else if (streak == 6) player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 4));
+                else player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT", "Kill-streak reward.", 5),
+                        castleFlintAndSteel(30, true));
+            }
+            case "tank" -> {
+                if (streak == 2) player.getInventory().addItem(namedItem(Material.GOLDEN_APPLE,
+                        ChatColor.LIGHT_PURPLE + "Golden Applegate", "Kill-streak reward."));
+                else if (streak == 4) player.getInventory().addItem(castlePotion(Material.POTION,
+                        PotionEffectType.REGENERATION, 90 * 20, 1, "Regeneration II Potion"));
+                else if (streak == 6) player.getInventory().addItem(castlePotion(Material.POTION,
+                        PotionEffectType.RESISTANCE, 90 * 20, 0, "Resistance Potion"));
+                else player.getInventory().addItem(castleEnchantedBook(Enchantment.THORNS, 2, "Thorns II"));
+            }
+            default -> {
+                if (streak == 2) player.getInventory().addItem(namedItem(Material.GOLDEN_APPLE,
+                        ChatColor.LIGHT_PURPLE + "Golden Applegate", "Kill-streak reward."));
+                else if (streak == 4) player.getInventory().addItem(castlePotion(Material.SPLASH_POTION,
+                        PotionEffectType.INSTANT_HEALTH, 1, 1, "Splash Healing II Potion"));
+                else if (streak == 6) player.getInventory().addItem(castlePotion(Material.POTION,
+                        PotionEffectType.SPEED, 90 * 20, 1, "Speed II Potion"));
+                else player.getInventory().addItem(castleEnchantedBook(Enchantment.FIRE_ASPECT, 1, "Fire Aspect I"));
+            }
+        }
+    }
+
+    void giveCastleAssaultKit(Player player, String requestedKit) {
+        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT || player == null
+                || !players.containsKey(player.getUniqueId())) return;
+        String kit = ArcadePortRules.normalizeCastleAssaultKit(requestedKit);
+        if (kit == null) kit = "fighter";
+        castleAssaultPlayerKits.put(player.getUniqueId(), kit);
+        for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) {
+            player.removePotionEffect(effect.getType());
+        }
+        player.getInventory().clear();
+        player.getInventory().setArmorContents(new ItemStack[4]);
+        player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 8 * 20, 4));
+        player.addPotionEffect(new PotionEffect(PotionEffectType.RESISTANCE, 8 * 20, 3));
+
+        ItemStack sword = new ItemStack(Material.DIAMOND_SWORD);
+        ItemMeta swordMeta = sword.getItemMeta();
+        swordMeta.setUnbreakable(true);
+        swordMeta.setLore(List.of(ChatColor.GRAY + "Castle Assault kit item"));
+        sword.setItemMeta(swordMeta);
+        player.getInventory().setItem(0, sword);
+
+        boolean demolitionist = "demolitionist".equals(kit);
+        player.getInventory().setHelmet(castleArmour(Material.DIAMOND_HELMET,
+                demolitionist ? Enchantment.BLAST_PROTECTION : null, demolitionist ? 4 : 0));
+        player.getInventory().setChestplate(castleArmour(Material.IRON_CHESTPLATE,
+                demolitionist ? Enchantment.BLAST_PROTECTION : "tank".equals(kit) ? Enchantment.PROTECTION : null,
+                demolitionist ? 4 : "tank".equals(kit) ? 1 : 0));
+        player.getInventory().setLeggings(castleArmour(Material.IRON_LEGGINGS,
+                demolitionist ? Enchantment.BLAST_PROTECTION : null, demolitionist ? 4 : 0));
+        player.getInventory().setBoots(castleArmour(Material.DIAMOND_BOOTS,
+                demolitionist ? Enchantment.BLAST_PROTECTION : null, demolitionist ? 4 : 0));
+
+        switch (kit) {
+            case "alchemist" -> {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 100_000, 0));
+                player.getInventory().setItem(1, castlePotion(Material.POTION, PotionEffectType.SPEED,
+                        3 * 60 * 20, 0, "Speed Potion"));
+            }
+            case "archer" -> {
+                ItemStack bow = new ItemStack(Material.BOW);
+                ItemMeta bowMeta = bow.getItemMeta();
+                bowMeta.setUnbreakable(true);
+                bow.setItemMeta(bowMeta);
+                player.getInventory().setItem(1, bow);
+                player.getInventory().setItem(2, namedItem(Material.ARROW, "Fletched Arrow",
+                        "Automatically supplied by the Archer kit.", 10));
+            }
+            case "demolitionist" -> {
+                player.getInventory().setItem(1, castleFlintAndSteel(4, true));
+                player.getInventory().setItem(2, namedItem(Material.TNT, "Throwing TNT",
+                        "Left-click to throw.", 2));
+            }
+            case "fighter" -> player.getInventory().setItem(1, namedItem(Material.GOLDEN_APPLE,
+                    ChatColor.LIGHT_PURPLE + "Golden Applegate", "Fighter kit item."));
+            case "tank" -> { /* The source Tank relies on its armour and kit passives. */ }
+            default -> { }
+        }
+        player.updateInventory();
+    }
+
+    void setHeroesOfGwenHero(Player player, String requestedHero) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN || player == null
+                || !players.containsKey(player.getUniqueId())) return;
+        String hero = ArcadePortRules.normalizeHeroesOfGwenHero(requestedHero);
+        if (hero == null) hero = "hattori";
+        selectedHeroesOfGwen.put(player.getUniqueId(), hero);
+        String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
+        player.sendActionBar(ChatColor.GOLD + "Hero: " + ArcadePortRules.heroesOfGwenHeroDisplayName(hero)
+                + ChatColor.GRAY + " | " + ChatColor.YELLOW + role + " Gold Upgrades");
     }
 
     void stop() {
@@ -1380,6 +1550,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         openStores.clear();
         entities.clear();
         castleKillStreaks.clear();
+        castleAssaultPlayerKits.clear();
+        selectedHeroesOfGwen.clear();
     }
 
     private static final class KingState {
