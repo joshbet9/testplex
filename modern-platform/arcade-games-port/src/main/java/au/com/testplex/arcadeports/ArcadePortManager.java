@@ -3174,6 +3174,9 @@ public final class ArcadePortManager implements Listener {
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
             String kit = session.baconKits.getOrDefault(id, "el-muchacho-pigo");
+            // The real player is hidden behind the pig/sheep disguise; disabling collisions
+            // on that hidden body avoids phantom pushes while preserving attack targeting.
+            player.setCollidable(false);
             PotionEffect invisible = player.getPotionEffect(PotionEffectType.INVISIBILITY);
             if (invisible == null || invisible.getDuration() < 20) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 40, 0, false, false, false));
@@ -9194,6 +9197,7 @@ public final class ArcadePortManager implements Listener {
         final int food;
         final float saturation;
         final float walkSpeed;
+        final boolean collidable;
         final Scoreboard scoreboard;
         final String playerListName;
         PlayerSnapshot(Player p) {
@@ -9214,6 +9218,7 @@ public final class ArcadePortManager implements Listener {
             food = p.getFoodLevel();
             saturation = p.getSaturation();
             walkSpeed = p.getWalkSpeed();
+            collidable = p.isCollidable();
             scoreboard = p.getScoreboard();
             playerListName = p.getPlayerListName();
         }
@@ -9233,6 +9238,7 @@ public final class ArcadePortManager implements Listener {
             p.setFoodLevel(food);
             p.setSaturation(saturation);
             p.setWalkSpeed(walkSpeed);
+            p.setCollidable(collidable);
             p.setScoreboard(scoreboard);
             p.setPlayerListName(playerListName);
             p.setAllowFlight(allowFlight);
