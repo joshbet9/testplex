@@ -71,6 +71,10 @@ public final class SnakeRules {
         return Double.isFinite(distanceSquared) && distanceSquared > 4.0D;
     }
 
+    public static boolean isAbilityItemInteraction(String actionName) {
+        return actionName != null && !"PHYSICAL".equalsIgnoreCase(actionName);
+    }
+
     public static boolean shouldEliminateForIdle(double distanceSquared, long idleMillis) {
         return idleMillis >= IDLE_TIMEOUT_MILLIS && !hasMovedForIdleCheck(distanceSquared);
     }
