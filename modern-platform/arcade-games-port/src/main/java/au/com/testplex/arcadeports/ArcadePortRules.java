@@ -1491,9 +1491,10 @@ public final class ArcadePortRules {
         return damage * (25.0D - armour) / 25.0D;
     }
 
-    /** Base logarithmic knockback with the Micro Battles projectile multiplier. */
-    public static double microBattlesArrowKnockback(double damage) {
-        return Math.log10(Math.max(damage, 2.0D)) * 1.6D;
+    /** Base logarithmic knockback; Micro adds a 1.6 multiplier to projectile hits only. */
+    public static double microBattlesKnockback(double damage, boolean projectile) {
+        double base = Math.log10(Math.max(damage, 2.0D));
+        return projectile ? base * 1.6D : base;
     }
 
     public static int microBattlesMinimumFoodLevel(int foodLevel) {
