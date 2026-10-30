@@ -8360,9 +8360,10 @@ public final class ArcadePortManager implements Listener {
         boolean dragonEscapeDisruptorLeftClick = session.type == ArcadePortGame.DRAGON_ESCAPE
                 && event.getAction() == Action.LEFT_CLICK_AIR;
         boolean evolutionCreeperLeftClick = session.type == ArcadePortGame.EVOLUTION
-                && session.evolutionLevels.getOrDefault(event.getPlayer().getUniqueId(), 0) == 2
-                && event.getAction().isLeftClick()
-                && event.getItem() != null && event.getItem().getType() == Material.TNT;
+                && ArcadePortRules.canUseEvolutionCreeperCharge(
+                        session.evolutionLevels.getOrDefault(event.getPlayer().getUniqueId(), 0),
+                        event.getAction().isLeftClick(),
+                        event.getItem() != null && event.getItem().getType() == Material.TNT);
         if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick
                 && !baconNonRightClick && !dragonEscapeDisruptorLeftClick
                 && !evolutionCreeperLeftClick) return;
@@ -8575,9 +8576,10 @@ public final class ArcadePortManager implements Listener {
             throwBombLobbersTnt(session, player);
             return;
         }
-        if (session.type == ArcadePortGame.EVOLUTION && item == Material.TNT
-                && session.evolutionLevels.getOrDefault(player.getUniqueId(), 0) == 2
-                && event.getAction().isLeftClick()) {
+        if (session.type == ArcadePortGame.EVOLUTION
+                && ArcadePortRules.canUseEvolutionCreeperCharge(
+                        session.evolutionLevels.getOrDefault(player.getUniqueId(), 0),
+                        event.getAction().isLeftClick(), item == Material.TNT)) {
             event.setCancelled(true);
             consumeHeld(player);
             Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.0D));
