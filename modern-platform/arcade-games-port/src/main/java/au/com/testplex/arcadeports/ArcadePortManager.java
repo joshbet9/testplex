@@ -4371,6 +4371,8 @@ public final class ArcadePortManager implements Listener {
             }
             Location itemLocation = item.getLocation();
             item.getWorld().spawnParticle(Particle.FIREWORK, itemLocation, 1, 0.08D, 0.08D, 0.08D, 0.0D);
+            // A Pyro lure inside an active flare cannot override the defensive exclusion zone.
+            if (isDragonLocationProtected(session, itemLocation, now)) continue;
             for (EnderDragon dragon : dragons) {
                 if (dragon.getLocation().distanceSquared(itemLocation)
                         > ArcadePortRules.DRAGONS_SPARKLER_RANGE_SQUARED) continue;
