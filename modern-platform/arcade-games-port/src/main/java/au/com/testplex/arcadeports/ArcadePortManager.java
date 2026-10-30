@@ -1155,7 +1155,8 @@ public final class ArcadePortManager implements Listener {
             player.closeInventory();
             player.leaveVehicle();
             player.teleport(spawn);
-            player.setGameMode(type == ArcadePortGame.BACON_BRAWL ? GameMode.ADVENTURE : GameMode.SURVIVAL);
+            player.setGameMode(type == ArcadePortGame.BACON_BRAWL || type == ArcadePortGame.DEATH_TAG
+                    ? GameMode.ADVENTURE : GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
             player.setSaturation(20.0F);
@@ -2129,11 +2130,9 @@ public final class ArcadePortManager implements Listener {
         else session.alphaChasers.remove(player.getUniqueId());
         awardDeathTagKill(session, killer);
         if (player.isOnline()) {
-            if (forcedAlpha) {
-                player.teleport(deathTagChaserRespawnSpawn(session, player));
-            }
-            // A normal runner conversion keeps the death location, matching DeathTag.RespawnPlayer().
-            player.setGameMode(GameMode.SURVIVAL);
+            // Source forced promotions change the player's role in place. Natural conversions
+            // likewise remain at the runner's death location, as in DeathTag.RespawnPlayer().
+            player.setGameMode(GameMode.ADVENTURE);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
             player.setSaturation(20.0F);
@@ -2189,7 +2188,7 @@ public final class ArcadePortManager implements Listener {
         if (active != session || player == null || !player.isOnline()) return;
         player.teleport(deathTagChaserRespawnSpawn(session, player));
         player.leaveVehicle();
-        player.setGameMode(GameMode.SURVIVAL);
+        player.setGameMode(GameMode.ADVENTURE);
         player.setHealth(player.getMaxHealth());
         player.setFoodLevel(20);
         player.setSaturation(20.0F);
