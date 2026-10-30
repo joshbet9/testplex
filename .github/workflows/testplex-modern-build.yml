@@ -119,15 +119,6 @@ jobs:
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
             echo "- Gameplay ports: Monster Maze and Snake plus 16 mechanics-first prototypes, including Draw My Thing and Master Builders; in-game validation still required"
             echo "- Deployment acceptance: eight Arcade candidates remain explicitly approved for acceptance; Draw My Thing and Master Builders are added as gameplay-in-progress test variants; Snake remains gated"
-            echo "- Server deploy: successful pushes to feat/testplex-modern-26.3-platform automatically invoke the isolated Hyper-V deploy job; pull requests and manual build-only runs do not deploy"
+            echo "- Server deploy: a separate workflow-run handler deploys only the latest successful push artifact from feat/testplex-modern-26.3-platform; later pushes no longer cancel an in-flight deployment"
           } >> "$GITHUB_STEP_SUMMARY"
 
-  deploy-modern-hyperv:
-    name: Auto-deploy successful modern build to isolated Hyper-V
-    needs: build-modern-arcade
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' }}
-    uses: ./.github/workflows/deploy-testplex-modern-hyperv.yml
-    with:
-      deploy_to_modern_test_server: true
-      source_run_id: ${{ github.run_id }}
-    secrets: inherit
