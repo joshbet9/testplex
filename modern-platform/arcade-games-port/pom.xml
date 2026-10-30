@@ -7,7 +7,7 @@
     <artifactId>testplex-modern-arcade-mechanics</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <name>Testplex Modern Arcade Mechanics</name>
-    <description>First-pass mechanics prototypes for the 14 Arcade games that are not Monster Maze or Snake.</description>
+    <description>First-pass mechanics prototypes for the 15 Arcade games that are not Monster Maze or Snake.</description>
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
