@@ -153,6 +153,17 @@ class SnakeRulesTest {
         assertFalse(SnakeRules.isPreparing(9_001L, 9_000L));
     }
 
+    @Test void eachSnakeKitKeepsItsSourceAbilityItemsDuringPreparation() {
+        assertTrue(SnakeRules.isKitAbilityItem("speed", "FEATHER"));
+        assertFalse(SnakeRules.isKitAbilityItem("speed", "COOKIE"));
+        assertTrue(SnakeRules.isKitAbilityItem("reverse", "COOKIE"));
+        assertFalse(SnakeRules.isKitAbilityItem("reverse", "FEATHER"));
+        assertTrue(SnakeRules.isKitAbilityItem("invulnerable", "NETHER_STAR"));
+        assertFalse(SnakeRules.isKitAbilityItem("invulnerable", "COOKIE"));
+        assertFalse(SnakeRules.isKitAbilityItem("unknown", "FEATHER"));
+        assertFalse(SnakeRules.isKitAbilityItem(null, "FEATHER"));
+    }
+
     @Test void sourceAbilityItemsTriggerOnEitherClickButNeverPhysicalActions() {
         assertTrue(SnakeRules.isAbilityItemInteraction("LEFT_CLICK_AIR"));
         assertTrue(SnakeRules.isAbilityItemInteraction("LEFT_CLICK_BLOCK"));
