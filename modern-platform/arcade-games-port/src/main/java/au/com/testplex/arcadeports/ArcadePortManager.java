@@ -1201,6 +1201,7 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.TURF_WARS) {
             announce(session, ChatColor.GREEN + "Opening build phase: place your team's wool on your own turf for 40 seconds.");
         }
+        if (type == ArcadePortGame.ONE_IN_THE_QUIVER) setupQuiverScoreboard(session);
         if (type == ArcadePortGame.DRAGON_ESCAPE) {
             setupDragonEscapeRaceScoreboard(session);
         }
@@ -2128,36 +2129,34 @@ public final class ArcadePortManager implements Listener {
             }
             case ONE_IN_THE_QUIVER: {
                 String kit = session.quiverKits.getOrDefault(player.getUniqueId(), "leaper");
-                player.getInventory().setItem(0, new ItemStack(Material.BOW));
+                ItemStack sword;
                 switch (kit) {
                     case "brawler":
-                        player.getInventory().setItem(2, new ItemStack(Material.IRON_SWORD));
+                        sword = new ItemStack(Material.IRON_SWORD);
                         break;
-                    case "enchanter": {
-                        ItemStack sword = new ItemStack(Material.STONE_SWORD);
+                    case "enchanter":
+                        sword = new ItemStack(Material.STONE_SWORD);
                         sword.addUnsafeEnchantment(Enchantment.UNBREAKING, 1);
-                        player.getInventory().setItem(2, sword);
                         break;
-                    }
                     case "slam-shot":
-                        player.getInventory().setItem(2, new ItemStack(Material.DIAMOND_SHOVEL));
+                        sword = new ItemStack(Material.DIAMOND_SHOVEL);
                         break;
-                    case "ninja": {
-                        ItemStack sword = new ItemStack(Material.GOLDEN_SWORD);
+                    case "ninja":
+                        sword = new ItemStack(Material.GOLDEN_SWORD);
                         ItemMeta meta = sword.getItemMeta();
                         if (meta != null) {
                             meta.setUnbreakable(true);
                             sword.setItemMeta(meta);
                         }
-                        player.getInventory().setItem(2, sword);
                         break;
-                    }
                     default:
-                        player.getInventory().setItem(2, new ItemStack(Material.STONE_SWORD));
+                        sword = new ItemStack(Material.STONE_SWORD);
                         break;
                 }
-                player.getInventory().setItem(1, namedItem(Material.ARROW, "Super Arrow",
-                        "One arrow per shot; earn another with each kill."));
+                player.getInventory().setItem(ArcadePortRules.QUIVER_SWORD_SLOT, sword);
+                player.getInventory().setItem(ArcadePortRules.QUIVER_BOW_SLOT, new ItemStack(Material.BOW));
+                player.getInventory().setItem(ArcadePortRules.QUIVER_ARROW_SLOT, namedItem(Material.ARROW,
+                        "Super Arrow", "One arrow per shot; earn another with each kill."));
                 break;
             }
             case PAINTBALL:
@@ -2321,42 +2320,47 @@ public final class ArcadePortManager implements Listener {
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
     }
 
-    private void tryQuiverRebound(Session session, Projectile projectile, Player shooter, Player struckPlayer) {
-        Integer bounces = session.quiverArrowBounces.remove(projectile.getUniqueId());
+    private void tryQuiverRebound(Session session, Projectile projectile, Player shooter, Location impact) {
+        UUID projectileId = projectile.getUniqueId();
+        Integer bounces = session.quiverArrowBounces.remove(projectileId);
+        Set<UUID> previousHits = session.quiverArrowIgnoredPlayers.remove(projectileId);
         if (!"enchanter".equals(session.quiverKits.getOrDefault(shooter.getUniqueId(), "leaper"))
                 || bounces == null || !ArcadePortRules.shouldQuiverArrowBounce(bounces)
-                || active != session || !struckPlayer.isOnline()) return;
-        Location origin = struckPlayer.getEyeLocation().clone();
-        Player nearest = null;
-        double nearestDistance = ArcadePortRules.QUIVER_REBOUND_MAX_DISTANCE_SQUARED;
-        for (Player candidate : alivePlayers(session)) {
-            if (candidate.equals(shooter) || candidate.equals(struckPlayer)) continue;
-            double distance = candidate.getLocation().distanceSquared(origin);
-            if (ArcadePortRules.isQuiverReboundTargetInRange(distance)
-                    && (nearest == null || distance < nearestDistance)) {
-                nearestDistance = distance;
-                nearest = candidate;
-            }
-        }
+                || active != session || impact == null || impact.getWorld() != session.world) return;
 
-        Vector trajectory;
-        if (nearest != null) {
-            trajectory = nearest.getEyeLocation().toVector().subtract(origin.toVector());
-        } else {
-            // The source Enchanter chain arrow still bounces when no nearby enemy is available.
-            double angle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
-            double vertical = ThreadLocalRandom.current().nextDouble(-0.12D, 0.22D);
-            trajectory = new Vector(Math.cos(angle), vertical, Math.sin(angle));
-        }
-        if (trajectory.lengthSquared() < 0.001D) {
-            double angle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
-            trajectory = new Vector(Math.cos(angle), 0.05D, Math.sin(angle));
-        }
+        Set<UUID> ignored = previousHits == null ? new HashSet<>() : previousHits;
+        ignored.add(shooter.getUniqueId());
+        Player struckPlayer = alivePlayers(session).stream()
+                .filter(candidate -> !ignored.contains(candidate.getUniqueId()))
+                .min(java.util.Comparator.comparingDouble(candidate -> Math.min(
+                        candidate.getLocation().distanceSquared(impact),
+                        candidate.getEyeLocation().distanceSquared(impact))))
+                .orElse(null);
+        if (struckPlayer == null) return;
+
+        double bodyDistanceSquared = struckPlayer.getLocation().distanceSquared(impact);
+        double eyeDistanceSquared = struckPlayer.getEyeLocation().distanceSquared(impact);
+        if (!ArcadePortRules.isQuiverReboundImpactInRange(bodyDistanceSquared, eyeDistanceSquared)) return;
+        ignored.add(struckPlayer.getUniqueId());
+
+        // Preserve the source ignore set and choose the nearest unused player without
+        // an arbitrary target range. The source simply stops when no new target exists.
+        Player nextTarget = alivePlayers(session).stream()
+                .filter(candidate -> !ignored.contains(candidate.getUniqueId()))
+                .min(java.util.Comparator.comparingDouble(candidate ->
+                        candidate.getLocation().distanceSquared(struckPlayer.getLocation())))
+                .orElse(null);
+        if (nextTarget == null) return;
+
+        Location origin = struckPlayer.getEyeLocation().clone();
+        Vector trajectory = nextTarget.getEyeLocation().toVector().subtract(origin.toVector());
+        if (trajectory.lengthSquared() < 0.001D) return;
         Arrow rebound = session.world.spawnArrow(origin, trajectory.normalize(), 1.2F, 0.0F);
         rebound.setShooter(shooter);
         session.entities.add(rebound);
-        session.quiverArrowBounces.put(rebound.getUniqueId(),
-                ArcadePortRules.quiverArrowBouncesAfterBounce(bounces));
+        UUID reboundId = rebound.getUniqueId();
+        session.quiverArrowBounces.put(reboundId, ArcadePortRules.quiverArrowBouncesAfterBounce(bounces));
+        session.quiverArrowIgnoredPlayers.put(reboundId, new HashSet<>(ignored));
     }
 
     private Location microCrumbleSpectatorLocation(Session session, SourceMapCatalog.MapData mapData) {
@@ -2936,7 +2940,11 @@ public final class ArcadePortManager implements Listener {
             updateMicroBattlesArrows(session, now);
             updateMicroCrumble(session, now);
         }
-        if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) updateQuiverKit(session, now);
+        if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
+            updateQuiverKit(session, now);
+            if (session.ticks % 5L == 0L) updateQuiverSpectatorCompass(session);
+            if (session.ticks % 10L == 0L) updateQuiverScoreboard(session);
+        }
         if (session.type == ArcadePortGame.DRAGONS) updateTestDragons(session, now);
         if (session.type == ArcadePortGame.DEATH_TAG && session.participantsAtStart > 1) {
             updateDeathTagChasers(session, now);
@@ -5173,6 +5181,94 @@ public final class ArcadePortManager implements Listener {
                 leaderDistance, racerDistance, ArcadePortRules.DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED);
     }
 
+    private void setupQuiverScoreboard(Session session) {
+        if (session.type != ArcadePortGame.ONE_IN_THE_QUIVER || Bukkit.getScoreboardManager() == null) return;
+        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+        Objective objective = scoreboard.registerNewObjective("quiver", "dummy",
+                ChatColor.GOLD + "ONE IN THE QUIVER");
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        Objective belowName = scoreboard.registerNewObjective("quiverkills", "dummy",
+                ChatColor.RED + "Kills");
+        belowName.setDisplaySlot(DisplaySlot.BELOW_NAME);
+        session.quiverScoreboard = scoreboard;
+        session.quiverScoreboardObjective = objective;
+        session.quiverBelowNameObjective = belowName;
+        for (int i = 0; i < 14; i++) {
+            Team line = scoreboard.registerNewTeam("qvrank" + i);
+            String entry = ChatColor.values()[i].toString();
+            line.addEntry(entry);
+            session.quiverScoreboardTeams.add(line);
+            session.quiverScoreboardEntries.add(entry);
+        }
+        for (Player player : session.players.values()) {
+            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
+        }
+        updateQuiverScoreboard(session);
+    }
+
+    private void updateQuiverScoreboard(Session session) {
+        Scoreboard scoreboard = session.quiverScoreboard;
+        Objective objective = session.quiverScoreboardObjective;
+        Objective belowName = session.quiverBelowNameObjective;
+        if (scoreboard == null || objective == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER) return;
+        List<Player> ranked = new ArrayList<>(session.players.values());
+        ranked.removeIf(player -> player == null || !player.isOnline());
+        ranked.sort((left, right) -> {
+            int byKills = Integer.compare(session.scores.getOrDefault(right.getUniqueId(), 0),
+                    session.scores.getOrDefault(left.getUniqueId(), 0));
+            return byKills != 0 ? byKills
+                    : String.CASE_INSENSITIVE_ORDER.compare(left.getName(), right.getName());
+        });
+        for (int i = 0; i < session.quiverScoreboardTeams.size(); i++) {
+            Team line = session.quiverScoreboardTeams.get(i);
+            String entry = session.quiverScoreboardEntries.get(i);
+            if (i < ranked.size()) {
+                Player rankedPlayer = ranked.get(i);
+                boolean alive = session.alive.contains(rankedPlayer.getUniqueId());
+                int kills = session.scores.getOrDefault(rankedPlayer.getUniqueId(), 0);
+                line.setPrefix((alive ? ChatColor.GREEN : ChatColor.RED) + "#" + (i + 1)
+                        + " " + rankedPlayer.getName());
+                line.setSuffix(ChatColor.GRAY + " " + kills + "/20");
+                objective.getScore(entry).setScore(session.quiverScoreboardTeams.size() - i);
+            } else {
+                line.setPrefix("");
+                line.setSuffix("");
+                scoreboard.resetScores(entry);
+            }
+        }
+        if (belowName != null) {
+            for (Player player : ranked) {
+                belowName.getScore(player.getName()).setScore(
+                        session.scores.getOrDefault(player.getUniqueId(), 0));
+            }
+        }
+    }
+
+    private void cleanupQuiverScoreboard(Session session) {
+        Scoreboard scoreboard = session.quiverScoreboard;
+        if (scoreboard == null) return;
+        try {
+            for (Team team : new ArrayList<>(session.quiverScoreboardTeams)) {
+                if (scoreboard.getTeam(team.getName()) != null) team.unregister();
+            }
+            if (session.quiverScoreboardObjective != null
+                    && scoreboard.getObjective(session.quiverScoreboardObjective.getName()) != null) {
+                session.quiverScoreboardObjective.unregister();
+            }
+            if (session.quiverBelowNameObjective != null
+                    && scoreboard.getObjective(session.quiverBelowNameObjective.getName()) != null) {
+                session.quiverBelowNameObjective.unregister();
+            }
+        } catch (IllegalArgumentException | IllegalStateException exception) {
+            plugin.getLogger().fine("OITQ scoreboard was already removed: " + exception.getMessage());
+        }
+        session.quiverScoreboardTeams.clear();
+        session.quiverScoreboardEntries.clear();
+        session.quiverScoreboardObjective = null;
+        session.quiverBelowNameObjective = null;
+        session.quiverScoreboard = null;
+    }
+
     private void setupDragonEscapeRaceScoreboard(Session session) {
         if (session.type != ArcadePortGame.DRAGON_ESCAPE || Bukkit.getScoreboardManager() == null) return;
         Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
@@ -5924,6 +6020,8 @@ public final class ArcadePortManager implements Listener {
             session.quiverKillStreaks.remove(victimId);
             player.leaveVehicle();
             player.setGameMode(GameMode.SPECTATOR);
+            player.getInventory().clear();
+            player.getInventory().setItem(0, quiverTrackingCompass());
             player.sendMessage(ChatColor.RED + "Eliminated! Respawning in one second.");
             session.respawning.add(victimId);
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -6861,6 +6959,11 @@ public final class ArcadePortManager implements Listener {
         }
 
         int kills = session.scores.merge(attackerId, 1, Integer::sum);
+        if (ArcadePortRules.quiverRegrantsArrowAfterKill()) {
+            attacker.getInventory().setItem(ArcadePortRules.QUIVER_ARROW_SLOT, namedItem(Material.ARROW,
+                    "Super Arrow", "One arrow per shot; earn another with each kill."));
+        }
+        updateQuiverScoreboard(session);
         attacker.sendMessage(ChatColor.GREEN + "Quiver kill! " + kills + "/20.");
         checkWinnerForScore(session, attacker);
         if (active != session) return;
@@ -6868,6 +6971,8 @@ public final class ArcadePortManager implements Listener {
 
         target.leaveVehicle();
         target.setGameMode(GameMode.SPECTATOR);
+        target.getInventory().clear();
+        target.getInventory().setItem(0, quiverTrackingCompass());
         session.alive.remove(targetId);
         session.quiverKillStreaks.remove(targetId);
         session.respawning.add(targetId);
@@ -6977,16 +7082,10 @@ public final class ArcadePortManager implements Listener {
         } else if (session.type == ArcadePortGame.TURF_WARS) {
             handlePlayerHit(session, shooter, target, "projectile hit");
         } else if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
-            UUID targetId = target.getUniqueId();
-            tryQuiverRebound(session, projectile, shooter, target);
+            tryQuiverRebound(session, projectile, shooter,
+                    projectile.getLocation().clone().add(projectile.getVelocity()));
             handlePlayerHit(session, shooter, target, "arrow hit");
             projectile.remove();
-            boolean targetEliminated = !session.alive.contains(targetId);
-            if (active == session && ArcadePortRules.quiverRegrantsArrowAfterHit(targetEliminated)
-                    && shooter.isOnline() && session.alive.contains(shooter.getUniqueId())) {
-                shooter.getInventory().setItem(1, namedItem(Material.ARROW, "Super Arrow",
-                        "One arrow per shot; earn another with each kill."));
-            }
         } else if (session.type == ArcadePortGame.MICRO_BATTLES) {
             handlePlayerHit(session, shooter, target, "arrow hit");
         } else {
@@ -7105,6 +7204,13 @@ public final class ArcadePortManager implements Listener {
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
         recordLocalStats(session, winner, announceWinner);
+        if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
+            cleanupQuiverScoreboard(session);
+            session.quiverArrowBounces.clear();
+            session.quiverArrowIgnoredPlayers.clear();
+            session.quiverCompassMenuTargets.clear();
+            session.quiverSpectateNextTeleportAt.clear();
+        }
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
         }
@@ -8844,7 +8950,9 @@ public final class ArcadePortManager implements Listener {
         session.quiverUsedBow.add(player.getUniqueId());
         if (!"enchanter".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))
                 || !(event.getProjectile() instanceof Arrow arrow)) return;
-        session.quiverArrowBounces.put(arrow.getUniqueId(), ArcadePortRules.QUIVER_MAX_ARROW_BOUNCES);
+        UUID arrowId = arrow.getUniqueId();
+        session.quiverArrowBounces.put(arrowId, ArcadePortRules.QUIVER_MAX_ARROW_BOUNCES);
+        session.quiverArrowIgnoredPlayers.put(arrowId, new HashSet<>(Set.of(player.getUniqueId())));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -9087,6 +9195,22 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
+        if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
+                && event.getEntity() instanceof Arrow quiverArrow
+                && session.quiverArrowBounces.containsKey(quiverArrow.getUniqueId())) {
+            if (event.getHitEntity() instanceof Player target
+                    && quiverArrow.getShooter() instanceof Player shooter) {
+                hitProjectile(session, quiverArrow, shooter, target);
+            } else {
+                if (quiverArrow.getShooter() instanceof Player shooter) {
+                    tryQuiverRebound(session, quiverArrow, shooter,
+                            quiverArrow.getLocation().clone().add(quiverArrow.getVelocity()));
+                }
+                session.entities.remove(quiverArrow);
+                quiverArrow.remove();
+            }
+            return;
+        }
         if (event.getHitEntity() instanceof Player target && event.getEntity() instanceof Projectile projectile) {
             ProjectileSource source = projectile.getShooter();
             if (source instanceof Player shooter) hitProjectile(session, projectile, shooter, target);
@@ -9119,6 +9243,27 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onQuiverFoodLevelChange(FoodLevelChangeEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
+                || !(event.getEntity() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())) return;
+        event.setCancelled(true);
+        player.setFoodLevel(20);
+        player.setSaturation(20.0F);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onQuiverPickup(EntityPickupItemEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
+                || event.getItem() == null || event.getItem().getWorld() != session.world
+                || !(event.getEntity() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())) return;
+        event.setCancelled(true);
+    }
+
     @EventHandler
     public void onBaconFoodLevelChange(FoodLevelChangeEvent event) {
         Session session = active;
@@ -9141,12 +9286,14 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         boolean bombLeftClick = session.type == ArcadePortGame.BOMB_LOBBERS && event.getAction().isLeftClick();
+        boolean quiverLeftClick = session.type == ArcadePortGame.ONE_IN_THE_QUIVER
+                && event.getAction().isLeftClick();
         boolean runnerLeftClick = session.type == ArcadePortGame.RUNNER && event.getAction().isLeftClick();
         boolean baconNonRightClick = session.type == ArcadePortGame.BACON_BRAWL
                 && !event.getAction().isRightClick();
         boolean dragonEscapeDisruptorLeftClick = session.type == ArcadePortGame.DRAGON_ESCAPE
                 && event.getAction() == Action.LEFT_CLICK_AIR;
-        if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick
+        if (!event.getAction().isRightClick() && !bombLeftClick && !quiverLeftClick && !runnerLeftClick
                 && !baconNonRightClick && !dragonEscapeDisruptorLeftClick) return;
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
@@ -9179,6 +9326,29 @@ public final class ArcadePortManager implements Listener {
                     player.setCompassTarget(target.getLocation());
                 } else {
                     player.sendMessage(ChatColor.YELLOW + "There are no living pigs to track.");
+                }
+            }
+            return;
+        }
+        if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
+                && !session.alive.contains(player.getUniqueId())
+                && isQuiverTrackingCompass(heldItem)) {
+            event.setCancelled(true);
+            if (event.getAction().isRightClick()) {
+                openQuiverSpectatorMenu(session, player);
+            } else if (event.getAction().isLeftClick()) {
+                long now = System.currentTimeMillis();
+                long readyAt = session.quiverSpectateNextTeleportAt.getOrDefault(player.getUniqueId(), 0L);
+                if (ArcadePortRules.isQuiverSpectatorTeleportReady(now, readyAt)) {
+                    Player target = nearestQuiverSpectateTarget(session, player);
+                    if (target != null) {
+                        player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                        player.setCompassTarget(target.getLocation());
+                        session.quiverSpectateNextTeleportAt.put(player.getUniqueId(),
+                                ArcadePortRules.nextQuiverSpectatorTeleportAt(now));
+                    } else {
+                        player.sendMessage(ChatColor.YELLOW + "There are no living players to track.");
+                    }
                 }
             }
             return;
@@ -9514,9 +9684,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isQuiverBreakableGlass(Material material) {
-        String name = material.name();
-        return material == Material.GLASS || material == Material.GLASS_PANE
-                || name.endsWith("_STAINED_GLASS") || name.endsWith("_STAINED_GLASS_PANE");
+        return material == Material.GLASS || material == Material.GLASS_PANE;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -9864,6 +10032,112 @@ public final class ArcadePortManager implements Listener {
                         + color + String.format(java.util.Locale.ROOT, "%.1f", height));
             }
         }
+    }
+
+    private ItemStack quiverTrackingCompass() {
+        return namedItem(Material.COMPASS, "Tracking Compass",
+                "Left-click to teleport to the nearest player; right-click to open the spectator menu.");
+    }
+
+    private boolean isQuiverTrackingCompass(ItemStack item) {
+        if (item == null || item.getType() != Material.COMPASS || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
+    }
+
+    private Player nearestQuiverSpectateTarget(Session session, Player spectator) {
+        if (session == null || spectator == null) return null;
+        return alivePlayers(session).stream()
+                .min(java.util.Comparator.comparingDouble(candidate ->
+                        candidate.getLocation().distanceSquared(spectator.getLocation())))
+                .orElse(null);
+    }
+
+    private void updateQuiverSpectatorCompass(Session session) {
+        for (Player spectator : session.players.values()) {
+            if (spectator == null || !spectator.isOnline()
+                    || session.alive.contains(spectator.getUniqueId())
+                    || spectator.getWorld() != session.world) continue;
+            Player target = nearestQuiverSpectateTarget(session, spectator);
+            if (target == null) continue;
+            spectator.setCompassTarget(target.getLocation());
+            if (isQuiverTrackingCompass(spectator.getInventory().getItemInMainHand())) {
+                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                double height = target.getLocation().getY() - spectator.getLocation().getY();
+                spectator.sendActionBar(ChatColor.WHITE + "" + ChatColor.BOLD + "Nearest Target: "
+                        + ChatColor.AQUA + target.getName() + ChatColor.WHITE + " | Distance: "
+                        + ChatColor.YELLOW + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                        + ChatColor.WHITE + " | Height: "
+                        + ChatColor.YELLOW + String.format(java.util.Locale.ROOT, "%+.1f", height));
+            }
+        }
+    }
+
+    private void openQuiverSpectatorMenu(Session session, Player spectator) {
+        Inventory inventory = Bukkit.createInventory(null, 54, ChatColor.DARK_GREEN + "Spectator Menu");
+        inventory.setItem(4, quiverTrackingCompass());
+        int[] slots = {19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34,
+                37, 38, 39, 40, 41, 42, 43, 46, 47, 48, 49, 50, 51, 52};
+        Map<Integer, UUID> targetsBySlot = new HashMap<>();
+        List<Player> targets = alivePlayers(session).stream()
+                .sorted(java.util.Comparator.comparing(Player::getName, String.CASE_INSENSITIVE_ORDER))
+                .toList();
+        for (int i = 0; i < targets.size() && i < slots.length; i++) {
+            Player target = targets.get(i);
+            int slot = slots[i];
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            if (head.getItemMeta() instanceof SkullMeta meta) {
+                meta.setOwningPlayer(target);
+                double distance = Math.sqrt(target.getLocation().distanceSquared(spectator.getLocation()));
+                double height = target.getLocation().getY() - spectator.getLocation().getY();
+                meta.setDisplayName(ChatColor.AQUA + target.getName());
+                meta.setLore(List.of(
+                        ChatColor.GRAY + "Kit: " + session.quiverKits.getOrDefault(target.getUniqueId(), "leaper"),
+                        ChatColor.GRAY + "Kills: " + session.scores.getOrDefault(target.getUniqueId(), 0),
+                        ChatColor.GRAY + "Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance),
+                        ChatColor.GRAY + "Height difference: " + String.format(java.util.Locale.ROOT, "%+.1f", height),
+                        ChatColor.YELLOW + "Left-click: Teleport",
+                        ChatColor.YELLOW + "Right-click: Spectate"));
+                head.setItemMeta(meta);
+            }
+            inventory.setItem(slot, head);
+            targetsBySlot.put(slot, target.getUniqueId());
+        }
+        session.quiverCompassMenuTargets.put(spectator.getUniqueId(), targetsBySlot);
+        spectator.openInventory(inventory);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onQuiverCompassMenuClick(InventoryClickEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
+                || !(ChatColor.DARK_GREEN + "Spectator Menu").equals(event.getView().getTitle())) return;
+        event.setCancelled(true);
+        if (!(event.getWhoClicked() instanceof Player spectator)) return;
+        int slot = event.getRawSlot();
+        if (slot < 0 || slot >= event.getView().getTopInventory().getSize()) return;
+        Map<Integer, UUID> targets = session.quiverCompassMenuTargets.get(spectator.getUniqueId());
+        UUID targetId = targets == null ? null : targets.get(slot);
+        if (targetId == null) return;
+        Player target = session.players.get(targetId);
+        session.quiverCompassMenuTargets.remove(spectator.getUniqueId());
+        spectator.closeInventory();
+        if (target == null || !target.isOnline() || !session.alive.contains(targetId)) {
+            spectator.sendMessage(ChatColor.YELLOW + "That player is no longer alive.");
+            return;
+        }
+        if (event.isRightClick()) {
+            spectator.setSpectatorTarget(target);
+        } else {
+            long now = System.currentTimeMillis();
+            long readyAt = session.quiverSpectateNextTeleportAt.getOrDefault(spectator.getUniqueId(), 0L);
+            if (!ArcadePortRules.isQuiverSpectatorTeleportReady(now, readyAt)) return;
+            spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+            session.quiverSpectateNextTeleportAt.put(spectator.getUniqueId(),
+                    ArcadePortRules.nextQuiverSpectatorTeleportAt(now));
+        }
+        spectator.setCompassTarget(target.getLocation());
     }
 
     private boolean isBombTrackingCompass(ItemStack item) {
@@ -11126,9 +11400,17 @@ public final class ArcadePortManager implements Listener {
         boolean microCrumbleScanComplete;
         final Map<UUID, String> quiverKits = new HashMap<>();
         final Map<UUID, Integer> quiverArrowBounces = new HashMap<>();
+        final Map<UUID, Set<UUID>> quiverArrowIgnoredPlayers = new HashMap<>();
         final Map<UUID, Integer> quiverKillStreaks = new HashMap<>();
         final Map<UUID, Integer> quiverFistKills = new HashMap<>();
         final Set<UUID> quiverUsedBow = new HashSet<>();
+        final Map<UUID, Map<Integer, UUID>> quiverCompassMenuTargets = new HashMap<>();
+        final Map<UUID, Long> quiverSpectateNextTeleportAt = new HashMap<>();
+        Scoreboard quiverScoreboard;
+        Objective quiverScoreboardObjective;
+        Objective quiverBelowNameObjective;
+        final List<Team> quiverScoreboardTeams = new ArrayList<>();
+        final List<String> quiverScoreboardEntries = new ArrayList<>();
         final Set<UUID> quiverLeapAwaitingLanding = new HashSet<>();
         final Map<UUID, Long> quiverCloakedUntil = new HashMap<>();
         final Map<UUID, Long> quiverGroundPoundReadyAt = new HashMap<>();
