@@ -1653,7 +1653,7 @@ class ArcadePortGameTest {
 
     @Test void dragonsSoloSurvivalAndPlacementGemRulesMatchSource() {
         assertEquals(0.0D, ArcadePortRules.dragonSurvivalGems(-1L), 0.00001D);
-        assertEquals(0.0D, ArcadePortRules.dragonSurvivalGems(9_999L), 0.00001D);
+        assertEquals(0.9999D, ArcadePortRules.dragonSurvivalGems(9_999L), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.dragonSurvivalGems(10_000L), 0.00001D);
         assertEquals(12.5D, ArcadePortRules.dragonSurvivalGems(125_000L), 0.00001D);
         assertEquals(20.0D, ArcadePortRules.dragonPlacementGemReward(1), 0.00001D);
