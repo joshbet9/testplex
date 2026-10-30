@@ -2834,6 +2834,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             updateDragonEscapeSafeLocations(session);
+            updateDragonEscapeTunnelBlocks(session);
             updateDragonEscapeResources(session, now);
             updateDragonEscapeMines(session);
             updateDragonEscapeChase(session);
@@ -4313,6 +4314,27 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    /** Reborn hides a Digger's tunnel from every other racer until its 120-second restore. */
+    private void updateDragonEscapeTunnelBlocks(Session session) {
+        Iterator<Map.Entry<Block, BlockData>> iterator = session.dragonEscapeTunnelBlocks.entrySet().iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<Block, BlockData> entry = iterator.next();
+            Block block = entry.getKey();
+            if (block.getType() != Material.AIR) {
+                session.dragonEscapeTunnelOwners.remove(block);
+                iterator.remove();
+                continue;
+            }
+            UUID owner = session.dragonEscapeTunnelOwners.get(block);
+            Location location = block.getLocation();
+            for (Player viewer : session.world.getPlayers()) {
+                if (owner == null || !viewer.getUniqueId().equals(owner)) {
+                    viewer.sendBlockChange(location, entry.getValue());
+                }
+            }
+        }
+    }
+
     private void updateDragonEscapeResources(Session session, long now) {
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
@@ -4409,11 +4431,19 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
+        long now = System.currentTimeMillis();
+        long nextDigAt = session.dragonEscapeDiggerNextUseAt.getOrDefault(id, 0L);
+        if (!ArcadePortRules.shouldAllowDragonEscapeDigger(now, nextDigAt)) return;
+
         BlockState originalState = block.getState();
+        BlockData originalBlockData = originalState.getBlockData().clone();
         Material mined = block.getType();
         Location dropLocation = block.getLocation().add(0.5D, 0.5D, 0.5D);
         block.setType(Material.AIR, false);
+        session.dragonEscapeTunnelBlocks.put(block, originalBlockData);
+        session.dragonEscapeTunnelOwners.put(block, id);
         scheduleDragonEscapeBlockRestore(session, originalState, block.getBlockData().clone());
+        session.dragonEscapeDiggerNextUseAt.put(id, now + ArcadePortRules.DRAGON_ESCAPE_DIGGER_RECHARGE_MILLIS);
         Map<Integer, ItemStack> overflow = player.getInventory().addItem(new ItemStack(mined, 1));
         for (ItemStack leftover : overflow.values()) player.getWorld().dropItemNaturally(dropLocation, leftover);
         remaining--;
@@ -4434,6 +4464,8 @@ public final class ArcadePortManager implements Listener {
         session.dragonEscapeBlockRestoreTokens.put(key, token);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!session.dragonEscapeBlockRestoreTokens.remove(key, token)) return;
+            session.dragonEscapeTunnelBlocks.remove(block);
+            session.dragonEscapeTunnelOwners.remove(block);
             World world = block.getWorld();
             if (!world.isChunkLoaded(block.getX() >> 4, block.getZ() >> 4)) return;
             Block current = world.getBlockAt(block.getX(), block.getY(), block.getZ());
@@ -9793,6 +9825,9 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Location> dragonEscapeSafeLocations = new HashMap<>();
         final Map<UUID, Long> dragonEscapeWarpedAt = new HashMap<>();
         final Map<UUID, Integer> dragonEscapeObservedWaypoint = new HashMap<>();
+        final Map<UUID, Long> dragonEscapeDiggerNextUseAt = new HashMap<>();
+        final Map<Block, BlockData> dragonEscapeTunnelBlocks = new HashMap<>();
+        final Map<Block, UUID> dragonEscapeTunnelOwners = new HashMap<>();
         final Map<String, Long> dragonEscapeBlockRestoreTokens = new HashMap<>();
         long dragonEscapeBlockRestoreSequence;
         final Map<UUID, UUID> dragonEscapeMineOwners = new HashMap<>();

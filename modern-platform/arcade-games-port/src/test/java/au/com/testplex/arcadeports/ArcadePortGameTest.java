@@ -1315,6 +1315,9 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.shouldPreventDragonEscapeDigger(1.49D, 20.0D));
         assertTrue(ArcadePortRules.shouldPreventDragonEscapeDigger(20.0D, 1.49D));
         assertFalse(ArcadePortRules.shouldPreventDragonEscapeDigger(1.5D, 20.0D));
+        assertEquals(100L, ArcadePortRules.DRAGON_ESCAPE_DIGGER_RECHARGE_MILLIS);
+        assertTrue(ArcadePortRules.shouldAllowDragonEscapeDigger(1_000L, 1_000L));
+        assertFalse(ArcadePortRules.shouldAllowDragonEscapeDigger(999L, 1_000L));
         assertEquals(2_400, ArcadePortRules.DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS);
     }
 

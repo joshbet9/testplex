@@ -398,6 +398,10 @@ public final class ArcadePortRules {
         return elapsedMillis < DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS;
     }
 
+    public static boolean shouldAllowDragonEscapeDigger(long nowMillis, long nextUseAtMillis) {
+        return nowMillis >= nextUseAtMillis;
+    }
+
     public static boolean shouldPreventDragonEscapeDigger(double distanceToBlockCenter, double distanceAboveBlock) {
         return (Double.isFinite(distanceToBlockCenter)
                 && distanceToBlockCenter >= 0.0D
@@ -447,6 +451,7 @@ public final class ArcadePortRules {
 
     public static final int DRAGON_ESCAPE_DIGGER_MAX_USES = 6;
     public static final long DRAGON_ESCAPE_DIGGER_OPENING_LOCKOUT_MILLIS = 10_000L;
+    public static final long DRAGON_ESCAPE_DIGGER_RECHARGE_MILLIS = 100L;
     public static final int DRAGON_ESCAPE_DIGGER_BLOCK_RESTORE_TICKS = 2_400;
     public static final double DRAGON_ESCAPE_DIGGER_NEARBY_PLAYER_RADIUS = 1.5D;
     public static final long DRAGON_ESCAPE_WARPER_GRACE_MILLIS = 1_000L;
