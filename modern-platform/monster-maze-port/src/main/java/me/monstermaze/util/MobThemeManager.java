@@ -38,7 +38,7 @@ public final class MobThemeManager implements Listener {
     private boolean warnedMissingDisguise;
     public MobThemeManager(MonsterMazePlugin plugin) {
         this.plugin=plugin; this.file=new File(plugin.getDataFolder(),"player-mob-themes.yml"); load();
-        Bukkit.getPluginManager().registerEvents(this,plugin);
+        Bukkit.getPluginManager().registerEvents(this,plugin.getHostPlugin());
     }
     public String selected(Player player) {
         if(player==null)return defaultTheme();
