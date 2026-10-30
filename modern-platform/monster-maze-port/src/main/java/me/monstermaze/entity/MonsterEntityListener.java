@@ -19,8 +19,8 @@ public final class MonsterEntityListener implements Listener {
 
     public MonsterEntityListener(MonsterMazePlugin plugin, GameManager game) {
         this.game = game;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
-        this.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
+        this.tickTask = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 for (LivingEntity entity : game.getMonsterManager().getMonsters()) {
                     MonsterEntityController.tick(entity);
