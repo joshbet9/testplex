@@ -23,6 +23,20 @@ public final class ArcadePortRules {
                 : CASTLE_ASSAULT_OBJECTIVE_TNT_RESPAWN_MILLIS;
     }
 
+    public static final long CASTLE_ASSAULT_ARCHER_REFILL_MILLIS = 6_000L;
+    public static final int CASTLE_ASSAULT_ARCHER_MAX_ARROWS = 10;
+
+    /** Reborn caps blast protection EPF at 20 before applying its TNT damage multiplier. */
+    public static double castleAssaultBlastDamageMultiplier(int blastProtectionEpf) {
+        int epf = Math.max(0, Math.min(20, blastProtectionEpf));
+        return 1.0D - epf / 25.0D;
+    }
+
+    /** Reborn reduces blast knockback by 15% per level of the strongest armour piece. */
+    public static double castleAssaultBlastKnockbackMultiplier(int highestBlastProtectionLevel) {
+        return Math.max(0.0D, 1.0D - Math.max(0, highestBlastProtectionLevel) * 0.15D);
+    }
+
     /** Normalise the five source Castle Assault kits for the test command and lobby selection. */
     public static String normalizeCastleAssaultKit(String requested) {
         if (requested == null) return null;
