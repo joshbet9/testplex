@@ -1751,12 +1751,23 @@ class ArcadePortGameTest {
         assertEquals(400L, ArcadePortRules.DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS);
     }
 
-    @Test void deathTagEndsWhenOneRunnerRemainsExceptInSmallTestLobbies() {
+    @Test void deathTagEndsWhenOneRunnerRemainsForEveryLobbySize() {
         assertTrue(ArcadePortRules.shouldFinishDeathTagRound(1, 8));
+        assertTrue(ArcadePortRules.shouldFinishDeathTagRound(1, 2));
+        assertTrue(ArcadePortRules.shouldFinishDeathTagRound(1, 1));
         assertTrue(ArcadePortRules.shouldFinishDeathTagRound(0, 8));
-        assertFalse(ArcadePortRules.shouldFinishDeathTagRound(2, 8));
-        assertFalse(ArcadePortRules.shouldFinishDeathTagRound(1, 2));
         assertTrue(ArcadePortRules.shouldFinishDeathTagRound(0, 2));
+        assertFalse(ArcadePortRules.shouldFinishDeathTagRound(2, 8));
+        assertFalse(ArcadePortRules.shouldFinishDeathTagRound(2, 2));
+    }
+
+    @Test void deathTagUsesTheLegacyTwentyMinuteTimeoutAndGemRewardSchedule() {
+        assertEquals(1_200_000L, ArcadePortRules.DEATH_TAG_GAME_TIMEOUT_MILLIS);
+        assertEquals(10, ArcadePortRules.DEATH_TAG_FORCED_CHASER_REWARD_GEMS);
+        assertEquals(15, ArcadePortRules.DEATH_TAG_FIRST_PLACE_REWARD_GEMS);
+        assertEquals(10, ArcadePortRules.DEATH_TAG_SECOND_PLACE_REWARD_GEMS);
+        assertEquals(5, ArcadePortRules.DEATH_TAG_THIRD_PLACE_REWARD_GEMS);
+        assertEquals(10, ArcadePortRules.DEATH_TAG_PARTICIPATION_REWARD_GEMS);
     }
 
     @Test void deployedArcadeAllowListExposesOnlyAcceptedGameIds() {
