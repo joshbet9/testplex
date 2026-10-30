@@ -10411,7 +10411,6 @@ public final class ArcadePortManager implements Listener {
         Location dragonEscapeLastDestructionLocation;
         final List<Location> dragonEscapeWaypoints = new ArrayList<>();
         final Map<UUID, Location> dragonEscapeStartLocations = new HashMap<>();
-        final Map<UUID, Map<Integer, Location>> dragonEscapeRunSplitLocations = new HashMap<>();
         final Map<UUID, String> dragonEscapeKits = new HashMap<>();
         final Map<UUID, Integer> dragonEscapeLeapUsesRemaining = new HashMap<>();
         final Map<UUID, Long> dragonEscapeLeapReadyAt = new HashMap<>();
