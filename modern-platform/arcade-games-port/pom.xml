@@ -37,6 +37,7 @@
                     <include>Bacon Brawl/**/*.zip</include>
                     <include>Bomb Lobbers/**/*.zip</include>
                     <include>Death Tag/**/*.zip</include>
+                    <include>Draw My Thing/**/*.zip</include>
                     <include>Dragon Escape/**/*.zip</include>
                     <include>Dragons/**/*.zip</include>
                     <include>Gladiators/**/*.zip</include>

@@ -196,19 +196,15 @@ public final class ArcadeCatalog {
 
         register(game("snake", "Snake", "SLIME_BALL", "Collect food, avoid collisions, and use the Mario-Kart-style item roll.",
                 GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
-                List.of(lineMulti("snake-style", "Snake Style", "One combined Snake cosmetic line: choose a serpent pattern, ability colour palette, and Speed / Super / Reversal visual style.",
-                        "SHEEP_SPAWN_EGG",
-                        grouped("anaconda", "Anaconda", "Green and earth-toned segmented body.", "snake-type"),
-                        grouped("cobra", "Cobra", "Red-and-black hood-inspired segment pattern.", "snake-type"),
-                        grouped("neon-viper", "Neon Viper", "Alternating cyan and purple segments.", "snake-type"),
-                        grouped("reef-serpent", "Reef Serpent", "Coral and sea-colour segment pattern.", "snake-type"),
-                        grouped("elemental", "Elemental", "Super: blue; Speed: yellow; Reversal: purple.", "colour-theme"),
-                        grouped("neon", "Neon", "Super: cyan; Speed: lime; Reversal: magenta.", "colour-theme"),
-                        grouped("sunset", "Sunset", "Super: red; Speed: pink; Reversal: orange.", "colour-theme"),
-                        grouped("classic", "Classic Ability Visuals", "Preserve the original ability appearance without extra particles.", "ability-visuals"),
-                        grouped("subtle", "Subtle", "A light cloud cue while an ability is active.", "ability-visuals"),
-                        grouped("neon-visuals", "Neon Ability Visuals", "Bright electric-style Speed, Super and Reversal particles.", "ability-visuals"),
-                        grouped("colour-coded", "Colour-Coded", "Ability particles match the selected ability colour.", "ability-visuals"))),
+                List.of(line("snake-identity", "Snake Identity", "A connected body pattern, not one generic particle trail.", "SLIME_BALL",
+                        single("anaconda", "Anaconda", "Segmented heavy scales along the body."),
+                        single("cobra", "Cobra", "A raised hood silhouette and alternating scales."),
+                        single("neon-viper", "Neon Viper", "A two-tone luminous stripe."),
+                        single("reef-serpent", "Reef Serpent", "Coral-like fins along the body.")),
+                     line("item-roll-visual", "Item Roll Visual", "The hotbar roll presentation; effect timing remains gameplay-owned.", "CHEST_MINECART",
+                        single("slot-reel", "Slot Reel", "A rapid item-strip animation."),
+                        single("dice-lock", "Dice Lock", "An animated dice reveal with a lock-in pulse."),
+                        single("roulette-orbit", "Roulette Orbit", "Items orbit briefly before the selected effect appears."))),
                 win("race-lap", "Final Lap", "A lap counter and racing pennants appear."),
                 win("snake-podium", "Snake Podium", "The winner coils around a compact podium."),
                 win("fruit-fountain", "Fruit Fountain", "Food items spiral into a colourful fountain")));
@@ -222,6 +218,18 @@ public final class ArcadeCatalog {
                 win("ice-throne", "Ice Throne", "A seat of ice rises from the surviving floor."),
                 win("last-snowflake", "Last Snowflake", "A single snowflake floats above the winner."),
                 win("shovel-salute", "Shovel Salute", "A ceremonial row of shovels rises from the floor")));
+
+        register(game("draw-my-thing", "Draw My Thing", "PAINTING",
+                "Take one 30-second drawing turn, reveal timed hints, and guess using a limited number of attempts.",
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                List.of(),
+                win("whiteboard-reveal", "Whiteboard Reveal", "The final drawing is framed above the winning guesser.")));
+
+        register(game("master-builders", "Master Builders", "GRASS_BLOCK",
+                "Build your theme in three minutes, then review and rate the other plots.",
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                List.of(),
+                win("builders-podium", "Builder's Podium", "The top-rated build rises above the winning builder.")));
 
         register(game("turf-wars", "Turf Wars", "BOW", "Win ranged combat and control the central turf.",
                 GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,

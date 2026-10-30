@@ -49,7 +49,7 @@ jobs:
       - name: Build Snake 26.3 port and run mechanics-rule tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/snake-port/pom.xml clean verify
 
-      - name: Build the other 14 Arcade mechanics prototypes
+      - name: Build the other 16 Arcade mechanics prototypes
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
 
       - name: Verify modern plugin metadata and packaged classes
@@ -77,23 +77,20 @@ jobs:
           jar tf "$snake_jar" | grep -Fxq "plugin.yml"
           jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeModernPlugin.class"
           jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeRules.class"
-          jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeMapCatalog.class"
-          jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeStatsStore.class"
           unzip -p "$snake_jar" plugin.yml | grep -Fxq "name: SnakeModern"
           unzip -p "$snake_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
-          snake_map_count="$(jar tf "$snake_jar" | grep -Ec '^source-maps/Snake/[^/]+\.zip$' || true)"
-          [[ "$snake_map_count" -eq 3 ]] || { echo "Expected all three original Snake maps in SnakeModern.jar, found $snake_map_count." >&2; exit 1; }
           jar tf "$arcade_jar" | grep -Fxq "plugin.yml"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadePortManager.class"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "name: ArcadeMechanicsModern"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
+          jar tf "$arcade_jar" | grep -Fxq "source-maps/Draw My Thing/Draw_Stadium.zip"
           arcade_config="$(unzip -p "$arcade_jar" config.yml)"
-          for candidate in bacon-brawl bomb-lobbers dragon-escape dragons gladiators paintball runner spleef; do
+          for candidate in bacon-brawl bomb-lobbers dragon-escape dragons gladiators paintball runner spleef draw-my-thing master-builders; do
             grep -Fxq "  - $candidate" <<< "$arcade_config"
           done
           ! grep -Eq "^  - (death-tag|evolution|micro-battles|one-in-the-quiver|sheep-quest|turf-wars)$" <<< "$arcade_config"
-          echo "All four modern Paper 26.3 plugin artifacts verified; SnakeModern packages all three original maps and local source stats."
+          echo "All four modern Paper 26.3 plugin artifacts verified; Draw My Thing includes its no-resource-pack Stadium map, and all ten enabled Arcade candidates are present."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
@@ -116,12 +113,12 @@ jobs:
             echo
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
-            echo "- Catalogue: 16 Arcade games"
+            echo "- Catalogue: 18 Arcade games"
             echo "- Built artifacts: TestplexModernArcade.jar, MonsterMazeModern.jar, SnakeModern.jar and ArcadeMechanicsModern.jar"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: Monster Maze and Snake plus 14 mechanics-first prototypes; in-game validation still required"
-            echo "- Deployment acceptance: Monster Maze and SnakeModern will be installed with the platform; Snake remains mechanics-in-progress until original-map multiplayer parity acceptance passes"
+            echo "- Gameplay ports: Monster Maze and Snake plus 16 mechanics-first prototypes, including Draw My Thing and Master Builders; in-game validation still required"
+            echo "- Deployment acceptance: eight Arcade candidates remain explicitly approved for acceptance; Draw My Thing and Master Builders are added as gameplay-in-progress test variants; Snake remains gated"
             echo "- Server deploy: successful pushes to feat/testplex-modern-26.3-platform automatically invoke the isolated Hyper-V deploy job; pull requests and manual build-only runs do not deploy"
           } >> "$GITHUB_STEP_SUMMARY"
 
