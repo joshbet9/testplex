@@ -384,7 +384,7 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeBaconBrawlKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Bacon Brawl kits: el-muchacho-pigo, mama-piggles, pig. Chris P. Bacon is intentionally omitted.");
+            player.sendMessage(ChatColor.YELLOW + "Bacon Brawl kits: El Muchacho Pigo, Mama Piggles, Pig Cloak, Brutus Bacon. Chris P. Bacon is intentionally omitted.");
             return;
         }
         baconKitPreferences.put(player.getUniqueId(), kit);
@@ -392,7 +392,13 @@ public final class ArcadePortManager implements Listener {
         boolean activeBaconRound = session != null && session.type == ArcadePortGame.BACON_BRAWL
                 && session.players.containsKey(player.getUniqueId()) && session.alive.contains(player.getUniqueId());
         boolean roundLocked = ArcadePortRules.shouldDeferBaconBrawlKitChange(activeBaconRound);
-        player.sendMessage(ChatColor.GREEN + "Bacon Brawl kit set to " + kit
+        String displayKit = switch (kit) {
+            case "mama-piggles" -> "Mama Piggles";
+            case "pig" -> "Pig Cloak";
+            case "brutus-bacon" -> "Brutus Bacon";
+            default -> "El Muchacho Pigo";
+        };
+        player.sendMessage(ChatColor.GREEN + "Bacon Brawl kit set to " + displayKit
                 + (roundLocked ? " for your next test. Kits are locked once a round starts."
                         : " for your next test."));
     }
