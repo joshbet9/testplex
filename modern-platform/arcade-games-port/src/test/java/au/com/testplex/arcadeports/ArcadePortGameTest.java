@@ -1578,6 +1578,16 @@ class ArcadePortGameTest {
         assertEquals(3, ArcadePortRules.gladiatorsTierForRound(4));
     }
 
+    @Test void gladiatorsVoteModesExposeTheCorrectClassicToolAvailability() {
+        assertTrue(GladiatorsMode.fromId("rodless").bowAvailable());
+        assertFalse(GladiatorsMode.fromId("rodless").rodAvailable());
+        assertTrue(GladiatorsMode.fromId("bowless").rodAvailable());
+        assertFalse(GladiatorsMode.fromId("bowless").bowAvailable());
+        assertFalse(GladiatorsMode.fromId("modern").hasClassicRangedTools());
+        assertFalse(GladiatorsMode.fromId("pot").hasClassicRangedTools());
+        assertNull(GladiatorsMode.fromId("not-a-mode"));
+    }
+
     @Test void gladiatorsChallengeAchievementRequiresAvailableClassicToolsAndNoUse() {
         assertTrue(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(true, false, false));
         assertFalse(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(true, true, false));
