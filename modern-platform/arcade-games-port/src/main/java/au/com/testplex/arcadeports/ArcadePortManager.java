@@ -4274,6 +4274,14 @@ public final class ArcadePortManager implements Listener {
     private void updateTestDragons(Session session, long now) {
         if (active != session) return;
         pruneDragonFlareZones(session, now);
+
+        // The source uses FASTEST (125 ms) for dragon pursuit/contact and FAST (500 ms)
+        // for Sparkler/Fletcher perk updates. Barrage itself remains a TICK ability.
+        boolean targetUpdate = now >= session.dragonNextTargetUpdateAt;
+        if (targetUpdate) session.dragonNextTargetUpdateAt = now + ArcadePortRules.DRAGONS_TARGET_INTERVAL_MILLIS;
+        boolean perkUpdate = now >= session.dragonNextPerkUpdateAt;
+        if (perkUpdate) session.dragonNextPerkUpdateAt = now + ArcadePortRules.DRAGONS_PERK_UPDATE_INTERVAL_MILLIS;
+
         List<Player> alive = alivePlayers(session);
         List<Player> possibleTargets = dragonTargetCandidates(session, alive, now);
 
@@ -4290,119 +4298,92 @@ public final class ArcadePortManager implements Listener {
         long dragonCount = session.entities.stream().filter(e -> e instanceof EnderDragon && e.isValid()).count();
         if (ArcadePortRules.shouldSpawnTestDragon((int) dragonCount, now, session.dragonNextSpawnAt)) {
             SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
+            // Reborn only reads WorldData.GetDataLocs("RED"). It does not invent spawn
+            // positions when a map has no RED locations.
             List<Location> spawns = mapData == null ? List.of() : mapData.dataLocations("RED");
-            if (spawns.isEmpty() && mapData != null) spawns = mapData.spawnLocations();
-            Location spawn;
-            if (!spawns.isEmpty()) {
-                spawn = spawns.get(ThreadLocalRandom.current().nextInt(spawns.size())).clone();
+            if (spawns.isEmpty()) {
+                if (!session.dragonMissingSpawnWarned) {
+                    plugin.getLogger().warning("Dragons selected map has no RED spawn markers. "
+                            + "No dragons will spawn until a valid source map is selected.");
+                    session.dragonMissingSpawnWarned = true;
+                }
+                session.dragonNextSpawnAt = now + ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS;
             } else {
-                Location center = session.dragonSpectatorLocation == null
-                        ? session.world.getSpawnLocation() : session.dragonSpectatorLocation;
-                spawn = center.clone().add(ThreadLocalRandom.current().nextDouble(-18.0D, 19.0D),
-                        0.0D, ThreadLocalRandom.current().nextDouble(-18.0D, 19.0D));
+                Location spawn = spawns.get(ThreadLocalRandom.current().nextInt(spawns.size())).clone();
+                EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
+                dragon.setAI(false);
+                dragon.setGravity(false);
+                // Reborn calls UtilEnt.vegetate + ghost(dragon, true, false):
+                // no normal AI and no collision, while remaining visible and targetable by the port.
+                dragon.setCollidable(false);
+                dragon.setRemoveWhenFarAway(false);
+                session.entities.add(dragon);
+                session.dragonTargetLocations.put(dragon.getUniqueId(), randomDragonSkyTarget(session));
+                session.dragonNextSpawnAt = now + ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS;
+                spawn.getWorld().playSound(spawn, Sound.ENTITY_ENDER_DRAGON_GROWL, 20.0F, 1.0F);
             }
-            EnderDragon dragon = session.world.spawn(spawn, EnderDragon.class);
-            dragon.setAI(false);
-            dragon.setGravity(false);
-            // Reborn dragons are visual hazards, not collidable living mobs.
-            dragon.setCollidable(false);
-            dragon.setInvulnerable(true);
-            dragon.setRemoveWhenFarAway(false);
-            dragon.setCustomName(ChatColor.DARK_PURPLE + "Dragon");
-            dragon.setCustomNameVisible(true);
-            session.entities.add(dragon);
-            session.dragonTargetLocations.put(dragon.getUniqueId(), randomDragonSkyTarget(session));
-            session.dragonNextSpawnAt = now + ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS;
-            spawn.getWorld().playSound(spawn, Sound.ENTITY_ENDER_DRAGON_GROWL, 2.0F, 1.0F);
         }
 
         for (Player player : alive) {
             UUID id = player.getUniqueId();
             String kit = session.dragonKits.getOrDefault(id, "coward");
-            if ("pyrotechnic".equals(kit)) {
-                long next = session.dragonNextSparklerAt.getOrDefault(id,
-                        now + ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS);
-                if (now >= next) {
-                    int held = countNamedItems(player, Material.EMERALD, "Throwing Sparkler");
-                    if (ArcadePortRules.shouldReplenishDragonSparkler(now, next, held)) {
-                        player.getInventory().addItem(namedItem(Material.EMERALD, "Throwing Sparkler",
-                                "Right-click to throw a sparkler that attracts nearby dragons.", 1));
-                        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8F, 1.0F);
+            if (perkUpdate) {
+                if ("pyrotechnic".equals(kit)) {
+                    long next = session.dragonNextSparklerAt.getOrDefault(id,
+                            now + ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS);
+                    if (now >= next) {
+                        int held = countNamedItems(player, Material.EMERALD, "Throwing Sparkler");
+                        if (ArcadePortRules.shouldReplenishDragonSparkler(now, next, held)) {
+                            player.getInventory().addItem(namedItem(Material.EMERALD, "Throwing Sparkler",
+                                    "Right-click to throw a sparkler that attracts nearby dragons.", 1));
+                            player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 2.0F, 1.0F);
+                        }
+                        session.dragonNextSparklerAt.put(id, now + ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS);
                     }
-                    session.dragonNextSparklerAt.put(id, now + ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS);
-                }
-            } else if ("marksman".equals(kit)) {
-                long nextArrow = session.dragonNextArrowAt.getOrDefault(id,
-                        now + ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
-                if (now >= nextArrow) {
-                    if (countNamedItems(player, Material.ARROW, "Fletched Arrow")
-                            < ArcadePortRules.DRAGONS_MARKSMAN_MAX_ARROWS) {
-                        player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
-                                "A replenishing Marksman arrow.", 1));
-                        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.6F, 1.0F);
+                } else if ("marksman".equals(kit)) {
+                    long nextArrow = session.dragonNextArrowAt.getOrDefault(id,
+                            now + ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
+                    if (now >= nextArrow) {
+                        if (countNamedItems(player, Material.ARROW, "Fletched Arrow")
+                                < ArcadePortRules.DRAGONS_MARKSMAN_MAX_ARROWS) {
+                            player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
+                                    "A replenishing Marksman arrow.", 1));
+                            player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 2.0F, 1.0F);
+                        }
+                        session.dragonNextArrowAt.put(id, now + ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
                     }
-                    session.dragonNextArrowAt.put(id, now + ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
                 }
-                updateDragonBarrageCharge(session, player, now);
             }
+            // Reborn's PerkBarrage charges and emits queued arrows every server TICK.
+            if ("marksman".equals(kit)) updateDragonBarrageCharge(session, player, now);
         }
 
         List<EnderDragon> dragons = session.entities.stream()
                 .filter(e -> e instanceof EnderDragon && e.isValid())
                 .map(e -> (EnderDragon) e).toList();
 
-        for (EnderDragon dragon : dragons) {
-            UUID dragonId = dragon.getUniqueId();
-            UUID targetPlayerId = session.dragonTargetPlayers.get(dragonId);
-            Location target = session.dragonTargetLocations.get(dragonId);
-            if (targetPlayerId != null) {
-                Player targetPlayer = session.players.get(targetPlayerId);
-                if (targetPlayer != null && targetPlayer.isOnline() && session.alive.contains(targetPlayerId)
-                        && !isDragonPlayerProtected(session, targetPlayer, now)) {
-                    target = targetPlayer.getLocation().clone();
-                    session.dragonTargetLocations.put(dragonId, target.clone());
-                } else {
-                    session.dragonTargetPlayers.remove(dragonId);
-                    target = null;
-                }
-            }
-            // A dragon may also be following a sparkler or sky coordinate; neither can remain
-            // inside a live flare exclusion zone.
-            if (target != null && isDragonLocationProtected(session, target, now)) {
-                session.dragonTargetPlayers.remove(dragonId);
-                target = null;
-            }
-
-            if (dragon.getLocation().getY() < 10.0D || target == null
-                    || dragon.getLocation().distanceSquared(target) <= 36.0D) {
-                if (session.dragonSpectatorLocation != null
-                        && dragon.getLocation().getY() > session.dragonSpectatorLocation.getY()
-                        && !possibleTargets.isEmpty()) {
-                    Player newTarget = possibleTargets.get(ThreadLocalRandom.current().nextInt(possibleTargets.size()));
-                    session.dragonTargetPlayers.put(dragonId, newTarget.getUniqueId());
-                    target = newTarget.getLocation().clone();
-                } else {
-                    session.dragonTargetPlayers.remove(dragonId);
-                    target = randomDragonSkyTarget(session);
-                }
-                session.dragonTargetLocations.put(dragonId, target.clone());
-            }
-        }
-
         for (Iterator<Entity> it = session.entities.iterator(); it.hasNext();) {
             Entity entity = it.next();
             if (!(entity instanceof Item item) || !session.dragonSparklerItems.contains(item.getUniqueId())) continue;
             UUID sparklerId = item.getUniqueId();
-            if (!item.isValid() || ArcadePortRules.shouldExpireDragonSparkler(item.getTicksLived(),
-                    item.getLocation().getY(), item.getLocation().getBlock().isLiquid())) {
+            if (!item.isValid() || ArcadePortRules.shouldExpireDragonSparkler(
+                    item.getTicksLived(), item.getLocation().getY(), item.getLocation().getBlock().isLiquid())) {
                 session.dragonSparklerItems.remove(sparklerId);
                 it.remove();
                 item.remove();
                 continue;
             }
+            if (perkUpdate) {
+                Location itemLocation = item.getLocation();
+                item.getWorld().spawnParticle(Particle.FIREWORK, itemLocation, 1,
+                        0.08D, 0.08D, 0.08D, 0.0D);
+            }
+            if (!targetUpdate) continue;
             Location itemLocation = item.getLocation();
-            item.getWorld().spawnParticle(Particle.FIREWORK, itemLocation, 1, 0.08D, 0.08D, 0.08D, 0.0D);
-            // A Pyro lure inside an active flare cannot override the defensive exclusion zone.
+            // Dragons ignores a low or submerged Sparkler for targeting but the Sparkler
+            // itself remains until PerkSparkler's >100 tick cleanup.
+            if (!ArcadePortRules.shouldDragonSparklerAttract(
+                    itemLocation.getY(), itemLocation.getBlock().isLiquid())) continue;
             if (isDragonLocationProtected(session, itemLocation, now)) continue;
             for (EnderDragon dragon : dragons) {
                 if (dragon.getLocation().distanceSquared(itemLocation)
@@ -4412,23 +4393,66 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
-        for (EnderDragon dragon : dragons) {
-            Location target = session.dragonTargetLocations.get(dragon.getUniqueId());
-            if (target != null) {
-                Vector direction = target.toVector().subtract(dragon.getLocation().toVector());
-                if (direction.lengthSquared() > 1.0D) {
-                    Vector flight = direction.normalize().multiply(0.32D);
-                    flight.setY(Math.max(-0.08D, Math.min(0.16D, flight.getY() + 0.04D)));
-                    dragon.setVelocity(flight);
+        if (targetUpdate) {
+            for (EnderDragon dragon : dragons) {
+                UUID dragonId = dragon.getUniqueId();
+                UUID targetPlayerId = session.dragonTargetPlayers.get(dragonId);
+                Location target = session.dragonTargetLocations.get(dragonId);
+                if (targetPlayerId != null) {
+                    Player targetPlayer = session.players.get(targetPlayerId);
+                    if (targetPlayer != null && targetPlayer.isOnline() && session.alive.contains(targetPlayerId)
+                            && !isDragonPlayerProtected(session, targetPlayer, now)) {
+                        target = targetPlayer.getLocation().clone();
+                        session.dragonTargetLocations.put(dragonId, target.clone());
+                    } else {
+                        session.dragonTargetPlayers.remove(dragonId);
+                        target = null;
+                    }
+                }
+
+                if (target != null && isDragonLocationProtected(session, target, now)) {
+                    session.dragonTargetPlayers.remove(dragonId);
+                    target = null;
+                }
+
+                // MineplexDragon.updateTarget() runs on FASTEST: if below Y=10, target sky;
+                // otherwise only select a new target within six blocks of the current one.
+                if (dragon.getLocation().getY() < 10.0D || target == null
+                        || dragon.getLocation().distanceSquared(target) <= 36.0D) {
+                    if (session.dragonSpectatorLocation != null
+                            && dragon.getLocation().getY() > session.dragonSpectatorLocation.getY()
+                            && !possibleTargets.isEmpty()) {
+                        Player newTarget = possibleTargets.get(
+                                ThreadLocalRandom.current().nextInt(possibleTargets.size()));
+                        session.dragonTargetPlayers.put(dragonId, newTarget.getUniqueId());
+                        target = newTarget.getLocation().clone();
+                    } else {
+                        session.dragonTargetPlayers.remove(dragonId);
+                        target = randomDragonSkyTarget(session);
+                    }
+                    session.dragonTargetLocations.put(dragonId, target.clone());
                 }
             }
-            for (Player player : alive) {
-                if (!isDragonPlayerProtected(session, player, now)
-                        && dragon.getLocation().distanceSquared(player.getLocation()) <= 36.0D) {
-                    applyDragonContactHit(session, dragon, player, now);
+
+            for (EnderDragon dragon : dragons) {
+                Location target = session.dragonTargetLocations.get(dragon.getUniqueId());
+                if (target != null) {
+                    Vector direction = target.toVector().subtract(dragon.getLocation().toVector());
+                    if (direction.lengthSquared() > 1.0D) {
+                        Vector flight = direction.normalize().multiply(0.32D);
+                        flight.setY(Math.max(-0.08D, Math.min(0.16D, flight.getY() + 0.04D)));
+                        dragon.setVelocity(flight);
+                    }
+                }
+                for (Player player : alive) {
+                    if (!isDragonPlayerProtected(session, player, now)
+                            && dragon.getBoundingBox().overlaps(player.getBoundingBox())) {
+                        applyDragonContactHit(session, dragon, player, now);
+                    }
                 }
             }
         }
+
         updateDragonsSpectatorCompasses(session);
     }
 
