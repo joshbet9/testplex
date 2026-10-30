@@ -820,6 +820,13 @@ public final class ArcadePortManager implements Listener {
         if (session != null && session.type == ArcadePortGame.TURF_WARS
                 && session.players.containsKey(id) && session.alive.contains(id)) {
             session.turfWarsKits.put(id, kit);
+            long now = System.currentTimeMillis();
+            session.turfConstructorNextAt.put(id, now);
+            session.turfArrowNextAt.put(id, now);
+            session.turfBarrageCharges.remove(id);
+            session.turfBarrageNextChargeAt.remove(id);
+            session.turfBarrageRemaining.remove(id);
+            session.turfBarrageFiring.remove(id);
             giveKit(session, player);
             player.sendMessage(ChatColor.GREEN + "Turf Wars kit changed to " + kit + ".");
         } else {
@@ -1278,8 +1285,10 @@ public final class ArcadePortManager implements Listener {
             initializeTurfWarsMap(session, turfSourceMap);
             for (Player player : participants) {
                 UUID playerId = player.getUniqueId();
-                session.turfWarsKits.put(playerId,
-                        turfWarsKitPreferences.getOrDefault(playerId, "marksman"));
+                String kit = turfWarsKitPreferences.getOrDefault(playerId, "marksman");
+                session.turfWarsKits.put(playerId, kit);
+                session.turfConstructorNextAt.put(playerId, now);
+                session.turfArrowNextAt.put(playerId, now);
             }
         }
         lastDragonHazard = now + 8_000L;
@@ -3349,6 +3358,127 @@ public final class ArcadePortManager implements Listener {
         return new Location(world, red ? -15.0D : 15.0D, 64.0D, z, red ? -90.0F : 90.0F, 0.0F);
     }
 
+    private int countTurfWarsWool(Player player, int team) {
+        Material wool = team == 0 ? Material.RED_WOOL : team == 1 ? Material.BLUE_WOOL : Material.AIR;
+        return wool == Material.AIR ? 0 : inventoryCount(player, wool);
+    }
+
+    private int countTurfWarsFletchedArrows(Player player) {
+        int count = 0;
+        for (ItemStack stack : player.getInventory().getContents()) {
+            if (stack == null || stack.getType() != Material.ARROW || !stack.hasItemMeta()) continue;
+            ItemMeta meta = stack.getItemMeta();
+            if (meta != null && meta.hasDisplayName()
+                    && ChatColor.stripColor(meta.getDisplayName()).contains("Fletched Arrow")) {
+                count += stack.getAmount();
+            }
+        }
+        return count;
+    }
+
+    private boolean isTurfWarsFletchedArrow(ItemStack stack) {
+        if (stack == null || stack.getType() != Material.ARROW || !stack.hasItemMeta()) return false;
+        ItemMeta meta = stack.getItemMeta();
+        return meta != null && meta.hasDisplayName()
+                && ChatColor.stripColor(meta.getDisplayName()).contains("Fletched Arrow");
+    }
+
+    private void updateTurfWars(Session session, long now) {
+        if (active != session) return;
+        updateTurfWarsBarrages(session, now);
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            String kit = session.turfWarsKits.getOrDefault(id, "marksman");
+            int team = session.teams.getOrDefault(id, -1);
+
+            long constructorAt = session.turfConstructorNextAt.getOrDefault(id, now);
+            if (now >= constructorAt) {
+                // PerkConstructor: one team-coloured wool every four seconds, up to the kit cap.
+                if (countTurfWarsWool(player, team) < ArcadePortRules.turfWarsConstructorMax(kit)) {
+                    Material wool = team == 0 ? Material.RED_WOOL : team == 1 ? Material.BLUE_WOOL : Material.AIR;
+                    if (wool != Material.AIR) {
+                        player.getInventory().addItem(new ItemStack(wool, 1));
+                        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8F, 1.0F);
+                    }
+                }
+                session.turfConstructorNextAt.put(id,
+                        now + ArcadePortRules.TURF_WARS_CONSTRUCTOR_INTERVAL_MILLIS);
+            }
+
+            long arrowAt = session.turfArrowNextAt.getOrDefault(id, now);
+            if (now >= arrowAt) {
+                if (countTurfWarsFletchedArrows(player)
+                        < ArcadePortRules.turfWarsArrowMax(kit)) {
+                    player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
+                            "A replenishing Turf Wars arrow."));
+                    player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8F, 1.0F);
+                }
+                session.turfArrowNextAt.put(id,
+                        now + ArcadePortRules.turfWarsArrowIntervalMillis(kit));
+            }
+        }
+    }
+
+    private void updateTurfWarsBarrages(Session session, long now) {
+        for (Player player : alivePlayers(session)) {
+            UUID id = player.getUniqueId();
+            if (!"shredder".equals(session.turfWarsKits.getOrDefault(id, "marksman"))) continue;
+            ItemStack held = player.getInventory().getItemInMainHand();
+            boolean holdingBow = held != null && held.getType() == Material.BOW;
+
+            if (session.turfBarrageCharges.containsKey(id) && !session.turfBarrageFiring.contains(id)) {
+                if (!holdingBow) {
+                    session.turfBarrageCharges.remove(id);
+                    session.turfBarrageNextChargeAt.remove(id);
+                } else if (session.turfBarrageCharges.getOrDefault(id, 0)
+                        < ArcadePortRules.TURF_WARS_BARRAGE_MAX_CHARGE
+                        && now >= session.turfBarrageNextChargeAt.getOrDefault(id, Long.MAX_VALUE)) {
+                    int charge = session.turfBarrageCharges.getOrDefault(id, 0) + 1;
+                    session.turfBarrageCharges.put(id, charge);
+                    session.turfBarrageNextChargeAt.put(id,
+                            now + ArcadePortRules.TURF_WARS_BARRAGE_CHARGE_INTERVAL_MILLIS);
+                    player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT,
+                            0.6F, 1.0F + charge * 0.1F);
+                    player.sendActionBar(ChatColor.GOLD + "BARRAGE "
+                            + ChatColor.YELLOW + charge + "/" + ArcadePortRules.TURF_WARS_BARRAGE_MAX_CHARGE);
+                }
+            }
+
+            if (!session.turfBarrageFiring.contains(id)) continue;
+            int remaining = session.turfBarrageRemaining.getOrDefault(id, 0);
+            if (!holdingBow || remaining <= 0) {
+                session.turfBarrageFiring.remove(id);
+                session.turfBarrageRemaining.remove(id);
+                session.turfBarrageCharges.remove(id);
+                session.turfBarrageNextChargeAt.remove(id);
+                continue;
+            }
+
+            Vector jitter = new Vector(
+                    ThreadLocalRandom.current().nextDouble(-0.05D, 0.05D),
+                    ThreadLocalRandom.current().nextDouble(-0.05D, 0.05D),
+                    ThreadLocalRandom.current().nextDouble(-0.05D, 0.05D));
+            Arrow arrow = player.launchProjectile(Arrow.class);
+            arrow.setVelocity(player.getLocation().getDirection().add(jitter).multiply(3.0D));
+            session.entities.add(arrow);
+            session.turfTrackedArrows.add(arrow.getUniqueId());
+            session.turfBarrageRemaining.put(id, remaining - 1);
+            player.getWorld().playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1.0F, 1.0F);
+        }
+    }
+
+    private void startTurfWarsBarrage(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        if (!"shredder".equals(session.turfWarsKits.getOrDefault(id, "marksman"))
+                || session.turfBarrageCharges.containsKey(id)
+                || session.turfBarrageFiring.contains(id)
+                || countTurfWarsFletchedArrows(player) <= 0) return;
+        session.turfBarrageCharges.put(id, 0);
+        session.turfBarrageNextChargeAt.put(id,
+                System.currentTimeMillis() + ArcadePortRules.TURF_WARS_BARRAGE_FIRST_CHARGE_MILLIS);
+        player.sendMessage(ChatColor.YELLOW + "Charging Barrage. Release your bow to fire.");
+    }
+
     private void giveTurfWarsWool(Session session, Player player) {
         int team = session.teams.getOrDefault(player.getUniqueId(), -1);
         if (team < 0) return;
@@ -4749,14 +4879,7 @@ public final class ArcadePortManager implements Listener {
             updatePaintballKitState(session, now);
             updatePaintballPelletCosmetics(session);
         }
-        if (session.type == ArcadePortGame.TURF_WARS && session.turfCombat && session.ticks % 40 == 0) {
-            for (UUID id : session.alive) {
-                Player player = session.players.get(id);
-                if (player != null && player.isOnline() && !player.getInventory().contains(Material.ARROW, 4)) {
-                    player.getInventory().addItem(new ItemStack(Material.ARROW, 4));
-                }
-            }
-        }
+        if (session.type == ArcadePortGame.TURF_WARS) updateTurfWars(session, now);
          updateTitles(session);
         checkRoundEnd(session);
     }
@@ -8922,7 +9045,9 @@ public final class ArcadePortManager implements Listener {
                 ItemStack heldWeapon = attacker.getInventory().getItemInMainHand();
                 boolean ironSword = "melee".equals(source) && heldWeapon != null
                         && heldWeapon.getType() == Material.IRON_SWORD;
-                double damage = ArcadePortRules.turfWarsHitDamage(!"melee".equals(source), ironSword);
+                String kit = session.turfWarsKits.getOrDefault(attacker.getUniqueId(), "marksman");
+                double damage = ArcadePortRules.turfWarsHitDamage(
+                        kit, !"melee".equals(source), ironSword);
                 applyTurfWarsHit(session, attacker, target, damage);
                 break;
             }
@@ -9125,6 +9250,9 @@ public final class ArcadePortManager implements Listener {
             projectile.remove();
         } else if (session.type == ArcadePortGame.TURF_WARS) {
             handlePlayerHit(session, shooter, target, "projectile hit");
+            session.turfTrackedArrows.remove(projectile.getUniqueId());
+            session.entities.remove(projectile);
+            projectile.remove();
         } else if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
             UUID targetId = target.getUniqueId();
             tryQuiverRebound(session, projectile, shooter, target);
@@ -11755,9 +11883,27 @@ public final class ArcadePortManager implements Listener {
             if (!event.isCancelled()) session.gladiatorUsedBow.add(player.getUniqueId());
             return;
         }
-        if (session.type != ArcadePortGame.TURF_WARS || session.turfCombat) return;
-        event.setCancelled(true);
-        player.sendMessage(ChatColor.YELLOW + "You cannot shoot during build time.");
+        if (session.type != ArcadePortGame.TURF_WARS) return;
+        if (!session.turfCombat) {
+            event.setCancelled(true);
+            player.sendMessage(ChatColor.YELLOW + "You cannot attack during Build Time!");
+            player.updateInventory();
+            return;
+        }
+        if (event.isCancelled() || !(event.getProjectile() instanceof Arrow arrow)) return;
+        session.entities.add(arrow);
+        session.turfTrackedArrows.add(arrow.getUniqueId());
+        UUID id = player.getUniqueId();
+        if ("shredder".equals(session.turfWarsKits.getOrDefault(id, "marksman"))
+                && session.turfBarrageCharges.containsKey(id)) {
+            int charge = session.turfBarrageCharges.getOrDefault(id, 0);
+            session.turfBarrageCharges.remove(id);
+            session.turfBarrageNextChargeAt.remove(id);
+            if (charge > 0) {
+                session.turfBarrageRemaining.put(id, charge);
+                session.turfBarrageFiring.add(id);
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -11817,6 +11963,30 @@ public final class ArcadePortManager implements Listener {
     public void onProjectileHit(ProjectileHitEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+
+        if (session.type == ArcadePortGame.TURF_WARS
+                && event.getEntity() instanceof Arrow turfArrow
+                && session.turfTrackedArrows.remove(turfArrow.getUniqueId())) {
+            if (event.getHitBlock() != null && isTurfWarsWool(event.getHitBlock().getType())) {
+                Block wool = event.getHitBlock();
+                Material woolType = wool.getType();
+                wool.setType(Material.AIR, false);
+                if (turfArrow.getShooter() instanceof Player shooter) {
+                    shooter.playSound(shooter.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 0.7F, 1.5F);
+                    String base = "local-stats." + shooter.getUniqueId() + ".turf-wars.";
+                    plugin.getConfig().set(base + "blocks-broken",
+                            plugin.getConfig().getInt(base + "blocks-broken", 0) + 1);
+                    if ("shredder".equals(session.turfWarsKits.getOrDefault(shooter.getUniqueId(), "marksman"))) {
+                        plugin.getConfig().set(base + "blocks-shredded",
+                                plugin.getConfig().getInt(base + "blocks-shredded", 0) + 1);
+                    }
+                }
+                session.world.playEffect(wool.getLocation(), Effect.STEP_SOUND, woolType);
+            }
+            session.entities.remove(turfArrow);
+            turfArrow.remove();
+            return;
+        }
 
         if (session.type == ArcadePortGame.DEATH_TAG
                 && event.getEntity() instanceof Arrow deathTagArrow
@@ -12050,6 +12220,46 @@ public final class ArcadePortManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onTurfWarsFoodLevelChange(FoodLevelChangeEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.TURF_WARS
+                && event.getEntity() instanceof Player player
+                && session.players.containsKey(player.getUniqueId())) {
+            event.setFoodLevel(20);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onTurfWarsFallDamage(EntityDamageEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.TURF_WARS
+                && event.getEntity() instanceof Player player
+                && session.players.containsKey(player.getUniqueId())
+                && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onTurfWarsItemPickup(EntityPickupItemEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.TURF_WARS
+                && event.getEntity() instanceof Player player
+                && session.players.containsKey(player.getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onTurfWarsWoolItemSpawn(ItemSpawnEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.TURF_WARS
+                && isTurfWarsWool(event.getEntity().getItemStack().getType())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onPlayerInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
@@ -12221,6 +12431,11 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (!session.alive.contains(player.getUniqueId())) return;
+        if (session.type == ArcadePortGame.TURF_WARS
+                && event.getAction().isRightClick() && item == Material.BOW
+                && "shredder".equals(session.turfWarsKits.getOrDefault(player.getUniqueId(), "marksman"))) {
+            startTurfWarsBarrage(session, player);
+        }
         if (session.type == ArcadePortGame.BACON_BRAWL && isBaconMeterItem(heldItem)) {
             event.setCancelled(true);
             return;
@@ -12619,11 +12834,22 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.TURF_WARS && session.alive.contains(event.getPlayer().getUniqueId())) {
             int team = session.teams.getOrDefault(event.getPlayer().getUniqueId(), -1);
-            Material ownWool = team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL;
-            if ((team == 0 || team == 1) && event.getBlock().getType() == ownWool) {
-                event.setDropItems(false);
-                event.setExpToDrop(0);
-                return;
+            Material broken = event.getBlock().getType();
+            if (isTurfWarsWool(broken)) {
+                if ((team == 0 && broken == Material.BLUE_WOOL)
+                        || (team == 1 && broken == Material.RED_WOOL)) {
+                    event.setCancelled(true);
+                    return;
+                }
+                if ((team == 0 && broken == Material.RED_WOOL)
+                        || (team == 1 && broken == Material.BLUE_WOOL)) {
+                    event.setDropItems(false);
+                    event.setExpToDrop(0);
+                    String base = "local-stats." + event.getPlayer().getUniqueId() + ".turf-wars.";
+                    plugin.getConfig().set(base + "blocks-broken",
+                            plugin.getConfig().getInt(base + "blocks-broken", 0) + 1);
+                    return;
+                }
             }
         }
         event.setCancelled(true);
@@ -12699,36 +12925,38 @@ public final class ArcadePortManager implements Listener {
             int team = session.teams.getOrDefault(player.getUniqueId(), -1);
             Material ownWool = team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL;
             Material ownTurf = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
-            if (session.turfCombat || !session.alive.contains(player.getUniqueId())
-                    || (team != 0 && team != 1) || event.getBlockPlaced().getType() != ownWool) {
-                event.setCancelled(true);
-                return;
-            }
             Block placed = event.getBlockPlaced();
-            if (!ArcadePortRules.isTurfWarsBuildWithinBounds(placed.getX(), placed.getZ(),
-                    session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive,
-                    session.turfMinZ, session.turfMaxZExclusive)) {
-                event.setCancelled(true);
-                player.sendMessage(ChatColor.YELLOW + "You must build inside the original arena.");
-                return;
-            }
-            int x = placed.getX();
-            if (!ArcadePortRules.canTurfWarsBuildOnTerritory(team, x, session.turfFrontlineX)) {
-                event.setCancelled(true);
-                player.sendMessage(ChatColor.YELLOW + "You can only build on your team's turf.");
-                return;
-            }
-            boolean aboveOwnTurf = false;
-            for (int i = 1; i <= 5; i++) {
-                Material below = event.getBlockPlaced().getRelative(0, -i, 0).getType();
-                if (below == ownTurf || below == ownWool) {
-                    aboveOwnTurf = true;
-                    break;
+            boolean allowed = !session.turfCombat && session.alive.contains(player.getUniqueId())
+                    && (team == 0 || team == 1) && placed.getType() == ownWool
+                    && ArcadePortRules.isTurfWarsBuildWithinBounds(placed.getX(), placed.getZ(),
+                            session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive,
+                            session.turfMinZ, session.turfMaxZExclusive);
+            if (allowed) {
+                Block ground = placed.getRelative(BlockFace.DOWN);
+                while (ground.getY() > Math.max(0, session.world.getMinHeight())
+                        && ground.getType() == Material.AIR) {
+                    ground = ground.getRelative(BlockFace.DOWN);
                 }
+                boolean onOwnTerritory = ground.getType() == ownTurf || ground.getType() == ownWool;
+                boolean aboveClay = false;
+                for (int y = 1; y <= 5; y++) {
+                    Material below = placed.getRelative(0, -y, 0).getType();
+                    if (below == Material.RED_TERRACOTTA || below == Material.BLUE_TERRACOTTA) {
+                        aboveClay = true;
+                        break;
+                    }
+                }
+                allowed = onOwnTerritory && aboveClay;
             }
-            if (!aboveOwnTurf) {
+            if (!allowed) {
                 event.setCancelled(true);
-                player.sendMessage(ChatColor.YELLOW + "Build no more than five blocks above your team's turf.");
+                player.sendMessage(ChatColor.YELLOW + "You can only build on your own coloured turf, within five blocks of the clay.");
+            } else {
+                event.setDropItems(false);
+                event.setExpToDrop(0);
+                String base = "local-stats." + player.getUniqueId() + ".turf-wars.";
+                plugin.getConfig().set(base + "blocks-placed",
+                        plugin.getConfig().getInt(base + "blocks-placed", 0) + 1);
             }
             return;
         }
@@ -14418,6 +14646,13 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> spleefLastHungerGainAt = new HashMap<>();
         final Map<UUID, Long> spleefNextArrowAt = new HashMap<>();
         final Map<UUID, String> turfWarsKits = new HashMap<>();
+        final Map<UUID, Long> turfConstructorNextAt = new HashMap<>();
+        final Map<UUID, Long> turfArrowNextAt = new HashMap<>();
+        final Map<UUID, Integer> turfBarrageCharges = new HashMap<>();
+        final Map<UUID, Long> turfBarrageNextChargeAt = new HashMap<>();
+        final Map<UUID, Integer> turfBarrageRemaining = new HashMap<>();
+        final Set<UUID> turfBarrageFiring = new HashSet<>();
+        final Set<UUID> turfTrackedArrows = new HashSet<>();
         final Map<UUID, String> microKits = new HashMap<>();
         final Map<UUID, Long> microNextArrowAt = new HashMap<>();
         final Set<UUID> microFletchedArrows = new HashSet<>();
