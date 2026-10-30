@@ -460,6 +460,19 @@ public final class ArcadePortRules {
     public static final long DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS = 8_000L;
     public static final long DRAGON_ESCAPE_LEAP_RECHARGE_MILLIS = 8_000L;
     public static final int DRAGON_ESCAPE_DISRUPTOR_ARM_TICKS = 40;
+
+    /** Reborn applies the 0.2 lift, caps Y, then adds a further 0.2 when grounded. */
+    public static double dragonEscapeLeapVerticalVelocity(double normalizedFacingY, boolean grounded) {
+        if (!Double.isFinite(normalizedFacingY)) normalizedFacingY = 0.0D;
+        double y = Math.min(1.0D, normalizedFacingY + 0.2D);
+        if (grounded) y += 0.2D;
+        return y;
+    }
+
+    /** Initial rank uses the current closest waypoint; later observations never move backwards. */
+    public static int dragonEscapeObservedWaypointBaseline(int previousObserved, int observed, boolean initialized) {
+        return initialized ? Math.max(previousObserved, observed) : observed;
+    }
     public static final double DRAGON_ESCAPE_DISRUPTOR_TRIGGER_RADIUS = 2.0D;
     public static final double DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y = 0.5D;
 

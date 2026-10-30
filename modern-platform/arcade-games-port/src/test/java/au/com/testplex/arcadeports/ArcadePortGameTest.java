@@ -1336,6 +1336,22 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.isDragonEscapeWarpGraceActive(2_000L, 1_000L));
     }
 
+    @Test void dragonEscapeLeapUsesSourceVelocityClampBeforeGroundBoostAndSourceItemCharges() {
+        assertEquals(0.4D, ArcadePortRules.dragonEscapeLeapVerticalVelocity(0.0D, true), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.dragonEscapeLeapVerticalVelocity(0.9D, false), 0.00001D);
+        assertEquals(1.2D, ArcadePortRules.dragonEscapeLeapVerticalVelocity(0.9D, true), 0.00001D);
+        assertEquals(-0.8D, ArcadePortRules.dragonEscapeLeapVerticalVelocity(-1.0D, false), 0.00001D);
+        assertEquals(4, ArcadePortRules.dragonEscapeLeapUses("jumper"));
+        assertEquals(3, ArcadePortRules.dragonEscapeLeapUses("disruptor"));
+        assertEquals(2, ArcadePortRules.dragonEscapeLeapUses("warper"));
+    }
+
+    @Test void dragonEscapeInitialWaypointRankUsesObservedWaypointWithoutFalseShortcut() {
+        assertEquals(4, ArcadePortRules.dragonEscapeObservedWaypointBaseline(0, 4, false));
+        assertEquals(5, ArcadePortRules.dragonEscapeObservedWaypointBaseline(4, 5, true));
+        assertEquals(4, ArcadePortRules.dragonEscapeObservedWaypointBaseline(4, 2, true));
+    }
+
     @Test void dragonEscapeDisruptorRechargesAtTheSourceEightSecondRate() {
         assertEquals(8_000L, ArcadePortRules.dragonEscapeNextTntChargeAt(0L));
         assertEquals(23_000L, ArcadePortRules.dragonEscapeNextTntChargeAt(15_000L));

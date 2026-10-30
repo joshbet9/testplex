@@ -1936,22 +1936,24 @@ public final class ArcadePortManager implements Listener {
                 // Reborn grants invisibility to every runner when their Dragon Escape kit is given.
                 player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,
                         Integer.MAX_VALUE, 0, false, false, false));
+                player.setExp(0.99F);
                 String kit = session.dragonEscapeKits.getOrDefault(id, "jumper");
                 int leaps = session.dragonEscapeLeapUsesRemaining.getOrDefault(id, ArcadePortRules.dragonEscapeLeapUses(kit));
                 if (!"digger".equals(kit)) {
                     player.getInventory().addItem(namedItem(Material.IRON_AXE, "Leap",
-                            "Right-click to leap forward (" + leaps + " uses remaining).", 1));
+                            "Right-click to leap forward (" + leaps + " uses remaining).", Math.max(1, leaps)));
                 }
                 if ("disruptor".equals(kit)) {
                     player.getInventory().addItem(namedItem(Material.TNT, "Mini Explosive",
-                            "Right-click to throw a trip mine. Recharges every 10 seconds.", 1));
+                            "Right-click to throw a trip mine. Recharges every 8 seconds.", 1));
                 } else if ("warper".equals(kit)) {
                     player.getInventory().addItem(namedItem(Material.ENDER_PEARL, "Warp",
-                            "Right-click to teleport to the nearest player ahead. One use."));
+                            "Right-click to warp to the next-ranked racer ahead. One use."));
                 } else if ("digger".equals(kit)) {
                     int digs = session.dragonEscapeDiggerUsesRemaining.getOrDefault(id, ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES);
                     player.getInventory().addItem(namedItem(Material.DIAMOND_PICKAXE, "Digger Pickaxe",
-                            "Left-click course blocks to recover and place as shortcuts (" + digs + " digs left)."));
+                            "Left-click course blocks to recover and place as shortcuts (" + digs + " digs left).",
+                            Math.max(1, digs)));
                 }
                 break;
             }
@@ -4176,12 +4178,11 @@ public final class ArcadePortManager implements Listener {
             player.getInventory().setItemInMainHand(null);
         } else {
             player.getInventory().setItemInMainHand(namedItem(Material.IRON_AXE, "Leap",
-                    "Right-click to leap forward (" + remaining + " uses remaining)."));
+                    "Right-click to leap forward (" + remaining + " uses remaining).", remaining));
         }
         Vector direction = player.getLocation().getDirection().normalize().multiply(1.0D);
-        direction.setY(direction.getY() + 0.2D);
-        if (player.isOnGround()) direction.setY(direction.getY() + 0.2D);
-        if (direction.getY() > 1.0D) direction.setY(1.0D);
+        direction.setY(ArcadePortRules.dragonEscapeLeapVerticalVelocity(
+                direction.getY(), player.isOnGround()));
         player.setVelocity(direction);
         player.setFallDistance(0.0F);
         player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 16,
@@ -4234,6 +4235,8 @@ public final class ArcadePortManager implements Listener {
             }
             scores.put(racer.getUniqueId(), progress * 10_000.0D - distance);
         }
+        ranked.removeIf(candidate -> !session.alive.contains(candidate.getUniqueId())
+                || !candidate.isOnline() || !scores.containsKey(candidate.getUniqueId()));
         ranked.sort((left, right) -> {
             int byScore = Double.compare(scores.get(right.getUniqueId()), scores.get(left.getUniqueId()));
             return byScore != 0 ? byScore : left.getName().compareToIgnoreCase(right.getName());
@@ -4247,7 +4250,10 @@ public final class ArcadePortManager implements Listener {
             UUID id = player.getUniqueId();
             int previousProgress = session.dragonEscapePlayerProgress.getOrDefault(id, 0);
             int observedIndex = getClosestDragonEscapeWaypointIndex(session, player.getLocation());
-            int previousObserved = session.dragonEscapeObservedWaypoint.getOrDefault(id, previousProgress);
+            Integer trackedObserved = session.dragonEscapeObservedWaypoint.get(id);
+            int previousObserved = ArcadePortRules.dragonEscapeObservedWaypointBaseline(
+                    trackedObserved == null ? previousProgress : trackedObserved, observedIndex,
+                    trackedObserved != null);
             int nextExpected = Math.min(session.dragonEscapeWaypoints.size() - 1,
                     Math.max(0, previousObserved + 1));
             double distanceToNext = player.getLocation().distance(session.dragonEscapeWaypoints.get(nextExpected));
@@ -4466,7 +4472,8 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().setItem(slot, null);
             } else {
                 player.getInventory().setItem(slot, namedItem(Material.DIAMOND_PICKAXE, "Digger Pickaxe",
-                        "Left-click course blocks to recover and place as shortcuts (" + remaining + " digs left)."));
+                        "Left-click course blocks to recover and place as shortcuts (" + remaining + " digs left).",
+                        remaining));
             }
             return;
         }
