@@ -140,7 +140,7 @@ jobs:
 
   deploy-modern-test-server:
     name: Deploy successful integration build to isolated Paper 26.3 VM
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' && (contains(join(github.event.head_commit.added, ','), 'modern-platform/') || contains(join(github.event.head_commit.modified, ','), 'modern-platform/') || contains(join(github.event.head_commit.removed, ','), 'modern-platform/')) }}
     needs: build-modern-arcade
     uses: ./.github/workflows/deploy-testplex-modern-hyperv.yml
     with:
