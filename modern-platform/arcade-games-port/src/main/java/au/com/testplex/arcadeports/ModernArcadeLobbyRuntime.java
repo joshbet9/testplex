@@ -278,6 +278,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     new KitChoice("spleef-snowballer", "Snowballer", Material.SNOWBALL),
                     new KitChoice("spleef-brawler", "Brawler", Material.IRON_SWORD),
                     new KitChoice("spleef-archer", "Archer", Material.BOW));
+            case SKY_WARS -> List.of(
+                    new KitChoice("ice", "Ice", Material.ICE),
+                    new KitChoice("fire", "Fire", Material.BLAZE_ROD),
+                    new KitChoice("air", "Air", Material.ENDER_EYE),
+                    new KitChoice("metal", "Metal", Material.COMPARATOR),
+                    new KitChoice("earth", "Earth", Material.DIRT));
             default -> List.of();
         };
     }
