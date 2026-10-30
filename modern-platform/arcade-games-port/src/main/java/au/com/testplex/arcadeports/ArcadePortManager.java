@@ -2033,11 +2033,17 @@ public final class ArcadePortManager implements Listener {
             }
         }
         long tagged = session.tagged.stream().filter(session.alive::contains).count();
-        boolean runnersHaveSpeed = ArcadePortRules.deathTagRunnersReceiveSpeed((int) tagged, session.alive.size());
+        boolean hadRunnerSpeed = session.deathTagRunnerSpeedUnlocked;
+        session.deathTagRunnerSpeedUnlocked = ArcadePortRules.deathTagRunnerSpeedUnlocked(
+                hadRunnerSpeed, (int) tagged, session.alive.size());
+        if (!hadRunnerSpeed && session.deathTagRunnerSpeedUnlocked) {
+            announce(session, ChatColor.GREEN + "" + ChatColor.BOLD + "Runners receive Speed I");
+        }
+        boolean runnersHaveSpeed = session.deathTagRunnerSpeedUnlocked;
         for (Player player : alivePlayers(session)) {
             if (session.tagged.contains(player.getUniqueId())) {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, 40, 4, false, false, true));
-                if (ArcadePortRules.deathTagChasersReceiveSpeed((int) tagged, session.alive.size())) {
+                if (!runnersHaveSpeed) {
                     player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 40, 0, false, false, true));
                 } else {
                     player.removePotionEffect(PotionEffectType.SPEED);
@@ -10998,6 +11004,7 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> tagged = new HashSet<>();
         final Set<UUID> alphaChasers = new HashSet<>();
         final Map<UUID, Mob> deathTagDisguises = new HashMap<>();
+        boolean deathTagRunnerSpeedUnlocked;
         Scoreboard deathTagScoreboard;
         Objective deathTagScoreboardObjective;
         Team deathTagRunnerScoreboardLine;
