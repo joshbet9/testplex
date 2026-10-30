@@ -528,12 +528,12 @@ jobs:
           done
 
           sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
-          # Only the catalogue plus the mechanics module whose allow-list currently enables Bacon Brawl.
-          # Do not load Monster Maze or Snake until their parity gates clear.
-          for jar in TestplexModernArcade.jar ArcadeMechanicsModern.jar; do
+          # Install the platform catalogue, Monster Maze (whose core feedback/nameplate features are in this port),
+          # and the Arcade mechanics module. Snake remains gated until its own parity checks clear.
+          for jar in TestplexModernArcade.jar MonsterMazeModern.jar ArcadeMechanicsModern.jar; do
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
           done
-          sudo -n rm -f "$SERVER_DIR/plugins/MonsterMazeModern.jar" "$SERVER_DIR/plugins/SnakeModern.jar"
+          sudo -n rm -f "$SERVER_DIR/plugins/SnakeModern.jar"
           sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/SHA256SUMS" "$SERVER_DIR/.testplex-plugin-sha256sums"
           printf '%s\n' "$BUILD_SHA" | sudo -n tee "$SERVER_DIR/.testplex-modern-deployed-build" >/dev/null
           printf '%s\n' "$paper_build" | sudo -n tee "$SERVER_DIR/.testplex-paper-build" >/dev/null
@@ -686,15 +686,20 @@ jobs:
             rollback
             exit 1
           fi
-          for plugin in TestplexModernArcade ArcadeMechanicsModern; do
+          for plugin in TestplexModernArcade MonsterMazeModern ArcadeMechanicsModern; do
             if ! sudo -n grep -Fq "$plugin" "$SERVER_DIR/logs/latest.log"; then
               echo "Expected plugin name $plugin not found in the modern server log." >&2
               rollback
               exit 1
             fi
           done
+          if ! sudo -n grep -Fq 'MonsterMazeStandalone enabled.' "$SERVER_DIR/logs/latest.log"; then
+            echo "MonsterMazeModern did not complete onEnable; rolling back the modern-only deployment." >&2
+            rollback
+            exit 1
+          fi
           sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR"
-          echo "Modern Paper 26.3 is ready with only Bacon Brawl enabled for in-game acceptance; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
+          echo "Modern Paper 26.3 is ready with Monster Maze and Bacon Brawl available for in-game acceptance; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "Legacy services were not stopped, restarted, or overwritten by this workflow."
           REMOTE_DEPLOY
 
