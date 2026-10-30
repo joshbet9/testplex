@@ -8,6 +8,7 @@ enabled-games:
   - dragons
   - paintball
   - runner
+  - skywars
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
