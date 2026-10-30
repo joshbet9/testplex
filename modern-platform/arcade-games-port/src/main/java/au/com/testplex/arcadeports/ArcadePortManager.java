@@ -78,6 +78,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -171,6 +172,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> microKitPreferences = new HashMap<>();
     private final Map<UUID, String> quiverKitPreferences = new HashMap<>();
     private final Map<UUID, String> runnerKitPreferences = new HashMap<>();
+    private final Map<UUID, String> sheepQuestKitPreferences = new HashMap<>();
     private final Map<UUID, String> gladiatorLobbyVotes = new HashMap<>();
     private final Map<UUID, String> dragonsKitPreferences = new HashMap<>();
     private final Map<UUID, String> dragonEscapeKitPreferences = new HashMap<>();
@@ -510,6 +512,7 @@ public final class ArcadePortManager implements Listener {
                 case PAINTBALL -> { selectPaintballKit(player, value); return; }
                 case DEATH_TAG -> { selectDeathTagRunnerKit(player, value); return; }
                 case RUNNER -> { selectRunnerKit(player, value); return; }
+                case SHEEP_QUEST -> { selectSheepQuestKit(player, value); return; }
                 case TURF_WARS -> { selectTurfWarsKit(player, value); return; }
                 default -> { }
             }
@@ -526,8 +529,38 @@ public final class ArcadePortManager implements Listener {
         else if (ArcadePortRules.normalizeDragonsKit(value) != null) selectDragonsKit(player, value);
         else if (ArcadePortRules.normalizeDragonEscapeKit(value) != null) selectDragonEscapeKit(player, value);
         else if (value.startsWith("runnerkit-")) selectRunnerKit(player, value);
+        else if (ArcadePortRules.normalizeSheepQuestKit(value) != null) selectSheepQuestKit(player, value);
         else if (ArcadePortRules.normalizeTurfWarsKit(value) != null) selectTurfWarsKit(player, value);
         else selectDeathTagRunnerKit(player, value);
+    }
+
+    public void selectSheepQuestKit(Player player, String requestedKit) {
+        if (player == null) return;
+        String kit = ArcadePortRules.normalizeSheepQuestKit(requestedKit);
+        if (kit == null) {
+            player.sendMessage(ChatColor.YELLOW + "Sheep Quest kits: Beserker, Archer, Brute.");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        sheepQuestKitPreferences.put(id, kit);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.SHEEP_QUEST
+                && session.players.containsKey(id) && session.alive.contains(id)) {
+            session.sheepQuestKits.put(id, kit);
+            long now = System.currentTimeMillis();
+            session.sheepBerserkerReadyAt.put(id, now);
+            session.sheepFletcherNextArrowAt.put(id, now);
+            session.sheepArcherCharge.remove(id);
+            session.sheepArcherLastChargeAt.remove(id);
+            session.sheepArcherVolleyRemaining.remove(id);
+            session.sheepArcherNextVolleyAt.remove(id);
+            player.setAllowFlight(false);
+            player.setFlying(false);
+            giveKit(session, player);
+            player.sendMessage(ChatColor.GREEN + "Sheep Quest kit changed to " + kit + ".");
+        } else {
+            player.sendMessage(ChatColor.GREEN + "Sheep Quest kit set to " + kit + " for your next test.");
+        }
     }
 
     public void selectBombLobbersKit(Player player, String requestedKit) {
@@ -1492,7 +1525,7 @@ public final class ArcadePortManager implements Listener {
             }
         }
         lastDragonHazard = now + 8_000L;
-        lastSheepSpawn = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
+        session.sheepNextSpawnAt = now + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
         if (type == ArcadePortGame.DRAGON_ESCAPE) spawnDragonEscapeDragon(session);
         SourceMapCatalog.MapData sourceMap = sourceMapData.get(type.id());
         String sourceMapName = sourceMap == null ? "" : sourceMap.mapName();
@@ -1535,6 +1568,17 @@ public final class ArcadePortManager implements Listener {
                 UUID playerId = player.getUniqueId();
                 session.spleefKits.put(playerId, spleefKitPreferences.getOrDefault(playerId, "snowballer"));
                 session.spleefNextArrowAt.put(playerId, now);
+            }
+            if (type == ArcadePortGame.SHEEP_QUEST) {
+                UUID playerId = player.getUniqueId();
+                String saved = plugin.getConfig().getString(
+                        "lobby-kit-preferences." + playerId + ".sheep-quest", "beserker");
+                String normalized = ArcadePortRules.normalizeSheepQuestKit(saved);
+                session.sheepQuestKits.put(playerId, sheepQuestKitPreferences.getOrDefault(
+                        playerId, normalized == null ? "beserker" : normalized));
+                session.sheepBerserkerReadyAt.put(playerId, now);
+                // Fletcher's first arrow is available immediately in the legacy kit.
+                session.sheepFletcherNextArrowAt.put(playerId, now);
             }
             if (type == ArcadePortGame.EVOLUTION) {
                 session.evolutionLevels.put(player.getUniqueId(), 0);
@@ -1624,6 +1668,7 @@ public final class ArcadePortManager implements Listener {
             player.setGameMode(type == ArcadePortGame.MASTER_BUILDERS ? GameMode.CREATIVE
                     : type == ArcadePortGame.BACON_BRAWL || type == ArcadePortGame.DEATH_TAG
                     || type == ArcadePortGame.DRAGONS || type == ArcadePortGame.DRAW_MY_THING
+                    || type == ArcadePortGame.SHEEP_QUEST
                     ? GameMode.ADVENTURE : GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
@@ -1722,6 +1767,8 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.SHEEP_QUEST) {
             for (int i = 0; i < ArcadePortRules.SHEEP_QUEST_INITIAL_SHEEP; i++) spawnSheep(session);
+            session.sheepNextSpawnAt = System.currentTimeMillis()
+                    + ArcadePortRules.SHEEP_QUEST_SPAWN_INTERVAL_MILLIS;
         }
         if (type == ArcadePortGame.DRAGONS) spawnTestDragons(session);
         if (type == ArcadePortGame.GLADIATORS && participants.size() > 1) {
@@ -3886,10 +3933,7 @@ public final class ArcadePortManager implements Listener {
                 break;
             }
             case SHEEP_QUEST:
-                player.getInventory().addItem(namedItem(Material.SADDLE, "Shepherd", "Hold to pick up sheep; carry them to your team's pen."));
-                player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
-                player.getInventory().addItem(new ItemStack(Material.BOW));
-                player.getInventory().addItem(new ItemStack(Material.ARROW, 8));
+                giveSheepQuestKit(session, player);
                 break;
             case SPLEEF: {
                 // The Reborn Spleef constructor enables Night Vision for the full round.
@@ -3921,6 +3965,55 @@ public final class ArcadePortManager implements Listener {
                 break;
             }
         }
+        player.updateInventory();
+    }
+
+    private ItemStack sheepQuestTeamArmorItem(int team, Material material) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta baseMeta = item.getItemMeta();
+        if (baseMeta instanceof LeatherArmorMeta meta) {
+            meta.setColor(sheepTeamDyeColor(team).getColor());
+            meta.setUnbreakable(true);
+            meta.setDisplayName(sheepTeamChatColor(team) + sheepTeamName(team) + " Team Armor");
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private void giveSheepQuestKit(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        int team = session.teams.getOrDefault(id, 0);
+        String kit = session.sheepQuestKits.getOrDefault(id, "beserker");
+        player.getInventory().clear();
+        player.getInventory().setArmorContents(new ItemStack[] {
+                sheepQuestTeamArmorItem(team, Material.LEATHER_BOOTS),
+                sheepQuestTeamArmorItem(team, Material.LEATHER_LEGGINGS),
+                sheepQuestTeamArmorItem(team, Material.LEATHER_CHESTPLATE),
+                sheepQuestTeamArmorItem(team, Material.LEATHER_HELMET)
+        });
+        player.getInventory().setItem(8, sheepQuestTeamArmorItem(team, Material.LEATHER_CHESTPLATE));
+        switch (kit) {
+            case "archer" -> {
+                player.getInventory().setItem(0, new ItemStack(Material.WOODEN_SWORD));
+                player.getInventory().setItem(1, new ItemStack(Material.BOW));
+                player.getInventory().setItem(2, namedItem(Material.SADDLE, "Hold This",
+                        "Hold to automatically pick up up to three sheep."));
+            }
+            case "brute" -> {
+                player.getInventory().setItem(0, new ItemStack(Material.IRON_SWORD));
+                player.getInventory().setItem(1, namedItem(Material.SADDLE, "Hold This",
+                        "Hold to pick up sheep and teammates. Drop an item to throw your passenger."));
+            }
+            default -> {
+                player.getInventory().setItem(0, namedItem(Material.IRON_AXE, "Beserker Jump",
+                        "Double-jump forward. Recharges while grounded every 8 seconds."));
+                player.getInventory().setItem(1, namedItem(Material.SADDLE, "Hold This",
+                        "Hold to automatically pick up up to three sheep."));
+            }
+        }
+        player.setExp(0.0F);
+        player.setAllowFlight(false);
+        player.setFlying(false);
         player.updateInventory();
     }
 
@@ -8022,7 +8115,7 @@ public final class ArcadePortManager implements Listener {
             double x = 0.0D, y = 0.0D, z = 0.0D;
             for (Location block : pen) {
                 x += block.getBlockX() + 0.5D;
-                y += block.getBlockY() + 1.0D;
+                y += block.getBlockY();
                 z += block.getBlockZ() + 0.5D;
             }
             return new Location(session.world, x / pen.size(), y / pen.size(), z / pen.size());
@@ -8081,6 +8174,7 @@ public final class ArcadePortManager implements Listener {
         }
         Location center = sheepQuestPenCenter(session, team);
         return Math.abs(location.getX() - center.getX()) <= 2.5D
+                && Math.abs(location.getY() - center.getY()) <= 0.75D
                 && Math.abs(location.getZ() - center.getZ()) <= 2.5D;
     }
 
@@ -14840,6 +14934,22 @@ public final class ArcadePortManager implements Listener {
         final Set<Sheep> sheep = new HashSet<>();
         final Map<Sheep, Integer> sheepOwners = new HashMap<>();
         final Map<Sheep, UUID> sheepCarriers = new LinkedHashMap<>();
+        final Map<Sheep, UUID> sheepHolders = new HashMap<>();
+        final Map<Sheep, Location> sheepHomes = new HashMap<>();
+        final Map<UUID, String> sheepQuestKits = new HashMap<>();
+        final Map<UUID, Long> sheepNextPickupAt = new HashMap<>();
+        final Map<UUID, Long> sheepBerserkerReadyAt = new HashMap<>();
+        final Map<UUID, Long> sheepFletcherNextArrowAt = new HashMap<>();
+        final Map<UUID, Integer> sheepArcherCharge = new HashMap<>();
+        final Map<UUID, Long> sheepArcherLastChargeAt = new HashMap<>();
+        final Map<UUID, Integer> sheepArcherVolleyRemaining = new HashMap<>();
+        final Map<UUID, Long> sheepArcherNextVolleyAt = new HashMap<>();
+        final Set<UUID> sheepArcherTrackedArrows = new HashSet<>();
+        final Map<UUID, UUID> sheepThrownBy = new HashMap<>();
+        final Map<UUID, Long> sheepThrownAt = new HashMap<>();
+        long sheepNextSpawnAt;
+        long sheepQuestNextOvertimeAnnouncementAt;
+        boolean sheepQuestOvertime;
         final Set<Entity> entities = new HashSet<>();
         final Map<UUID, UUID> bombOwners = new HashMap<>();
         final Map<UUID, Item> bombPowerupDrops = new HashMap<>();
