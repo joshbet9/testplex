@@ -107,7 +107,8 @@ public final class SnakeMapCatalog {
     }
 
     public static boolean install(JavaPlugin plugin, String resource) {
-        if (plugin == null || !isSnakeResource(resource) || plugin.getResource(resource) == null) {
+        if (plugin == null) return false;
+        if (!isSnakeResource(resource)) {
             plugin.getLogger().severe("Refusing to install an unbundled or non-Snake map resource: " + resource);
             return false;
         }
@@ -125,34 +126,35 @@ public final class SnakeMapCatalog {
         try {
             resetReservedWorld(container, root, staging);
             Files.createDirectories(staging);
-            try (InputStream input = plugin.getResource(resource);
-                 ZipInputStream zip = new ZipInputStream(input)) {
+            try (InputStream input = plugin.getResource(resource)) {
                 if (input == null) throw new IOException("Missing embedded map archive " + resource);
-                ZipEntry entry;
-                long extracted = 0L;
-                while ((entry = zip.getNextEntry()) != null) {
-                    Path output = staging.resolve(entry.getName()).normalize();
-                    if (!output.startsWith(staging) || output.equals(staging)) {
-                        throw new IOException("Unsafe path in Snake map archive: " + entry.getName());
-                    }
-                    if (entry.isDirectory()) {
-                        Files.createDirectories(output);
-                    } else {
-                        Path parent = output.getParent();
-                        if (parent != null) Files.createDirectories(parent);
-                        try (OutputStream stream = Files.newOutputStream(output)) {
-                            byte[] buffer = new byte[64 * 1024];
-                            int count;
-                            while ((count = zip.read(buffer)) != -1) {
-                                extracted += count;
-                                if (extracted > MAX_EXTRACTED_BYTES) {
-                                    throw new IOException("Snake map archive exceeds the extraction safety limit.");
+                try (ZipInputStream zip = new ZipInputStream(input)) {
+                    ZipEntry entry;
+                    long extracted = 0L;
+                    while ((entry = zip.getNextEntry()) != null) {
+                        Path output = staging.resolve(entry.getName()).normalize();
+                        if (!output.startsWith(staging) || output.equals(staging)) {
+                            throw new IOException("Unsafe path in Snake map archive: " + entry.getName());
+                        }
+                        if (entry.isDirectory()) {
+                            Files.createDirectories(output);
+                        } else {
+                            Path parent = output.getParent();
+                            if (parent != null) Files.createDirectories(parent);
+                            try (OutputStream stream = Files.newOutputStream(output)) {
+                                byte[] buffer = new byte[64 * 1024];
+                                int count;
+                                while ((count = zip.read(buffer)) != -1) {
+                                    extracted += count;
+                                    if (extracted > MAX_EXTRACTED_BYTES) {
+                                        throw new IOException("Snake map archive exceeds the extraction safety limit.");
+                                    }
+                                    stream.write(buffer, 0, count);
                                 }
-                                stream.write(buffer, 0, count);
                             }
                         }
+                        zip.closeEntry();
                     }
-                    zip.closeEntry();
                 }
             }
 
