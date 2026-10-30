@@ -45,7 +45,7 @@ jobs:
       - name: Build Snake 26.3 port and run mechanics-rule tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/snake-port/pom.xml clean verify
 
-      - name: Build the other 16 Arcade mechanics prototypes
+      - name: Build Arcade mechanics and the integrated Monster Maze module
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
 
       - name: Verify modern plugin metadata and packaged classes
@@ -74,6 +74,7 @@ jobs:
           jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/game/GameManager.class"
           jar tf "$arcade_jar" | grep -Fxq "monster-maze/maps.yml"
           jar tf "$arcade_jar" | grep -Fxq "monster-maze/config.yml"
+          ! jar tf "$arcade_jar" | grep -Fxq "monster-maze/plugin.yml"
           ! jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/MonsterMazeStandalonePlugin.class"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "name: ArcadeMechanicsModern"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
@@ -83,7 +84,7 @@ jobs:
             grep -Fxq "  - $candidate" <<< "$arcade_config"
           done
           ! grep -Eq "^  - (death-tag|evolution|micro-battles|one-in-the-quiver|sheep-quest|turf-wars)$" <<< "$arcade_config"
-          echo "All four modern Paper 26.3 plugin artifacts verified; Draw My Thing includes its no-resource-pack Stadium map, and all ten enabled Arcade candidates are present."
+          echo "All three modern Paper 26.3 Bukkit plugins verified; Draw My Thing includes its no-resource-pack Stadium map, and all ten enabled Arcade candidates are present."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
