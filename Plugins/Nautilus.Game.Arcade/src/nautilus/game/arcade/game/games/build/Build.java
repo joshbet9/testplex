@@ -382,7 +382,57 @@ public class Build extends Game
 		//Game
 		if (_buildGameState == 0)
 		{
-			if (_countdownTimerState == 0 && UtilTime.elapsed(GetStateTime(), 60000))
+			if (_buildTime < 300000)
+			{
+				long remainingTime = Math.max(0L, _buildTime - (System.currentTimeMillis() - GetStateTime()));
+
+				if (_countdownTimerState == 0 && remainingTime <= 120000)
+				{
+					UtilTextMiddle.display(null, C.cYellow + "2 Minutes Remaining", 0, 60, 5);
+					_countdownTimerState++;
+				}
+				else if (_countdownTimerState == 1 && remainingTime <= 60000)
+				{
+					UtilTextMiddle.display(null, C.cYellow + "1 Minute Remaining", 0, 60, 5);
+					_countdownTimerState++;
+				}
+				else if (_countdownTimerState == 2 && remainingTime <= 30000)
+				{
+					UtilTextMiddle.display(null, C.cYellow + "30 Seconds Remaining", 0, 60, 5);
+					_countdownTimerState++;
+				}
+				else if (_countdownTimerState == 3 && remainingTime <= 15000)
+				{
+					UtilTextMiddle.display(null, C.cYellow + "15 Seconds Remaining", 0, 60, 5);
+					_countdownTimerState++;
+				}
+				else if (_countdownTimerState == 4 && remainingTime <= 5000)
+				{
+					UtilTextMiddle.display(null, C.cYellow + "5 Seconds Remaining", 0, 60, 5);
+					_countdownTimerState++;
+				}
+				else if (_countdownTimerState == 5 && remainingTime <= 4000)
+				{
+					UtilTextMiddle.display(null, C.cYellow + "4 Seconds Remaining", 0, 60, 5);
+					_countdownTimerState++;
+				}
+				else if (_countdownTimerState == 6 && remainingTime <= 3000)
+				{
+					UtilTextMiddle.display(null, C.cYellow + "3 Seconds Remaining", 0, 60, 5);
+					_countdownTimerState++;
+				}
+				else if (_countdownTimerState == 7 && remainingTime <= 2000)
+				{
+					UtilTextMiddle.display(null, C.cYellow + "2 Seconds Remaining", 0, 60, 5);
+					_countdownTimerState++;
+				}
+				else if (_countdownTimerState == 8 && remainingTime <= 1000)
+				{
+					UtilTextMiddle.display(null, C.cYellow + "1 Second Remaining", 0, 60, 5);
+					_countdownTimerState++;
+				}
+			}
+			else if (_countdownTimerState == 0 && UtilTime.elapsed(GetStateTime(), 60000))
 			{
 				UtilTextMiddle.display(null, C.cYellow + "4 Minutes Remaining", 0, 60, 5);
 				_countdownTimerState++;
