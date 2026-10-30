@@ -10102,6 +10102,27 @@ public final class ArcadePortManager implements Listener {
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
         session.alive.remove(id);
+        if (session.type == ArcadePortGame.EVOLUTION) {
+            // A player can disconnect during the public evolution animation. Remove its
+            // floating egg immediately and discard per-player round state instead of
+            // leaving an orphaned display or stale assist contribution behind.
+            cleanupEvolutionEggEffect(session, id);
+            session.evolutionLevels.remove(id);
+            session.evolutionLifeKills.remove(id);
+            session.evolutionKillsSinceEvolution.remove(id);
+            session.evolutionAvailable.remove(id);
+            session.evolutionCharge.remove(id);
+            session.evolving.remove(id);
+            session.evolutionLockedLocations.remove(id);
+            session.evolutionWaterMessageAt.remove(id);
+            session.evolutionPityUntil.remove(id);
+            session.evolutionKillsAtAttempt.remove(id);
+            session.evolutionOverkillEligible.remove(id);
+            session.evolutionDamageContributors.remove(id);
+            for (Map<UUID, Long> contributors : session.evolutionDamageContributors.values()) {
+                contributors.remove(id);
+            }
+        }
         if (session.type == ArcadePortGame.BOMB_LOBBERS) updateBombLobbersMvpEligibility(session);
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             session.baconBrutusUntil.remove(id);
