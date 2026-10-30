@@ -12952,8 +12952,6 @@ public final class ArcadePortManager implements Listener {
                 event.setCancelled(true);
                 player.sendMessage(ChatColor.YELLOW + "You can only build on your own coloured turf, within five blocks of the clay.");
             } else {
-                event.setDropItems(false);
-                event.setExpToDrop(0);
                 String base = "local-stats." + player.getUniqueId() + ".turf-wars.";
                 plugin.getConfig().set(base + "blocks-placed",
                         plugin.getConfig().getInt(base + "blocks-placed", 0) + 1);
