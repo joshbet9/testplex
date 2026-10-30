@@ -85,9 +85,19 @@ jobs:
           jar tf "$arcade_jar" | grep -Fxq "monster-maze/config.yml"
           ! jar tf "$arcade_jar" | grep -Fxq "monster-maze/plugin.yml"
           ! jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/MonsterMazeStandalonePlugin.class"
+          ! jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/game/LobbyListener.class"
+          ! jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/world/VoidWorldManager.class"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "name: ArcadeMechanicsModern"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
+          ! unzip -p "$arcade_jar" plugin.yml | grep -Eq '^  games:'
           jar tf "$arcade_jar" | grep -Fxq "source-maps/Draw My Thing/Draw_Stadium.zip"
+
+          # Guard the deployment path against the real standalone source artifact name.
+          deploy_workflow=".github/workflows/deploy-testplex-modern-hyperv.yml"
+          grep -Fq 'plugins/MonsterMazeStandalone' "$deploy_workflow"
+          grep -Fq 'MonsterMazeStandalone' "$deploy_workflow"
+          grep -Fq 'me.monstermaze.MonsterMazePlugin' "$deploy_workflow"
+          grep -Fq 'retired-monster-maze-plugins' "$deploy_workflow"
           arcade_config="$(unzip -p "$arcade_jar" config.yml)"
           enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config" | paste -sd, -)"
           [[ "$enabled_ids" == "death-tag,one-in-the-quiver" ]] || {
@@ -96,7 +106,7 @@ jobs:
           }
           snake_config="$(unzip -p "$snake_jar" config.yml)"
           grep -Fxq "enabled: false" <<< "$snake_config"
-          echo "All three modern Paper 26.3 Bukkit plugins verified; 21 Arcade catalogue games are packaged, only Death Tag and One in the Quiver are enabled, and Snake remains gated."
+          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 21 Arcade catalogue games are packaged, only Death Tag and One in the Quiver are enabled, and Snake remains gated."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
