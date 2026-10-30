@@ -17,7 +17,20 @@
 - `ArcadeMechanicsModern.jar`: first-pass, distinct mechanical loops for the other 14 games; separate generated arena per game. These are prototypes for rapid compatibility testing, not source-parity sign-off.
 - Gladiators now has the lobby rules vote, in-duel hotbar editing, parallel double-elimination brackets, per-duel combat timers, two requested achievements, Silky Seconds tracking and player-selectable kill messages. It is an isolated 26.3 acceptance candidate; keep its catalogue status in progress until multiplayer sign-off.
 - All 16 entries remain marked MECHANICS_IN_PROGRESS; passing CI means compile/unit tests only, not that player experience has been accepted in-game.
-- New cosmetic lines and unique win scenes are still deferred.
+- New cosmetic lines are being added game-by-game; Micro Battles now has personal middle-glass and shared border-particle colour lines. Unique win scenes for the remaining games are still deferred.
+
+
+## Micro Battles parity checkpoint
+
+The modern Micro Battles port now covers the Reborn source flow at code level: Archer / Worker / Fighter kits; the ten-second starting glass barrier; the four-second own-island restriction; team-coloured, protected armour and the slot-8 team badge; progressive map crumble; hunger floor; team-safe damage; projectile knockback; Fighter Iron Skin's fixed 0.5 damage reduction; block growth/flow prevention; sword-drop protection while allowing ordinary resource drops; and spectator tracking with opposing-team filtering, a player menu and a three-second teleport cooldown.
+
+The four-team timeout resolver compares surviving player counts first, then team kills; a complete tie is a draw. Annihilation uses the source eight-kill threshold, and Last Two fires when exactly two teams remain alive. Both are recorded as local Testplex acceptance achievements/missions because the isolated modern server does not connect to Mineplex's production achievement and mission services.
+
+Micro Battles has two independent 16-colour cosmetic lines:
+- **Middle Glass Colour** changes the starting glass only for its owner through per-viewer block updates.
+- **Border Particle Colour** renders shared dust particles at three heights, every four ticks, while living players are within three blocks of the nearest border face. A shared floating **⚠ BORDER** label follows nearby players and clears on leaving the warning range, elimination, disconnect or round end.
+
+Still required before sign-off: build/test on the current platform branch, deploy to the isolated server, and live multi-client checks for personal glass isolation, shared border visibility, spectator controls, team match flow, reconnect handling and cleanup. Production Mineplex mission / chat-stat backends are intentionally not represented as connected; this port remains MECHANICS_IN_PROGRESS until live acceptance is complete.
 
 ## In-game acceptance
 
