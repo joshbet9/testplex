@@ -154,6 +154,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> runnerKitPreferences = new HashMap<>();
     private final Map<UUID, String> dragonsKitPreferences = new HashMap<>();
     private final Map<UUID, String> dragonEscapeKitPreferences = new HashMap<>();
+    private final Map<UUID, String> skyWarsKitPreferences = new HashMap<>();
     /** Packet-thread-safe entity-ID lookup for the optional Bacon client hit bridge. */
     private final Map<Integer, UUID> baconAvatarOwnersByEntityId = new ConcurrentHashMap<>();
     private Object baconAvatarPacketBridge;
@@ -480,6 +481,7 @@ public final class ArcadePortManager implements Listener {
                 case PAINTBALL -> { selectPaintballKit(player, value); return; }
                 case DEATH_TAG -> { selectDeathTagRunnerKit(player, value); return; }
                 case RUNNER -> { selectRunnerKit(player, value); return; }
+                case SKY_WARS -> { selectSkyWarsKit(player, value); return; }
                 default -> { }
             }
         }
@@ -495,7 +497,27 @@ public final class ArcadePortManager implements Listener {
         else if (ArcadePortRules.normalizeDragonsKit(value) != null) selectDragonsKit(player, value);
         else if (ArcadePortRules.normalizeDragonEscapeKit(value) != null) selectDragonEscapeKit(player, value);
         else if (value.startsWith("runnerkit-")) selectRunnerKit(player, value);
+        else if (Set.of("ice", "fire", "air", "metal", "earth").contains(value)) selectSkyWarsKit(player, value);
         else selectDeathTagRunnerKit(player, value);
+    }
+
+    public void selectSkyWarsKit(Player player, String requestedKit) {
+        if (player == null || requestedKit == null) return;
+        String kit = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (!Set.of("ice", "fire", "air", "metal", "earth").contains(kit)) {
+            player.sendMessage(ChatColor.YELLOW + "SkyWars kits: ice, fire, air, metal, earth.");
+            return;
+        }
+        skyWarsKitPreferences.put(player.getUniqueId(), kit);
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.SKY_WARS
+                && session.players.containsKey(player.getUniqueId())
+                && session.alive.contains(player.getUniqueId())) {
+            session.skyWarsKits.put(player.getUniqueId(), kit);
+            session.skyWarsKitReadyAt.remove(player.getUniqueId());
+            giveKit(session, player);
+        }
+        player.sendMessage(ChatColor.GREEN + "SkyWars kit set to " + kit + ".");
     }
 
     public void selectBombLobbersKit(Player player, String requestedKit) {
@@ -1262,6 +1284,13 @@ public final class ArcadePortManager implements Listener {
             }
             if (type == ArcadePortGame.ONE_IN_THE_QUIVER) {
                 session.quiverKits.put(player.getUniqueId(), quiverKitPreferences.getOrDefault(player.getUniqueId(), "leaper"));
+            }
+            if (type == ArcadePortGame.SKY_WARS) {
+                String selectedKit = skyWarsKitPreferences.getOrDefault(player.getUniqueId(), "ice");
+                session.skyWarsKits.put(player.getUniqueId(), selectedKit);
+                session.skyWarsKitReadyAt.put(player.getUniqueId(), 0L);
+                if ("air".equals(selectedKit)) session.skyWarsSafeLocations.put(player.getUniqueId(), spawn.clone());
+                if ("earth".equals(selectedKit)) session.skyWarsNextDirtAt.put(player.getUniqueId(), now + 20_000L);
             }
             if (type == ArcadePortGame.RUNNER) {
                 UUID playerId = player.getUniqueId();
@@ -2837,9 +2866,38 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().addItem(new ItemStack(Material.ARROW, 32));
                 giveTurfWarsWool(session, player);
                 break;
-            case SKY_WARS:
-                // SkyWars starts with no kit: all equipment is looted from the archived island chests.
+            case SKY_WARS: {
+                String kit = session.skyWarsKits.getOrDefault(player.getUniqueId(), "ice");
+                player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
+                switch (kit) {
+                    case "ice" -> player.getInventory().addItem(namedItem(Material.ICE,
+                            "Ice Bridge", "Right-click to rise and create a temporary ice bridge."));
+                    case "fire" -> {
+                        player.getInventory().addItem(namedItem(Material.BLAZE_ROD,
+                                "Fire Burst", "Right-click to ignite and damage nearby opponents."));
+                        player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE,
+                                Integer.MAX_VALUE, 0, false, false, false));
+                    }
+                    case "air" -> player.getInventory().addItem(namedItem(Material.ENDER_EYE,
+                            "Void Saver", "Right-click to teleport to your last safe grounded position."));
+                    case "metal" -> {
+                        player.getInventory().addItem(new ItemStack(Material.STONE_PICKAXE));
+                        player.getInventory().addItem(namedItem(Material.COMPARATOR,
+                                "Magnet", "Right-click to pull a metal-armoured opponent towards you."));
+                    }
+                    case "earth" -> {
+                        player.getInventory().addItem(new ItemStack(Material.WOODEN_SHOVEL));
+                        player.getInventory().setItem(2, namedItem(Material.DIRT, "Throwable Dirt",
+                                "Click to throw dirt and knock back an opponent."));
+                    }
+                    default -> { }
+                }
+                if ("air".equals(kit)) {
+                    player.setAllowFlight(false);
+                    player.setFlying(false);
+                }
                 break;
+            }
         }
         player.updateInventory();
     }
@@ -4147,6 +4205,11 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             return;
         }
+        if (event.getCause() == EntityDamageEvent.DamageCause.FALL
+                && "air".equals(session.skyWarsKits.getOrDefault(target.getUniqueId(), "ice"))) {
+            event.setCancelled(true);
+            return;
+        }
         event.setCancelled(true);
         double damage = event.getFinalDamage();
         if (!Double.isFinite(damage) || damage <= 0.0D) return;
@@ -4247,6 +4310,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.SKY_WARS) {
             updateSkyWarsGuardians(session);
+            updateSkyWarsKits(session, now);
             updateSkyWars(session, now);
         }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
@@ -13213,6 +13277,13 @@ public final class ArcadePortManager implements Listener {
         final Map<String, Integer> runnerMapPaletteCounts = new HashMap<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
         final int participantsAtStart;
+        final Map<UUID, String> skyWarsKits = new HashMap<>();
+        final Map<UUID, Long> skyWarsKitReadyAt = new HashMap<>();
+        final Map<UUID, Long> skyWarsNextDirtAt = new HashMap<>();
+        final Map<UUID, Location> skyWarsSafeLocations = new HashMap<>();
+        final Map<Block, Long> skyWarsIceBridgeExpiresAt = new HashMap<>();
+        final Map<Block, BlockData> skyWarsIceBridgeOriginals = new HashMap<>();
+        final Map<UUID, UUID> skyWarsDirtProjectiles = new HashMap<>();
         final Map<UUID, UUID> skyWarsLastDamager = new HashMap<>();
         final Map<UUID, Long> skyWarsLastDamagedAt = new HashMap<>();
         final Map<UUID, Long> skyWarsLastTntThrowAt = new HashMap<>();
