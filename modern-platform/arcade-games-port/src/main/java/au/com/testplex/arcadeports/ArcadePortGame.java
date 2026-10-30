@@ -17,6 +17,7 @@ public enum ArcadePortGame {
     RUNNER("runner", "Runner", Material.WHITE_CONCRETE),
     SHEEP_QUEST("sheep-quest", "Sheep Quest", Material.GRASS_BLOCK),
     SPLEEF("spleef", "Spleef", Material.SNOW_BLOCK),
+    SNEAKY_ASSASSINS("sneaky-assassins", "Sneaky Assassins", Material.EMERALD_BLOCK),
     TURF_WARS("turf-wars", "Turf Wars", Material.GREEN_WOOL);
 
     private final String id;
