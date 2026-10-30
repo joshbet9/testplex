@@ -2706,6 +2706,88 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private boolean isMicroTrackingCompass(ItemStack item) {
+        return item != null && item.getType() == Material.COMPASS && item.hasItemMeta()
+                && item.getItemMeta().hasDisplayName()
+                && "Tracking Compass".equals(ChatColor.stripColor(item.getItemMeta().getDisplayName()));
+    }
+
+    private void giveMicroTrackingCompass(Player player) {
+        if (player == null || !player.isOnline()) return;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (isMicroTrackingCompass(item)) return;
+        }
+        ItemStack compass = new ItemStack(Material.COMPASS);
+        ItemMeta meta = compass.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GREEN + "" + ChatColor.BOLD + "Tracking Compass");
+            meta.setLore(List.of(ChatColor.GRAY + "Left-click to teleport to the nearest opponent.",
+                    ChatColor.GRAY + "Right-click to choose an opponent."));
+            compass.setItemMeta(meta);
+        }
+        player.getInventory().addItem(compass);
+    }
+
+    private Player nearestMicroSpectateTarget(Session session, Player spectator) {
+        int spectatorTeam = session.teams.getOrDefault(spectator.getUniqueId(), -1);
+        return alivePlayers(session).stream()
+                .filter(target -> target.getUniqueId() != spectator.getUniqueId())
+                .filter(target -> session.teams.getOrDefault(target.getUniqueId(), -1) != spectatorTeam)
+                .min(java.util.Comparator.comparingDouble(target -> target.getLocation().distanceSquared(spectator.getLocation())))
+                .orElse(null);
+    }
+
+    private String microCompassMenuTitle() {
+        return ChatColor.DARK_GREEN + "Micro Battles Tracker";
+    }
+
+    private boolean isMicroCompassMenuTitle(String title) {
+        return microCompassMenuTitle().equals(title);
+    }
+
+    private void openMicroCompassMenu(Session session, Player spectator) {
+        if (active != session || session.type != ArcadePortGame.MICRO_BATTLES) return;
+        List<Player> targets = alivePlayers(session).stream()
+                .filter(target -> session.teams.getOrDefault(target.getUniqueId(), -1)
+                        != session.teams.getOrDefault(spectator.getUniqueId(), -1))
+                .sorted(java.util.Comparator.comparingDouble(
+                        target -> target.getLocation().distanceSquared(spectator.getLocation())))
+                .toList();
+        Inventory inventory = Bukkit.createInventory(null, 54, microCompassMenuTitle());
+        Map<Integer, UUID> slots = new HashMap<>();
+        int slot = 0;
+        for (Player target : targets) {
+            if (slot >= 54) break;
+            ItemStack head = new ItemStack(Material.PLAYER_HEAD);
+            if (head.getItemMeta() instanceof SkullMeta meta) {
+                meta.setOwningPlayer(target);
+                int team = session.teams.getOrDefault(target.getUniqueId(), -1);
+                meta.setDisplayName(microTeamChatColor(team) + target.getName());
+                meta.setLore(List.of(ChatColor.GRAY + "Team " + microTeamName(team),
+                        ChatColor.YELLOW + "Left-click: teleport",
+                        ChatColor.YELLOW + "Right-click: spectate"));
+                head.setItemMeta(meta);
+            }
+            inventory.setItem(slot, head);
+            slots.put(slot, target.getUniqueId());
+            slot++;
+        }
+        if (targets.isEmpty()) inventory.setItem(22, namedItem(Material.BARRIER,
+                "No opponents alive", "There are no opposing players to track."));
+        session.microCompassMenuTargets.put(spectator.getUniqueId(), slots);
+        spectator.openInventory(inventory);
+    }
+
+    private void updateMicroSpectatorCompass(Session session) {
+        if (active != session || session.ticks % 4 != 0) return;
+        for (Player player : session.players.values()) {
+            if (player == null || !player.isOnline() || session.alive.contains(player.getUniqueId())) continue;
+            giveMicroTrackingCompass(player);
+            Player target = nearestMicroSpectateTarget(session, player);
+            if (target != null) player.setCompassTarget(target.getLocation());
+        }
+    }
+
     private void enforceMicroBattlesHunger(Session session) {
         for (Player player : alivePlayers(session)) {
             int minimum = ArcadePortRules.microBattlesMinimumFoodLevel(player.getFoodLevel());
@@ -3080,6 +3162,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.GLADIATORS) updateGladiators(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             updateMicroBattlesBorderParticles(session);
+            updateMicroSpectatorCompass(session);
             enforceMicroBattlesHunger(session);
             updateMicroBattlesArrows(session, now);
             updateMicroCrumble(session, now);
@@ -9322,6 +9405,35 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
+        Session activeSession = active;
+        if (activeSession != null && activeSession.type == ArcadePortGame.MICRO_BATTLES
+                && isMicroCompassMenuTitle(event.getView().getTitle())) {
+            event.setCancelled(true);
+            if (!(event.getWhoClicked() instanceof Player spectator)) return;
+            int slot = event.getRawSlot();
+            if (slot < 0 || slot >= event.getView().getTopInventory().getSize()) return;
+            Map<Integer, UUID> targets = activeSession.microCompassMenuTargets.get(spectator.getUniqueId());
+            UUID targetId = targets == null ? null : targets.get(slot);
+            if (targetId == null) return;
+            Player target = activeSession.players.get(targetId);
+            activeSession.microCompassMenuTargets.remove(spectator.getUniqueId());
+            spectator.closeInventory();
+            if (target == null || !target.isOnline() || !activeSession.alive.contains(targetId)) {
+                spectator.sendMessage(ChatColor.YELLOW + "That opponent is no longer available.");
+                return;
+            }
+            if (event.isRightClick()) {
+                spectator.setSpectatorTarget(target);
+            } else {
+                long now = System.currentTimeMillis();
+                long readyAt = activeSession.microSpectateNextTeleportAt.getOrDefault(spectator.getUniqueId(), 0L);
+                if (now < readyAt) return;
+                spectator.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                activeSession.microSpectateNextTeleportAt.put(spectator.getUniqueId(), now + 3_000L);
+            }
+            spectator.setCompassTarget(target.getLocation());
+            return;
+        }
         if (event.getView().getTopInventory().getHolder() instanceof StatsMenuHolder holder) {
             event.setCancelled(true);
             if (!(event.getWhoClicked() instanceof Player player)
