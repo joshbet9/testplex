@@ -1846,7 +1846,12 @@ public final class ArcadePortManager implements Listener {
             disguise.teleport(player.getLocation());
         }
         disguise.setCustomName(ChatColor.RED + player.getName());
-        player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, 40, 0, false, false, false));
+        // Hide the real Player entity from every other viewer (including held equipment),
+        // while leaving the server-side Player available for combat and stat attribution.
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            if (!viewer.getUniqueId().equals(id)) viewer.hideEntity(plugin, player);
+        }
+        player.removePotionEffect(PotionEffectType.INVISIBILITY);
     }
 
     private void removeDeathTagDisguise(Session session, UUID playerId) {
@@ -1855,6 +1860,13 @@ public final class ArcadePortManager implements Listener {
         if (disguise != null) {
             session.entities.remove(disguise);
             if (disguise.isValid()) disguise.remove();
+        }
+        Player realPlayer = session.players.get(playerId);
+        if (realPlayer != null && realPlayer.isOnline()) {
+            for (Player viewer : Bukkit.getOnlinePlayers()) {
+                if (!viewer.getUniqueId().equals(playerId)) viewer.showEntity(plugin, realPlayer);
+            }
+            realPlayer.removePotionEffect(PotionEffectType.INVISIBILITY);
         }
     }
 
