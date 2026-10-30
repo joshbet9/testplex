@@ -10942,6 +10942,36 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             event.setCancelled(true);
+            if (session.type == ArcadePortGame.SPLEEF) {
+                if (event instanceof EntityDamageByEntityEvent spleefDamage) {
+                    Entity damager = spleefDamage.getDamager();
+                    if (damager instanceof Player attacker) {
+                        handlePlayerHit(session, attacker, target, "melee");
+                        return;
+                    }
+                    if (damager instanceof Projectile) {
+                        // PerkKnockback resolves player projectile hits in ProjectileHitEvent.
+                        return;
+                    }
+                }
+                if (event.getCause() == EntityDamageEvent.DamageCause.DROWNING) {
+                    // updateSourceWaterDamage applies Reborn's four-damage water tick.
+                    return;
+                }
+                if (event.getCause() == EntityDamageEvent.DamageCause.VOID) {
+                    eliminate(session, target, null, "fell into the void");
+                    return;
+                }
+                if (incomingDamage > 0.0D) {
+                    String cause = event.getCause().name().toLowerCase(java.util.Locale.ROOT).replace('_', ' ');
+                    if (target.getHealth() <= incomingDamage) {
+                        eliminate(session, target, null, cause);
+                    } else {
+                        target.setHealth(target.getHealth() - incomingDamage);
+                    }
+                }
+                return;
+            }
             if (session.type == ArcadePortGame.DRAGON_ESCAPE
                     && event instanceof EntityDamageByEntityEvent dragonEscapeDamage) {
                 Entity damager = dragonEscapeDamage.getDamager();
