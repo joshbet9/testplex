@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /**
  * Full game loop closer to original Mineplex Monster Maze.
@@ -95,6 +96,10 @@ public class GameManager implements Listener {
     private BukkitTask mainTask;
     private BukkitTask secondTask;
     private BukkitTask startingTask;   // runs the jump lock during STARTING (pre-glass fall)
+    private List<Player> pendingTestplexParticipants;
+    private Consumer<Player> testplexReturnToLobby;
+    private boolean testplexManagedRound;
+
 
     /** PERF: cached per-tick packet targets so we only send what actually changed. */
     private int liveTick;
@@ -205,6 +210,33 @@ public class GameManager implements Listener {
 
     // -------------------- Start / Stop --------------------
 
+/** Configure a round whose participants and return path are owned by Testplex Arcade. */
+public boolean startTestplexRound(List<Player> participants, Consumer<Player> returnToLobby) {
+    if (state != GameState.IDLE || participants == null || participants.isEmpty()) return false;
+    List<Player> selected = new ArrayList<>();
+    for (Player player : participants) {
+        if (player != null && player.isOnline() && !selected.contains(player)) selected.add(player);
+    }
+    if (selected.isEmpty()) return false;
+    this.pendingTestplexParticipants = selected;
+    this.testplexReturnToLobby = returnToLobby;
+    this.testplexManagedRound = true;
+    startGame();
+    if (state != GameState.STARTING && state != GameState.LIVE) {
+        this.pendingTestplexParticipants = null;
+        this.testplexReturnToLobby = null;
+        this.testplexManagedRound = false;
+        return false;
+    }
+    return true;
+}
+
+public void setTestplexReturnToLobby(Consumer<Player> returnToLobby) {
+    this.testplexReturnToLobby = returnToLobby;
+}
+
+public boolean isTestplexManagedRound() { return testplexManagedRound; }
+
 public void startGame() {
     startGame(null, -1);
 }
@@ -256,11 +288,17 @@ public void startGame(Location preferCenter, int requestedPattern) {
         stats.reset();
 
         // Freeze the participant list before generation so late entrants are not reset or counted.
-        final List<Player> startingPlayers = getArenaWorldPlayers();
+        final List<Player> startingPlayers = testplexManagedRound && pendingTestplexParticipants != null
+                ? new ArrayList<>(pendingTestplexParticipants) : getArenaWorldPlayers();
+        pendingTestplexParticipants = null;
         roundParticipants.clear();
         for (Player player : startingPlayers) {
             if (player != null && player.isOnline() && player.getGameMode() != GameMode.SPECTATOR) {
                 roundParticipants.add(player.getUniqueId());
+                if (testplexManagedRound) {
+                    player.closeInventory();
+                    player.teleport(center.clone().add(0.5D, 1.0D, 0.5D));
+                }
             }
         }
 
@@ -462,24 +500,31 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 p.showPlayer(target);
             }
 
-            Location lobby = getLobbySpawn();
-            if (lobby != null) {
-                p.teleport(lobby);
+            if (testplexManagedRound && testplexReturnToLobby != null) {
+                testplexReturnToLobby.accept(p);
+            } else {
+                Location lobby = getLobbySpawn();
+                if (lobby != null) p.teleport(lobby);
             }
         }
         alive.clear();
         spectators.clear();
         state = GameState.IDLE;
-        // Restore lobby kit NPCs
-        if (center != null) {
+        // Testplex owns the only player lobby. The standalone Monster Maze lobby
+        // remains available only for isolated module tests.
+        if (!testplexManagedRound && center != null) {
             kitManager.spawnSelectors(mazeGenerator.getLobbyCenter());
             refreshLeaderboardBoard();
+            for (Player p : arenaPlayers) kitManager.openSelector(p);
+            broadcast(ChatColor.GREEN + "Back in lobby. Pick a kit, then /mm start");
+        } else if (testplexManagedRound) {
             for (Player p : arenaPlayers) {
-                kitManager.openSelector(p);
+                if (p.isOnline()) p.sendMessage(ChatColor.GREEN + "Monster Maze finished. Returned to the Testplex Arcade lobby.");
             }
         }
-        broadcast(ChatColor.GREEN + "Back in lobby. Pick a kit, then /mm start");
         roundParticipants.clear();
+        testplexManagedRound = false;
+        testplexReturnToLobby = null;
     }
 
     /** Rebuild + redraw the lobby leaderboard hologram. Safe to call outside a live game. */
