@@ -1664,6 +1664,9 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.isDragonFlareActive(5_999L, 6_000L));
         assertFalse(ArcadePortRules.isDragonFlareActive(6_000L, 6_000L));
         assertEquals(6_000L, ArcadePortRules.DRAGONS_FLARE_DURATION_MILLIS);
+        assertEquals(3_000L, ArcadePortRules.DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
+        assertTrue(ArcadePortRules.canUseDragonSpectatorTeleport(3_000L, 3_000L));
+        assertFalse(ArcadePortRules.canUseDragonSpectatorTeleport(2_999L, 3_000L));
     }
 
     @Test void dragonEscapeHasAThreeDimensionalFinishWaypoint() {

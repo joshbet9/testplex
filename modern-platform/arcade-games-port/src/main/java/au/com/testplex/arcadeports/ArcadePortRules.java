@@ -371,6 +371,7 @@ public final class ArcadePortRules {
     public static final double DRAGONS_FLARE_RADIUS_SQUARED = DRAGONS_FLARE_RADIUS * DRAGONS_FLARE_RADIUS;
     public static final double DRAGONS_FLARE_VERTICAL_RANGE = 24.0D;
     public static final long DRAGONS_FLARE_DURATION_MILLIS = 6_000L;
+    public static final long DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS = 3_000L;
     public static final int DRAGONS_MARKSMAN_START_ARROWS = 1;
     public static final long DRAGONS_CONTACT_COOLDOWN_MILLIS = 2_000L;
     public static final long DRAGONS_SPARKLER_INTERVAL_MILLIS = 25_000L;
@@ -530,6 +531,10 @@ public final class ArcadePortRules {
 
     public static boolean isDragonFlareActive(long nowMillis, long expiresAtMillis) {
         return expiresAtMillis > nowMillis;
+    }
+
+    public static boolean canUseDragonSpectatorTeleport(long nowMillis, long nextAllowedMillis) {
+        return nowMillis >= nextAllowedMillis;
     }
 
     /** Horizontal radius is circular; the vertical limit prevents one flare protecting an entire tower. */
