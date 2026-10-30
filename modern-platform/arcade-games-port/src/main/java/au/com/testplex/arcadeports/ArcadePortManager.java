@@ -4336,10 +4336,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void spawnTestDragons(Session session) {
-        // Reborn starts its spawn loop during live play and adds at most one
-        // dragon every 500 ms until five are active. Do not flood the arena at
-        // round start; updateTestDragons() handles the source cadence and RED
-        // map spawn markers for every dragon.
+        // Reborn's SEC_05 update adds at most one dragon every five seconds.
+        // The first spawn is delayed until the first source update after round start.
         session.dragonNextSpawnAt = System.currentTimeMillis() + ArcadePortRules.DRAGONS_SPAWN_INTERVAL_MILLIS;
         announce(session, ChatColor.DARK_PURPLE
                 + "The dragons are hunting! Use your kit ability, and keep moving.");
@@ -4616,8 +4614,13 @@ public final class ArcadePortManager implements Listener {
 
         // Dragons is SoloGame: the original CompassPage uses one yellow Players
         // team header, followed by eight player heads per row.
-        int rows = Math.max(3, 2 + (targets.size() + 7) / 8);
-        int size = Math.min(54, rows * 9);
+        int slot = 19;
+        int lastSlot = 18;
+        for (int i = 0; i < targets.size(); i++) {
+            lastSlot = slot;
+            slot = (slot + 2) % 9 == 0 ? slot + 3 : slot + 1;
+        }
+        int size = Math.min(54, Math.max(27, ((lastSlot / 9) + 1) * 9));
         DragonCompassMenuHolder holder = new DragonCompassMenuHolder(spectator.getUniqueId());
         holder.inventory = Bukkit.createInventory(holder, size, "Spectator Menu");
         populateDragonsSpectatorMenu(session, spectator, holder);
@@ -4660,7 +4663,7 @@ public final class ArcadePortManager implements Listener {
             }
             holder.inventory.setItem(slot, head);
             holder.targetsBySlot.put(slot, target.getUniqueId());
-            if ((slot + 2) % 9 == 0) slot += 4;
+            if ((slot + 2) % 9 == 0) slot += 3;
             else slot++;
         }
         return !targets.isEmpty();
@@ -4674,24 +4677,17 @@ public final class ArcadePortManager implements Listener {
             if (!alive.isEmpty()) {
                 for (Player spectator : session.players.values()) {
                     if (spectator == null || !spectator.isOnline()
-                            || session.alive.contains(spectator.getUniqueId())
-                            || inventoryCount(spectator, Material.COMPASS) <= 0) continue;
+                            || session.alive.contains(spectator.getUniqueId())) continue;
+                    if (inventoryCount(spectator, Material.COMPASS) <= 0) {
+                        spectator.getInventory().addItem(namedItem(Material.COMPASS, "Tracking Compass",
+                                "Points to the nearest survivor. Left-click to teleport; right-click for the spectator menu."));
+                    }
                     Player target = alive.stream()
                             .min(java.util.Comparator.comparingDouble(p ->
                                     p.getLocation().distanceSquared(spectator.getLocation())))
                             .orElse(null);
                     if (target == null) continue;
                     spectator.setCompassTarget(target.getLocation());
-                    if (isDragonsTrackingCompass(spectator.getInventory().getItemInMainHand())) {
-                        double distance = Math.sqrt(spectator.getLocation().distanceSquared(target.getLocation()));
-                        double height = target.getLocation().getY() - spectator.getLocation().getY();
-                        spectator.sendActionBar(ChatColor.WHITE + "" + ChatColor.BOLD + "Nearest Target: "
-                                + ChatColor.YELLOW + target.getName() + "    "
-                                + ChatColor.WHITE + ChatColor.BOLD + "Distance: "
-                                + ChatColor.YELLOW + String.format(java.util.Locale.ROOT, "%.1f", distance)
-                                + "    " + ChatColor.WHITE + ChatColor.BOLD + "Height: "
-                                + ChatColor.YELLOW + String.format(java.util.Locale.ROOT, "%.1f", height));
-                    }
                 }
             }
         }
@@ -4734,7 +4730,6 @@ public final class ArcadePortManager implements Listener {
         Location current = player.getLocation();
         for (DragonFlareZone zone : session.dragonFlareZones) {
             if (!ArcadePortRules.isDragonFlareActive(now, zone.expiresAtMillis())) continue;
-            if (zone.ownerId().equals(playerId)) return true;
             Location center = zone.center();
             if (center.getWorld() != current.getWorld()) continue;
             double dx = current.getX() - center.getX();
@@ -6475,6 +6470,22 @@ public final class ArcadePortManager implements Listener {
         for (UUID id : session.players.keySet()) {
             Player p = session.players.get(id);
             if (!p.isOnline()) continue;
+            if (session.type == ArcadePortGame.DRAGONS
+                    && !session.alive.contains(id)
+                    && isDragonsTrackingCompass(p.getInventory().getItemInMainHand())) {
+                Player target = nearestDragonsSpectatorTarget(session, p);
+                if (target != null) {
+                    double distance = Math.sqrt(target.getLocation().distanceSquared(p.getLocation()));
+                    double height = target.getLocation().getY() - p.getLocation().getY();
+                    p.sendActionBar(ChatColor.WHITE + "" + ChatColor.BOLD + "Nearest Target: "
+                            + ChatColor.YELLOW + target.getName() + "    "
+                            + ChatColor.WHITE + ChatColor.BOLD + "Distance: "
+                            + ChatColor.YELLOW + String.format(java.util.Locale.ROOT, "%.1f", distance)
+                            + "    " + ChatColor.WHITE + ChatColor.BOLD + "Height: "
+                            + ChatColor.YELLOW + String.format(java.util.Locale.ROOT, "%.1f", height));
+                    continue;
+                }
+            }
             if (session.type == ArcadePortGame.BACON_BRAWL
                     && !session.alive.contains(id)
                     && isBaconTrackingCompass(p.getInventory().getItemInMainHand())) {
@@ -10174,7 +10185,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isDragonProtectedKitItem(ItemStack item) {
-        if (item == null || item.getType().isAir() || !item.hasItemMeta()) return false;
+        if (item == null || item.getType().isAir()) return false;
+        // PerkSparkler protects every emerald, not just stacks carrying its display name.
+        if (item.getType() == Material.EMERALD) return true;
+        if (!item.hasItemMeta()) return false;
         ItemMeta meta = item.getItemMeta();
         if (!meta.hasDisplayName()) return false;
         String name = ChatColor.stripColor(meta.getDisplayName());
