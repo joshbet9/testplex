@@ -80,3 +80,19 @@ The isolated Death Tag stats page now records lifetime local Kills, Deaths and K
 4. Fire each pellet style with Rifle, Shotgun, Machine Gun and Sniper. All players in the match world, including distant spectators and clients using reduced particle settings, must see the same team-coloured Colourburst, Paint Drip or Stencil Stamp trail. Verify pellet cosmetics do not alter projectile speed, spread, sniper charge/damage, paint-piece count or hit detection.
 5. Confirm Water Bomb revival/cleanse, team colours, elimination scoring, and round cleanup still work with each cosmetic selected. Change a cosmetic mid-round and verify the weapon finish refreshes and newly fired pellets use the new selection; already-fired pellets keep the style they were launched with.
 6. Restart the server and verify the one-line weapon/pellet selections persist independently for the player.
+
+## Runner — achievements and map-aware trail cosmetics
+
+The modern Runner port includes these local test achievements:
+
+| Achievement | Requirement |
+| --- | --- |
+| Gettin’ those steps in! | Walk over 400 horizontal blocks in one Runner game. |
+| Hop to it | Jump 100 times in one Runner game. |
+| Flash | Win a Runner game within 90 seconds. |
+
+Progress is tracked per player and per round. The walk counter accumulates horizontal movement while excluding teleports and implausible position corrections. The jump counter uses Paper's dedicated jump event. Achievement unlocks persist in the isolated mechanics config and appear on the Runner page of `/stats`.
+
+Runner's `/arcadecosmetics` entry now offers 15 non-red trail colours. At the start of a round, the mechanics port samples exposed course surfaces from the selected archived map palette. If a player's chosen colour is already present on that map, it selects an unused alternative; if every colour is represented, it chooses the least represented alternative. The selected trail is applied as actual world-block changes, so players and spectators all see the same colour rather than a client-only particle effect.
+
+Live acceptance still needs to check the three achievement thresholds, the 90-second win boundary, a second client observing another player's trail, and a colour clash on a map containing the requested trail colour.

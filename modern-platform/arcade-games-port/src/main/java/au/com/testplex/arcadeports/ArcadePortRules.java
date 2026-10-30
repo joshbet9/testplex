@@ -56,6 +56,62 @@ public final class ArcadePortRules {
     public static final int RUNNER_MAX_FROSTBALLS = 16;
     public static final int RUNNER_FROSTBALL_SLOW_TICKS = 40;
     public static final int RUNNER_FROSTBALL_SLOW_AMPLIFIER = 2;
+    public static final double RUNNER_STEPS_ACHIEVEMENT_BLOCKS = 400.0D;
+    public static final int RUNNER_HOP_ACHIEVEMENT_JUMPS = 100;
+    public static final long RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS = 90_000L;
+    private static final java.util.List<String> RUNNER_TRAIL_COLOURS = java.util.List.of(
+            "cyan", "white", "orange", "magenta", "light-blue", "yellow", "lime",
+            "pink", "gray", "light-gray", "purple", "blue", "brown", "green", "black");
+    /** Available non-red Runner trail colours, in deterministic fallback order. */
+    public static java.util.List<String> runnerTrailColours() {
+        return RUNNER_TRAIL_COLOURS;
+    }
+
+    /** Filter teleports and implausible position corrections out of the walk-distance counter. */
+    public static boolean shouldCountRunnerWalkSegment(double horizontalBlocks) {
+        return Double.isFinite(horizontalBlocks) && horizontalBlocks > 0.0D && horizontalBlocks <= 2.0D;
+    }
+
+    /** The source wording is "over 400", so the threshold is strictly greater than 400. */
+    public static boolean shouldAwardRunnerSteps(double walkedBlocks) {
+        return Double.isFinite(walkedBlocks) && walkedBlocks > RUNNER_STEPS_ACHIEVEMENT_BLOCKS;
+    }
+
+    public static boolean shouldAwardRunnerHopToIt(int jumps) {
+        return jumps >= RUNNER_HOP_ACHIEVEMENT_JUMPS;
+    }
+
+    public static boolean shouldAwardRunnerFlash(long elapsedMillis, boolean won) {
+        return won && elapsedMillis >= 0L && elapsedMillis <= RUNNER_FLASH_ACHIEVEMENT_MAX_WIN_MILLIS;
+    }
+
+    /**
+     * Avoid a trail colour already present on the selected map's exposed palette.
+     * Prefer the first unused alternative; if all choices occur, use the least
+     * represented alternative (excluding the requested colour).
+     */
+    public static String resolveRunnerTrailColour(
+            String requestedColour, java.util.Map<String, Integer> mapPaletteCounts) {
+        String requested = requestedColour == null ? "" : requestedColour.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace("trail-", "");
+        if (!RUNNER_TRAIL_COLOURS.contains(requested)) requested = "cyan";
+        if (mapPaletteCounts == null || Math.max(0, mapPaletteCounts.getOrDefault(requested, 0)) == 0) {
+            return requested;
+        }
+
+        String fallback = null;
+        int lowestUse = Integer.MAX_VALUE;
+        for (String candidate : RUNNER_TRAIL_COLOURS) {
+            if (candidate.equals(requested)) continue;
+            int use = Math.max(0, mapPaletteCounts.getOrDefault(candidate, 0));
+            if (use < lowestUse) {
+                fallback = candidate;
+                lowestUse = use;
+            }
+        }
+        return fallback == null ? "cyan" : fallback;
+    }
+
     /** Meter charge comes from the source damage value recorded for each successful hit. */
     public static final int BACON_BLAST_PROJECTILE_STACK_SIZE = 16;
     public static final int BACON_METER_MAX = 100;

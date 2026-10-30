@@ -1,5 +1,6 @@
 package au.com.testplex.arcadeports;
 
+import com.destroystokyo.paper.event.player.PlayerJumpEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.ChatColor;
@@ -966,6 +967,11 @@ public final class ArcadePortManager implements Listener {
         active = session;
         long now = System.currentTimeMillis();
         session.startedAt = now;
+        if (type == ArcadePortGame.RUNNER) {
+            session.runnerMapPaletteCounts.putAll(scanRunnerMapPalette(session));
+            plugin.getLogger().info("Runner exposed map palette scan found "
+                    + session.runnerMapPaletteCounts.size() + " colour families.");
+        }
         if (type == ArcadePortGame.BOMB_LOBBERS) {
             session.bombNextPowerupSpawnAt = now
                     + ArcadePortRules.BOMB_LOBBERS_POWERUP_FIRST_SPAWN_DELAY_MILLIS;
@@ -1132,6 +1138,17 @@ public final class ArcadePortManager implements Listener {
                 UUID playerId = player.getUniqueId();
                 session.runnerKits.put(playerId, runnerKitPreferences.getOrDefault(playerId, "leaper"));
                 session.runnerNextFrostBallAt.put(playerId, now + ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS);
+                String selectedTrail = runnerTrailCosmeticOption(playerId);
+                String requestedTrail = selectedTrail.startsWith("trail-")
+                        ? selectedTrail.substring("trail-".length()) : selectedTrail;
+                String resolvedTrail = ArcadePortRules.resolveRunnerTrailColour(
+                        requestedTrail, session.runnerMapPaletteCounts);
+                session.runnerTrailOptions.put(playerId, "trail-" + resolvedTrail);
+                if (!requestedTrail.equalsIgnoreCase(resolvedTrail)) {
+                    player.sendMessage(ChatColor.GRAY + "Your " + requestedTrail.replace('-', ' ')
+                            + " Runner trail clashes with this map's palette; "
+                            + resolvedTrail.replace('-', ' ') + " is used for this round.");
+                }
             }
             if (type == ArcadePortGame.DRAGONS) {
                 UUID playerId = player.getUniqueId();
@@ -7251,6 +7268,9 @@ public final class ArcadePortManager implements Listener {
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
         }
+        if (announceWinner && session.type == ArcadePortGame.RUNNER) {
+            recordRunnerAchievements(session, winner);
+        }
         active = null;
         if (session.tickTask != null) session.tickTask.cancel();
         if (announceWinner && session.type == ArcadePortGame.BACON_BRAWL && winner != null) {
@@ -7324,6 +7344,11 @@ public final class ArcadePortManager implements Listener {
         for (Block block : session.evolutionWebs.keySet()) if (block.getType() == Material.COBWEB) block.setType(Material.AIR, false);
         session.evolutionWebs.clear();
         session.runnerBlocks.clear();
+        session.runnerBlockMaterials.clear();
+        session.runnerWalkedBlocks.clear();
+        session.runnerJumpCounts.clear();
+        session.runnerTrailOptions.clear();
+        session.runnerMapPaletteCounts.clear();
         cleanupBaconDisguiseNameTags(session);
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             cleanupBaconPlayerVisibility(session);
@@ -7385,6 +7410,40 @@ public final class ArcadePortManager implements Listener {
         lobbyRuntime.returnBotsToLobby();
         if (session.type == ArcadePortGame.BACON_BRAWL) baconSourceSpawnOverrides = List.of();
         lobbyRuntime.refreshDisplays();
+    }
+
+    private String runnerAchievementKey(UUID playerId, String slug) {
+        return "test-achievements.runner." + playerId + "." + slug;
+    }
+
+    private void recordRunnerAchievements(Session session, Player winner) {
+        for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
+            UUID id = entry.getKey();
+            Player player = entry.getValue();
+            if (ArcadePortRules.shouldAwardRunnerSteps(session.runnerWalkedBlocks.getOrDefault(id, 0.0D))) {
+                awardRunnerAchievement(player, runnerAchievementKey(id, "gettin-those-steps-in"),
+                        "Gettin’ those steps in! — walked over 400 blocks in one Runner game.");
+            }
+            if (ArcadePortRules.shouldAwardRunnerHopToIt(session.runnerJumpCounts.getOrDefault(id, 0))) {
+                awardRunnerAchievement(player, runnerAchievementKey(id, "hop-to-it"),
+                        "Hop to it — jumped 100 times in one Runner game.");
+            }
+        }
+        long elapsed = Math.max(0L, System.currentTimeMillis() - session.startedAt);
+        if (winner != null && ArcadePortRules.shouldAwardRunnerFlash(elapsed, true)) {
+            UUID winnerId = winner.getUniqueId();
+            awardRunnerAchievement(winner, runnerAchievementKey(winnerId, "flash"),
+                    "Flash — won Runner within 1.5 minutes.");
+        }
+    }
+
+    private void awardRunnerAchievement(Player player, String key, String description) {
+        if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        if (player != null && player.isOnline()) {
+            player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
+        }
+        plugin.saveConfig();
     }
 
     /** Record local Bacon Brawl achievements in isolated test config, never production milestones. */
@@ -7912,6 +7971,24 @@ public final class ArcadePortManager implements Listener {
                         (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.displayName(),
                         lore, "noop", null, null));
             }
+        } else if ("runner".equals(gameId)) {
+            String[] slugs = {"gettin-those-steps-in", "hop-to-it", "flash"};
+            String[] names = {"Gettin’ those steps in!", "Hop to it", "Flash"};
+            String[] requirements = {
+                    "Walk over 400 blocks in one game.",
+                    "Jump 100 times in one game.",
+                    "Win a game within 1.5 minutes."
+            };
+            int[] achievementSlots = {10, 11, 12};
+            for (int i = 0; i < slugs.length; i++) {
+                boolean unlocked = plugin.getConfig().getBoolean(runnerAchievementKey(targetId, slugs[i]), false);
+                inventory.setItem(achievementSlots[i], statsItem(
+                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + names[i],
+                        List.of(" ", ChatColor.GRAY + requirements[i], " ",
+                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
+                        "noop", null, null));
+            }
         } else {
             int[] slots = {29, 30, 31, 32};
             int[] values = {played, wins, score, knockouts};
@@ -8025,6 +8102,12 @@ public final class ArcadePortManager implements Listener {
                     + "/" + BombLobbersAchievement.values().length);
             lore.add(ChatColor.GRAY + "TNT thrown: " + plugin.getConfig().getInt(path + "thrown", 0));
             lore.add(ChatColor.GRAY + "Direct hits: " + plugin.getConfig().getInt(path + "direct-hits", 0));
+        } else if ("runner".equals(gameId)) {
+            String[] slugs = {"gettin-those-steps-in", "hop-to-it", "flash"};
+            long unlocked = java.util.Arrays.stream(slugs)
+                    .filter(slug -> plugin.getConfig().getBoolean(runnerAchievementKey(targetId, slug), false))
+                    .count();
+            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/3");
         }
         if (!compact) lore.add(ChatColor.DARK_GRAY + "Stats recorded by the isolated test server.");
         else lore.add(ChatColor.RESET + "Click for more details!");
@@ -8179,6 +8262,18 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    @EventHandler(ignoreCancelled = true)
+    public void onRunnerJump(PlayerJumpEvent event) {
+        Session session = active;
+        Player player = event.getPlayer();
+        UUID playerId = player.getUniqueId();
+        if (session == null || session.type != ArcadePortGame.RUNNER
+                || !session.players.containsKey(playerId)
+                || !session.alive.contains(playerId)
+                || player.getWorld() != session.world) return;
+        session.runnerJumpCounts.merge(playerId, 1, Integer::sum);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
         Session session = active;
@@ -8226,9 +8321,18 @@ public final class ArcadePortManager implements Listener {
         }
         checkPlayerArena(session, player);
         if (active != session || !session.alive.contains(player.getUniqueId())) return;
-        Location previous = session.lastLocations.get(player.getUniqueId());
+        Location previous = session.lastLocations.get(playerId);
         Location current = event.getTo();
-        if (previous == null || current == null || (previous.getBlockX() == current.getBlockX() && previous.getBlockZ() == current.getBlockZ())) return;
+        if (session.type == ArcadePortGame.RUNNER && !(event instanceof PlayerTeleportEvent)
+                && event.getFrom().getWorld() == session.world && current.getWorld() == session.world) {
+            double horizontalDistance = Math.hypot(
+                    current.getX() - event.getFrom().getX(), current.getZ() - event.getFrom().getZ());
+            if (ArcadePortRules.shouldCountRunnerWalkSegment(horizontalDistance)) {
+                session.runnerWalkedBlocks.merge(playerId, horizontalDistance, Double::sum);
+            }
+        }
+        if (previous == null || current == null
+                || (previous.getBlockX() == current.getBlockX() && previous.getBlockZ() == current.getBlockZ())) return;
         if (session.type == ArcadePortGame.DRAGON_ESCAPE
                 && ArcadePortRules.shouldCrumbleDragonEscapeFallbackTrack(
                         !session.dragonEscapeWaypoints.isEmpty(), current.getBlockZ())) {
@@ -8238,9 +8342,84 @@ public final class ArcadePortManager implements Listener {
         session.lastLocations.put(player.getUniqueId(), current.clone());
     }
 
-    private Material runnerTrailMaterial(Player owner) {
-        // With no cosmetic selected, Reborn's default trail is red clay.
-        return Material.RED_TERRACOTTA;
+    /**
+     * Count colours on exposed blocks in the archived Runner map. Trails replace
+     * exposed course surfaces, so buried blocks cannot cause false palette clashes.
+     */
+    private Map<String, Integer> scanRunnerMapPalette(Session session) {
+        Map<String, Integer> palette = new HashMap<>();
+        SourceMapCatalog.MapData mapData = sourceMapData.get(ArcadePortGame.RUNNER.id());
+        int minX = mapData != null && mapData.hasBounds() ? mapData.minX() : -HALF_SIZE;
+        int maxX = mapData != null && mapData.hasBounds() ? mapData.maxX() : HALF_SIZE + 1;
+        int minZ = mapData != null && mapData.hasBounds() ? mapData.minZ() : -HALF_SIZE;
+        int maxZ = mapData != null && mapData.hasBounds() ? mapData.maxZ() : HALF_SIZE + 1;
+        int minY = mapData != null && mapData.hasVerticalBounds()
+                ? mapData.minY() : Math.max(session.world.getMinHeight(), 0);
+        int maxY = mapData != null && mapData.hasVerticalBounds()
+                ? mapData.maxY() : Math.min(session.world.getMaxHeight() - 1, 128);
+        if (mapData != null && !mapData.hasVerticalBounds()) {
+            List<Location> spawns = mapData.spawnLocations();
+            if (!spawns.isEmpty()) {
+                double lowestSpawn = spawns.stream().mapToDouble(Location::getY).min().orElse(minY);
+                double highestSpawn = spawns.stream().mapToDouble(Location::getY).max().orElse(maxY);
+                minY = Math.max(session.world.getMinHeight(), (int) Math.floor(lowestSpawn) - 16);
+                maxY = Math.min(session.world.getMaxHeight() - 1, (int) Math.ceil(highestSpawn) + 32);
+            }
+        }
+        minY = Math.max(minY, session.world.getMinHeight());
+        maxY = Math.min(maxY, session.world.getMaxHeight() - 1);
+        if (maxX <= minX || maxZ <= minZ || maxY < minY) return palette;
+
+        long area = (long) (maxX - minX) * (long) (maxZ - minZ);
+        int columnStride = Math.max(1, (int) Math.ceil(Math.sqrt(area / 12_000.0D)));
+        for (int x = minX; x < maxX; x += columnStride) {
+            for (int z = minZ; z < maxZ; z += columnStride) {
+                for (int y = minY; y <= maxY; y++) {
+                    Block block = session.world.getBlockAt(x, y, z);
+                    if (!block.getType().isSolid() || block.isLiquid()
+                            || !block.getRelative(BlockFace.UP).getType().isAir()) continue;
+                    String colour = runnerPaletteColour(block.getType());
+                    if (colour != null) palette.merge(colour, 1, Integer::sum);
+                }
+            }
+        }
+        return palette;
+    }
+
+    private String runnerPaletteColour(Material material) {
+        String name = material.name();
+        for (String suffix : List.of("_CONCRETE_POWDER", "_STAINED_GLASS_PANE", "_STAINED_GLASS",
+                "_CONCRETE", "_GLAZED_TERRACOTTA", "_TERRACOTTA", "_WOOL")) {
+            if (!name.endsWith(suffix)) continue;
+            String colour = name.substring(0, name.length() - suffix.length())
+                    .toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+            if (ArcadePortRules.runnerTrailColours().contains(colour)) return colour;
+        }
+        return null;
+    }
+
+    /** Read the shared catalogue selection without creating a hard plugin dependency. */
+    private String runnerTrailCosmeticOption(UUID playerId) {
+        String fallback = "trail-cyan";
+        org.bukkit.plugin.Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (cosmeticsPlugin == null || !cosmeticsPlugin.isEnabled()) return fallback;
+        try {
+            Object selected = cosmeticsPlugin.getClass()
+                    .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
+                    .invoke(cosmeticsPlugin, playerId, "runner", "trail");
+            return selected instanceof String value && value.startsWith("trail-") ? value : fallback;
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().fine("Runner trail preference bridge unavailable: " + exception.getMessage());
+            return fallback;
+        }
+    }
+
+    private Material runnerTrailMaterial(Session session, Player owner) {
+        String selected = session.runnerTrailOptions.getOrDefault(owner.getUniqueId(), "trail-cyan");
+        String colour = selected.startsWith("trail-") ? selected.substring("trail-".length()) : selected;
+        Material material = Material.matchMaterial(
+                colour.toUpperCase(java.util.Locale.ROOT).replace('-', '_') + "_TERRACOTTA");
+        return material == null ? Material.CYAN_TERRACOTTA : material;
     }
 
     private boolean insideSourceMapBounds(Session session, int x, int z) {
@@ -8286,7 +8465,8 @@ public final class ArcadePortManager implements Listener {
         if (!ArcadePortRules.shouldMarkRunnerBlock(block.getType().isSolid(),
                 block.getType() == Material.BEDROCK, block.isLiquid(), aboveIsAir,
                 session.runnerBlocks.containsKey(block))) return;
-        Material trail = runnerTrailMaterial(owner);
+        // World-block changes are sent by the server to all players and spectators.
+        Material trail = runnerTrailMaterial(session, owner);
         block.setType(trail, false);
         session.runnerBlocks.put(block, now);
         session.runnerBlockMaterials.put(block, trail);
@@ -11299,6 +11479,10 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> runnerQuickshotReadyAt = new HashMap<>();
         final Map<UUID, Long> runnerNextFrostBallAt = new HashMap<>();
         final Map<UUID, Long> runnerFallingBlockExpiresAt = new HashMap<>();
+        final Map<UUID, Double> runnerWalkedBlocks = new HashMap<>();
+        final Map<UUID, Integer> runnerJumpCounts = new HashMap<>();
+        final Map<UUID, String> runnerTrailOptions = new HashMap<>();
+        final Map<String, Integer> runnerMapPaletteCounts = new HashMap<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
         final int participantsAtStart;
         int baconBlastExplosionDepth;
