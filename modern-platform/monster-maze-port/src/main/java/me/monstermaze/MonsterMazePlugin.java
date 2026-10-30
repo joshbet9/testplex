@@ -20,7 +20,6 @@ import me.monstermaze.world.MapManager;
 import me.monstermaze.world.MapThemeApplier;
 import me.monstermaze.world.MapWorldSafetyListener;
 import me.monstermaze.world.SoloPBCommandListener;
-import me.monstermaze.world.VoidWorldManager;
 import me.monstermaze.util.MobThemeManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -56,7 +55,6 @@ public final class MonsterMazePlugin {
 
     private GameManager gameManager;
     private MobThemeManager mobThemeManager;
-    private VoidWorldManager voidWorlds;
     private MapManager mapManager;
     private MapThemeApplier mapThemeApplier;
     private MapWorldSafetyListener mapWorldSafetyListener;
@@ -92,7 +90,6 @@ public final class MonsterMazePlugin {
         instance = this;
         saveDefaultConfig();
         this.backendClient = new BackendClient(this);
-        this.voidWorlds = new VoidWorldManager(this);
         this.mapManager = new MapManager(this);
         this.mapThemeApplier = new MapThemeApplier(this);
         this.mapWorldSafetyListener = new MapWorldSafetyListener(this);
@@ -134,6 +131,7 @@ public final class MonsterMazePlugin {
             getLogger().warning("No active Monster Maze source map is available yet; the module will remain idle until a map can be loaded.");
         }
         this.gameManager = new GameManager(this);
+        if (mapCenter != null) this.gameManager.setCenter(mapCenter);
         this.gameManager.getMonsterManager().setMobType(mapManager.activeMob());
         this.monsterEntityListener = new MonsterEntityListener(this, gameManager);
         if (Bukkit.getPluginManager().isPluginEnabled("ProtocolLib")) {
@@ -224,7 +222,6 @@ public final class MonsterMazePlugin {
         saveConfig();
         return newMode;
     }
-    public VoidWorldManager getVoidWorlds() { return voidWorlds; }
     public MapManager getMapManager() { return mapManager; }
     public MapThemeApplier getMapThemeApplier() { return mapThemeApplier; }
     public me.monstermaze.stats.LeaderboardManager getLeaderboards() { return leaderboards; }
