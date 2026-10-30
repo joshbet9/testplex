@@ -21,7 +21,7 @@ public final class SoloPBCommandListener implements Listener {
 
     public SoloPBCommandListener(MonsterMazePlugin plugin) {
         this.plugin = plugin;
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
+        plugin.getServer().getPluginManager().registerEvents(this, plugin.getHostPlugin());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)

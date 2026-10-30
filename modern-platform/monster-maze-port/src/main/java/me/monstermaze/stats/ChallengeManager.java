@@ -27,8 +27,8 @@ public final class ChallengeManager {
         this.plugin = plugin;
         this.backend = plugin.getBackendClient();
         if (backend != null && backend.isEnabled()) {
-            Bukkit.getScheduler().runTaskLater(plugin, new Runnable() { @Override public void run() { refresh(); } }, 40L);
-            Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() { @Override public void run() { refresh(); } }, 1200L, 1200L);
+            Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() { @Override public void run() { refresh(); } }, 40L);
+            Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() { @Override public void run() { refresh(); } }, 1200L, 1200L);
         }
     }
     public boolean isEnabled() { return backend != null && backend.isEnabled(); }
@@ -36,7 +36,7 @@ public final class ChallengeManager {
     public List<Row> getRows() { return new ArrayList<Row>(rows); }
     public void refresh() {
         if (!isEnabled()) return;
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, new Runnable() {
+        Bukkit.getScheduler().runTaskAsynchronously(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 try {
                     Challenge c = parseChallenge(backend.get("/api/v1/challenge/1.21"));
@@ -44,7 +44,6 @@ public final class ChallengeManager {
                     if (c == null || s == null) throw new IllegalStateException("invalid challenge response");
                     if (!c.week.equals(s.challenge.week) || c.number != s.challenge.number) throw new IllegalStateException("challenge changed while syncing");
                     challenge = c; rows = s.rows;
-                    Bukkit.getScheduler().runTask(plugin, new Runnable() { @Override public void run() { if (plugin.getGameManager() != null) plugin.getGameManager().rerenderLeaderboardBoard(); } });
                 } catch (Exception e) { plugin.getLogger().warning("Weekly challenge sync failed: " + e.getMessage()); }
             }
         });

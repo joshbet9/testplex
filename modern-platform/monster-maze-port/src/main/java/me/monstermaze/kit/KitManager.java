@@ -114,20 +114,16 @@ public class KitManager implements Listener {
      *  or TRANSPARENT (see-through ghosts). */
     private enum VisMode { VISIBLE, INVISIBLE, TRANSPARENT }
 
-    private KitGUI gui;
-    private KitSelectorNPCs npcs;
 
     public KitManager(MonsterMazePlugin plugin, GameManager game, me.monstermaze.util.GameScoreboard scoreboard) {
         this.plugin = plugin;
         this.game = game;
         this.scoreboard = scoreboard;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
 
-        this.gui = new KitGUI(plugin, game, this);
-        this.npcs = new KitSelectorNPCs(plugin, game, this, gui);
 
         // Slowball constructor tick (every 2 seconds = PerkConstructor rate)
-        Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override
             public void run() {
                 if (game.getState() != GameState.LIVE) return;
@@ -138,7 +134,7 @@ public class KitManager implements Listener {
         }, 40L, 40L);
 
         // Jumper jumpEvent + Repulsor launched cleanup every tick
-        Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override
             public void run() {
                 if (game.getState() != GameState.LIVE) return;
@@ -147,18 +143,6 @@ public class KitManager implements Listener {
                 tickAbilityBars();
             }
         }, 1L, 1L);
-    }
-
-    public void openSelector(Player player) {
-        gui.open(player);
-    }
-
-    public void spawnSelectors(org.bukkit.Location center) {
-        npcs.spawnAt(center);
-    }
-
-    public void clearSelectors() {
-        npcs.clear();
     }
 
     public KitType getKit(Player player) {
@@ -587,11 +571,11 @@ public class KitManager implements Listener {
             for (Player observer : Bukkit.getOnlinePlayers()) {
                 boolean visible = observer.getWorld() == target.getWorld() && !isHiddenFrom(observer, target);
                 if (visible) {
-                    observer.showEntity(plugin, icon);
-                    observer.showEntity(plugin, count);
+                    observer.showEntity(plugin.getHostPlugin(), icon);
+                    observer.showEntity(plugin.getHostPlugin(), count);
                 } else {
-                    observer.hideEntity(plugin, icon);
-                    observer.hideEntity(plugin, count);
+                    observer.hideEntity(plugin.getHostPlugin(), icon);
+                    observer.hideEntity(plugin.getHostPlugin(), count);
                 }
             }
         }
@@ -765,7 +749,7 @@ public class KitManager implements Listener {
                     .build());
             meta.setPower(0);
             fw.setFireworkMeta(meta);
-            Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+            Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
                 @Override public void run() {
                     if (fw.isValid()) fw.detonate();
                 }
@@ -835,7 +819,7 @@ public class KitManager implements Listener {
                         .build());
                 meta.setPower(0);
                 fw.setFireworkMeta(meta);
-                Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+                Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
                     @Override public void run() {
                         if (fw.isValid()) fw.detonate();
                     }
@@ -1168,11 +1152,7 @@ public class KitManager implements Listener {
         if (game.getState() != GameState.LIVE && game.getState() != GameState.STARTING) return;
         Player p = (Player) event.getWhoClicked();
         if (!game.getAlivePlayers().contains(p)) return;
-        // Allow kit GUI only
-        if (event.getInventory() != null && event.getView().getTitle() != null
-                && event.getView().getTitle().equals(KitGUI.TITLE)) {
-            return;
-        }
+        // Testplex's shared lobby owns kit selection; all match inventories stay locked.
         event.setCancelled(true);
     }
 
@@ -1187,7 +1167,7 @@ public class KitManager implements Listener {
         visMode.remove(id);
         scoreboard.setGhost(id, false);
         // Re-render remaining players' views of each other now that this player has left.
-        Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+        Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() { refreshViews(); }
         }, 1L);
     }

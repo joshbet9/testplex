@@ -1,7 +1,6 @@
 package me.monstermaze.game;
 
 import me.monstermaze.MonsterMazePlugin;
-import me.monstermaze.world.VoidWorldManager;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -42,7 +41,7 @@ public class ArenaListener implements Listener {
     public ArenaListener(MonsterMazePlugin plugin, GameManager game) {
         this.plugin = plugin;
         this.game = game;
-        org.bukkit.Bukkit.getPluginManager().registerEvents(this, plugin);
+        org.bukkit.Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
     }
 
     private boolean inArena(Location loc) {
@@ -68,7 +67,7 @@ public class ArenaListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerVelocity(PlayerVelocityEvent event) {
         Player p = event.getPlayer();
-        if (p.hasMetadata("maverick_launch")) p.removeMetadata("maverick_launch", plugin);
+        if (p.hasMetadata("maverick_launch")) p.removeMetadata("maverick_launch", plugin.getHostPlugin());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -79,7 +78,7 @@ public class ArenaListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerHitMonster(EntityDamageByEntityEvent event) {
         if (!(event.getEntity() instanceof Snowman)) return;
-        if (!inVoidWorld(event.getEntity().getWorld())) return;
+        if (!inArena(event.getEntity().getLocation())) return;
         Entity damager = event.getDamager();
         if (damager instanceof Player) {
             event.setCancelled(true);
@@ -92,12 +91,12 @@ public class ArenaListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onWeather(WeatherChangeEvent event) {
-        if (inVoidWorld(event.getWorld()) && event.toWeatherState()) event.setCancelled(true);
+        if (game.getState() != GameState.IDLE && event.toWeatherState() && game.getCenter() != null && event.getWorld() == game.getCenter().getWorld()) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onThunder(ThunderChangeEvent event) {
-        if (inVoidWorld(event.getWorld()) && event.toThunderState()) event.setCancelled(true);
+        if (game.getState() != GameState.IDLE && event.toThunderState() && game.getCenter() != null && event.getWorld() == game.getCenter().getWorld()) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -160,7 +159,7 @@ public class ArenaListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onFood(FoodLevelChangeEvent event) {
         if (!(event.getEntity() instanceof Player)) return;
-        if (!inVoidWorld(event.getEntity().getWorld())) return;
+        if (!inArena(event.getEntity().getLocation())) return;
         event.setCancelled(true);
         Player p = (Player) event.getEntity();
         p.setFoodLevel(20);
@@ -168,26 +167,13 @@ public class ArenaListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
-    public void onLobbyDamage(EntityDamageEvent event) {
-        if (!(event.getEntity() instanceof Player)) return;
-        if (game.getState() != GameState.IDLE && game.getState() != GameState.ENDING) return;
-        if (!inVoidWorld(event.getEntity().getWorld())) return;
-        event.setCancelled(true);
-        ((Player) event.getEntity()).setHealth(((Player) event.getEntity()).getMaxHealth());
-        ((Player) event.getEntity()).setFoodLevel(20);
-    }
-
-    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
-        if (inVoidWorld(event.getPlayer().getWorld()) && game.getState() != GameState.IDLE) event.setCancelled(true);
+        if (inArena(event.getBlock().getLocation()) && game.getState() != GameState.IDLE) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent event) {
-        if (inVoidWorld(event.getPlayer().getWorld()) && game.getState() != GameState.IDLE) event.setCancelled(true);
+        if (inArena(event.getBlock().getLocation()) && game.getState() != GameState.IDLE) event.setCancelled(true);
     }
 
-    private boolean inVoidWorld(World w) {
-        return w != null && VoidWorldManager.WORLD_NAME.equals(w.getName());
-    }
 }

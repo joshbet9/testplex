@@ -257,6 +257,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     new KitChoice("micro-archer", "Archer", Material.BOW),
                     new KitChoice("micro-worker", "Worker", Material.IRON_PICKAXE),
                     new KitChoice("micro-fighter", "Fighter", Material.IRON_SWORD));
+            case MONSTER_MAZE -> List.of(
+                    new KitChoice("jumper", "Jumper", Material.FEATHER),
+                    new KitChoice("slowball", "Slowballer", Material.SNOWBALL),
+                    new KitChoice("body-builder", "Body Builder", Material.APPLE),
+                    new KitChoice("repulsor", "Repulsor", Material.COAL),
+                    new KitChoice("maverick", "Maverick", Material.ARROW));
             case ONE_IN_THE_QUIVER -> List.of(
                     new KitChoice("quiver-leaper", "Leaper", Material.RABBIT_FOOT),
                     new KitChoice("quiver-brawler", "Brawler", Material.IRON_SWORD),

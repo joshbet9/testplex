@@ -36,20 +36,16 @@ jobs:
           cache: maven
           cache-dependency-path: |
             modern-platform/pom.xml
-            modern-platform/monster-maze-port/pom.xml
             modern-platform/snake-port/pom.xml
             modern-platform/arcade-games-port/pom.xml
 
       - name: Build and run catalogue tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/pom.xml clean verify
 
-      - name: Build Monster Maze 26.3 port and run contract tests
-        run: mvn --batch-mode --no-transfer-progress -f modern-platform/monster-maze-port/pom.xml clean verify
-
       - name: Build Snake 26.3 port and run mechanics-rule tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/snake-port/pom.xml clean verify
 
-      - name: Build the other 16 Arcade mechanics prototypes
+      - name: Build Arcade mechanics and the integrated Monster Maze module
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
 
       - name: Verify modern plugin metadata and packaged classes
@@ -57,23 +53,15 @@ jobs:
         run: |
           set -euo pipefail
           jar_file="modern-platform/target/TestplexModernArcade.jar"
-          maze_jar="modern-platform/monster-maze-port/target/MonsterMazeModern.jar"
           snake_jar="modern-platform/snake-port/target/SnakeModern.jar"
           arcade_jar="modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar"
           test -s "$jar_file"
-          test -s "$maze_jar"
           test -s "$snake_jar"
           test -s "$arcade_jar"
           jar tf "$jar_file" | grep -Fxq "plugin.yml"
           jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/TestplexModernArcade.class"
           jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/model/ArcadeCatalog.class"
           unzip -p "$jar_file" plugin.yml | grep -Fxq "api-version: '26.3'"
-          jar tf "$maze_jar" | grep -Fxq "plugin.yml"
-          jar tf "$maze_jar" | grep -Fxq "me/monstermaze/MonsterMazePlugin.class"
-          jar tf "$maze_jar" | grep -Fxq "me/monstermaze/maze/MazeGenerator.class"
-          jar tf "$maze_jar" | grep -Fxq "me/monstermaze/util/PlayerFeedback.class"
-          unzip -p "$maze_jar" plugin.yml | grep -Fxq "name: MonsterMazeModern"
-          unzip -p "$maze_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
           jar tf "$snake_jar" | grep -Fxq "plugin.yml"
           jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeModernPlugin.class"
           jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeRules.class"
@@ -82,6 +70,12 @@ jobs:
           jar tf "$arcade_jar" | grep -Fxq "plugin.yml"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadePortManager.class"
+          jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/MonsterMazePlugin.class"
+          jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/game/GameManager.class"
+          jar tf "$arcade_jar" | grep -Fxq "monster-maze/maps.yml"
+          jar tf "$arcade_jar" | grep -Fxq "monster-maze/config.yml"
+          ! jar tf "$arcade_jar" | grep -Fxq "monster-maze/plugin.yml"
+          ! jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/MonsterMazeStandalonePlugin.class"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "name: ArcadeMechanicsModern"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
           jar tf "$arcade_jar" | grep -Fxq "source-maps/Draw My Thing/Draw_Stadium.zip"
@@ -90,7 +84,7 @@ jobs:
             grep -Fxq "  - $candidate" <<< "$arcade_config"
           done
           ! grep -Eq "^  - (death-tag|evolution|micro-battles|one-in-the-quiver|sheep-quest|turf-wars)$" <<< "$arcade_config"
-          echo "All four modern Paper 26.3 plugin artifacts verified; Draw My Thing includes its no-resource-pack Stadium map, and all ten enabled Arcade candidates are present."
+          echo "All three modern Paper 26.3 Bukkit plugins verified; Draw My Thing includes its no-resource-pack Stadium map, and all ten enabled Arcade candidates are present."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
@@ -98,7 +92,6 @@ jobs:
           name: testplex-modern-paper-26.3
           path: |
             modern-platform/target/TestplexModernArcade.jar
-            modern-platform/monster-maze-port/target/MonsterMazeModern.jar
             modern-platform/snake-port/target/SnakeModern.jar
             modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar
           if-no-files-found: error
@@ -114,7 +107,7 @@ jobs:
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
             echo "- Catalogue: 18 Arcade games"
-            echo "- Built artifacts: TestplexModernArcade.jar, MonsterMazeModern.jar, SnakeModern.jar and ArcadeMechanicsModern.jar"
+            echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar and ArcadeMechanicsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
             echo "- Gameplay ports: Monster Maze and Snake plus 16 mechanics-first prototypes, including Draw My Thing and Master Builders; in-game validation still required"

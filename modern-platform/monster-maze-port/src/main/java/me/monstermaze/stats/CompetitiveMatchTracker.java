@@ -35,8 +35,8 @@ public final class CompetitiveMatchTracker implements Listener {
 
     public CompetitiveMatchTracker(MonsterMazePlugin plugin) {
         this.plugin = plugin;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
-        tickTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
+        tickTask = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() { tick(); }
         }, 1L, 1L);
     }
@@ -50,7 +50,7 @@ public final class CompetitiveMatchTracker implements Listener {
         }
         if (!active) return;
         tick++;
-        Bukkit.getScheduler().runTask(plugin, new Runnable() {
+        Bukkit.getScheduler().runTask(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() { observeAfterGameTick(); }
         });
     }

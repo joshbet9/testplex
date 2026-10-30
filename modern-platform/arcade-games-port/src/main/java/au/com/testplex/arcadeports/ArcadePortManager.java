@@ -1,5 +1,7 @@
 package au.com.testplex.arcadeports;
 
+import me.monstermaze.MonsterMazePlugin;
+
 import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -200,6 +202,7 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey gladiatorHotbarKey;
     private final ModernArcadeLobby lobby;
     private final ModernArcadeLobbyRuntime lobbyRuntime;
+    private MonsterMazePlugin monsterMazeModule;
 
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
@@ -220,6 +223,46 @@ public final class ArcadePortManager implements Listener {
         lobbyRuntime.setSelectedGame(ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", "bacon-brawl")));
         registerOptionalBaconPacketBridge();
         registerOptionalDragonEscapeGhostBridge();
+    }
+
+    public void setMonsterMazeModule(MonsterMazePlugin module) {
+        this.monsterMazeModule = module;
+    }
+
+    public void returnPlayerToLobby(Player player) {
+        if (player != null && player.isOnline()) lobby.sendToLobby(player);
+    }
+
+    /** Start an explicit participant set through the same Testplex Arcade queue/manager path. */
+    public boolean startMonsterMazeTournamentRound(List<Player> requestedParticipants) {
+        if (requestedParticipants == null || requestedParticipants.isEmpty()
+                || monsterMazeModule == null || active != null || monsterMazeRunning()
+                || !isGameEnabled(ArcadePortGame.MONSTER_MAZE)) return false;
+        LinkedHashMap<UUID, Player> selected = new LinkedHashMap<>();
+        for (Player player : requestedParticipants) {
+            if (player == null || !player.isOnline()) continue;
+            for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(player.getUniqueId());
+            lobby.ensurePlayerInLobby(player);
+            selected.put(player.getUniqueId(), player);
+        }
+        if (selected.isEmpty()) return false;
+        // Tournament matches have a fixed bracket participant list, not a public join window.
+        queues.remove(ArcadePortGame.MONSTER_MAZE.id());
+        queues.put(ArcadePortGame.MONSTER_MAZE.id(), selected);
+        startQueued(ArcadePortGame.MONSTER_MAZE, null, Bukkit.getConsoleSender(), false);
+        return monsterMazeRunning();
+    }
+
+    public void restoreMonsterMazeKitPreference(Player player) {
+        if (player == null || monsterMazeModule == null || monsterMazeModule.getGameManager() == null) return;
+        String selected = plugin.getConfig().getString(
+                "lobby-kit-preferences." + player.getUniqueId() + ".monster-maze", "jumper");
+        me.monstermaze.kit.KitType kit = me.monstermaze.kit.KitType.byName(selected);
+        if (kit != null) monsterMazeModule.getGameManager().getKitManager().setKit(player, kit);
+    }
+
+    private boolean monsterMazeRunning() {
+        return monsterMazeModule != null && monsterMazeModule.isGameRunning();
     }
 
     public void selectLobbyGame(ArcadePortGame type) {
@@ -497,6 +540,29 @@ public final class ArcadePortManager implements Listener {
     public void selectKit(Player player, String requestedKit) {
         if (player == null || requestedKit == null) return;
         String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        boolean explicitMonsterMazeKit = value.startsWith("monster-maze-");
+        if (explicitMonsterMazeKit) value = value.substring("monster-maze-".length());
+        boolean monsterMazeLobby = "monster-maze".equals(
+                plugin.getConfig().getString("lobby-selected-game", "bacon-brawl"));
+        if (explicitMonsterMazeKit || monsterMazeLobby || monsterMazeRunning()) {
+            me.monstermaze.kit.KitType mazeKit = me.monstermaze.kit.KitType.byName(value);
+            if (mazeKit != null) {
+                if (monsterMazeRunning()) {
+                    player.sendMessage(ChatColor.RED + "Monster Maze kits are locked once the round starts.");
+                    return;
+                }
+                if (monsterMazeModule == null || monsterMazeModule.getGameManager() == null) {
+                    player.sendMessage(ChatColor.RED + "Monster Maze is not loaded by Testplex Arcade.");
+                    return;
+                }
+                monsterMazeModule.getGameManager().getKitManager().setKit(player, mazeKit);
+                plugin.getConfig().set("lobby-kit-preferences." + player.getUniqueId() + ".monster-maze", mazeKit.name().toLowerCase(java.util.Locale.ROOT));
+                plugin.saveConfig();
+                lobby.refreshPlayerScoreboard(player);
+                player.sendMessage(ChatColor.GREEN + "Selected " + mazeKit.display + " for Monster Maze.");
+                return;
+            }
+        }
         Session running = active;
         if (running != null && running.players.containsKey(player.getUniqueId())) {
             switch (running.type) {
@@ -1070,6 +1136,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void queue(ArcadePortGame type, Player player, boolean quickStart, boolean mixedArcadeVariant) {
+        if (monsterMazeRunning()) {
+            player.sendMessage(ChatColor.RED + "Monster Maze is already running. Wait for the current Testplex game to finish.");
+            return;
+        }
         if (type == null) {
             player.sendMessage(ChatColor.RED + "Unknown game id. Use /arcadeport help for the available IDs.");
             return;
@@ -1159,9 +1229,9 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
-        if (active != null) {
-            sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running: "
-                    + active.type.displayName() + ".");
+        if (active != null || monsterMazeRunning()) {
+            sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running"
+                    + (active == null ? " (Monster Maze)." : ": " + active.type.displayName() + "."));
             return;
         }
         if (manualStartCountdown != null) {
@@ -1288,8 +1358,9 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
         }
-        if (active != null) {
-            sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running: " + active.type.displayName() + ".");
+        if (active != null || monsterMazeRunning()) {
+            sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running"
+                    + (active == null ? " (Monster Maze)." : ": " + active.type.displayName() + "."));
             return;
         }
         String selectedQueueKey = queueKey(type, mixedArcadeVariant);
@@ -1305,6 +1376,27 @@ public final class ArcadePortManager implements Listener {
             String requestedId = mixedArcadeVariant ? "turf-wars-mixed" : type.id();
             sender.sendMessage(ChatColor.YELLOW + "No online players queued. Use /arcadeport join "
                     + requestedId + " or /arcadeport play " + requestedId + ".");
+            return;
+        }
+        if (type == ArcadePortGame.MONSTER_MAZE) {
+            if (monsterMazeModule == null) {
+                sender.sendMessage(ChatColor.RED + "Monster Maze module is not loaded by Testplex Arcade.");
+                return;
+            }
+            if (!monsterMazeModule.startTestplexGame(participants)) {
+                sender.sendMessage(ChatColor.RED + "Monster Maze could not start. Check its map and game status in the server log.");
+                return;
+            }
+            if (queue != null) queues.remove(selectedQueueKey);
+            if (pendingStart != null && pendingType == type) {
+                pendingStart.cancel();
+                pendingStart = null;
+                pendingType = null;
+                pendingMixedArcadeVariant = false;
+            }
+            for (Player player : participants) {
+                if (player.isOnline()) player.sendMessage(ChatColor.AQUA + "Testplex has started Monster Maze.");
+            }
             return;
         }
         if (type == ArcadePortGame.MASTER_BUILDERS && participants.size() > 16) {
@@ -8491,6 +8583,9 @@ public final class ArcadePortManager implements Listener {
                     : "guesses " + Math.max(0, DRAW_MY_THING_MAX_GUESSES - session.drawGuessAttempts.getOrDefault(id, 0)) + "/10";
             case MASTER_BUILDERS -> session.masterBuilderPhase == MasterBuildersPhase.BUILDING
                     ? "building | " + session.masterBuilderTheme : "review | " + session.masterBuilderTheme;
+            // Monster Maze owns its own in-process GameManager session and does not
+            // create an ArcadePortManager Session object.
+            case MONSTER_MAZE -> "Monster Maze";
         };
     }
 
@@ -10834,6 +10929,10 @@ public final class ArcadePortManager implements Listener {
         List<Player> participantsToReturn = stopping == null
                 ? List.of() : new ArrayList<>(stopping.players.values());
         if (stopping != null) finish(stopping, null, false);
+        if (monsterMazeRunning() && monsterMazeModule != null
+                && monsterMazeModule.getGameManager() != null) {
+            monsterMazeModule.getGameManager().forceStop();
+        }
         // Make the explicit Stop Game action authoritative: every participant from
         // the stopped session is put at the lobby spawn after round state is cleaned.
         for (Player player : participantsToReturn) {
@@ -10846,7 +10945,9 @@ public final class ArcadePortManager implements Listener {
 
     public String status() {
         String variant = active != null && active.mixedArcadeVariant ? " (Mixed Arcade)" : "";
-        String game = active == null ? "idle" : active.type.displayName() + variant
+        String game = active == null
+                ? (monsterMazeRunning() ? "Monster Maze (" + monsterMazeModule.getGameManager().getStage() + " stages reached)" : "idle")
+                : active.type.displayName() + variant
                 + " (" + active.alive.size() + "/" + active.participantsAtStart + " alive)";
         int queued = queues.values().stream().mapToInt(Map::size).sum();
         return game + "; queued=" + queued + "; cleared-games=" + enabledGamesLabel();

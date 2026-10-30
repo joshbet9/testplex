@@ -25,8 +25,8 @@ public final class SoloRunCompletionListener implements Listener {
 
     public SoloRunCompletionListener(final MonsterMazePlugin plugin) {
         this.plugin = plugin;
-        plugin.getServer().getPluginManager().registerEvents(this, plugin);
-        this.task = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        plugin.getServer().getPluginManager().registerEvents(this, plugin.getHostPlugin());
+        this.task = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() { tick(); }
         }, 1L, 1L);
     }
@@ -81,7 +81,7 @@ public final class SoloRunCompletionListener implements Listener {
 
     private void scheduleRecord(final Player player, final int stage) {
         if (!plugin.isRecordRuns()) return;
-        Bukkit.getScheduler().runTask(plugin, new Runnable() {
+        Bukkit.getScheduler().runTask(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 RunInfo info = runs.remove(player.getUniqueId());
                 if (info == null) return;

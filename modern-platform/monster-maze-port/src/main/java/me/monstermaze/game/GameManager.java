@@ -8,7 +8,6 @@ import me.monstermaze.kit.KitManager;
 import me.monstermaze.maze.MazeGenerator;
 import me.monstermaze.maze.MazePathfinder;
 import me.monstermaze.stats.StatTracker;
-import me.monstermaze.stats.LeaderboardBoard;
 import me.monstermaze.util.GameScoreboard;
 import me.monstermaze.util.PlayerFeedback;
 import me.monstermaze.util.TextUtil;
@@ -50,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /**
  * Full game loop closer to original Mineplex Monster Maze.
@@ -63,7 +63,6 @@ public class GameManager implements Listener {
     private final KitManager kitManager;
     private final StatTracker stats;
     private final GameScoreboard scoreboard = new GameScoreboard();
-    private final LeaderboardBoard leaderboardBoard;
     private final PlayerFeedback feedback;
 
     private GameState state = GameState.IDLE;
@@ -95,6 +94,10 @@ public class GameManager implements Listener {
     private BukkitTask mainTask;
     private BukkitTask secondTask;
     private BukkitTask startingTask;   // runs the jump lock during STARTING (pre-glass fall)
+    private List<Player> pendingTestplexParticipants;
+    private Consumer<Player> testplexReturnToLobby;
+    private boolean testplexManagedRound;
+
 
     /** PERF: cached per-tick packet targets so we only send what actually changed. */
     private int liveTick;
@@ -108,9 +111,8 @@ public class GameManager implements Listener {
         this.monsterManager = new MonsterManager(plugin, this);
         this.kitManager = new KitManager(plugin, this, scoreboard);
         this.stats = new StatTracker(this, plugin);
-        this.leaderboardBoard = new LeaderboardBoard(plugin);
         this.feedback = new PlayerFeedback(plugin, this);
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
         new ArenaListener(plugin, this);
     }
 
@@ -122,63 +124,14 @@ public class GameManager implements Listener {
         // A live round's arena world is part of its player/entity isolation boundary.
         if (loc == null || loc.getWorld() == null || isRunning()) return;
         this.center = loc.clone();
-        // Empty world + small pre-game lobby box only
-        mazeGenerator.buildLobby(center);
-        // Kit NPCs in lobby while idle
-        if (state == GameState.IDLE) {
-            kitManager.clearSelectors();
-            kitManager.spawnSelectors(mazeGenerator.getLobbyCenter());
-            refreshLeaderboardBoard();
-        }
+        // Testplex owns the only lobby. Store only the arena origin here.
+        mazeGenerator.setArenaCenter(center);
     }
 
-    /** Call on enable: void spawn becomes lobby center. */
-    public void bootstrapLobby(Location voidSpawn) {
-        if (voidSpawn == null) return;
-        this.center = voidSpawn.clone();
-        mazeGenerator.buildLobby(center);
-        kitManager.clearSelectors();
-        kitManager.spawnSelectors(mazeGenerator.getLobbyCenter());
-        refreshLeaderboardBoard();
-    }
-
-    public Location getLobbySpawn() {
-        if (mazeGenerator.getLobbyCenter() != null) {
-            // Feet on the elevated lobby platform
-            return mazeGenerator.getLobbyCenter().add(0, 1, 0);
-        }
-        if (center != null) {
-            return center.clone().add(0.5, 1, 0.5);
-        }
-        return null;
-    }
-
+    /** Compatibility bridge: all player lobby returns belong to Testplex Arcade. */
     public void sendToLobby(Player player) {
-        if (center == null) {
-            // Should have been bootstrapped; last resort
-            return;
-        }
-        if (state == GameState.IDLE || state == GameState.ENDING) {
-            player.teleport(getLobbySpawn());
-            player.setGameMode(GameMode.SURVIVAL);
-            player.setCollidable(true);
-            kitManager.resetPlayerState(player);
-            player.getInventory().clear();
-            // Ensure NPCs exist
-            if (state == GameState.IDLE) {
-                kitManager.spawnSelectors(mazeGenerator.getLobbyCenter());
-            }
-            player.sendMessage(ChatColor.GOLD + "Monster Maze lobby");
-            player.sendMessage(ChatColor.YELLOW + "Pick a kit (villagers or /mm kit), then an admin runs /mm start");
-            // Open kit GUI shortly after TP
-            final Player p = player;
-            Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
-                @Override public void run() {
-                    if (p.isOnline() && state == GameState.IDLE) {
-                        kitManager.openSelector(p);
-                    }
-                }
-            }, 10L);
+        if (player != null && player.isOnline()) {
+            plugin.getHostPlugin().returnPlayerToArcadeLobby(player);
         }
     }
     public Location getCenter() { return center; }
@@ -204,6 +157,35 @@ public class GameManager implements Listener {
     }
 
     // -------------------- Start / Stop --------------------
+
+/** Configure a round whose participants and return path are owned by Testplex Arcade. */
+public boolean startTestplexRound(List<Player> participants, Consumer<Player> returnToLobby) {
+    if (state != GameState.IDLE || participants == null || participants.isEmpty()) return false;
+    List<Player> selected = new ArrayList<>();
+    for (Player player : participants) {
+        if (player != null && player.isOnline() && !selected.contains(player)) selected.add(player);
+    }
+    if (selected.isEmpty()) return false;
+    this.pendingTestplexParticipants = selected;
+    this.testplexReturnToLobby = returnToLobby;
+    this.testplexManagedRound = true;
+    // Testplex's MM configuration commands set the mode and pattern before
+    // queueing; the Arcade manager remains the only way to begin a round.
+    startGame(null, plugin.getConfig().getInt("forced-pattern", -1));
+    if (state != GameState.STARTING && state != GameState.LIVE) {
+        this.pendingTestplexParticipants = null;
+        this.testplexReturnToLobby = null;
+        this.testplexManagedRound = false;
+        return false;
+    }
+    return true;
+}
+
+public void setTestplexReturnToLobby(Consumer<Player> returnToLobby) {
+    this.testplexReturnToLobby = returnToLobby;
+}
+
+public boolean isTestplexManagedRound() { return testplexManagedRound; }
 
 public void startGame() {
     startGame(null, -1);
@@ -237,7 +219,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
         // MazeGenerator needs its own center + lobby before generate
         if (mazeGenerator.getCenter() == null) {
-            mazeGenerator.buildLobby(center);
+            mazeGenerator.setArenaCenter(center);
         }
 
         cleanupEntities();
@@ -256,10 +238,14 @@ public void startGame(Location preferCenter, int requestedPattern) {
         stats.reset();
 
         // Freeze the participant list before generation so late entrants are not reset or counted.
-        final List<Player> startingPlayers = getArenaWorldPlayers();
+        final List<Player> startingPlayers = testplexManagedRound && pendingTestplexParticipants != null
+                ? new ArrayList<>(pendingTestplexParticipants) : getArenaWorldPlayers();
+        pendingTestplexParticipants = null;
         roundParticipants.clear();
         for (Player player : startingPlayers) {
             if (player != null && player.isOnline() && player.getGameMode() != GameMode.SPECTATOR) {
+                // Keep players in Testplex's shared lobby while the maze is generated.
+                // They enter the arena only when the game is ready to start.
                 roundParticipants.add(player.getUniqueId());
             }
         }
@@ -285,9 +271,15 @@ public void startGame(Location preferCenter, int requestedPattern) {
                         continue;
                     }
                     UUID playerId = p.getUniqueId();
-                    if (!roundParticipants.contains(playerId)
-                            || !isInArenaWorld(center == null ? null : center.getWorld(), p.getWorld())
-                            || p.getGameMode() == GameMode.SPECTATOR) {
+                    if (!roundParticipants.contains(playerId) || p.getGameMode() == GameMode.SPECTATOR) {
+                        roundParticipants.remove(playerId);
+                        continue;
+                    }
+                    if (testplexManagedRound) {
+                        p.closeInventory();
+                        p.teleport(center.clone().add(0.5D, 1.0D, 0.5D));
+                    }
+                    if (!isInArenaWorld(center == null ? null : center.getWorld(), p.getWorld())) {
                         roundParticipants.remove(playerId);
                         continue;
                     }
@@ -296,11 +288,8 @@ public void startGame(Location preferCenter, int requestedPattern) {
                     p.teleport(center.clone().add(0.5, 1, 0.5));
                 }
 
-                kitManager.spawnSelectors(mazeGenerator.getLobbyCenter());
-                for (Player p : getAlivePlayers()) {
-                    kitManager.openSelector(p);
-                    p.sendMessage(ChatColor.YELLOW + "Choose a kit! Click a villager or use the menu.");
-                }
+                // Selected kits were chosen in Testplex's shared Arcade lobby.
+                // preparePlayer() applies that selection; no Monster Maze lobby/menu is created.
 
                 if (alive.isEmpty()) {
                     forceStop();
@@ -350,7 +339,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 // Lock jumping during the STARTING countdown too (pre-glass-fall): only the
                 // Jumper kit can move around the spawn; everyone else is grounded. The LIVE
                 // mainTask calls tickJumpLock() once the game starts, so we stop this one then.
-                startingTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+                startingTask = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
                     @Override public void run() {
                         if (state != GameState.STARTING) return;
                         kitManager.tickJumpLock();
@@ -366,7 +355,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
                         titleArenaPlayers("", ChatColor.YELLOW + "" + t, 0, 15, 5);
                         t--;
                     }
-                }.runTaskTimer(plugin, 10L, 20L);
+                }.runTaskTimer(plugin.getHostPlugin(), 10L, 20L);
             }
         });
     }
@@ -376,14 +365,12 @@ public void startGame(Location preferCenter, int requestedPattern) {
         if (startingTask != null) { startingTask.cancel(); startingTask = null; }
         liveStartMs = System.currentTimeMillis();
         mazeGenerator.dropContainment();
-        kitManager.clearSelectors();
-        leaderboardBoard.clear();
         for (Player p : getAlivePlayers()) p.closeInventory();
 
         titleArenaPlayers("", ChatColor.YELLOW + "" + ChatColor.BOLD + "Get to the Safe Pad!", 5, 40, 5);
         broadcast(ChatColor.GREEN + "" + ChatColor.BOLD + "GO!");
 
-        secondTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        secondTask = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 if (state != GameState.LIVE) return;
                 decrementSafePadTime();
@@ -394,7 +381,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             }
         }, 20L, 20L);
 
-        mainTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        mainTask = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 if (state != GameState.LIVE) return;
                 liveTick++;
@@ -439,14 +426,13 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
         monsterManager.stop();
         feedback.clear();
-        kitManager.clearSelectors();
         safePadNavigation.clear();
         padLockIns.clear();
         lastCompassTargets.clear();
         playersOnPad.clear();
         destroyAllPads();
         List<Player> arenaPlayers = getRoundPlayersForCleanup();
-        mazeGenerator.returnToLobby();
+        mazeGenerator.cleanup();
         scoreboard.clear(arenaPlayers);
 
         for (Player p : arenaPlayers) {
@@ -462,41 +448,22 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 p.showPlayer(target);
             }
 
-            Location lobby = getLobbySpawn();
-            if (lobby != null) {
-                p.teleport(lobby);
-            }
+            if (testplexReturnToLobby != null) testplexReturnToLobby.accept(p);
+            else plugin.getHostPlugin().returnPlayerToArcadeLobby(p);
         }
         alive.clear();
         spectators.clear();
         state = GameState.IDLE;
-        // Restore lobby kit NPCs
-        if (center != null) {
-            kitManager.spawnSelectors(mazeGenerator.getLobbyCenter());
-            refreshLeaderboardBoard();
+        // Testplex owns the only player lobby. The standalone Monster Maze lobby
+        // remains available only for isolated module tests.
+        if (testplexManagedRound) {
             for (Player p : arenaPlayers) {
-                kitManager.openSelector(p);
+                if (p.isOnline()) p.sendMessage(ChatColor.GREEN + "Monster Maze finished. Returned to the Testplex Arcade lobby.");
             }
         }
-        broadcast(ChatColor.GREEN + "Back in lobby. Pick a kit, then /mm start");
         roundParticipants.clear();
-    }
-
-    /** Rebuild + redraw the lobby leaderboard hologram. Safe to call outside a live game. */
-    private void refreshLeaderboardBoard() {
-        if (mazeGenerator.getLobbyCenter() != null) {
-            leaderboardBoard.place(mazeGenerator.getLobbyCenter());
-            leaderboardBoard.render(plugin.getMode());
-        } else {
-            leaderboardBoard.remove();
-        }
-    }
-
-    /** Public hook to redraw the lobby board (e.g. after a mode change). */
-    public void rerenderLeaderboardBoard() {
-        if (state == GameState.IDLE || state == GameState.ENDING) {
-            refreshLeaderboardBoard();
-        }
+        testplexManagedRound = false;
+        testplexReturnToLobby = null;
     }
 
     private void cleanupEntities() {
@@ -818,7 +785,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             if (remaining.isEmpty()) {
                 state = GameState.ENDING;
                 broadcast(ChatColor.GOLD + "Solo run over — reached stage " + curSafe + "!");
-                Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+                Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
                     @Override public void run() { forceStop(); }
                 }, 80L);
             }
@@ -844,7 +811,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
             
             // Transition state after recording
             state = GameState.ENDING;
-            Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+            Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
                 @Override public void run() { forceStop(); }
             }, 100L);
         }
@@ -934,7 +901,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         final Location center=pad.getLocation().clone().add(0,1,0);final boolean firstPad=curSafe==1;
         for(int i=0;i<3;i++){
             final int shot=i;
-            Bukkit.getScheduler().runTaskLater(plugin,new Runnable(){@Override public void run(){
+            Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(),new Runnable(){@Override public void run(){
                 Location at=center.clone().add((shot-1)*0.45,0,shot==1?0.35:-0.35);
                 try{
                     Firework firework=at.getWorld().spawn(at,Firework.class);FireworkMeta meta=firework.getFireworkMeta();meta.setPower(1);
@@ -1032,7 +999,9 @@ public void startGame(Location preferCenter, int requestedPattern) {
         for (UUID id : new HashSet<UUID>(roundParticipants)) {
             Player player = Bukkit.getPlayer(id);
             if (player == null) continue;
-            if (!shouldIncludeRoundAudience(true, player.isOnline(), liveAudience,
+            boolean requireArenaWorld = liveAudience
+                    && !(testplexManagedRound && state == GameState.STARTING);
+            if (!shouldIncludeRoundAudience(true, player.isOnline(), requireArenaWorld,
                     arenaWorld, player.getWorld())) continue;
             players.add(player);
         }
@@ -1068,10 +1037,15 @@ public void startGame(Location preferCenter, int requestedPattern) {
         UUID id = player.getUniqueId();
         if (center == null) return;
         World arenaWorld = center.getWorld();
+        if (testplexManagedRound && state == GameState.STARTING && roundParticipants.contains(id)) {
+            // Testplex participants intentionally remain in the shared Arcade lobby
+            // while the arena is generated; do not treat that as leaving the game.
+            return;
+        }
         if (shouldRedirectUnregisteredPlayer(state, roundParticipants.contains(id),
                 arenaWorld, player.getWorld())) {
-            Location lobby = getLobbySpawn();
-            if (lobby != null) player.teleport(lobby);
+            if (testplexReturnToLobby != null) testplexReturnToLobby.accept(player);
+            else plugin.getHostPlugin().returnPlayerToArcadeLobby(player);
             return;
         }
         if (!roundParticipants.contains(id)
@@ -1120,7 +1094,7 @@ public void startGame(Location preferCenter, int requestedPattern) {
         if (!spectators.contains(event.getPlayer().getUniqueId())) return;
         if (center != null) event.setRespawnLocation(center.clone().add(0, 1, 0));
         final Player p = event.getPlayer();
-        Bukkit.getScheduler().runTaskLater(plugin, new Runnable() {
+        Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 if (p.isOnline()) p.setGameMode(GameMode.SPECTATOR);
             }

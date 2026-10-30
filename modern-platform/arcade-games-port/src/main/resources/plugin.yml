@@ -13,8 +13,14 @@ commands:
     usage: /stats [player]
     aliases: [arcadestats]
   arcadeport:
-    description: Start and test a modern Arcade mechanics prototype
+    description: Start and test a modern Arcade game
     usage: /arcadeport <play|join|start|kit|ghost|maps|lobby|bot|status|stop>
+  mm:
+    description: Monster Maze game commands managed by Testplex Arcade
+    usage: /mm <start|stop|kit|kits|map|mode|pattern|stats|pb|lb|status>
+  pause:
+    description: Pause or resume the active Monster Maze round
+    usage: /pause
 permissions:
   testplex.arcadeports.admin:
     description: Allows stopping and resetting an Arcade prototype

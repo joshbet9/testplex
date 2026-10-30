@@ -23,14 +23,14 @@ import java.util.Set;
 
 /** Short-lived modern-only floating health feedback above players in Monster Maze. */
 public final class PlayerFeedback implements Listener {
-    private final Plugin plugin;
+    private final MonsterMazePlugin plugin;
     private final GameManager game;
     private final Set<TextDisplay> activeDisplays = new HashSet<TextDisplay>();
 
     public PlayerFeedback(MonsterMazePlugin plugin, GameManager game) {
         this.plugin = plugin;
         this.game = game;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
     }
 
     @EventHandler
@@ -84,16 +84,16 @@ public final class PlayerFeedback implements Listener {
                 display.setTextOpacity((byte) Math.max(0, 255 - age * 10));
                 age++;
             }
-        }.runTaskTimer(plugin, 1L, 1L);
+        }.runTaskTimer(plugin.getHostPlugin(), 1L, 1L);
     }
 
     private void showToAllowedViewers(Player subject, TextDisplay display) {
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             if (viewer.getWorld() != subject.getWorld()
                     || game.getKitManager().isHiddenFrom(viewer, subject)) {
-                viewer.hideEntity(plugin, display);
+                viewer.hideEntity(plugin.getHostPlugin(), display);
             } else {
-                viewer.showEntity(plugin, display);
+                viewer.showEntity(plugin.getHostPlugin(), display);
             }
         }
     }

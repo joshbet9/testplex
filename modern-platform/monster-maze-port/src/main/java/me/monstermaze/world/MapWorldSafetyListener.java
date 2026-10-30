@@ -30,7 +30,7 @@ public final class MapWorldSafetyListener implements Listener {
 
     public MapWorldSafetyListener(MonsterMazePlugin plugin) {
         this.plugin = plugin;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
 
         // MapManager loads the active map before this listener is constructed, so WorldLoadEvent
         // is not sufficient for converted 1.8 worlds. Clean already-loaded worlds immediately.
@@ -40,7 +40,7 @@ public final class MapWorldSafetyListener implements Listener {
             purgeLoadedChunks(world);
         }
 
-        this.enforcementTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
+        this.enforcementTask = Bukkit.getScheduler().runTaskTimer(plugin.getHostPlugin(), new Runnable() {
             @Override public void run() {
                 for (World world : Bukkit.getWorlds()) {
                     if (!isManagedWorld(world)) continue;

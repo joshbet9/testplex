@@ -5,6 +5,7 @@ import me.monstermaze.event.FirstToSafepadEvent;
 import me.monstermaze.event.MonsterBumpPlayerEvent;
 import me.monstermaze.event.SafepadBuildEvent;
 import me.monstermaze.game.GameManager;
+import me.monstermaze.MonsterMazePlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
@@ -31,9 +32,9 @@ public class StatTracker implements Listener {
     private final Map<UUID, Long> bumpedAt = new HashMap<UUID, Long>(); // UUID -> bump time (ms)
     private boolean toughGiven = false;
 
-    public StatTracker(GameManager game, org.bukkit.plugin.Plugin plugin) {
+    public StatTracker(GameManager game, MonsterMazePlugin plugin) {
         this.game = game;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
     }
 
     public void reset() {
