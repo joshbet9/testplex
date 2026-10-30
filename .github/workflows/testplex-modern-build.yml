@@ -88,7 +88,7 @@ jobs:
           for candidate in bacon-brawl bomb-lobbers dragon-escape dragons paintball runner; do
             grep -Fxq "  - $candidate" <<< "$arcade_config"
           done
-          ! grep -Eq "^  - (death-tag|evolution|gladiators|micro-battles|one-in-the-quiver|sheep-quest|spleef|turf-wars)$" <<< "$arcade_config"
+          ! grep -Eq "^  - (death-tag|evolution|micro-battles|one-in-the-quiver|sheep-quest|spleef|turf-wars)$" <<< "$arcade_config"
           echo "All four modern Paper 26.3 plugin artifacts verified; Monster Maze feedback is packaged and all six approved Arcade candidates, including Dragons, are enabled."
 
       - name: Upload modern plugin artifact
@@ -117,7 +117,7 @@ jobs:
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
             echo "- Gameplay ports: Monster Maze and Snake plus 14 mechanics-first prototypes; in-game validation still required"
-            echo "- Deployment acceptance: Monster Maze plugin will be installed with the platform; the five explicitly approved Arcade candidates (Bacon Brawl, Bomb Lobbers, Dragon Escape, Paintball, Runner) are enabled; Snake remains gated"
+            echo "- Deployment acceptance: Monster Maze plugin will be installed with the platform; the seven explicitly approved Arcade candidates (Bacon Brawl, Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball, Runner) are enabled; Snake remains gated"
             echo "- Server deploy: successful pushes to feat/testplex-modern-26.3-platform automatically invoke the isolated Hyper-V deploy job; pull requests and manual build-only runs do not deploy"
           } >> "$GITHUB_STEP_SUMMARY"
 

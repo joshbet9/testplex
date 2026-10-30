@@ -94,7 +94,12 @@ public final class ArcadeCatalog {
                 List.of(line("duel-intro", "Duel Entrance", "A distinct combat entrance before the first hit.", "IRON_SWORD",
                         single("arena-challenger", "Arena Challenger", "An arena bell and crossed-sword flash."),
                         single("red-sand", "Red Sand", "A compact sand burst under the fighter."),
-                        single("oath-mark", "Oath Mark", "An emblem stamps briefly at the player's feet."))),
+                        single("oath-mark", "Oath Mark", "An emblem stamps briefly at the player's feet.")),
+                     line("kill-message", "Kill Message", "Choose the message everyone sees when you eliminate an opponent.", "WRITABLE_BOOK",
+                        single("classic", "Classic", "A straightforward Gladiators elimination message."),
+                        single("sent-to-sand", "Sent to the Sand", "A dramatic arena-themed elimination message."),
+                        single("broken-oath", "Broken Oath", "A ceremonial challenge-ending message."),
+                        single("outclassed", "Outclassed", "A short, competitive kill message."))),
                 win("champions-podium", "Champion's Podium", "The champion is raised on a stone podium."),
                 win("crossed-steel", "Crossed Steel", "Two swords frame the winner."),
                 win("arena-banners", "Arena Banners", "Banners unfurl around the final combatant")));
