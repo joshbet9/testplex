@@ -427,7 +427,7 @@ jobs:
 
           [[ "$BUILD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid source build SHA." >&2; exit 1; }
           [[ "$ACCEPT_EULA" == "true" ]] || { echo "Minecraft EULA acknowledgement missing." >&2; exit 1; }
-          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar;
+          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
             sudo -n test -s "$UPLOAD_DIR/$jar"
           done
           sudo -n test -s "$UPLOAD_DIR/MonsterMazeMaps.tar.gz"
@@ -523,7 +523,7 @@ jobs:
           sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
           # Install all four Bukkit plugins owned by the Testplex Modern server.
           # Monster Maze gameplay is compiled into ArcadeMechanicsModern and is not a plugin of its own.
-          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar;
+          for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
           done
 
