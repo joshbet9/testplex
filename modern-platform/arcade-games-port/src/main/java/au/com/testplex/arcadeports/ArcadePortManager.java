@@ -4799,22 +4799,34 @@ public final class ArcadePortManager implements Listener {
             double fraction = Math.max(0.0D, Math.min(1.0D, (player.getLocation().getZ() + 24.0D) / 104.0D));
             return Math.round(totalPb * fraction);
         }
+
         int progress = Math.max(0, Math.min(count - 1, dragonEscapePlayerProgress(session, player)));
         int segment = ArcadePortRules.dragonEscapePbSegmentStartIndex(progress, count);
-        // The last authored marker is the finish area; its split is the full PB time.
-        if (segment < 0) return Math.max(0L, totalPb);
+        if (segment < 0) return 0L;
 
-        Location from = session.dragonEscapeWaypoints.get(segment);
-        Location to = session.dragonEscapeWaypoints.get(segment + 1);
         Map<Integer, Long> splits = dragonEscapePersonalBestSplits(
                 player.getUniqueId(), session.dragonEscapeMapResource);
         long fromTime = splits.getOrDefault(segment,
                 ArcadePortRules.dragonEscapeDefaultSplitMillis(totalPb, segment, count));
         long toTime = splits.getOrDefault(segment + 1,
                 ArcadePortRules.dragonEscapeDefaultSplitMillis(totalPb, segment + 1, count));
-        double segmentLength = from.distance(to);
-        double fraction = segmentLength < 0.001D ? 0.0D
-                : Math.max(0.0D, Math.min(1.0D, 1.0D - player.getLocation().distance(to) / segmentLength));
+
+        double fraction;
+        if (segment < count - 1) {
+            // Normal leg: interpolate from the current authored waypoint to the next one.
+            Location from = session.dragonEscapeWaypoints.get(segment);
+            Location to = session.dragonEscapeWaypoints.get(segment + 1);
+            double segmentLength = from.distance(to);
+            fraction = segmentLength < 0.001D ? 0.0D
+                    : 1.0D - player.getLocation().distance(to) / segmentLength;
+        } else {
+            // Final leg: Reborn finishes inside a three-block radius of the last marker.
+            // Keep the PB delta moving through that finish radius rather than freezing at
+            // the last checkpoint or jumping to the full PB before the finish is reached.
+            double distanceToFinish = player.getLocation().distance(
+                    session.dragonEscapeWaypoints.get(count - 1));
+            fraction = 1.0D - distanceToFinish / 3.0D;
+        }
         return ArcadePortRules.interpolateDragonEscapeSplitMillis(fromTime, toTime, fraction);
     }
 
@@ -4826,22 +4838,31 @@ public final class ArcadePortManager implements Listener {
         Map<Integer, Long> splits = dragonEscapePersonalBestSplits(playerId, session.dragonEscapeMapResource);
         List<Location> route = session.dragonEscapeWaypoints;
         int count = route.size();
-        for (int i = 0; i < count - 1; i++) {
-            long t0 = splits.getOrDefault(i,
-                    ArcadePortRules.dragonEscapeDefaultSplitMillis(pb, i, count));
-            long t1 = splits.getOrDefault(i + 1,
-                    ArcadePortRules.dragonEscapeDefaultSplitMillis(pb, i + 1, count));
-            if (t1 <= t0) t1 = t0 + 1L;
-            if (elapsed > t1) continue;
-            double fraction = Math.max(0.0D, Math.min(1.0D, (elapsed - t0) / (double) (t1 - t0)));
-            Location from = route.get(i);
-            Location to = route.get(i + 1);
+
+        // Splits are keyed 0 at the start, 1..N-1 at authored route progress,
+        // and N at the finish. Render every corresponding leg in that same order.
+        for (int segment = 0; segment < count; segment++) {
+            long fromTime = splits.getOrDefault(segment,
+                    ArcadePortRules.dragonEscapeDefaultSplitMillis(pb, segment, count));
+            long toTime = splits.getOrDefault(segment + 1,
+                    ArcadePortRules.dragonEscapeDefaultSplitMillis(pb, segment + 1, count));
+            if (toTime <= fromTime) toTime = fromTime + 1L;
+            if (elapsed > toTime) continue;
+
+            if (segment == count - 1) {
+                // The final PB split is the finish trigger inside the last marker's
+                // radius. Keep the ghost on that final marker for this short leg.
+                return route.get(count - 1).clone();
+            }
+
+            double fraction = Math.max(0.0D, Math.min(1.0D,
+                    (elapsed - fromTime) / (double) (toTime - fromTime)));
+            Location from = route.get(segment);
+            Location to = route.get(segment + 1);
             return from.clone().add((to.getX() - from.getX()) * fraction,
                     (to.getY() - from.getY()) * fraction,
                     (to.getZ() - from.getZ()) * fraction);
         }
-        // The stored final split is the finish time, so hold the ghost at the last marker
-        // for any small finish-radius interval rather than replaying the preceding segment.
         return route.get(count - 1).clone();
     }
 
