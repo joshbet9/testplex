@@ -1491,6 +1491,11 @@ class ArcadePortGameTest {
         assertEquals(50_000L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 50_000L, 2.0D));
         assertEquals(20_000L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 10_000L, 0.5D));
         assertEquals(20_000L, ArcadePortRules.interpolateDragonEscapeSplitMillis(20_000L, 50_000L, Double.NaN));
+
+        assertEquals(5.0D, ArcadePortRules.interpolateDragonEscapeCoordinate(0.0D, 10.0D, 0.5D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.interpolateDragonEscapeCoordinate(0.0D, 10.0D, -1.0D), 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.interpolateDragonEscapeCoordinate(0.0D, 10.0D, 2.0D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.interpolateDragonEscapeCoordinate(0.0D, 10.0D, Double.NaN), 0.00001D);
     }
 
     @Test void dragonEscapeRouteOnlyDeduplicatesCoincidentWaypoints() {
