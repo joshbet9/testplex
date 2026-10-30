@@ -422,12 +422,16 @@ public final class MenuService implements Listener {
         Set<String> selected = preferences.getSelected(player.getUniqueId(), game, line);
         int slot = 0;
         for (CosmeticOption option : line.getOptions()) {
+            String selectionHint = line.getSelectionMode() == CosmeticLineDefinition.SelectionMode.SINGLE
+                    ? ChatColor.YELLOW + "Click to equip"
+                    : option.getSelectionGroup() == null
+                            ? ChatColor.YELLOW + "Click to toggle"
+                            : ChatColor.YELLOW + "Click to equip in " + option.getSelectionGroup();
             ItemStack item = makeItem(line.getIcon(),
                     (selected.contains(option.getId()) ? ChatColor.GREEN + "✓ " : ChatColor.WHITE) + option.getName(),
                     List.of(ChatColor.GRAY + option.getDescription(),
                             selected.contains(option.getId()) ? ChatColor.GREEN + "Selected" : ChatColor.GRAY + "Not selected",
-                            line.getSelectionMode() == CosmeticLineDefinition.SelectionMode.MULTI
-                                    ? ChatColor.YELLOW + "Click to toggle" : ChatColor.YELLOW + "Click to equip"));
+                            selectionHint));
             mark(item, "cosmetic-option", game, line, option.getId());
             inventory.setItem(slot++, item);
         }
