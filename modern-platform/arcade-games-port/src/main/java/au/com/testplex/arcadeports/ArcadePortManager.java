@@ -4311,14 +4311,10 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         consumeHeld(player);
-        Vector direction = player.getEyeLocation().getDirection().normalize();
-        Location spawn = player.getEyeLocation().add(direction.clone().multiply(0.8D));
-        Item mine = session.world.dropItem(spawn, new ItemStack(Material.TNT));
+        // Reborn drops an ordinary TNT item at the eye position and leaves it
+        // subject to the normal pickup event; it is not a primed explosive.
+        Item mine = session.world.dropItem(player.getEyeLocation(), new ItemStack(Material.TNT));
         mine.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
-        mine.setPickupDelay(Integer.MAX_VALUE);
-        mine.setInvulnerable(true);
-        mine.setCustomName(ChatColor.RED + "Disruptor Mine");
-        mine.setCustomNameVisible(true);
         session.entities.add(mine);
         session.dragonEscapeMineOwners.put(mine.getUniqueId(), player.getUniqueId());
         player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.15F);
@@ -4370,33 +4366,44 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    /** Remove owner tracking when the source-style dropped TNT item despawns or is removed. */
     private void updateDragonEscapeMines(Session session) {
-        for (Entity entity : new ArrayList<>(session.entities)) {
-            if (!(entity instanceof Item mine)) continue;
-            UUID ownerId = session.dragonEscapeMineOwners.get(mine.getUniqueId());
-            if (ownerId == null) continue;
-            if (!mine.isValid()) {
-                session.dragonEscapeMineOwners.remove(mine.getUniqueId());
-                session.entities.remove(mine);
-                continue;
-            }
-            for (Player target : alivePlayers(session)) {
-                boolean sameOwner = target.getUniqueId().equals(ownerId);
-                double distance = target.getLocation().distance(mine.getLocation());
-                if (!ArcadePortRules.shouldTriggerDragonEscapeDisruptor(
-                        mine.getTicksLived(), distance, sameOwner)) continue;
-                session.dragonEscapeMineOwners.remove(mine.getUniqueId());
-                session.entities.remove(mine);
-                mine.remove();
-                target.setVelocity(new Vector(0.0D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y, 0.0D));
-                target.setFallDistance(0.0F);
-                target.playEffect(EntityEffect.HURT);
-                target.setSprinting(false);
-                target.getWorld().playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1.0F, 2.0F);
-                target.sendActionBar(ChatColor.RED + "A Disruptor mine launched you!");
-                break;
+        for (UUID mineId : new ArrayList<>(session.dragonEscapeMineOwners.keySet())) {
+            Entity entity = session.world.getEntity(mineId);
+            if (entity == null || !entity.isValid()) {
+                session.dragonEscapeMineOwners.remove(mineId);
+                if (entity != null) session.entities.remove(entity);
             }
         }
+    }
+
+    /** Reborn's Disruptor detonates on an opponent's pickup, not by proximity alone. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onDragonEscapeDisruptorPickup(EntityPickupItemEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.DRAGON_ESCAPE
+                || event.getItem() == null || event.getItem().getWorld() != session.world
+                || !(event.getEntity() instanceof Player target)) return;
+        Item mine = event.getItem();
+        UUID ownerId = session.dragonEscapeMineOwners.get(mine.getUniqueId());
+        if (ownerId == null) return;
+
+        // Cancel every pickup attempt so TNT never enters an inventory.
+        event.setCancelled(true);
+        if (!session.alive.contains(target.getUniqueId())) return;
+        if (!ArcadePortRules.shouldTriggerDragonEscapeDisruptor(
+                mine.getTicksLived(), target.getLocation().distance(mine.getLocation()),
+                target.getUniqueId().equals(ownerId))) return;
+
+        session.dragonEscapeMineOwners.remove(mine.getUniqueId());
+        session.entities.remove(mine);
+        mine.remove();
+        target.setVelocity(new Vector(0.0D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y, 0.0D));
+        target.setFallDistance(0.0F);
+        target.playEffect(EntityEffect.HURT);
+        target.setSprinting(false);
+        target.getWorld().playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1.0F, 2.0F);
+        target.sendActionBar(ChatColor.RED + "A Disruptor mine launched you!");
     }
 
     private boolean isDragonEscapeDiggerBlockAllowed(Material material) {
@@ -8046,7 +8053,10 @@ public final class ArcadePortManager implements Listener {
         boolean runnerLeftClick = session.type == ArcadePortGame.RUNNER && event.getAction().isLeftClick();
         boolean baconNonRightClick = session.type == ArcadePortGame.BACON_BRAWL
                 && !event.getAction().isRightClick();
-        if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick && !baconNonRightClick) return;
+        boolean dragonEscapeDisruptorLeftClick = session.type == ArcadePortGame.DRAGON_ESCAPE
+                && event.getAction() == Action.LEFT_CLICK_AIR;
+        if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick
+                && !baconNonRightClick && !dragonEscapeDisruptorLeftClick) return;
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
         if (event.isCancelled()) {
@@ -8150,7 +8160,8 @@ public final class ArcadePortManager implements Listener {
                 useDragonEscapeWarper(session, player);
                 return;
             }
-            if (event.getAction().isRightClick() && item == Material.TNT && "disruptor".equals(kit)) {
+            if ((event.getAction().isRightClick() || event.getAction() == Action.LEFT_CLICK_AIR)
+                    && item == Material.TNT && "disruptor".equals(kit)) {
                 event.setCancelled(true);
                 throwDragonEscapeMine(session, player);
                 return;
