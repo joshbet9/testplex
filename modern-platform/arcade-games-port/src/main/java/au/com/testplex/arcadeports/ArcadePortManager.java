@@ -523,7 +523,6 @@ public final class ArcadePortManager implements Listener {
         if (session != null && session.type == ArcadePortGame.SPLEEF
                 && session.players.containsKey(player.getUniqueId()) && session.alive.contains(player.getUniqueId())) {
             session.spleefKits.put(player.getUniqueId(), kit);
-            session.spleefLeapReadyAt.remove(player.getUniqueId());
             giveKit(session, player);
             player.sendMessage(ChatColor.GREEN + "Spleef kit changed to " + kit + ".");
         } else {
@@ -2578,7 +2577,7 @@ public final class ArcadePortManager implements Listener {
                 switch (kit) {
                     case "brawler":
                         player.getInventory().addItem(namedItem(Material.IRON_AXE, "Leaper Axe",
-                                "Right-click to leap. Damaging a floor block also breaks its neighbours."));
+                                "Right-click to leap (30-second cooldown). Damaging a floor block also breaks its neighbours."));
                         break;
                     case "archer":
                         player.getInventory().addItem(new ItemStack(Material.BOW));
@@ -8627,13 +8626,13 @@ public final class ArcadePortManager implements Listener {
                     for (int dy = -1; dy <= 1; dy++) {
                         for (int dz = -1; dz <= 1; dz++) {
                             if (dx == 0 && dy == 0 && dz == 0) continue;
-                            fadeSpleefBlock(session, block.getRelative(dx, dy, dz), false);
+                            fadeSpleefBlock(session, player, block.getRelative(dx, dy, dz), false);
                         }
                     }
                 }
-                fadeSpleefBlock(session, block, false);
-            } else fadeSpleefBlock(session, block, false);
-        } else fadeSpleefBlock(session, block, false);
+                fadeSpleefBlock(session, player, block, false);
+            } else fadeSpleefBlock(session, player, block, false);
+        } else fadeSpleefBlock(session, player, block, false);
         giveSpleefSnowball(session, player);
     }
 
@@ -8684,12 +8683,12 @@ public final class ArcadePortManager implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.7F, 1.2F);
     }
 
-    private void fadeSpleefBlock(Session session, Block block, boolean slowDamage) {
+    private void fadeSpleefBlock(Session session, Player breaker, Block block, boolean slowDamage) {
         if (active != session || session.type != ArcadePortGame.SPLEEF || block == null
                 || block.getWorld() != session.world || isSpleefProtectedBlock(block.getType())) return;
         Material material = block.getType();
         if (!slowDamage) {
-            breakSpleefBlock(session, block);
+            breakSpleefBlock(session, breaker, block);
             return;
         }
         Material damaged = null;
@@ -8707,7 +8706,7 @@ public final class ArcadePortManager implements Listener {
             damaged = Material.BIRCH_PLANKS;
         }
         if (damaged == null || damaged == material) {
-            breakSpleefBlock(session, block);
+            breakSpleefBlock(session, breaker, block);
         } else {
             block.setType(damaged, false);
         }
@@ -8722,12 +8721,70 @@ public final class ArcadePortManager implements Listener {
         return ArcadePortRules.nextSpleefSlowDamageMaterial(material);
     }
 
-    private void breakSpleefBlock(Session session, Block block) {
+    private String spleefBreakSignatureOption(UUID playerId) {
+        String fallback = "snowburst";
+        if (playerId == null) return fallback;
+        org.bukkit.plugin.Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (cosmeticsPlugin == null || !cosmeticsPlugin.isEnabled()) return fallback;
+        try {
+            Object selected = cosmeticsPlugin.getClass()
+                    .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
+                    .invoke(cosmeticsPlugin, playerId, "spleef", "signature");
+            return selected instanceof String value
+                    && java.util.Set.of("snowburst", "ice-shards", "chalk-grid").contains(value)
+                    ? value : fallback;
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().fine("Spleef block-break cosmetic preference bridge unavailable: "
+                    + exception.getMessage());
+            return fallback;
+        }
+    }
+
+    /**
+     * Render the block break selected by the player who caused it. Explicitly
+     * target every player in this isolated match world and force delivery, so
+     * distant players and spectators see the same effect as the breaker.
+     */
+    private void breakSpleefBlock(Session session, Player breaker, Block block) {
         if (isSpleefProtectedBlock(block.getType())) return;
+        BlockData brokenData = block.getBlockData();
+        Location center = block.getLocation().add(0.5D, 0.5D, 0.5D);
         block.setType(Material.AIR, false);
-        session.world.spawnParticle(Particle.CLOUD, block.getLocation().add(0.5D, 0.5D, 0.5D),
-                4, 0.2D, 0.2D, 0.2D, 0.02D);
-        session.world.playSound(block.getLocation(), Sound.BLOCK_STONE_BREAK, 0.5F, 1.15F);
+
+        List<Player> receivers = new ArrayList<>(session.world.getPlayers());
+        if (!receivers.isEmpty()) {
+            String signature = spleefBreakSignatureOption(breaker == null ? null : breaker.getUniqueId());
+            switch (signature) {
+                case "ice-shards" -> {
+                    session.world.spawnParticle(Particle.BLOCK, receivers, null,
+                            center.getX(), center.getY(), center.getZ(), 14,
+                            0.24D, 0.22D, 0.24D, 0.11D, brokenData, true);
+                    session.world.spawnParticle(Particle.SNOWFLAKE, receivers, null,
+                            center.getX(), center.getY(), center.getZ(), 8,
+                            0.20D, 0.20D, 0.20D, 0.035D, null, true);
+                }
+                case "chalk-grid" -> {
+                    Particle.DustOptions chalk = new Particle.DustOptions(Color.fromRGB(235, 239, 245), 0.9F);
+                    for (double offset : new double[] {-0.28D, 0.0D, 0.28D}) {
+                        session.world.spawnParticle(Particle.DUST, receivers, null,
+                                center.getX(), center.getY(), center.getZ() + offset, 3,
+                                0.26D, 0.0D, 0.0D, 0.0D, chalk, true);
+                        session.world.spawnParticle(Particle.DUST, receivers, null,
+                                center.getX() + offset, center.getY(), center.getZ(), 3,
+                                0.0D, 0.0D, 0.26D, 0.0D, chalk, true);
+                    }
+                }
+                default -> {
+                    session.world.spawnParticle(Particle.SNOWFLAKE, receivers, null,
+                            center.getX(), center.getY(), center.getZ(), 12,
+                            0.20D, 0.18D, 0.20D, 0.06D, null, true);
+                    session.world.spawnParticle(Particle.CLOUD, receivers, null,
+                            center.getX(), center.getY(), center.getZ(), 4,
+                            0.14D, 0.12D, 0.14D, 0.02D, null, true);
+                }
+            }
+        }
+        session.world.playSound(center, Sound.BLOCK_STONE_BREAK, 0.5F, 1.15F);
     }
 
     private void updateRunnerKits(Session session, long now) {
@@ -9359,18 +9416,18 @@ public final class ArcadePortManager implements Listener {
                     double arrowSpeed = arrow.getVelocity().length();
                     double radius = Math.min(3.0D, 0.5D + arrowSpeed / 1.6D);
                     int limit = ArcadePortRules.spleefProjectileClearRadius(true, arrowSpeed);
-                    fadeSpleefBlock(session, center, false);
+                    fadeSpleefBlock(session, shooter, center, false);
                     for (int dx = -limit; dx <= limit; dx++) {
                         for (int dy = -limit; dy <= limit; dy++) {
                             for (int dz = -limit; dz <= limit; dz++) {
                                 if ((dx == 0 && dy == 0 && dz == 0)
                                         || dx * dx + dy * dy + dz * dz > radius * radius) continue;
-                                fadeSpleefBlock(session, center.getRelative(dx, dy, dz), true);
+                                fadeSpleefBlock(session, shooter, center.getRelative(dx, dy, dz), true);
                             }
                         }
                     }
                 } else {
-                    fadeSpleefBlock(session, center, false);
+                    fadeSpleefBlock(session, shooter, center, false);
                     giveSpleefSnowball(session, shooter);
                 }
             }
