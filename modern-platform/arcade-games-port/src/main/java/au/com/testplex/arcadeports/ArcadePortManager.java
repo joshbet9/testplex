@@ -7765,6 +7765,14 @@ public final class ArcadePortManager implements Listener {
         }
         if (event.getEntity() instanceof Player target && session.players.containsKey(target.getUniqueId())) {
             event.setCancelled(true);
+            if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                    && event instanceof EntityDamageByEntityEvent dragonEscapeDamage) {
+                Entity damager = dragonEscapeDamage.getDamager();
+                boolean directPvp = damager instanceof Player;
+                boolean playerProjectile = damager instanceof Projectile projectile
+                        && projectile.getShooter() instanceof Player;
+                if (directPvp || playerProjectile) return;
+            }
             if (session.type == ArcadePortGame.RUNNER && event instanceof EntityDamageByEntityEvent runnerDamage) {
                 Entity damager = runnerDamage.getDamager();
                 if (damager instanceof Player || damager instanceof Projectile) return;
