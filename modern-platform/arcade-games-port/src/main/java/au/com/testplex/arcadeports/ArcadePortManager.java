@@ -4800,16 +4800,22 @@ public final class ArcadePortManager implements Listener {
             return Math.round(totalPb * fraction);
         }
         int progress = Math.max(0, Math.min(count - 1, dragonEscapePlayerProgress(session, player)));
-        Location from = progress == 0 ? session.dragonEscapeStartLocation : session.dragonEscapeWaypoints.get(progress - 1);
-        Location to = session.dragonEscapeWaypoints.get(progress);
-        Map<Integer, Long> splits = dragonEscapePersonalBestSplits(player.getUniqueId(), session.dragonEscapeMapResource);
-        long fromTime = splits.getOrDefault(progress, Math.round(totalPb * (progress / (double) count)));
-        long toTime = splits.getOrDefault(progress + 1, Math.round(totalPb * ((progress + 1.0D) / count)));
-        if (toTime < fromTime) toTime = fromTime;
-        double segmentLength = from == null ? 0.0D : from.distance(to);
-        double fraction = segmentLength < 0.001D || from == null ? 0.0D
+        int segment = ArcadePortRules.dragonEscapePbSegmentStartIndex(progress, count);
+        // The last authored marker is the finish area; its split is the full PB time.
+        if (segment < 0) return Math.max(0L, totalPb);
+
+        Location from = session.dragonEscapeWaypoints.get(segment);
+        Location to = session.dragonEscapeWaypoints.get(segment + 1);
+        Map<Integer, Long> splits = dragonEscapePersonalBestSplits(
+                player.getUniqueId(), session.dragonEscapeMapResource);
+        long fromTime = splits.getOrDefault(segment,
+                ArcadePortRules.dragonEscapeDefaultSplitMillis(totalPb, segment, count));
+        long toTime = splits.getOrDefault(segment + 1,
+                ArcadePortRules.dragonEscapeDefaultSplitMillis(totalPb, segment + 1, count));
+        double segmentLength = from.distance(to);
+        double fraction = segmentLength < 0.001D ? 0.0D
                 : Math.max(0.0D, Math.min(1.0D, 1.0D - player.getLocation().distance(to) / segmentLength));
-        return Math.max(0L, fromTime + Math.round((toTime - fromTime) * fraction));
+        return ArcadePortRules.interpolateDragonEscapeSplitMillis(fromTime, toTime, fraction);
     }
 
     private Location dragonEscapeGhostLocation(Session session, UUID playerId, long elapsed) {
@@ -4818,19 +4824,25 @@ public final class ArcadePortManager implements Listener {
         long pb = dragonEscapePersonalBestMillis(playerId, session.dragonEscapeMapResource);
         if (pb <= 0L || elapsed >= pb) return null;
         Map<Integer, Long> splits = dragonEscapePersonalBestSplits(playerId, session.dragonEscapeMapResource);
-        int count = session.dragonEscapeWaypoints.size();
-        for (int i = 0; i < count; i++) {
-            long t0 = splits.getOrDefault(i, Math.round(pb * (i / (double) count)));
-            long t1 = splits.getOrDefault(i + 1, Math.round(pb * ((i + 1.0D) / count)));
+        List<Location> route = session.dragonEscapeWaypoints;
+        int count = route.size();
+        for (int i = 0; i < count - 1; i++) {
+            long t0 = splits.getOrDefault(i,
+                    ArcadePortRules.dragonEscapeDefaultSplitMillis(pb, i, count));
+            long t1 = splits.getOrDefault(i + 1,
+                    ArcadePortRules.dragonEscapeDefaultSplitMillis(pb, i + 1, count));
             if (t1 <= t0) t1 = t0 + 1L;
             if (elapsed > t1) continue;
-            double f = Math.max(0.0D, Math.min(1.0D, (elapsed - t0) / (double) (t1 - t0)));
-            Location from = i == 0 ? session.dragonEscapeStartLocation : session.dragonEscapeWaypoints.get(i - 1);
-            Location to = session.dragonEscapeWaypoints.get(i);
-            return from.clone().add((to.getX() - from.getX()) * f,
-                    (to.getY() - from.getY()) * f, (to.getZ() - from.getZ()) * f);
+            double fraction = Math.max(0.0D, Math.min(1.0D, (elapsed - t0) / (double) (t1 - t0)));
+            Location from = route.get(i);
+            Location to = route.get(i + 1);
+            return from.clone().add((to.getX() - from.getX()) * fraction,
+                    (to.getY() - from.getY()) * fraction,
+                    (to.getZ() - from.getZ()) * fraction);
         }
-        return null;
+        // The stored final split is the finish time, so hold the ghost at the last marker
+        // for any small finish-radius interval rather than replaying the preceding segment.
+        return route.get(count - 1).clone();
     }
 
     private Color dragonEscapeBeaconRgb(String color) {
