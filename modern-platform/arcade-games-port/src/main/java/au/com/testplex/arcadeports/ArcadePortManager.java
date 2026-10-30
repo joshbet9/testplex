@@ -7344,6 +7344,12 @@ public final class ArcadePortManager implements Listener {
                     + " Y" + sheepQuestTeamCount(session, 3);
             case SPLEEF -> "snowballs " + inventoryCount(player, Material.SNOWBALL);
             case TURF_WARS -> (session.turfCombat ? "COMBAT" : "BUILD") + " | turf " + session.turfFrontlineX;
+            case DRAW_MY_THING -> session.drawCurrentDrawer == null ? "waiting for next drawing"
+                    : session.drawCurrentDrawer.equals(id) ? "drawing"
+                    : session.drawCorrectGuessers.contains(id) ? "guessed correctly"
+                    : "guesses " + Math.max(0, DRAW_MY_THING_MAX_GUESSES - session.drawGuessAttempts.getOrDefault(id, 0)) + "/10";
+            case MASTER_BUILDERS -> session.masterBuilderPhase == MasterBuildersPhase.BUILDING
+                    ? "building | " + session.masterBuilderTheme : "review | " + session.masterBuilderTheme;
         };
     }
 
