@@ -57,8 +57,10 @@ import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
@@ -142,6 +144,9 @@ public final class ArcadePortManager implements Listener {
     private final NamespacedKey statsCategoryKey;
     private final NamespacedKey statsGameKey;
     private final NamespacedKey bombPowerupKey;
+    private final NamespacedKey gladiatorMenuActionKey;
+    private final NamespacedKey gladiatorMenuValueKey;
+    private final NamespacedKey gladiatorPotionKey;
     private final ModernArcadeLobby lobby;
     private final ModernArcadeLobbyRuntime lobbyRuntime;
 
@@ -151,6 +156,9 @@ public final class ArcadePortManager implements Listener {
         this.statsCategoryKey = new NamespacedKey(plugin, "stats-category");
         this.statsGameKey = new NamespacedKey(plugin, "stats-game");
         this.bombPowerupKey = new NamespacedKey(plugin, "bomb-lobbers-powerup");
+        this.gladiatorMenuActionKey = new NamespacedKey(plugin, "gladiators-menu-action");
+        this.gladiatorMenuValueKey = new NamespacedKey(plugin, "gladiators-menu-value");
+        this.gladiatorPotionKey = new NamespacedKey(plugin, "gladiators-healing-pot");
         this.lobby = new ModernArcadeLobby(plugin);
         Bukkit.getPluginManager().registerEvents(this, plugin);
         Bukkit.getPluginManager().registerEvents(lobby, plugin);
@@ -1177,7 +1185,10 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.DRAGONS) spawnTestDragons(session);
         if (type == ArcadePortGame.GLADIATORS && participants.size() > 1) {
-            startGladiatorsRound(session, alivePlayers(session), true);
+            beginGladiatorVote(session);
+        } else if (type == ArcadePortGame.GLADIATORS && participants.size() == 1) {
+            session.gladiatorMode = GladiatorsMode.RODLESS.id();
+            giveGladiatorKit(session, participants.get(0));
         }
         if (type == ArcadePortGame.MICRO_BATTLES) announce(session, ChatColor.AQUA + "Micro Battles: gather blocks; glass barriers drop after 10 seconds.");
         else announce(session, ChatColor.GOLD + type.displayName() + " started! This is a first-pass mechanics test.");
@@ -5477,7 +5488,10 @@ public final class ArcadePortManager implements Listener {
                     case 3 -> "red";
                     default -> "green";
                 };
-                yield tier + " | matches " + Math.max(0, session.gladiatorPairCount - session.gladiatorResolvedPairs.size());
+                long matches = session.gladiatorPairBrackets.keySet().stream()
+                        .filter(pair -> !session.gladiatorResolvedPairs.contains(pair)).count();
+                yield tier + " | " + session.gladiatorMode + " | W " + session.gladiatorWinnerQueue.size()
+                        + " / L " + session.gladiatorLoserQueue.size() + " | fights " + matches;
             }
             case MICRO_BATTLES -> "team " + (session.teams.getOrDefault(id, 0) + 1) + "/4";
             case ONE_IN_THE_QUIVER -> "kills " + scoreFor(session, id) + "/20";
@@ -5515,15 +5529,7 @@ public final class ArcadePortManager implements Listener {
         // Keep solo practice and last-runner attempts live until the finish is reached.
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) return;
         if (session.type == ArcadePortGame.GLADIATORS && session.participantsAtStart > 1) {
-            if (session.alive.size() <= 1) {
-                finish(session, alivePlayers(session).stream().findFirst().orElse(null), true);
-                return;
-            }
-            if (ArcadePortRules.allGladiatorPairsResolved(session.gladiatorPairCount, session.gladiatorResolvedPairs.size())
-                    && session.nextGladiatorRoundAt == 0L) {
-                session.nextGladiatorRoundAt = System.currentTimeMillis() + 2_000L;
-                announce(session, ChatColor.GREEN + "All matches are complete. Advancing the winners...");
-            }
+            progressGladiators(session);
             return;
         }
         if ((session.type == ArcadePortGame.MICRO_BATTLES || session.type == ArcadePortGame.PAINTBALL
@@ -5997,7 +6003,9 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.GLADIATORS) {
             Integer attackerPair = session.gladiatorPairs.get(attacker.getUniqueId());
             Integer targetPair = session.gladiatorPairs.get(target.getUniqueId());
-            if (!ArcadePortRules.canGladiatorsFight(System.currentTimeMillis(), session.gladiatorFightStartsAt,
+            long fightStartsAt = attackerPair == null ? Long.MAX_VALUE
+                    : session.gladiatorFightStartsAtByPair.getOrDefault(attackerPair, Long.MAX_VALUE);
+            if (!ArcadePortRules.canGladiatorsFight(System.currentTimeMillis(), fightStartsAt,
                     attackerPair == null ? -1 : attackerPair,
                     targetPair == null ? -2 : targetPair,
                     attackerPair != null && session.gladiatorResolvedPairs.contains(attackerPair))) return;
