@@ -18,6 +18,7 @@ import nautilus.game.arcade.game.games.bossbattles.BossBattles;
 import nautilus.game.arcade.game.games.bridge.Bridge;
 import nautilus.game.arcade.game.games.bridge.modes.OverpoweredBridge;
 import nautilus.game.arcade.game.games.build.Build;
+import nautilus.game.arcade.game.games.build.BuildArcade;
 import nautilus.game.arcade.game.games.buildmavericks.BuildMavericks;
 import nautilus.game.arcade.game.games.cakewars.CakeWars;
 import nautilus.game.arcade.game.games.cakewars.modes.CakeWarsDuos;
@@ -35,6 +36,7 @@ import nautilus.game.arcade.game.games.dragonescape.DragonEscape;
 import nautilus.game.arcade.game.games.dragons.Dragons;
 import nautilus.game.arcade.game.games.dragons.DragonsTeams;
 import nautilus.game.arcade.game.games.draw.Draw;
+import nautilus.game.arcade.game.games.draw.DrawArcade;
 import nautilus.game.arcade.game.games.event.EventGame;
 import nautilus.game.arcade.game.games.evolution.Evolution;
 import nautilus.game.arcade.game.games.gladiators.Gladiators;
@@ -135,6 +137,7 @@ public enum GameType implements Voteable
 					Pair.create(MinecraftVersion.Version1_9, "https://up.nitro.moe/mineplex/ResDrawMyThing19.zip"),
 					Pair.create(MinecraftVersion.Version1_13, "https://up.nitro.moe/mineplex/ResDrawMyThing113.zip")
 			}, true),
+	DrawArcade(DrawArcade.class, GameDisplay.Draw, new GameType[]{GameType.Draw}, false),
 	ElytraRings(ElytraRings.class, GameDisplay.ElytraRings),
 	Evolution(Evolution.class, GameDisplay.Evolution),
 	Gravity(Gravity.class, GameDisplay.Gravity),
@@ -200,6 +203,7 @@ public enum GameType implements Voteable
 			}, true),
 	ZombieSurvival(ZombieSurvival.class, GameDisplay.ZombieSurvival),
 	Build(Build.class, GameDisplay.Build),
+	BuildArcade(BuildArcade.class, GameDisplay.Build, new GameType[]{GameType.Build}, false),
 	BuildMavericks(BuildMavericks.class, GameDisplay.BuildMavericks),
 	Skywars(SoloSkywars.class, GameDisplay.Skywars),
 	SkywarsTeams(TeamSkywars.class, GameDisplay.SkywarsTeams, new GameType[]{GameType.Skywars}, false),

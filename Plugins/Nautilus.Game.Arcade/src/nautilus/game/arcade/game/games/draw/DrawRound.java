@@ -1,7 +1,10 @@
 package nautilus.game.arcade.game.games.draw;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -29,6 +32,8 @@ public class DrawRound
 	public double TimeMax;
 	public double TimeChooseMax = 10;
 	public HashSet<String> Guessed = new HashSet<String>(); 
+	private final Map<UUID, Integer> _guessAttempts = new HashMap<UUID, Integer>();
+	public static final int MAX_ARCADE_GUESSES = 10;
 	public ArrayList<String> WordChoices;
 
 	public DrawRound(Draw draw, Player player)
@@ -43,7 +48,7 @@ public class DrawRound
 		Kit kit = draw.GetKit(player);
 		
 		//Time
-		TimeMax = 60;
+		TimeMax = draw.isArcadeVariant() ? 30 : 60;
 		
 		//Word
 		SetWord(draw.GetWord());
@@ -68,7 +73,7 @@ public class DrawRound
 	{
 		if (Guessed.add(player.getName()))
 		{
-			TimeMax -= 5;
+			TimeMax = Host.isArcadeVariant() ? Math.max(5, TimeMax - 2.5) : TimeMax - 5;
 
 			Bukkit.getPluginManager().callEvent(new DrawGuessCorrectlyEvent(player, this, Guessed.size()));
 
@@ -76,6 +81,22 @@ public class DrawRound
 		}
 
 		return false;
+	}
+
+	public synchronized boolean TryUseGuess(Player player)
+	{
+		int used = _guessAttempts.getOrDefault(player.getUniqueId(), 0);
+		if (used >= MAX_ARCADE_GUESSES)
+		{
+			return false;
+		}
+		_guessAttempts.put(player.getUniqueId(), used + 1);
+		return true;
+	}
+
+	public synchronized int GetGuessesRemaining(Player player)
+	{
+		return Math.max(0, MAX_ARCADE_GUESSES - _guessAttempts.getOrDefault(player.getUniqueId(), 0));
 	}
 
 	public void UpdateReveal()

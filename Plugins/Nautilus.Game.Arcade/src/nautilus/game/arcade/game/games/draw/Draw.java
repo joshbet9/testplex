@@ -103,7 +103,12 @@ public class Draw extends SoloGame
 
 	public Draw(ArcadeManager manager) 
 	{
-		super(manager, GameType.Draw,
+		this(manager, GameType.Draw);
+	}
+
+	protected Draw(ArcadeManager manager, GameType gameType)
+	{
+		super(manager, gameType,
 
 				new Kit[]
 						{
@@ -269,6 +274,11 @@ public class Draw extends SoloGame
 				.register(this);
 	}
 
+	boolean isArcadeVariant()
+	{
+		return GetType() == GameType.DrawArcade;
+	}
+
 	@Override
 	public void ParseData()
 	{
@@ -349,7 +359,8 @@ public class Draw extends SoloGame
 		
 		ArrayList<Player> players = GetPlayers(true);
 		
-		for (int i=0 ; i<2 ; i++)
+		int roundsPerPlayer = isArcadeVariant() ? 1 : 2;
+		for (int i=0 ; i<roundsPerPlayer ; i++)
 			for (Player player : players)
 			{
 				_roundPlayer.add(player);
@@ -391,8 +402,12 @@ public class Draw extends SoloGame
 		if (_round != null && !_round.ChooseWordUpdate())
 			return;
 
-		//End Round
-		if (_round != null && (_round.IsDone() || _drawers.GetPlayers(true).isEmpty() || _round.AllGuessed(_guessers.GetPlayers(true))))
+		// An Arcade round survives a drawer disconnect once somebody has guessed correctly.
+		boolean drawerUnavailable = _round != null && _drawers.GetPlayers(true).isEmpty();
+		boolean keepRoundAfterDrawerQuit = isArcadeVariant() && _round != null && !_round.Guessed.isEmpty();
+		if (_round != null && (_round.IsDone()
+				|| (drawerUnavailable && !keepRoundAfterDrawerQuit)
+				|| _round.AllGuessed(_guessers.GetPlayers(true))))
 		{
 			Bukkit.getPluginManager().callEvent(new DrawRoundEndEvent(_round));
 
@@ -406,6 +421,9 @@ public class Draw extends SoloGame
 			for (Player player : _drawers.GetPlayers(false))
 			{
 				_drawers.RemovePlayer(player);
+				if (!player.isOnline())
+					continue;
+
 				_guessers.AddPlayer(player, true);
 				UtilInv.Clear(player);
 
@@ -519,6 +537,14 @@ public class Draw extends SoloGame
 				}
 			}
 
+			// The Arcade format counts one chat message as one guess attempt.
+			if (isArcadeVariant() && !_round.Guessed.contains(player.getName()) && !_round.TryUseGuess(player))
+			{
+				UtilPlayer.message(player, F.main("Game", "You have used all 10 guesses for this round!"));
+				event.setCancelled(true);
+				return;
+			}
+
 			if (event.getMessage().toLowerCase().contains(_round.Word.toLowerCase()))
 			{
 				// First Guess
@@ -528,9 +554,11 @@ public class Draw extends SoloGame
 					score = 3;
 
 					// Points for Drawer
-					AddScore(_round.Drawer, 2);
-
-					this.AddGems(_round.Drawer, 2, "Drawings Guessed", true, true);
+					if (_round.Drawer.isOnline())
+					{
+						AddScore(_round.Drawer, 2);
+						this.AddGems(_round.Drawer, 2, "Drawings Guessed", true, true);
+					}
 				}
 
 				if (_round.Guessed(player))
@@ -592,7 +620,10 @@ public class Draw extends SoloGame
 			}	
 			else
 			{
-				UtilTextBottom.display(_round.GetRevealedWord() + C.cYellow + C.Bold + "   HINT   " +  ChatColor.RESET + _round.GetTimeString(), player);
+				String guessCounter = isArcadeVariant()
+						? C.cAqua + "   Guesses: " + _round.GetGuessesRemaining(player) + "/10"
+						: "";
+				UtilTextBottom.display(_round.GetRevealedWord() + C.cYellow + C.Bold + "   HINT   " + ChatColor.RESET + _round.GetTimeString() + guessCounter, player);
 			}
 		}
 	}	
