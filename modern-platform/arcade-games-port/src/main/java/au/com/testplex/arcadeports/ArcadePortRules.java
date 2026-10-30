@@ -1640,6 +1640,13 @@ public final class ArcadePortRules {
         return now + QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS;
     }
 
+    /** Only the old stained-glass materials are breakable in the source Quiver maps. */
+    public static boolean isQuiverBreakableGlassMaterial(String materialName) {
+        if (materialName == null) return false;
+        return materialName.endsWith("_STAINED_GLASS")
+                || materialName.endsWith("_STAINED_GLASS_PANE");
+    }
+
     /** Last-survivor completion must wait for any one-second Quiver respawns. */
     public static boolean shouldFinishQuiverLastPlayer(int alivePlayers, int respawningPlayers,
                                                         int participantsAtStart) {
