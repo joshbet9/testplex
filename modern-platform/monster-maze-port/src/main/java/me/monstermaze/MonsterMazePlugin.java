@@ -195,6 +195,15 @@ public final class MonsterMazePlugin {
         saveConfig();
     }
 
+    public void setReturnToTestplex(java.util.function.Consumer<Player> callback) {
+        if (gameManager != null) gameManager.setTestplexReturnToLobby(callback);
+    }
+    public boolean startTestplexGame(java.util.List<Player> participants) {
+        return gameManager != null && gameManager.startTestplexRound(participants,
+                player -> host.returnPlayerToArcadeLobby(player));
+    }
+    public boolean isGameRunning() { return gameManager != null && gameManager.isRunning(); }
+
     public ArcadeMechanicsModernPlugin getHostPlugin() { return host; }
     public static MonsterMazePlugin getInstance() { return instance; }
     public GameManager getGameManager() { return gameManager; }
