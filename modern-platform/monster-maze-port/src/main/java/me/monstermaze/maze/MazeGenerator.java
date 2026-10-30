@@ -178,7 +178,7 @@ public class MazeGenerator {
                 // Place every maze support/surface block with the active map palette from
                 // the very first block. MapThemeApplier remains useful as a defensive repair,
                 // but is no longer required to correct an initially-quartz maze.
-                Bukkit.getScheduler().runTask(plugin, new Runnable() {
+                Bukkit.getScheduler().runTask(plugin.getHostPlugin(), new Runnable() {
                     int mz = 0;
 
                     @Override
@@ -191,7 +191,7 @@ public class MazeGenerator {
                         }
 
                         if (mz < MAZE_SIZE) {
-                            Bukkit.getScheduler().runTaskLater(plugin, this, 1L);
+                            Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), this, 1L);
                             return;
                         }
 
@@ -229,7 +229,7 @@ public class MazeGenerator {
         final int span = (endX - startX + 1) * (endZ - startZ + 1);
         plugin.getLogger().info("[MonsterMaze] Clearing shell region over maze (" + span + " cells)...");
 
-        Bukkit.getScheduler().runTask(plugin, new Runnable() {
+        Bukkit.getScheduler().runTask(plugin.getHostPlugin(), new Runnable() {
             int index = 0;
             @Override
             public void run() {
@@ -244,7 +244,7 @@ public class MazeGenerator {
                     index++;
                 }
                 if (index < span) {
-                    Bukkit.getScheduler().runTaskLater(plugin, this, 1L);
+                    Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), this, 1L);
                 } else if (onDone != null) {
                     onDone.run();
                 }
@@ -286,7 +286,7 @@ public class MazeGenerator {
             clearRuntimeLists();
             mazeLive = false;
 
-            Bukkit.getScheduler().runTask(plugin, new Runnable() {
+            Bukkit.getScheduler().runTask(plugin.getHostPlugin(), new Runnable() {
                 int idx = toClear.size() - 1;
 
                 @Override
@@ -298,7 +298,7 @@ public class MazeGenerator {
                         if (b.getType() != Material.AIR) b.setType(Material.AIR);
                         idx--;
                     }
-                    if (idx >= 0) Bukkit.getScheduler().runTaskLater(plugin, this, 1L);
+                    if (idx >= 0) Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), this, 1L);
                 }
             });
         } else {
