@@ -8358,8 +8358,13 @@ public final class ArcadePortManager implements Listener {
                 && !event.getAction().isRightClick();
         boolean dragonEscapeDisruptorLeftClick = session.type == ArcadePortGame.DRAGON_ESCAPE
                 && event.getAction() == Action.LEFT_CLICK_AIR;
+        boolean evolutionCreeperLeftClick = session.type == ArcadePortGame.EVOLUTION
+                && session.evolutionLevels.getOrDefault(event.getPlayer().getUniqueId(), 0) == 2
+                && event.getAction().isLeftClick()
+                && event.getItem() != null && event.getItem().getType() == Material.TNT;
         if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick
-                && !baconNonRightClick && !dragonEscapeDisruptorLeftClick) return;
+                && !baconNonRightClick && !dragonEscapeDisruptorLeftClick
+                && !evolutionCreeperLeftClick) return;
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
         if (event.isCancelled()) {
