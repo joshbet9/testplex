@@ -8421,7 +8421,7 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.RED + "Eliminated: " + reason + ".");
         }
         if (killer != null && session.scores.containsKey(killer.getUniqueId())) session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
-        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS && killer != null) sneakyAssassins.onKill(killer);
+        if (session.type == ArcadePortGame.SNEAKY_ASSASSINS && killer != null) sneakyAssassins.onKill(killer, player);
         if (session.type == ArcadePortGame.GLADIATORS) {
             Integer pair = session.gladiatorPairs.get(player.getUniqueId());
             if (pair != null) {
