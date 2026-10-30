@@ -30,7 +30,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: testplex-isolated-hyperv-server
+  group: testplex-isolated-hyperv-server-v2-20261031
   cancel-in-progress: false
 
 jobs:
@@ -197,7 +197,7 @@ jobs:
           # Capture pre-deploy service states before any service is stopped. The
           # failure handler uses these flags to restore only services that were
           # running before this attempt.
-          state_lines="$(ssh "${ssh_opts[@]}" "$remote" 'set -e; sudo -n true; for unit in testplex-reborn.service testplex-modern.service; do state="$(sudo -n systemctl is-active "$unit" 2>/dev/null || true)"; printf "%s=%s\n" "$unit" "${state:-unknown}"; done')"
+          state_lines="$(timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" 'set -e; sudo -n true; for unit in testplex-reborn.service testplex-modern.service; do state="$(sudo -n systemctl is-active "$unit" 2>/dev/null || true)"; printf "%s=%s\n" "$unit" "${state:-unknown}"; done')"
           get_state() {
             printf '%s\n' "$state_lines" | awk -F= -v unit="$1" '$1 == unit {print $2; exit}'
           }
@@ -219,7 +219,7 @@ jobs:
             fi
           done
 
-          ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_PREFLIGHT'
+          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_PREFLIGHT'
           set -euo pipefail
           sudo -n true
           legacy_state="$(sudo -n systemctl is-active testplex-reborn.service 2>/dev/null || true)"
@@ -311,7 +311,7 @@ jobs:
           # directory in /var/tmp. The legacy and modern deploy jobs share one Hyper-V disk and are
           # serialized by testplex-isolated-hyperv-server, so only these generated staging directories
           # are safe to prune here; never clean server worlds, plugin directories, databases or backups.
-          ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" <<'REMOTE_STAGE_PREP'
+          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" <<'REMOTE_STAGE_PREP'
           set -euo pipefail
           build_sha="$1"
           [[ "$build_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid build SHA for artifact staging." >&2; exit 1; }
@@ -370,8 +370,8 @@ jobs:
             done
           } > "$batch_file"
           echo "Uploading verified modern artifacts with SFTP, ${#arcade_chunks[@]} 4 MiB Arcade JAR parts and ${#world_chunks[@]} 512 KiB map parts."
-          timeout --foreground --signal=TERM 15m sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
-          ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" <<'REMOTE_ASSEMBLE_ARCADE'
+          timeout --foreground --signal=TERM --kill-after=30s 15m sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
+          timeout --foreground --signal=TERM --kill-after=30s 6m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" <<'REMOTE_ASSEMBLE_ARCADE'
           set -euo pipefail
           upload_dir="$1"
           cd "$upload_dir"
@@ -389,9 +389,9 @@ jobs:
           echo "Assembled MonsterMazeMaps.tar.gz ($(stat -c %s MonsterMazeMaps.tar.gz) bytes)."
           echo "Assembled ArcadeMechanicsModern.jar ($(stat -c %s ArcadeMechanicsModern.jar) bytes)."
           REMOTE_ASSEMBLE_ARCADE
-          timeout --foreground --signal=TERM 3m scp "${scp_opts[@]}" \
+          timeout --foreground --signal=TERM --kill-after=15s 3m scp "${scp_opts[@]}" \
             "$STAGE_DIR/SHA256SUMS" "$remote:$upload_dir/SHA256SUMS"
-          ssh "${ssh_opts[@]}" "$remote" "echo 'Disk after transfer:'; df -h /var/tmp; du -sh '$upload_dir'; cd '$upload_dir' && sha256sum -c SHA256SUMS"
+          timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" "echo 'Disk after transfer:'; df -h /var/tmp; du -sh '$upload_dir'; cd '$upload_dir' && sha256sum -c SHA256SUMS"
           echo "upload_dir=$upload_dir" >> "$GITHUB_OUTPUT"
 
       - name: Provision and start only testplex-modern.service
@@ -415,7 +415,8 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20)
-          ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" <<'REMOTE_DEPLOY'
+          echo "[deploy] opening an exclusive remote deployment lock."
+          timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" <<'REMOTE_DEPLOY'
           set -euo pipefail
           BUILD_SHA="$1"
           UPLOAD_DIR="$2"
@@ -442,13 +443,15 @@ jobs:
           # Separate Monster Maze services are deliberately outside this deployment's scope.
 
           if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
-            sudo -n apt-get update
-            sudo -n apt-get install -y curl jq unzip
+            echo '[deploy] installing host prerequisites (8 minute limit).'
+            timeout --foreground --signal=TERM 8m sudo -n apt-get update
+            timeout --foreground --signal=TERM 8m sudo -n apt-get install -y curl jq unzip
           fi
 
           if [[ ! -x "$JAVA_BIN" ]]; then
             echo "Installing an isolated Temurin Java 25 JRE under /opt/testplex; system Java alternatives and legacy units are not changed."
-            curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
+            echo "[deploy] downloading Java 25 JRE (6 minute limit)."
+            timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
               "https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jre/hotspot/normal/eclipse" \
               -o "$UPLOAD_DIR/temurin25-jre.tar.gz"
             sudo -n install -d -m 0755 /opt/testplex
@@ -462,7 +465,8 @@ jobs:
           "$JAVA_BIN" -version
 
           echo "Fetching a stable Paper build for Minecraft 26.3 from PaperMC's official downloads service."
-          builds_json="$(curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \
+          echo "[deploy] querying Paper 26.3 metadata (4 minute limit)."
+          builds_json="$(timeout --foreground --signal=TERM 4m curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \
             "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds")"
           if printf '%s' "$builds_json" | jq -e '.ok == false' >/dev/null 2>&1; then
             printf '%s\n' "$builds_json" | jq -r '.message // "PaperMC downloads API returned an error."' >&2
@@ -472,7 +476,8 @@ jobs:
           paper_url="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".url)')"
           paper_sha="$(printf '%s' "$builds_json" | jq -er 'first(.[] | select(.channel == "STABLE") | .downloads."server:default".checksums.sha256)')"
           paper_tmp="$UPLOAD_DIR/paper-26.3-$paper_build.jar"
-          curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp"
+          echo "[deploy] downloading Paper build $paper_build (8 minute limit)."
+          timeout --foreground --signal=TERM 8m curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp"
           printf '%s  %s\n' "$paper_sha" "$paper_tmp" | sha256sum -c -
 
           sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$SERVER_DIR"
@@ -736,7 +741,8 @@ jobs:
           fi
           echo "Installed Monster Maze map source commit $(cat "$UPLOAD_DIR/MonsterMazeMapsSource.txt")."
 
-          if ! sudo -n systemctl restart testplex-modern.service; then
+          echo "[deploy] restarting testplex-modern.service (90 second limit)."
+          if ! timeout --foreground --signal=TERM 90s sudo -n systemctl restart testplex-modern.service; then
             rollback
             exit 1
           fi
@@ -794,13 +800,13 @@ jobs:
           fi
           sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR"
           echo "Modern Paper 26.3 is ready with Monster Maze hosted by Testplex Arcade; Death Tag and One in the Quiver are enabled for acceptance; Snake, Wizards and all other unfinished game ports remain installed but disabled; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
-          echo "Legacy services were not stopped, restarted, or overwritten by this workflow."
+          echo "On successful deployment, testplex-reborn.service remains stopped if it was active during preflight; a failed deployment restores services that were active before preflight. Separate Monster Maze project services/data were not modified."
           REMOTE_DEPLOY
 
           echo "Modern deployment completed. Server directory: /home/monstermaze/servers/testplex-modern"
           echo "Service: testplex-modern.service (disabled at boot by default)"
           echo "Endpoint, when the host's Tailscale/firewall routing allows it: 100.98.188.97:25568"
-          echo "The legacy testplex-reborn.service and standalone Monster Maze units were not modified."
+          echo "Separate Monster Maze project units/data were not modified. The Testplex Reborn 1.8 service remains stopped after a successful modern deployment to preserve VM memory."
 
       - name: Restore previously running game servers if modern deployment fails
         if: ${{ failure() && (steps.remote-preflight.outputs.testplex_reborn_was_active == 'true' || steps.remote-preflight.outputs.modern_was_active == 'true') }}
