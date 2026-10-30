@@ -8821,10 +8821,10 @@ public final class ArcadePortManager implements Listener {
             spawnPaintballSaveMeMarker(session, player);
             player.setHealth(20.0D);
             player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 30, 0, false, false, true), true);
-            player.setVelocity(new Vector(0.0D, 1.2D, 0.0D));
             player.setGameMode(GameMode.SPECTATOR);
             player.setAllowFlight(true);
             player.setFlying(true);
+            player.setVelocity(new Vector(0.0D, 1.2D, 0.0D));
             player.sendMessage(ChatColor.RED + "Painted out! A teammate can throw a Water Bomb at your SAVE ME marker.");
             if (killer != null && session.alive.contains(killer.getUniqueId())) {
                 session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
@@ -12706,6 +12706,14 @@ public final class ArcadePortManager implements Listener {
             ProjectileSource source = projectile.getShooter();
             if (source instanceof Player shooter) hitProjectile(session, projectile, shooter, projectileTarget);
         }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onRunnerTrackingCompassDrop(PlayerDropItemEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.RUNNER
+                || session.alive.contains(event.getPlayer().getUniqueId())) return;
+        if (isRunnerTrackingCompass(event.getItemDrop().getItemStack())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
