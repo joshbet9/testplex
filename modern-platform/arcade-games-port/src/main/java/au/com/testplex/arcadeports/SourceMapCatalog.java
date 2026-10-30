@@ -50,11 +50,13 @@ public final class SourceMapCatalog {
         if (game == null) return List.of();
         return switch (game) {
             case BACON_BRAWL -> List.of("Bacon Brawl");
+            case CASTLE_ASSAULT -> List.of("Castle Assault");
             case BOMB_LOBBERS -> List.of("Bomb Lobbers");
             case DEATH_TAG -> List.of("Death Tag");
             case DRAGON_ESCAPE -> List.of("Dragon Escape");
             case DRAGONS -> List.of("Dragons");
             case GLADIATORS -> List.of("Gladiators");
+            case HEROES_OF_GWEN -> List.of("Heroes of GWEN");
             case MICRO_BATTLES -> List.of("Micro Battle");
             case ONE_IN_THE_QUIVER -> List.of("One in the Quiver");
             case PAINTBALL -> List.of("Paintball", "Super Paintball");
@@ -115,7 +117,7 @@ public final class SourceMapCatalog {
             name = name.substring(0, name.length() - 4);
         }
         String[] prefixes = {
-                "BaconBrawl_", "Lobbers_", "DeathTag_", "DragonEscape_", "Dragons_",
+                "BaconBrawl_", "CastleAssault_", "HOG_", "Lobbers_", "DeathTag_", "DragonEscape_", "Dragons_",
                 "DR_", "Gladiators_", "Micro_", "OITQ_", "Quiver_", "Paintball_",
                 "Runner_", "Spleef_", "SP_", "TF_"
         };
@@ -237,7 +239,7 @@ public final class SourceMapCatalog {
     }
 
     public static boolean hasMap(ArcadePortGame game) {
-        return resourceFor(game) != null;
+        return game != null && (resourceFor(game) != null || !mapFoldersFor(game).isEmpty());
     }
 
     public static boolean isReservedSourceWorldName(String worldName) {
@@ -923,6 +925,14 @@ public final class SourceMapCatalog {
         }
         public List<Location> customLocations(String name) {
             return copyLocations(customLocations.get(name == null ? "" : name.toUpperCase(java.util.Locale.ROOT)));
+        }
+        /** All authored custom marker groups, copied so match runtimes cannot mutate map metadata. */
+        public Map<String, List<Location>> customLocationGroups() {
+            Map<String, List<Location>> copy = new LinkedHashMap<>();
+            for (Map.Entry<String, List<Location>> entry : customLocations.entrySet()) {
+                copy.put(entry.getKey(), copyLocations(entry.getValue()));
+            }
+            return Map.copyOf(copy);
         }
         private List<Location> copyLocations(List<Location> values) {
             return values == null ? new ArrayList<>() : new ArrayList<>(values);
