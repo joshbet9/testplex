@@ -949,8 +949,7 @@ public final class ArcadePortManager implements Listener {
                 && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER)
                 || (type == ArcadePortGame.DRAGON_ESCAPE && !ArcadePortRules.DRAGON_ESCAPE_HAS_ROUND_TIMER)
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
-                : type == ArcadePortGame.GLADIATORS && participants.size() < 2 ? 0L
-                : type == ArcadePortGame.GLADIATORS ? 600_000L
+                : type == ArcadePortGame.GLADIATORS ? 0L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
                 : ROUND_MS);
         session.lastBaconHungerAt = now;
@@ -1563,11 +1562,17 @@ public final class ArcadePortManager implements Listener {
 
     private static final class GladiatorMenuHolder implements InventoryHolder {
         private final GladiatorMenuType type;
+        private final boolean lobbyVote;
         private int selectedHotbarSlot = -1;
         private Inventory inventory;
 
         private GladiatorMenuHolder(GladiatorMenuType type) {
+            this(type, false);
+        }
+
+        private GladiatorMenuHolder(GladiatorMenuType type, boolean lobbyVote) {
             this.type = type;
+            this.lobbyVote = lobbyVote;
         }
 
         @Override
@@ -1605,7 +1610,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void openGladiatorVoteMenu(Player player, Map<UUID, String> votes, String title) {
-        GladiatorMenuHolder holder = new GladiatorMenuHolder(GladiatorMenuType.VOTE);
+        GladiatorMenuHolder holder = new GladiatorMenuHolder(
+                GladiatorMenuType.VOTE, votes == gladiatorLobbyVotes);
         Inventory inventory = Bukkit.createInventory(holder, 27, title);
         holder.inventory = inventory;
         Material[] icons = {Material.BOW, Material.FISHING_ROD, Material.SHIELD, Material.SPLASH_POTION};
@@ -1997,8 +2003,8 @@ public final class ArcadePortManager implements Listener {
 
         // Advance the winners' bracket only when every duel in its current stage is resolved.
         // The loser's bracket is deliberately independent and continues pairing players in parallel.
-        if (!hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_WINNERS)
-                && session.gladiatorWinnerQueue.size() >= 2) {
+        boolean winnersStageReady = !hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_WINNERS);
+        if (winnersStageReady && session.gladiatorWinnerQueue.size() >= 2) {
             if (session.gladiatorWinnerBracketStarted) {
                 session.gladiatorRound = ArcadePortRules.gladiatorsTierForRound(session.gladiatorRound + 1);
                 // Lower-bracket loadouts follow the current tournament tier, but only
@@ -2018,7 +2024,7 @@ public final class ArcadePortManager implements Listener {
         // Loser matches do not wait for winners' bracket matches to finish.
         // Gear tier follows the current tournament stage, avoiding timer/order-dependent
         // upgrades when losses arrive while an earlier lower-bracket duel is still running.
-        if (!hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_LOSERS)
+        if (winnersStageReady && !hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_LOSERS)
                 && session.gladiatorLoserQueue.size() >= 2) {
             session.gladiatorLoserArenaCursor = 0;
             while (session.gladiatorLoserQueue.size() >= 2) {
@@ -9770,7 +9776,7 @@ public final class ArcadePortManager implements Listener {
                 String action = meta.getPersistentDataContainer().get(gladiatorMenuActionKey, PersistentDataType.STRING);
                 String value = meta.getPersistentDataContainer().get(gladiatorMenuValueKey, PersistentDataType.STRING);
                 if ("vote".equals(action)) {
-                    Session voting = active;
+                    Session voting = holder.lobbyVote ? null : active;
                     voteGladiators(voting, player, GladiatorsMode.fromId(value));
                 }
                 return;
