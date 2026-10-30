@@ -68,7 +68,7 @@ public class ArenaListener implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onPlayerVelocity(PlayerVelocityEvent event) {
         Player p = event.getPlayer();
-        if (p.hasMetadata("maverick_launch")) p.removeMetadata("maverick_launch", plugin);
+        if (p.hasMetadata("maverick_launch")) p.removeMetadata("maverick_launch", plugin.getHostPlugin());
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
