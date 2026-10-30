@@ -60,10 +60,12 @@ This is the manual runtime checklist for the isolated Mineplex Reborn test serve
 
 ### Micro Battles
 - Equip different middle-glass colours on two clients. Confirm each player sees their own selected glass colour only; the other client must retain its own colour or the default.
-- Move an alive player to each map edge. Within three blocks of the boundary, confirm a vertical particle cue appears at the nearby edge in that player's selected style and glass colour.
+- Equip different border-particle colours on two clients. Confirm the coloured vertical dust column uses each player's own selection and is only sent to that player.
+- Move an alive player to each map edge. Within three blocks of the boundary, confirm a vertical particle cue appears at the nearby edge in that player's selected style and border colour.
 - Confirm the border particles are sent only to the player who is approaching the edge; another client should not inherit that player's cosmetic colour.
 - Confirm a visible warning label floats above players while they are within three blocks of the boundary, and disappears when they move out of range, are eliminated, or the game ends.
-- Select Off for Border Particles. Confirm the particle cosmetic is disabled while the overhead gameplay warning remains.
+- Select Off for Border Particle Style. Confirm the particle cosmetic is disabled while the overhead gameplay warning remains.
+- Leave and rejoin the game server while a round is active. Confirm the selected glass colour is sent to the reconnecting client's view and no old overhead indicator remains.
 - Wait for the ten-second starting glass barrier to disappear. Confirm the tinted glass is removed normally and no stale warning indicators remain after the round.
 - Confirm the game loop remains smooth with multiple players near the boundary.
 
