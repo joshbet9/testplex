@@ -652,7 +652,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             double chance = ThreadLocalRandom.current().nextDouble();
             double subChance = ThreadLocalRandom.current().nextDouble();
             ItemStack loot;
-            // Match CastleAssault.generateLoot(): ranged 30%, potion 20%, rods/gaps 30%, misc 20%.
+            // Match CastleAssault.fillChest() thresholds: ranged 30%, potions 20%, rods/gaps 10%, misc 40%.
             if (chance <= 0.30D) {
                 loot = ThreadLocalRandom.current().nextBoolean()
                         ? new ItemStack(Material.EGG, ThreadLocalRandom.current().nextInt(3, 6))
@@ -682,6 +682,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             inventory.setItem(slot, loot);
         }
         chest.update(true, false);
+    }
+
+    private static ItemStack namedItem(Material material, String name, String lore, int amount) {
+        ItemStack item = namedItem(material, name, lore);
+        item.setAmount(Math.max(1, Math.min(item.getMaxStackSize(), amount)));
+        return item;
     }
 
     private ItemStack castlePotion(Material material, PotionEffectType effect, int durationTicks,
