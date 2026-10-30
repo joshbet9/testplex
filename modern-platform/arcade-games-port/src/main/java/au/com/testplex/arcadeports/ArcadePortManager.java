@@ -53,7 +53,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.entity.EntityKnockbackEvent;
+import io.papermc.paper.event.entity.EntityKnockbackEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
@@ -5913,6 +5913,38 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         
+        if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
+                && session.alive.contains(player.getUniqueId())) {
+            UUID victimId = player.getUniqueId();
+            if (killer != null && !killer.equals(player) && session.alive.contains(killer.getUniqueId())) {
+                scoreQuiverKill(session, killer, player);
+                return;
+            }
+            if (!session.alive.remove(victimId)) return;
+            session.quiverKillStreaks.remove(victimId);
+            player.leaveVehicle();
+            player.setGameMode(GameMode.SPECTATOR);
+            player.sendMessage(ChatColor.RED + "Eliminated! Respawning in one second.");
+            session.respawning.add(victimId);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (active != session || !player.isOnline()
+                        || !session.players.containsKey(victimId) || !session.respawning.remove(victimId)) return;
+                Location spawn = spawnFor(session, player);
+                player.teleport(spawn);
+                player.setGameMode(GameMode.SURVIVAL);
+                player.setHealth(player.getMaxHealth());
+                player.setFoodLevel(20);
+                player.setSaturation(20.0F);
+                player.setFireTicks(0);
+                player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+                session.alive.add(victimId);
+                session.lastLocations.put(victimId, spawn.clone());
+                giveKit(session, player);
+                player.sendMessage(ChatColor.GREEN + "Respawned. First to 20 kills wins.");
+            }, ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS);
+            return;
+        }
+
         if (session.type == ArcadePortGame.BOMB_LOBBERS && session.alive.contains(player.getUniqueId())) {
             UUID victimId = player.getUniqueId();
             if (!session.alive.remove(victimId)) return;
@@ -6087,7 +6119,7 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().setItem(0, namedItem(Material.FEATHER, "Egg Launch",
                         "Right-click to throw an egg; three eggs are carried. Double-jump with Space.", 1));
                 player.getInventory().setItem(1, new ItemStack(Material.EGG, 3));
-                player.setAllowFlight(player.isOnGround());
+                player.setAllowFlight(false);
                 break;
         }
         player.sendMessage(ChatColor.GREEN + "Evolution stage restored: " + (level + 1) + "/5.");
@@ -6100,8 +6132,13 @@ public final class ArcadePortManager implements Listener {
         // The source kit gives Chicken a single mid-air double jump; re-arm only after landing.
         if (level == 4) {
             boolean landed = player.isOnGround() && player.getVelocity().getY() <= 0.01D;
-            if (landed) session.evolutionChickenJumpUsed.remove(id);
-            player.setAllowFlight(!session.evolutionChickenJumpUsed.contains(id));
+            if (landed) {
+                session.evolutionChickenJumpUsed.remove(id);
+                player.setAllowFlight(false);
+            } else {
+                // The first normal jump must happen before the mid-air jump is armed.
+                player.setAllowFlight(!session.evolutionChickenJumpUsed.contains(id));
+            }
         } else {
             session.evolutionChickenJumpUsed.remove(id);
             if (player.getAllowFlight()) player.setAllowFlight(false);
@@ -6346,7 +6383,7 @@ public final class ArcadePortManager implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_SLIME_JUMP, 1.0F, 1.0F);
     }
 
-    private void startEvolutionChickenEgg(Player player) {
+    private void startEvolutionChickenEgg(Session session, Player player) {
         if (inventoryCount(player, Material.EGG) <= 0) {
             player.sendMessage(ChatColor.YELLOW + "You need an egg to use Egg Launch.");
             return;
@@ -6354,6 +6391,7 @@ public final class ArcadePortManager implements Listener {
         consumeOne(player, Material.EGG);
         Egg egg = player.launchProjectile(Egg.class);
         egg.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.35D));
+        session.entities.add(egg);
         player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.9F, 1.0F);
     }
 
@@ -7138,6 +7176,9 @@ public final class ArcadePortManager implements Listener {
         }
         session.paintballSaveMeLocations.clear();
         session.quiverArrowBounces.clear();
+        session.quiverKillStreaks.clear();
+        session.quiverFistKills.clear();
+        session.quiverUsedBow.clear();
         session.quiverCloakedUntil.clear();
         for (BlockDisplay display : session.evolutionEggDisplays.values()) {
             if (display != null && display.isValid()) display.remove();
@@ -9340,7 +9381,7 @@ public final class ArcadePortManager implements Listener {
             }
             if (level == 4 && item == Material.FEATHER) {
                 event.setCancelled(true);
-                startEvolutionChickenEgg(player);
+                startEvolutionChickenEgg(session, player);
                 return;
             }
         }
