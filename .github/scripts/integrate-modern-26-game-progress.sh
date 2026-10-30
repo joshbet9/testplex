@@ -594,7 +594,7 @@ fallback_anchor = "        if (value.startsWith(\"quiver-\")) { selectQuiverKit(
 fallback_replacement = """        if (ArcadePortRules.normalizeCastleAssaultKit(value) != null) selectCastleAssaultKit(player, value);
         else if (ArcadePortRules.normalizeHeroesOfGwenHero(value) != null) selectHeroesOfGwenHero(player, value);
         else if (value.startsWith("quiver-")) { selectQuiverKit(player, value); }"""
-if "normalizeCastleAssaultKit(value)) != null) selectCastleAssaultKit" not in source:
+if "normalizeCastleAssaultKit(value) != null) selectCastleAssaultKit" not in source:
     if fallback_anchor not in source:
         raise SystemExit("Could not find shared kit-selection fallback chain.")
     source = source.replace(fallback_anchor, fallback_replacement, 1)
@@ -832,6 +832,10 @@ mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom
 mvn --batch-mode --no-transfer-progress -f modern-platform/wizards-port/pom.xml clean verify
 
 git diff --check
+git add -A
+if ! git diff --cached --quiet; then
+  git commit -m "Integrate reconciled 26-game modern Arcade progress"
+fi
 git status --short
 git push origin "HEAD:refs/heads/$INTEGRATION_BRANCH"
 echo "Validated integration branch pushed at $(git rev-parse HEAD)"
