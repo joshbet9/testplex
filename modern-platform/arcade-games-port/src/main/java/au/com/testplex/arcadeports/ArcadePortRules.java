@@ -1640,6 +1640,12 @@ public final class ArcadePortRules {
         return now + QUIVER_SPECTATOR_TELEPORT_COOLDOWN_MILLIS;
     }
 
+    /** Last-survivor completion must wait for any one-second Quiver respawns. */
+    public static boolean shouldFinishQuiverLastPlayer(int alivePlayers, int respawningPlayers,
+                                                        int participantsAtStart) {
+        return participantsAtStart > 1 && alivePlayers == 1 && respawningPlayers == 0;
+    }
+
     /** Reborn's Ground Pound scales horizontal knockback from 0 at range to 0.8 at point-blank. */
     public static double quiverGroundPoundHorizontalMultiplier(double distance) {
         if (!Double.isFinite(distance)) return 0.0D;
