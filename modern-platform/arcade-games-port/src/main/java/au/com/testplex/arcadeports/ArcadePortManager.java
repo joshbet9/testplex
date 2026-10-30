@@ -88,6 +88,7 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
+import org.bukkit.util.EulerAngle;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -3226,6 +3227,7 @@ public final class ArcadePortManager implements Listener {
 
     private void paintPaintballBlockImpact(Session session, Projectile projectile) {
         if (session == null || projectile == null || projectile.getWorld() != session.world) return;
+        if (!session.paintProjectileImpacts.add(projectile.getUniqueId())) return;
         Integer team = session.paintProjectileTeams.get(projectile.getUniqueId());
         if (team == null && projectile.getShooter() instanceof Player shooter) team = session.teams.getOrDefault(shooter.getUniqueId(), 0);
         if (team == null) return;
@@ -3291,7 +3293,7 @@ public final class ArcadePortManager implements Listener {
         marker.setArms(true);
         marker.setBasePlate(false);
         marker.setGravity(false);
-        marker.setVisible(true);
+        marker.setVisible(false);
         marker.setInvulnerable(true);
         marker.setSilent(true);
         marker.setCanPickupItems(false);
@@ -3299,6 +3301,11 @@ public final class ArcadePortManager implements Listener {
         marker.setCustomName(ChatColor.RED + "SAVE ME! " + ChatColor.WHITE + player.getName()
                 + ChatColor.GRAY + " — Painted by " + ChatColor.GOLD + killerName);
         marker.setCustomNameVisible(true);
+        // Reborn's fallen copy uses a slightly randomized ragdoll pose.
+        marker.setRightArmPose(randomPaintballPose());
+        marker.setLeftArmPose(randomPaintballPose());
+        marker.setRightLegPose(randomPaintballPose());
+        marker.setLeftLegPose(randomPaintballPose());
         ItemStack[] armour = player.getInventory().getArmorContents();
         ItemStack[] copiedArmour = new ItemStack[armour.length];
         for (int i = 0; i < armour.length; i++) copiedArmour[i] = armour[i] == null ? null : armour[i].clone();
@@ -3315,6 +3322,13 @@ public final class ArcadePortManager implements Listener {
         session.paintballSaveMeMarkers.put(player.getUniqueId(), marker);
         session.paintballSaveMeLocations.put(player.getUniqueId(), location.clone());
         return marker;
+    }
+
+    private EulerAngle randomPaintballPose() {
+        double x = Math.toRadians(ThreadLocalRandom.current().nextInt(-3, 17));
+        double y = Math.toRadians(ThreadLocalRandom.current().nextInt(-12, 13));
+        double z = Math.toRadians(ThreadLocalRandom.current().nextInt(-15, 16));
+        return new EulerAngle(x, y, z);
     }
 
     private void removePaintballSaveMeMarker(Session session, UUID outPlayer) {
@@ -7275,6 +7289,8 @@ public final class ArcadePortManager implements Listener {
         } else if (session.type == ArcadePortGame.BOMB_LOBBERS) {
             handlePlayerHit(session, shooter, target, "bomb hit");
         } else if (session.type == ArcadePortGame.PAINTBALL) {
+            // Reborn paints the map for each projectile collision, including hits on players.
+            paintPaintballBlockImpact(session, projectile);
             int paintAmount = session.paintProjectileDamage.getOrDefault(projectile.getUniqueId(), 1);
             session.paintProjectileDamage.remove(projectile.getUniqueId());
             session.paintProjectileTeams.remove(projectile.getUniqueId());
@@ -7477,6 +7493,7 @@ public final class ArcadePortManager implements Listener {
         session.dragonContactCooldowns.clear();
         session.paintProjectileDamage.clear();
         session.paintProjectileTeams.clear();
+        session.paintProjectileImpacts.clear();
         session.paintballProjectileCosmetics.clear();
         for (Map.Entry<Block, BlockData> entry : session.paintballOriginalBlocks.entrySet()) {
             Block block = entry.getKey();
@@ -7821,8 +7838,9 @@ public final class ArcadePortManager implements Listener {
                         plugin.getConfig().getInt(path + "knockouts", 0) + 1);
             }
             boolean won = winnerId != null && (winnerId.equals(id)
-                    || ((session.type == ArcadePortGame.BOMB_LOBBERS || session.type == ArcadePortGame.PAINTBALL)
-                        && session.alive.contains(id)
+                    || (session.type == ArcadePortGame.PAINTBALL
+                        && session.teams.getOrDefault(id, -2) == winningTeam)
+                    || (session.type == ArcadePortGame.BOMB_LOBBERS && session.alive.contains(id)
                         && session.teams.getOrDefault(id, -2) == winningTeam));
             if (won) {
                 plugin.getConfig().set(path + "wins",
@@ -11676,6 +11694,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, ArmorStand> paintballSaveMeMarkers = new HashMap<>();
         final Map<UUID, Location> paintballSaveMeLocations = new HashMap<>();
         final Map<UUID, Integer> paintProjectileDamage = new HashMap<>();
+        final Set<UUID> paintProjectileImpacts = new HashSet<>();
         final Map<UUID, PaintballProjectileVisual> paintballProjectileCosmetics = new HashMap<>();
         final Map<UUID, Integer> evolutionLevels = new HashMap<>();
         final Map<UUID, Integer> evolutionLifeKills = new HashMap<>();
