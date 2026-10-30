@@ -10,6 +10,11 @@ import java.util.Collection;
  * needing a live Paper server.
  */
 public final class ArcadePortRules {
+    public static final long DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS = 30_000L;
+    public static final long DEATH_TAG_ARCHER_ARROW_INTERVAL_MILLIS = 2_000L;
+    public static final int DEATH_TAG_ARCHER_MAX_ARROWS = 2;
+    public static final double DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER = 3.0D;
+    public static final long DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS = 400L;
     public static final int EVOLUTION_WIN_LEVEL = 6;
     public static final double DRAGON_ESCAPE_FINISH_X = 0.5D;
     public static final double DRAGON_ESCAPE_FINISH_Y = 64.0D;
@@ -1553,7 +1558,8 @@ public final class ArcadePortRules {
     }
 
     public static int requiredDeathTagChasers(long elapsedMillis) {
-        return elapsedMillis < 0L ? 1 : 1 + (int) (elapsedMillis / 30_000L);
+        return elapsedMillis < 0L ? 1
+                : 1 + (int) (elapsedMillis / DEATH_TAG_CHASER_PROMOTION_INTERVAL_MILLIS);
     }
 
     public static boolean shouldSpreadDeathTag(boolean attackerTagged, boolean targetTagged) {
@@ -1593,6 +1599,21 @@ public final class ArcadePortRules {
     /** Reborn's runner speed threshold is strictly greater than 25% chasers. */
     public static boolean deathTagRunnersReceiveSpeed(int chasers, int totalPlayers) {
         return totalPlayers > 0 && chasers >= 0 && (double) chasers / (double) totalPlayers > 0.25D;
+    }
+
+    /** Chasers retain their opening Speed I only until the runners earn their own Speed I. */
+    public static boolean deathTagChasersReceiveSpeed(int chasers, int totalPlayers) {
+        return chasers > 0 && !deathTagRunnersReceiveSpeed(chasers, totalPlayers);
+    }
+
+    /** Archer arrows have 300% of normal knockback; Alpha Chasers take half knockback. */
+    public static double deathTagArcherArrowKnockbackMultiplier(boolean alphaChaser) {
+        return DEATH_TAG_ARCHER_ARROW_KNOCKBACK_POWER * deathTagKnockbackMultiplier(alphaChaser);
+    }
+
+    /** Reborn's Traitor knockback perk has a per-target 400 ms recharge. */
+    public static boolean deathTagTraitorKnockbackReady(long nowMillis, long lastUseMillis) {
+        return lastUseMillis <= 0L || nowMillis - lastUseMillis >= DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS;
     }
 
     /** Surviving runners have the Death Tag objective at timeout; chaser scores are only a fallback when none remain. */
