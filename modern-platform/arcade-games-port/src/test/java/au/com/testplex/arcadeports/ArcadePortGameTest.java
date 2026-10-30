@@ -1308,6 +1308,12 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldAdvanceDragonEscapeWaypoint(Double.NaN, 0.0D, 1.0D));
     }
 
+    @Test void dragonEscapeRemainsAnElapsedRaceUntilFinishOrNoRacersRemain() {
+        assertFalse(ArcadePortRules.DRAGON_ESCAPE_HAS_ROUND_TIMER);
+        assertFalse(ArcadePortRules.shouldFinishWhenNobodyIsAlive(1, 0));
+        assertTrue(ArcadePortRules.shouldFinishWhenNobodyIsAlive(0, 0));
+    }
+
     @Test void dragonEscapeDiggerHonoursOpeningLockoutProximityAndSourceRestoreWindow() {
         assertTrue(ArcadePortRules.isDragonEscapeDiggerOpeningLocked(0L));
         assertTrue(ArcadePortRules.isDragonEscapeDiggerOpeningLocked(9_999L));

@@ -934,8 +934,9 @@ public final class ArcadePortManager implements Listener {
             session.bombNextPowerupSpawnAt = now
                     + ArcadePortRules.BOMB_LOBBERS_POWERUP_FIRST_SPAWN_DELAY_MILLIS;
         }
-        session.endsAt = type == ArcadePortGame.BACON_BRAWL
-                && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER
+        session.endsAt = (type == ArcadePortGame.BACON_BRAWL
+                && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER)
+                || (type == ArcadePortGame.DRAGON_ESCAPE && !ArcadePortRules.DRAGON_ESCAPE_HAS_ROUND_TIMER)
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 600_000L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
@@ -5297,6 +5298,9 @@ public final class ArcadePortManager implements Listener {
             finish(session, null, true);
             return;
         }
+        // Dragon Escape is a course race: one surviving racer is not a round winner.
+        // Keep solo practice and last-runner attempts live until the finish is reached.
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE) return;
         if (session.type == ArcadePortGame.GLADIATORS && session.participantsAtStart > 1) {
             if (session.alive.size() <= 1) {
                 finish(session, alivePlayers(session).stream().findFirst().orElse(null), true);

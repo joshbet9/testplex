@@ -255,6 +255,7 @@ public final class ArcadePortRules {
 
     /** Reborn Bacon Brawl has no fixed timer; SoloGame ends when at most one player remains alive. */
     public static final boolean BACON_BRAWL_HAS_ROUND_TIMER = false;
+    public static final boolean DRAGON_ESCAPE_HAS_ROUND_TIMER = false;
     public static final long BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS = 50_000L;
     public static final long BACON_KNOCKBACK_INTERVAL_STEP_MILLIS = 5_000L;
     public static final long BACON_MIN_KNOCKBACK_INTERVAL_MILLIS = 5_000L;
