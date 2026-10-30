@@ -584,6 +584,30 @@ class ArcadePortGameTest {
         assertEquals(4.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(4.0D, false), 0.00001D);
     }
 
+    @Test void spleefBrawlerLeapMatchesLegacyPowerVerticalBoostAndGroundCap() {
+        org.bukkit.util.Vector airborne = ArcadePortRules.spleefLeapVelocity(
+                new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D), false);
+        assertEquals(1.2D, airborne.getX(), 0.00001D);
+        assertEquals(0.2D, airborne.getY(), 0.00001D);
+        assertEquals(0.0D, airborne.getZ(), 0.00001D);
+
+        org.bukkit.util.Vector grounded = ArcadePortRules.spleefLeapVelocity(
+                new org.bukkit.util.Vector(1.0D, 0.0D, 0.0D), true);
+        assertEquals(1.2D, grounded.getX(), 0.00001D);
+        assertEquals(0.4D, grounded.getY(), 0.00001D);
+
+        org.bukkit.util.Vector lookingDown = ArcadePortRules.spleefLeapVelocity(
+                new org.bukkit.util.Vector(0.0D, -1.0D, 0.0D), false);
+        assertEquals(-0.8D, lookingDown.getY(), 0.00001D);
+        org.bukkit.util.Vector lookingUp = ArcadePortRules.spleefLeapVelocity(
+                new org.bukkit.util.Vector(0.0D, 1.0D, 0.0D), true);
+        assertEquals(1.2D, lookingUp.getY(), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.spleefLeapVelocity(
+                new org.bukkit.util.Vector(0.0D, 0.0D, 0.0D), true).length(), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.spleefLeapVelocity(
+                new org.bukkit.util.Vector(Double.NaN, 0.0D, 0.0D), true).length(), 0.00001D);
+    }
+
     @Test void spleefSourceKitSelectionHungerAndPerkTimingAreExplicit() {
         assertEquals("snowballer", ArcadePortRules.normalizeSpleefKit("Snowballer"));
         assertEquals("brawler", ArcadePortRules.normalizeSpleefKit("brawler"));
