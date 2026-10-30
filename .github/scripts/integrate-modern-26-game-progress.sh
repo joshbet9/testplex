@@ -220,6 +220,47 @@ config = config.replace("# The other 19 ports remain installed but unavailable u
                         "# The other 22 catalogue entries remain disabled until their parity/acceptance gate is cleared.")
 config_path.write_text(config)
 
+
+# Force the reviewed acceptance surface to the two games actually cleared for
+# manual testing, regardless of any stale branch config/revision changes.
+plugin_path = Path("modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.java")
+plugin = plugin_path.read_text()
+ready_pattern = re.compile(
+    r'(READY_FOR_TEST_GAME_IDS\s*=\s*)(?:java\.util\.)?List\.of\s*\([^)]*\)',
+    re.S
+)
+plugin, ready_replacements = ready_pattern.subn(
+    'READY_FOR_TEST_GAME_IDS = java.util.List.of("death-tag", "one-in-the-quiver")',
+    plugin, count=1
+)
+if ready_replacements != 1:
+    raise SystemExit("Could not set the strict Death Tag / One in the Quiver runtime allow-list.")
+revision_pattern = re.compile(r'PLAYABLE_GAMES_REVISION\s*=\s*"[^"]+"')
+plugin, revision_replacements = revision_pattern.subn(
+    'PLAYABLE_GAMES_REVISION = "ready-only-20261031-strict-v3"',
+    plugin, count=1
+)
+if revision_replacements != 1:
+    raise SystemExit("Could not update the playable-games config migration revision.")
+plugin_path.write_text(plugin)
+
+config_lines = config_path.read_text().splitlines()
+config_start = next((i for i, line in enumerate(config_lines) if line.strip() == "enabled-games:"), -1)
+if config_start < 0:
+    raise SystemExit("Could not find enabled-games in the packaged Arcade config.")
+config_end = config_start + 1
+while config_end < len(config_lines):
+    line = config_lines[config_end]
+    if line and not line.startswith((" ", "\t", "#")):
+        break
+    config_end += 1
+config_lines[config_start:config_end] = [
+    "enabled-games:",
+    "  - death-tag",
+    "  - one-in-the-quiver",
+]
+config_path.write_text("\n".join(config_lines) + "\n")
+
 build_path = Path(".github/workflows/testplex-modern-build.yml")
 build = build_path.read_text()
 build = build.replace("21 Arcade catalogue games are packaged", "24 shared Arcade catalogue entries are packaged")
