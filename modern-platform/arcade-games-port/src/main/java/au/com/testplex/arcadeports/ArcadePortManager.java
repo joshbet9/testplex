@@ -2924,7 +2924,9 @@ public final class ArcadePortManager implements Listener {
             }
         }
         session.paintballKits.put(player.getUniqueId(), safeKit);
-        player.getInventory().setItem(0, namedItem(weapon, title, lore));
+        Material visibleWeapon = ArcadePortRules.paintballWeaponMaterial(
+                safeKit, paintballCosmeticOption(player.getUniqueId(), "weapon"));
+        player.getInventory().setItem(0, namedItem(visibleWeapon == null ? weapon : visibleWeapon, title, lore));
         int waterBombs = "sniper".equals(safeKit) ? 2 : 3;
         player.getInventory().setItem(1, namedItem(Material.SPLASH_POTION, "Water Bomb",
                 "Clean painted teammates or revive an eliminated teammate near the SAVE ME marker.", waterBombs));
@@ -2957,17 +2959,19 @@ public final class ArcadePortManager implements Listener {
         long cooldown = switch (kit) {
             case "sniper" -> 1_000L;
             case "shotgun" -> 1_400L;
-            case "machine-gun" -> 80L;
+            case "machine-gun" -> ArcadePortRules.PAINTBALL_MACHINE_GUN_FIRE_COOLDOWN_MILLIS;
             default -> 500L;
         };
         Long lastShot = session.paintballLastShotAt.get(playerId);
         if (lastShot != null && now - lastShot < cooldown) return;
-        if ("machine-gun".equals(kit) && player.getExp() >= 0.97F) {
+        if ("machine-gun".equals(kit) && !ArcadePortRules.canFirePaintballMachineGun(player.getExp())) {
             player.sendMessage(ChatColor.RED + "Machine gun overheated. Release fire and let the gauge cool.");
             return;
         }
         session.paintballLastShotAt.put(playerId, now);
-        if ("machine-gun".equals(kit)) player.setExp(Math.min(0.999F, player.getExp() + 0.025F));
+        if ("machine-gun".equals(kit)) {
+            player.setExp((float) ArcadePortRules.paintballMachineGunHeatAfterShot(player.getExp()));
+        }
 
         if ("sniper".equals(kit)) {
             int paintAmount = ArcadePortRules.paintballPaintAmount(kit, true, player.getExp());
@@ -2975,6 +2979,7 @@ public final class ArcadePortManager implements Listener {
             arrow.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(15.0D));
             session.entities.add(arrow);
             session.paintProjectileDamage.put(arrow.getUniqueId(), paintAmount);
+            trackPaintballProjectileCosmetic(session, player, arrow);
             player.setExp(0.0F);
             player.setSneaking(false);
             player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.8F, 1.0F);
@@ -3004,6 +3009,7 @@ public final class ArcadePortManager implements Listener {
             projectile.setVelocity(velocity);
             session.entities.add(projectile);
             session.paintProjectileDamage.put(projectile.getUniqueId(), paintAmount);
+            trackPaintballProjectileCosmetic(session, player, projectile);
         }
         float pitch = "shotgun".equals(kit) ? 0.9F : "machine-gun".equals(kit) ? 1.8F : 1.3F;
         player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 1.2F, pitch);
@@ -3015,18 +3021,97 @@ public final class ArcadePortManager implements Listener {
             String kit = session.paintballKits.getOrDefault(id, "rifle");
             if ("sniper".equals(kit)) {
                 ItemStack held = player.getInventory().getItemInMainHand();
-                if (player.isSneaking() && held.getType() == Material.STONE_HOE) {
+                if (player.isSneaking() && "sniper".equals(paintballKitForItem(held))) {
                     player.setExp(Math.min(0.999F, player.getExp() + 0.03332F));
                 } else if (player.getExp() > 0.0F && !player.isSneaking()) {
                     player.setExp(0.0F);
                 }
             } else if ("machine-gun".equals(kit)) {
                 Long lastShot = session.paintballLastShotAt.get(id);
-                if (lastShot == null || now - lastShot >= 250L) {
-                    player.setExp(Math.max(0.0F, player.getExp() - 0.02F));
+                if (lastShot == null || now - lastShot >= ArcadePortRules.PAINTBALL_MACHINE_GUN_COOL_RECHARGE_MILLIS) {
+                    player.setExp((float) ArcadePortRules.coolPaintballMachineGunHeat(player.getExp()));
                 }
             } else if (player.getExp() != 0.0F) {
                 player.setExp(0.0F);
+            }
+            if (session.ticks % 10 == 0) updatePaintballWeaponSkin(session, player);
+        }
+    }
+
+    /**
+     * Read the selected option from TestplexModernArcade without a hard dependency
+     * on that optional cosmetics/UI plugin. The game falls back to its first
+     * catalogue choice when the UI plugin is absent.
+     */
+    private String paintballCosmeticOption(UUID playerId, String group) {
+        String fallback = "weapon".equals(group) ? "chrome-marker" : "colourburst";
+        org.bukkit.plugin.Plugin cosmeticsPlugin = Bukkit.getPluginManager().getPlugin("TestplexModernArcade");
+        if (cosmeticsPlugin == null || !cosmeticsPlugin.isEnabled()) return fallback;
+        try {
+            Object selected = cosmeticsPlugin.getClass()
+                    .getMethod("getSelectedCosmeticOption", UUID.class, String.class, String.class)
+                    .invoke(cosmeticsPlugin, playerId, "paintball", group);
+            return selected instanceof String value && !value.isBlank() ? value : fallback;
+        } catch (ReflectiveOperationException | LinkageError exception) {
+            plugin.getLogger().fine("Paintball cosmetic preference bridge unavailable: " + exception.getMessage());
+            return fallback;
+        }
+    }
+
+    private void updatePaintballWeaponSkin(Session session, Player player) {
+        ItemStack held = player.getInventory().getItem(0);
+        String kit = paintballKitForItem(held);
+        if (kit == null) return;
+        Material desired = ArcadePortRules.paintballWeaponMaterial(
+                kit, paintballCosmeticOption(player.getUniqueId(), "weapon"));
+        if (desired == null || held.getType() == desired) return;
+        ItemStack replacement = held.clone();
+        replacement.setType(desired);
+        player.getInventory().setItem(0, replacement);
+    }
+
+    private void trackPaintballProjectileCosmetic(Session session, Player shooter, Projectile projectile) {
+        if (session == null || shooter == null || projectile == null) return;
+        int team = session.teams.getOrDefault(shooter.getUniqueId(), 0);
+        Color colour = team == 0 ? Color.RED : Color.AQUA;
+        String style = paintballCosmeticOption(shooter.getUniqueId(), "pellet");
+        session.paintballProjectileCosmetics.put(projectile.getUniqueId(),
+                new PaintballProjectileVisual(projectile, style, colour));
+    }
+
+    /**
+     * Broadcast the selected pellet skin as world particles. World.spawnParticle
+     * is intentional: spectators and opponents see the same cosmetic trail as
+     * the shooter. It never changes projectile velocity, hitboxes or damage.
+     */
+    private void updatePaintballPelletCosmetics(Session session) {
+        for (Map.Entry<UUID, PaintballProjectileVisual> entry
+                : new ArrayList<>(session.paintballProjectileCosmetics.entrySet())) {
+            PaintballProjectileVisual visual = entry.getValue();
+            Projectile projectile = visual.projectile();
+            if (projectile == null || !projectile.isValid() || projectile.getWorld() != session.world) {
+                session.paintballProjectileCosmetics.remove(entry.getKey());
+                continue;
+            }
+            Location point = projectile.getLocation();
+            Particle.DustOptions dust = new Particle.DustOptions(visual.teamColor(), 1.35F);
+            switch (visual.style()) {
+                case "paint-drip" -> {
+                    session.world.spawnParticle(Particle.DUST, point.clone().add(0.0D, -0.08D, 0.0D),
+                            1, 0.008D, 0.008D, 0.008D, 0.0D, dust);
+                    session.world.spawnParticle(Particle.DUST, point.clone().add(0.0D, -0.16D, 0.0D),
+                            1, 0.008D, 0.008D, 0.008D, 0.0D, dust);
+                }
+                case "stencil-stamp" -> {
+                    for (double dx : new double[] {-0.035D, 0.035D}) {
+                        for (double dz : new double[] {-0.035D, 0.035D}) {
+                            session.world.spawnParticle(Particle.DUST, point.clone().add(dx, 0.0D, dz),
+                                    1, 0.0D, 0.0D, 0.0D, 0.0D, dust);
+                        }
+                    }
+                }
+                default -> session.world.spawnParticle(Particle.DUST, point, 4,
+                        0.045D, 0.045D, 0.045D, 0.0D, dust);
             }
         }
     }
@@ -3281,7 +3366,10 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
-        if (session.type == ArcadePortGame.PAINTBALL) updatePaintballKitState(session, now);
+        if (session.type == ArcadePortGame.PAINTBALL) {
+            updatePaintballKitState(session, now);
+            updatePaintballPelletCosmetics(session);
+        }
         if (session.type == ArcadePortGame.TURF_WARS && session.turfCombat && session.ticks % 40 == 0) {
             for (UUID id : session.alive) {
                 Player player = session.players.get(id);
@@ -6999,6 +7087,7 @@ public final class ArcadePortManager implements Listener {
         } else if (session.type == ArcadePortGame.PAINTBALL) {
             int paintAmount = session.paintProjectileDamage.getOrDefault(projectile.getUniqueId(), 1);
             session.paintProjectileDamage.remove(projectile.getUniqueId());
+            session.paintballProjectileCosmetics.remove(projectile.getUniqueId());
             handlePlayerHit(session, shooter, target, "projectile hit", paintAmount);
         } else if (session.type == ArcadePortGame.DEATH_TAG) {
             if (projectile instanceof Arrow arrow
@@ -7193,6 +7282,7 @@ public final class ArcadePortManager implements Listener {
         session.bombPlayersDamaged.clear();
         session.dragonContactCooldowns.clear();
         session.paintProjectileDamage.clear();
+        session.paintballProjectileCosmetics.clear();
         session.paintballLastShotAt.clear();
         session.paintballWaterBombLastThrowAt.clear();
         session.paintballWaterBombs.clear();
@@ -9011,8 +9101,12 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
-         if (session.type == ArcadePortGame.PAINTBALL && event.getHitEntity() == null) {
-            session.paintProjectileDamage.remove(event.getEntity().getUniqueId());
+         if (session.type == ArcadePortGame.PAINTBALL) {
+            // Block impacts and non-player entity impacts also end the visible pellet trail.
+            session.paintballProjectileCosmetics.remove(event.getEntity().getUniqueId());
+            if (event.getHitEntity() == null) {
+                session.paintProjectileDamage.remove(event.getEntity().getUniqueId());
+            }
         }
 
         // Handle Dragons fireballs here rather than relying on damage-event ordering.
@@ -10943,6 +11037,9 @@ public final class ArcadePortManager implements Listener {
         });
     }
 
+    private record PaintballProjectileVisual(Projectile projectile, String style, Color teamColor) {
+    }
+
     private record DragonEscapeGhostFrame(
             long timeMillis, double x, double y, double z,
             float yaw, float pitch, boolean sneaking, boolean sprinting, boolean onGround) {
@@ -10963,6 +11060,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, ArmorStand> paintballSaveMeMarkers = new HashMap<>();
         final Map<UUID, Location> paintballSaveMeLocations = new HashMap<>();
         final Map<UUID, Integer> paintProjectileDamage = new HashMap<>();
+        final Map<UUID, PaintballProjectileVisual> paintballProjectileCosmetics = new HashMap<>();
         final Map<UUID, Integer> evolutionLevels = new HashMap<>();
         final Map<UUID, Integer> evolutionLifeKills = new HashMap<>();
         final Set<UUID> evolutionAvailable = new HashSet<>();
