@@ -2163,6 +2163,7 @@ public final class ArcadePortManager implements Listener {
             default -> new Material[]{Material.LEATHER_BOOTS, Material.LEATHER_LEGGINGS, Material.LEATHER_CHESTPLATE, Material.LEATHER_HELMET};
         };
         player.getInventory().clear();
+        player.getInventory().setItemInOffHand(null);
         player.getInventory().addItem(new ItemStack(sword));
         GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
         if (mode == null) mode = GladiatorsMode.RODLESS;
@@ -8664,10 +8665,10 @@ public final class ArcadePortManager implements Listener {
             Player attacker = damager instanceof Player direct ? direct
                     : damager instanceof Projectile projectile
                         && projectile.getShooter() instanceof Player shooter ? shooter : null;
+            double finalDamage = event.getFinalDamage();
+            event.setCancelled(true);
             if (attacker != null && session.alive.contains(attacker.getUniqueId())
                     && session.alive.contains(gladiatorTarget.getUniqueId())) {
-                double finalDamage = event.getFinalDamage();
-                event.setCancelled(true);
                 applyGladiatorDamage(session, attacker, gladiatorTarget, finalDamage, damager instanceof Projectile);
             }
             return;
