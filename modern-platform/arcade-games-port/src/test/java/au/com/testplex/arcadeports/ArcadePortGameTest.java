@@ -18,6 +18,8 @@ class ArcadePortGameTest {
         assertEquals(java.util.List.of("Speef", "Super Spleef"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.SPLEEF));
         assertEquals(java.util.List.of("Turf Wars"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.TURF_WARS));
+        assertEquals(java.util.List.of("Castle Assault"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.CASTLE_ASSAULT));
+        assertEquals(java.util.List.of("Heroes of GWEN"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.HEROES_OF_GWEN));
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.EVOLUTION).isEmpty(),
                 "Evolution has no legacy map archive folder and must not be given an invented one");
         assertEquals(java.util.List.of("Draw My Thing"),
@@ -116,8 +118,8 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheSixteenGamesNotCoveredByDedicatedMechanicsModules() {
-        assertEquals(16, ArcadePortGame.values().length);
+    @Test void exposesTheEighteenGamesNotCoveredByDedicatedMechanicsModules() {
+        assertEquals(18, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -134,6 +136,8 @@ class ArcadePortGameTest {
         assertEquals(ArcadePortGame.ONE_IN_THE_QUIVER, ArcadePortGame.fromId("one_in_the_quiver"));
         assertEquals(ArcadePortGame.BOMB_LOBBERS, ArcadePortGame.fromId("Bomb Lobbers"));
         assertEquals(ArcadePortGame.MICRO_BATTLES, ArcadePortGame.fromId("micro-battles"));
+        assertEquals(ArcadePortGame.CASTLE_ASSAULT, ArcadePortGame.fromId("castle-assault"));
+        assertEquals(ArcadePortGame.HEROES_OF_GWEN, ArcadePortGame.fromId("Heroes of Gwen"));
     }
     @Test void microBattlesGlassBarrierDropsAfterTenSeconds() {
         assertFalse(ArcadePortRules.shouldRemoveMicroBarrier(9_999L));
