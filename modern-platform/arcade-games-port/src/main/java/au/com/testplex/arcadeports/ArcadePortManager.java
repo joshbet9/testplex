@@ -6045,6 +6045,7 @@ public final class ArcadePortManager implements Listener {
                 session.lastLocations.put(victimId, spawn.clone());
                 giveKit(session, player);
                 player.sendMessage(ChatColor.GREEN + "Respawned. First to 20 kills wins.");
+                checkRoundEnd(session);
             }, ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS);
             return;
         }
@@ -6999,6 +7000,7 @@ public final class ArcadePortManager implements Listener {
             session.lastLocations.put(targetId, spawn.clone());
             giveKit(session, target);
             target.sendMessage(ChatColor.GREEN + "Respawned. First to 20 kills wins.");
+            checkRoundEnd(session);
         }, ArcadePortRules.QUIVER_RESPAWN_DELAY_TICKS);
     }
 
