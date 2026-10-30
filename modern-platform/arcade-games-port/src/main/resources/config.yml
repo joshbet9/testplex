@@ -1,8 +1,9 @@
 # Isolated manual-acceptance candidates. Availability does not itself certify 100% in-game parity.
-# Dragon Escape stays gated until Bomb Lobbers has passed in-game acceptance.
+# Dragon Escape is open for in-game acceptance now that Bomb Lobbers has passed.
 enabled-games:
   - bacon-brawl
   - bomb-lobbers
+  - dragon-escape
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
