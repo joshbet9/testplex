@@ -11,7 +11,9 @@ git checkout -B "$INTEGRATION_BRANCH" "origin/$BASE_BRANCH"
 
 for branch in \
   feat/skywars-mixed-arcade-26.3-20261030 \
-  feat/milk-cow-wither-assault-26.3; do
+  feat/milk-cow-wither-assault-26.3 \
+  feat/castle-assault-gwen-mixed-arcade-variants-20261030-v6 \
+  feat/sheep-quest-parity-20261030-rebased; do
   echo "Integrating $branch"
   git fetch origin "refs/heads/$branch:refs/remotes/origin/$branch"
   if ! git merge-base --is-ancestor "origin/$branch" HEAD; then
@@ -83,6 +85,175 @@ if 'register(game("skywars"' not in catalog:
         raise SystemExit("Could not find the ArcadeCatalog insertion point for SkyWars.")
     catalog = catalog.replace(insert_before, skywars + "\n\n" + insert_before, 1)
 catalog_path.write_text(catalog)
+
+
+# Git's -X ours merge deliberately kept the newer platform manager around conflicting
+# regions. Re-introduce only the missing SkyWars declarations from the feature branch,
+# retaining the rest of the newer manager.
+python3 - <<'PY'
+from pathlib import Path
+import re
+import subprocess
+
+path = Path("modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortManager.java")
+source = path.read_text()
+sky = subprocess.check_output([
+    "git", "show",
+    "origin/feat/skywars-mixed-arcade-26.3-20261030:modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortManager.java"
+], text=True)
+
+def extract(start_marker: str, end_marker: str) -> str:
+    start = sky.find(start_marker)
+    end = sky.find(end_marker, start + len(start_marker))
+    if start < 0 or end < 0:
+        raise SystemExit(f"Could not extract SkyWars source block: {start_marker}")
+    return sky[start:end]
+
+if "skyWarsKitPreferences" not in source:
+    anchor = "    private final Map<UUID, String> dragonEscapeKitPreferences = new HashMap<>();"
+    if anchor not in source:
+        raise SystemExit("Could not find kit-preference field anchor.")
+    source = source.replace(anchor, anchor + "\n    private final Map<UUID, String> skyWarsKitPreferences = new HashMap<>();", 1)
+
+if "private ItemStack skyWarsKitItem(" not in source:
+    helper = extract("    private ItemStack skyWarsKitItem(", "    private void prepareSkyWarsMap(")
+    anchor = "    private void prepareSkyWarsMap("
+    if anchor not in source:
+        raise SystemExit("Could not find SkyWars map preparation method.")
+    source = source.replace(anchor, helper + anchor, 1)
+
+if "private void updateSkyWarsCompass(" not in source:
+    helpers = extract("    private Player nearestSkyWarsTarget(", "    private int skyWarsMetalArmorPieces(")
+    anchor = "    private int skyWarsMetalArmorPieces("
+    if anchor not in source:
+        raise SystemExit("Could not find SkyWars metal armour helper anchor.")
+    source = source.replace(anchor, helpers + anchor, 1)
+
+if "private record SkyWarsCrumbleCandidate(" not in source:
+    record = re.search(r"    private record SkyWarsCrumbleCandidate\([^\n]+\n", sky)
+    if not record:
+        raise SystemExit("Could not find SkyWars crumble candidate record.")
+    anchor = "    private static final class Session {"
+    if anchor not in source:
+        raise SystemExit("Could not find Arcade session declaration.")
+    source = source.replace(anchor, record.group(0) + "\n" + anchor, 1)
+
+# The feature branch referenced spawn before declaring it. Move the Air kit safe
+# location assignment to immediately after the actual selected spawn is created.
+source = source.replace(
+    '                if ("air".equals(selectedKit)) session.skyWarsSafeLocations.put(player.getUniqueId(), spawn.clone());\n',
+    ""
+)
+spawn_line = "            Location spawn = spawns.get(i % spawns.size()).clone();"
+if spawn_line not in source:
+    raise SystemExit("Could not find participant spawn assignment for SkyWars Air spawn fix.")
+spawn_replacement = spawn_line + """
+            if (type == ArcadePortGame.SKY_WARS
+                    && "air".equals(session.skyWarsKits.get(player.getUniqueId()))) {
+                session.skyWarsSafeLocations.put(player.getUniqueId(), spawn.clone());
+            }"""
+source = source.replace(spawn_line, spawn_replacement, 1)
+
+# Reconcile the shared Testplex queue with SkyWars' separate 16-player Mixed queue.
+queue_start = source.find("    public void queue(ArcadePortGame type, Player player, boolean quickStart, boolean mixedArcadeVariant) {")
+queue_end = source.find("    private void scheduleQuickStart", queue_start)
+if queue_start < 0 or queue_end < 0:
+    raise SystemExit("Could not find the complete Arcade queue method to reconcile.")
+queue_method = """    public void queue(ArcadePortGame type, Player player, boolean quickStart, boolean mixedArcadeVariant) {
+        if (monsterMazeRunning()) {
+            player.sendMessage(ChatColor.RED + "Monster Maze is already running. Wait for the current Testplex game to finish.");
+            return;
+        }
+        if (type == null) {
+            player.sendMessage(ChatColor.RED + "Unknown game id. Use /arcadeport help for the available IDs.");
+            return;
+        }
+        if (mixedArcadeVariant && type != ArcadePortGame.SKY_WARS && !supportsMixedArcadeVariant(type)) {
+            player.sendMessage(ChatColor.RED + "That Mixed Arcade variant is not available for this game.");
+            return;
+        }
+        if (type == ArcadePortGame.SKY_WARS && !mixedArcadeVariant) {
+            player.sendMessage(ChatColor.RED + "Use /arcadeport join skywars-mixed for the 16-player Mixed Arcade rules.");
+            return;
+        }
+        if (!isGameEnabled(type)) {
+            player.sendMessage(ChatColor.RED + type.displayName()
+                    + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
+            return;
+        }
+        if (active != null && active.type == type) {
+            player.sendMessage(ChatColor.RED + "That game is already in progress. Use /arcadeport status or queue the next game.");
+            return;
+        }
+        if (manualStartCountdown != null && manualStartType != type) {
+            player.sendMessage(ChatColor.RED + manualStartType.displayName()
+                    + " is already counting down. Wait for that round to start before queueing another game.");
+            return;
+        }
+
+        String queueId = queueKey(type, mixedArcadeVariant);
+        LinkedHashMap<UUID, Player> targetQueue = queues.computeIfAbsent(queueId, ignored -> new LinkedHashMap<>());
+        int queuedPlayers = (int) targetQueue.values().stream()
+                .filter(queued -> queued != null && queued.isOnline()
+                        && !queued.getUniqueId().equals(player.getUniqueId())).count();
+        if (type == ArcadePortGame.SKY_WARS && mixedArcadeVariant
+                && !SkyWarsMixedArcadeRules.hasRoom(queuedPlayers)) {
+            player.sendMessage(ChatColor.RED + "SkyWars Mixed Arcade is full (16/16 players).");
+            return;
+        }
+
+        lobby.ensurePlayerInLobby(player);
+        for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) existingQueue.remove(player.getUniqueId());
+        if (type != ArcadePortGame.GLADIATORS) gladiatorLobbyVotes.remove(player.getUniqueId());
+        queues.computeIfAbsent(queueId, ignored -> new LinkedHashMap<>()).put(player.getUniqueId(), player);
+        String variantName = mixedArcadeVariant ? " (Mixed Arcade)" : "";
+        String nextAction = manualStartCountdown != null && manualStartType == type
+                ? "The existing start countdown is already running."
+                : quickStart ? "Starting after a short join window so friends can join too."
+                : "An operator/player can use /arcadeport start "
+                        + (mixedArcadeVariant ? type.id() + "-mixed" : type.id()) + ".";
+        player.sendMessage(ChatColor.GREEN + "Queued for " + type.displayName() + variantName + ". " + nextAction);
+        if (quickStart) scheduleQuickStart(type, mixedArcadeVariant);
+        if (type == ArcadePortGame.GLADIATORS) openGladiatorLobbyVoteMenu(player);
+    }
+
+"""
+source = source[:queue_start] + queue_method + source[queue_end:]
+
+# Keep holder ownership alongside the existing sheep->carrier map so ownership is
+# always removed when a sheep is dropped, invalidated or scored.
+if "final Map<Sheep, UUID> sheepHolders" not in source:
+    anchor = "        final Map<Sheep, UUID> sheepCarriers = new LinkedHashMap<>();"
+    if anchor not in source:
+        raise SystemExit("Could not find Sheep Quest session carrier map.")
+    source = source.replace(anchor, anchor + "\n        final Map<Sheep, UUID> sheepHolders = new HashMap<>();", 1)
+pickup = "        session.sheepCarriers.put(sheep, playerId);"
+if pickup in source and "session.sheepHolders.put(sheep, playerId);" not in source:
+    source = source.replace(pickup, pickup + "\n        session.sheepHolders.put(sheep, playerId);", 1)
+drop_start = source.find("    private void dropSheepFromCarrier(")
+drop_end = source.find("    private void updateSheepQuest(", drop_start)
+if drop_start < 0 or drop_end < 0:
+    raise SystemExit("Could not find Sheep Quest drop method.")
+drop = source[drop_start:drop_end]
+drop = drop.replace("            session.sheepCarriers.remove(sheep);\n",
+                    "            session.sheepCarriers.remove(sheep);\n            session.sheepHolders.remove(sheep);\n", 1)
+source = source[:drop_start] + drop + source[drop_end:]
+update_start = source.find("    private void updateSheepQuest(")
+update_end = source.find("\n    private ", update_start + 20)
+if update_start < 0 or update_end < 0:
+    raise SystemExit("Could not find Sheep Quest update method.")
+update = source[update_start:update_end]
+update = update.replace("                session.sheep.remove(sheep);\n",
+                        "                session.sheep.remove(sheep);\n                session.sheepHolders.remove(sheep);\n", 1)
+update = update.replace("            int previousOwner = session.sheepOwners.getOrDefault(sheep, -1);\n",
+                        "            int previousOwner = session.sheepOwners.getOrDefault(sheep, -1);\n            UUID holderId = session.sheepHolders.remove(sheep);\n", 1)
+update = update.replace("            if (previousOwner != team) {\n",
+                        "            if (previousOwner != team && (holderId == null || holderId.equals(carrierId))) {\n", 1)
+source = source[:update_start] + update + source[update_end:]
+
+path.write_text(source)
+print("Reconciled SkyWars helper declarations, spawn placement, shared queue, and Sheep Quest holder cleanup.")
+PY
 
 test_path = Path("modern-platform/src/test/java/au/com/testplex/modern/model/ArcadeCatalogTest.java")
 test = test_path.read_text()
