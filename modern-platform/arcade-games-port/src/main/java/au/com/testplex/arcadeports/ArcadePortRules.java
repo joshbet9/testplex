@@ -1639,14 +1639,17 @@ public final class ArcadePortRules {
         return lastUseMillis <= 0L || nowMillis - lastUseMillis >= DEATH_TAG_TRAITOR_KNOCKBACK_COOLDOWN_MILLIS;
     }
 
-    /** Surviving runners have the Death Tag objective at timeout; chaser scores are only a fallback when none remain. */
-    /** The chaser side wins only after there are no living runners left. */
+    /** The source Death Tag game only awards winning placement to surviving Runners. */
+    public static boolean deathTagHasRunnerWinner(int runnersRemaining) {
+        return runnersRemaining > 0;
+    }
+
     public static boolean deathTagChasersWinRound(int runnersRemaining) {
-        return runnersRemaining <= 0;
+        return false; // Chasers are the losing side; an empty Runner team has no winner.
     }
 
     public static boolean shouldDeathTagRunnerWinTimeout(int runnersRemaining) {
-        return runnersRemaining > 0;
+        return deathTagHasRunnerWinner(runnersRemaining);
     }
 
     public static boolean shouldFinishDeathTagRound(int runnersRemaining, int initialPlayers) {
