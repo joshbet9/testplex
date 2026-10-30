@@ -31,28 +31,16 @@ public class MMCommand implements CommandExecutor {
 
     @Override public boolean onCommand(CommandSender sender,Command command,String label,String[] args){
         GameManager gm=plugin.getGameManager();
-        if (sender instanceof Player && args.length > 0 && "start".equalsIgnoreCase(args[0])) {
-            final Player player = (Player) sender;
-            Location center = gm.getCenter();
-            if (center != null && center.getWorld() != null
-                    // The modern Game Panel is the entry point; redirect from any lobby/world
-                    // into Monster Maze's own arena before replaying the requested start command.
-                    && player.getWorld() != center.getWorld() && gm.getState() == GameState.IDLE) {
+        if (args.length > 0 && "start".equalsIgnoreCase(args[0])) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage(ChatColor.YELLOW + "Queue players through Testplex Arcade with /arcadeport start monster-maze.");
+            } else if (gm.isRunning()) {
+                player.sendMessage(ChatColor.RED + "Monster Maze is already running.");
+            } else {
                 player.closeInventory();
-                gm.sendToLobby(player);
-                final StringBuilder forwarded = new StringBuilder("mm");
-                for (String arg : args) forwarded.append(" ").append(arg);
-                final String replay = forwarded.toString();
-                org.bukkit.Bukkit.getScheduler().runTaskLater(plugin.getHostPlugin(), new Runnable() {
-                    @Override public void run() {
-                        if (player.isOnline() && gm.getCenter() != null
-                                && player.getWorld() == gm.getCenter().getWorld()) {
-                            player.performCommand(replay);
-                        }
-                    }
-                }, 2L);
-                return true;
+                player.performCommand("arcadeport play monster-maze");
             }
+            return true;
         }
         if(args.length==0){showHelp(sender);return true;}
         String sub=args[0].toLowerCase();
@@ -67,7 +55,7 @@ public class MMCommand implements CommandExecutor {
 
         if(sub.equals("void")||sub.equals("voidworld")||sub.equals("lobby")||sub.equals("stop")||sub.equals("force")||sub.equals("setcenter")||sub.equals("build")||sub.equals("buildmode")){
             if(!sender.hasPermission("monstermaze.admin")){sender.sendMessage(ChatColor.RED+"No permission.");return true;}
-            if(sub.equals("void")||sub.equals("voidworld")||sub.equals("lobby")){if(!(sender instanceof Player)){sender.sendMessage(ChatColor.RED+"Players only.");return true;}plugin.getVoidWorlds().sendToVoid((Player)sender);return true;}
+            if(sub.equals("void")||sub.equals("voidworld")||sub.equals("lobby")){if(!(sender instanceof Player)){sender.sendMessage(ChatColor.RED+"Players only.");return true;}plugin.getHostPlugin().returnPlayerToArcadeLobby((Player)sender);return true;}
             if(sub.equals("stop")||sub.equals("force")){gm.forceStop();sender.sendMessage(ChatColor.GREEN+"Monster Maze force stopped.");return true;}
             if(sub.equals("setcenter")){if(!(sender instanceof Player)){sender.sendMessage(ChatColor.RED+"Only players can set the center.");return true;}if(gm.isRunning()){sender.sendMessage(ChatColor.RED+"Cannot move the Monster Maze center while a round is running.");return true;}Player p=(Player)sender;gm.setCenter(p.getLocation());sender.sendMessage(ChatColor.GREEN+"Lobby box placed at "+p.getLocation().getBlockX()+", "+p.getLocation().getBlockY()+", "+p.getLocation().getBlockZ());return true;}
             sender.sendMessage(ChatColor.YELLOW+"Build mode remains an admin-only tool.");return true;
