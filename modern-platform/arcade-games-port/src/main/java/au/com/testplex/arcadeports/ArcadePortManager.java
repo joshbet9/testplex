@@ -1987,7 +1987,8 @@ public final class ArcadePortManager implements Listener {
                 break;
             }
             case EVOLUTION:
-                player.getInventory().addItem(new ItemStack(Material.WOODEN_SWORD));
+                // Use the same complete first-form kit on initial spawn as on every respawn.
+                giveEvolutionKit(session, player);
                 break;
             case GLADIATORS:
                 // The tiered tournament loadout is applied when its arena round starts.
