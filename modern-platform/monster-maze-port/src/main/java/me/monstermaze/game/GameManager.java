@@ -283,12 +283,8 @@ public void startGame(Location preferCenter, int requestedPattern) {
                     p.teleport(center.clone().add(0.5, 1, 0.5));
                 }
 
-                // Kit selection remains a gameplay GUI; there are no lobby NPCs or
-                // a separate Monster Maze lobby in Testplex.
-                for (Player p : getAlivePlayers()) {
-                    kitManager.openSelector(p);
-                    p.sendMessage(ChatColor.YELLOW + "Choose a kit! Click a villager or use the menu.");
-                }
+                // Selected kits were chosen in Testplex's shared Arcade lobby.
+                // preparePlayer() applies that selection; no Monster Maze lobby/menu is created.
 
                 if (alive.isEmpty()) {
                     forceStop();
