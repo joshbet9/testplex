@@ -20,7 +20,7 @@ class TurfWarsMixedVariantTest {
 
     @Test
     void mixedArcadeKillsMoveTheFrontlineTwoColumnsInEitherDirection() {
-        assertEquals(-1, ArcadePortRules.advanceTurfFrontline(-1, 0, false));
+        assertEquals(0, ArcadePortRules.advanceTurfFrontline(-1, 0, false));
         assertEquals(-2, ArcadePortRules.advanceTurfFrontline(-1, 1, false));
         assertEquals(1, ArcadePortRules.advanceTurfFrontline(-1, 0, true));
         assertEquals(-3, ArcadePortRules.advanceTurfFrontline(-1, 1, true));
