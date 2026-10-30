@@ -1080,15 +1080,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (player == null || !player.isOnline()) continue;
             long next = castleArcherNextArrowAt.getOrDefault(id, now);
             if (now < next) continue;
-            ItemStack arrows = player.getInventory().getItem(2);
-            int amount = arrows != null && arrows.getType() == Material.ARROW ? arrows.getAmount() : 0;
+            int amount = 0;
+            for (ItemStack item : player.getInventory().getContents()) {
+                if (isCastleFletchedArrow(item)) amount += item.getAmount();
+            }
             if (amount < ArcadePortRules.CASTLE_ASSAULT_ARCHER_MAX_ARROWS) {
-                if (amount == 0) {
-                    player.getInventory().setItem(2, namedItem(Material.ARROW, "Fletched Arrow",
-                            "Replenished by the Archer kit."));
-                } else {
-                    arrows.setAmount(amount + 1);
-                }
+                player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrow",
+                        "Replenished by the Archer kit."));
                 player.updateInventory();
             }
             castleArcherNextArrowAt.put(id, now + ArcadePortRules.CASTLE_ASSAULT_ARCHER_REFILL_MILLIS);
