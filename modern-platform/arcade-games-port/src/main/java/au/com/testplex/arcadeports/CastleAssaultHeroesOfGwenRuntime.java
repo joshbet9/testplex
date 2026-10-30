@@ -70,7 +70,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private static final long CASTLE_NORMAL_TNT_DELAY = 60_000L;
     private static final long MOBA_PASSIVE_GOLD_INTERVAL = 5_000L;
     private static final long MOBA_TOWER_UPDATE_INTERVAL = 1_000L;
+    private static final long MOBA_CAPTURE_UPDATE_INTERVAL = 1_000L;
     private static final double MOBA_TOWER_RANGE_SQUARED = 100.0D;
+    private static final double MOBA_CAPTURE_POINT_RANGE_SQUARED = 25.0D;
     private static final double MOBA_TOWER_DAMAGE = 3.0D;
     private static final double MOBA_TOWER_HEAL = 2.6D;
 
@@ -95,6 +97,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, Integer> playerGold = new HashMap<>();
     private final Map<UUID, ItemStack> carriedTntOldHelmet = new HashMap<>();
     private final Map<Integer, List<TowerState>> towers = new HashMap<>();
+    private final List<CapturePointState> capturePoints = new ArrayList<>();
     private final Map<Integer, Wither> withers = new HashMap<>();
     private final Map<Integer, Boolean> witherDamageable = new HashMap<>();
     private final List<Location> objectiveTntSpawns = new ArrayList<>();
@@ -107,6 +110,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private long objectiveRespawnAt;
     private long nextGoldAt;
     private long nextStructureUpdateAt;
+    private long nextCapturePointUpdateAt;
     private int objectiveKillsEnabled;
     private int castleKillCountRed;
     private int castleKillCountBlue;
@@ -221,14 +225,23 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         int found = 0;
         for (Map.Entry<String, List<Location>> group : map.customLocationGroups().entrySet()) {
             String name = group.getKey();
-            if (!name.toUpperCase(Locale.ROOT).startsWith("TOWER")) continue;
-            int owner = teamFromMarker(name);
-            if (owner < 0) continue;
-            for (Location location : group.getValue()) {
-                if (mixedArcade && isMiddleTowerMarker(name)) continue;
+            List<Location> markerLocations = group.getValue();
+            if (markerLocations.isEmpty()) continue;
+            if (name.toUpperCase(Locale.ROOT).startsWith("TOWER")) {
+                int owner = teamFromMarker(name);
+                if (owner < 0) continue;
+                boolean middleTower = isMiddleTowerMarker(name);
+                if (!ArcadePortRules.heroesOfGwenShouldSpawnTower(mixedArcade, middleTower)) continue;
+                // Reborn's getLocationStartsWith("TOWER") uses the first custom location per marker.
+                Location location = markerLocations.get(0);
                 boolean first = isFirstTowerMarker(name);
                 spawnMobaTower(owner, location, first, name);
                 found++;
+            } else if (name.toUpperCase(Locale.ROOT).startsWith("POINT")) {
+                String[] parts = name.split("[ _-]+");
+                if (parts.length < 3) continue;
+                Location center = markerLocations.get(0).clone();
+                capturePoints.add(new CapturePointState(parts[1], parts[2], center, capturePointWool(center)));
             }
         }
         if (found == 0) {
@@ -434,17 +447,44 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return parts.length > 0 && "1".equals(parts[parts.length - 1]);
     }
 
+    /**
+     * The Reborn Heroes of GWEN archives name the two towers per team
+     * "TOWER <team> 1" and "TOWER <team> 2". In the source layouts, marker
+     * 1 sits beside the mid-map beacon line; marker 2 is the base-side tower.
+     * Mixed Arcade removes only those central marker-1 towers.
+     */
     static boolean isMiddleTowerMarker(String marker) {
         if (marker == null) return false;
         String upper = marker.toUpperCase(Locale.ROOT);
         if (upper.contains("MIDDLE") || upper.contains("MIDLANE")
                 || upper.contains("MID LANE") || upper.contains("CENTER")
                 || upper.contains("CENTRE")) return true;
-        for (String part : upper.split("[ _-]+")) {
+        String[] parts = upper.trim().split("[ _-]+");
+        if (parts.length >= 3 && "TOWER".equals(parts[0]) && "1".equals(parts[parts.length - 1])) {
+            return true;
+        }
+        for (String part : parts) {
             if ("MID".equals(part) || "MIDDLE".equals(part) || "CENTER".equals(part)
                     || "CENTRE".equals(part)) return true;
         }
         return false;
+    }
+
+    private List<Block> capturePointWool(Location center) {
+        List<Block> result = new ArrayList<>();
+        int x = center.getBlockX(), y = center.getBlockY(), z = center.getBlockZ();
+        int radius = 5;
+        for (int bx = x - radius; bx <= x + radius; bx++) {
+            for (int by = y - 2; by <= y + 2; by++) {
+                for (int bz = z - radius; bz <= z + radius; bz++) {
+                    Block block = world.getBlockAt(bx, by, bz);
+                    if (block.getLocation().distanceSquared(center) > MOBA_CAPTURE_POINT_RANGE_SQUARED) continue;
+                    String material = block.getType().name();
+                    if (material.equals("WOOL") || material.endsWith("_WOOL")) result.add(block);
+                }
+            }
+        }
+        return result;
     }
 
     private long objectiveDelay() {
@@ -478,7 +518,19 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private void tickHeroesOfGwen(long now) {
         if (now >= nextGoldAt) {
             for (Player player : activeMatchPlayers()) addGold(player, 20, "Passive gold");
+            for (CapturePointState point : capturePoints) {
+                if (point.owner < 0) continue;
+                for (Player player : activeMatchPlayers()) {
+                    if (teams.getOrDefault(player.getUniqueId(), -1) == point.owner) {
+                        addGold(player, 5, "Captured beacon");
+                    }
+                }
+            }
             nextGoldAt = now + MOBA_PASSIVE_GOLD_INTERVAL;
+        }
+        if (now >= nextCapturePointUpdateAt) {
+            updateCapturePoints();
+            nextCapturePointUpdateAt = now + MOBA_CAPTURE_UPDATE_INTERVAL;
         }
         if (now >= nextStructureUpdateAt) {
             updateMobaTowers();
@@ -649,6 +701,95 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             announce(ChatColor.GOLD + king.name + " has fallen. " + teamName(1 - king.team) + " wins Castle Assault!");
             hooks.finish(firstPlayerOnTeam(1 - king.team), 1 - king.team, "enemy king defeated");
         }
+    }
+
+    private void updateCapturePoints() {
+        for (CapturePointState point : capturePoints) {
+            int redPlayers = 0;
+            int bluePlayers = 0;
+            for (Player player : activeMatchPlayers()) {
+                if (player.getLocation().distanceSquared(point.center) > MOBA_CAPTURE_POINT_RANGE_SQUARED) continue;
+                int team = teams.getOrDefault(player.getUniqueId(), -1);
+                if (team == 0) redPlayers++;
+                else if (team == 1) bluePlayers++;
+            }
+            // The original beacon is contested when both teams are present.
+            if (redPlayers > 0 && bluePlayers > 0) continue;
+            int advancingTeam;
+            int playersOnPoint;
+            if (redPlayers > 0) {
+                advancingTeam = 0;
+                playersOnPoint = redPlayers;
+            } else if (bluePlayers > 0) {
+                advancingTeam = 1;
+                playersOnPoint = bluePlayers;
+            } else if (point.owner >= 0) {
+                // An owned point slowly restores its progress when nobody is standing on it.
+                advancingTeam = point.owner;
+                playersOnPoint = 1;
+            } else {
+                continue;
+            }
+
+            if (point.side < 0) point.side = advancingTeam;
+            if (point.side == advancingTeam) {
+                point.progress += playersOnPoint;
+                int maximum = point.owner < 0 ? 10 : 5;
+                point.progress = Math.min(maximum, point.progress);
+                updateCapturePointBlocks(point);
+                if (point.progress >= maximum) setCapturePointOwner(point, advancingTeam);
+            } else {
+                point.progress -= playersOnPoint;
+                if (point.progress <= 0) {
+                    point.owner = -1;
+                    point.side = advancingTeam;
+                    point.progress = 0;
+                    setCapturePointBeacon(point, -1);
+                }
+                updateCapturePointBlocks(point);
+            }
+        }
+    }
+
+    private void setCapturePointOwner(CapturePointState point, int owner) {
+        if (point.owner == owner) return;
+        point.owner = owner;
+        point.side = owner;
+        point.progress = 5;
+        setCapturePointBeacon(point, owner);
+        for (Player player : activeMatchPlayers()) {
+            if (teams.getOrDefault(player.getUniqueId(), -1) == owner) {
+                addGold(player, 25, "Capturing " + point.name);
+            }
+        }
+        announce(ChatColor.GOLD + teamName(owner) + " captured the " + point.colour + " " + point.name + " Beacon!");
+    }
+
+    private void updateCapturePointBlocks(CapturePointState point) {
+        if (point.wool.isEmpty()) return;
+        int maximum = point.owner < 0 ? 10 : 5;
+        int count = Math.min(point.wool.size(),
+                (int) Math.ceil(point.wool.size() / (double) maximum) * point.progress + 1);
+        Material colour = teamWool(point.side);
+        for (int i = 0; i < point.wool.size(); i++) {
+            Block block = point.wool.get(i);
+            rememberBlock(block);
+            Block above = block.getRelative(BlockFace.UP);
+            rememberBlock(above);
+            Material target = i < count ? colour : Material.WHITE_WOOL;
+            block.setType(target, false);
+            above.setType(target, false);
+        }
+    }
+
+    private void setCapturePointBeacon(CapturePointState point, int owner) {
+        Block beacon = point.center.getBlock().getRelative(BlockFace.DOWN);
+        rememberBlock(beacon);
+        beacon.setType(owner < 0 ? Material.WHITE_WOOL : teamWool(owner), false);
+    }
+
+    private Material teamWool(int team) {
+        return team == 0 ? Material.RED_WOOL : team == 1 ? Material.LIGHT_BLUE_WOOL : Material.WHITE_WOOL;
     }
 
     private void updateMobaTowers() {
@@ -1119,6 +1260,22 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         int activeCrystals() {
             return (int) crystals.stream().filter(crystal -> crystal != null && crystal.isValid()).count();
+        }
+    }
+
+    private static final class CapturePointState {
+        final String name;
+        final String colour;
+        final Location center;
+        final List<Block> wool;
+        int owner = -1;
+        int side = -1;
+        int progress;
+        CapturePointState(String name, String colour, Location center, List<Block> wool) {
+            this.name = name;
+            this.colour = colour;
+            this.center = center;
+            this.wool = wool;
         }
     }
 
