@@ -322,7 +322,7 @@ if "private ItemStack skyWarsKitItem(" not in source:
     source = source.replace(anchor, helper + anchor, 1)
 
 if "private void updateSkyWarsCompass(" not in source:
-    helpers = extract("    private Player nearestSkyWarsTarget(", "    private int skyWarsMetalArmorPieces(")
+    helpers = extract("    private boolean isSkyWarsTrackingCompass(", "    private int skyWarsMetalArmorPieces(")
     anchor = "    private void updateQuiverKit("
     if anchor not in source:
         raise SystemExit("Could not find stable compass-helper insertion point.")
@@ -545,8 +545,216 @@ for case_marker, case_text in status_cases:
         status_method = status_method.replace(turf_anchor, case_text + turf_anchor, 1)
 source = source[:status_start] + status_method + source[status_end:]
 
+
+# Add preference fields and selection methods from the Heroes v6 port without
+# replacing the newer Testplex lifecycle/queue manager.
+if "private final Map<UUID, String> castleAssaultKitPreferences" not in source:
+    anchor = "    private final Map<UUID, String> paintballKitPreferences = new HashMap<>();"
+    if anchor not in source:
+        raise SystemExit("Could not find kit preference map insertion point.")
+    source = source.replace(anchor, anchor + """
+    private final Map<UUID, String> castleAssaultKitPreferences = new HashMap<>();
+    private final Map<UUID, String> heroesOfGwenHeroPreferences = new HashMap<>();""", 1)
+
+v6_manager = subprocess.check_output([
+    "git", "show",
+    "origin/feat/castle-assault-gwen-mixed-arcade-variants-20261030-v6:modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortManager.java"
+], text=True)
+
+def extract_v6(start_marker: str, end_marker: str) -> str:
+    start = v6_manager.find(start_marker)
+    end = v6_manager.find(end_marker, start + len(start_marker))
+    if start < 0 or end < 0:
+        raise SystemExit(f"Could not extract Heroes v6 manager code: {start_marker}")
+    return v6_manager[start:end]
+
+if "public void selectCastleAssaultKit(" not in source:
+    selections = extract_v6("    public void selectCastleAssaultKit(", "    public void selectBombLobbersKit(")
+    selections = selections.replace(
+        "Hero abilities are still being ported; your current combat loadout is unchanged.",
+        "Your selected hero's role-specific abilities are now equipped."
+    )
+    anchor = "    public void selectBombLobbersKit("
+    if anchor not in source:
+        raise SystemExit("Could not find kit-selection method insertion point.")
+    source = source.replace(anchor, selections + anchor, 1)
+
+# Route the common Testplex kit selector to Castle Assault and Heroes of Gwen.
+switch_anchor = "            switch (running.type) {\n                case BACON_BRAWL"
+switch_replacement = """            switch (running.type) {
+                case CASTLE_ASSAULT -> { selectCastleAssaultKit(player, value); return; }
+                case HEROES_OF_GWEN -> { selectHeroesOfGwenHero(player, value); return; }
+                case BACON_BRAWL"""
+if "case CASTLE_ASSAULT -> { selectCastleAssaultKit(player, value); return; }" not in source:
+    if switch_anchor not in source:
+        raise SystemExit("Could not find active-game kit selection switch.")
+    source = source.replace(switch_anchor, switch_replacement, 1)
+
+fallback_anchor = "        if (value.startsWith(\"quiver-\")) { selectQuiverKit(player, value); }"
+fallback_replacement = """        if (ArcadePortRules.normalizeCastleAssaultKit(value) != null) selectCastleAssaultKit(player, value);
+        else if (ArcadePortRules.normalizeHeroesOfGwenHero(value) != null) selectHeroesOfGwenHero(player, value);
+        else if (value.startsWith("quiver-")) { selectQuiverKit(player, value); }"""
+if "normalizeCastleAssaultKit(value)) != null) selectCastleAssaultKit" not in source:
+    if fallback_anchor not in source:
+        raise SystemExit("Could not find shared kit-selection fallback chain.")
+    source = source.replace(fallback_anchor, fallback_replacement, 1)
+
+# Use the source Castle kits / selected Heroes hero when the shared Testplex
+# runtime gives a player their match inventory.
+old_castle = """            case CASTLE_ASSAULT:
+                player.getInventory().addItem(new ItemStack(Material.IRON_SWORD),
+                        new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 16),
+                        new ItemStack(Material.TNT, 2));
+                player.getInventory().setChestplate(new ItemStack(Material.IRON_CHESTPLATE));
+                player.getInventory().setLeggings(new ItemStack(Material.IRON_LEGGINGS));
+                player.getInventory().setBoots(new ItemStack(Material.IRON_BOOTS));
+                break;"""
+new_castle = """            case CASTLE_ASSAULT: {
+                String kit = castleAssaultKitPreferences.getOrDefault(player.getUniqueId(), "fighter");
+                if (session.variantRuntime != null && session.variantRuntime.isReady()) {
+                    session.variantRuntime.giveCastleAssaultKit(player, kit);
+                } else {
+                    player.getInventory().addItem(new ItemStack(Material.DIAMOND_SWORD));
+                    player.getInventory().setHelmet(new ItemStack(Material.DIAMOND_HELMET));
+                    player.getInventory().setChestplate(new ItemStack(Material.IRON_CHESTPLATE));
+                    player.getInventory().setLeggings(new ItemStack(Material.IRON_LEGGINGS));
+                    player.getInventory().setBoots(new ItemStack(Material.DIAMOND_BOOTS));
+                }
+                break;
+            }"""
+if "castleAssaultKitPreferences.getOrDefault(player.getUniqueId(), \"fighter\")" not in source:
+    if old_castle not in source:
+        raise SystemExit("Could not find the existing Castle Assault generic kit.")
+    source = source.replace(old_castle, new_castle, 1)
+
+old_heroes = """            case HEROES_OF_GWEN:
+                player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
+                        new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 8),
+                        namedItem(Material.GOLD_INGOT, "Gold & Store", "Right-click to open the Heroes of Gwen store."));
+                player.getInventory().setChestplate(new ItemStack(Material.LEATHER_CHESTPLATE));
+                player.getInventory().setLeggings(new ItemStack(Material.LEATHER_LEGGINGS));
+                player.getInventory().setBoots(new ItemStack(Material.LEATHER_BOOTS));
+                break;"""
+new_heroes = """            case HEROES_OF_GWEN:
+                player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
+                        new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 8),
+                        namedItem(Material.GOLD_INGOT, "Gold & Store", "Right-click to open the Heroes of Gwen store."));
+                player.getInventory().setChestplate(new ItemStack(Material.LEATHER_CHESTPLATE));
+                player.getInventory().setLeggings(new ItemStack(Material.LEATHER_LEGGINGS));
+                player.getInventory().setBoots(new ItemStack(Material.LEATHER_BOOTS));
+                if (session.variantRuntime != null && session.variantRuntime.isReady()) {
+                    session.variantRuntime.setHeroesOfGwenHero(player,
+                            heroesOfGwenHeroPreferences.getOrDefault(player.getUniqueId(), "hattori"));
+                }
+                break;"""
+if "heroesOfGwenHeroPreferences.getOrDefault(player.getUniqueId(), \"hattori\")" not in source:
+    if old_heroes not in source:
+        raise SystemExit("Could not find the existing Heroes of Gwen generic kit.")
+    source = source.replace(old_heroes, new_heroes, 1)
+
+# Sheep Quest timeout branch has been partially merged from the newer branch.
+# Ensure its one-tick guard is declared in the preserved tick() method.
+tick_start = source.find("    private void tick(Session session) {")
+tick_end = source.find("\n    private void ", tick_start + 25)
+if tick_start < 0 or tick_end < 0:
+    raise SystemExit("Could not find the Testplex game tick method.")
+tick = source[tick_start:tick_end]
+if "sheepQuestUpdatedBeforeTimeout" in tick and "boolean sheepQuestUpdatedBeforeTimeout" not in tick:
+    marker = "        long now = System.currentTimeMillis();"
+    if marker not in tick:
+        raise SystemExit("Could not find current-time marker in game tick.")
+    tick = tick.replace(marker, marker + "\n        boolean sheepQuestUpdatedBeforeTimeout = false;", 1)
+    source = source[:tick_start] + tick + source[tick_end:]
+
 path.write_text(source)
 print("Reconciled SkyWars helper declarations, spawn placement, shared queue, and Sheep Quest holder cleanup.")
+PY
+
+python3 - <<'PY'
+from pathlib import Path
+import subprocess
+
+path = Path("modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortRules.java")
+source = path.read_text()
+v6 = subprocess.check_output([
+    "git", "show",
+    "origin/feat/castle-assault-gwen-mixed-arcade-variants-20261030-v6:modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadePortRules.java"
+], text=True)
+
+start_marker = "    public static final long CASTLE_ASSAULT_ARCHER_REFILL_MILLIS ="
+end_marker = "    /** Heroes of Gwen's Mixed Arcade store prices are half their standard cost. */"
+start = v6.find(start_marker)
+end = v6.find(end_marker, start + len(start_marker))
+if start < 0 or end < 0:
+    raise SystemExit("Could not extract the Castle/Heroes source rules block.")
+block = v6[start:end]
+
+# The current platform already owns Mixed Arcade price scaling and tower
+# selection. Keep those newer definitions and import only missing v6 rules.
+known = [
+    "CASTLE_ASSAULT_ARCHER_REFILL_MILLIS",
+    "CASTLE_ASSAULT_ARCHER_MAX_ARROWS",
+    "CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS",
+    "CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT",
+    "HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS",
+    "HEROES_OF_GWEN_WITHER_TARGET_SPEED",
+    "HEROES_OF_GWEN_WITHER_HOME_SPEED",
+    "HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS",
+    "HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE",
+]
+missing = [name for name in known if name not in source]
+if missing:
+    constant_lines = []
+    for line in block.splitlines():
+        if any(name in line for name in missing):
+            constant_lines.append(line)
+    for name in missing:
+        if not any(name in line for line in constant_lines):
+            raise SystemExit(f"Missing source rule constant {name} in v6 branch.")
+    insertion = "\n".join(constant_lines) + "\n\n"
+    anchor = "    /** Heroes of Gwen's Mixed Arcade store prices are half their standard cost. */"
+    if anchor not in source:
+        raise SystemExit("Could not find common Mixed Arcade rules insertion point.")
+    source = source.replace(anchor, insertion + anchor, 1)
+
+method_names = [
+    "heroesOfGwenWitherStepPerTick",
+    "heroesOfGwenWitherEarthquakeDamage",
+    "castleAssaultBlastDamageMultiplier",
+    "castleAssaultBlastKnockbackMultiplier",
+    "normalizeCastleAssaultKit",
+    "normalizeHeroesOfGwenHero",
+    "heroesOfGwenHeroRole",
+    "heroesOfGwenHeroDisplayName",
+]
+for name in method_names:
+    if name in source:
+        continue
+    marker = re.search(r"(?m)^    public static (?:final )?[\w<>?,.\[\] ]+\s+" + re.escape(name) + r"\s*\(", v6)
+    if not marker:
+        raise SystemExit(f"Could not locate source method {name} in v6 rules.")
+    method_start = marker.start()
+    brace = v6.find("{", marker.end())
+    if brace < 0:
+        raise SystemExit(f"Could not locate method body for {name}.")
+    depth = 0
+    method_end = -1
+    for index in range(brace, len(v6)):
+        if v6[index] == "{":
+            depth += 1
+        elif v6[index] == "}":
+            depth -= 1
+            if depth == 0:
+                method_end = index + 1
+                break
+    if method_end < 0:
+        raise SystemExit(f"Unbalanced method body for {name}.")
+    snippet = v6[method_start:method_end]
+    anchor = "    /** Heroes of Gwen's Mixed Arcade store prices are half their standard cost. */"
+    source = source.replace(anchor, snippet + "\n\n" + anchor, 1)
+
+path.write_text(source)
+print("Integrated Castle Assault and Heroes of Gwen source rule constants/helpers.")
 PY
 
 python3 - <<'PY'
