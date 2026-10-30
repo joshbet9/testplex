@@ -279,19 +279,7 @@ public class MazeGenerator {
         generateMaze();
     }
 
-    public void prepareRound() { }
-
-    public void endRound() { returnToLobby(); }
-
-    public void cleanup() { returnToLobby(); }
-
-    public void dropContainment() {
-        for (Location loc : containmentGlass) {
-            Block b = loc.getBlock();
-            if (b.getType() == Material.CYAN_STAINED_GLASS) b.setType(Material.AIR);
-        }
-        containmentGlass.clear();
-    }
+    public Location getCenter() { return center == null ? null : center.clone(); }
 
     // -------------------- Build path row --------------------
 
