@@ -1115,8 +1115,12 @@ public void startGame(Location preferCenter, int requestedPattern) {
         World arenaWorld = center.getWorld();
         if (shouldRedirectUnregisteredPlayer(state, roundParticipants.contains(id),
                 arenaWorld, player.getWorld())) {
-            Location lobby = getLobbySpawn();
-            if (lobby != null) player.teleport(lobby);
+            if (testplexManagedRound && testplexReturnToLobby != null) {
+                testplexReturnToLobby.accept(player);
+            } else {
+                Location lobby = getLobbySpawn();
+                if (lobby != null) player.teleport(lobby);
+            }
             return;
         }
         if (!roundParticipants.contains(id)
