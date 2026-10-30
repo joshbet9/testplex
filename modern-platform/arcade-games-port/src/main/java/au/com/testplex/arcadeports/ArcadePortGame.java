@@ -20,7 +20,8 @@ public enum ArcadePortGame {
     TURF_WARS("turf-wars", "Turf Wars", Material.GREEN_WOOL),
     DRAW_MY_THING("draw-my-thing", "Draw My Thing", Material.WHITE_WOOL),
     MASTER_BUILDERS("master-builders", "Master Builders", Material.GRASS_BLOCK),
-    MONSTER_MAZE("monster-maze", "Monster Maze", Material.ROTTEN_FLESH);
+    MONSTER_MAZE("monster-maze", "Monster Maze", Material.ROTTEN_FLESH),
+    SNEAKY_ASSASSINS("sneaky-assassins", "Sneaky Assassins", Material.EMERALD_BLOCK);
 
     private final String id;
     private final String displayName;
