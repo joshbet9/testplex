@@ -1580,45 +1580,236 @@ public final class ArcadePortManager implements Listener {
         player.updateInventory();
     }
 
-    private void startGladiatorsRound(Session session, List<Player> advancing, boolean initial) {
-        if (active != session || advancing.isEmpty()) return;
-        if (advancing.size() == 1) {
-            finish(session, advancing.get(0), true);
+    private static final int GLADIATOR_BRACKET_WINNERS = 0;
+    private static final int GLADIATOR_BRACKET_LOSERS = 1;
+    private static final int GLADIATOR_BRACKET_FINAL = 2;
+
+    private void beginGladiatorVote(Session session) {
+        session.gladiatorVotes.clear();
+        session.gladiatorMode = GladiatorsMode.RODLESS.id();
+        session.gladiatorVotingEndsAt = System.currentTimeMillis() + 15_000L;
+        announce(session, ChatColor.GOLD + "Gladiators vote: choose the PvP rules for this tournament.");
+        for (Player player : session.players.values()) {
+            if (player != null && player.isOnline()) openGladiatorVoteMenu(player);
+        }
+    }
+
+    public void openGladiatorVote(Player player) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.GLADIATORS
+                || session.gladiatorVotingEndsAt <= System.currentTimeMillis()
+                || !session.players.containsKey(player.getUniqueId())) {
+            player.sendMessage(ChatColor.YELLOW + "The Gladiators vote is not currently open.");
             return;
         }
-        session.gladiatorRound = initial
-                ? ArcadePortRules.gladiatorsStartingTierForPlayers(advancing.size())
-                : ArcadePortRules.gladiatorsTierForRound(session.gladiatorRound + 1);
-        session.gladiatorPairs.clear();
-        session.gladiatorResolvedPairs.clear();
-        session.gladiatorPairCount = ArcadePortRules.gladiatorsPairCount(advancing.size());
-        session.nextGladiatorRoundAt = 0L;
-        session.gladiatorRoundStartedAt = System.currentTimeMillis();
-        session.gladiatorFightStartsAt = session.gladiatorRoundStartedAt + ArcadePortRules.GLADIATOR_ROUND_COUNTDOWN_MILLIS;
-        session.lastGladiatorPoisonAt = session.gladiatorRoundStartedAt + ArcadePortRules.GLADIATOR_POISON_DELAY_MILLIS;
-        Collections.shuffle(advancing);
+        openGladiatorVoteMenu(player);
+    }
 
-        String roundName = switch (session.gladiatorRound) {
-            case 1 -> "Yellow arena";
-            case 2 -> "Orange arena";
-            case 3 -> "Red finals";
-            default -> "Green arena";
-        };
-        announce(session, ChatColor.GOLD + "Gladiators — " + roundName + ". Defeat your opponent to advance!");
+    public void openGladiatorHotbarEditor(Player player) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.GLADIATORS
+                || !session.alive.contains(player.getUniqueId())
+                || player.getGameMode() != GameMode.SURVIVAL
+                || !session.players.containsKey(player.getUniqueId())) {
+            player.sendMessage(ChatColor.YELLOW + "The Gladiators hotbar editor is available while you are fighting.");
+            return;
+        }
+        openGladiatorHotbarMenu(player);
+    }
 
-        boolean useSourceMapArenas = hasGladiatorSourceArenas(session);
-        List<Location> arenaCenters = gladiatorArenaCenters(session);
+    public void openGladiatorKillMessages(Player player) {
+        if (player == null || !player.isOnline()) return;
+        openGladiatorKillMessageMenu(player);
+    }
 
-        for (int i = 0; i < advancing.size(); i++) {
-            Player player = advancing.get(i);
-            int pair = i / 2;
-            int arenaSlot = pair % arenaCenters.size();
-            session.gladiatorPairs.put(player.getUniqueId(), pair);
-            if (!useSourceMapArenas) buildGladiatorArena(session.world, arenaSlot, session.gladiatorRound);
-            Location center = arenaCenters.get(arenaSlot);
-            boolean left = i % 2 == 0;
-            Location[] combatSpawns = gladiatorArenaSpawnPair(session, center, useSourceMapArenas);
-            Location spawn = combatSpawns[left ? 0 : 1].clone();
+    private void voteGladiators(Session session, Player player, GladiatorsMode mode) {
+        if (active != session || session.gladiatorVotingEndsAt <= System.currentTimeMillis()
+                || !session.players.containsKey(player.getUniqueId()) || mode == null) return;
+        session.gladiatorVotes.put(player.getUniqueId(), mode.id());
+        player.closeInventory();
+        player.sendMessage(ChatColor.GREEN + "Vote recorded: " + mode.displayName() + ".");
+        long onlineVoters = session.players.values().stream()
+                .filter(candidate -> candidate != null && candidate.isOnline()).count();
+        if (session.gladiatorVotes.size() >= onlineVoters) resolveGladiatorVote(session);
+    }
+
+    private void resolveGladiatorVote(Session session) {
+        if (active != session || session.gladiatorVotingEndsAt <= 0L) return;
+        session.gladiatorVotingEndsAt = 0L;
+        Map<GladiatorsMode, Integer> counts = new java.util.EnumMap<>(GladiatorsMode.class);
+        for (String vote : session.gladiatorVotes.values()) {
+            GladiatorsMode mode = GladiatorsMode.fromId(vote);
+            if (mode != null) counts.merge(mode, 1, Integer::sum);
+        }
+        GladiatorsMode selected = GladiatorsMode.RODLESS;
+        int highest = -1;
+        for (GladiatorsMode mode : GladiatorsMode.values()) {
+            int count = counts.getOrDefault(mode, 0);
+            if (count > highest) {
+                highest = count;
+                selected = mode;
+            }
+        }
+        session.gladiatorMode = selected.id();
+        for (Player player : session.players.values()) {
+            if (player != null && player.isOnline()
+                    && player.getOpenInventory().getTopInventory().getHolder() instanceof GladiatorMenuHolder holder
+                    && holder.type == GladiatorMenuType.VOTE) player.closeInventory();
+        }
+        announce(session, ChatColor.GOLD + "Gladiators rules selected: " + ChatColor.YELLOW
+                + selected.displayName() + ChatColor.GOLD + ". First-loss players enter the parallel loser's bracket.");
+        startGladiatorsRound(session, alivePlayers(session), true);
+    }
+
+    private void startGladiatorsRound(Session session, List<Player> advancing, boolean initial) {
+        if (active != session || advancing.isEmpty()) return;
+        if (initial) {
+            session.gladiatorRound = ArcadePortRules.gladiatorsStartingTierForPlayers(advancing.size());
+            session.gladiatorWinnerQueue.clear();
+            session.gladiatorLoserQueue.clear();
+            session.gladiatorLosses.clear();
+            session.gladiatorPairs.clear();
+            session.gladiatorPairBrackets.clear();
+            session.gladiatorResolvedPairs.clear();
+            session.gladiatorFightStartsAtByPair.clear();
+            session.gladiatorRoundStartedAtByPair.clear();
+            session.gladiatorNextPoisonAtByPair.clear();
+            session.gladiatorWinnerBracketStarted = false;
+            session.gladiatorNextPairId = 0;
+            for (Player player : advancing) {
+                if (player != null && player.isOnline()) {
+                    session.gladiatorLosses.put(player.getUniqueId(), 0);
+                    session.gladiatorWinnerQueue.add(player.getUniqueId());
+                }
+            }
+        } else {
+            for (Player player : advancing) {
+                if (player != null && player.isOnline()) session.gladiatorWinnerQueue.add(player.getUniqueId());
+            }
+        }
+        progressGladiators(session);
+    }
+
+    private boolean hasOpenGladiatorMatches(Session session, int bracket) {
+        for (Map.Entry<Integer, Integer> entry : session.gladiatorPairBrackets.entrySet()) {
+            if ((bracket < 0 || entry.getValue() == bracket)
+                    && !session.gladiatorResolvedPairs.contains(entry.getKey())) return true;
+        }
+        return false;
+    }
+
+    private void progressGladiators(Session session) {
+        if (active != session || session.gladiatorVotingEndsAt > 0L) return;
+
+        if (session.gladiatorWinnerQueue.size() >= 2) {
+            if (!hasOpenGladiatorMatches(session, GLADIATOR_BRACKET_WINNERS)
+                    && session.gladiatorWinnerBracketStarted) {
+                session.gladiatorRound = ArcadePortRules.gladiatorsTierForRound(session.gladiatorRound + 1);
+                session.gladiatorWinnerArenaCursor = 0;
+            }
+            while (session.gladiatorWinnerQueue.size() >= 2) {
+                UUID first = session.gladiatorWinnerQueue.remove(0);
+                UUID second = session.gladiatorWinnerQueue.remove(0);
+                startGladiatorMatch(session, first, second, GLADIATOR_BRACKET_WINNERS);
+                session.gladiatorWinnerBracketStarted = true;
+                if (active != session) return;
+            }
+        }
+
+        while (session.gladiatorLoserQueue.size() >= 2) {
+            UUID first = session.gladiatorLoserQueue.remove(0);
+            UUID second = session.gladiatorLoserQueue.remove(0);
+            startGladiatorMatch(session, first, second, GLADIATOR_BRACKET_LOSERS);
+            if (active != session) return;
+        }
+
+        if (hasOpenGladiatorMatches(session, -1)) return;
+        if (session.gladiatorWinnerQueue.size() == 1 && session.gladiatorLoserQueue.size() == 1) {
+            UUID undefeated = session.gladiatorWinnerQueue.remove(0);
+            UUID challenger = session.gladiatorLoserQueue.remove(0);
+            session.gladiatorRound = 3;
+            announce(session, ChatColor.GOLD + "GRAND FINAL! " + ChatColor.YELLOW
+                    + "The winners' champion faces the last player from the loser's bracket.");
+            startGladiatorMatch(session, undefeated, challenger, GLADIATOR_BRACKET_FINAL);
+            return;
+        }
+        if (session.alive.size() <= 1) {
+            Player winner = alivePlayers(session).stream().findFirst().orElse(null);
+            finish(session, winner, true);
+        }
+    }
+
+    private void startGladiatorMatch(Session session, UUID firstId, UUID secondId, int bracket) {
+        if (active != session || firstId == null || secondId == null || firstId.equals(secondId)) return;
+        Player first = session.players.get(firstId);
+        Player second = session.players.get(secondId);
+        if (first == null || second == null || !first.isOnline() || !second.isOnline()
+                || !session.alive.contains(firstId) || !session.alive.contains(secondId)) {
+            if (first == null || !first.isOnline()) session.alive.remove(firstId);
+            if (second == null || !second.isOnline()) session.alive.remove(secondId);
+            if (first != null && first.isOnline() && session.alive.contains(firstId)) {
+                if (bracket == GLADIATOR_BRACKET_WINNERS) session.gladiatorWinnerQueue.add(firstId);
+                else if (bracket == GLADIATOR_BRACKET_LOSERS) session.gladiatorLoserQueue.add(firstId);
+            }
+            if (second != null && second.isOnline() && session.alive.contains(secondId)) {
+                if (bracket == GLADIATOR_BRACKET_WINNERS) session.gladiatorWinnerQueue.add(secondId);
+                else if (bracket == GLADIATOR_BRACKET_LOSERS) session.gladiatorLoserQueue.add(secondId);
+            }
+            return;
+        }
+
+        int pair = session.gladiatorNextPairId++;
+        session.gladiatorPairs.put(firstId, pair);
+        session.gladiatorPairs.put(secondId, pair);
+        session.gladiatorPairBrackets.put(pair, bracket);
+        session.gladiatorPairCount++;
+        long now = System.currentTimeMillis();
+        session.gladiatorRoundStartedAtByPair.put(pair, now);
+        session.gladiatorFightStartsAtByPair.put(pair, now + ArcadePortRules.GLADIATOR_ROUND_COUNTDOWN_MILLIS);
+        session.gladiatorNextPoisonAtByPair.put(pair, now + ArcadePortRules.GLADIATOR_POISON_DELAY_MILLIS);
+
+        boolean sourceArenas = false;
+        Location center;
+        if (bracket == GLADIATOR_BRACKET_LOSERS) {
+            center = gladiatorLoserArenaCenter(session, session.gladiatorLoserArenaCursor++);
+            buildGladiatorArenaAt(session.world, center, session.gladiatorRound, true);
+        } else {
+            if (bracket == GLADIATOR_BRACKET_FINAL) {
+                SourceMapCatalog.MapData data = sourceMapData.get(session.type.id());
+                List<Location> finals = data == null ? List.of() : data.dataLocations("RED");
+                if (!finals.isEmpty() && data.dataLocations("BLACK").size() >= 2) {
+                    center = finals.get(Math.floorMod(session.gladiatorWinnerArenaCursor++, finals.size()));
+                    sourceArenas = true;
+                } else {
+                    center = gladiatorArenaCenter(session.world, session.gladiatorWinnerArenaCursor++);
+                }
+            } else {
+                sourceArenas = hasGladiatorSourceArenas(session);
+                List<Location> centers = gladiatorArenaCenters(session);
+                int slot = session.gladiatorWinnerArenaCursor++;
+                center = centers.get(Math.floorMod(slot, centers.size())).clone();
+            }
+            if (!sourceArenas) buildGladiatorArenaAt(session.world, center, session.gladiatorRound, false);
+        }
+
+        Location[] spawns;
+        if (sourceArenas) {
+            spawns = gladiatorArenaSpawnPair(session, center, true);
+        } else {
+            Location left = center.clone().add(-2.0D, 0.0D, 0.0D);
+            Location right = center.clone().add(2.0D, 0.0D, 0.0D);
+            left.setYaw(-90.0F);
+            right.setYaw(90.0F);
+            left.setPitch(0.0F);
+            right.setPitch(0.0F);
+            spawns = new Location[]{left, right};
+        }
+
+        Player[] fighters = {first, second};
+        for (int i = 0; i < fighters.length; i++) {
+            Player player = fighters[i];
+            Location spawn = spawns[i].clone();
+            player.closeInventory();
             player.leaveVehicle();
             player.teleport(spawn);
             player.setGameMode(GameMode.SURVIVAL);
@@ -1629,50 +1820,135 @@ public final class ArcadePortManager implements Listener {
             player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
             giveGladiatorKit(session, player);
             session.lastLocations.put(player.getUniqueId(), spawn.clone());
+            String bracketName = bracket == GLADIATOR_BRACKET_WINNERS ? "Winners bracket"
+                    : bracket == GLADIATOR_BRACKET_LOSERS ? "Loser's bracket" : "Grand final";
+            player.sendMessage(ChatColor.GOLD + bracketName + ChatColor.GRAY + " — duel starts in 5 seconds.");
         }
-        if (advancing.size() % 2 == 1) {
-            int byePair = session.gladiatorPairCount - 1;
-            session.gladiatorResolvedPairs.add(byePair);
-            Player bye = advancing.get(advancing.size() - 1);
-            bye.sendMessage(ChatColor.GREEN + "You have a bye and automatically advance to the next round.");
+        if (bracket == GLADIATOR_BRACKET_LOSERS) {
+            announce(session, ChatColor.LIGHT_PURPLE + first.getName() + " vs " + second.getName()
+                    + " — loser's bracket match.");
         }
+    }
+
+    private Location gladiatorLoserArenaCenter(Session session, int arenaSlot) {
+        SourceMapCatalog.MapData data = sourceMapData.get(session.type.id());
+        double baseX = data != null && data.hasBounds()
+                ? data.maxX() + 18.0D : session.world.getWorldBorder().getCenter().getX() + 60.0D;
+        double baseZ = data != null && data.hasBounds()
+                ? data.centerZ() - 18.0D : session.world.getWorldBorder().getCenter().getZ() - 18.0D;
+        double x = baseX + Math.floorMod(arenaSlot, 4) * 12.0D;
+        double z = baseZ + Math.floorDiv(arenaSlot, 4) * 12.0D;
+        double requiredBorder = Math.max(session.world.getWorldBorder().getSize(),
+                Math.abs(x - session.world.getWorldBorder().getCenter().getX()) * 2.0D + 40.0D);
+        session.world.getWorldBorder().setSize(requiredBorder);
+        return new Location(session.world, x + 0.5D, 64.0D, z + 0.5D);
+    }
+
+    private void buildGladiatorArenaAt(World world, Location center, int tier, boolean loserBracket) {
+        int cx = center.getBlockX();
+        int cz = center.getBlockZ();
+        Material floor = loserBracket ? Material.PURPLE_CONCRETE : gladiatorFloor(tier);
+        for (int x = cx - 4; x <= cx + 4; x++) {
+            for (int z = cz - 4; z <= cz + 4; z++) {
+                world.getBlockAt(x, 63, z).setType(floor, false);
+                boolean wall = Math.abs(x - cx) == 4 || Math.abs(z - cz) == 4;
+                if (wall) {
+                    for (int y = 64; y <= 66; y++) {
+                        world.getBlockAt(x, y, z).setType(Material.BLACKSTONE, false);
+                    }
+                }
+            }
+        }
+    }
+
+    private void giveGladiatorKit(Session session, Player player) {
+        int tier = Math.max(0, Math.min(3, session.gladiatorRound));
+        Material sword = switch (tier) {
+            case 1 -> Material.STONE_SWORD;
+            case 2 -> Material.IRON_SWORD;
+            case 3 -> Material.DIAMOND_SWORD;
+            default -> Material.WOODEN_SWORD;
+        };
+        Material[] armor = switch (tier) {
+            case 1 -> new Material[]{Material.GOLDEN_BOOTS, Material.GOLDEN_LEGGINGS, Material.GOLDEN_CHESTPLATE, Material.GOLDEN_HELMET};
+            case 2 -> new Material[]{Material.CHAINMAIL_BOOTS, Material.CHAINMAIL_LEGGINGS, Material.CHAINMAIL_CHESTPLATE, Material.CHAINMAIL_HELMET};
+            case 3 -> new Material[]{Material.IRON_BOOTS, Material.IRON_LEGGINGS, Material.IRON_CHESTPLATE, Material.IRON_HELMET};
+            default -> new Material[]{Material.LEATHER_BOOTS, Material.LEATHER_LEGGINGS, Material.LEATHER_CHESTPLATE, Material.LEATHER_HELMET};
+        };
+        player.getInventory().clear();
+        player.getInventory().addItem(new ItemStack(sword));
+        GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
+        if (mode == null) mode = GladiatorsMode.RODLESS;
+        switch (mode) {
+            case RODLESS -> {
+                player.getInventory().addItem(new ItemStack(Material.BOW),
+                        new ItemStack(Material.ARROW, new int[]{3, 5, 7, 10}[tier]));
+            }
+            case BOWLESS -> player.getInventory().addItem(new ItemStack(Material.FISHING_ROD));
+            case MODERN -> {
+                player.getInventory().addItem(new ItemStack(Material.STONE_AXE));
+                player.getInventory().setItemInOffHand(new ItemStack(Material.SHIELD));
+            }
+            case POT -> {
+                ItemStack potions = namedItem(Material.SPLASH_POTION, "Healing Potions",
+                        "Right-click to restore two hearts.", 5);
+                ItemMeta meta = potions.getItemMeta();
+                meta.getPersistentDataContainer().set(gladiatorPotionKey, PersistentDataType.BYTE, (byte) 1);
+                potions.setItemMeta(meta);
+                player.getInventory().addItem(potions);
+            }
+        }
+        ItemStack[] armorItems = new ItemStack[4];
+        for (int i = 0; i < armorItems.length; i++) {
+            armorItems[i] = new ItemStack(armor[i]);
+            if (armorItems[i].getItemMeta() instanceof LeatherArmorMeta meta) {
+                Color color = switch (tier) {
+                    case 1 -> Color.YELLOW;
+                    case 2 -> Color.ORANGE;
+                    case 3 -> Color.RED;
+                    default -> Color.LIME;
+                };
+                meta.setColor(color);
+                armorItems[i].setItemMeta(meta);
+            }
+        }
+        player.getInventory().setArmorContents(armorItems);
+        applyGladiatorHotbarLayout(player);
+        player.updateInventory();
     }
 
     private void updateGladiators(Session session, long now) {
         if (active != session) return;
-        if (now >= session.lastGladiatorPoisonAt) {
-            session.lastGladiatorPoisonAt = now + ArcadePortRules.GLADIATOR_POISON_INTERVAL_MILLIS;
-            for (Player player : new ArrayList<>(alivePlayers(session))) {
-                UUID playerId = player.getUniqueId();
-                Integer pair = session.gladiatorPairs.get(playerId);
-                if (pair == null || !ArcadePortRules.shouldGladiatorPoison(now,
-                        session.gladiatorRoundStartedAt, session.gladiatorResolvedPairs.contains(pair),
-                        aliveGladiatorPairMembers(session, pair))) continue;
+        if (session.gladiatorVotingEndsAt > 0L) {
+            long onlineVoters = session.players.values().stream()
+                    .filter(player -> player != null && player.isOnline()).count();
+            if (session.gladiatorVotes.size() >= onlineVoters
+                    || now >= session.gladiatorVotingEndsAt) resolveGladiatorVote(session);
+            return;
+        }
+        for (Integer pair : new ArrayList<>(session.gladiatorPairBrackets.keySet())) {
+            if (active != session) return;
+            if (session.gladiatorResolvedPairs.contains(pair)) continue;
+            long nextPoison = session.gladiatorNextPoisonAtByPair.getOrDefault(pair, Long.MAX_VALUE);
+            if (now < nextPoison) continue;
+            session.gladiatorNextPoisonAtByPair.put(pair, now + ArcadePortRules.GLADIATOR_POISON_INTERVAL_MILLIS);
+            long roundStarted = session.gladiatorRoundStartedAtByPair.getOrDefault(pair, now);
+            List<Player> fighters = session.gladiatorPairs.entrySet().stream()
+                    .filter(entry -> entry.getValue().equals(pair) && session.alive.contains(entry.getKey()))
+                    .map(entry -> session.players.get(entry.getKey()))
+                    .filter(player -> player != null && player.isOnline()).toList();
+            if (!ArcadePortRules.shouldGladiatorPoison(now, roundStarted, false, fighters.size())) continue;
+            for (Player player : fighters) {
                 if (player.getHealth() <= ArcadePortRules.GLADIATOR_POISON_DAMAGE) {
                     eliminate(session, player, null, "was defeated by arena poison");
-                } else {
-                    player.setHealth(player.getHealth() - ArcadePortRules.GLADIATOR_POISON_DAMAGE);
-                    player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.7F, 0.7F);
-                    player.sendActionBar(ChatColor.RED + "POISON! Keep fighting!");
+                    break;
                 }
-                if (active != session) return;
+                player.setHealth(player.getHealth() - ArcadePortRules.GLADIATOR_POISON_DAMAGE);
+                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.7F, 0.7F);
+                player.sendActionBar(ChatColor.RED + "POISON! Keep fighting!");
             }
         }
-        if (session.nextGladiatorRoundAt > 0L && now >= session.nextGladiatorRoundAt) {
-            if (session.alive.size() <= 1) {
-                finish(session, alivePlayers(session).stream().findFirst().orElse(null), true);
-                return;
-            }
-            startGladiatorsRound(session, alivePlayers(session), false);
-        }
-    }
-
-    private int aliveGladiatorPairMembers(Session session, int pair) {
-        int count = 0;
-        for (UUID id : session.alive) {
-            if (session.gladiatorPairs.get(id) != null && session.gladiatorPairs.get(id) == pair) count++;
-        }
-        return count;
+        progressGladiators(session);
     }
 
     private Location islandSpawn(int index) {
