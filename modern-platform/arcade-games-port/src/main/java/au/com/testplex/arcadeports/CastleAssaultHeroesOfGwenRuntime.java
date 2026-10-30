@@ -669,12 +669,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 } else if (ThreadLocalRandom.current().nextBoolean()) {
                     loot = castlePotion(Material.POTION, PotionEffectType.SPEED, 3600, 0, "Speed Potion");
                 } else {
-                    loot = castlePotion(Material.SPLASH_POTION, PotionEffectType.INSTANT_HEALTH, 1, 0,
-                            "Splash Healing Potion");
+                    loot = castlePotion(Material.SPLASH_POTION, PotionEffectType.REGENERATION, 22 * 20, 1,
+                            "Splash Regeneration II Potion");
                 }
             } else if (chance <= 0.60D) {
                 loot = ThreadLocalRandom.current().nextBoolean()
-                        ? new ItemStack(Material.FISHING_ROD)
+                        ? castleUnbreakableRod()
                         : namedItem(Material.GOLDEN_APPLE, ChatColor.LIGHT_PURPLE + "Golden Applegate",
                                 "Castle Assault chest reward.");
             } else {
@@ -703,6 +703,23 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         meta.setDisplayName(ChatColor.LIGHT_PURPLE + displayName);
         item.setItemMeta(meta);
         return item;
+    }
+
+    private ItemStack castleUnbreakableRod() {
+        ItemStack item = new ItemStack(Material.FISHING_ROD);
+        ItemMeta meta = item.getItemMeta();
+        meta.setUnbreakable(true);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private boolean isCastleKitItem(ItemStack item) {
+        if (item == null || !item.hasItemMeta()) return false;
+        ItemMeta meta = item.getItemMeta();
+        if (meta == null || !meta.hasLore()) return false;
+        return meta.getLore().stream().map(ChatColor::stripColor).anyMatch(lore ->
+                lore != null && ("Kit Item".equalsIgnoreCase(lore.trim())
+                        || "Castle Assault kit item".equalsIgnoreCase(lore.trim())));
     }
 
     private ItemStack castleFlintAndSteel(int remainingUses, boolean kitItem) {
@@ -790,10 +807,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         ItemStack dropped = event.getItemDrop().getItemStack();
         boolean lockedTnt = "demolitionist".equals(kit) && dropped.getType() == Material.TNT;
         boolean lockedArrow = "archer".equals(kit) && isCastleFletchedArrow(dropped);
-        if (!lockedTnt && !lockedArrow) return;
+        boolean lockedKitItem = kit != null && isCastleKitItem(dropped);
+        if (!lockedTnt && !lockedArrow && !lockedKitItem) return;
         event.setCancelled(true);
-        player.sendMessage(ChatColor.RED + (lockedTnt
-                ? "You cannot drop your Throwing TNT." : "You cannot drop your Fletched Arrows."));
+        player.sendMessage(ChatColor.RED + (lockedTnt ? "You cannot drop your Throwing TNT."
+                : lockedArrow ? "You cannot drop your Fletched Arrows." : "You cannot drop a kit item."));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -810,6 +828,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 && ((current != null && current.getType() == Material.TNT)
                     || (cursor != null && cursor.getType() == Material.TNT));
         movesLockedItem |= archer && (isCastleFletchedArrow(current) || isCastleFletchedArrow(cursor));
+        boolean kitItemInChest = event.getView().getTopInventory().getType() == org.bukkit.event.inventory.InventoryType.CHEST
+                && (isCastleKitItem(current) || isCastleKitItem(cursor));
+        movesLockedItem |= kitItemInChest;
         if (!movesLockedItem && event.getHotbarButton() >= 0) {
             ItemStack hotbar = player.getInventory().getItem(event.getHotbarButton());
             movesLockedItem = demolitionist && hotbar != null && hotbar.getType() == Material.TNT
@@ -1559,7 +1580,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         castlePotion(Material.SPLASH_POTION, PotionEffectType.INSTANT_DAMAGE, 1, 1,
                                 "Splash Harming II Potion"));
                 else player.getInventory().addItem(castlePotion(Material.POTION,
-                        PotionEffectType.REGENERATION, 90 * 20, 2, "Regeneration III Potion"));
+                        PotionEffectType.REGENERATION, 10 * 20, 2, "Regeneration III Potion"));
             }
             case "archer" -> {
                 if (streak == 2) player.getInventory().addItem(namedItem(Material.ARROW, "Fletched Arrows", "Kill-streak reward.", 8));
@@ -1581,7 +1602,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 if (streak == 2) player.getInventory().addItem(namedItem(Material.GOLDEN_APPLE,
                         ChatColor.LIGHT_PURPLE + "Golden Applegate", "Kill-streak reward."));
                 else if (streak == 4) player.getInventory().addItem(castlePotion(Material.POTION,
-                        PotionEffectType.REGENERATION, 90 * 20, 1, "Regeneration II Potion"));
+                        PotionEffectType.REGENERATION, 22 * 20, 1, "Regeneration II Potion"));
                 else if (streak == 6) player.getInventory().addItem(castlePotion(Material.POTION,
                         PotionEffectType.RESISTANCE, 90 * 20, 0, "Resistance Potion"));
                 else player.getInventory().addItem(castleEnchantedBook(Enchantment.THORNS, 2, "Thorns II"));
@@ -1645,13 +1666,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         switch (kit) {
             case "alchemist" -> {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE, 100_000, 0));
-                player.getInventory().setItem(1, castlePotion(Material.POTION, PotionEffectType.SPEED,
-                        3 * 60 * 20, 0, "Speed Potion"));
+                ItemStack speed = castlePotion(Material.POTION, PotionEffectType.SPEED,
+                        3 * 60 * 20, 0, "Speed Potion");
+                ItemMeta speedMeta = speed.getItemMeta();
+                speedMeta.setLore(List.of(ChatColor.GRAY + "Kit Item"));
+                speed.setItemMeta(speedMeta);
+                player.getInventory().setItem(1, speed);
             }
             case "archer" -> {
                 ItemStack bow = new ItemStack(Material.BOW);
                 ItemMeta bowMeta = bow.getItemMeta();
                 bowMeta.setUnbreakable(true);
+                bowMeta.setLore(List.of(ChatColor.GRAY + "Kit Item"));
                 bow.setItemMeta(bowMeta);
                 player.getInventory().setItem(1, bow);
                 player.getInventory().setItem(2, namedItem(Material.ARROW, "Fletched Arrow",
