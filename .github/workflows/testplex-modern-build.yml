@@ -85,11 +85,11 @@ jobs:
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "name: ArcadeMechanicsModern"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
           arcade_config="$(unzip -p "$arcade_jar" config.yml)"
-          for candidate in bacon-brawl bomb-lobbers dragon-escape paintball runner; do
+          for candidate in bacon-brawl bomb-lobbers dragon-escape dragons paintball runner; do
             grep -Fxq "  - $candidate" <<< "$arcade_config"
           done
-          ! grep -Eq "^  - (death-tag|dragons|evolution|gladiators|micro-battles|one-in-the-quiver|sheep-quest|spleef|turf-wars)$" <<< "$arcade_config"
-          echo "All four modern Paper 26.3 plugin artifacts verified; Monster Maze feedback is packaged and the five explicitly approved Arcade candidates are enabled."
+          ! grep -Eq "^  - (death-tag|evolution|gladiators|micro-battles|one-in-the-quiver|sheep-quest|spleef|turf-wars)$" <<< "$arcade_config"
+          echo "All four modern Paper 26.3 plugin artifacts verified; Monster Maze feedback is packaged and all six approved Arcade candidates, including Dragons, are enabled."
 
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
