@@ -1413,6 +1413,35 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.DRAGON_ESCAPE) {
             setupDragonEscapeRaceScoreboard(session);
         }
+        if (type == ArcadePortGame.CASTLE_ASSAULT || type == ArcadePortGame.HEROES_OF_GWEN) {
+            session.variantRuntime = new CastleAssaultHeroesOfGwenRuntime(plugin, type, world,
+                    sourceMapData.get(type.id()), participants, session.teams, mixedArcadeVariant,
+                    new CastleAssaultHeroesOfGwenRuntime.Hooks() {
+                        @Override
+                        public void eliminate(Player victim, Player killer, String reason) {
+                            ArcadePortManager.this.eliminate(session, victim, killer, reason);
+                        }
+
+                        @Override
+                        public void finish(Player winner, int winningTeam, String reason) {
+                            if (active == session) ArcadePortManager.this.finish(session, winner, winner != null);
+                        }
+                    });
+            if (!session.variantRuntime.isReady()) {
+                sender.sendMessage(ChatColor.RED + "The authentic " + type.displayName()
+                        + " source markers could not be prepared. The round was cancelled without enabling this game.");
+                finish(session, null, false);
+                return;
+            }
+            if (type == ArcadePortGame.CASTLE_ASSAULT) {
+                announce(session, ChatColor.GOLD + "Castle Assault: destroy the two enemy sentry crystals, then defeat the King. "
+                        + "Objective TNT respawns every "
+                        + ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(mixedArcadeVariant) / 1000L + " seconds.");
+            } else {
+                announce(session, ChatColor.GOLD + "Heroes of Gwen: destroy the enemy towers, then defeat the Wither. "
+                        + (mixedArcadeVariant ? "Middle towers are removed and store prices are halved." : "Earn gold to buy upgrades."));
+            }
+        }
         if (participants.size() == 1) announce(session, ChatColor.GRAY + "Solo test mode: the run will remain available for practice until the timer ends or you reset it.");
         session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
         sender.sendMessage(ChatColor.GREEN + "Started " + type.displayName() + " with " + participants.size() + (participants.size() == 1 ? " player." : " players."));
@@ -3207,6 +3236,22 @@ public final class ArcadePortManager implements Listener {
     private void giveKit(Session session, Player player) {
         player.getInventory().clear();
         switch (session.type) {
+            case CASTLE_ASSAULT:
+                player.getInventory().addItem(new ItemStack(Material.IRON_SWORD),
+                        new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 16),
+                        new ItemStack(Material.TNT, 2));
+                player.getInventory().setChestplate(new ItemStack(Material.IRON_CHESTPLATE));
+                player.getInventory().setLeggings(new ItemStack(Material.IRON_LEGGINGS));
+                player.getInventory().setBoots(new ItemStack(Material.IRON_BOOTS));
+                break;
+            case HEROES_OF_GWEN:
+                player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
+                        new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 8),
+                        namedItem(Material.GOLD_INGOT, "Gold & Store", "Right-click to open the Heroes of Gwen store."));
+                player.getInventory().setChestplate(new ItemStack(Material.LEATHER_CHESTPLATE));
+                player.getInventory().setLeggings(new ItemStack(Material.LEATHER_LEGGINGS));
+                player.getInventory().setBoots(new ItemStack(Material.LEATHER_BOOTS));
+                break;
             case BACON_BRAWL: {
                 for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) player.removePotionEffect(effect.getType());
                 String kit = session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo");
@@ -7735,6 +7780,44 @@ public final class ArcadePortManager implements Listener {
 
     private void eliminate(Session session, Player player, Player killer, String reason) {
         if (active != session || player == null) return;
+        if ((session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN)
+                && session.alive.contains(player.getUniqueId())) {
+            UUID victimId = player.getUniqueId();
+            if (!session.alive.remove(victimId)) return;
+            if (session.variantRuntime != null) session.variantRuntime.onPlayerEliminated(player);
+            if (killer != null && !killer.getUniqueId().equals(victimId)
+                    && session.players.containsKey(killer.getUniqueId())) {
+                int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
+                killer.sendMessage(ChatColor.GREEN + session.type.displayName() + " kill! " + kills + " kills.");
+                if (session.variantRuntime != null) session.variantRuntime.onPlayerKill(killer);
+            }
+            session.respawning.add(victimId);
+            player.leaveVehicle();
+            player.setGameMode(GameMode.SPECTATOR);
+            player.getInventory().clear();
+            player.sendMessage(ChatColor.RED + "Defeated: " + reason + ". You will respawn for your team.");
+            long respawnTicks = session.type == ArcadePortGame.CASTLE_ASSAULT ? 100L : 240L;
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (active != session || !player.isOnline()
+                        || !session.players.containsKey(victimId)
+                        || !session.respawning.remove(victimId)) return;
+                Location spawn = teamSpawnFor(session, player, 2);
+                player.teleport(spawn);
+                player.setGameMode(GameMode.SURVIVAL);
+                player.setHealth(player.getMaxHealth());
+                player.setFoodLevel(20);
+                player.setSaturation(20.0F);
+                player.setFireTicks(0);
+                session.alive.add(victimId);
+                if (session.variantRuntime != null) session.variantRuntime.onPlayerRespawned(player);
+                session.lastLocations.put(victimId, spawn.clone());
+                giveKit(session, player);
+                player.sendMessage(ChatColor.GREEN + "You are back in the fight!");
+                checkRoundEnd(session);
+            }, respawnTicks);
+            checkRoundEnd(session);
+            return;
+        }
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && session.alive.contains(player.getUniqueId())) {
             UUID playerId = player.getUniqueId();
@@ -8744,6 +8827,10 @@ public final class ArcadePortManager implements Listener {
             recordDeathTagRewards(session);
         }
         recordLocalStats(session, winner, announceWinner);
+        if (session.variantRuntime != null) {
+            session.variantRuntime.stop();
+            session.variantRuntime = null;
+        }
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
         }
@@ -10723,6 +10810,36 @@ public final class ArcadePortManager implements Listener {
     public void onDamage(EntityDamageEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if ((session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN)
+                && event.getEntity() instanceof Player teamTarget
+                && session.players.containsKey(teamTarget.getUniqueId())) {
+            event.setCancelled(true);
+            if (!session.alive.contains(teamTarget.getUniqueId())) return;
+            Player attacker = null;
+            if (event instanceof EntityDamageByEntityEvent byEntity) {
+                Entity damager = byEntity.getDamager();
+                if (damager instanceof Player direct) attacker = direct;
+                else if (damager instanceof Projectile projectile
+                        && projectile.getShooter() instanceof Player shooter) attacker = shooter;
+            }
+            if (attacker != null) {
+                if (!session.players.containsKey(attacker.getUniqueId())
+                        || !session.alive.contains(attacker.getUniqueId())
+                        || attacker.getUniqueId().equals(teamTarget.getUniqueId())
+                        || session.teams.getOrDefault(attacker.getUniqueId(), -1)
+                                == session.teams.getOrDefault(teamTarget.getUniqueId(), -2)) return;
+            }
+            double damage = Math.max(0.0D, event.getFinalDamage());
+            if (damage <= 0.0D) return;
+            if (teamTarget.getHealth() <= damage) {
+                eliminate(session, teamTarget, attacker, attacker == null
+                        ? "was defeated" : "was defeated by " + attacker.getName());
+            } else {
+                teamTarget.setHealth(teamTarget.getHealth() - damage);
+                teamTarget.playSound(teamTarget.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.BOMB_LOBBERS
                 && event instanceof EntityDamageByEntityEvent byEntity
                 && byEntity.getDamager() instanceof Player attacker) {
@@ -13551,6 +13668,7 @@ public final class ArcadePortManager implements Listener {
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
         boolean wasAlive;
+        if (session.variantRuntime != null) session.variantRuntime.onQuit(player);
         if (session.type == ArcadePortGame.GLADIATORS) {
             forfeitGladiator(player, session);
             wasAlive = false;
