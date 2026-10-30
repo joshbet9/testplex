@@ -22,6 +22,8 @@ import org.bukkit.entity.Slime;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import au.com.testplex.snake.event.SlimeUpgradeEvent;
+import au.com.testplex.snake.event.TailGrowEvent;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
@@ -41,6 +43,7 @@ import org.bukkit.inventory.meta.SkullMeta;
 import net.kyori.adventure.text.Component;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
@@ -66,7 +69,7 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public final class SnakeGameManager implements Listener {
     private static final String WORLD_NAME = SnakeMapCatalog.WORLD_NAME;
-    private static final String SPECTATE_MENU_TITLE = "Snake Spectate";
+    private static final String SPECTATE_MENU_TITLE = "Spectator Menu";
     private static final int MAX_HAZARDS = SnakeRules.MAX_HAZARDS;
     private static final int HOTBAR_ROULETTE_SLOT = 8;
     private static final int ROULETTE_STEPS = 12;
@@ -196,7 +199,7 @@ public final class SnakeGameManager implements Listener {
             player.closeInventory();
             player.leaveVehicle();
             player.teleport(spawn);
-            player.setGameMode(GameMode.ADVENTURE);
+            player.setGameMode(GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
             player.setSaturation(5.0F);
@@ -216,6 +219,10 @@ public final class SnakeGameManager implements Listener {
             state.segments.add(head);
             state.path.addFirst(spawn.clone());
             head.addPassenger(player);
+            // Reborn renders the mounted rider as a sheep disguise. Paper has no native player-disguise API;
+            // hide the rider while keeping the server-side sheep head and tail visible to everyone.
+            player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY,
+                    Integer.MAX_VALUE, 0, false, false, false));
             snakes.put(player.getUniqueId(), state);
             grantKit(player, kit);
         }
@@ -534,6 +541,7 @@ public final class SnakeGameManager implements Listener {
                     grow(state, 2);
                     state.slimesEaten++;
                     stats.recordSlime(state.player, state.slimesEaten);
+                    Bukkit.getPluginManager().callEvent(new SlimeUpgradeEvent(state.player));
                     stats.recordTailLength(state.player, state.segments.size());
                     state.player.playSound(state.player.getLocation(), Sound.ENTITY_GENERIC_EAT, 1.0F, 1.0F);
                     state.player.sendMessage(ChatColor.GREEN + "Slime eaten! Snake length: " + state.segments.size());
@@ -559,6 +567,7 @@ public final class SnakeGameManager implements Listener {
             loc.add(extension.multiply(SEGMENT_SPACING));
             Sheep body = spawnSegment(loc, state.color);
             state.segments.add(body);
+            Bukkit.getPluginManager().callEvent(new TailGrowEvent(state.player, state.segments.size()));
             if (state.segments.size() > state.maxTailLength) {
                 state.maxTailLength = state.segments.size();
                 stats.recordTailLength(state.player, state.maxTailLength);
@@ -822,6 +831,7 @@ public final class SnakeGameManager implements Listener {
         removeSegments(state);
         if (state.player.isOnline()) {
             state.player.leaveVehicle();
+            state.player.removePotionEffect(PotionEffectType.INVISIBILITY);
             state.player.setGameMode(GameMode.ADVENTURE);
             state.player.getInventory().clear();
             state.player.getInventory().setItem(0, trackingCompass());
@@ -956,16 +966,31 @@ public final class SnakeGameManager implements Listener {
     }
 
     private void openSpectatorMenu(Player player) {
-        Inventory inventory = Bukkit.createInventory(null, 27, SPECTATE_MENU_TITLE);
-        int slot = 0;
-        for (SnakeState target : snakes.values()) {
-            if (!target.alive || !target.player.isOnline() || slot >= 27) continue;
+        Inventory inventory = Bukkit.createInventory(null, 54, SPECTATE_MENU_TITLE);
+        List<SnakeState> survivors = snakes.values().stream()
+                .filter(target -> target.alive && target.player.isOnline())
+                .sorted(java.util.Comparator.comparing(target -> target.player.getName(),
+                        String.CASE_INSENSITIVE_ORDER))
+                .toList();
+
+        ItemStack teamHeader = new ItemStack(Material.GRAY_WOOL);
+        ItemMeta headerMeta = teamHeader.getItemMeta();
+        if (headerMeta != null) {
+            headerMeta.setDisplayName(ChatColor.GOLD + "Players Alive");
+            headerMeta.setLore(List.of(ChatColor.GRAY + "Players: " + survivors.size()));
+            teamHeader.setItemMeta(headerMeta);
+        }
+        inventory.setItem(13, teamHeader);
+
+        int slot = 19; // Reborn's single-team CompassPage starts its player row at slot 19.
+        for (SnakeState target : survivors) {
+            if (slot >= 54) break;
             ItemStack icon = new ItemStack(Material.PLAYER_HEAD);
             ItemMeta meta = icon.getItemMeta();
             if (meta != null) {
-                meta.setDisplayName(ChatColor.GREEN + target.player.getName());
                 double distance = player.getLocation().distance(target.player.getLocation());
                 double height = target.player.getLocation().getY() - player.getLocation().getY();
+                meta.setDisplayName(ChatColor.WHITE + target.player.getName());
                 meta.setLore(List.of(ChatColor.GRAY + "Kit: " + target.kit,
                         ChatColor.GRAY + "Tail length: " + target.segments.size(),
                         ChatColor.GRAY + "Distance: " + String.format(java.util.Locale.ROOT, "%.1f", distance),
@@ -978,12 +1003,13 @@ public final class SnakeGameManager implements Listener {
                 icon.setItemMeta(meta);
             }
             inventory.setItem(slot++, icon);
+            if ((slot + 2) % 9 == 0 && slot < 54) slot += 3;
         }
-        if (slot == 0) {
+        if (survivors.isEmpty()) {
             ItemStack none = new ItemStack(Material.BARRIER);
             ItemMeta meta = none.getItemMeta();
             if (meta != null) { meta.setDisplayName(ChatColor.RED + "No survivors"); none.setItemMeta(meta); }
-            inventory.setItem(13, none);
+            inventory.setItem(31, none);
         }
         player.openInventory(inventory);
     }
@@ -1011,7 +1037,8 @@ public final class SnakeGameManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onAbilityInteract(PlayerInteractEvent event) {
-        if (event.getHand() != EquipmentSlot.HAND) return;
+        if (event.getHand() != EquipmentSlot.HAND
+                || event.getAction() == org.bukkit.event.block.Action.PHYSICAL) return;
         SnakeState state = snakes.get(event.getPlayer().getUniqueId());
         if (!running || state == null) return;
         if (!state.alive) {
@@ -1028,7 +1055,6 @@ public final class SnakeGameManager implements Listener {
             }
             return;
         }
-        if (!event.getAction().isRightClick()) return;
         if (state.rouletteActive) {
             event.setCancelled(true);
             return;
@@ -1181,7 +1207,7 @@ public final class SnakeGameManager implements Listener {
     }
 
     private void updateSnakeAppearance(SnakeState state, long now) {
-        if (state == null || !state.alive || state.segments.isEmpty() || tick % 4 != 0) return;
+        if (state == null || !state.alive || state.segments.isEmpty()) return;
         String snakeType = plugin.selectedCosmeticOption(state.player, "snake-type");
         String colourTheme = plugin.selectedCosmeticOption(state.player, "colour-theme");
         String visual = plugin.selectedCosmeticOption(state.player, "ability-visuals");
@@ -1196,12 +1222,12 @@ public final class SnakeGameManager implements Listener {
             DyeColor colour = abilityColour == null ? snakeTypeColour(snakeType, i, state.color) : abilityColour;
             segment.setColor(colour);
         }
-        if (ability == null || visual == null || "classic".equalsIgnoreCase(visual)) return;
+        if (ability == null || visual == null || "classic".equalsIgnoreCase(visual) || tick % 4 != 0) return;
         Particle particle;
         if ("subtle".equalsIgnoreCase(visual)) particle = Particle.CLOUD;
-        else if ("neon".equalsIgnoreCase(visual)) particle = "reverse".equals(ability) ? Particle.PORTAL : Particle.END_ROD;
+        else if ("neon".equalsIgnoreCase(visual)) particle = "reverse".equals(ability) ? Particle.WITCH : Particle.FIREWORK;
         else if ("colour-coded".equalsIgnoreCase(visual)) {
-            particle = "super".equals(ability) ? Particle.END_ROD
+            particle = "super".equals(ability) ? Particle.FIREWORK
                     : "speed".equals(ability) ? Particle.HAPPY_VILLAGER : Particle.PORTAL;
         } else return;
         Location effect = state.player.getLocation().clone().add(0.0D, 0.25D, 0.0D);
