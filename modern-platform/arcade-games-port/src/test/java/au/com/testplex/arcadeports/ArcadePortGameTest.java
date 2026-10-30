@@ -199,6 +199,18 @@ class ArcadePortGameTest {
         assertEquals("", ArcadePortRules.microBattlesAchievementConfigKey(playerId, "Invalid Slug"));
     }
 
+    @Test void microBattlesLastTwoMissionOnlyTriggersWithExactlyTwoAliveTeams() {
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesLastTwo(0));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesLastTwo(1));
+        assertTrue(ArcadePortRules.shouldAwardMicroBattlesLastTwo(2));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesLastTwo(3));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesLastTwo(4));
+
+        java.util.UUID playerId = java.util.UUID.fromString("00000000-0000-0000-0000-000000000002");
+        assertEquals("test-achievements.micro-battles." + playerId + ".last-two",
+                MicroBattlesAchievement.LAST_TWO.configKey(playerId));
+    }
+
     @Test void microBattlesVerticalMapScanUsesExclusiveMaximum() {
         assertFalse(ArcadePortRules.isMicroCrumbleScanComplete(95, 96));
         assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(96, 96));
