@@ -71,6 +71,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class SnakeGameManager implements Listener {
     private static final String WORLD_NAME = SnakeMapCatalog.WORLD_NAME;
     private static final String SPECTATE_MENU_TITLE = "Spectator Menu";
+    private static final String KIT_MENU_TITLE = "Snake Kits";
     private static final int MAX_HAZARDS = SnakeRules.MAX_HAZARDS;
     private static final int HOTBAR_ROULETTE_SLOT = 8;
     private static final int ROULETTE_STEPS = 12;
@@ -88,6 +89,7 @@ public final class SnakeGameManager implements Listener {
     private final Set<MagmaCube> hazards = new HashSet<>();
     private final SnakeStatsStore stats;
     private final NamespacedKey spectatorTargetKey;
+    private final NamespacedKey kitMenuKey;
     private World arena;
     private SnakeMapCatalog.MapData mapData;
     private String mapResource;
@@ -108,6 +110,7 @@ public final class SnakeGameManager implements Listener {
         this.plugin = plugin;
         this.stats = new SnakeStatsStore(plugin);
         this.spectatorTargetKey = new NamespacedKey(plugin, "snake-spectator-target");
+        this.kitMenuKey = new NamespacedKey(plugin, "snake-kit-choice");
         this.mapResource = SnakeMapCatalog.selectedResource(plugin);
         this.arena = createArena();
         this.mapData = SnakeMapCatalog.readMapData(plugin, arena, mapResource);
@@ -240,6 +243,35 @@ public final class SnakeGameManager implements Listener {
         if (startingPlayerCount == 1) announce(ChatColor.GRAY + "Solo mechanics test: the round stays live until /snake stop or you leave.");
         sender.sendMessage(ChatColor.GREEN + "Preparing Snake with " + players.size()
                 + (players.size() == 1 ? " player." : " players.") + " Live begins in 9 seconds.");
+    }
+
+    public void openKitMenu(Player player) {
+        if (running) {
+            player.sendMessage(ChatColor.RED + "Snake kits are locked once preparation begins.");
+            return;
+        }
+        Inventory inventory = Bukkit.createInventory(null, 27, KIT_MENU_TITLE);
+        addKitMenuItem(inventory, 11, "speed", Material.FEATHER,
+                ChatColor.YELLOW + "Speed", "5 feathers", "Two seconds of increased movement speed.");
+        addKitMenuItem(inventory, 13, "reverse", Material.COOKIE,
+                ChatColor.LIGHT_PURPLE + "Reverser", "3 cookies", "Reverse the direction of your Snake for two seconds.");
+        addKitMenuItem(inventory, 15, "invulnerable", Material.NETHER_STAR,
+                ChatColor.AQUA + "Super Snake", "2 nether stars", "Ignore tail collisions for two seconds.");
+        player.openInventory(inventory);
+    }
+
+    private void addKitMenuItem(Inventory inventory, int slot, String kit, Material material,
+                                String name, String itemCount, String description) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        if (meta != null) {
+            meta.setDisplayName(name);
+            meta.setLore(List.of(ChatColor.GRAY + itemCount, ChatColor.DARK_GRAY + description,
+                    ChatColor.YELLOW + "Click to select"));
+            meta.getPersistentDataContainer().set(kitMenuKey, PersistentDataType.STRING, kit);
+            item.setItemMeta(meta);
+        }
+        inventory.setItem(slot, item);
     }
 
     public void setKit(Player player, String rawKit) {
@@ -1231,12 +1263,29 @@ public final class SnakeGameManager implements Listener {
 
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent event) {
-        if (SPECTATE_MENU_TITLE.equals(event.getView().getTitle())) event.setCancelled(true);
+        if (SPECTATE_MENU_TITLE.equals(event.getView().getTitle())
+                || KIT_MENU_TITLE.equals(event.getView().getTitle())) event.setCancelled(true);
     }
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) return;
+        if (KIT_MENU_TITLE.equals(event.getView().getTitle())) {
+            event.setCancelled(true);
+            ItemStack clicked = event.getCurrentItem();
+            if (clicked == null || !clicked.hasItemMeta()) return;
+            String kit = clicked.getItemMeta().getPersistentDataContainer()
+                    .get(kitMenuKey, PersistentDataType.STRING);
+            if (kit == null) return;
+            if (running) {
+                player.sendMessage(ChatColor.RED + "Snake kits are locked once preparation begins.");
+                player.closeInventory();
+                return;
+            }
+            setKit(player, kit);
+            player.closeInventory();
+            return;
+        }
         if (SPECTATE_MENU_TITLE.equals(event.getView().getTitle())) {
             event.setCancelled(true);
             ItemStack clicked = event.getCurrentItem();
