@@ -4846,7 +4846,10 @@ public final class ArcadePortManager implements Listener {
                 return new Location(session.world, x, y, z);
             }
         }
-        // Older PB records predate per-player starts; retain their shared-route origin.
+        // Older PB records predate per-player starts. The current GREEN start is a
+        // better lane-compatible fallback than the shared RED Douglas spawn.
+        Location currentRunStart = session.dragonEscapeStartLocations.get(playerId);
+        if (currentRunStart != null) return currentRunStart.clone();
         return session.dragonEscapeStartLocation == null
                 ? session.dragonEscapeWaypoints.get(0).clone()
                 : session.dragonEscapeStartLocation.clone();
