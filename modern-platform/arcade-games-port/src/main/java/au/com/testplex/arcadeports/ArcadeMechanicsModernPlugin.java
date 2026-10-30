@@ -48,9 +48,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         getServer().getPluginManager().registerEvents(mapMenu, this);
         for (Player online : Bukkit.getOnlinePlayers()) {
             Bukkit.getScheduler().runTask(this, () -> {
-                if (online.isOnline()) {
+                if (online.isOnline() && manager != null) {
+                    manager.returnPlayerToLobby(online);
                     grantConfiguredAdmin(online);
-                    if (manager != null) manager.restoreMonsterMazeKitPreference(online);
+                    manager.restoreMonsterMazeKitPreference(online);
                 }
             });
         }
@@ -105,9 +106,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         Bukkit.getScheduler().runTask(this, () -> {
-            if (player.isOnline()) {
+            if (player.isOnline() && manager != null) {
+                // The server's only player-facing spawn is the shared Testplex Arcade lobby.
+                manager.returnPlayerToLobby(player);
                 grantConfiguredAdmin(player);
-                if (manager != null) manager.restoreMonsterMazeKitPreference(player);
+                manager.restoreMonsterMazeKitPreference(player);
             }
         });
     }
