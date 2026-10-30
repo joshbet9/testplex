@@ -344,37 +344,36 @@ jobs:
           echo "Available space after stale-cache cleanup: $((avail_kb / 1024)) MiB."
           install -d -m 0700 -- "$upload_dir"
           REMOTE_STAGE_PREP
-          # The Arcade JAR contains the complete archived map set and is large enough
-          # that opening/writing one SCP file can leave the legacy SCP remote silent.
-          # Split it into independently acknowledged 16 MiB pieces, then assemble it
-          # on the VM before running the original SHA256 manifest verification.
-          # The transfer-wide timeout remains bounded at 12 minutes; SSH keepalives now
-          # tolerate up to 10 minutes of remote disk pressure before abandoning the upload.
-          scp_opts=(-p -P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+          # Use the SFTP subsystem rather than legacy SCP's single remote sink process.
+          # Split the large JAR into smaller files and keep only four SFTP writes outstanding;
+          # this avoids leaving the VM unresponsive while its /var/tmp storage flushes a large write.
+          sftp_opts=(-P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15
-            -o ServerAliveCountMax=40 -o TCPKeepAlive=yes -v)
+            -o ServerAliveCountMax=40 -o TCPKeepAlive=yes
+            -B 65536 -R 4)
           chunk_dir="$RUNNER_TEMP/testplex-modern-arcade-chunks"
           mkdir -p "$chunk_dir"
-          split -b 16M -d -a 3 "$STAGE_DIR/ArcadeMechanicsModern.jar" "$chunk_dir/ArcadeMechanicsModern.jar.part."
-          # The prior retry stalled while writing the 15 MiB map bundle itself. Keep
-          # the bundled map world data in small pieces too, so no single remote write
-          # can leave the SCP receiver silent for minutes.
-          split -b 1M -d -a 3 "$STAGE_DIR/MonsterMazeMaps.tar.gz" "$chunk_dir/MonsterMazeMaps.tar.gz.part."
+          split -b 4M -d -a 3 "$STAGE_DIR/ArcadeMechanicsModern.jar" "$chunk_dir/ArcadeMechanicsModern.jar.part."
+          split -b 512K -d -a 3 "$STAGE_DIR/MonsterMazeMaps.tar.gz" "$chunk_dir/MonsterMazeMaps.tar.gz.part."
           mapfile -t arcade_chunks < <(printf '%s\n' "$chunk_dir"/ArcadeMechanicsModern.jar.part.* | sort)
           mapfile -t world_chunks < <(printf '%s\n' "$chunk_dir"/MonsterMazeMaps.tar.gz.part.* | sort)
           test "${#arcade_chunks[@]}" -gt 0
           test "${#world_chunks[@]}" -gt 0
-          echo "Uploading verified modern artifacts, ${#arcade_chunks[@]} Arcade JAR parts and ${#world_chunks[@]} small world-map parts."
-          timeout --foreground --signal=TERM 12m scp "${scp_opts[@]}" \
-            "$STAGE_DIR/TestplexModernArcade.jar" \
-            "$STAGE_DIR/MonsterMazeModern.jar" \
-            "$STAGE_DIR/SnakeModern.jar" \
-            "$STAGE_DIR/MonsterMazeMapsSource.txt" \
-            "${world_chunks[@]}" \
-            "${arcade_chunks[@]}" \
-            "$remote:$upload_dir/"
+          batch_file="$RUNNER_TEMP/testplex-modern-upload.sftp"
+          {
+            printf 'cd "%s"\n' "$upload_dir"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/TestplexModernArcade.jar" "TestplexModernArcade.jar"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/MonsterMazeModern.jar" "MonsterMazeModern.jar"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/SnakeModern.jar" "SnakeModern.jar"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/MonsterMazeMapsSource.txt" "MonsterMazeMapsSource.txt"
+            for file in "${world_chunks[@]}" "${arcade_chunks[@]}"; do
+              printf 'put "%s" "%s"\n' "$file" "${file##*/}"
+            done
+          } > "$batch_file"
+          echo "Uploading verified modern artifacts with SFTP, ${#arcade_chunks[@]} 4 MiB Arcade JAR parts and ${#world_chunks[@]} 512 KiB map parts."
+          timeout --foreground --signal=TERM 15m sftp "${sftp_opts[@]}" -b "$batch_file" "$remote"
           ssh "${ssh_opts[@]}" "$remote" bash -s -- "$upload_dir" <<'REMOTE_ASSEMBLE_ARCADE'
           set -euo pipefail
           upload_dir="$1"
