@@ -72,7 +72,8 @@ public final class ArcadeCatalog {
                 win("phoenix-rise", "Phoenix Rise", "The winner rises through a phoenix-shaped flame arc."),
                 win("last-platform", "Last Platform", "The remaining platform is spotlighted as the arena fades")));
 
-        register(game("evolution", "Evolution", "DRAGON_EGG", "Fly upward as a chicken and evolve at the summit.",
+        register(game("evolution", "Evolution", "DRAGON_EGG",
+                "Earn evolutions through kills or the 90-second pity clock; progress through five forms.",
                 GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("metamorphosis", "Dragon Egg Variants",
                         "Choose the dragon egg and its evolving particle sequence; effects are visible to everyone in the game.",

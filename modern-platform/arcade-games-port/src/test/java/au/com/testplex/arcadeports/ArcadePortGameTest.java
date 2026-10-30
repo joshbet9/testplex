@@ -1548,6 +1548,12 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.evolutionOverkillRequirementMet(2));
     }
 
+    @Test void evolutionOnlyRetainsTheOverkillAchievement() {
+        assertEquals(1, EvolutionAchievement.values().length);
+        assertEquals("Overkill", EvolutionAchievement.OVERKILL.displayName());
+        assertEquals("Get 2 kills before each evolution.", EvolutionAchievement.OVERKILL.requirement());
+    }
+
     @Test void evolutionChargeAcceleratesWithKillsAndCapsAtTheSourceRate() {
         assertEquals(0.012D, ArcadePortRules.evolutionChargePerTick(0), 0.00001D);
         assertEquals(0.012D, ArcadePortRules.evolutionChargePerTick(1), 0.00001D);
