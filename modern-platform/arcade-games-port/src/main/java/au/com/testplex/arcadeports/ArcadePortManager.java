@@ -2825,6 +2825,9 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().addItem(new ItemStack(Material.ARROW, 32));
                 giveTurfWarsWool(session, player);
                 break;
+            case SKY_WARS:
+                // SkyWars starts with no kit: all equipment is looted from the archived island chests.
+                break;
         }
         player.updateInventory();
     }
