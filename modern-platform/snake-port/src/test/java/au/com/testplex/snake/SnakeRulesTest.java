@@ -145,6 +145,15 @@ class SnakeRulesTest {
         assertFalse(SnakeRules.shouldConsumeHazardOnContact(true));
     }
 
+    @Test void sourceAbilityItemsTriggerOnEitherClickButNeverPhysicalActions() {
+        assertTrue(SnakeRules.isAbilityItemInteraction("LEFT_CLICK_AIR"));
+        assertTrue(SnakeRules.isAbilityItemInteraction("LEFT_CLICK_BLOCK"));
+        assertTrue(SnakeRules.isAbilityItemInteraction("RIGHT_CLICK_AIR"));
+        assertTrue(SnakeRules.isAbilityItemInteraction("RIGHT_CLICK_BLOCK"));
+        assertFalse(SnakeRules.isAbilityItemInteraction("PHYSICAL"));
+        assertFalse(SnakeRules.isAbilityItemInteraction(null));
+    }
+
     @Test void sourceIdleRuleUsesTwoBlocksOfProgressWithinTwoSeconds() {
         assertTrue(SnakeRules.hasMovedForIdleCheck(4.001D));
         assertFalse(SnakeRules.hasMovedForIdleCheck(4.0D));
