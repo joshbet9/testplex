@@ -3252,6 +3252,7 @@ public final class ArcadePortManager implements Listener {
         double armourPoints = armourAttribute == null ? 0.0D : armourAttribute.getValue();
         double damage = ArcadePortRules.microBattlesDamageAfterArmor(afterPerk, armourPoints);
         if (damage <= 0.0D) return;
+        recordMicroBattlesDamage(session, attacker, target, afterPerk);
         if (target.getHealth() <= damage) {
             eliminate(session, target, attacker, "was eliminated in Micro Battles");
             return;
@@ -3260,6 +3261,50 @@ public final class ArcadePortManager implements Listener {
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
         target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0.0D, 1.0D, 0.0D),
                 5, 0.25D, 0.35D, 0.25D, 0.05D);
+    }
+
+    /** Record the unarmoured CustomDamageEvent amount, matching the legacy ChatStats trackers. */
+    private void recordMicroBattlesDamage(Session session, Player attacker, Player target, double sourceDamage) {
+        if (session == null || attacker == null || target == null || !Double.isFinite(sourceDamage)
+                || sourceDamage <= 0.0D) return;
+        int roundedDamage = (int) Math.round(sourceDamage);
+        if (roundedDamage <= 0) return;
+        UUID attackerId = attacker.getUniqueId();
+        UUID targetId = target.getUniqueId();
+        session.microDamageDealt.merge(attackerId, roundedDamage, Integer::sum);
+        session.microDamageTaken.merge(targetId, roundedDamage, Integer::sum);
+        session.microDamageContributors.computeIfAbsent(targetId, ignored -> new HashMap<>())
+                .put(attackerId, System.currentTimeMillis());
+    }
+
+    /** Resolve the latest valid attacker as killer and the other recent attackers as assists. */
+    private Player resolveMicroBattlesKillCredit(Session session, Player victim, Player creditedKiller) {
+        UUID victimId = victim.getUniqueId();
+        Map<UUID, Long> contributions = session.microDamageContributors.remove(victimId);
+        if (contributions == null || contributions.isEmpty()) return creditedKiller;
+        long now = System.currentTimeMillis();
+        List<Map.Entry<UUID, Long>> recent = contributions.entrySet().stream()
+                .filter(entry -> session.players.containsKey(entry.getKey()))
+                .filter(entry -> ArcadePortRules.shouldCreditMicroBattlesAssist(
+                        true, false, now, entry.getValue()))
+                .sorted(Map.Entry.<UUID, Long>comparingByValue().reversed())
+                .toList();
+        if (creditedKiller == null && !recent.isEmpty()) {
+            creditedKiller = session.players.get(recent.get(0).getKey());
+        }
+        UUID killerId = creditedKiller == null ? null : creditedKiller.getUniqueId();
+        for (Map.Entry<UUID, Long> entry : recent) {
+            UUID attackerId = entry.getKey();
+            if (attackerId.equals(killerId)
+                    || !ArcadePortRules.shouldCreditMicroBattlesAssist(true,
+                            killerId != null && attackerId.equals(killerId), now, entry.getValue())) continue;
+            int assists = session.microAssists.merge(attackerId, 1, Integer::sum);
+            Player assister = session.players.get(attackerId);
+            if (assister != null && assister.isOnline()) {
+                assister.sendMessage(ChatColor.GREEN + "Micro Battles assist! " + assists + " assists.");
+            }
+        }
+        return creditedKiller;
     }
 
     /** Mirrors DamageManager plus Micro's extra 1.6 multiplier for every projectile hit. */
@@ -6847,6 +6892,10 @@ public final class ArcadePortManager implements Listener {
 
     private void eliminate(Session session, Player player, Player killer, String reason) {
         if (active != session || player == null) return;
+        if (session.type == ArcadePortGame.MICRO_BATTLES
+                && session.alive.contains(player.getUniqueId())) {
+            killer = resolveMicroBattlesKillCredit(session, player, killer);
+        }
         if (session.type == ArcadePortGame.BACON_BRAWL
                 && session.alive.contains(player.getUniqueId())) {
             UUID playerId = player.getUniqueId();
@@ -7995,6 +8044,23 @@ public final class ArcadePortManager implements Listener {
                     plugin.getConfig().set(path + "come-at-me-bro",
                             plugin.getConfig().getInt(path + "come-at-me-bro", 0) + comeAtMeBro);
                 }
+            }
+        }
+        if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            for (UUID id : session.players.keySet()) {
+                String path = localStatsPath(id, session.type.id());
+                plugin.getConfig().set(path + "kills",
+                        plugin.getConfig().getInt(path + "kills", 0)
+                                + Math.max(0, session.scores.getOrDefault(id, 0)));
+                plugin.getConfig().set(path + "assists",
+                        plugin.getConfig().getInt(path + "assists", 0)
+                                + Math.max(0, session.microAssists.getOrDefault(id, 0)));
+                plugin.getConfig().set(path + "damage-dealt",
+                        plugin.getConfig().getInt(path + "damage-dealt", 0)
+                                + Math.max(0, session.microDamageDealt.getOrDefault(id, 0)));
+                plugin.getConfig().set(path + "damage-taken",
+                        plugin.getConfig().getInt(path + "damage-taken", 0)
+                                + Math.max(0, session.microDamageTaken.getOrDefault(id, 0)));
             }
         }
         plugin.saveConfig();
@@ -9265,6 +9331,17 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             event.setCancelled(true);
+            if (session.type == ArcadePortGame.MICRO_BATTLES) {
+                boolean playerSourcedDamage = event instanceof EntityDamageByEntityEvent microByEntity
+                        && (microByEntity.getDamager() instanceof Player
+                                || (microByEntity.getDamager() instanceof Projectile microProjectile
+                                        && microProjectile.getShooter() instanceof Player));
+                if (!playerSourcedDamage) {
+                    int roundedDamage = (int) Math.round(Math.max(0.0D, event.getDamage()));
+                    if (roundedDamage > 0) session.microDamageTaken.merge(
+                            target.getUniqueId(), roundedDamage, Integer::sum);
+                }
+            }
             if (session.type == ArcadePortGame.DRAGON_ESCAPE
                     && event instanceof EntityDamageByEntityEvent dragonEscapeDamage) {
                 Entity damager = dragonEscapeDamage.getDamager();
@@ -11801,6 +11878,10 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> microNextArrowAt = new HashMap<>();
         final Set<UUID> microFletchedArrows = new HashSet<>();
         final Map<UUID, Vector> microArrowVelocities = new HashMap<>();
+        final Map<UUID, Integer> microDamageDealt = new HashMap<>();
+        final Map<UUID, Integer> microDamageTaken = new HashMap<>();
+        final Map<UUID, Integer> microAssists = new HashMap<>();
+        final Map<UUID, Map<UUID, Long>> microDamageContributors = new HashMap<>();
         final Set<Block> microCrumbleBlocks = new HashSet<>();
         int microCrumbleMinX = -20, microCrumbleMaxX = 20, microCrumbleMinZ = -20, microCrumbleMaxZ = 20;
         int microCrumbleMinY, microCrumbleMaxY = 96, microCrumbleScanY;
