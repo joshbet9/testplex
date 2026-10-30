@@ -170,7 +170,9 @@ public boolean startTestplexRound(List<Player> participants, Consumer<Player> re
     this.pendingTestplexParticipants = selected;
     this.testplexReturnToLobby = returnToLobby;
     this.testplexManagedRound = true;
-    startGame();
+    // Testplex's MM configuration commands set the mode and pattern before
+    // queueing; the Arcade manager remains the only way to begin a round.
+    startGame(null, plugin.getConfig().getInt("forced-pattern", -1));
     if (state != GameState.STARTING && state != GameState.LIVE) {
         this.pendingTestplexParticipants = null;
         this.testplexReturnToLobby = null;
