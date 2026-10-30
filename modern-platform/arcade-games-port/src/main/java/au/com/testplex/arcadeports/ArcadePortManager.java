@@ -5921,9 +5921,15 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.participantsAtStart <= 1) return;
+        if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
+            if (ArcadePortRules.shouldFinishQuiverLastPlayer(
+                    session.alive.size(), session.respawning.size(), session.participantsAtStart)) {
+                finish(session, alivePlayers(session).stream().findFirst().orElse(null), true);
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.PAINTBALL || session.type == ArcadePortGame.TURF_WARS
-                || session.type == ArcadePortGame.SHEEP_QUEST || session.type == ArcadePortGame.EVOLUTION
-                || session.type == ArcadePortGame.ONE_IN_THE_QUIVER) return;
+                || session.type == ArcadePortGame.SHEEP_QUEST || session.type == ArcadePortGame.EVOLUTION) return;
         if (session.type == ArcadePortGame.DEATH_TAG) {
             List<Player> runners = alivePlayers(session).stream()
                     .filter(p -> !session.tagged.contains(p.getUniqueId()))
