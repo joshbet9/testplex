@@ -253,7 +253,7 @@ public class Dragons extends SoloGame
 		{
 			case "ember":
 				type = Type.BALL_LARGE;
-				color = Color.ORANGE;
+				color = Color.fromRGB(255, 112, 24);
 				break;
 			case "frost":
 				type = Type.STAR;
