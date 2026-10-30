@@ -1182,6 +1182,7 @@ public final class ArcadePortManager implements Listener {
                 giveDeathTagKit(session, player, session.tagged.contains(player.getUniqueId()),
                         session.alphaChasers.contains(player.getUniqueId()));
             }
+            setupDeathTagScoreboard(session);
         }
         if (type == ArcadePortGame.SHEEP_QUEST) {
             for (int i = 0; i < ArcadePortRules.SHEEP_QUEST_INITIAL_SHEEP; i++) spawnSheep(session);
@@ -1856,6 +1857,51 @@ public final class ArcadePortManager implements Listener {
                 && "Tracking Compass".equals(ChatColor.stripColor(meta.getDisplayName()));
     }
 
+    private void setupDeathTagScoreboard(Session session) {
+        if (session == null || Bukkit.getScoreboardManager() == null) return;
+        Scoreboard scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+        Objective objective = scoreboard.registerNewObjective("deathtag", "dummy",
+                ChatColor.GOLD + "DEATH TAG");
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        session.deathTagScoreboard = scoreboard;
+        session.deathTagScoreboardObjective = objective;
+
+        session.deathTagRunnerScoreboardLine = scoreboard.registerNewTeam("dtrunners");
+        session.deathTagRunnerScoreboardEntry = ChatColor.GREEN.toString();
+        session.deathTagRunnerScoreboardLine.addEntry(session.deathTagRunnerScoreboardEntry);
+        session.deathTagRunnerScoreboardLine.setPrefix(ChatColor.GREEN.toString());
+        objective.getScore(session.deathTagRunnerScoreboardEntry).setScore(3);
+
+        Team blankLine = scoreboard.registerNewTeam("dtblank");
+        String blankEntry = ChatColor.BLACK.toString();
+        blankLine.addEntry(blankEntry);
+        blankLine.setPrefix(" ");
+        objective.getScore(blankEntry).setScore(2);
+
+        session.deathTagChaserScoreboardLine = scoreboard.registerNewTeam("dtchasers");
+        session.deathTagChaserScoreboardEntry = ChatColor.RED.toString();
+        session.deathTagChaserScoreboardLine.addEntry(session.deathTagChaserScoreboardEntry);
+        session.deathTagChaserScoreboardLine.setPrefix(ChatColor.RED.toString());
+        objective.getScore(session.deathTagChaserScoreboardEntry).setScore(1);
+
+        for (Player player : session.players.values()) {
+            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
+        }
+        updateDeathTagScoreboard(session);
+    }
+
+    private void updateDeathTagScoreboard(Session session) {
+        if (session == null || session.deathTagScoreboardObjective == null) return;
+        int chasers = (int) session.tagged.stream().filter(session.alive::contains).count();
+        int runners = Math.max(0, session.alive.size() - chasers);
+        if (session.deathTagRunnerScoreboardLine != null) {
+            session.deathTagRunnerScoreboardLine.setSuffix(ChatColor.WHITE + " " + runners + " Runners");
+        }
+        if (session.deathTagChaserScoreboardLine != null) {
+            session.deathTagChaserScoreboardLine.setSuffix(ChatColor.WHITE + " " + chasers + " Chasers");
+        }
+    }
+
     private void updateDeathTagLights(Session session, long now) {
         if (session.deathTagOriginalLightBlocks.isEmpty() || now < session.deathTagNextLightAt) return;
         session.deathTagNextLightAt = now + 1_000L;
@@ -1884,6 +1930,7 @@ public final class ArcadePortManager implements Listener {
         }
         updateDeathTagDisguises(session);
         updateDeathTagCompass(session);
+        updateDeathTagScoreboard(session);
         for (Player player : alivePlayers(session)) {
             if (!session.tagged.contains(player.getUniqueId())
                     && "archer".equals(session.deathTagRunnerKits.getOrDefault(player.getUniqueId(), "basher"))) {
@@ -1962,7 +2009,11 @@ public final class ArcadePortManager implements Listener {
         else session.alphaChasers.remove(player.getUniqueId());
         awardDeathTagKill(session, killer);
         if (player.isOnline()) {
-            if (player.getLocation().getY() < 59.0D) player.teleport(spawnFor(session, player));
+            if (forcedAlpha) {
+                player.teleport(deathTagChaserRespawnSpawn(session, player));
+            } else if (player.getLocation().getY() < 59.0D) {
+                player.teleport(spawnFor(session, player));
+            }
             player.setGameMode(GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
@@ -10529,6 +10580,12 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> tagged = new HashSet<>();
         final Set<UUID> alphaChasers = new HashSet<>();
         final Map<UUID, Mob> deathTagDisguises = new HashMap<>();
+        Scoreboard deathTagScoreboard;
+        Objective deathTagScoreboardObjective;
+        Team deathTagRunnerScoreboardLine;
+        String deathTagRunnerScoreboardEntry;
+        Team deathTagChaserScoreboardLine;
+        String deathTagChaserScoreboardEntry;
         final Map<UUID, String> deathTagRunnerKits = new HashMap<>();
         final Map<UUID, Long> deathTagLastArrowAt = new HashMap<>();
         final Map<UUID, Long> deathTagSoloChaserHitReadyAt = new HashMap<>();
