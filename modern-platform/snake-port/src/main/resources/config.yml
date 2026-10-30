@@ -1,4 +1,6 @@
-# Test arena defaults. Per-player kit choices are stored under kits.<uuid>.
-# This plugin is self-contained and does not contact any backend.
+# Isolated Paper 26.3 Snake test defaults.
+# Original Reborn map archives are bundled in SnakeModern.jar.
+# Change with /snake map <name>; map changes are only allowed while the game is idle.
 test-mode: true
+selected-map: Snake_Pit.zip
 kits: {}
