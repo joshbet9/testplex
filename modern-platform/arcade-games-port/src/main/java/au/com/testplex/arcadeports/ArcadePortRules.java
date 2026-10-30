@@ -1989,6 +1989,11 @@ public final class ArcadePortRules {
         return combatPhase ? 2.0D : 500.0D;
     }
 
+    /** Reborn's Comeback tracker remembers a team once its remaining line count reaches five. */
+    public static boolean turfWarsShouldTrackComeback(int remainingLines) {
+        return remainingLines <= 5;
+    }
+
     /** Reborn advances one line for the first combat round, two for the second, etc. */
     public static int turfWarsLinesPerKill(int combatRoundsStarted, boolean mixedArcadeVariant) {
         int sourceLines = Math.max(1, combatRoundsStarted);
