@@ -1359,8 +1359,12 @@ public final class ArcadePortManager implements Listener {
             spawnSkyWarsGuardians(session);
             session.skyWarsTntGenerator = skyWarsTntGenerator(session);
             if (session.skyWarsTntGenerator != null) {
-                session.skyWarsGeneratorBase = session.skyWarsTntGenerator.getBlock().getRelative(BlockFace.DOWN);
-                session.skyWarsGeneratorBase.setType(Material.IRON_BLOCK, false);
+                SourceMapCatalog.MapData skyWarsMap = sourceMapData.get(type.id());
+                List<Location> generatorMarkers = skyWarsMap == null ? List.of() : skyWarsMap.dataLocations("LIME");
+                if (!generatorMarkers.isEmpty()) {
+                    session.skyWarsGeneratorBase = generatorMarkers.get(0).getBlock().getRelative(BlockFace.DOWN);
+                    session.skyWarsGeneratorBase.setType(Material.IRON_BLOCK, false);
+                }
             } else {
                 plugin.getLogger().warning("SkyWars map " + session.world.getName()
                         + " has no LIME throwable-TNT generator marker.");
@@ -3727,7 +3731,7 @@ public final class ArcadePortManager implements Listener {
     private void spawnSkyWarsGuardians(Session session) {
         SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.SKY_WARS.id());
         if (map == null) return;
-        for (Location spawn : map.customLocations("RED")) {
+        for (Location spawn : map.dataLocations("RED")) {
             if (spawn == null || spawn.getWorld() != session.world) continue;
             Zombie guardian = session.world.spawn(spawn.clone(), Zombie.class);
             guardian.setRemoveWhenFarAway(false);
