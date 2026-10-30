@@ -2369,6 +2369,34 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.canCarryAnotherSheep(-1));
     }
 
+    @Test void sheepQuestKitNamesMatchTheLegacyMenuAndAliases() {
+        assertEquals("beserker", ArcadePortRules.normalizeSheepQuestKit("Beserker"));
+        assertEquals("beserker", ArcadePortRules.normalizeSheepQuestKit("sheep-berserker"));
+        assertEquals("beserker", ArcadePortRules.normalizeSheepQuestKit("double jump"));
+        assertEquals("archer", ArcadePortRules.normalizeSheepQuestKit("sheep archer"));
+        assertEquals("brute", ArcadePortRules.normalizeSheepQuestKit("thrower"));
+        assertNull(ArcadePortRules.normalizeSheepQuestKit("fighter"));
+        assertNull(ArcadePortRules.normalizeSheepQuestKit(null));
+    }
+
+    @Test void sheepQuestPickupUsesLegacyRangeAndRecharge() {
+        assertEquals(2.5D, ArcadePortRules.SHEEP_QUEST_PICKUP_RADIUS, 0.00001D);
+        assertEquals(500L, ArcadePortRules.SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS);
+        assertTrue(ArcadePortRules.sheepQuestPickupReady(1_500L, 1_500L));
+        assertFalse(ArcadePortRules.sheepQuestPickupReady(1_499L, 1_500L));
+        assertEquals(8_000L, ArcadePortRules.SHEEP_QUEST_BESERKER_JUMP_COOLDOWN_MILLIS);
+    }
+
+    @Test void sheepQuestTiedFiveMinuteResultEntersLeadChangeOvertime() {
+        assertTrue(ArcadePortRules.sheepQuestIsTied(new int[]{4, 4, 1, 0}));
+        assertTrue(ArcadePortRules.sheepQuestIsTied(new int[]{2, 2, 2, 2}));
+        assertTrue(ArcadePortRules.sheepQuestIsTied(new int[]{0, 0, 0, 0}));
+        assertFalse(ArcadePortRules.sheepQuestIsTied(new int[]{5, 4, 4, 0}));
+        assertTrue(ArcadePortRules.sheepQuestIsTied(null));
+        assertEquals(10_000L, ArcadePortRules.SHEEP_QUEST_OVERTIME_ANNOUNCE_INTERVAL_MILLIS);
+        assertEquals(6.0D, ArcadePortRules.SHEEP_QUEST_THROWER_DAMAGE, 0.00001D);
+    }
+
     @Test void sheepQuestSlowsMoreAsPlayersCarryAdditionalSheep() {
         assertEquals(-1, ArcadePortRules.sheepQuestCarrySlownessAmplifier(0));
         assertEquals(0, ArcadePortRules.sheepQuestCarrySlownessAmplifier(1));
@@ -2396,11 +2424,11 @@ class ArcadePortGameTest {
         assertEquals("UNASSIGNED", ArcadePortRules.sheepQuestTeamPenMarker(4));
     }
 
-    @Test void sheepQuestPenMarkersMatchTheFloorOneBlockBelowSheepFeet() {
-        assertTrue(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -4, 10, 63, -4));
-        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 63, -4, 10, 63, -4));
-        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(11, 64, -4, 10, 63, -4));
-        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -3, 10, 63, -4));
+    @Test void sheepQuestPenMarkersMatchTheExactSourceDataLocations() {
+        assertTrue(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -4, 10, 64, -4));
+        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 65, -4, 10, 64, -4));
+        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(11, 64, -4, 10, 64, -4));
+        assertFalse(ArcadePortRules.sheepQuestInsidePenMarker(10, 64, -3, 10, 64, -4));
     }
 
     @Test void sheepQuestPlayerHitsDropSheepAndDealDamage() {
