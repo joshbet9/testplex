@@ -3,7 +3,7 @@ version: 0.1.0-SNAPSHOT
 main: au.com.testplex.arcadeports.ArcadeMechanicsModernPlugin
 api-version: '26.3'
 author: Testplex
-description: Mechanics-first prototypes for the other 15 Arcade games on Paper 26.3
+description: Mechanics-first prototypes for the other 17 Arcade games on Paper 26.3
 softdepend:
   - TestplexModernArcade
   - packetevents
