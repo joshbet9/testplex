@@ -202,24 +202,27 @@ source = source.replace(
     "            sudo -n apt-get install -y curl jq unzip",
     "            timeout --foreground --signal=TERM 8m sudo -n apt-get install -y curl jq unzip"
 )
-old_java = """            curl --fail --location --retry 3 --user-agent "$USER_AGENT" \\
-              "https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jre/hotspot/normal/eclipse" \\
-              -o "$UPLOAD_DIR/temurin25-jre.tar.gz""""
-new_java = """            echo "[deploy] downloading isolated Java 25 JRE (6 minute limit)."
-            timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \\
-              "https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jre/hotspot/normal/eclipse" \\
-              -o "$UPLOAD_DIR/temurin25-jre.tar.gz""""
+old_java = '''            curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
+              "https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jre/hotspot/normal/eclipse" \
+              -o "$UPLOAD_DIR/temurin25-jre.tar.gz"'''
+new_java = '''            echo "[deploy] downloading isolated Java 25 JRE (6 minute limit)."
+            timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
+              "https://api.adoptium.net/v3/binary/latest/25/ga/linux/x64/jre/hotspot/normal/eclipse" \
+              -o "$UPLOAD_DIR/temurin25-jre.tar.gz"'''
 source = source.replace(old_java, new_java)
-old_api = """          builds_json="$(curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \\
-            "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds")"""
-new_api = """          echo "[deploy] querying Paper 26.3 stable build metadata (4 minute limit)."
-          builds_json="$(timeout --foreground --signal=TERM 4m curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \\
-            "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds")"""
+
+old_api = '''          builds_json="$(curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \
+            "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds")"'''
+new_api = '''          echo "[deploy] querying Paper 26.3 stable build metadata (4 minute limit)."
+          builds_json="$(timeout --foreground --signal=TERM 4m curl --fail --silent --show-error --retry 3 --user-agent "$USER_AGENT" \
+            "https://fill.papermc.io/v3/projects/paper/versions/26.3/builds")"'''
 source = source.replace(old_api, new_api)
-old_paper = """          curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp""""
-new_paper = """          echo "[deploy] downloading Paper build $paper_build (8 minute limit)."
-          timeout --foreground --signal=TERM 8m curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp""""
+
+old_paper = '''          curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp"'''
+new_paper = '''          echo "[deploy] downloading Paper build $paper_build (8 minute limit)."
+          timeout --foreground --signal=TERM 8m curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp"'''
 source = source.replace(old_paper, new_paper)
+
 source = source.replace(
     "          if ! sudo -n systemctl restart testplex-modern.service; then",
     '          echo "[deploy] restarting testplex-modern.service (90 second limit)."\n          if ! timeout --foreground --signal=TERM 90s sudo -n systemctl restart testplex-modern.service; then'
