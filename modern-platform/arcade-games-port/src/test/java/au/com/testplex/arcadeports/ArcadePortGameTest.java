@@ -863,6 +863,25 @@ class ArcadePortGameTest {
                 org.bukkit.Material.IRON_AXE, false, "chris-p-bacon"));
     }
 
+    @Test void baconBrutusGuardBlocksFrontHitsButBackstabsBreakItAndPigCloakUsesTimedDuration() {
+        assertEquals("pig", ArcadePortRules.normalizeBaconBrawlKit("pig-cloak"));
+        assertEquals("brutus-bacon", ArcadePortRules.normalizeBaconBrawlKit("Brutus Bacon"));
+        assertTrue(ArcadePortRules.shouldBaconBrutusGuardHit(true, false),
+                "A frontal hit is blocked while Brutus Guard is active.");
+        assertFalse(ArcadePortRules.shouldBaconBrutusGuardHit(true, true),
+                "A backstab breaks the guard so the normal hit/knockback can land.");
+        assertFalse(ArcadePortRules.shouldBaconBrutusGuardHit(false, false),
+                "Brutus Guard should not protect outside its timer.");
+        assertTrue(ArcadePortRules.isBaconTimedCritical(500L));
+        assertTrue(ArcadePortRules.isBaconTimedCritical(900L));
+        assertFalse(ArcadePortRules.isBaconTimedCritical(499L));
+        assertFalse(ArcadePortRules.isBaconTimedCritical(901L));
+        assertEquals(ArcadePortRules.BACON_PIG_INVINCIBILITY_MIN_MILLIS,
+                ArcadePortRules.baconAbilityDurationMillis(10));
+        assertEquals(ArcadePortRules.BACON_PIG_INVINCIBILITY_MAX_MILLIS,
+                ArcadePortRules.baconAbilityDurationMillis(100));
+    }
+
     @Test void baconPigBackstabAddsTwoHundredAndFiftyPercentKnockback() {
         assertEquals(1.0D, ArcadePortRules.baconBrawlKnockbackMultiplier(false), 0.00001D);
         assertEquals(2.5D, ArcadePortRules.BACON_PIG_BACKSTAB_KNOCKBACK_MULTIPLIER, 0.00001D);
