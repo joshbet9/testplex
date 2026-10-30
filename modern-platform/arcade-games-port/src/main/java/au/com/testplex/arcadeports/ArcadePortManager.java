@@ -192,6 +192,8 @@ public final class ArcadePortManager implements Listener {
     private final Map<String, SourceMapCatalog.MapData> sourceMapData = new HashMap<>();
     private final Map<UUID, PlayerSnapshot> pendingRestore = new HashMap<>();
     private final Map<UUID, String> paintballKitPreferences = new HashMap<>();
+    private final Map<UUID, String> castleAssaultKitPreferences = new HashMap<>();
+    private final Map<UUID, String> heroesOfGwenHeroPreferences = new HashMap<>();
     private final Map<UUID, String> deathTagRunnerKitPreferences = new HashMap<>();
     private final Map<UUID, String> baconKitPreferences = new HashMap<>();
     private final Map<UUID, String> bombLobbersKitPreferences = new HashMap<>();
@@ -599,6 +601,8 @@ public final class ArcadePortManager implements Listener {
         Session running = active;
         if (running != null && running.players.containsKey(player.getUniqueId())) {
             switch (running.type) {
+                case CASTLE_ASSAULT -> { selectCastleAssaultKit(player, value); return; }
+                case HEROES_OF_GWEN -> { selectHeroesOfGwenHero(player, value); return; }
                 case BACON_BRAWL -> { selectBaconBrawlKit(player, value); return; }
                 case BOMB_LOBBERS -> { selectBombLobbersKit(player, value); return; }
                 case SPLEEF -> { selectSpleefKit(player, value); return; }
@@ -614,7 +618,9 @@ public final class ArcadePortManager implements Listener {
                 default -> { }
             }
         }
-        if (value.startsWith("quiver-")) { selectQuiverKit(player, value); }
+        if (ArcadePortRules.normalizeCastleAssaultKit(value) != null) selectCastleAssaultKit(player, value);
+        else if (ArcadePortRules.normalizeHeroesOfGwenHero(value) != null) selectHeroesOfGwenHero(player, value);
+        else if (value.startsWith("quiver-")) { selectQuiverKit(player, value); }
         else if (value.startsWith("spleef-")) { selectSpleefKit(player, value.substring("spleef-".length())); }
         else if (value.startsWith("micro-")) { selectMicroBattlesKit(player, value.substring("micro-".length())); }
         else if (ArcadePortRules.normalizeBaconBrawlKit(value) != null) selectBaconBrawlKit(player, value);
