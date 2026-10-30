@@ -64,7 +64,7 @@ public final class MonsterEntityController {
         SKINS.put(entity.getUniqueId(), value);
         SKIN_ENTITIES.put(entity.getUniqueId(), entity);
         try {
-            entity.setMetadata(MONSTER_SKIN_METADATA, new FixedMetadataValue(MonsterMazePlugin.getInstance(), value));
+            entity.setMetadata(MONSTER_SKIN_METADATA, new FixedMetadataValue(MonsterMazePlugin.getInstance().getHostPlugin(), value));
         } catch (Throwable ignored) { }
     }
 
@@ -110,7 +110,7 @@ public final class MonsterEntityController {
 
     private static void tag(LivingEntity entity) {
         try {
-            entity.setMetadata(MONSTER_METADATA, new FixedMetadataValue(MonsterMazePlugin.getInstance(), true));
+            entity.setMetadata(MONSTER_METADATA, new FixedMetadataValue(MonsterMazePlugin.getInstance().getHostPlugin(), true));
         } catch (Throwable ignored) { }
     }
 
