@@ -200,9 +200,9 @@ public final class ArcadeCatalog {
         register(game("spleef", "Spleef", "IRON_SHOVEL", "Break the floor beneath opponents and stay above the void.",
                 GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
                 List.of(line("break-signature", "Block Break Signature", "A game-specific shape for each block break.", "IRON_SHOVEL",
-                        single("snowburst", "Snowburst", "A short snow burst at the broken tile."),
-                        single("ice-shards", "Ice Shards", "Crystalline fragments spread outward."),
-                        single("chalk-grid", "Chalk Grid", "The broken tile briefly outlines a grid."))),
+                        grouped("snowburst", "Snowburst", "A short snow burst at the broken tile.", "signature"),
+                        grouped("ice-shards", "Ice Shards", "Crystalline fragments spread outward.", "signature"),
+                        grouped("chalk-grid", "Chalk Grid", "The broken tile briefly outlines a grid.", "signature"))),
                 win("ice-throne", "Ice Throne", "A seat of ice rises from the surviving floor."),
                 win("last-snowflake", "Last Snowflake", "A single snowflake floats above the winner."),
                 win("shovel-salute", "Shovel Salute", "A ceremonial row of shovels rises from the floor")));
