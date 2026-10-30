@@ -20,13 +20,13 @@
 
 ## Micro Battles parity checkpoint
 
-The modern port now mirrors these source behaviours at code level: Archer / Worker / Fighter loadouts; the 10-second starting glass barrier; the four-second own-island restriction; team-coloured, protected armour and slot-8 team badge; map crumble; hunger floor; team-safe damage and projectile knockback; block growth/flow prevention; sword-drop protection while allowing other ordinary drops; spectator tracking compass with opposing-team filtering, menu selection and the three-second teleport cooldown; four-team timeout standings (surviving team count first, team kills as the tiebreak, draw on an exact tie); and the eight-kill Annihilation milestone in local test stats.
+The modern port now mirrors these source behaviours at code level: Archer / Worker / Fighter loadouts; the 10-second starting glass barrier; the four-second own-island restriction; team-coloured, protected armour and slot-8 team badge; map crumble; hunger floor; team-safe damage and projectile knockback; block growth/flow prevention; sword-drop protection while allowing other ordinary drops; spectator tracking compass with opposing-team filtering, menu selection and the three-second teleport cooldown; four-team timeout standings (surviving team count first, team kills as the tiebreak, draw on an exact tie); the eight-kill Annihilation milestone, and the Last Two (exactly two surviving teams) mission trigger in local test stats.
 
 Micro Battles cosmetics are now separately configurable in player preferences:
 - **Middle Glass Colour** changes the starting glass only for the owning player, using per-viewer block updates. Other players retain the normal map glass.
 - **Border Particle Colour** colours a vertical dust cue that is broadcast to nearby viewers. It appears for living players within three blocks of the nearest world-border face, at three heights, every four ticks. It is not tied to the temporary starting glass, so it remains available after that barrier is removed.
 
-Still not production-parity sign-off: the Mineplex MICRO_LAST_TWO mission backend and the legacy KillsWithinGameStatTracker / ChatStats integrations are not connected to the isolated modern server. The Annihilation bottle is a local test-server equivalent only. Four-team match flow, cosmetics, reconnect/cleanup and multi-client visibility still require live-server acceptance; this game remains MECHANICS_IN_PROGRESS.
+Still not production-parity sign-off: the Mineplex MICRO_LAST_TWO mission backend and the legacy KillsWithinGameStatTracker / ChatStats integrations are not connected to the isolated modern server. The Annihilation and Last Two bottles are local test-server equivalents only. Four-team match flow, cosmetics, reconnect/cleanup and multi-client visibility still require live-server acceptance; this game remains MECHANICS_IN_PROGRESS.
 
 ## In-game acceptance
 
