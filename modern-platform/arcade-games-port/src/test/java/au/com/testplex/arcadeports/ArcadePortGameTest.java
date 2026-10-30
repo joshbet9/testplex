@@ -650,6 +650,7 @@ class ArcadePortGameTest {
         assertEquals(3.5D, ArcadePortRules.microBattlesDamageAfterIronSkin(4.0D, true), 0.00001D);
         assertEquals(5.5D, ArcadePortRules.microBattlesDamageAfterIronSkin(6.0D, true), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(1.0D, true), 0.00001D);
+        assertEquals(1.5D, ArcadePortRules.microBattlesDamageAfterIronSkin(2.0D, true), 0.00001D);
         assertEquals(4.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(4.0D, false), 0.00001D);
     }
 

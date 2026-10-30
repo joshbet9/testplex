@@ -563,6 +563,11 @@ public final class ArcadePortRules {
     public static final int MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS = 4;
     public static final int MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS = 3;
     public static final int MICRO_BATTLES_ANNIHILATION_KILLS = 8;
+    public static final String MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR = "light-blue";
+    public static final double MICRO_BATTLES_BORDER_PARTICLE_DISTANCE = 3.0D;
+    public static final int MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS = 4;
+    public static final int MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS = 3;
+    public static final int MICRO_BATTLES_ANNIHILATION_KILLS = 8;
     public static final long MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS = 15_000L;
     public static final String MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR = "light-blue";
 
@@ -815,6 +820,11 @@ public final class ArcadePortRules {
     }
 
     /** Reborn's PerkIronSkin(0.5) subtracts half a damage point; it does not halve damage. */
+    /**
+     * Mirrors Reborn PerkIronSkin(0.5): subtract a fixed half damage point
+     * from eligible hits rather than reducing all incoming damage by 50%.
+     * The source perk leaves damage of one point or less unchanged.
+     */
     public static double microBattlesDamageAfterIronSkin(double damage, boolean fighter) {
         if (!Double.isFinite(damage) || damage <= 0.0D) return 0.0D;
         if (!fighter || damage <= 1.0D) return damage;
@@ -1730,7 +1740,7 @@ public final class ArcadePortRules {
      */
     /** Isolated equivalent of the source KillsWithinGameStatTracker(8, "Annihilation"). */
     public static boolean shouldAwardMicroBattlesAnnihilation(int killsThisGame) {
-        return killsThisGame == MICRO_BATTLES_ANNIHILATION_KILLS;
+        return killsThisGame >= MICRO_BATTLES_ANNIHILATION_KILLS;
     }
 
     /** The Reborn Last2Tracker grants mission progress when exactly two teams remain alive. */
