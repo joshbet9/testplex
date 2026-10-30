@@ -48,6 +48,9 @@ jobs:
       - name: Build Arcade mechanics and the integrated Monster Maze module
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
 
+      - name: Build the disabled Wizards 26.3 port and run spell-rule tests
+        run: mvn --batch-mode --no-transfer-progress -f modern-platform/wizards-port/pom.xml clean verify
+
       - name: Verify modern plugin metadata and packaged classes
         shell: bash
         run: |
@@ -58,6 +61,12 @@ jobs:
           test -s "$jar_file"
           test -s "$snake_jar"
           test -s "$arcade_jar"
+          wizards_jar="modern-platform/wizards-port/target/WizardsModern.jar"
+          test -s "$wizards_jar"
+          jar tf "$wizards_jar" | grep -Fxq "plugin.yml"
+          jar tf "$wizards_jar" | grep -Fxq "au/com/testplex/wizards/WizardsModernPlugin.class"
+          unzip -p "$wizards_jar" plugin.yml | grep -Fxq "name: WizardsModern"
+          unzip -p "$wizards_jar" config.yml | grep -Fxq "enabled: false"
           jar tf "$jar_file" | grep -Fxq "plugin.yml"
           jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/TestplexModernArcade.class"
           jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/model/ArcadeCatalog.class"
@@ -97,6 +106,7 @@ jobs:
             modern-platform/target/TestplexModernArcade.jar
             modern-platform/snake-port/target/SnakeModern.jar
             modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar
+            modern-platform/wizards-port/target/WizardsModern.jar
           if-no-files-found: error
           retention-days: 14
 
@@ -110,11 +120,11 @@ jobs:
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
             echo "- Catalogue: 21 Arcade games (two READY_FOR_TEST, 19 MECHANICS_IN_PROGRESS)"
-            echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar and ArcadeMechanicsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
+            echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar, ArcadeMechanicsModern.jar and WizardsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: all 21 catalogue entries are packaged; unfinished ports remain installed but unavailable for starting live games"
-            echo "- Playable allow-list: Death Tag and One in the Quiver only; all other 19 catalogue entries and Snake remain gated pending readiness promotion"
+            echo "- Gameplay ports: 21 Arcade catalogue entries plus the resource-packless Wizards prototype are packaged; unfinished ports remain installed but unavailable for starting live games"
+            echo "- Playable allow-list: Death Tag and One in the Quiver only; all other catalogue entries, Snake and Wizards remain gated pending readiness promotion"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
 
