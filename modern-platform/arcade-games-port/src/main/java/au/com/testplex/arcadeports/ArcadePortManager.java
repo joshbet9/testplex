@@ -9708,6 +9708,20 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
 
+        if (session.type == ArcadePortGame.SHEEP_QUEST
+                && event.getEntity() instanceof Arrow sheepArrow
+                && session.sheepArcherTrackedArrows.remove(sheepArrow.getUniqueId())) {
+            if (event.getHitEntity() instanceof Player target
+                    && session.alive.contains(target.getUniqueId())
+                    && sheepArrow.getShooter() instanceof Player shooter
+                    && session.alive.contains(shooter.getUniqueId())) {
+                hitProjectile(session, sheepArrow, shooter, target);
+            }
+            session.entities.remove(sheepArrow);
+            sheepArrow.remove();
+            return;
+        }
+
         if (session.type == ArcadePortGame.DEATH_TAG
                 && event.getEntity() instanceof Arrow deathTagArrow
                 && session.deathTagFletchedArrows.remove(deathTagArrow.getUniqueId())) {
@@ -10030,6 +10044,22 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
+        if (session.type == ArcadePortGame.SHEEP_QUEST && event.getAction().isRightClick()
+                && item == Material.LEATHER_CHESTPLATE && heldItem != null && heldItem.hasItemMeta()
+                && heldItem.getItemMeta().hasDisplayName()
+                && ChatColor.stripColor(heldItem.getItemMeta().getDisplayName()).contains("Team Armor")) {
+            event.setCancelled(true);
+            Bukkit.getScheduler().runTaskLater(plugin, player::updateInventory, 1L);
+            return;
+        }
+        if (session.type == ArcadePortGame.SHEEP_QUEST && "archer".equals(
+                session.sheepQuestKits.getOrDefault(player.getUniqueId(), "beserker"))
+                && item == Material.BOW && event.getAction().isRightClick()
+                && player.getInventory().contains(Material.ARROW)) {
+            UUID id = player.getUniqueId();
+            session.sheepArcherCharge.putIfAbsent(id, 0);
+            session.sheepArcherLastChargeAt.putIfAbsent(id, System.currentTimeMillis());
+        }
         if (session.type == ArcadePortGame.BOMB_LOBBERS && event.getAction().isRightClick()
                 && "wind-charge".equals(bombLobbersPowerupType(heldItem))) {
             event.setCancelled(true);
@@ -10265,6 +10295,32 @@ public final class ArcadePortManager implements Listener {
         ItemStack held = player.getInventory().getItemInMainHand();
         Material item = held == null ? Material.AIR : held.getType();
 
+        if (session.type == ArcadePortGame.SHEEP_QUEST
+                && event.getRightClicked() instanceof Player teammate) {
+            event.setCancelled(true);
+            if (!"brute".equals(session.sheepQuestKits.getOrDefault(player.getUniqueId(), "beserker"))
+                    || !session.alive.contains(teammate.getUniqueId())
+                    || session.teams.getOrDefault(teammate.getUniqueId(), -2)
+                            != session.teams.getOrDefault(player.getUniqueId(), -1)
+                    || teammate.isInsideVehicle() || !teammate.getPassengers().isEmpty()
+                    || (item != Material.SADDLE && item != Material.AIR)) return;
+            long now = System.currentTimeMillis();
+            UUID id = player.getUniqueId();
+            if (!ArcadePortRules.sheepQuestPickupReady(now,
+                    session.sheepNextPickupAt.getOrDefault(id, 0L))) return;
+            if (!player.getPassengers().isEmpty()) {
+                dropSheepFromCarrier(session, player, "picked up a teammate");
+            }
+            if (player.addPassenger(teammate)) {
+                session.sheepNextPickupAt.put(id,
+                        now + ArcadePortRules.SHEEP_QUEST_PICKUP_COOLDOWN_MILLIS);
+                player.playSound(player.getLocation(), Sound.ENTITY_HORSE_ARMOR, 1.0F, 1.0F);
+                teammate.sendMessage(ChatColor.YELLOW + player.getName() + " picked you up.");
+                player.sendMessage(ChatColor.GREEN + "You picked up " + teammate.getName() + ".");
+            }
+            return;
+        }
+
         if (session.type == ArcadePortGame.BACON_BRAWL && item == Material.IRON_AXE) {
             String kit = session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo");
             if (ArcadePortRules.shouldActivateBaconBrawlAbility(true, item, false, kit)) {
@@ -10334,24 +10390,9 @@ public final class ArcadePortManager implements Listener {
         ItemStack held = player.getInventory().getItemInMainHand();
         if (held == null || held.getType() != Material.SADDLE) return;
         event.setCancelled(true);
-        UUID playerId = player.getUniqueId();
-        int team = session.teams.getOrDefault(playerId, -1);
-        int owner = session.sheepOwners.getOrDefault(sheep, -1);
-        if (team < 0 || team > 3) return;
-        if (owner == team && isInsideSheepPen(session, sheep.getLocation(), team)) {
-            player.sendMessage(ChatColor.YELLOW + "That sheep is already safe in your pen.");
-            return;
+        if (pickUpSheepQuest(session, player, sheep, System.currentTimeMillis())) {
+            player.sendMessage(ChatColor.GREEN + "Sheep picked up. Return it to your team's pen!");
         }
-        int carriedCount = sheepCarriedBy(session, playerId);
-        if (!ArcadePortRules.canCarryAnotherSheep(carriedCount)) {
-            player.sendMessage(ChatColor.YELLOW + "You can carry up to three sheep at once.");
-            return;
-        }
-        session.sheepCarriers.put(sheep, playerId);
-        sheep.setAI(false);
-        sheep.setColor(sheepTeamDyeColor(team));
-        player.playSound(player.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 2.0F);
-        player.sendMessage(ChatColor.GREEN + "Sheep picked up. Carry it to your team's pen!");
     }
 
     private boolean isQuiverBreakableGlass(Material material) {
