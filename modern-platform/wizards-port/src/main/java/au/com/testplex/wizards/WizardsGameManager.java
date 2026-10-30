@@ -26,6 +26,7 @@ import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Wolf;
 import org.bukkit.entity.Fireball;
 import org.bukkit.entity.LightningStrike;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.block.TileState;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
