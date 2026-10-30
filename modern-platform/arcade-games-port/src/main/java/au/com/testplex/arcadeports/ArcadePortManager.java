@@ -2155,17 +2155,17 @@ public final class ArcadePortManager implements Listener {
                         break;
                 }
                 // Adventure mode mirrors the source Quiver rules. Give the kit weapon only
-            // the stained-glass break predicate; the BlockBreak listener enforces it again.
-            Set<Material> breakableGlass = new HashSet<>();
-            for (Material candidate : Material.values()) {
-                if (isQuiverBreakableGlass(candidate)) breakableGlass.add(candidate);
-            }
-            ItemMeta swordMeta = sword.getItemMeta();
-            if (swordMeta != null) {
-                swordMeta.setCanDestroy(breakableGlass);
-                sword.setItemMeta(swordMeta);
-            }
-            player.getInventory().setItem(ArcadePortRules.QUIVER_SWORD_SLOT, sword);
+                // the stained-glass break predicate; the BlockBreak listener enforces it again.
+                Set<Material> breakableGlass = new HashSet<>();
+                for (Material candidate : Material.values()) {
+                    if (isQuiverBreakableGlass(candidate)) breakableGlass.add(candidate);
+                }
+                ItemMeta swordMeta = sword.getItemMeta();
+                if (swordMeta != null) {
+                    swordMeta.setCanDestroy(breakableGlass);
+                    sword.setItemMeta(swordMeta);
+                }
+                player.getInventory().setItem(ArcadePortRules.QUIVER_SWORD_SLOT, sword);
                 player.getInventory().setItem(ArcadePortRules.QUIVER_BOW_SLOT, new ItemStack(Material.BOW));
                 player.getInventory().setItem(ArcadePortRules.QUIVER_ARROW_SLOT, namedItem(Material.ARROW,
                         "Super Arrow", "One arrow per shot; earn another with each kill."));
