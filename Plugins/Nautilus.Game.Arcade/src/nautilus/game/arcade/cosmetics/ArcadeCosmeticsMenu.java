@@ -174,13 +174,13 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
 
         registerGame("microbattles", "Micro Battles", Material.STAINED_GLASS, (short) 3,
                 "Three players fall from the pillar, with the winner being the last to fall.",
-                compositeFeature("battle-style", "Glass Colour & Border Effects", Material.STAINED_GLASS,
-                        "Customise your starting glass colour and border particles independently within one cosmetic line.",
-                        setting("glass-colour", "Starting Glass Colour", Material.STAINED_GLASS,
-                                "The existing player-specific theme colour selection. It must only recolour that player's starting glass.",
+                compositeFeature("battle-style", "Middle Glass & Border Particles", Material.STAINED_GLASS,
+                        "Customise your own middle-glass colour and the vertical particle warning shown as you approach the map edge.",
+                        setting("glass-colour", "Middle Glass Colour", Material.STAINED_GLASS,
+                                "Changes only the stained-glass barrier shown on your client. Other players see their own colour or the default.",
                                 "microbattles", false, "aqua", "ember", "forest", "royal", "sunset", "solar", "frost", "void"),
                         setting("border-particles", "Border Particles", Material.FIREWORK,
-                                "Choose the visual cue shown beside the stained-glass starting barrier while it remains active.",
+                                "Choose the vertical warning particles shown to you within three blocks of the map edge. Matching uses your middle-glass colour.",
                                 null, false, "matching", "spark", "soft", "off")));
 
         registerGame("monstermaze", "Monster Maze", Material.ROTTEN_FLESH, (short) 0,
