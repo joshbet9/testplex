@@ -12,17 +12,24 @@ import org.bukkit.attribute.Attribute;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Hanging;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Skeleton;
 import org.bukkit.entity.Villager;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.Team;
 import org.bukkit.inventory.EntityEquipment;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -58,7 +65,6 @@ final class SneakyAssassinsMechanics {
     static final long REVEALER_DURATION_MILLIS = 5_000L;
     static final long SMOKE_CLOAK_DURATION_MILLIS = 1_200L;
     static final long BRIBE_COOLDOWN_MILLIS = 8_000L;
-    static final long BRIBE_DURATION_MILLIS = 15_000L;
     static final long FIRST_POWERUP_DELAY_MILLIS = 20_000L;
     static final long NEXT_POWERUP_DELAY_MILLIS = 10_000L;
     static final double REVEALER_RADIUS = 12.0D;
@@ -99,6 +105,10 @@ final class SneakyAssassinsMechanics {
     private long lastHudUpdateAt;
     private long nextNpcCullAt;
     private int globalRevealWarning = -1;
+    private Scoreboard scoreboard;
+    private Objective scoreboardObjective;
+    private Team aliveScoreboardTeam;
+    private Team deadScoreboardTeam;
     private int tick;
 
     SneakyAssassinsMechanics(ArcadeMechanicsModernPlugin plugin) {
@@ -226,7 +236,7 @@ final class SneakyAssassinsMechanics {
             }
             case "briber" -> {
                 player.getInventory().addItem(new ItemStack(Material.EMERALD, 4));
-                player.sendMessage(ChatColor.GRAY + "Briber: right-click a villager with an emerald to bribe it for 15 seconds.");
+                player.sendMessage(ChatColor.GRAY + "Briber: right-click a villager with an emerald to make it attack your enemies.");
             }
             case "revealer" -> {
                 player.getInventory().addItem(new ItemStack(Material.DIAMOND, 3));
@@ -280,6 +290,7 @@ final class SneakyAssassinsMechanics {
         nextPowerUpAt = now + FIRST_POWERUP_DELAY_MILLIS;
         nextGlobalRevealAt = now + GLOBAL_REVEAL_INTERVAL_MILLIS;
         nextNpcCullAt = now + 4_000L;
+        setupScoreboard();
         announce(ChatColor.GOLD + "Sneaky Assassins: stay disguised, collect power-ups and be the last assassin alive!");
         plugin.getLogger().info("Sneaky Assassins started with " + players.size()
                 + " players and " + npcIds.size() + " town NPCs.");
@@ -305,6 +316,7 @@ final class SneakyAssassinsMechanics {
         int seconds = globalRevealEndsAt > 0L
                 ? (int) Math.max(0L, (globalRevealEndsAt - now + 999L) / 1_000L)
                 : (int) ((revealRemaining + 999L) / 1_000L);
+        updateScoreboard(seconds);
         for (UUID id : players.keySet()) {
             Player player = players.get(id);
             if (player == null || !player.isOnline() || !isAlive.test(id)) continue;
@@ -313,6 +325,55 @@ final class SneakyAssassinsMechanics {
                     + ChatColor.DARK_GRAY + "  |  " + ChatColor.YELLOW
                     + (masterAssassins.contains(id) ? "MASTER" : "Reveal: " + seconds + "s"));
         }
+    }
+
+    private void setupScoreboard() {
+        if (Bukkit.getScoreboardManager() == null) return;
+        scoreboard = Bukkit.getScoreboardManager().getNewScoreboard();
+        scoreboardObjective = scoreboard.registerNewObjective("sneaky", "dummy", ChatColor.GOLD + "Sneaky Assassins");
+        scoreboardObjective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        aliveScoreboardTeam = scoreboard.registerNewTeam("sneakyAlive");
+        aliveScoreboardTeam.setPrefix(ChatColor.GREEN.toString());
+        deadScoreboardTeam = scoreboard.registerNewTeam("sneakyDead");
+        deadScoreboardTeam.setPrefix(ChatColor.GRAY.toString());
+        for (Player player : players.values()) {
+            if (player != null && player.isOnline()) player.setScoreboard(scoreboard);
+        }
+    }
+
+    private void updateScoreboard(int revealSeconds) {
+        if (scoreboard == null || scoreboardObjective == null) return;
+        for (String entry : new HashSet<>(aliveScoreboardTeam.getEntries())) aliveScoreboardTeam.removeEntry(entry);
+        for (String entry : new HashSet<>(deadScoreboardTeam.getEntries())) deadScoreboardTeam.removeEntry(entry);
+        for (String entry : new HashSet<>(scoreboard.getEntries())) scoreboard.resetScores(entry);
+        List<Player> all = players.values().stream().filter(p -> p != null && p.isOnline()).toList();
+        List<Player> alive = all.stream().filter(p -> isAlive.test(p.getUniqueId())).toList();
+        List<Player> dead = all.stream().filter(p -> !isAlive.test(p.getUniqueId())).toList();
+        int line = 15;
+        if (all.size() < 13 || (alive.size() < 13 && alive.size() > 0)) {
+            List<Player> shown = all.size() < 13 ? all : alive;
+            for (Player player : shown) {
+                UUID id = player.getUniqueId();
+                String name = player.getName();
+                Team team = isAlive.test(id) ? aliveScoreboardTeam : deadScoreboardTeam;
+                team.setSuffix(ChatColor.WHITE + "  " + powerUpCounts.getOrDefault(id, 0));
+                team.addEntry(name);
+                scoreboardObjective.getScore(name).setScore(line--);
+            }
+        } else {
+            addScoreboardLine(ChatColor.GREEN + "Players Alive", alive.size(), line--);
+            addScoreboardLine(ChatColor.RED + "Players Dead", dead.size(), line--);
+        }
+        addScoreboardLine(ChatColor.YELLOW + "Player Reveal", Math.max(0, revealSeconds), line--);
+    }
+
+    private void addScoreboardLine(String label, int value, int score) {
+        String entry = label;
+        scoreboardObjective.getScore(entry).setScore(score);
+        String valueEntry = ChatColor.WHITE + String.valueOf(value);
+        // Preserve uniqueness when a player name happens to match a display line.
+        if (scoreboard.getEntries().contains(valueEntry)) valueEntry += ChatColor.RESET;
+        scoreboardObjective.getScore(valueEntry).setScore(score - 1);
     }
 
     private void updateRevealCycle(long now) {
@@ -480,12 +541,6 @@ final class SneakyAssassinsMechanics {
             }
             Bribe bribe = bribes.get(id);
             if (bribe != null) {
-                if (now >= bribe.expiresAt) {
-                    bribes.remove(id);
-                    npc.setCustomName(null);
-                    npc.setVelocity(new Vector(0, npc.getVelocity().getY(), 0));
-                    continue;
-                }
                 Player target = nearestEnemy(npc.getLocation(), bribe.owner);
                 if (target == null) continue;
                 Vector direction = target.getLocation().toVector().subtract(npc.getLocation().toVector());
@@ -564,11 +619,18 @@ final class SneakyAssassinsMechanics {
     void handleEntityInteract(PlayerInteractEntityEvent event) {
         Player player = event.getPlayer();
         if (world == null || player.getWorld() != world || !players.containsKey(player.getUniqueId())
-                || !isAlive.test(player.getUniqueId()) || !(event.getRightClicked() instanceof Villager villager)
-                || !npcIds.contains(villager.getUniqueId())
+                || !isAlive.test(player.getUniqueId())) return;
+        Entity clicked = event.getRightClicked();
+        if (clicked instanceof Hanging) {
+            event.setCancelled(true);
+            return;
+        }
+        if (!(clicked instanceof Villager villager)) return;
+        // Source blocks villager trading/interactions even when the player is not bribing.
+        event.setCancelled(true);
+        if (!npcIds.contains(villager.getUniqueId())
                 || !"briber".equals(selectedKit(player.getUniqueId()))
                 || player.getInventory().getItemInMainHand().getType() != Material.EMERALD) return;
-        event.setCancelled(true);
         long now = System.currentTimeMillis();
         long ready = bribeReadyAt.getOrDefault(player.getUniqueId(), 0L);
         if (now < ready) {
@@ -578,12 +640,12 @@ final class SneakyAssassinsMechanics {
         }
         bribeReadyAt.put(player.getUniqueId(), now + BRIBE_COOLDOWN_MILLIS);
         consumeHeld(player);
-        bribes.put(villager.getUniqueId(), new Bribe(player, now + BRIBE_DURATION_MILLIS));
+        bribes.put(villager.getUniqueId(), new Bribe(player));
         villager.setCustomName(ChatColor.GOLD + "Bribed");
         villager.setCustomNameVisible(true);
         villager.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, villager.getLocation().add(0, 1, 0),
                 12, 0.35D, 0.35D, 0.35D, 0.02D);
-        player.sendMessage(ChatColor.GREEN + "Villager bribed! It will attack your nearest enemy for 15 seconds.");
+        player.sendMessage(ChatColor.GREEN + "Villager bribed! It will attack your nearest enemy until it is removed.");
         player.playSound(player.getLocation(), Sound.ENTITY_VILLAGER_YES, 1.0F, 1.1F);
     }
 
@@ -844,10 +906,6 @@ final class SneakyAssassinsMechanics {
     void handleDamage(EntityDamageEvent event) {
         if (world == null || event.getEntity().getWorld() != world) return;
         Entity entity = event.getEntity();
-        if (entity instanceof Villager villager && npcIds.contains(villager.getUniqueId())) {
-            event.setCancelled(true);
-            return;
-        }
         if (entity instanceof Skeleton skeleton && powerUps.stream().anyMatch(p -> p.item == skeleton)) {
             event.setCancelled(true);
             return;
@@ -895,6 +953,21 @@ final class SneakyAssassinsMechanics {
         }
         if (damage <= 0.0D) return;
         applyDamage(target, damage, attacker, "was defeated");
+    }
+
+    void handleNpcDeath(EntityDeathEvent event) {
+        if (world == null || event.getEntity().getWorld() != world) return;
+        UUID id = event.getEntity().getUniqueId();
+        if (!npcIds.remove(id)) return;
+        event.getDrops().clear();
+        event.setDroppedExp(0);
+        bribes.remove(id);
+        npcNextAttackAt.remove(id);
+    }
+
+    void handleCombust(EntityCombustEvent event) {
+        if (world == null || event.getEntity().getWorld() != world) return;
+        event.setCancelled(true);
     }
 
     void projectileMissed(org.bukkit.entity.Projectile projectile) {
@@ -973,6 +1046,11 @@ final class SneakyAssassinsMechanics {
             cloakUntil.remove(id);
             masterAssassins.remove(id);
             masterCompassUpdateAt.remove(id);
+            if (scoreboard != null) {
+                aliveScoreboardTeam.removeEntry(player.getName());
+                deadScoreboardTeam.removeEntry(player.getName());
+                scoreboard.resetScores(player.getName());
+            }
         }
     }
 
@@ -1000,6 +1078,10 @@ final class SneakyAssassinsMechanics {
         powerUpCounts.clear();
         masterAssassins.clear();
         masterCompassUpdateAt.clear();
+        scoreboard = null;
+        scoreboardObjective = null;
+        aliveScoreboardTeam = null;
+        deadScoreboardTeam = null;
         world = null;
         isAlive = ignored -> false;
         eliminator = (victim, killer, reason) -> { };
@@ -1016,8 +1098,7 @@ final class SneakyAssassinsMechanics {
 
     private static final class Bribe {
         final Player owner;
-        final long expiresAt;
-        Bribe(Player owner, long expiresAt) { this.owner = owner; this.expiresAt = expiresAt; }
+        Bribe(Player owner) { this.owner = owner; }
     }
 
     private static final class PowerUp {
