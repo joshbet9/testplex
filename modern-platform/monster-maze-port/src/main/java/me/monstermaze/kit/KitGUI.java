@@ -23,7 +23,7 @@ import java.util.List;
  * choose maps, change modes, or bypass Testplex Arcade's session lifecycle.
  */
 public final class KitGUI implements Listener {
-    private static final String TITLE = ChatColor.DARK_GREEN + "Monster Maze Kits";
+    static final String TITLE = ChatColor.DARK_GREEN + "Monster Maze Kits";
     private static final int[] SLOTS = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
 
     private final MonsterMazePlugin plugin;
