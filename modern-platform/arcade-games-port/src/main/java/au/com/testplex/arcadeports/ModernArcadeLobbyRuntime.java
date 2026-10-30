@@ -602,6 +602,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
     private void tickBot(Bot b,long now,World lobbyWorld){
         Entity e=b.actor;if(!(e instanceof LivingEntity actor)||!e.isValid()){Location at=b.actorLocation==null?lobby.spawnLocation().add(0,-3,8):b.actorLocation.clone();spawnBotEntity(b,at,b.inGame);return;}
+        // Re-assert collisionless, non-AI target state every tick; game logic drives movement/knockback.
+        actor.setCollidable(false);
+        if (actor instanceof Mob mob) mob.setAI(false);
         if(!b.inGame||b.deployedGame==null||!manager.isActiveGame(e.getWorld(),b.deployedGame)){
             if(e.getWorld()!=lobbyWorld&&b.inGame)returnBotsToLobby();
             return;
@@ -765,34 +768,54 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         }, 1L);
     }
 
-    private void applyBotHit(Bot bot,LivingEntity actor,Player attacker,double rawDamage){
+    private void applyBotHit(Bot bot, LivingEntity actor, Player attacker, double rawDamage) {
+        long now = System.currentTimeMillis();
+        java.util.UUID attackerId = attacker.getUniqueId();
+        // Bukkit damage and the arm-swing fallback can describe the same attack packet.
+        if (now - lastBotHitAtByAttacker.getOrDefault(attackerId, 0L) < 180L) return;
+
+        actor.setCollidable(false);
         actor.setNoDamageTicks(0);
-        ArcadePortManager.BaconBrawlBotHitResult hit = manager.recordBaconBrawlBotHit(attacker,bot.name,rawDamage);
-        double timingMultiplier = hit.timingMultiplier();
-        Vector dir=actor.getLocation().toVector().subtract(attacker.getLocation().toVector()).setY(0);
-        if(dir.lengthSquared()<0.01)dir=new Vector(0,0,1);
-        double knockback = manager.baconBrawlKnockbackValue(actor.getWorld()) * timingMultiplier;
-        actor.setVelocity(dir.normalize().multiply(Math.min(1.5,Math.max(0.65,knockback))).setY(0.4));
-        lastBotHitAtByAttacker.put(attacker.getUniqueId(),System.currentTimeMillis());
-        String quality = timingMultiplier >= 1.5D ? ChatColor.GREEN+"TIMED HIT"
-                : timingMultiplier < 1.0D ? ChatColor.RED+"TOO FAST" : ChatColor.YELLOW+"HIT";
-        String actionbar = quality+ChatColor.WHITE+" | KB x"+String.format(Locale.ROOT,"%.2f",timingMultiplier)
-                +(hit.meter()>=0?ChatColor.GRAY+" | Meter "+ChatColor.GREEN+hit.meter()+"%":"");
-        showBotImpact(bot,actor,attacker,quality,actionbar);
+        ArcadePortManager.BaconBrawlBotHitResult hit =
+                manager.applyBaconBrawlBotHit(attacker, actor, bot.name, bot.kit, rawDamage);
+        if (hit.meter() < 0) return;
+        lastBotHitAtByAttacker.put(attackerId, now);
+
+        boolean critical = hit.timingMultiplier() >= 1.5D;
+        String flashy = ChatColor.GOLD + "✦ " + ChatColor.YELLOW + ChatColor.BOLD
+                + "FLASHY CRITICAL!" + ChatColor.GOLD + " ✦";
+        if (critical) {
+            attacker.sendActionBar(flashy + ChatColor.WHITE + "  Knockback x"
+                    + String.format(Locale.ROOT, "%.2f", hit.timingMultiplier()));
+            attacker.sendTitle("", flashy, 0, 18, 5);
+            actor.getWorld().spawnParticle(Particle.FIREWORK, actor.getLocation().add(0, 1, 0),
+                    18, 0.45, 0.5, 0.45, 0.06);
+        }
+        // Every hit has hurt animation, sound and impact particles; only critical hits get
+        // the explicit flashy label, so normal/early/late hits aren't mislabeled as misses.
+        showBotImpact(bot, actor, attacker, critical ? flashy : null, null);
     }
 
-    private void showBotImpact(Bot bot,LivingEntity actor,Player attacker,String visibleLabel,String actionbar) {
+    private void showBotImpact(Bot bot, LivingEntity actor, Player attacker, String visibleLabel, String actionbar) {
+        actor.setCollidable(false);
         actor.playEffect(EntityEffect.HURT);
-        actor.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,actor.getLocation().add(0,1,0),5,0.28,0.35,0.28,0.01);
-        actor.getWorld().spawnParticle(particle(bot.theme),actor.getLocation().add(0,1,0),12,0.4,0.4,0.4,0.02);
+        Location impact = actor.getLocation().clone().add(0, 1, 0);
+        actor.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR, impact, 5, 0.28, 0.35, 0.28, 0.01);
+        actor.getWorld().spawnParticle(particle(bot.theme), impact, 12, 0.4, 0.4, 0.4, 0.02);
         Sound hurt = actor instanceof Pig ? Sound.ENTITY_PIG_HURT : Sound.ENTITY_SHEEP_HURT;
-        actor.getWorld().playSound(actor.getLocation(),hurt,1.0F,1.0F);
-        if(attacker!=null&&attacker.isOnline())attacker.sendActionBar(actionbar);
-        final ArmorStand label=actor.getWorld().spawn(actor.getLocation().clone().add(0,1.8D,0),ArmorStand.class);
-        label.setVisible(false);label.setSmall(true);label.setGravity(false);label.setBasePlate(false);
-        label.setArms(false);label.setMarker(true);label.setInvulnerable(true);label.setCanPickupItems(false);
-        label.setCustomName(visibleLabel);label.setCustomNameVisible(true);
-        Bukkit.getScheduler().runTaskLater(plugin,()->{if(label.isValid()&&!label.isDead())label.remove();},16L);
+        actor.getWorld().playSound(actor.getLocation(), hurt, 1.0F, 1.0F);
+        if (attacker != null && attacker.isOnline() && actionbar != null && !actionbar.isBlank()) {
+            attacker.sendActionBar(actionbar);
+        }
+        if (visibleLabel != null && !visibleLabel.isBlank()) {
+            final ArmorStand label = actor.getWorld().spawn(actor.getLocation().clone().add(0, 1.8D, 0), ArmorStand.class);
+            label.setVisible(false); label.setSmall(true); label.setGravity(false); label.setBasePlate(false);
+            label.setArms(false); label.setMarker(true); label.setInvulnerable(true); label.setCanPickupItems(false);
+            label.setCustomName(visibleLabel); label.setCustomNameVisible(true);
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (label.isValid() && !label.isDead()) label.remove();
+            }, 16L);
+        }
     }
 
     /** Called by the TNT sweep when a Bomb Lobbers test bot is struck directly. */
