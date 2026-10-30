@@ -425,9 +425,32 @@ public final class ArcadePortRules {
     public static final int SPLEEF_SNOWBALLER_MAX_SNOWBALLS = 16;
     public static final long SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS = 30_000L;
     public static final long SPLEEF_SMASHER_COOLDOWN_MILLIS = 250L;
+    public static final long TURF_WARS_GAME_TIMEOUT_MILLIS = 900_000L;
     public static final long TURF_WARS_INITIAL_BUILD_PHASE_MILLIS = 40_000L;
     public static final long TURF_WARS_BUILD_PHASE_MILLIS = 20_000L;
     public static final long TURF_WARS_COMBAT_PHASE_MILLIS = 90_000L;
+    public static final long TURF_WARS_CONSTRUCTOR_INTERVAL_MILLIS = 4_000L;
+    public static final long TURF_WARS_MARKSMAN_ARROW_INTERVAL_MILLIS = 8_000L;
+    public static final long TURF_WARS_SHREDDER_ARROW_INTERVAL_MILLIS = 4_000L;
+    public static final long TURF_WARS_BARRAGE_FIRST_CHARGE_MILLIS = 1_000L;
+    public static final long TURF_WARS_BARRAGE_CHARGE_INTERVAL_MILLIS = 250L;
+    public static final int TURF_WARS_BARRAGE_MAX_CHARGE = 5;
+    public static final int TURF_WARS_STARTING_WOOL = 6;
+    public static final int TURF_WARS_BUILD_PHASE_WOOL = 24;
+    public static final int TURF_WARS_MARKSMAN_MAX_WOOL = 8;
+    public static final int TURF_WARS_INFILTRATOR_MAX_WOOL = 4;
+    public static final int TURF_WARS_SHREDDER_MAX_WOOL = 6;
+    public static final int TURF_WARS_MARKSMAN_MAX_ARROWS = 2;
+    public static final int TURF_WARS_INFILTRATOR_MAX_ARROWS = 1;
+    public static final int TURF_WARS_SHREDDER_MAX_ARROWS = 2;
+    public static final long TURF_WARS_RESPAWN_DELAY_TICKS = 80L;
+    public static final long TURF_WARS_TERRITORY_KNOCKBACK_COOLDOWN_MILLIS = 2_000L;
+    public static final long TURF_WARS_SPAWN_DAMAGE_COOLDOWN_MILLIS = 2_000L;
+    public static final long TURF_WARS_INFIlTRATOR_SLOW_INTERVAL_MILLIS = 5_000L;
+    public static final long TURF_WARS_INFIlTRATOR_KILL_SLOW_INTERVAL_MILLIS = 2_500L;
+    public static final double TURF_WARS_SHREDDER_ARROW_DAMAGE = 9.0D;
+    public static final double TURF_WARS_MELEE_DAMAGE = 6.0D;
+    public static final double TURF_WARS_IRON_SWORD_DAMAGE = 12.0D;
     public static final long TURF_WARS_MIXED_ARCADE_INITIAL_BUILD_PHASE_MILLIS = 20_000L;
     public static final long TURF_WARS_MIXED_ARCADE_BUILD_PHASE_MILLIS = 10_000L;
     public static final long TURF_WARS_MIXED_ARCADE_COMBAT_PHASE_MILLIS = 45_000L;
@@ -1918,9 +1941,82 @@ public final class ArcadePortRules {
         return Math.max(low, Math.min(high, coordinate));
     }
 
+    public static String normalizeTurfWarsKit(String requested) {
+        if (requested == null) return null;
+        String kit = requested.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return switch (kit) {
+            case "marksman", "turfwars-marksman", "turf-wars-marksman" -> "marksman";
+            case "infiltrator", "turfwars-infiltrator", "turf-wars-infiltrator" -> "infiltrator";
+            case "shredder", "turfwars-shredder", "turf-wars-shredder" -> "shredder";
+            default -> null;
+        };
+    }
+
+    public static int turfWarsConstructorMax(String kit) {
+        return switch (normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit)) {
+            case "infiltrator" -> TURF_WARS_INFILTRATOR_MAX_WOOL;
+            case "shredder" -> TURF_WARS_SHREDDER_MAX_WOOL;
+            default -> TURF_WARS_MARKSMAN_MAX_WOOL;
+        };
+    }
+
+    public static int turfWarsArrowMax(String kit) {
+        return switch (normalizeTurfWarsKit(kit) == null ? "marksman" : normalizeTurfWarsKit(kit)) {
+            case "infiltrator" -> TURF_WARS_INFILTRATOR_MAX_ARROWS;
+            case "shredder" -> TURF_WARS_SHREDDER_MAX_ARROWS;
+            default -> TURF_WARS_MARKSMAN_MAX_ARROWS;
+        };
+    }
+
+    public static long turfWarsArrowIntervalMillis(String kit) {
+        return "shredder".equals(normalizeTurfWarsKit(kit))
+                ? TURF_WARS_SHREDDER_ARROW_INTERVAL_MILLIS : TURF_WARS_MARKSMAN_ARROW_INTERVAL_MILLIS;
+    }
+
+    /** Reborn advances one line for the first combat round, two for the second, etc. */
+    public static int turfWarsLinesPerKill(int combatRoundsStarted, boolean mixedArcadeVariant) {
+        int sourceLines = Math.max(1, combatRoundsStarted);
+        return sourceLines * (mixedArcadeVariant ? 2 : 1);
+    }
+
+    /** Source axis vector points from the blue marker back toward the red marker. */
+    public static int turfWarsMarkerDelta(int teamId, int axisDirection, int lines) {
+        int count = Math.max(0, lines);
+        if (teamId == 0) return -axisDirection * count;
+        if (teamId == 1) return axisDirection * count;
+        return 0;
+    }
+
+    /** A source turf tile belongs to a captured line if it shares any active map axis. */
+    public static boolean turfWarsTileOnMarkerLine(int tileX, int tileZ,
+            int markerX, int markerZ, int axisX, int axisZ) {
+        return (axisX != 0 && tileX == markerX) || (axisZ != 0 && tileZ == markerZ);
+    }
+
+    public static int turfWarsRemainingLines(int frontCoordinate, int baseCoordinate) {
+        return Math.abs(baseCoordinate - frontCoordinate);
+    }
+
+    /** The team closer to its authored goal has fewer remaining lines. */
+    public static int turfWarsLeadingTeam(int redLinesRemaining, int blueLinesRemaining,
+            int redKills, int blueKills) {
+        if (redLinesRemaining < blueLinesRemaining) return 0;
+        if (blueLinesRemaining < redLinesRemaining) return 1;
+        if (redKills != blueKills) return redKills > blueKills ? 0 : 1;
+        return -1;
+    }
+
     public static double turfWarsHitDamage(boolean projectile, boolean ironSword) {
-        if (projectile) return 9.0D;
-        return ironSword ? 12.0D : 6.0D;
+        return turfWarsHitDamage("marksman", projectile, ironSword);
+    }
+
+    public static double turfWarsHitDamage(String kit, boolean projectile, boolean ironSword) {
+        if (projectile) {
+            return "shredder".equals(normalizeTurfWarsKit(kit))
+                    ? TURF_WARS_SHREDDER_ARROW_DAMAGE : 500.0D;
+        }
+        return ironSword ? TURF_WARS_IRON_SWORD_DAMAGE : TURF_WARS_MELEE_DAMAGE;
     }
 
     public static long turfWarsInitialBuildPhaseMillis(boolean mixedArcadeVariant) {
