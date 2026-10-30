@@ -4650,10 +4650,20 @@ public final class ArcadePortManager implements Listener {
                 if (dx * dx + dy * dy + dz * dz <= radius * radius) block.setType(Material.AIR, false);
             }
         }
+        long now = System.currentTimeMillis();
+        if (ArcadePortRules.shouldRunDragonEscapeScoreUpdate(
+                now, session.dragonEscapeNextScoreUpdateAt)) {
+            session.dragonEscapeNextScoreUpdateAt =
+                    ArcadePortRules.nextDragonEscapeScoreUpdateAt(now);
+            for (Player racer : alivePlayers(session)) {
+                session.dragonEscapePlayerRankScores.put(
+                        racer.getUniqueId(), racer.getLocation().getZ());
+            }
+        }
         double dragonProgress = location.getZ();
         for (Player player : new ArrayList<>(alivePlayers(session))) {
             if (player.getLocation().getZ() >= 78.0D) {
-                recordDragonEscapeFinish(session, player, System.currentTimeMillis());
+                recordDragonEscapeFinish(session, player, now);
                 finish(session, player, true);
                 return;
             }
