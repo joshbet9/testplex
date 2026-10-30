@@ -112,8 +112,8 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheFourteenGamesNotCoveredByDedicatedMechanicsModules() {
-        assertEquals(14, ArcadePortGame.values().length);
+    @Test void exposesTheFifteenGamesNotCoveredByDedicatedMechanicsModules() {
+        assertEquals(15, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -122,6 +122,7 @@ class ArcadePortGameTest {
         }
         assertNull(ArcadePortGame.fromId("monster-maze"));
         assertNull(ArcadePortGame.fromId("snake"));
+        assertEquals(ArcadePortGame.SNEAKY_ASSASSINS, ArcadePortGame.fromId("sneaky-assassins"));
     }
 
     @Test void normalizesSpacesAndUnderscoresInTestCommands() {
