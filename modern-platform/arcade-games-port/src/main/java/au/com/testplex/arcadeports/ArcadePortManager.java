@@ -1585,7 +1585,7 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         if (session == null || session.type != ArcadePortGame.GLADIATORS
                 || session.gladiatorVotingEndsAt <= System.currentTimeMillis()) return;
-        openGladiatorVoteMenu(player, session.gladiatorVotes, "Gladiators — PvP Vote", true);
+        openGladiatorVoteMenu(player, session.gladiatorVotes, "Gladiators — PvP Vote");
     }
 
     private void openGladiatorLobbyVoteMenu(Player player) {
@@ -1594,10 +1594,10 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Join the Gladiators lobby queue before voting.");
             return;
         }
-        openGladiatorVoteMenu(player, gladiatorLobbyVotes, "Gladiators Lobby — PvP Vote", false);
+        openGladiatorVoteMenu(player, gladiatorLobbyVotes, "Gladiators Lobby — PvP Vote");
     }
 
-    private void openGladiatorVoteMenu(Player player, Map<UUID, String> votes, String title, boolean allowHotbar) {
+    private void openGladiatorVoteMenu(Player player, Map<UUID, String> votes, String title) {
         GladiatorMenuHolder holder = new GladiatorMenuHolder(GladiatorMenuType.VOTE);
         Inventory inventory = Bukkit.createInventory(holder, 27, title);
         holder.inventory = inventory;
@@ -1892,7 +1892,7 @@ public final class ArcadePortManager implements Listener {
                 if (queued == null || !queued.isOnline()) continue;
                 queued.sendMessage(ChatColor.GOLD + player.getName() + " voted " + mode.displayName() + ".");
                 openGladiatorVoteMenu(queued, gladiatorLobbyVotes,
-                        "Gladiators Lobby — PvP Vote", false);
+                        "Gladiators Lobby — PvP Vote");
             }
             return;
         }
