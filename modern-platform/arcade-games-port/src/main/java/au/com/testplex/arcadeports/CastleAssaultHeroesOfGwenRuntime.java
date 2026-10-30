@@ -82,6 +82,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Hooks hooks;
     private final Map<UUID, Integer> teams = new HashMap<>();
     private final Map<UUID, Player> players = new HashMap<>();
+    private final Set<UUID> activePlayers = new HashSet<>();
     private final Set<Entity> entities = new HashSet<>();
     private final Map<Block, BlockData> changedBlocks = new HashMap<>();
     private final NamespacedKey objectiveTntKey;
@@ -133,7 +134,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         this.shopRoleKey = new NamespacedKey(plugin, "heroes-gwen-store-role");
         this.kingKey = new NamespacedKey(plugin, "castle-king-team");
         this.towerKey = new NamespacedKey(plugin, "heroes-gwen-tower");
-        for (Player player : participants) this.players.put(player.getUniqueId(), player);
+        for (Player player : participants) {
+            this.players.put(player.getUniqueId(), player);
+            this.activePlayers.add(player.getUniqueId());
+        }
         this.teams.putAll(teams);
 
         boolean prepared = game == ArcadePortGame.CASTLE_ASSAULT
@@ -454,6 +458,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void tickCastleAssault(long now) {
+        if (objectiveItem != null && objectiveItem.isValid() && activeObjectiveSpawn != null) {
+            objectiveItem.teleport(activeObjectiveSpawn);
+            objectiveItem.setVelocity(new Vector());
+        }
         if (objectiveItem == null && objectiveCarrier == null && now >= objectiveRespawnAt) {
             spawnObjectiveTnt();
         }
@@ -469,7 +477,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void tickHeroesOfGwen(long now) {
         if (now >= nextGoldAt) {
-            for (Player player : onlinePlayers()) addGold(player, 20, "Passive gold");
+            for (Player player : activeMatchPlayers()) addGold(player, 20, "Passive gold");
             nextGoldAt = now + MOBA_PASSIVE_GOLD_INTERVAL;
         }
         if (now >= nextStructureUpdateAt) {
@@ -488,6 +496,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         activeObjectiveSpawn = spawn.clone();
         objectiveItem = world.dropItem(spawn, new ItemStack(Material.TNT));
         objectiveItem.setPickupDelay(0);
+        objectiveItem.setGravity(false);
+        objectiveItem.setVelocity(new Vector());
         objectiveItem.setUnlimitedLifetime(true);
         objectiveItem.setCustomName(ChatColor.RED + "Objective TNT");
         objectiveItem.setCustomNameVisible(true);
@@ -595,7 +605,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         world.spawnParticle(Particle.CLOUD, center, 30, 0.65D, 0.65D, 0.65D, 0.08D);
         world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 1.3F, 0.9F);
         int attackingTeam = teams.getOrDefault(owner.getUniqueId(), -1);
-        for (Player target : onlinePlayers()) {
+        for (Player target : activeMatchPlayers()) {
             if (target.equals(owner) && objective) continue;
             if (!target.equals(owner) && teams.getOrDefault(target.getUniqueId(), -2) == attackingTeam) continue;
             double distance = target.getLocation().distance(center);
@@ -653,7 +663,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0, 1, 0),
                             4, 0.2D, 0.3D, 0.2D, 0.02D);
                 }
-                for (Player teammate : onlinePlayers()) {
+                for (Player teammate : activeMatchPlayers()) {
                     if (teams.getOrDefault(teammate.getUniqueId(), -1) != owner
                             || teammate.getLocation().distanceSquared(tower.location) > MOBA_TOWER_RANGE_SQUARED) continue;
                     teammate.setHealth(Math.min(teammate.getMaxHealth(), teammate.getHealth() + MOBA_TOWER_HEAL));
@@ -776,7 +786,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private Player nearestEnemy(Location origin, int owner) {
         Player best = null;
         double distance = MOBA_TOWER_RANGE_SQUARED;
-        for (Player player : onlinePlayers()) {
+        for (Player player : activeMatchPlayers()) {
             if (teams.getOrDefault(player.getUniqueId(), -1) == owner) continue;
             double candidate = player.getLocation().distanceSquared(origin);
             if (candidate < distance) {
@@ -949,6 +959,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return result;
     }
 
+    private List<Player> activeMatchPlayers() {
+        List<Player> result = new ArrayList<>();
+        for (UUID id : activePlayers) {
+            Player player = players.get(id);
+            if (player != null && player.isOnline()) result.add(player);
+        }
+        return result;
+    }
+
     private Player firstPlayerOnTeam(int team) {
         return onlinePlayers().stream().filter(player -> teams.getOrDefault(player.getUniqueId(), -1) == team)
                 .findFirst().orElse(null);
@@ -1019,16 +1038,26 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     void onPlayerEliminated(Player player) {
-        if (player == null || game != ArcadePortGame.CASTLE_ASSAULT
-                || !player.getUniqueId().equals(objectiveCarrier)) return;
-        restoreCarrierHelmet(player);
-        objectiveCarrier = null;
-        objectiveRespawnAt = System.currentTimeMillis() + objectiveDelay();
+        if (player == null) return;
+        UUID id = player.getUniqueId();
+        activePlayers.remove(id);
+        if (game == ArcadePortGame.CASTLE_ASSAULT && id.equals(objectiveCarrier)) {
+            restoreCarrierHelmet(player);
+            objectiveCarrier = null;
+            objectiveRespawnAt = System.currentTimeMillis() + objectiveDelay();
+        }
+    }
+
+    void onPlayerRespawned(Player player) {
+        if (player != null && player.isOnline() && players.containsKey(player.getUniqueId())) {
+            activePlayers.add(player.getUniqueId());
+        }
     }
 
     void onQuit(Player player) {
         if (player == null) return;
         UUID id = player.getUniqueId();
+        activePlayers.remove(id);
         openStores.remove(id);
         if (game == ArcadePortGame.CASTLE_ASSAULT && id.equals(objectiveCarrier)) {
             carriedTntOldHelmet.remove(id);
