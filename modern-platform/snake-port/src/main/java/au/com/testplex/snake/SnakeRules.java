@@ -11,6 +11,10 @@ public final class SnakeRules {
     private static final int[] ROULETTE_SECONDS = {1, 3, 5, 10, 15, 20, 30};
 
     public static final int SPEED_REFERENCE_LENGTH = 180;
+    public static final long IDLE_TIMEOUT_MILLIS = 2_000L;
+    public static final int CANNIBAL_KILLS_REQUIRED = 6;
+    public static final int CHOO_CHOO_LENGTH_REQUIRED = 60;
+    public static final int SLIMY_SHEEP_REQUIRED = 20;
     public static final double SEGMENT_SPACING = 1.0D;
     public static final double SNAKE_TAIL_COLLISION_RADIUS = 1.2D;
     public static final double FOOD_PICKUP_RADIUS = 2.0D;
@@ -53,6 +57,27 @@ public final class SnakeRules {
     /** Legacy Snake leaves an item box available if the player is still rolling an item. */
     public static boolean shouldConsumeHazardOnContact(boolean rouletteActive) {
         return !rouletteActive;
+    }
+
+    /** Reborn's Idle rule resets only after the head has travelled more than two blocks. */
+    public static boolean hasMovedForIdleCheck(double distanceSquared) {
+        return Double.isFinite(distanceSquared) && distanceSquared > 4.0D;
+    }
+
+    public static boolean shouldEliminateForIdle(double distanceSquared, long idleMillis) {
+        return idleMillis >= IDLE_TIMEOUT_MILLIS && !hasMovedForIdleCheck(distanceSquared);
+    }
+
+    public static boolean shouldAwardCannibal(int killsThisRound) {
+        return killsThisRound == CANNIBAL_KILLS_REQUIRED;
+    }
+
+    public static boolean shouldAwardChooChoo(int tailLength) {
+        return tailLength >= CHOO_CHOO_LENGTH_REQUIRED;
+    }
+
+    public static boolean shouldAwardSlimySheep(int slimesEatenThisRound) {
+        return slimesEatenThisRound == SLIMY_SHEEP_REQUIRED;
     }
 
     private SnakeRules() {}

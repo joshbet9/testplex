@@ -1,23 +1,28 @@
-# Snake — modern Paper 26.3 mechanics port
+# Snake — Paper 26.3 source-parity port
 
-This is a standalone, Paper-native first-pass port of the Arcade Snake mechanics for the modern Testplex test platform. It runs separately from the legacy Java 8 server and makes its own `snake_arena` test world if needed.
+This module ports the existing Mineplex Reborn 1.8.9 Snake game into the isolated Java 25 / Paper 26.3 test platform. The original implementation in `Plugins/Nautilus.Game.Arcade/.../snake/Snake.java` and its three archived maps under `update/maps/Snake` are the source of truth.
 
-## Current mechanics
-- Sheep-headed player snakes with a following sheep tail. Growth continues as the round progresses and adds two segments per green slime; new segments follow the existing tail direction at source-style one-block spacing.
-- Speed, Reverse and Invulnerable kits with 2-second effects and a 1-second item cooldown. The speed curve follows the source `CreatureMoveFast` multiplier and plateaus once the tail reaches 126 segments (180 is the source reference length, not a growth cap).
-- Reverse flips the segment order, keeps the geometry/path history, remounts the player on the new head and pauses movement for the source 2-second duration. The player is re-seated on the current head each tick if they dismount.
-- Food spawns once per second in the source radial arena distribution, with a clear-floor/space search and no artificial 12-food cap. Pickups use the source strict 2-block 3D radius and grow the tail by two.
-- Physical steering magma-cube item-box hazards (10-second first spawn, then 15-second intervals, four-cube cap, source 48-point golden-angle spawn search with five-block clearance, 0.12 steering every four ticks and native hop/gravity). Touching a box during an active roulette leaves it in the arena; the roulette retains the original hotbar item while animating.
-- Four per-player steering effects (Turn Lag, Drift, Overshoot and Weak Sharp Turning) escalate on repeat hits: 1, 3, 5, 10, 15, 20, then 30 seconds.
-- Source-style 1.2-block 3D tail collision radius, self-tail grace for the first three segments, lava elimination, cancelled combustion/vanilla targeting, and cleanup that restores inventory, location, potion effects, health, hunger, saturation, fire ticks and walk speed.
-- Solo mechanics mode keeps a single-player test alive until `/snake stop`; multiplayer starts when multiple players queue.
+## Source features carried into the modern port
+
+- The original Snake Pit, Snake Volcanic and Snake WinterBabylon map archives are packaged in `SnakeModern.jar`. `/snake maps` lists them and `/snake map <name>` changes the selected archive while the game is idle. Paper 26.3 legacy-world storage is prepared before the map is loaded.
+- A player rides the leading sheep entity, with sheep segments following the travelled path. The player is not made invisible; the 1.8 game uses a normal third-person player model mounted on the sheep head. Segment colour is assigned per player.
+- The snake grows by one segment each second. Green slime food spawns once per second in the source radial distribution; eating a slime adds two segments and updates the local Slime-upgrade/stat path.
+- Source movement speed follows the original length-dependent curve, including the 126-segment speed plateau while the tail itself continues growing. Reverse pauses normal movement for two seconds, reverses the segment order and rebuilds the path so the tail does not collapse.
+- Speed, Reverse and Invulnerable kits retain their source items (5 feathers, 3 cookies and 2 nether stars respectively), two-second abilities and one-second reuse cooldown.
+- The physical Magma Cube item boxes retain the 10-second first spawn, 15-second subsequent interval, four-cube cap, 48-point golden-angle spawn search, five-block clearance, native hop/gravity, 0.12 steering every four ticks, 2.1-block contact radius, 12-step hotbar roll, and per-player 1/3/5/10/15/20/30-second steering-debuff escalation. An occupied roulette does not consume another cube.
+- Tail collisions use the source 1.2-block radius and first-three-segment self-collision grace. Invulnerability and Reverse suppress collision checks. Lava is fatal; ordinary damage, combustion and vanilla entity targeting are cancelled.
+- The original idle elimination is retained: the head must make more than two blocks of progress within each two-second window. Reverse refreshes the idle position just as the original ReverseUpdate does.
+- Eliminated players receive the Tracking Compass. The nearest live player is tracked; left-click spectates the nearest survivor with the original three-second cooldown, and right-click opens the survivor selection menu. Compass items cannot be dropped.
+- Source achievement/stat thresholds are retained locally for the isolated test server: Cannibal at six kills, ChooChoo at a tail length of 60, and SlimySheep after 20 slimes. Round chat stats include kills, tail length, slimes eaten and kit. Lifetime totals are stored in `stats.yml`.
+- The combined Snake cosmetic line keeps the legacy palettes (Elemental, Neon, Sunset) and ability-specific Speed / Super / Reversal colours and visual styles. Snake-type segment sets (Anaconda, Cobra, Neon Viper, Reef Serpent) are selectable alongside those options in one menu line.
 
 ## Commands
-- `/gamepanel` → Snake → Start / Test Snake.
-- `/snake join`, `/snake start`, `/snake kit <speed|reverse|invulnerable>`, `/snake status`, `/snake leave`.
+
+- `/gamepanel` → Snake → Start / Test.
+- `/snake join`, `/snake start`, `/snake kit <speed|reverse|invulnerable>`, `/snake status`.
+- `/snake maps`, `/snake map <name>`, `/snake stats`, `/snake leave`.
 - `/snake stop` is operator-only.
 
-## Status and limitations
-This remains a mechanics-first port, not a final parity sign-off. Cosmetic line rendering, the dedicated victory scene and source stat/event integrations are not ported yet. The player appearance uses an invisibility fallback because a verified Paper 26.3 packet-disguise library is not currently bundled; it is not equivalent to the original packet-level sheep disguise. Validate mounted controls, course pacing, collision distances, item-box contacts and cleanup in a running Paper 26.3 server before accepting this game.
+## Acceptance boundary
 
-The arena is generated by the plugin as a bounded test surface rather than importing an original Arcade map. That means map-specific layout parity is still outstanding.
+The automated tests cover deterministic source rules and map metadata parsing. A successful Java 25 / Paper 26.3 build does not establish client-visible or multiplayer parity. The three original maps, mounted movement/camera presentation, steering and tail collision, kit timings, food and item-box interaction, spectator tracking, achievements, and cleanup still require the in-game acceptance matrix on the isolated 26.3 server. Snake remains marked mechanics-in-progress until those checks pass.
