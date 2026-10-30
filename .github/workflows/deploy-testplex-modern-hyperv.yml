@@ -368,7 +368,6 @@ jobs:
           {
             printf 'cd "%s"\n' "$upload_dir"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/TestplexModernArcade.jar" "TestplexModernArcade.jar"
-            printf 'put "%s" "%s"\n' "$STAGE_DIR/MonsterMazeModern.jar" "MonsterMazeModern.jar"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/SnakeModern.jar" "SnakeModern.jar"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/MonsterMazeMapsSource.txt" "MonsterMazeMapsSource.txt"
             for file in "${world_chunks[@]}" "${arcade_chunks[@]}"; do
