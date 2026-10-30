@@ -23,7 +23,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private static final String PLAYABLE_GAMES_REVISION = "ready-only-20261031-v1";
 
     @Override
-    @Override
     public void onEnable() {
         saveDefaultConfig();
 

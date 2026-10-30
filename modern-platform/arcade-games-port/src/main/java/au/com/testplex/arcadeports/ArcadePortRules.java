@@ -565,12 +565,7 @@ public final class ArcadePortRules {
     public static final int MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS = 3;
     public static final int MICRO_BATTLES_ANNIHILATION_KILLS = 8;
     public static final String MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR = "light-blue";
-    public static final double MICRO_BATTLES_BORDER_PARTICLE_DISTANCE = 3.0D;
-    public static final int MICRO_BATTLES_BORDER_PARTICLE_INTERVAL_TICKS = 4;
-    public static final int MICRO_BATTLES_BORDER_PARTICLE_VERTICAL_POINTS = 3;
-    public static final int MICRO_BATTLES_ANNIHILATION_KILLS = 8;
     public static final long MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS = 15_000L;
-    public static final String MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR = "light-blue";
 
     private ArcadePortRules() {
     }
@@ -791,91 +786,26 @@ public final class ArcadePortRules {
                 && Math.abs(verticalDistance) <= DRAGONS_FLARE_VERTICAL_RANGE;
     }
 
-    public static int dragonsFlareCharges(String requestedKit) {
-        return switch (normalizeDragonsKit(requestedKit) == null ? "" : normalizeDragonsKit(requestedKit)) {
-            case "marksman" -> 3;
-            case "pyrotechnic" -> 2;
-            case "coward" -> 1;
-            default -> 0;
-        };
-    }
 
-    public static boolean isDragonFlareActive(long nowMillis, long expiresAtMillis) {
-        return expiresAtMillis > nowMillis;
-    }
-
-    public static boolean shouldCancelDragonsPvp(boolean directPlayerDamager, boolean playerProjectileShooter) {
-        return directPlayerDamager || playerProjectileShooter;
-    }
-
-    public static boolean shouldAllowDragonWorldItem(Material material) {
-        return material == Material.EMERALD;
-    }
 
     /** SoloGame awards one survival gem per ten seconds alive. */
-    public static double dragonSurvivalGems(long survivedMillis) {
-        return Math.max(0L, survivedMillis) / 10_000.0D;
-    }
+
 
     /** SoloGame end-of-round placement rewards, one-based. */
-    public static double dragonPlacementGemReward(int place) {
-        return switch (place) {
-            case 1 -> 20.0D;
-            case 2 -> 15.0D;
-            case 3 -> 10.0D;
-            default -> 0.0D;
-        };
-    }
+
 
     /** SoloGame sidebar: 0=all alive/dead names, 1=alive names, 2=alive/dead counts. */
-    public static int dragonsSoloScoreboardMode(int totalPlayers, int alivePlayers) {
-        if (totalPlayers < 15) return 0;
-        if (alivePlayers < 16) return 1;
-        return 2;
-    }
+
 
     /** Mirrors UtilAction.velocity(entity, facing, 1.2, false, 0, 0.2, 1.0, true). */
-    public static Vector dragonsLeapVelocity(Vector facing, boolean grounded) {
-        if (facing == null || !Double.isFinite(facing.getX()) || !Double.isFinite(facing.getY())
-                || !Double.isFinite(facing.getZ()) || facing.lengthSquared() <= 1.0E-12D) {
-            return new Vector();
-        }
-        Vector velocity = facing.clone().normalize().multiply(1.2D);
-        velocity.setY(velocity.getY() + 0.2D);
-        if (velocity.getY() > 1.0D) velocity.setY(1.0D);
-        if (grounded) velocity.setY(velocity.getY() + 0.2D);
-        return velocity;
-    }
+
 
     /** Mirrors UtilAction.velocity(entity, trajectory, 1.0, false, 0, 0.6, 2.0, true). */
-    public static Vector dragonsContactKnockback(Vector trajectory, boolean grounded) {
-        if (trajectory == null || !Double.isFinite(trajectory.getX()) || !Double.isFinite(trajectory.getY())
-                || !Double.isFinite(trajectory.getZ()) || trajectory.lengthSquared() <= 1.0E-12D) {
-            return new Vector();
-        }
-        Vector velocity = trajectory.clone().normalize();
-        velocity.setY(velocity.getY() + 0.6D);
-        if (velocity.getY() > 2.0D) velocity.setY(2.0D);
-        if (grounded) velocity.setY(velocity.getY() + 0.2D);
-        return velocity;
-    }
 
-    public static boolean shouldDragonSparklerAttract(double y, boolean inLiquid) {
-        return y >= 4.0D && !inLiquid;
-    }
 
-    public static boolean canUseDragonSpectatorTeleport(long nowMillis, long nextAllowedMillis) {
-        return nowMillis >= nextAllowedMillis;
-    }
 
     /** Horizontal radius is circular; the vertical limit prevents one flare protecting an entire tower. */
-    public static boolean isDragonFlareLocationProtected(
-            double horizontalDistanceSquared, double verticalDistance) {
-        return Double.isFinite(horizontalDistanceSquared) && horizontalDistanceSquared >= 0.0D
-                && horizontalDistanceSquared <= DRAGONS_FLARE_RADIUS_SQUARED
-                && Double.isFinite(verticalDistance)
-                && Math.abs(verticalDistance) <= DRAGONS_FLARE_VERTICAL_RANGE;
-    }
+
 
     public static boolean shouldSpawnTestDragon(int currentCount, long now, long nextSpawnAt) {
         return currentCount < DRAGONS_MAX_DRAGONS && now >= nextSpawnAt;
@@ -2151,6 +2081,7 @@ public final class ArcadePortRules {
     public static final double QUIVER_REBOUND_MAX_IMPACT_DISTANCE_SQUARED = 1.0D;
     /** The requested modern Enchanter change is two rebounds, instead of the source's one. */
     public static final int QUIVER_MAX_ARROW_BOUNCES = 2;
+    public static final double QUIVER_REBOUND_MAX_DISTANCE_SQUARED = 64.0D;
     /** Original Quiver labels 20 consecutive kills without dying as a Perfect Run. */
     public static final int QUIVER_PERFECT_RUN_KILL_STREAK = 20;
 
@@ -2197,6 +2128,11 @@ public final class ArcadePortRules {
         return bodyNear || eyesNear;
     }
 
+    public static boolean isQuiverReboundTargetInRange(double distanceSquared) {
+        return Double.isFinite(distanceSquared) && distanceSquared >= 0.0D
+                && distanceSquared <= QUIVER_REBOUND_MAX_DISTANCE_SQUARED;
+    }
+
     public static boolean shouldQuiverArrowBounce(int remainingBounces) {
         return remainingBounces > 0;
     }
@@ -2220,6 +2156,10 @@ public final class ArcadePortRules {
     }
 
     /** Reborn grants a fresh single Super Arrow for every kill, including melee kills. */
+    public static boolean quiverRegrantsArrowAfterHit(boolean targetEliminated) {
+        return targetEliminated;
+    }
+
     public static boolean quiverRegrantsArrowAfterKill() {
         return true;
     }
@@ -2661,48 +2601,20 @@ public final class ArcadePortRules {
     }
 
     /** A classic-tool challenge is only meaningful in a ruleset that supplies a bow or rod. */
-    public static boolean shouldAwardGladiatorsNoBowOrRodWin(
-            boolean classicToolsAvailable, boolean usedBow, boolean usedRod) {
-        return classicToolsAvailable && !usedBow && !usedRod;
-    }
+
 
     /** Half a heart is one health point in Bukkit's two-points-per-heart scale. */
-    public static boolean shouldAwardGladiatorsHalfHeartWin(double winnerHealth) {
-        return Double.isFinite(winnerHealth) && winnerHealth > 0.0D && winnerHealth <= 1.0001D;
-    }
+
 
     /** A second tournament loss removes a player; the first loss only moves them to the lower bracket. */
-    public static boolean shouldEliminateGladiatorAfterLoss(int totalLosses) {
-        return totalLosses >= 2;
-    }
 
-    public static final double GLADIATORS_LOSER_ARENA_HALF_WIDTH = 3.65D;
 
-    public static boolean isOutsideGladiatorsLoserArena(
-            double x, double z, double centerX, double centerZ) {
-        return !Double.isFinite(x) || !Double.isFinite(z)
-                || !Double.isFinite(centerX) || !Double.isFinite(centerZ)
-                || Math.abs(x - centerX) > GLADIATORS_LOSER_ARENA_HALF_WIDTH
-                || Math.abs(z - centerZ) > GLADIATORS_LOSER_ARENA_HALF_WIDTH;
-    }
+
+
 
     /** WorldConfig min/max coordinates are inclusive block coordinates. */
-    public static boolean isOutsideGladiatorsSourceMap(
-            double x, double z, int minX, int maxX, int minZ, int maxZ) {
-        return !Double.isFinite(x) || !Double.isFinite(z)
-                || x <= minX || x >= maxX + 1.0D
-                || z <= minZ || z >= maxZ + 1.0D;
-    }
 
-    public static String gladiatorsAchievementConfigKey(java.util.UUID playerId, String achievementId) {
-        String safeId = achievementId == null ? "" : achievementId.toLowerCase(java.util.Locale.ROOT)
-                .replaceAll("[^a-z0-9-]+", "-").replaceAll("^-+|-+$", "");
-        return "test-achievements.gladiators." + playerId + "." + safeId;
-    }
 
-    public static String gladiatorsMilestoneConfigKey(java.util.UUID playerId) {
-        return "test-milestones.gladiators." + playerId + ".silky-seconds";
-    }
 
     /** Turf floor is the block below players' source spawn feet location. */
     public static int turfWarsFloorYFromSpawn(double spawnY) {
