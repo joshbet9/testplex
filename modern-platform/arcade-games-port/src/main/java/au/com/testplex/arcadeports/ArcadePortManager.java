@@ -1,5 +1,9 @@
 package au.com.testplex.arcadeports;
 
+import io.papermc.paper.event.player.AsyncChatEvent;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
+
 import com.destroystokyo.paper.event.player.PlayerJumpEvent;
 import org.bukkit.Bukkit;
 import org.bukkit.attribute.Attribute;
@@ -132,6 +136,21 @@ import java.util.concurrent.ThreadLocalRandom;
 public final class ArcadePortManager implements Listener {
     private static final int HALF_SIZE = 20;
     private static final long ROUND_MS = 180_000L;
+    private static final long DRAW_MY_THING_ROUND_MILLIS = 30_000L;
+    private static final long DRAW_MY_THING_INTERMISSION_MILLIS = 3_000L;
+    private static final int DRAW_MY_THING_MAX_GUESSES = 10;
+    private static final long MASTER_BUILDERS_BUILD_MILLIS = 180_000L;
+    private static final long MASTER_BUILDERS_REVIEW_MILLIS = 8_000L;
+    private static final List<String> DRAW_MY_THING_WORDS = List.of(
+            "Airplane", "Anchor", "Apple", "Astronaut", "Balloon", "Banana", "Basketball", "Bee",
+            "Bicycle", "Bridge", "Burger", "Butterfly", "Camera", "Campfire", "Castle", "Cat",
+            "Cactus", "Clock", "Cloud", "Coconut", "Computer", "Crown", "Dinosaur", "Dolphin",
+            "Dragon", "Elephant", "Fireworks", "Fish", "Flower", "Football", "Frog", "Ghost",
+            "Guitar", "Hamburger", "Helicopter", "Ice Cream", "Kangaroo", "Key", "Lighthouse",
+            "Lion", "Mermaid", "Moon", "Mountain", "Mushroom", "Octopus", "Paintbrush", "Penguin",
+            "Piano", "Pizza", "Rainbow", "Robot", "Rocket", "Sandcastle", "Shark", "Snowman",
+            "Spaceship", "Spider", "Submarine", "Sunflower", "Telescope", "Tiger", "Toaster",
+            "Treasure", "Turtle", "Volcano", "Waterfall", "Whale", "Windmill", "Wizard", "Zebra");
     private static final long JOIN_WINDOW_TICKS = 100L;
     static final int MANUAL_START_COUNTDOWN_SECONDS = 0;
     private final ArcadeMechanicsModernPlugin plugin;
@@ -959,6 +978,10 @@ public final class ArcadePortManager implements Listener {
                     + requestedId + " or /arcadeport play " + requestedId + ".");
             return;
         }
+        if (type == ArcadePortGame.MASTER_BUILDERS && participants.size() > 16) {
+            sender.sendMessage(ChatColor.RED + "Master Builders supports up to 16 builders (one per plot).");
+            return;
+        }
         if (queue != null) queues.remove(selectedQueueKey);
         if (pendingStart != null && pendingType == type
                 && pendingMixedArcadeVariant == mixedArcadeVariant) {
@@ -1035,6 +1058,15 @@ public final class ArcadePortManager implements Listener {
         active = session;
         long now = System.currentTimeMillis();
         session.startedAt = now;
+        if (type == ArcadePortGame.DRAW_MY_THING) {
+            prepareDrawMyThing(session, participants);
+        }
+        if (type == ArcadePortGame.MASTER_BUILDERS) {
+            for (int i = 0; i < participants.size(); i++) {
+                session.masterBuilderPlots.put(participants.get(i).getUniqueId(), i);
+                session.masterBuilderReviewOrder.add(participants.get(i).getUniqueId());
+            }
+        }
         if (type == ArcadePortGame.RUNNER) {
             session.runnerMapPaletteCounts.putAll(scanRunnerMapPalette(session));
             plugin.getLogger().info("Runner exposed map palette scan found "
@@ -1048,6 +1080,8 @@ public final class ArcadePortManager implements Listener {
                 && !ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER)
                 || (type == ArcadePortGame.DRAGON_ESCAPE && !ArcadePortRules.DRAGON_ESCAPE_HAS_ROUND_TIMER)
                 || type == ArcadePortGame.DRAGONS
+                || type == ArcadePortGame.DRAW_MY_THING
+                || type == ArcadePortGame.MASTER_BUILDERS
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 600_000L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
@@ -1242,7 +1276,9 @@ public final class ArcadePortManager implements Listener {
             player.closeInventory();
             player.leaveVehicle();
             player.teleport(spawn);
-            player.setGameMode(type == ArcadePortGame.BACON_BRAWL || type == ArcadePortGame.DEATH_TAG || type == ArcadePortGame.DRAGONS
+            player.setGameMode(type == ArcadePortGame.MASTER_BUILDERS ? GameMode.CREATIVE
+                    : type == ArcadePortGame.BACON_BRAWL || type == ArcadePortGame.DEATH_TAG
+                    || type == ArcadePortGame.DRAGONS || type == ArcadePortGame.DRAW_MY_THING
                     ? GameMode.ADVENTURE : GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
@@ -1253,6 +1289,9 @@ public final class ArcadePortManager implements Listener {
             player.getInventory().clear();
             giveKit(session, player);
             session.lastLocations.put(player.getUniqueId(), spawn.clone());
+            if (type == ArcadePortGame.DRAW_MY_THING) {
+                session.drawStartLocations.put(player.getUniqueId(), spawn.clone());
+            }
             if (type == ArcadePortGame.DRAGON_ESCAPE) {
                 Location initial = player.getLocation().clone();
                 session.dragonEscapeRunGhostFrames.put(player.getUniqueId(), new ArrayList<>(List.of(
@@ -1260,6 +1299,12 @@ public final class ArcadePortManager implements Listener {
                                 initial.getYaw(), initial.getPitch(), player.isSneaking(),
                                 player.isSprinting(), player.isOnGround()))));
             }
+        }
+        if (type == ArcadePortGame.DRAW_MY_THING) {
+            startNextDrawMyThingRound(session, now);
+        }
+        if (type == ArcadePortGame.MASTER_BUILDERS) {
+            startMasterBuilders(session, now);
         }
         if (type == ArcadePortGame.BOMB_LOBBERS) {
             cacheBombLobbersTeamSpawnCentres(session);
@@ -1347,6 +1392,13 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.DRAGON_ESCAPE) {
             setupDragonEscapeRaceScoreboard(session);
+        }
+        if (type == ArcadePortGame.DRAW_MY_THING) {
+            announce(session, ChatColor.AQUA + "Draw My Thing: every player draws once. Each 30-second round allows 10 guesses; timed hints appear during the round.");
+        }
+        if (type == ArcadePortGame.MASTER_BUILDERS) {
+            announce(session, ChatColor.AQUA + "Master Builders: build " + ChatColor.YELLOW + session.masterBuilderTheme
+                    + ChatColor.AQUA + " in 3 minutes, followed by player reviews.");
         }
         if (participants.size() == 1) announce(session, ChatColor.GRAY + "Solo test mode: the run will remain available for practice until the timer ends or you reset it.");
         session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
@@ -1509,6 +1561,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void buildArena(ArcadePortGame type, World world) {
+        if (type == ArcadePortGame.MASTER_BUILDERS) {
+            buildMasterBuildersArena(world);
+            return;
+        }
         int minX = type == ArcadePortGame.DRAGON_ESCAPE ? -10 : -HALF_SIZE - 2;
         int maxX = type == ArcadePortGame.DRAGON_ESCAPE ? 10 : HALF_SIZE + 2;
         int minZ = type == ArcadePortGame.DRAGON_ESCAPE ? -26 : -HALF_SIZE - 2;
@@ -1570,6 +1626,31 @@ public final class ArcadePortManager implements Listener {
     }
 
     private List<Location> spawnLocations(ArcadePortGame type, int count) {
+        if (type == ArcadePortGame.MASTER_BUILDERS) {
+            List<Location> locations = new ArrayList<>();
+            World world = worlds.get(type.id());
+            for (int i = 0; i < Math.max(1, count); i++) locations.add(masterBuilderPlotCenter(world, i));
+            return locations;
+        }
+        if (type == ArcadePortGame.DRAW_MY_THING) {
+            SourceMapCatalog.MapData drawMap = sourceMapData.get(type.id());
+            List<Location> authored = drawMap == null ? List.of() : drawMap.spawnLocations();
+            if (authored.isEmpty() && drawMap != null) authored = drawMap.dataLocations("GREEN");
+            if (!authored.isEmpty()) {
+                List<Location> chosen = new ArrayList<>();
+                for (int i = 0; i < Math.max(1, count); i++) chosen.add(authored.get(i % authored.size()).clone());
+                return chosen;
+            }
+            World world = worlds.get(type.id());
+            Location centre = world.getSpawnLocation();
+            List<Location> fallback = new ArrayList<>();
+            for (int i = 0; i < Math.max(1, count); i++) {
+                double angle = Math.PI * 2.0D * i / Math.max(1, count);
+                fallback.add(new Location(world, centre.getX() + Math.cos(angle) * 5.0D,
+                        centre.getY() + 1.0D, centre.getZ() + Math.sin(angle) * 5.0D));
+            }
+            return fallback;
+        }
         if (type == ArcadePortGame.BACON_BRAWL && !baconSourceSpawnOverrides.isEmpty()) {
             List<Location> chosen = new ArrayList<>();
             for (int i = 0; i < Math.max(1, count); i++) {
@@ -3555,6 +3636,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
+        if (session.type == ArcadePortGame.DRAW_MY_THING) updateDrawMyThing(session, now);
+        if (session.type == ArcadePortGame.MASTER_BUILDERS) updateMasterBuilders(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
         if (session.type == ArcadePortGame.GLADIATORS) updateGladiators(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
@@ -6978,6 +7061,7 @@ public final class ArcadePortManager implements Listener {
 
     private void checkRoundEnd(Session session) {
         if (active != session) return;
+        if (session.type == ArcadePortGame.DRAW_MY_THING || session.type == ArcadePortGame.MASTER_BUILDERS) return;
         // An empty live set is a real end condition even during a one-player test.
         if (session.alive.isEmpty()) {
             if (!ArcadePortRules.shouldFinishWhenNobodyIsAlive(session.alive.size(), session.respawning.size())) return;
@@ -9590,6 +9674,10 @@ public final class ArcadePortManager implements Listener {
     public void onDamage(EntityDamageEvent event) {
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.DRAW_MY_THING || session.type == ArcadePortGame.MASTER_BUILDERS) {
+            event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.BOMB_LOBBERS
                 && event instanceof EntityDamageByEntityEvent byEntity
                 && byEntity.getDamager() instanceof Player attacker) {
@@ -10219,6 +10307,15 @@ public final class ArcadePortManager implements Listener {
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
+        if (session.type == ArcadePortGame.DRAW_MY_THING) {
+            handleDrawMyThingInteract(session, event);
+            return;
+        }
+        if (session.type == ArcadePortGame.MASTER_BUILDERS
+                && session.masterBuilderPhase == MasterBuildersPhase.REVIEW) {
+            handleMasterBuildersVote(session, event.getPlayer(), event);
+            return;
+        }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE
                 && event.getAction() != Action.PHYSICAL
                 && isDragonEscapeUsableBlock(event.getClickedBlock())) {
@@ -10686,6 +10783,21 @@ public final class ArcadePortManager implements Listener {
     public void onBlockBreak(BlockBreakEvent event) {
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.DRAW_MY_THING) {
+            event.setCancelled(true);
+            return;
+        }
+        if (session.type == ArcadePortGame.MASTER_BUILDERS) {
+            if (session.masterBuilderPhase == MasterBuildersPhase.BUILDING
+                    && session.alive.contains(event.getPlayer().getUniqueId())
+                    && isInsideMasterBuilderPlot(session, event.getPlayer().getUniqueId(), event.getBlock())) {
+                event.setDropItems(false);
+                event.setExpToDrop(0);
+                return;
+            }
+            event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
                 && session.alive.contains(event.getPlayer().getUniqueId())
                 && isQuiverBreakableGlass(event.getBlock().getType())) {
@@ -10743,6 +10855,17 @@ public final class ArcadePortManager implements Listener {
     public void onBlockPlace(BlockPlaceEvent event) {
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.DRAW_MY_THING) {
+            event.setCancelled(true);
+            return;
+        }
+        if (session.type == ArcadePortGame.MASTER_BUILDERS) {
+            boolean allowed = session.masterBuilderPhase == MasterBuildersPhase.BUILDING
+                    && session.alive.contains(event.getPlayer().getUniqueId())
+                    && isInsideMasterBuilderPlot(session, event.getPlayer().getUniqueId(), event.getBlockPlaced());
+            if (!allowed) event.setCancelled(true);
+            return;
+        }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
             Player player = event.getPlayer();
             Block placed = event.getBlockPlaced();
@@ -12202,6 +12325,8 @@ public final class ArcadePortManager implements Listener {
 
     private record DragonFlareZone(UUID ownerId, Location center, long expiresAtMillis) { }
 
+    private enum MasterBuildersPhase { BUILDING, REVIEW }
+
     private static final class Session {
         final ArcadePortGame type;
         final World world;
@@ -12209,6 +12334,29 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, PlayerSnapshot> snapshots = new HashMap<>();
         final Set<UUID> alive = new HashSet<>();
         final Map<UUID, Integer> scores = new HashMap<>();
+        final List<UUID> drawTurnOrder = new ArrayList<>();
+        final Map<UUID, Location> drawStartLocations = new HashMap<>();
+        final Set<Block> drawCanvasBlocks = new HashSet<>();
+        final Set<UUID> drawCorrectGuessers = new HashSet<>();
+        final Map<UUID, Integer> drawGuessAttempts = new HashMap<>();
+        final Set<Integer> drawRevealedLetters = new HashSet<>();
+        final Set<String> drawUsedWords = new HashSet<>();
+        UUID drawCurrentDrawer;
+        String drawWord;
+        Location drawDrawerLocation;
+        long drawRoundStartedAt;
+        long drawRoundEndsAt;
+        long drawNextRoundAt;
+        int drawTurnIndex;
+        final Map<UUID, Integer> masterBuilderPlots = new LinkedHashMap<>();
+        final List<UUID> masterBuilderReviewOrder = new ArrayList<>();
+        final Map<UUID, Map<UUID, Integer>> masterBuilderVotes = new HashMap<>();
+        MasterBuildersPhase masterBuilderPhase = MasterBuildersPhase.BUILDING;
+        String masterBuilderTheme;
+        UUID masterBuilderCurrentTarget;
+        long masterBuilderBuildEndsAt;
+        long masterBuilderReviewEndsAt;
+        int masterBuilderReviewIndex;
         final Map<UUID, Integer> paintPiecesRemaining = new HashMap<>();
         final Map<UUID, String> paintballKits = new HashMap<>();
         final Map<UUID, Long> paintballLastShotAt = new HashMap<>();
