@@ -75,7 +75,7 @@ public final class TestplexModernArcade extends JavaPlugin implements Listener {
             sender.sendMessage(ChatColor.GRAY + "Registered games: " + catalog.size());
             long ready = catalog.getGames().stream().filter(game -> game.isReadyForTest()).count();
             sender.sendMessage(ChatColor.GRAY + "Ready for in-game testing: " + ready);
-            sender.sendMessage(ChatColor.GRAY + "All 16 games remain mechanics-in-progress; 14 first-pass ports are available when ArcadeMechanicsModern is installed.");
+            sender.sendMessage(ChatColor.GRAY + "All 18 games remain mechanics-in-progress; 16 first-pass ports are available when ArcadeMechanicsModern is installed.");
             sender.sendMessage(ChatColor.GRAY + "Live cosmetic renderers: Spleef Block Break Signature and Paintball Weapon & Pellet Identity; other game renderers remain in progress.");
         });
 
