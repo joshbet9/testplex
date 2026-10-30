@@ -3462,8 +3462,14 @@ public final class ArcadePortManager implements Listener {
         long now = System.currentTimeMillis();
         session.ticks++;
         updateSourceWaterDamage(session, now);
+        boolean sheepQuestUpdatedBeforeTimeout = false;
         if (session.endsAt > 0L && now >= session.endsAt) {
             if (session.type == ArcadePortGame.SHEEP_QUEST) {
+                // Resolve a carrier who crossed a pen on the final game tick before
+                // deciding whether the five-minute result is tied.
+                updateSheepQuest(session, now);
+                updateSheepQuestKits(session, now);
+                sheepQuestUpdatedBeforeTimeout = true;
                 Player leader = sheepQuestLeader(session);
                 if (leader != null) {
                     finish(session, leader, true);
@@ -3537,8 +3543,10 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (session.type == ArcadePortGame.SHEEP_QUEST) {
-            updateSheepQuest(session, now);
-            updateSheepQuestKits(session, now);
+            if (!sheepQuestUpdatedBeforeTimeout) {
+                updateSheepQuest(session, now);
+                updateSheepQuestKits(session, now);
+            }
             if (now >= session.sheepNextSpawnAt) {
                 // Reborn continues spawning sheep every twenty seconds; there is no
                 // twelve-sheep population cap.
@@ -6381,6 +6389,8 @@ public final class ArcadePortManager implements Listener {
 
     private void captureSheepQuestForTeam(Session session, Sheep sheep, int team) {
         if (session == null || sheep == null || team < 0 || team > 3) return;
+        session.sheepThrownBy.remove(sheep.getUniqueId());
+        session.sheepThrownAt.remove(sheep.getUniqueId());
         int previousOwner = session.sheepOwners.getOrDefault(sheep, -1);
         if (previousOwner == team) return;
         UUID holderId = session.sheepHolders.remove(sheep);
@@ -6449,6 +6459,8 @@ public final class ArcadePortManager implements Listener {
             Player carrier = session.players.get(carrierId);
             if (sheep == null || !sheep.isValid() || sheep.isDead()) {
                 session.sheepCarriers.remove(sheep);
+                session.sheepHolders.remove(sheep);
+                session.sheepHomes.remove(sheep);
                 session.sheep.remove(sheep);
                 session.sheepOwners.remove(sheep);
                 continue;
@@ -6473,9 +6485,19 @@ public final class ArcadePortManager implements Listener {
         }
 
         for (Sheep sheep : new ArrayList<>(session.sheep)) {
-            if (!sheep.isValid() || sheep.isInsideVehicle()
-                    || session.sheepThrownBy.containsKey(sheep.getUniqueId())) continue;
+            if (!sheep.isValid() || sheep.isInsideVehicle()) continue;
+            boolean thrown = session.sheepThrownBy.containsKey(sheep.getUniqueId());
             int owner = session.sheepOwners.getOrDefault(sheep, -1);
+            if (thrown) {
+                // The source checks detached thrown sheep against pen blocks too.
+                for (int team = 0; team < 4; team++) {
+                    if (isInsideSheepPen(session, sheep.getLocation(), team)) {
+                        captureSheepQuestForTeam(session, sheep, team);
+                        break;
+                    }
+                }
+                continue;
+            }
             if (owner < 0) {
                 // SheepData.Update calls GetTeamPen for every unheld sheep, so a loose
                 // sheep that physically reaches any pen is assigned to that team.
@@ -6903,12 +6925,18 @@ public final class ArcadePortManager implements Listener {
         // Keep solo practice and last-runner attempts live until the finish is reached.
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) return;
         if (session.type == ArcadePortGame.SHEEP_QUEST && session.participantsAtStart > 1) {
+            // A player remains part of their team during Sheep Quest's six-second
+            // respawn window. Do not eliminate a side while its members are respawning.
             Set<Integer> remainingTeams = new HashSet<>();
             for (UUID id : session.alive) remainingTeams.add(session.teams.getOrDefault(id, -1));
+            for (UUID id : session.respawning) remainingTeams.add(session.teams.getOrDefault(id, -1));
             if (remainingTeams.size() <= 1) {
                 int winnerTeam = remainingTeams.stream().findFirst().orElse(-1);
-                Player winner = winnerTeam < 0 ? null : alivePlayers(session).stream()
-                        .filter(p -> session.teams.getOrDefault(p.getUniqueId(), -2) == winnerTeam)
+                Player winner = winnerTeam < 0 ? null : session.players.values().stream()
+                        .filter(p -> p != null && p.isOnline()
+                                && session.teams.getOrDefault(p.getUniqueId(), -2) == winnerTeam
+                                && (session.alive.contains(p.getUniqueId())
+                                        || session.respawning.contains(p.getUniqueId())))
                         .max(java.util.Comparator.comparingInt(p ->
                                 session.scores.getOrDefault(p.getUniqueId(), 0)))
                         .orElse(null);
