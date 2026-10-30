@@ -2297,9 +2297,34 @@ class ArcadePortGameTest {
         assertEquals(2.0D, ArcadePortRules.paintballHealthAfterHit(0), 0.00001D);
     }
 
-    @Test void microBattlesUsesNonLethalWeaponHitsAndMinimumHunger() {
-        assertEquals(4.0D, ArcadePortRules.microBattlesHitDamage(true), 0.00001D);
-        assertEquals(6.0D, ArcadePortRules.microBattlesHitDamage(false), 0.00001D);
+    @Test void microBattlesCombatMatchesRebornWeaponArrowAndArmourDamage() {
+        assertEquals(3.0D, ArcadePortRules.microBattlesMeleeDamage(Material.WOODEN_SWORD), 0.00001D);
+        assertEquals(3.0D, ArcadePortRules.microBattlesMeleeDamage(Material.WOODEN_AXE), 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.microBattlesMeleeDamage(Material.STONE_SWORD), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.microBattlesMeleeDamage(Material.IRON_SWORD), 0.00001D);
+        assertEquals(7.0D, ArcadePortRules.microBattlesMeleeDamage(Material.DIAMOND_SWORD), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.microBattlesMeleeDamage(Material.GOLDEN_SWORD), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.microBattlesMeleeDamage(Material.STONE_PICKAXE), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.microBattlesMeleeDamage(Material.AIR), 0.00001D);
+
+        assertEquals(9.0D, ArcadePortRules.microBattlesArrowDamage(3.0D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.microBattlesArrowDamage(Double.NaN), 0.00001D);
+
+        // Reborn subtracts Fighter's fixed 0.5 before applying the physical armour multiplier.
+        assertEquals(2.5D, ArcadePortRules.microBattlesDamageAfterIronSkin(3.0D, true), 0.00001D);
+        assertEquals(1.8D, ArcadePortRules.microBattlesDamageAfterArmor(2.5D, 7.0D), 0.00001D);
+        assertEquals(2.16D, ArcadePortRules.microBattlesDamageAfterArmor(3.0D, 7.0D), 0.00001D);
+        assertEquals(6.48D, ArcadePortRules.microBattlesDamageAfterArmor(9.0D, 7.0D), 0.00001D);
+        assertEquals(9.0D, ArcadePortRules.microBattlesDamageAfterArmor(9.0D, 0.0D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.microBattlesDamageAfterArmor(9.0D, 25.0D), 0.00001D);
+
+        assertEquals(Math.log10(2.5D) * 1.6D,
+                ArcadePortRules.microBattlesKnockbackStrength(2.5D), 0.00001D);
+        assertEquals(Math.log10(2.0D) * 1.6D,
+                ArcadePortRules.microBattlesKnockbackStrength(1.0D), 0.00001D);
+    }
+
+    @Test void microBattlesUsesMinimumHunger() {
         assertEquals(2, ArcadePortRules.microBattlesMinimumFoodLevel(0));
         assertEquals(2, ArcadePortRules.microBattlesMinimumFoodLevel(2));
         assertEquals(7, ArcadePortRules.microBattlesMinimumFoodLevel(7));
