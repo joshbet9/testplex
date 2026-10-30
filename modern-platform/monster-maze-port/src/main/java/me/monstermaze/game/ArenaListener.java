@@ -173,7 +173,7 @@ public class ArenaListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent event) {
-        if (inVoidWorld(event.getPlayer().getWorld()) && game.getState() != GameState.IDLE) event.setCancelled(true);
+        if (inArena(event.getBlock().getLocation()) && game.getState() != GameState.IDLE) event.setCancelled(true);
     }
 
 }
