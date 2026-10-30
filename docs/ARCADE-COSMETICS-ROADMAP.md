@@ -57,9 +57,9 @@ For every game, the **cosmetic** is the player-selectable appearance or effect u
 - **Implementation notes:** Keep the chat lines selectable and within normal chat/safety limits. The beacon represents the current leader, so the colour must follow leader changes rather than remain attached to the previous leader.
 
 ### Dragons
-- **Cosmetics:** Pyrotechnic ability particle effects.
+- **Cosmetics:** Pyrotechnic ability particle effects and player-selected flare burst effects visible to the whole lobby.
 - **Win effect:** Use a Pyro platform, then have the winner get hit by a dragon while everyone else falls.
-- **Implementation notes:** Reuse the existing Pyro/platform and dragon interactions where possible. The staged sequence must not interfere with a live round or leave temporary entities/blocks behind.
+- **Implementation notes:** Reuse the existing Pyro/platform and dragon interactions where possible. Flare effects are visual-only; the flare itself briefly excludes the user and nearby target area from every dragon's player and sparkler target selection. The staged sequence must not interfere with a live round or leave temporary entities/blocks behind.
 
 ### Evolution
 - **Cosmetics:** Alternative evolving particle effects and dragon-egg appearance/effect choices.
