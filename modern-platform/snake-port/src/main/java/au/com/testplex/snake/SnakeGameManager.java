@@ -856,11 +856,15 @@ public final class SnakeGameManager implements Listener {
         if (startingPlayerCount > 1 && live.size() <= 1) {
             finish(live.isEmpty() ? null : live.get(0).player, true);
         } else if (startingPlayerCount == 1 && live.isEmpty()) {
-            finish(null, false);
+            finish(null, false, true);
         }
     }
 
     private void finish(Player winner, boolean announceWinner) {
+        finish(winner, announceWinner, announceWinner);
+    }
+
+    private void finish(Player winner, boolean announceWinner, boolean recordStats) {
         if (!running) return;
         running = false;
         if (announceWinner && winner != null) announce(ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won Snake!");
@@ -871,6 +875,12 @@ public final class SnakeGameManager implements Listener {
             }
             restoreRouletteSlot(state);
             removeSegments(state);
+            if (recordStats) {
+                boolean won = winner != null && winner.getUniqueId().equals(state.player.getUniqueId());
+                boolean knockedOut = !state.alive;
+                stats.recordGameEnd(state.player.getUniqueId(), won, state.kills);
+                stats.publishToArcadeStats(state.player.getUniqueId(), won, state.kills, knockedOut);
+            }
             if (state.player.isOnline()) {
                 state.player.sendMessage(ChatColor.GRAY + "Snake stats — Kills: " + state.kills
                         + ", Tail Length: " + state.maxTailLength + ", Slimes Eaten: " + state.slimesEaten
@@ -1187,7 +1197,7 @@ public final class SnakeGameManager implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         queue.remove(player.getUniqueId());
-        SnakeState state = snakes.remove(player.getUniqueId());
+        SnakeState state = snakes.get(player.getUniqueId());
         if (state != null) {
             if (state.alive) eliminate(state, null, "disconnected");
             pendingRestore.put(player.getUniqueId(), state.snapshot);
