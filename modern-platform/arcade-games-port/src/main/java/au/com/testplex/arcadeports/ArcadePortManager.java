@@ -8994,10 +8994,11 @@ public final class ArcadePortManager implements Listener {
         if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
                 || !(event.getEntity() instanceof Player player)) return;
         session.quiverUsedBow.add(player.getUniqueId());
-        if (!"enchanter".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))
-                || !(event.getProjectile() instanceof Arrow arrow)) return;
-        UUID arrowId = arrow.getUniqueId();
+        if (!(event.getProjectile() instanceof Arrow arrow)) return;
+        // Track every Quiver arrow so all remaining projectiles are cleaned up at round end.
         session.entities.add(arrow);
+        if (!"enchanter".equals(session.quiverKits.getOrDefault(player.getUniqueId(), "leaper"))) return;
+        UUID arrowId = arrow.getUniqueId();
         session.quiverArrowBounces.put(arrowId, ArcadePortRules.QUIVER_MAX_ARROW_BOUNCES);
         session.quiverArrowIgnoredPlayers.put(arrowId, new HashSet<>(Set.of(player.getUniqueId())));
     }
