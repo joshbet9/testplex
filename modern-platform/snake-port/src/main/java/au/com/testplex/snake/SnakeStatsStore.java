@@ -56,13 +56,31 @@ public final class SnakeStatsStore {
         }
     }
 
+    public void recordGameEnd(UUID player, boolean won, int killsThisRound) {
+        String path = base(player);
+        data.set(path + ".games-played", data.getInt(path + ".games-played") + 1);
+        if (won) data.set(path + ".wins", data.getInt(path + ".wins") + 1);
+        data.set(path + ".score-kills", data.getInt(path + ".score-kills") + Math.max(0, killsThisRound));
+        save();
+    }
+
+    public int lifetimeKills(UUID player) { return data.getInt(base(player) + ".lifetime-kills"); }
+    public int lifetimeSlimes(UUID player) { return data.getInt(base(player) + ".lifetime-slimes"); }
+    public int bestTailLength(UUID player) { return data.getInt(base(player) + ".best-tail-length"); }
+    public Set<String> achievements(UUID player) {
+        Set<String> result = new LinkedHashSet<>();
+        for (String stat : Set.of("Cannibal", "ChooChoo", "SlimySheep")) {
+            if (data.getBoolean(base(player) + ".achievements." + stat)) result.add(stat);
+        }
+        return Set.copyOf(result);
+    }
+
     public String summary(Player player) {
         String path = base(player.getUniqueId());
-        Set<String> achievements = new LinkedHashSet<>();
-        for (String stat : Set.of("Cannibal", "ChooChoo", "SlimySheep")) {
-            if (data.getBoolean(path + ".achievements." + stat)) achievements.add(stat);
-        }
-        return "Snake lifetime stats — Kills: " + data.getInt(path + ".lifetime-kills")
+        Set<String> achievements = achievements(player.getUniqueId());
+        return "Snake lifetime stats — Games: " + data.getInt(path + ".games-played")
+                + ", Wins: " + data.getInt(path + ".wins")
+                + ", Kills: " + data.getInt(path + ".lifetime-kills")
                 + ", Slimes: " + data.getInt(path + ".lifetime-slimes")
                 + ", Best tail: " + data.getInt(path + ".best-tail-length")
                 + ", Achievements: " + (achievements.isEmpty() ? "none" : String.join(", ", achievements));
