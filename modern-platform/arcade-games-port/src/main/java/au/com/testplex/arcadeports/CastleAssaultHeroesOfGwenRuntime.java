@@ -959,13 +959,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             for (ItemStack item : player.getInventory().getContents()) {
                 if (item != null && item.getType() == Material.TNT) current += item.getAmount();
             }
-            if (current < 2) {
+            if (current < ArcadePortRules.CASTLE_ASSAULT_DEMOLITIONIST_MAX_TNT) {
                 player.getInventory().addItem(namedItem(Material.TNT, "Throwing TNT",
                         "Replenished by the Demolitionist kit."));
                 player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 1.0F, 1.0F);
                 player.updateInventory();
             }
-            castleDemolitionistNextTntAt.put(id, now + 10_000L);
+            castleDemolitionistNextTntAt.put(id, now + ArcadePortRules.CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS);
         }
     }
 
@@ -1633,7 +1633,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             castleArcherNextArrowAt.remove(player.getUniqueId());
         }
         if ("demolitionist".equals(kit)) {
-            castleDemolitionistNextTntAt.put(player.getUniqueId(), kitAppliedAt + 10_000L);
+            castleDemolitionistNextTntAt.put(player.getUniqueId(), kitAppliedAt + ArcadePortRules.CASTLE_ASSAULT_DEMOLITIONIST_TNT_REFILL_MILLIS);
         } else {
             castleDemolitionistNextTntAt.remove(player.getUniqueId());
         }
