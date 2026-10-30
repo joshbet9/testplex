@@ -33,7 +33,7 @@ public class StatTracker implements Listener {
 
     public StatTracker(GameManager game, org.bukkit.plugin.Plugin plugin) {
         this.game = game;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        Bukkit.getPluginManager().registerEvents(this, plugin.getHostPlugin());
     }
 
     public void reset() {
