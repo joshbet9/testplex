@@ -2754,6 +2754,38 @@ public final class ArcadePortManager implements Listener {
                 player.getInventory().addItem(new ItemStack(Material.ARROW, 32));
                 giveTurfWarsWool(session, player);
                 break;
+            case MILK_THE_COW:
+                if (session.teams.getOrDefault(player.getUniqueId(), 0) == 1) {
+                    player.getInventory().setItem(0, namedItem(Material.IRON_AXE, "Cow Bomb", "Right-click to launch a baby cow."));
+                    player.getInventory().setItem(1, namedItem(Material.IRON_SHOVEL, "Body Slam", "Right-click to leap and slam nearby Farmers."));
+                    player.getInventory().setItem(2, namedItem(Material.LEATHER, "Cow Charge", "Sprint into Farmers to knock them back."));
+                } else {
+                    player.getInventory().setItem(0, new ItemStack(Material.BUCKET));
+                    player.setAllowFlight(true);
+                    player.setFlying(false);
+                }
+                break;
+            case WITHER_ASSAULT:
+                if (session.teams.getOrDefault(player.getUniqueId(), 0) == 1) {
+                    player.getInventory().setItem(0, namedItem(Material.GOLDEN_SWORD, "Wither Blast", "Left-click to launch a Wither skull."));
+                    player.setAllowFlight(true);
+                    player.setFlying(true);
+                    player.setFlySpeed((float) WitherAssaultMovementRules.SPAWN_HOVER_SPEED);
+                } else {
+                    String kit = session.witherAssaultKits.getOrDefault(player.getUniqueId(), "archer");
+                    if ("editor".equals(kit)) {
+                        player.getInventory().setItem(0, new ItemStack(Material.IRON_PICKAXE));
+                        player.getInventory().setItem(1, new ItemStack(Material.COBBLESTONE, 32));
+                    } else if ("medic".equals(kit)) {
+                        player.getInventory().setItem(0, new ItemStack(Material.STONE_SWORD));
+                        player.getInventory().setItem(1, new ItemStack(Material.GOLDEN_APPLE, 2));
+                    } else {
+                        player.getInventory().setItem(0, new ItemStack(Material.BOW));
+                        player.getInventory().setItem(1, new ItemStack(Material.ARROW, 16));
+                        player.getInventory().setItem(2, new ItemStack(Material.STONE_SWORD));
+                    }
+                }
+                break;
         }
         player.updateInventory();
     }
@@ -10676,6 +10708,314 @@ public final class ArcadePortManager implements Listener {
         player.sendMessage(ChatColor.GREEN + "Sheep picked up. Carry it to your team's pen!");
     }
 
+    private Set<Integer> randomPlayerSlots(int playerCount, int selectedCount) {
+        if (playerCount <= 0 || selectedCount <= 0) return Set.of();
+        List<Integer> slots = new ArrayList<>();
+        for (int i = 0; i < playerCount; i++) slots.add(i);
+        Collections.shuffle(slots, ThreadLocalRandom.current());
+        return new HashSet<>(slots.subList(0, Math.min(playerCount, selectedCount)));
+    }
+
+    private void spawnMilkCowMapAnimals(Session session) {
+        SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.MILK_THE_COW.id());
+        if (map == null) return;
+        spawnMilkCowMapAnimals(session, map.dataLocations("WHITE"), EntityType.CHICKEN);
+        spawnMilkCowMapAnimals(session, map.dataLocations("PINK"), EntityType.PIG);
+        spawnMilkCowMapAnimals(session, map.dataLocations("PURPLE"), EntityType.VILLAGER);
+    }
+
+    private void spawnMilkCowMapAnimals(Session session, List<Location> locations, EntityType type) {
+        for (Location source : locations) {
+            Location at = source.clone();
+            at.setWorld(session.world);
+            Entity animal = session.world.spawnEntity(at, type);
+            if (animal instanceof Ageable ageable) {
+                ageable.setBaby();
+                ageable.setAgeLock(true);
+            } else {
+                animal.setCustomName("Bob");
+                animal.setCustomNameVisible(true);
+            }
+            session.entities.add(animal);
+        }
+    }
+
+    private void incrementMilkCowScore(Session session, Player player, int change, String reason) {
+        if (active != session || player == null || !session.players.containsKey(player.getUniqueId())) return;
+        UUID id = player.getUniqueId();
+        int score = MilkCowRules.scoreAfterChange(session.scores.getOrDefault(id, 0), change);
+        session.scores.put(id, score);
+        player.sendMessage((change >= 0 ? ChatColor.GREEN : ChatColor.RED)
+                + reason + ": " + score + "/" + MilkCowRules.SCORE_TO_WIN);
+        if (MilkCowRules.hasWon(score)) {
+            announce(session, ChatColor.GOLD + player.getName() + " reached " + MilkCowRules.SCORE_TO_WIN + " points!");
+            finish(session, player, true);
+        }
+    }
+
+    private void setMilkCowRole(Session session, Player player) {
+        if (active != session || player == null || !player.isOnline()) return;
+        UUID id = player.getUniqueId();
+        session.teams.put(id, 1);
+        session.milkDoubleJumpUsed.remove(id);
+        player.setAllowFlight(false);
+        player.setFlying(false);
+        giveKit(session, player);
+        player.sendMessage(ChatColor.RED + "You have become a Cow. Defend your herd!");
+        announce(session, ChatColor.RED + player.getName() + " has become a Cow.");
+        player.getWorld().strikeLightningEffect(player.getLocation());
+    }
+
+    private void updateMilkCow(Session session, long now) {
+        if (active != session) return;
+        List<Player> cows = alivePlayers(session).stream()
+                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), 0) == 1).toList();
+        List<Player> farmers = alivePlayers(session).stream()
+                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), 0) == 0).toList();
+        if (cows.isEmpty() && !farmers.isEmpty() && session.participantsAtStart > 1) {
+            Player promoted = farmers.get(ThreadLocalRandom.current().nextInt(farmers.size()));
+            setMilkCowRole(session, promoted);
+            cows = List.of(promoted);
+        }
+        if (session.participantsAtStart > 1 && farmers.isEmpty() && !cows.isEmpty()) {
+            finish(session, cows.get(0), true);
+            return;
+        }
+
+        for (Player cowPlayer : cows) {
+            if (!cowPlayer.isSprinting()) continue;
+            Location forward = cowPlayer.getLocation().clone().add(cowPlayer.getLocation().getDirection().setY(0).normalize());
+            for (Entity nearby : session.world.getNearbyEntities(forward, 2.0D, 1.6D, 2.0D)) {
+                if (!(nearby instanceof Player target) || session.teams.getOrDefault(target.getUniqueId(), 1) != 0
+                        || !session.alive.contains(target.getUniqueId())) continue;
+                String key = cowPlayer.getUniqueId() + ":" + target.getUniqueId();
+                long ready = session.milkChargeCooldowns.getOrDefault(key, 0L);
+                if (now < ready) continue;
+                session.milkChargeCooldowns.put(key, now + 500L);
+                for (ItemStack stack : target.getInventory().getContents()) {
+                    if (stack != null && stack.getType() == Material.MILK_BUCKET) stack.setType(Material.BUCKET);
+                }
+                damageMilkCowFarmer(session, target, cowPlayer, 3.0D);
+                Vector push = target.getLocation().toVector().subtract(cowPlayer.getLocation().toVector());
+                push.setY(0.45D);
+                if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(1.15D));
+                cowPlayer.getWorld().playSound(cowPlayer.getLocation(), Sound.ENTITY_COW_HURT, 0.7F, 1.1F);
+                if (active != session) return;
+            }
+        }
+
+        if (now >= session.milkNextHerdUpdateAt) {
+            session.milkNextHerdUpdateAt = now + 1_000L;
+            if (!cows.isEmpty()) {
+                Location target = cows.get(0).getLocation();
+                session.milkCowHerd.removeIf(cow -> cow == null || !cow.isValid());
+                for (Cow cow : session.milkCowHerd) {
+                    Vector direction = target.toVector().subtract(cow.getLocation().toVector());
+                    direction.setY(Math.max(-0.08D, Math.min(0.12D, direction.getY())));
+                    if (direction.lengthSquared() > 2.25D) cow.setVelocity(direction.normalize().multiply(0.28D));
+                }
+                while (session.milkCowHerd.size() < MilkCowRules.HERD_SIZE) {
+                    Location spawn = target.clone().add(
+                            ThreadLocalRandom.current().nextDouble(-2.5D, 2.5D), 0.0D,
+                            ThreadLocalRandom.current().nextDouble(-2.5D, 2.5D));
+                    Cow cow = session.world.spawn(spawn, Cow.class);
+                    cow.setRemoveWhenFarAway(false);
+                    session.milkCowHerd.add(cow);
+                    session.entities.add(cow);
+                }
+            }
+        }
+
+        for (Map.Entry<UUID, Cow> entry : new ArrayList<>(session.milkCowBombs.entrySet())) {
+            Cow bomb = entry.getValue();
+            if (bomb == null || !bomb.isValid()) {
+                session.milkCowBombs.remove(entry.getKey());
+                session.milkCowBombExpiresAt.remove(entry.getKey());
+                session.milkCowBombOwners.remove(entry.getKey());
+                continue;
+            }
+            boolean hitPlayer = session.world.getNearbyEntities(bomb.getLocation(), 1.1D, 1.1D, 1.1D).stream()
+                    .anyMatch(entity -> entity instanceof Player target
+                            && session.teams.getOrDefault(target.getUniqueId(), 1) == 0
+                            && session.alive.contains(target.getUniqueId()));
+            boolean hitBlock = !bomb.getLocation().getBlock().isPassable();
+            if (hitPlayer || hitBlock || now >= session.milkCowBombExpiresAt.getOrDefault(entry.getKey(), Long.MAX_VALUE)) {
+                explodeMilkCowBomb(session, bomb);
+                if (active != session) return;
+            }
+        }
+
+        for (Map.Entry<UUID, Long> entry : new ArrayList<>(session.milkBodySlamStartedAt.entrySet())) {
+            Player player = session.players.get(entry.getKey());
+            if (player == null || !player.isOnline()) {
+                session.milkBodySlamStartedAt.remove(entry.getKey());
+            } else if ((player.isOnGround() && now - entry.getValue() >= 900L)
+                    || now - entry.getValue() >= 2_500L) {
+                session.milkBodySlamStartedAt.remove(entry.getKey());
+                resolveMilkCowBodySlam(session, player);
+                if (active != session) return;
+            }
+        }
+
+        for (Player farmer : farmers) {
+            UUID id = farmer.getUniqueId();
+            if (farmer.isOnGround() && session.milkDoubleJumpUsed.remove(id)) {
+                farmer.setAllowFlight(true);
+            }
+        }
+    }
+
+    private void damageMilkCowFarmer(Session session, Player target, Player attacker, double damage) {
+        if (active != session || target == null || !session.alive.contains(target.getUniqueId())
+                || session.teams.getOrDefault(target.getUniqueId(), 0) != 0 || damage <= 0.0D) return;
+        if (target.getHealth() <= damage) {
+            incrementMilkCowScore(session, target, -MilkCowRules.SCORE_LOST_ON_DEATH, "Farmer defeated");
+            if (active != session) return;
+            if (attacker != null && session.teams.getOrDefault(attacker.getUniqueId(), -1) == 1) {
+                incrementMilkCowScore(session, attacker, 1, "Farmer defeated");
+                if (active != session) return;
+            }
+            Location respawn = session.milkRespawnSpawns.getOrDefault(
+                    target.getUniqueId(), spawnLocations(session.type, 1).get(0)).clone();
+            target.teleport(respawn);
+            target.setHealth(target.getMaxHealth());
+            target.setFoodLevel(20);
+            target.setSaturation(20.0F);
+            target.setFireTicks(0);
+            target.setNoDamageTicks(20);
+            session.lastLocations.put(target.getUniqueId(), respawn.clone());
+        } else {
+            target.setHealth(Math.max(1.0D, target.getHealth() - damage));
+        }
+    }
+
+    private void launchMilkCowBomb(Session session, Player player, long now) {
+        UUID owner = player.getUniqueId();
+        if (now < session.milkBombReadyAt.getOrDefault(owner, 0L)) {
+            player.sendMessage(ChatColor.YELLOW + "Cow Bomb is recharging.");
+            return;
+        }
+        session.milkBombReadyAt.put(owner, now + 3_000L);
+        Cow bomb = session.world.spawn(player.getEyeLocation().add(player.getLocation().getDirection()), Cow.class);
+        bomb.setBaby();
+        bomb.setAgeLock(true);
+        bomb.setAI(false);
+        bomb.setRemoveWhenFarAway(false);
+        bomb.setCustomName(ChatColor.RED + "Cow Bomb");
+        bomb.setCustomNameVisible(false);
+        bomb.setVelocity(player.getLocation().getDirection().normalize().multiply(1.35D).setY(0.28D));
+        session.milkCowBombs.put(bomb.getUniqueId(), bomb);
+        session.milkCowBombOwners.put(bomb.getUniqueId(), owner);
+        session.milkCowBombExpiresAt.put(bomb.getUniqueId(), now + 2_500L);
+        session.entities.add(bomb);
+        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_COW_AMBIENT, 1.0F, 1.5F);
+    }
+
+    private void explodeMilkCowBomb(Session session, Cow bomb) {
+        if (bomb == null || !session.milkCowBombs.containsKey(bomb.getUniqueId())) return;
+        Location centre = bomb.getLocation().clone();
+        UUID ownerId = session.milkCowBombOwners.remove(bomb.getUniqueId());
+        Player owner = ownerId == null ? null : session.players.get(ownerId);
+        session.milkCowBombs.remove(bomb.getUniqueId());
+        session.milkCowBombExpiresAt.remove(bomb.getUniqueId());
+        session.entities.remove(bomb);
+        bomb.remove();
+        centre.getWorld().playSound(centre, Sound.ENTITY_COW_HURT, 1.5F, 1.1F);
+        centre.getWorld().spawnParticle(Particle.EXPLOSION, centre, 1);
+        for (Entity nearby : centre.getWorld().getNearbyEntities(centre, 3.0D, 3.0D, 3.0D)) {
+            if (!(nearby instanceof Player target) || session.teams.getOrDefault(target.getUniqueId(), 1) != 0
+                    || !session.alive.contains(target.getUniqueId())) continue;
+            double distance = target.getLocation().distance(centre);
+            damageMilkCowFarmer(session, target, owner, Math.max(1.5D, 4.0D - distance * 0.7D));
+            Vector push = target.getLocation().toVector().subtract(centre.toVector());
+            push.setY(0.5D);
+            if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(1.1D));
+            if (active != session) return;
+        }
+    }
+
+    private void startMilkCowBodySlam(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        if (now < session.milkBodySlamReadyAt.getOrDefault(id, 0L)
+                || session.milkBodySlamStartedAt.containsKey(id)) {
+            player.sendMessage(ChatColor.YELLOW + "Body Slam is recharging.");
+            return;
+        }
+        session.milkBodySlamReadyAt.put(id, now + 6_000L);
+        session.milkBodySlamStartedAt.put(id, now);
+        Vector leap = player.getLocation().getDirection().normalize().multiply(0.9D);
+        leap.setY(Math.max(0.65D, Math.abs(leap.getY()) + 0.35D));
+        player.setVelocity(leap);
+        player.setFallDistance(0.0F);
+    }
+
+    private void resolveMilkCowBodySlam(Session session, Player player) {
+        Location centre = player.getLocation().clone();
+        centre.getWorld().playSound(centre, Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 0.65F);
+        for (Entity nearby : centre.getWorld().getNearbyEntities(centre, 6.0D, 4.0D, 6.0D)) {
+            if (!(nearby instanceof Player target) || target == player
+                    || session.teams.getOrDefault(target.getUniqueId(), 1) != 0
+                    || !session.alive.contains(target.getUniqueId())) continue;
+            double distance = target.getLocation().distance(centre);
+            damageMilkCowFarmer(session, target, player, Math.max(1.0D, 4.5D - distance * 0.55D));
+            Vector push = target.getLocation().toVector().subtract(centre.toVector());
+            push.setY(0.55D);
+            if (push.lengthSquared() > 0.001D) target.setVelocity(push.normalize().multiply(1.0D));
+            if (active != session) return;
+        }
+    }
+
+    private Location witherAssaultSpawn(Session session, Player player) {
+        Location location = player == null ? new Location(session.world, 0.5D, session.witherAssaultSpawnY, 0.5D)
+                : player.getLocation().clone();
+        location.setWorld(session.world);
+        location.setY(session.witherAssaultSpawnY);
+        return location;
+    }
+
+    private void updateWitherAssault(Session session, long now) {
+        if (active != session) return;
+        List<Player> withers = alivePlayers(session).stream()
+                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), 0) == 1).toList();
+        List<Player> humans = alivePlayers(session).stream()
+                .filter(player -> session.teams.getOrDefault(player.getUniqueId(), 0) == 0).toList();
+        if (withers.isEmpty() && !humans.isEmpty() && session.participantsAtStart > 1) {
+            Player promoted = humans.get(ThreadLocalRandom.current().nextInt(humans.size()));
+            session.teams.put(promoted.getUniqueId(), 1);
+            promoted.teleport(witherAssaultSpawn(session, promoted));
+            giveKit(session, promoted);
+            withers = List.of(promoted);
+            announce(session, ChatColor.RED + promoted.getName() + " has become a Wither.");
+        }
+        for (Player wither : withers) {
+            UUID id = wither.getUniqueId();
+            if (!wither.getAllowFlight()) wither.setAllowFlight(true);
+            if (!wither.isFlying()) wither.setFlying(true);
+            double target = WitherAssaultMovementRules.targetFlySpeed(
+                    wither.getLocation().getY(), session.witherAssaultSpawnY, session.witherAssaultYLimit);
+            double current = session.witherFlySpeeds.getOrDefault(id,
+                    WitherAssaultMovementRules.SPAWN_HOVER_SPEED);
+            double next = WitherAssaultMovementRules.approachSpeed(current, target);
+            session.witherFlySpeeds.put(id, next);
+            wither.setFlySpeed((float) next);
+        }
+    }
+
+    private void launchWitherAssaultSkull(Session session, Player player, long now) {
+        UUID id = player.getUniqueId();
+        if (now < session.witherLastAttackAt.getOrDefault(id, 0L)) {
+            player.sendMessage(ChatColor.YELLOW + "Wither Blast is recharging.");
+            return;
+        }
+        session.witherLastAttackAt.put(id, now + 1_500L);
+        WitherSkull skull = player.launchProjectile(WitherSkull.class);
+        skull.setIsIncendiary(false);
+        skull.setYield(0.0F);
+        skull.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.15D));
+        session.entities.add(skull);
+        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_WITHER_SHOOT, 0.8F, 1.0F);
+    }
+
     private boolean isQuiverBreakableGlass(Material material) {
         String name = material.name();
         return material == Material.GLASS || material == Material.GLASS_PANE
@@ -12235,6 +12575,24 @@ public final class ArcadePortManager implements Listener {
         long lastGladiatorPoisonAt;
         long nextGladiatorRoundAt;
         final Map<UUID, Integer> teams = new HashMap<>();
+        final Set<Cow> milkCowHerd = new HashSet<>();
+        final Map<UUID, Location> milkRespawnSpawns = new HashMap<>();
+        final Set<UUID> milkDoubleJumpUsed = new HashSet<>();
+        final Map<String, Long> milkChargeCooldowns = new HashMap<>();
+        final Map<UUID, Cow> milkCowBombs = new HashMap<>();
+        final Map<UUID, Long> milkCowBombExpiresAt = new HashMap<>();
+        final Map<UUID, UUID> milkCowBombOwners = new HashMap<>();
+        final Map<UUID, Long> milkBombReadyAt = new HashMap<>();
+        final Map<UUID, Long> milkBodySlamStartedAt = new HashMap<>();
+        final Map<UUID, Long> milkBodySlamReadyAt = new HashMap<>();
+        final Map<UUID, String> witherAssaultKits = new HashMap<>();
+        final Set<Block> witherEditorBlocks = new HashSet<>();
+        final Map<UUID, Long> witherLastAttackAt = new HashMap<>();
+        final Map<UUID, Double> witherFlySpeeds = new HashMap<>();
+        double witherAssaultSpawnY = 76.0D;
+        double witherAssaultYLimit = 76.0D;
+        long witherAssaultAttackStartsAt;
+        long milkNextHerdUpdateAt;
         final Set<UUID> tagged = new HashSet<>();
         final Set<UUID> alphaChasers = new HashSet<>();
         final Map<UUID, Mob> deathTagDisguises = new HashMap<>();

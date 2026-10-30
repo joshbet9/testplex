@@ -18,6 +18,8 @@ class ArcadePortGameTest {
         assertEquals(java.util.List.of("Speef", "Super Spleef"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.SPLEEF));
         assertEquals(java.util.List.of("Turf Wars"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.TURF_WARS));
+        assertEquals(java.util.List.of("Milk the Cow"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.MILK_THE_COW));
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.WITHER_ASSAULT).isEmpty());
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.EVOLUTION).isEmpty(),
                 "Evolution has no legacy map archive folder and must not be given an invented one");
     }
@@ -25,6 +27,10 @@ class ArcadePortGameTest {
     @Test void selectedMapArchivePathsAreValidatedAgainstTheirGame() {
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.BACON_BRAWL, "source-maps/Bacon Brawl/BaconBrawl_Castle.zip"));
+        assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.MILK_THE_COW, "source-maps/Milk the Cow/Milk_BobsFarm.zip"));
+        assertFalse(SourceMapCatalog.resourcePathBelongsToGame(
+                ArcadePortGame.WITHER_ASSAULT, "source-maps/Milk the Cow/Milk_BobsFarm.zip"));
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
                 ArcadePortGame.PAINTBALL, "source-maps/Super Paintball/SP_Arena.zip"));
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(
@@ -112,8 +118,8 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheFourteenGamesNotCoveredByDedicatedMechanicsModules() {
-        assertEquals(14, ArcadePortGame.values().length);
+    @Test void exposesTheSixteenGamesNotCoveredByDedicatedMechanicsModules() {
+        assertEquals(16, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -504,7 +510,7 @@ class ArcadePortGameTest {
         assertEquals(1, SourceMapCatalog.MapData.orderedRouteMarkers(start, null, 0.75D).size());
     }
 
-    @Test void originalMapCatalogEmbedsThirteenSourceWorldsAndLeavesEvolutionExplicitlyUnmapped() {
+    @Test void originalMapCatalogEmbedsFourteenSourceWorldsAndLeavesUnmappedGamesExplicitlyUnmapped() {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BACON_BRAWL));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.BOMB_LOBBERS));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DEATH_TAG));
@@ -519,7 +525,10 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SHEEP_QUEST));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SPLEEF));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.TURF_WARS));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MILK_THE_COW));
+        assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.WITHER_ASSAULT));
         assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.EVOLUTION));
+        assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.WITHER_ASSAULT));
     }
 
     @Test void oneInTheQuiverSourceKitsAndMeleeDamageAreExplicit() {

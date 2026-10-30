@@ -41,6 +41,8 @@ public final class SourceMapCatalog {
             case SHEEP_QUEST -> "maps/sheep-quest.zip";
             case SPLEEF -> "maps/spleef.zip";
             case TURF_WARS -> "maps/turf-wars.zip";
+            case MILK_THE_COW -> "maps/milk-the-cow.zip";
+            case WITHER_ASSAULT -> null;
             default -> null;
         };
     }
@@ -62,6 +64,8 @@ public final class SourceMapCatalog {
             case SHEEP_QUEST -> List.of("Sheep Quest");
             case SPLEEF -> List.of("Speef", "Super Spleef");
             case TURF_WARS -> List.of("Turf Wars");
+            case MILK_THE_COW -> List.of("Milk the Cow");
+            case WITHER_ASSAULT -> List.of();
             default -> List.of();
         };
     }
