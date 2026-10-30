@@ -1329,6 +1329,19 @@ class ArcadePortGameTest {
         assertEquals(-1, ArcadePortRules.monotonicDragonEscapeProgress(0, 1, 0));
     }
 
+    @Test void dragonEscapeRaceTimeGapUsesCourseDistanceAndSafeSpeed() {
+        assertEquals(2_000L,
+                ArcadePortRules.dragonEscapeCourseTimeGapMillis(25.0D, 15.0D, 5.0D));
+        assertEquals(0L,
+                ArcadePortRules.dragonEscapeCourseTimeGapMillis(10.0D, 15.0D, 5.0D));
+        assertEquals(0L,
+                ArcadePortRules.dragonEscapeCourseTimeGapMillis(Double.NaN, 15.0D, 5.0D));
+        assertEquals(0L,
+                ArcadePortRules.dragonEscapeCourseTimeGapMillis(25.0D, 15.0D, 0.0D));
+        assertEquals(3.0D, ArcadePortRules.DRAGON_ESCAPE_FINISH_RADIUS, 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.DRAGON_ESCAPE_RACE_GAP_ESTIMATED_SPEED, 0.00001D);
+    }
+
     @Test void dragonEscapeRankingUsesCheckpointScoreThenDistanceToNextMarker() {
         assertEquals(-2.0D, ArcadePortRules.dragonEscapeRankScore(0, 2.0D), 0.00001D);
         assertEquals(9_997.0D, ArcadePortRules.dragonEscapeRankScore(1, 3.0D), 0.00001D);
