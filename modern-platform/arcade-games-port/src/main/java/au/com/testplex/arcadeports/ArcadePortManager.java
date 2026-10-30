@@ -7818,7 +7818,9 @@ public final class ArcadePortManager implements Listener {
         }
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             Player participant = entry.getValue();
-            if (participant != null && participant.isOnline()) awardDragonTestGems(entry.getKey(), 10.0D);
+            if (participant != null && participant.isOnline()) {
+                awardDragonTestGems(entry.getKey(), ArcadePortRules.DRAGONS_PARTICIPATION_GEMS);
+            }
         }
     }
 
