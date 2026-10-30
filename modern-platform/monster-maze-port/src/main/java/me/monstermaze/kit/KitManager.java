@@ -577,11 +577,11 @@ public class KitManager implements Listener {
             for (Player observer : Bukkit.getOnlinePlayers()) {
                 boolean visible = observer.getWorld() == target.getWorld() && !isHiddenFrom(observer, target);
                 if (visible) {
-                    observer.showEntity(plugin, icon);
-                    observer.showEntity(plugin, count);
+                    observer.showEntity(plugin.getHostPlugin(), icon);
+                    observer.showEntity(plugin.getHostPlugin(), count);
                 } else {
-                    observer.hideEntity(plugin, icon);
-                    observer.hideEntity(plugin, count);
+                    observer.hideEntity(plugin.getHostPlugin(), icon);
+                    observer.hideEntity(plugin.getHostPlugin(), count);
                 }
             }
         }
