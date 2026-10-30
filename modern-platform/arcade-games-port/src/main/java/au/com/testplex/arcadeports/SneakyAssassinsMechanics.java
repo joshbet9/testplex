@@ -148,6 +148,15 @@ final class SneakyAssassinsMechanics {
         return kitPreferences.getOrDefault(playerId, "escape-artist");
     }
 
+    String statusText(UUID playerId) {
+        int count = powerUpCounts.getOrDefault(playerId, 0);
+        long now = System.currentTimeMillis();
+        int seconds = globalRevealEndsAt > now ? 0
+                : (int) Math.max(0L, (nextGlobalRevealAt - now + 999L) / 1_000L);
+        return "power-ups " + count + "/5 | "
+                + (masterAssassins.contains(playerId) ? "MASTER" : "reveal " + seconds + "s");
+    }
+
     void buildArena(World world) {
         for (int x = -22; x <= 22; x++) {
             for (int z = -22; z <= 22; z++) {
