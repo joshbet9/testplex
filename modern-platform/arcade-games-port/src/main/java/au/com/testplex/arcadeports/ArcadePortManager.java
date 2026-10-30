@@ -2299,13 +2299,22 @@ public final class ArcadePortManager implements Listener {
 
     private void handleQuiverMeleeHit(Session session, Player attacker, Player target) {
         String kit = session.quiverKits.getOrDefault(attacker.getUniqueId(), "leaper");
-        double damage = ArcadePortRules.quiverMeleeDamage(kit);
+        ItemStack held = attacker.getInventory().getItemInMainHand();
+        Material heldType = held == null ? Material.AIR : held.getType();
+        boolean holdingKitWeapon = switch (kit) {
+            case "brawler" -> heldType == Material.IRON_SWORD;
+            case "enchanter" -> heldType == Material.STONE_SWORD;
+            case "slam-shot" -> heldType == Material.DIAMOND_SHOVEL;
+            case "ninja" -> heldType == Material.GOLDEN_SWORD;
+            default -> heldType == Material.STONE_SWORD;
+        };
+        // Mineplex's Strength perk adds one damage to Brawler's normal fist punch too;
+        // the kit weapon's sword/shovel damage must not leak into bare-hand or bow-punch hits.
+        double damage = ArcadePortRules.quiverMeleeDamage(kit, holdingKitWeapon);
         if (ArcadePortRules.shouldRemoveQuiverInvisibilityOnHit(true, "ninja".equals(kit))) {
             clearQuiverCloak(session, attacker.getUniqueId());
         }
         if (target.getHealth() <= damage) {
-            ItemStack held = attacker.getInventory().getItemInMainHand();
-            Material heldType = held == null ? Material.AIR : held.getType();
             if (heldType.isAir() || heldType == Material.BOW) {
                 int fistKills = session.quiverFistKills.merge(attacker.getUniqueId(), 1, Integer::sum);
                 if (ArcadePortRules.shouldAwardQuiverFistPunchKills(fistKills)) {
@@ -2332,9 +2341,8 @@ public final class ArcadePortManager implements Listener {
         ignored.add(shooter.getUniqueId());
         Player struckPlayer = alivePlayers(session).stream()
                 .filter(candidate -> !ignored.contains(candidate.getUniqueId()))
-                .min(java.util.Comparator.comparingDouble(candidate -> Math.min(
-                        candidate.getLocation().distanceSquared(impact),
-                        candidate.getEyeLocation().distanceSquared(impact))))
+                .min(java.util.Comparator.comparingDouble(candidate ->
+                        candidate.getLocation().distanceSquared(impact)))
                 .orElse(null);
         if (struckPlayer == null) return;
 
@@ -2343,19 +2351,25 @@ public final class ArcadePortManager implements Listener {
         if (!ArcadePortRules.isQuiverReboundImpactInRange(bodyDistanceSquared, eyeDistanceSquared)) return;
         ignored.add(struckPlayer.getUniqueId());
 
-        // Preserve the source ignore set and choose the nearest unused player without
-        // an arbitrary target range. The source simply stops when no new target exists.
+        // The original perk picks the next unused target from the arrow's impact point,
+        // not from the player struck by the rebound. Its trajectory then curves upward
+        // slightly and scales arrow power with the distance to that next target.
         Player nextTarget = alivePlayers(session).stream()
                 .filter(candidate -> !ignored.contains(candidate.getUniqueId()))
                 .min(java.util.Comparator.comparingDouble(candidate ->
-                        candidate.getLocation().distanceSquared(struckPlayer.getLocation())))
+                        candidate.getLocation().distanceSquared(impact)))
                 .orElse(null);
         if (nextTarget == null) return;
 
-        Location origin = struckPlayer.getEyeLocation().clone();
-        Vector trajectory = nextTarget.getEyeLocation().toVector().subtract(origin.toVector());
+        Location struckLocation = struckPlayer.getLocation();
+        double distance = struckLocation.distance(nextTarget.getLocation());
+        Vector trajectory = nextTarget.getLocation().toVector().subtract(struckLocation.toVector());
         if (trajectory.lengthSquared() < 0.001D) return;
-        Arrow rebound = session.world.spawnArrow(origin, trajectory.normalize(), 1.2F, 0.0F);
+        trajectory.normalize().add(new Vector(0.0D,
+                ArcadePortRules.quiverReboundVerticalArc(distance), 0.0D));
+        Location origin = struckPlayer.getEyeLocation().clone().add(trajectory.clone().normalize());
+        Arrow rebound = session.world.spawnArrow(origin, trajectory,
+                (float) ArcadePortRules.quiverReboundPower(distance), 0.0F);
         rebound.setShooter(shooter);
         session.entities.add(rebound);
         UUID reboundId = rebound.getUniqueId();
