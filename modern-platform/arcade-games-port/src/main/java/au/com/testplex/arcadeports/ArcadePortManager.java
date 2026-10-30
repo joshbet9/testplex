@@ -755,7 +755,7 @@ public final class ArcadePortManager implements Listener {
             // Source ParseData colours ties blue: only a strictly closer red marker gets red turf.
             boolean redSide = surface.distanceSquared(session.turfRedFront)
                     < surface.distanceSquared(session.turfBlueFront);
-            surface.getBlock().setType(redSide ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA, false);
+            surface.getBlock().setType(redSide ? Material.RED_TERRACOTTA : Material.LIGHT_BLUE_TERRACOTTA, false);
         }
         session.turfFrontlineX = session.turfRedFront.getBlockX();
         session.turfInitialFrontlineX = session.turfFrontlineX;
@@ -831,7 +831,7 @@ public final class ArcadePortManager implements Listener {
         if (block == null) return -1;
         Material type = block.getType();
         if (type == Material.RED_TERRACOTTA) return 0;
-        if (type == Material.BLUE_TERRACOTTA) return 1;
+        if (type == Material.LIGHT_BLUE_TERRACOTTA) return 1;
         return -1;
     }
 
@@ -1968,7 +1968,7 @@ public final class ArcadePortManager implements Listener {
         for (int x = -HALF_SIZE; x <= HALF_SIZE; x++) {
             for (int z = -HALF_SIZE; z <= HALF_SIZE; z++) {
                 Material floor = type == ArcadePortGame.TURF_WARS
-                        ? (x <= -1 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA) : type.floor();
+                        ? (x <= -1 ? Material.RED_TERRACOTTA : Material.LIGHT_BLUE_TERRACOTTA) : type.floor();
                 world.getBlockAt(x, 63, z).setType(floor, false);
                 if (walls && (Math.abs(x) == HALF_SIZE || Math.abs(z) == HALF_SIZE)) {
                     for (int y = 64; y <= 66; y++) world.getBlockAt(x, y, z).setType(Material.BLACKSTONE, false);
@@ -3598,7 +3598,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private int countTurfWarsWool(Player player, int team) {
-        Material wool = team == 0 ? Material.RED_WOOL : team == 1 ? Material.BLUE_WOOL : Material.AIR;
+        Material wool = team == 0 ? Material.RED_WOOL : team == 1 ? Material.LIGHT_BLUE_WOOL : Material.AIR;
         return wool == Material.AIR ? 0 : inventoryCount(player, wool);
     }
 
@@ -3626,7 +3626,7 @@ public final class ArcadePortManager implements Listener {
         if (active != session) return;
         trackTurfWarsComeback(session);
         updateTurfWarsBarrages(session, now);
-        if (session.ticks % 3 == 0) updateTurfWarsTerritory(session, now);
+        updateTurfWarsTerritory(session, now);
         if (active != session) return;
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
@@ -3637,7 +3637,7 @@ public final class ArcadePortManager implements Listener {
             if (now >= constructorAt) {
                 // PerkConstructor: one team-coloured wool every four seconds, up to the kit cap.
                 if (countTurfWarsWool(player, team) < ArcadePortRules.turfWarsConstructorMax(kit)) {
-                    Material wool = team == 0 ? Material.RED_WOOL : team == 1 ? Material.BLUE_WOOL : Material.AIR;
+                    Material wool = team == 0 ? Material.RED_WOOL : team == 1 ? Material.LIGHT_BLUE_WOOL : Material.AIR;
                     if (wool != Material.AIR) {
                         player.getInventory().addItem(new ItemStack(wool, 1));
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8F, 1.0F);
@@ -3733,14 +3733,14 @@ public final class ArcadePortManager implements Listener {
     private void giveTurfWarsWool(Session session, Player player) {
         int team = session.teams.getOrDefault(player.getUniqueId(), -1);
         if (team < 0) return;
-        Material wool = team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL;
+        Material wool = team == 0 ? Material.RED_WOOL : Material.LIGHT_BLUE_WOOL;
         player.getInventory().addItem(new ItemStack(wool, ArcadePortRules.TURF_WARS_BUILD_PHASE_WOOL));
     }
 
     private void giveTurfWarsStartingWool(Session session, Player player) {
         int team = session.teams.getOrDefault(player.getUniqueId(), -1);
         if (team < 0) return;
-        Material wool = team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL;
+        Material wool = team == 0 ? Material.RED_WOOL : Material.LIGHT_BLUE_WOOL;
         player.getInventory().addItem(new ItemStack(wool, ArcadePortRules.TURF_WARS_STARTING_WOOL));
     }
 
@@ -9359,7 +9359,7 @@ public final class ArcadePortManager implements Listener {
             for (int line = 0; line < linesPerKill; line++) {
                 // The opponent's current frontline marks the strip being captured next.
                 Location boundary = (team == 0 ? session.turfBlueFront : session.turfRedFront).clone();
-                Material turf = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
+                Material turf = team == 0 ? Material.RED_TERRACOTTA : Material.LIGHT_BLUE_TERRACOTTA;
                 for (Location tile : session.turfSurfaceLocations) {
                     if (!ArcadePortRules.turfWarsTileOnMarkerLine(tile.getBlockX(), tile.getBlockZ(),
                             boundary.getBlockX(), boundary.getBlockZ(), session.turfAxisX, session.turfAxisZ)) continue;
@@ -9388,7 +9388,7 @@ public final class ArcadePortManager implements Listener {
             int delta = team == 0 ? linesPerKill : -linesPerKill;
             int nextFrontline = oldFrontline + delta;
             session.turfFrontlineX = nextFrontline;
-            Material turf = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
+            Material turf = team == 0 ? Material.RED_TERRACOTTA : Material.LIGHT_BLUE_TERRACOTTA;
             List<Integer> capturedColumns = ArcadePortRules.turfWarsCapturedColumns(
                     oldFrontline, nextFrontline, team,
                     session.turfFrontlineMinX, session.turfFrontlineMaxXExclusive);
@@ -12235,7 +12235,7 @@ public final class ArcadePortManager implements Listener {
                 if (turfArrow.getShooter() instanceof Player shooter) {
                     shooter.playSound(shooter.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 0.7F, 1.5F);
                     String base = localStatsPath(shooter.getUniqueId(), "turf-wars");
-                    if (woolType == Material.RED_WOOL || woolType == Material.BLUE_WOOL) {
+                    if (woolType == Material.RED_WOOL || woolType == Material.LIGHT_BLUE_WOOL) {
                         plugin.getConfig().set(base + "blocks-broken",
                                 plugin.getConfig().getInt(base + "blocks-broken", 0) + 1);
                     }
@@ -12477,7 +12477,7 @@ public final class ArcadePortManager implements Listener {
 
     private boolean isTurfWarsProtectedKitItem(ItemStack item) {
         if (item == null || item.getType().isAir()) return false;
-        return item.getType() == Material.RED_WOOL || item.getType() == Material.BLUE_WOOL
+        return item.getType() == Material.RED_WOOL || item.getType() == Material.LIGHT_BLUE_WOOL
                 || isTurfWarsFletchedArrow(item);
     }
 
@@ -13132,13 +13132,13 @@ public final class ArcadePortManager implements Listener {
             int team = session.teams.getOrDefault(event.getPlayer().getUniqueId(), -1);
             Material broken = event.getBlock().getType();
             if (isTurfWarsWool(broken)) {
-                if ((team == 0 && broken == Material.BLUE_WOOL)
+                if ((team == 0 && broken == Material.LIGHT_BLUE_WOOL)
                         || (team == 1 && broken == Material.RED_WOOL)) {
                     event.setCancelled(true);
                     return;
                 }
                 if ((team == 0 && broken == Material.RED_WOOL)
-                        || (team == 1 && broken == Material.BLUE_WOOL)) {
+                        || (team == 1 && broken == Material.LIGHT_BLUE_WOOL)) {
                     event.setDropItems(false);
                     event.setExpToDrop(0);
                     String base = "local-stats." + event.getPlayer().getUniqueId() + ".turf-wars.";
@@ -13219,8 +13219,8 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.TURF_WARS) {
             Player player = event.getPlayer();
             int team = session.teams.getOrDefault(player.getUniqueId(), -1);
-            Material ownWool = team == 0 ? Material.RED_WOOL : Material.BLUE_WOOL;
-            Material ownTurf = team == 0 ? Material.RED_TERRACOTTA : Material.BLUE_TERRACOTTA;
+            Material ownWool = team == 0 ? Material.RED_WOOL : Material.LIGHT_BLUE_WOOL;
+            Material ownTurf = team == 0 ? Material.RED_TERRACOTTA : Material.LIGHT_BLUE_TERRACOTTA;
             Block placed = event.getBlockPlaced();
             boolean allowed = !session.turfCombat && session.alive.contains(player.getUniqueId())
                     && (team == 0 || team == 1) && placed.getType() == ownWool
@@ -13237,7 +13237,7 @@ public final class ArcadePortManager implements Listener {
                 boolean aboveClay = false;
                 for (int y = 1; y <= 5; y++) {
                     Material below = placed.getRelative(0, -y, 0).getType();
-                    if (below == Material.RED_TERRACOTTA || below == Material.BLUE_TERRACOTTA) {
+                    if (below == Material.RED_TERRACOTTA || below == Material.LIGHT_BLUE_TERRACOTTA) {
                         aboveClay = true;
                         break;
                     }
