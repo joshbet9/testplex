@@ -71,6 +71,16 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         if (manager != null) manager.shutdown();
     }
 
+    /** Public bridge for standalone games whose mechanics live in a separate plugin JAR. */
+    public void recordSnakeStats(java.util.UUID playerId, boolean won, int kills, boolean knockedOut,
+                                 int lifetimeKills, int lifetimeSlimes, int bestTailLength,
+                                 java.util.Set<String> achievements) {
+        if (manager != null) {
+            manager.recordSnakeStats(playerId, won, kills, knockedOut,
+                    lifetimeKills, lifetimeSlimes, bestTailLength, achievements);
+        }
+    }
+
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
