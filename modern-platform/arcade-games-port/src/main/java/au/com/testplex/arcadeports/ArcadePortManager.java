@@ -1660,6 +1660,26 @@ public final class ArcadePortManager implements Listener {
                 barrier.setType(Material.GLASS, false);
             }
         }
+        if (type == ArcadePortGame.MICRO_BATTLES && session.microBarrierBlocks.isEmpty()) {
+            // Source-map fallback: retain the same two-block team-island glass rings as the generated arena.
+            for (int team = 0; team < 4; team++) {
+                Location island = microSourceMap == null ? islandSpawn(team * 2) : microTeamCenter(session, team);
+                int cx = island.getBlockX(), cy = island.getBlockY(), cz = island.getBlockZ();
+                for (int offset = -4; offset <= 4; offset++) {
+                    for (int y = cy; y <= ArcadePortRules.microBattlesBarrierTopY(cy); y++) {
+                        Block[] ring = {
+                                session.world.getBlockAt(cx + offset, y, cz - 4),
+                                session.world.getBlockAt(cx + offset, y, cz + 4),
+                                session.world.getBlockAt(cx - 4, y, cz + offset),
+                                session.world.getBlockAt(cx + 4, y, cz + offset)
+                        };
+                        for (Block barrier : ring) {
+                            if (barrier.getType() == Material.GLASS) session.microBarrierBlocks.add(barrier);
+                        }
+                    }
+                }
+            }
+        }
         if (type == ArcadePortGame.DEATH_TAG) {
             SourceMapCatalog.MapData deathTagMap = sourceMapData.get(type.id());
             if (deathTagMap != null) {
@@ -14825,6 +14845,24 @@ public final class ArcadePortManager implements Listener {
                 } else {
                     player.sendMessage(ChatColor.YELLOW + "There are no living Spleef players to track.");
                 }
+            }
+            return;
+        }
+        if (session.type == ArcadePortGame.MICRO_BATTLES
+                && !session.alive.contains(player.getUniqueId()) && isMicroTrackingCompass(heldItem)) {
+            event.setCancelled(true);
+            if (event.getAction().isRightClick()) {
+                openMicroCompassMenu(session, player);
+            } else if (event.getAction().isLeftClick()) {
+                long now = System.currentTimeMillis();
+                long readyAt = session.microSpectateNextTeleportAt.getOrDefault(player.getUniqueId(), 0L);
+                if (now < readyAt) return;
+                Player target = nearestMicroSpectateTarget(session, player);
+                if (target != null) {
+                    player.teleport(target.getLocation().clone().add(0.0D, 1.0D, 0.0D));
+                    player.setCompassTarget(target.getLocation());
+                    session.microSpectateNextTeleportAt.put(player.getUniqueId(), now + 3_000L);
+                } else player.sendMessage(ChatColor.YELLOW + "There are no living opponents to track.");
             }
             return;
         }
