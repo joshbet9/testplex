@@ -61,7 +61,10 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityTargetEvent;
+import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
@@ -1323,6 +1326,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.SKY_WARS) {
             prepareSkyWarsMap(session);
+            spawnSkyWarsGuardians(session);
             session.skyWarsTntGenerator = skyWarsTntGenerator(session);
             if (session.skyWarsTntGenerator != null) {
                 session.skyWarsGeneratorBase = session.skyWarsTntGenerator.getBlock().getRelative(BlockFace.DOWN);
@@ -3658,6 +3662,144 @@ public final class ArcadePortManager implements Listener {
                 + island + ", connector=" + connector + ", middle=" + middle + ".");
     }
 
+    private void spawnSkyWarsGuardians(Session session) {
+        SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.SKY_WARS.id());
+        if (map == null) return;
+        for (Location spawn : map.customLocations("RED")) {
+            if (spawn == null || spawn.getWorld() != session.world) continue;
+            Zombie guardian = session.world.spawn(spawn.clone(), Zombie.class);
+            guardian.setRemoveWhenFarAway(false);
+            guardian.setCustomName(ChatColor.DARK_RED + "Zombie Guardian");
+            guardian.setCustomNameVisible(true);
+            var maxHealth = guardian.getAttribute(Attribute.MAX_HEALTH);
+            if (maxHealth != null) maxHealth.setBaseValue(15.0D);
+            guardian.setHealth(15.0D);
+            guardian.addPotionEffect(new PotionEffect(PotionEffectType.FIRE_RESISTANCE,
+                    Integer.MAX_VALUE, 0, false, false, false));
+            var equipment = guardian.getEquipment();
+            if (equipment != null) {
+                equipment.setArmorContents(new ItemStack[] {
+                        new ItemStack(Material.GOLDEN_BOOTS),
+                        new ItemStack(Material.GOLDEN_LEGGINGS),
+                        new ItemStack(Material.GOLDEN_CHESTPLATE),
+                        new ItemStack(Material.GOLDEN_HELMET) });
+                equipment.setBootsDropChance(0.0F);
+                equipment.setLeggingsDropChance(0.0F);
+                equipment.setChestplateDropChance(0.0F);
+                equipment.setHelmetDropChance(0.0F);
+            }
+            guardian.setCanPickupItems(false);
+            session.skyWarsGuardianHomes.put(guardian.getUniqueId(), spawn.clone());
+            session.entities.add(guardian);
+        }
+        plugin.getLogger().info("Spawned " + session.skyWarsGuardianHomes.size()
+                + " SkyWars Zombie Guardians from the selected map's RED datapoints.");
+    }
+
+    private void updateSkyWarsGuardians(Session session) {
+        for (Map.Entry<UUID, Location> entry : new ArrayList<>(session.skyWarsGuardianHomes.entrySet())) {
+            Entity entity = Bukkit.getEntity(entry.getKey());
+            if (!(entity instanceof Zombie guardian) || !guardian.isValid()) {
+                session.skyWarsGuardianHomes.remove(entry.getKey());
+                continue;
+            }
+            Location home = entry.getValue();
+            boolean targetLost = guardian.getTarget() == null
+                    || guardian.getTarget().getLocation().distanceSquared(home) > 64.0D;
+            boolean strayed = guardian.getLocation().distanceSquared(home) > 64.0D;
+            if (targetLost || strayed) {
+                guardian.setTarget(null);
+                if (strayed) guardian.getPathfinder().moveTo(home, 1.0D);
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSkyWarsGuardianTarget(EntityTargetLivingEntityEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SKY_WARS
+                || !session.skyWarsGuardianHomes.containsKey(event.getEntity().getUniqueId())
+                || event.getTarget() == null) return;
+        Location home = session.skyWarsGuardianHomes.get(event.getEntity().getUniqueId());
+        if (home != null && event.getTarget().getLocation().distanceSquared(home) > 64.0D) {
+            event.setCancelled(true);
+            if (event.getEntity() instanceof Zombie guardian) guardian.setTarget(null);
+        }
+    }
+
+    @EventHandler
+    public void onSkyWarsGuardianCombust(EntityCombustEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.SKY_WARS
+                && session.skyWarsGuardianHomes.containsKey(event.getEntity().getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSkyWarsGuardianDamage(EntityDamageEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SKY_WARS
+                || !(event.getEntity() instanceof Zombie)
+                || !session.skyWarsGuardianHomes.containsKey(event.getEntity().getUniqueId())) return;
+        if (event.getCause() == EntityDamageEvent.DamageCause.ENTITY_EXPLOSION
+                || event.getCause() == EntityDamageEvent.DamageCause.BLOCK_EXPLOSION) {
+            // Legacy CustomDamageEvent replaces all explosion mitigation with a flat eight damage.
+            event.setDamage(8.0D);
+        }
+    }
+
+    @EventHandler
+    public void onSkyWarsGuardianDeath(EntityDeathEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SKY_WARS
+                || !session.skyWarsGuardianHomes.containsKey(event.getEntity().getUniqueId())) return;
+        session.skyWarsGuardianHomes.remove(event.getEntity().getUniqueId());
+        session.entities.remove(event.getEntity());
+        event.getDrops().clear();
+        event.setDroppedExp(0);
+        List<SkyWarsLootPool> middlePools = skyWarsLootPools(2);
+        if (!middlePools.isEmpty()) {
+            SkyWarsLootPool pool = middlePools.get(ThreadLocalRandom.current().nextInt(middlePools.size()));
+            ItemStack reward = rollSkyWarsPoolItem(pool);
+            if (reward != null) event.getDrops().add(reward);
+        }
+        if (event.getEntity() instanceof Zombie guardian && guardian.getKiller() != null) {
+            Player killer = guardian.getKiller();
+            String statPath = localStatsPath(killer.getUniqueId(), "skywars") + "zombie-guardian-kills";
+            plugin.getConfig().set(statPath, plugin.getConfig().getInt(statPath, 0) + 1);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSkyWarsGeneratorPickup(EntityPickupItemEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SKY_WARS
+                || session.skyWarsGeneratorDropId == null
+                || !event.getItem().getUniqueId().equals(session.skyWarsGeneratorDropId)) return;
+        event.setCancelled(true);
+        if (!(event.getEntity() instanceof Player player)
+                || !session.skyWarsLive || !session.alive.contains(player.getUniqueId())) return;
+
+        Item drop = event.getItem();
+        ItemStack reward = drop.getItemStack().clone();
+        Map<Integer, ItemStack> overflow = player.getInventory().addItem(reward);
+        for (ItemStack item : overflow.values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), item);
+        }
+        session.entities.remove(drop);
+        drop.remove();
+        session.skyWarsGeneratorDrop = null;
+        session.skyWarsGeneratorDropId = null;
+        if (session.skyWarsGeneratorBase != null) session.skyWarsGeneratorBase.setType(Material.IRON_BLOCK, false);
+        session.skyWarsNextTntAt = System.currentTimeMillis()
+                + SkyWarsMixedArcadeRules.TNT_GENERATOR_INTERVAL_MILLIS;
+        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.8F, 1.35F);
+        player.sendActionBar(ChatColor.GREEN + "Throwable TNT collected!");
+        String statPath = localStatsPath(player.getUniqueId(), "skywars") + "bomb-pickups";
+        plugin.getConfig().set(statPath, plugin.getConfig().getInt(statPath, 0) + 1);
+    }
+
     private Location skyWarsTntGenerator(Session session) {
         SourceMapCatalog.MapData map = sourceMapData.get(ArcadePortGame.SKY_WARS.id());
         if (map == null) return null;
@@ -4103,7 +4245,10 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
-        if (session.type == ArcadePortGame.SKY_WARS) updateSkyWars(session, now);
+        if (session.type == ArcadePortGame.SKY_WARS) {
+            updateSkyWarsGuardians(session);
+            updateSkyWars(session, now);
+        }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWarsPhase(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
         if (session.type == ArcadePortGame.GLADIATORS) updateGladiators(session, now);
@@ -11269,7 +11414,8 @@ public final class ArcadePortManager implements Listener {
         if (session == null || event.getBlock().getWorld() != session.world) return;
         if (session.type == ArcadePortGame.SKY_WARS) {
             boolean protectedBlock = event.getBlock().getType() == Material.BEDROCK
-                    || event.getBlock().getType() == Material.BARRIER;
+                    || event.getBlock().getType() == Material.BARRIER
+                    || event.getBlock().equals(session.skyWarsGeneratorBase);
             if (!session.alive.contains(event.getPlayer().getUniqueId()) || !session.skyWarsLive || protectedBlock) {
                 event.setCancelled(true);
             } else {
@@ -13071,6 +13217,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> skyWarsLastDamagedAt = new HashMap<>();
         final Map<UUID, Long> skyWarsLastTntThrowAt = new HashMap<>();
         final Map<UUID, UUID> skyWarsTntOwners = new HashMap<>();
+        final Map<UUID, Location> skyWarsGuardianHomes = new HashMap<>();
         Item skyWarsGeneratorDrop;
         UUID skyWarsGeneratorDropId;
         Block skyWarsGeneratorBase;
