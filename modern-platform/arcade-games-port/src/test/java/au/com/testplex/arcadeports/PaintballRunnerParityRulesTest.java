@@ -36,6 +36,7 @@ final class PaintballRunnerParityRulesTest {
     void paintballImpactDoesNotChangeUnpaintableBlocks() {
         assertNull(ArcadePortRules.paintballPaintedBlock(Material.STONE, 0));
         assertNull(ArcadePortRules.paintballPaintedBlock(Material.GLASS, 1));
+        assertNull(ArcadePortRules.paintballPaintedBlock(Material.BLUE_GLAZED_TERRACOTTA, 1));
         assertNull(ArcadePortRules.paintballPaintedBlock(null, 0));
     }
 
