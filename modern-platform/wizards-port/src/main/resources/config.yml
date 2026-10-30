@@ -1,0 +1,9 @@
+# Standalone Wizards acceptance test defaults. No resource pack is downloaded or required.
+test-mode: true
+arena-world: wizards_arena
+arena-radius: 48
+chest-count: 32
+allow-solo-start: true
+minimum-players: 2
+kits:
+  default: MAGE
