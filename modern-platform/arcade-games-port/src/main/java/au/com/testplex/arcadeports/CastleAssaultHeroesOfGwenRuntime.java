@@ -16,6 +16,7 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.EnderCrystal;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.FallingBlock;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
@@ -29,6 +30,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
@@ -80,6 +82,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private static final long MOBA_PASSIVE_GOLD_INTERVAL = 5_000L;
     private static final long MOBA_TOWER_UPDATE_INTERVAL = 1_000L;
     private static final long MOBA_CAPTURE_UPDATE_INTERVAL = 1_000L;
+    private static final long MOBA_WITHER_EARTHQUAKE_INTERVAL = 4_000L;
+    private static final double MOBA_WITHER_TARGET_SPEED = 4.0D;
+    private static final double MOBA_WITHER_HOME_SPEED = 6.0D;
+    private static final double MOBA_WITHER_EARTHQUAKE_RADIUS = 8.0D;
+    private static final double MOBA_WITHER_EARTHQUAKE_DAMAGE = 4.0D;
     private static final double MOBA_TOWER_RANGE_SQUARED = 100.0D;
     private static final double MOBA_CAPTURE_POINT_RANGE_SQUARED = 25.0D;
     private static final double MOBA_TOWER_DAMAGE = 3.0D;
@@ -109,6 +116,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final List<CapturePointState> capturePoints = new ArrayList<>();
     private final Map<Integer, Wither> withers = new HashMap<>();
     private final Map<Integer, Boolean> witherDamageable = new HashMap<>();
+    private final Map<Integer, Location> witherHomes = new HashMap<>();
+    private final Map<Integer, List<Location>> witherBoundaries = new HashMap<>();
+    private final Map<Integer, UUID> witherTargets = new HashMap<>();
+    private final Map<Integer, Long> witherNextEarthquakeAt = new HashMap<>();
+    private final Set<FallingBlock> witherDebris = new HashSet<>();
     private final List<Location> objectiveTntSpawns = new ArrayList<>();
     private final List<Block> castleChests = new ArrayList<>();
     private final Map<UUID, Integer> castleKillStreaks = new HashMap<>();
@@ -313,6 +325,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (maxHealth != null) maxHealth.setBaseValue(275.0D);
         wither.setHealth(275.0D);
         wither.setAI(false);
+        wither.setGravity(false);
         wither.setInvulnerable(false);
         wither.setSilent(true);
         wither.setRemoveWhenFarAway(false);
@@ -322,6 +335,132 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         entities.add(wither);
         withers.put(team, wither);
         witherDamageable.put(team, false);
+        witherHomes.put(team, location.clone());
+        String boundaryMarker = team == 0 ? "ORANGE" : "LIGHT_BLUE";
+        List<Location> boundary = map.dataLocations(boundaryMarker).stream().map(Location::clone).toList();
+        witherBoundaries.put(team, boundary);
+        witherNextEarthquakeAt.put(team, System.currentTimeMillis() + MOBA_WITHER_EARTHQUAKE_INTERVAL);
+    }
+
+    private void updateMobaWithers(long now) {
+        for (int team = 0; team < 2; team++) {
+            Wither wither = withers.get(team);
+            Location home = witherHomes.get(team);
+            if (wither == null || !wither.isValid() || home == null) continue;
+
+            Player target = witherTargets.containsKey(team) ? players.get(witherTargets.get(team)) : null;
+            if (!isValidWitherTarget(team, target)) {
+                target = activeMatchPlayers().stream()
+                        .filter(player -> isValidWitherTarget(team, player))
+                        .min(java.util.Comparator.comparingDouble(player ->
+                                player.getLocation().distanceSquared(home)))
+                        .orElse(null);
+                if (target == null) witherTargets.remove(team);
+                else witherTargets.put(team, target.getUniqueId());
+            }
+
+            Location goal = target == null ? home : target.getLocation();
+            moveWitherDirectly(wither, goal, target == null
+                    ? MOBA_WITHER_HOME_SPEED : MOBA_WITHER_TARGET_SPEED);
+            if (target != null) {
+                long nextAttack = witherNextEarthquakeAt.getOrDefault(team, now);
+                if (now >= nextAttack) {
+                    earthquakeWither(team, wither);
+                    witherNextEarthquakeAt.put(team, now + MOBA_WITHER_EARTHQUAKE_INTERVAL);
+                }
+            }
+        }
+    }
+
+    private boolean isValidWitherTarget(int team, Player target) {
+        return target != null && target.isOnline() && activePlayers.contains(target.getUniqueId())
+                && teams.getOrDefault(target.getUniqueId(), -1) == 1 - team
+                && isInsideWitherBoundary(team, target.getLocation());
+    }
+
+    private boolean isInsideWitherBoundary(int team, Location location) {
+        List<Location> points = witherBoundaries.getOrDefault(team, List.of());
+        if (points.size() < 3) return true;
+        double x = location.getX();
+        double z = location.getZ();
+        boolean inside = false;
+        for (int i = 0, j = points.size() - 1; i < points.size(); j = i++) {
+            double xi = points.get(i).getX();
+            double zi = points.get(i).getZ();
+            double xj = points.get(j).getX();
+            double zj = points.get(j).getZ();
+            boolean crosses = (zi > z) != (zj > z)
+                    && x < (xj - xi) * (z - zi) / ((zj - zi) == 0.0D ? 0.000001D : zj - zi) + xi;
+            if (crosses) inside = !inside;
+        }
+        return inside;
+    }
+
+    private void moveWitherDirectly(Wither wither, Location goal, double sourceSpeed) {
+        Location current = wither.getLocation();
+        Vector direction = goal.toVector().subtract(current.toVector());
+        if (direction.lengthSquared() < 4.0D) return;
+        current.setDirection(direction);
+        current.add(direction.normalize().multiply(sourceSpeed / 20.0D));
+        wither.teleport(current);
+        wither.setVelocity(new Vector());
+    }
+
+    private void earthquakeWither(int team, Wither wither) {
+        Location center = wither.getLocation();
+        for (Entity entity : world.getNearbyEntities(center, MOBA_WITHER_EARTHQUAKE_RADIUS,
+                MOBA_WITHER_EARTHQUAKE_RADIUS, MOBA_WITHER_EARTHQUAKE_RADIUS)) {
+            if (!(entity instanceof Player player) || !activePlayers.contains(player.getUniqueId())
+                    || teams.getOrDefault(player.getUniqueId(), -1) == team) continue;
+            double distance = Math.min(center.distance(player.getLocation()),
+                    center.distance(player.getEyeLocation()));
+            if (distance >= MOBA_WITHER_EARTHQUAKE_RADIUS) continue;
+            double proximity = 1.0D - distance / MOBA_WITHER_EARTHQUAKE_RADIUS;
+            double damage = MOBA_WITHER_EARTHQUAKE_DAMAGE * (proximity + 0.5D);
+            if (player.getHealth() <= damage) {
+                hooks.eliminate(player, null, "was struck by the enemy Wither's Earthquake");
+            } else {
+                player.setHealth(player.getHealth() - damage);
+            }
+            Vector knockback = player.getLocation().toVector().subtract(center.toVector());
+            if (knockback.lengthSquared() > 0.001D) {
+                player.setVelocity(knockback.normalize().setY(1.0D));
+            }
+        }
+
+        int radius = (int) MOBA_WITHER_EARTHQUAKE_RADIUS;
+        int minY = Math.max(world.getMinHeight(), center.getBlockY() - radius);
+        int maxY = Math.min(world.getMaxHeight() - 1, center.getBlockY() + radius);
+        for (int x = center.getBlockX() - radius; x <= center.getBlockX() + radius; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = center.getBlockZ() - radius; z <= center.getBlockZ() + radius; z++) {
+                    Block block = world.getBlockAt(x, y, z);
+                    if (block.getType().isAir() || !block.getRelative(BlockFace.UP).getType().isAir()
+                            || block.getLocation().distanceSquared(center) > radius * radius
+                            || ThreadLocalRandom.current().nextDouble() > 0.1D) continue;
+                    FallingBlock debris = world.spawnFallingBlock(
+                            block.getLocation().add(0.5D, 1.0D, 0.5D), block.getBlockData());
+                    debris.setHurtEntities(false);
+                    debris.setDropItem(false);
+                    Vector trajectory = debris.getLocation().toVector().subtract(center.toVector());
+                    if (trajectory.lengthSquared() > 0.001D) {
+                        debris.setVelocity(trajectory.normalize().multiply(0.25D)
+                                .setY(0.7D + ThreadLocalRandom.current().nextDouble()));
+                    }
+                    witherDebris.add(debris);
+                }
+            }
+        }
+        world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 1.0F, 0.7F);
+        world.spawnParticle(Particle.EXPLOSION, center, 2, 0.4D, 0.3D, 0.4D, 0.02D);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onWitherDebrisLand(EntityChangeBlockEvent event) {
+        if (event.getEntity() instanceof FallingBlock falling && witherDebris.remove(falling)) {
+            event.setCancelled(true);
+            falling.remove();
+        }
     }
 
     private Location findTowerCrystalBase(Location location) {
@@ -615,6 +754,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void tickHeroesOfGwen(long now) {
+        updateMobaWithers(now);
         if (now >= nextGoldAt) {
             for (Player player : activeMatchPlayers()) addGold(player, 20, "Passive gold");
             for (CapturePointState point : capturePoints) {
@@ -1725,6 +1865,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         openStores.clear();
         entities.clear();
+        for (FallingBlock debris : new HashSet<>(witherDebris)) {
+            if (debris != null && debris.isValid()) debris.remove();
+        }
+        witherDebris.clear();
+        witherTargets.clear();
+        witherHomes.clear();
+        witherBoundaries.clear();
+        witherNextEarthquakeAt.clear();
         castleKillStreaks.clear();
         castleAssaultPlayerKits.clear();
         castleArcherNextArrowAt.clear();
