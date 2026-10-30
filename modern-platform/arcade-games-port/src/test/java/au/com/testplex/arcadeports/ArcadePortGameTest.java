@@ -1386,7 +1386,7 @@ class ArcadePortGameTest {
                 ArcadePortRules.dragonEscapeNextTntChargeAt(-1_000L) - (-1_000L));
     }
 
-    @Test void dragonEscapeDisruptorMineArmsThenTriggersOnlyForNearbyOpponents() {
+    @Test void dragonEscapeDisruptorMineTriggersOnlyOnArmedOpponentPickup() {
         assertFalse(ArcadePortRules.shouldTriggerDragonEscapeDisruptor(39, 0.5D, false));
         assertFalse(ArcadePortRules.shouldTriggerDragonEscapeDisruptor(40, 2.01D, false));
         assertFalse(ArcadePortRules.shouldTriggerDragonEscapeDisruptor(80, 1.0D, true));
