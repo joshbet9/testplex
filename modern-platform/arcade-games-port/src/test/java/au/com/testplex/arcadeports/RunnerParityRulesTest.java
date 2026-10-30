@@ -54,10 +54,12 @@ final class RunnerParityRulesTest {
     @Test
     void leastRepresentedAlternativeWinsWhenEveryColourAppearsOnTheMap() {
         assertEquals("green", ArcadePortRules.resolveRunnerTrailColour("cyan",
-                Map.of("cyan", 10, "white", 6, "orange", 5, "magenta", 7,
-                        "light-blue", 4, "yellow", 8, "lime", 9, "pink", 7,
-                        "gray", 5, "light-gray", 6, "purple", 3, "blue", 4,
-                        "brown", 2, "green", 1, "black", 3)));
+                Map.ofEntries(
+                        Map.entry("cyan", 10), Map.entry("white", 6), Map.entry("orange", 5),
+                        Map.entry("magenta", 7), Map.entry("light-blue", 4), Map.entry("yellow", 8),
+                        Map.entry("lime", 9), Map.entry("pink", 7), Map.entry("gray", 5),
+                        Map.entry("light-gray", 6), Map.entry("purple", 3), Map.entry("blue", 4),
+                        Map.entry("brown", 2), Map.entry("green", 1), Map.entry("black", 3))));
     }
 
     @Test
