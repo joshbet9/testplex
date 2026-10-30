@@ -309,6 +309,10 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
+          scp_opts=(-P "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=40)
           # Every modern deployment used to leave a full maps archive under a new commit-specific
           # directory in /var/tmp. The legacy and modern deploy jobs share one Hyper-V disk and are
           # serialized by testplex-isolated-hyperv-server, so only these generated staging directories
