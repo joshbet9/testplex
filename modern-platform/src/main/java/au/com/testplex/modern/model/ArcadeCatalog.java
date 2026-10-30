@@ -135,14 +135,15 @@ public final class ArcadeCatalog {
 
         register(game("paintball", "Paintball", "SNOWBALL", "Control lanes with paintball weapons and team colours.",
                 GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
-                List.of(line("weapon-personality", "Weapon Personality", "Per-weapon identity; projectile mechanics remain unchanged.", "CROSSBOW",
-                        single("chrome-marker", "Chrome Marker", "A reflective chrome finish."),
-                        single("splatter-cannon", "Splatter Cannon", "A chunky paint cannon silhouette."),
-                        single("neon-suppressor", "Neon Suppressor", "A bright, angular weapon finish.")),
-                     line("paint-impact", "Paint Impact Signature", "A unique splat silhouette for impacts.", "SLIME_BALL",
-                        single("colourburst", "Colourburst", "A radial paint bloom."),
-                        single("paint-drip", "Paint Drip", "Paint droplets slide down the hit point."),
-                        single("stencil-stamp", "Stencil Stamp", "A team-coloured stencil flashes briefly."))),
+                List.of(lineMulti("weapon-and-pellet-identity", "Weapon & Pellet Identity",
+                        "Equip one visible weapon finish and one visible in-flight pellet style. Both are shown to all players.",
+                        "CROSSBOW",
+                        grouped("chrome-marker", "Chrome Marker", "A reflective metal finish for your held paintball weapon.", "weapon"),
+                        grouped("splatter-cannon", "Splatter Cannon", "A chunky crossbow-like paint cannon finish.", "weapon"),
+                        grouped("neon-suppressor", "Neon Suppressor", "A bright amethyst-and-neon weapon finish.", "weapon"),
+                        grouped("colourburst", "Colourburst Pellets", "A radial team-coloured paint bloom follows every pellet.", "pellet"),
+                        grouped("paint-drip", "Paint Drip Pellets", "A droplet-shaped team-coloured trail follows every pellet.", "pellet"),
+                        grouped("stencil-stamp", "Stencil Stamp Pellets", "A compact square stencil pattern follows every pellet.", "pellet"))),
                 win("paint-wall", "Paint Wall", "A team-coloured mural paints in behind the winner."),
                 win("marker-medal", "Marker Medal", "A medal assembles from paint-marker parts."),
                 win("splatter-crown", "Splatter Crown", "A crown of layered paint splashes")));
@@ -230,6 +231,10 @@ public final class ArcadeCatalog {
 
     private static CosmeticOption single(String id, String name, String description) {
         return new CosmeticOption(id, name, description);
+    }
+
+    private static CosmeticOption grouped(String id, String name, String description, String selectionGroup) {
+        return new CosmeticOption(id, name, description, selectionGroup);
     }
 
     private static CosmeticOption win(String id, String name, String description) {
