@@ -15,7 +15,9 @@ public final class SkyWarsMixedArcadeRules {
     public static final double FINAL_BORDER_SIZE = 32.0D;
     public static final long TNT_GENERATOR_INTERVAL_MILLIS = 15_000L;
     public static final int TNT_PER_DROP = 2;
-    public static final long TNT_THROW_FUSE_TICKS = 40L;
+    public static final long TNT_THROW_FUSE_TICKS = 60L;
+    public static final long TNT_THROW_COOLDOWN_MILLIS = 500L;
+    public static final double TNT_THROW_STRENGTH = 1.6D;
 
     public static boolean hasRoom(int queuedPlayers) {
         return queuedPlayers < MAX_PLAYERS;
