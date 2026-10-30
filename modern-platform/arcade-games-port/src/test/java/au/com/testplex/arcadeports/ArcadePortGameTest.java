@@ -1595,6 +1595,13 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(false, false, false));
     }
 
+    @Test void gladiatorsFirstLossMovesToLowerBracketAndSecondLossEliminates() {
+        assertFalse(ArcadePortRules.shouldEliminateGladiatorAfterLoss(0));
+        assertFalse(ArcadePortRules.shouldEliminateGladiatorAfterLoss(1));
+        assertTrue(ArcadePortRules.shouldEliminateGladiatorAfterLoss(2));
+        assertTrue(ArcadePortRules.shouldEliminateGladiatorAfterLoss(3));
+    }
+
     @Test void gladiatorsHalfHeartAchievementUsesOneHealthPoint() {
         assertTrue(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(1.0D));
         assertTrue(ArcadePortRules.shouldAwardGladiatorsHalfHeartWin(0.5D));
