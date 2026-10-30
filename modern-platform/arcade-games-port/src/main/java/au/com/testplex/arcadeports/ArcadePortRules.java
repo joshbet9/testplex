@@ -1660,14 +1660,32 @@ public final class ArcadePortRules {
     }
 
     public static double quiverMeleeDamage(String kit) {
+        return quiverMeleeDamage(kit, true);
+    }
+
+    /** Kit weapon damage applies only while its own weapon is held; punching uses base damage. */
+    public static double quiverMeleeDamage(String kit, boolean holdingKitWeapon) {
         String value = normalizeQuiverKit(kit);
         if (value == null) value = "leaper";
+        if (!holdingKitWeapon) return "brawler".equals(value) ? 2.0D : 1.0D;
         return switch (value) {
             case "brawler" -> 7.0D;
             case "slam-shot" -> 5.5D;
             case "ninja" -> 4.0D;
             default -> 5.0D;
         };
+    }
+
+    /** Reborn's Chain Arrows gain speed with travel distance, capped at 1.2. */
+    public static double quiverReboundPower(double targetDistance) {
+        if (!Double.isFinite(targetDistance)) return 0.8D;
+        return Math.min(1.2D, 0.8D + Math.max(0.0D, targetDistance) / 30.0D);
+    }
+
+    /** Reborn adds a small upward arc proportional to the distance between rebound targets. */
+    public static double quiverReboundVerticalArc(double targetDistance) {
+        if (!Double.isFinite(targetDistance)) return 0.0D;
+        return Math.max(0.0D, targetDistance) / 100.0D;
     }
 
     /** Leaper flight can be re-enabled only on landing, never during the launch frame. */
