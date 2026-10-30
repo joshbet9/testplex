@@ -2201,4 +2201,10 @@ class ArcadePortGameTest {
         assertEquals(1, ArcadePortRules.turfWarsTimeoutLeader(-1, 4, 5));
         assertEquals(-1, ArcadePortRules.turfWarsTimeoutLeader(-1, 5, 5));
     }
+    @Test void sneakyAssassinsUsesTheGeneratedTownUntilTheLegacyMapArchiveExists() {
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.SNEAKY_ASSASSINS).isEmpty());
+        assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.SNEAKY_ASSASSINS));
+        assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.SNEAKY_ASSASSINS));
+    }
+
 }
