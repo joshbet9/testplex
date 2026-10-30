@@ -529,7 +529,7 @@ jobs:
 
           sudo -n install -o monstermaze -g monstermaze -m 0644 "$paper_tmp" "$SERVER_DIR/paper.jar"
           # Install the platform catalogue, Monster Maze (whose core feedback/nameplate features are in this port),
-          # and the Arcade mechanics module. Only Bacon Brawl, Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball and Runner are enabled for live acceptance; all other games remain gated.
+          # and the Arcade mechanics module. Bacon Brawl, Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball, Runner and Spleef are enabled for live acceptance; all other games remain gated.
           for jar in TestplexModernArcade.jar MonsterMazeModern.jar ArcadeMechanicsModern.jar; do
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
           done
@@ -723,7 +723,7 @@ jobs:
             exit 1
           fi
           sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR"
-          echo "Modern Paper 26.3 is ready with Monster Maze, Bacon Brawl, Bomb Lobbers, Dragon Escape, Paintball and Runner available for in-game acceptance; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
+          echo "Modern Paper 26.3 is ready with Monster Maze, Bacon Brawl, Bomb Lobbers, Dragon Escape, Dragons, Gladiators, Paintball, Runner and Spleef available for in-game acceptance; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "Legacy services were not stopped, restarted, or overwritten by this workflow."
           REMOTE_DEPLOY
 
