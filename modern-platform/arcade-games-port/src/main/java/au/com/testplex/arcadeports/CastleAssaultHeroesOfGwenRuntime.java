@@ -310,8 +310,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private static int teamFromMarker(String marker) {
         String upper = marker.toUpperCase(Locale.ROOT);
-        if (upper.matches(".*\\bRED\\b.*")) return 0;
-        if (upper.matches(".*\\b(BLUE|AQUA|CYAN)\\b.*")) return 1;
+        String[] parts = upper.split("[ _-]+");
+        for (String part : parts) {
+            if ("RED".equals(part)) return 0;
+            if ("BLUE".equals(part) || "AQUA".equals(part) || "CYAN".equals(part)) return 1;
+        }
         return -1;
     }
 
@@ -747,8 +750,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void checkTeamDeparture() {
         for (int team = 0; team < 2; team++) {
+            final int currentTeam = team;
             boolean hasOnlinePlayer = players.values().stream().anyMatch(player -> player.isOnline()
-                    && teams.getOrDefault(player.getUniqueId(), -1) == team);
+                    && teams.getOrDefault(player.getUniqueId(), -1) == currentTeam);
             if (!hasOnlinePlayer) {
                 int winner = 1 - team;
                 hooks.finish(firstPlayerOnTeam(winner), winner, "opposing team left the match");
@@ -830,6 +834,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         meta.setLore(List.of(ChatColor.GRAY + lore));
         item.setItemMeta(meta);
         return item;
+    }
+
+    void onPlayerEliminated(Player player) {
+        if (player == null || game != ArcadePortGame.CASTLE_ASSAULT
+                || !player.getUniqueId().equals(objectiveCarrier)) return;
+        restoreCarrierHelmet(player);
+        objectiveCarrier = null;
+        objectiveRespawnAt = System.currentTimeMillis() + objectiveDelay();
     }
 
     void onPlayerKill(Player killer) {
