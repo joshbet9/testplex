@@ -40,6 +40,8 @@ import org.bukkit.entity.Projectile;
 import org.bukkit.entity.Sheep;
 import org.bukkit.entity.Snowball;
 import org.bukkit.entity.TNTPrimed;
+import org.bukkit.entity.TextDisplay;
+import org.bukkit.entity.Display;
 import org.bukkit.entity.ThrownPotion;
 import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
@@ -2674,6 +2676,67 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    /**
+     * Shared floating warning over players who are within the border warning distance.
+     * The TextDisplay is a world entity, so nearby players all see the same warning.
+     */
+    private void updateMicroBorderWarnings(Session session) {
+        if (active != session || session.type != ArcadePortGame.MICRO_BATTLES) {
+            removeAllMicroBorderWarnings(session);
+            return;
+        }
+        WorldBorder border = session.world.getWorldBorder();
+        Location center = border.getCenter();
+        Set<UUID> showing = new HashSet<>();
+        for (Player player : alivePlayers(session)) {
+            Location location = player.getLocation();
+            boolean nearBorder = ArcadePortRules.shouldShowMicroBattlesBorderParticles(
+                    location.getX(), location.getZ(), center.getX(), center.getZ(), border.getSize());
+            if (!nearBorder) continue;
+
+            UUID playerId = player.getUniqueId();
+            showing.add(playerId);
+            TextDisplay warning = session.microBorderWarnings.get(playerId);
+            Location aboveHead = location.clone().add(0.0D, 2.35D, 0.0D);
+            if (warning == null || !warning.isValid()) {
+                warning = session.world.spawn(aboveHead, TextDisplay.class);
+                warning.setText(ChatColor.GOLD + "" + ChatColor.BOLD + "⚠ BORDER");
+                warning.setBillboard(Display.Billboard.CENTER);
+                warning.setAlignment(TextDisplay.TextAlignment.CENTER);
+                warning.setSeeThrough(true);
+                warning.setShadowed(true);
+                warning.setDefaultBackground(false);
+                warning.setLineWidth(120);
+                warning.setPersistent(false);
+                warning.setGravity(false);
+                warning.setInvulnerable(true);
+                warning.setSilent(true);
+                warning.setViewRange(1.2F);
+                session.microBorderWarnings.put(playerId, warning);
+            } else {
+                // Follow every game tick so the label stays directly above a moving player.
+                warning.teleport(aboveHead);
+            }
+        }
+
+        for (UUID playerId : new HashSet<>(session.microBorderWarnings.keySet())) {
+            if (!showing.contains(playerId)) removeMicroBorderWarning(session, playerId);
+        }
+    }
+
+    private void removeMicroBorderWarning(Session session, UUID playerId) {
+        if (session == null || playerId == null) return;
+        TextDisplay warning = session.microBorderWarnings.remove(playerId);
+        if (warning != null && warning.isValid()) warning.remove();
+    }
+
+    private void removeAllMicroBorderWarnings(Session session) {
+        if (session == null) return;
+        for (UUID playerId : new HashSet<>(session.microBorderWarnings.keySet())) {
+            removeMicroBorderWarning(session, playerId);
+        }
+    }
+
     /** The source cue is a shared vertical wall marker, positioned at the nearest world-border face. */
     private void updateMicroBattlesBorderParticles(Session session) {
         if (active != session || session.type != ArcadePortGame.MICRO_BATTLES
@@ -3188,6 +3251,7 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.MICRO_BATTLES) updateMicroBarrier(session, now);
         if (session.type == ArcadePortGame.GLADIATORS) updateGladiators(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            updateMicroBorderWarnings(session);
             updateMicroBattlesBorderParticles(session);
             updateMicroSpectatorCompass(session);
             if (session.ticks % 20 == 0) updateMicroLastTwoMission(session);
@@ -6282,6 +6346,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (player.isOnline()) {
             if (session.type == ArcadePortGame.MICRO_BATTLES) {
+                removeMicroBorderWarning(session, player.getUniqueId());
                 restoreMicroMiddleGlassCosmetic(session, player);
                 player.getInventory().clear();
                 giveMicroTrackingCompass(player);
@@ -6922,6 +6987,7 @@ public final class ArcadePortManager implements Listener {
         if (active != session) return;
         recordLocalStats(session, winner, announceWinner);
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            removeAllMicroBorderWarnings(session);
             for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
         }
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
@@ -10682,6 +10748,7 @@ public final class ArcadePortManager implements Listener {
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
         session.alive.remove(id);
+        if (session.type == ArcadePortGame.MICRO_BATTLES) removeMicroBorderWarning(session, id);
         if (session.type == ArcadePortGame.BOMB_LOBBERS) updateBombLobbersMvpEligibility(session);
         if (session.type == ArcadePortGame.BACON_BRAWL) {
             session.baconBrutusUntil.remove(id);
@@ -10845,6 +10912,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> microGlassColours = new HashMap<>();
         final Map<UUID, String> microBorderColours = new HashMap<>();
         final Map<UUID, Set<Block>> microPersonalGlassBlocks = new HashMap<>();
+        final Map<UUID, TextDisplay> microBorderWarnings = new HashMap<>();
         boolean microLastTwoAwarded;
         final Map<UUID, Map<Integer, UUID>> microCompassMenuTargets = new HashMap<>();
         final Map<UUID, Long> microSpectateNextTeleportAt = new HashMap<>();
