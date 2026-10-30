@@ -10957,7 +10957,6 @@ public final class ArcadePortManager implements Listener {
         boolean gladiatorWinnerBracketStarted;
         boolean gladiatorLoserBracketStarted;
         String gladiatorMode = "rodless";
-        boolean gladiatorWinnerBracketStarted;
         final Map<UUID, Integer> teams = new HashMap<>();
         final Set<UUID> tagged = new HashSet<>();
         final Set<UUID> alphaChasers = new HashSet<>();
