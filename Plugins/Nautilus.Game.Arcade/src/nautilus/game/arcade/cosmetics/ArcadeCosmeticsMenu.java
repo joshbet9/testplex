@@ -153,7 +153,10 @@ public final class ArcadeCosmeticsMenu implements CommandExecutor, Listener {
                 "Use a Pyro platform; the winner is hit by a dragon while everyone else falls.",
                 feature("pyro-particles", "Pyro Ability Particles", Material.BLAZE_POWDER,
                         "Choose a server-visible Pyro particle style. Visual only; it does not change dragon targeting or damage.",
-                        null, false, "ember", "frost", "ender", "spark", "aurora"));
+                        null, false, "ember", "frost", "ender", "spark", "aurora"),
+                feature("flare-effects", "Flare Effects", Material.FIREWORK,
+                        "Choose the server-visible burst shown to everyone when you launch a Dragon Flare.",
+                        null, false, "classic", "ember", "frost", "ender", "solar", "aurora"));
 
         registerGame("evolution", "Evolution", Material.DRAGON_EGG, (short) 0,
                 "Fly to the top of a building as a chicken, then evolve at the top.",
