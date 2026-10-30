@@ -5053,7 +5053,7 @@ public final class ArcadePortManager implements Listener {
                     line.setSuffix(ChatColor.YELLOW + " " + ArcadePortRules.formatDragonEscapeTime(elapsed));
                 } else if (liveLeader != null) {
                     long gap = dragonEscapeRaceGapMillis(session, liveLeader, racer, now);
-                    line.setSuffix(ChatColor.RED + " +" + ArcadePortRules.formatDragonEscapeTime(gap));
+                    line.setSuffix(ChatColor.RED + " ~+" + ArcadePortRules.formatDragonEscapeTime(gap));
                 } else {
                     line.setSuffix("");
                 }
@@ -5111,7 +5111,7 @@ public final class ArcadePortManager implements Listener {
             } else {
                 long gap = dragonEscapeRaceGapMillis(session, leader, racer, now);
                 prefix = ChatColor.GRAY + "#" + (i + 1) + " " + ChatColor.WHITE + racer.getName()
-                        + ChatColor.RED + " +" + ArcadePortRules.formatDragonEscapeTime(gap);
+                        + ChatColor.RED + " ~+" + ArcadePortRules.formatDragonEscapeTime(gap);
             }
             String tabName = prefix.length() > 64 ? prefix.substring(0, 64) : prefix;
             if (!tabName.equals(racer.getPlayerListName())) racer.setPlayerListName(tabName);
