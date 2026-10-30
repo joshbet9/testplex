@@ -886,18 +886,18 @@ source = source.replace(
 # Bound the actual deployment flow. The modern deploy uploads split JAR/map
 # files with SFTP, then performs remote assembly and checksumming over SSH.
 source = source.replace(
-    'state_lines="$(ssh "\${ssh_opts[@]}" "$remote"',
-    'state_lines="$(timeout --foreground --signal=TERM --kill-after=15s 3m ssh "\${ssh_opts[@]}" "$remote"',
+    'state_lines="$(ssh "${ssh_opts[@]}" "$remote"',
+    'state_lines="$(timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote"',
     1
 )
 source = source.replace(
-    "          ssh \"\${ssh_opts[@]}\" \"$remote\" bash -s <<'REMOTE_PREFLIGHT'",
-    "          timeout --foreground --signal=TERM --kill-after=15s 5m ssh \"\${ssh_opts[@]}\" \"$remote\" bash -s <<'REMOTE_PREFLIGHT'",
+    "          ssh \"${ssh_opts[@]}\" \"$remote\" bash -s <<'REMOTE_PREFLIGHT'",
+    "          timeout --foreground --signal=TERM --kill-after=15s 5m ssh \"${ssh_opts[@]}\" \"$remote\" bash -s <<'REMOTE_PREFLIGHT'",
     1
 )
 source = source.replace(
-    "          ssh \"\${ssh_opts[@]}\" \"$remote\" bash -s -- \"$BUILD_SHA\" <<'REMOTE_STAGE_PREP'",
-    "          timeout --foreground --signal=TERM --kill-after=15s 5m ssh \"\${ssh_opts[@]}\" \"$remote\" bash -s -- \"$BUILD_SHA\" <<'REMOTE_STAGE_PREP'",
+    "          ssh \"${ssh_opts[@]}\" \"$remote\" bash -s -- \"$BUILD_SHA\" <<'REMOTE_STAGE_PREP'",
+    "          timeout --foreground --signal=TERM --kill-after=15s 5m ssh \"${ssh_opts[@]}\" \"$remote\" bash -s -- \"$BUILD_SHA\" <<'REMOTE_STAGE_PREP'",
     1
 )
 source = source.replace(
@@ -906,8 +906,8 @@ source = source.replace(
     1
 )
 source = source.replace(
-    "          ssh \"\${ssh_opts[@]}\" \"$remote\" bash -s -- \"$upload_dir\" <<'REMOTE_ASSEMBLE_ARCADE'",
-    "          timeout --foreground --signal=TERM --kill-after=30s 6m ssh \"\${ssh_opts[@]}\" \"$remote\" bash -s -- \"$upload_dir\" <<'REMOTE_ASSEMBLE_ARCADE'",
+    "          ssh \"${ssh_opts[@]}\" \"$remote\" bash -s -- \"$upload_dir\" <<'REMOTE_ASSEMBLE_ARCADE'",
+    "          timeout --foreground --signal=TERM --kill-after=30s 6m ssh \"${ssh_opts[@]}\" \"$remote\" bash -s -- \"$upload_dir\" <<'REMOTE_ASSEMBLE_ARCADE'",
     1
 )
 source = source.replace(
@@ -916,8 +916,8 @@ source = source.replace(
     1
 )
 source = source.replace(
-    "          ssh \"\${ssh_opts[@]}\" \"$remote\" \"echo 'Disk after transfer:'",
-    "          timeout --foreground --signal=TERM --kill-after=15s 3m ssh \"\${ssh_opts[@]}\" \"$remote\" \"echo 'Disk after transfer:'",
+    "          ssh \"${ssh_opts[@]}\" \"$remote\" \"echo 'Disk after transfer:'",
+    "          timeout --foreground --signal=TERM --kill-after=15s 3m ssh \"${ssh_opts[@]}\" \"$remote\" \"echo 'Disk after transfer:'",
     1
 )
 
