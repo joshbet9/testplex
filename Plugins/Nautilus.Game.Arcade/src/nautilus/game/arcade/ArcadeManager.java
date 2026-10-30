@@ -320,6 +320,20 @@ public class ArcadeManager extends MiniPlugin implements IRelation
 		_serverConfig = serverConfig;
 		_testplexSandbox = readTestplexSandboxMarker();
 
+		if (isTestplexSandbox())
+		{
+			// Keep these Mixed Arcade variants available to the isolated Testplex
+			// game rotation without changing production server game lists.
+			if (!_serverConfig.GameList.contains(GameType.DrawArcade))
+			{
+				_serverConfig.GameList.add(GameType.DrawArcade);
+			}
+			if (!_serverConfig.GameList.contains(GameType.BuildArcade))
+			{
+				_serverConfig.GameList.add(GameType.BuildArcade);
+			}
+		}
+
 		// Modules
 		_blockRestore = Managers.get(BlockRestore.class);
 
