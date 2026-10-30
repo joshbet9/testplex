@@ -10479,6 +10479,11 @@ public final class ArcadePortManager implements Listener {
                     && heldItem.getType() == Material.GOLDEN_SWORD
                     && session.teams.getOrDefault(player.getUniqueId(), 0) == 1
                     && session.alive.contains(player.getUniqueId());
+            boolean forceWitherMinionOrScent = session.type == ArcadePortGame.WITHER_ASSAULT
+                    && heldItem != null && (heldItem.getType() == Material.DIAMOND_SWORD
+                    || heldItem.getType() == Material.COMPASS)
+                    && session.teams.getOrDefault(player.getUniqueId(), 0) == 1
+                    && session.alive.contains(player.getUniqueId());
             boolean forceBombControlClick = session.type == ArcadePortGame.BOMB_LOBBERS
                     && heldItem != null
                     && (heldItem.getType() == Material.TNT
@@ -10487,15 +10492,26 @@ public final class ArcadePortManager implements Listener {
                         || ("waller".equals(bombKit) && heldItem.getType() == Material.STONE_SHOVEL))
                     && (event.getAction().isRightClick() || event.getAction().isLeftClick())
                     && session.alive.contains(player.getUniqueId());
-            if (!forceBaconAbility && !forceBombControlClick && !forceWitherBlast) return;
+            if (!forceBaconAbility && !forceBombControlClick && !forceWitherBlast && !forceWitherMinionOrScent) return;
         }
-        if (session.type == ArcadePortGame.WITHER_ASSAULT && witherLeftClick
-                && session.alive.contains(player.getUniqueId())
-                && session.teams.getOrDefault(player.getUniqueId(), 0) == 1
-                && heldItem != null && heldItem.getType() == Material.GOLDEN_SWORD) {
-            event.setCancelled(true);
-            launchWitherAssaultSkull(session, player, System.currentTimeMillis());
-            return;
+        if (session.type == ArcadePortGame.WITHER_ASSAULT && session.alive.contains(player.getUniqueId())
+                && session.teams.getOrDefault(player.getUniqueId(), 0) == 1 && heldItem != null) {
+            boolean usable = event.getClickedBlock() != null && event.getClickedBlock().getType().isInteractable();
+            if (witherLeftClick && heldItem.getType() == Material.GOLDEN_SWORD) {
+                event.setCancelled(true);
+                launchWitherAssaultSkull(session, player, System.currentTimeMillis());
+                return;
+            }
+            if (!usable && witherLeftClick && heldItem.getType() == Material.DIAMOND_SWORD) {
+                event.setCancelled(true);
+                launchWitherMinions(session, player, System.currentTimeMillis());
+                return;
+            }
+            if (!usable && event.getAction().isRightClick() && heldItem.getType() == Material.COMPASS) {
+                event.setCancelled(true);
+                useWitherScent(session, player, System.currentTimeMillis());
+                return;
+            }
         }
         if (session.type == ArcadePortGame.MILK_THE_COW && event.getAction().isRightClick()
                 && session.alive.contains(player.getUniqueId())
@@ -10847,19 +10863,13 @@ public final class ArcadePortManager implements Listener {
         Material item = held == null ? Material.AIR : held.getType();
 
         if (session.type == ArcadePortGame.MILK_THE_COW && item == Material.BUCKET
-                && session.teams.getOrDefault(player.getUniqueId(), 0) == 0) {
-            if (event.getRightClicked() instanceof Player cowPlayer
-                    && session.teams.getOrDefault(cowPlayer.getUniqueId(), 0) == 1) {
-                event.setCancelled(true);
-                player.getInventory().setItemInMainHand(new ItemStack(Material.MILK_BUCKET));
-                player.playSound(player.getLocation(), Sound.ENTITY_COW_AMBIENT, 0.7F, 1.4F);
-                return;
-            }
-            if (event.getRightClicked() instanceof Cow npcCow && session.milkCowHerd.contains(npcCow)) {
-                event.setCancelled(true);
-                player.getInventory().setItemInMainHand(new ItemStack(Material.MILK_BUCKET));
-                return;
-            }
+                && session.teams.getOrDefault(player.getUniqueId(), 0) == 0
+                && event.getRightClicked() instanceof Player cowPlayer
+                && session.teams.getOrDefault(cowPlayer.getUniqueId(), 0) == 1) {
+            event.setCancelled(true);
+            player.getInventory().setItemInMainHand(new ItemStack(Material.MILK_BUCKET));
+            player.playSound(player.getLocation(), Sound.ENTITY_COW_AMBIENT, 0.7F, 1.4F);
+            return;
         }
         if (session.type == ArcadePortGame.BACON_BRAWL && item == Material.IRON_AXE) {
             String kit = session.baconKits.getOrDefault(player.getUniqueId(), "el-muchacho-pigo");
@@ -11629,8 +11639,15 @@ public final class ArcadePortManager implements Listener {
             Player player = event.getPlayer();
             boolean editor = session.alive.contains(player.getUniqueId())
                     && session.teams.getOrDefault(player.getUniqueId(), 0) == 0
-                    && "editor".equals(session.witherAssaultKits.getOrDefault(player.getUniqueId(), "archer"));
-            if (editor && session.witherEditorBlocks.remove(event.getBlock())) {
+                    && "editor".equals(session.witherAssaultKits.getOrDefault(player.getUniqueId(), "archer"))
+                    && session.witherEditorBlocks.contains(event.getBlock());
+            boolean supportsAnotherHuman = false;
+            if (editor && event.getBlock().getRelative(0, 1, 0).getType().isAir()) {
+                supportsAnotherHuman = alivePlayers(session).stream().anyMatch(human -> !human.equals(player)
+                        && session.teams.getOrDefault(human.getUniqueId(), 1) == 0
+                        && human.getLocation().getBlock().getRelative(0, -1, 0).equals(event.getBlock()));
+            }
+            if (editor && session.witherEditorBlocks.remove(event.getBlock()) && !supportsAnotherHuman) {
                 event.setDropItems(false);
                 event.setExpToDrop(0);
             } else event.setCancelled(true);
@@ -11704,14 +11721,26 @@ public final class ArcadePortManager implements Listener {
                 event.setCancelled(true);
             } else {
                 session.witherEditorBlocks.add(placed);
-                BlockData placedData = placed.getBlockData().clone();
-                BlockData replacedData = event.getBlockReplacedState().getBlockData().clone();
+            }
+            return;
+        }
+        if (session.type == ArcadePortGame.WITHER_ASSAULT && event.getAction() == Action.RIGHT_CLICK_BLOCK
+                && session.alive.contains(event.getPlayer().getUniqueId())
+                && session.teams.getOrDefault(event.getPlayer().getUniqueId(), 1) == 0
+                && session.witherEditorBlocks.contains(event.getClickedBlock())) {
+            ItemStack held = event.getItem();
+            boolean holdingBlock = held != null && held.getType().isBlock();
+            if (!holdingBlock) {
+                Block clicked = event.getClickedBlock();
                 Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                    if (placed.getWorld() == session.world && placed.getBlockData().equals(placedData)) {
-                        placed.setBlockData(replacedData, false);
-                        session.witherEditorBlocks.remove(placed);
+                    if (active == session && clicked != null && clicked.getType() != Material.AIR
+                            && session.witherEditorBlocks.remove(clicked)) {
+                        clicked.getWorld().spawnParticle(Particle.FLAME,
+                                clicked.getLocation().add(0.5D, 0.5D, 0.5D), 1);
+                        clicked.getWorld().playSound(clicked.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 1.0F, 1.0F);
+                        clicked.setType(Material.AIR, false);
                     }
-                }, 40L);
+                }, 5L);
             }
             return;
         }
@@ -11791,6 +11820,19 @@ public final class ArcadePortManager implements Listener {
      * Do not interfere with plugin-owned menus such as the spectator compass menu.
      */
     /** Prevent moving or swapping the source TeamArmorModule's protected gear. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onWitherEditorItemPickup(EntityPickupItemEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.WITHER_ASSAULT
+                || !(event.getEntity() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())
+                || !session.alive.contains(player.getUniqueId())) return;
+        if (session.teams.getOrDefault(player.getUniqueId(), 1) != 0
+                || !"editor".equals(session.witherAssaultKits.getOrDefault(player.getUniqueId(), "archer"))) {
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDeathTagItemPickup(EntityPickupItemEvent event) {
         Session session = active;
@@ -12863,6 +12905,35 @@ public final class ArcadePortManager implements Listener {
             return true;
         }
         return false;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onWitherHumanDoubleJump(org.bukkit.event.player.PlayerToggleFlightEvent event) {
+        Player player = event.getPlayer();
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.WITHER_ASSAULT
+                || !session.alive.contains(player.getUniqueId())
+                || session.teams.getOrDefault(player.getUniqueId(), 1) != 0) return;
+        event.setCancelled(true);
+        UUID id = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        long readyAt = session.witherLeapReadyAt.getOrDefault(id, 0L);
+        if (now < readyAt) {
+            player.setFlying(false);
+            player.setAllowFlight(false);
+            player.sendActionBar(ChatColor.YELLOW + "Double Jump is recharging.");
+            return;
+        }
+        session.witherLeapReadyAt.put(id, now + 6_000L);
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        String kit = session.witherAssaultKits.getOrDefault(id, "archer");
+        double power = "archer".equals(kit) ? 1.2D : 1.0D;
+        Vector direction = player.getLocation().getDirection().normalize().multiply(power);
+        direction.setY(Math.max(0.65D, Math.min(1.0D, Math.abs(direction.getY()) + 0.35D)));
+        player.setVelocity(direction);
+        player.setFallDistance(0.0F);
+        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.8F, 1.2F);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
