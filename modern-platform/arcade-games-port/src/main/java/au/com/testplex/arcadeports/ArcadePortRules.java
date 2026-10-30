@@ -1817,7 +1817,7 @@ public final class ArcadePortRules {
      */
     /** Isolated equivalent of the source KillsWithinGameStatTracker(8, "Annihilation"). */
     public static boolean shouldAwardMicroBattlesAnnihilation(int killsThisGame) {
-        return killsThisGame >= MICRO_BATTLES_ANNIHILATION_KILLS;
+        return killsThisGame == MICRO_BATTLES_ANNIHILATION_KILLS;
     }
 
     /** The Reborn Last2Tracker grants mission progress when exactly two teams remain alive. */
