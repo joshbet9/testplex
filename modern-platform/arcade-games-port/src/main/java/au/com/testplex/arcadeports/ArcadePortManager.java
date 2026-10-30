@@ -5799,7 +5799,7 @@ public final class ArcadePortManager implements Listener {
                 break;
             case 2:
                 player.getInventory().addItem(new ItemStack(Material.IRON_SWORD),
-                        namedItem(Material.TNT, "Creeper Charge", "Right-click to throw an explosive charge.", 3));
+                        namedItem(Material.TNT, "Creeper Charge", "Left-click to throw an explosive charge.", 3));
                 break;
             case 3:
                 player.getInventory().addItem(new ItemStack(Material.STONE_SWORD),
