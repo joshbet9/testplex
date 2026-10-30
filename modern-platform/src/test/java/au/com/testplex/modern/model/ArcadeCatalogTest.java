@@ -35,17 +35,27 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void everyGameHasAnInitialMechanicsPortButNoneIsDeclaredReadyBeforeLiveValidation() {
+    void deathTagIsReadyForInGameAcceptanceWhileOtherPortsRemainInProgress() {
         ArcadeCatalog catalog = new ArcadeCatalog();
+        GameDefinition deathTag = catalog.getGame("death-tag");
+        assertNotNull(deathTag);
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, deathTag.getPortStatus());
+        assertTrue(deathTag.isReadyForTest());
+
         for (GameDefinition game : catalog.getGames()) {
+            if (game.getId().equals("death-tag")) continue;
             assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus(),
-                    game.getId() + " must remain in progress until its modern gameplay is validated");
+                    game.getId() + " must remain in progress until its gameplay parity is validated");
             assertFalse(game.isReadyForTest());
         }
+        long readyForTest = catalog.getGames().stream()
+                .filter(GameDefinition::isReadyForTest)
+                .count();
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS)
                 .count();
-        assertEquals(16, inProgress);
+        assertEquals(1, readyForTest);
+        assertEquals(15, inProgress);
     }
 
     @Test
