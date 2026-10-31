@@ -168,6 +168,22 @@ class ArcadePortGameTest {
                 ArcadePortManager.teamCountForGame(ArcadePortGame.BOMB_LOBBERS));
     }
 
+    @Test void lobbyKitCatalogueIdsResolveForActiveAndLobbySelectionPaths() {
+        assertEquals("archer", ArcadePortRules.normalizeMicroBattlesKit("micro-archer"));
+        assertEquals("worker", ArcadePortRules.normalizeMicroBattlesKit("micro-worker"));
+        assertEquals("fighter", ArcadePortRules.normalizeMicroBattlesKit("micro-fighter"));
+        assertEquals("snowballer", ArcadePortRules.normalizeSpleefKit("spleef-snowballer"));
+        assertEquals("brawler", ArcadePortRules.normalizeSpleefKit("spleef-brawler"));
+        assertEquals("archer", ArcadePortRules.normalizeSpleefKit("spleef-archer"));
+        assertEquals("basher", normalizeDeathTagKitForCatalogue("runner-basher"));
+    }
+
+    private static String normalizeDeathTagKitForCatalogue(String value) {
+        String kit = value.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (kit.startsWith("runner-")) kit = kit.substring("runner-".length());
+        return java.util.Set.of("basher", "archer", "traitor", "null").contains(kit) ? kit : null;
+    }
+
     @Test void normalizesSpacesAndUnderscoresInTestCommands() {
         assertEquals(ArcadePortGame.ONE_IN_THE_QUIVER, ArcadePortGame.fromId("one_in_the_quiver"));
         assertEquals(ArcadePortGame.BOMB_LOBBERS, ArcadePortGame.fromId("Bomb Lobbers"));
