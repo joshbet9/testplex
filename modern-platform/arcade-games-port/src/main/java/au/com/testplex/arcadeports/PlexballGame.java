@@ -853,7 +853,7 @@ public final class PlexballGame implements Listener {
         timing = PlexballRules.timingMultiplier(gradedTimingDistance);
         // Server-tick physics are tuned as a pair: lower contact is a loft,
         // upper contact is a faster line drive, and good timing preserves power.
-        double horizontalSpeed = (4.0D + 1.5D * contactY)
+        double horizontalSpeed = (3.0D + 1.1D * contactY)
                 * (0.65D + 0.35D * timing) * kit.battingPower;
         double verticalSpeed = PlexballRules.clamp(0.47D - 0.25D * contactY, 0.20D, 0.75D);
         if (kit == Kit.SPRINTER) {
