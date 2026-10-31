@@ -29,6 +29,14 @@ class CameraShyRulesTest {
     }
 
     @Test
+    void smokeAndMirrorsRequiresTheCloudToObscureThePursuitBeforeItsWindowExpires() {
+        assertTrue(CameraShyRules.shouldAwardSmokeEscape(true, 5_000L, 7_000L));
+        assertFalse(CameraShyRules.shouldAwardSmokeEscape(false, 5_000L, 7_000L));
+        assertFalse(CameraShyRules.shouldAwardSmokeEscape(true, 7_001L, 7_000L));
+        assertFalse(CameraShyRules.shouldAwardSmokeEscape(true, 5_000L, 0L));
+    }
+
+    @Test
     void fiveExposureThresholdIsInclusive() {
         assertFalse(CameraShyRules.eliminatedAt(4));
         assertTrue(CameraShyRules.eliminatedAt(5));
