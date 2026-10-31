@@ -93,7 +93,7 @@ public final class ArcadeCatalog {
                 win("gene-helix", "Gene Helix", "A double helix spirals into the sky")));
 
         register(game("gladiators", "Gladiators", "IRON_SWORD", "Fight for the last position in the duel arena.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("duel-intro", "Duel Entrance", "A distinct combat entrance before the first hit.", "IRON_SWORD",
                         single("arena-challenger", "Arena Challenger", "An arena bell and crossed-sword flash."),
                         single("red-sand", "Red Sand", "A compact sand burst under the fighter."),
@@ -108,7 +108,7 @@ public final class ArcadeCatalog {
                 win("arena-banners", "Arena Banners", "Banners unfurl around the final combatant")));
 
         register(game("micro-battles", "Micro Battles", "LIGHT_BLUE_STAINED_GLASS", "Fight on tiny platforms as the border closes.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("middle-glass-colour", "Middle Glass Colour",
                                 "Change the starting glass on your island. Only you see your selected colour.", "LIGHT_BLUE_STAINED_GLASS",
                         single("light-blue", "Light Blue", "Personal light-blue starting glass."),
