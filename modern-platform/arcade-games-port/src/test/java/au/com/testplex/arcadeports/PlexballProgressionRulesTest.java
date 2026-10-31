@@ -84,6 +84,9 @@ class PlexballProgressionRulesTest {
             assertNotNull(achievement.icon());
         }
         assertEquals(9, achievementSlugs.size());
+        assertEquals("sweet-spot-75m", PlexballAchievement.SWEET_SPOT.slug());
+        assertEquals("warning-track-95m", PlexballAchievement.WARNING_TRACK.slug());
+        assertEquals("champion-five-win-streak", PlexballAchievement.CHAMPION.slug());
 
         Set<String> milestoneSlugs = new HashSet<>();
         for (PlexballMilestone milestone : PlexballMilestone.values()) {
@@ -92,6 +95,8 @@ class PlexballProgressionRulesTest {
             assertFalse(milestone.configPath(UUID.randomUUID()).isBlank());
             assertFalse(milestone.targetLabel().isBlank());
         }
+        assertEquals(4, milestoneSlugs.size());
+        assertEquals("wall-of-leather-300", milestone(PlexballMilestone.Metric.CATCHES).slug());
     }
 
     private static PlexballMilestone milestone(PlexballMilestone.Metric metric) {
