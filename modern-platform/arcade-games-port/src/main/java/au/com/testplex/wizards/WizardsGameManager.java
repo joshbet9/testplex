@@ -112,6 +112,7 @@ public final class WizardsGameManager implements Listener {
     private final Map<UUID, Objective> matchObjectives = new HashMap<>();
     private final Map<Location, TemporaryBlock> temporaryBlocks = new HashMap<>();
     private final Set<UUID> ownedEntities = new HashSet<>();
+    private final Set<UUID> spellDamageSources = new HashSet<>();
     private final Map<UUID, SpectralArrowData> spectralArrows = new HashMap<>();
     private final Map<UUID, SummonedWolfData> summonedWolves = new HashMap<>();
     private final Map<UUID, ManaBoltData> manaBolts = new HashMap<>();
@@ -1273,6 +1274,25 @@ public final class WizardsGameManager implements Listener {
         event.setDamage(modifier, -event.getDamage() * protection);
     }
 
+    /**
+     * Keep spell damage attributed to its caster without letting the generic
+     * player-melee cap or wand attack handler rewrite/re-enter the spell.
+     */
+    private void damageFromSpell(Player caster, Player victim, double damage) {
+        if (victim == null || !victim.isOnline() || damage <= 0.0D) return;
+        if (caster == null || !caster.isOnline()) {
+            victim.damage(damage);
+            return;
+        }
+        UUID casterId = caster.getUniqueId();
+        spellDamageSources.add(casterId);
+        try {
+            damageFromSpell(caster, victim, damage);
+        } finally {
+            spellDamageSources.remove(casterId);
+        }
+    }
+
     @EventHandler(ignoreCancelled = true)
     public void onDamageByEntity(EntityDamageByEntityEvent event) {
         if (event.getDamager() instanceof LightningStrike lightning
@@ -1287,7 +1307,7 @@ public final class WizardsGameManager implements Listener {
                 int level = lightning.getPersistentDataContainer().getOrDefault(
                         anvilLevelKey, PersistentDataType.INTEGER, 1);
                 victim.setFireTicks(80);
-                victim.damage(WizardsRules.lightningStrikeDamage(level), owner);
+                damageFromSpell(owner, victim, WizardsRules.lightningStrikeDamage(level));
                 victim.getWorld().spawnParticle(Particle.ELECTRIC_SPARK,
                         victim.getLocation().add(0.0D, 1.0D, 0.0D), 18, 0.35D, 0.45D, 0.35D, 0.08D);
             }
@@ -1342,6 +1362,7 @@ public final class WizardsGameManager implements Listener {
         }
 
         if (!(event.getDamager() instanceof Player attacker)) return;
+        if (spellDamageSources.contains(attacker.getUniqueId())) return;
         WizardState state = states.get(attacker.getUniqueId());
         if (!running || state == null || !state.alive) return;
         int slot = attacker.getInventory().getHeldItemSlot();
@@ -1398,7 +1419,7 @@ public final class WizardsGameManager implements Listener {
                 if (owner == null || victim.equals(owner) || !victim.getWorld().equals(location.getWorld())) continue;
                 double distance = victim.getLocation().distance(location);
                 if (distance <= explosionRadius) {
-                    victim.damage(damage == null ? 6.0D : damage, owner);
+                    damageFromSpell(owner, victim, damage == null ? 6.0D : damage);
                     victim.setFireTicks(Math.max(victim.getFireTicks(), 80));
                 }
             }
@@ -1435,7 +1456,7 @@ public final class WizardsGameManager implements Listener {
                 if (!victim.getWorld().equals(impact.getWorld())) continue;
                 double distance = victim.getLocation().distance(impact);
                 if (distance <= radius) {
-                    victim.damage(3.0D + level * 2.0D, owner);
+                    damageFromSpell(owner, victim, 3.0D + level * 2.0D);
                 }
             }
         }
@@ -1843,7 +1864,7 @@ public final class WizardsGameManager implements Listener {
                     end = victim.getEyeLocation();
                     double distance = caster.getEyeLocation().distance(end);
                     double damage = WizardsRules.rainbowBeamDamage(level, distance);
-                    victim.damage(damage, caster);
+                    damageFromSpell(caster, victim, damage);
                     victim.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, victim.getLocation().add(0.0D, 1.0D, 0.0D),
                             18, 0.35D, 0.45D, 0.35D, 0.08D);
                     victim.getWorld().playSound(victim.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0F, 1.2F);
@@ -2174,7 +2195,7 @@ public final class WizardsGameManager implements Listener {
                     double heat = heatRadius - victim.getLocation().distance(napalm);
                     if (heat <= 0.0D) continue;
                     victim.setFireTicks(Math.max(victim.getFireTicks(), (int) (heat * 40.0D)));
-                    if (ticks % 10 == 0) victim.damage(Math.max(0.5D, heat / 1.5D), caster);
+                    if (ticks % 10 == 0) damageFromSpell(caster, victim, Math.max(0.5D, heat / 1.5D));
                 }
 
                 // Legacy Napalm can destroy blocks; modern test arenas instead get reversible flame.
@@ -2311,7 +2332,7 @@ public final class WizardsGameManager implements Listener {
                         double height = feet.getY() - block.getY();
                         if (height < 0.0D || height > 3.0D) continue;
                         hit.add(victim.getUniqueId());
-                        victim.damage(WizardsRules.rumbleDamage(level), caster);
+                        damageFromSpell(caster, victim, WizardsRules.rumbleDamage(level));
                         victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60,
                                 Math.max(0, level - 1), true, true, true));
                         break;
@@ -2342,7 +2363,7 @@ public final class WizardsGameManager implements Listener {
             double distance = victim.getLocation().distance(centre);
             if (distance >= 2.0D) continue;
             double damage = WizardsRules.rumbleExplosionDamage(level);
-            victim.damage(damage, caster);
+            damageFromSpell(caster, victim, damage);
             Vector push = victim.getLocation().toVector().subtract(centre.toVector());
             if (push.lengthSquared() > 0.001D) victim.setVelocity(push.normalize().multiply(0.8D).setY(0.38D));
         }
@@ -2433,7 +2454,7 @@ public final class WizardsGameManager implements Listener {
             double distance = victim.getLocation().distance(centre);
             if (distance > radius + 1.0D) continue;
             double damage = Math.max(1.0D, maxDamage * Math.max(0.15D, 1.0D - distance / (radius + 1.0D)));
-            victim.damage(damage, owner);
+            damageFromSpell(owner, victim, damage);
             Vector push = victim.getLocation().toVector().subtract(centre.toVector());
             if (push.lengthSquared() > 0.001D) victim.setVelocity(push.normalize().multiply(1.0D).setY(0.45D));
         }
@@ -2660,6 +2681,7 @@ public final class WizardsGameManager implements Listener {
             if (entity != null && entity.isValid()) entity.remove();
         }
         ownedEntities.clear();
+        spellDamageSources.clear();
 
         for (Map.Entry<UUID, PlayerSnapshot> entry : snapshots.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());

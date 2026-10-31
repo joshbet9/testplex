@@ -281,10 +281,29 @@ public final class WizardsPaperSmoke extends JavaPlugin {
 
         getLogger().info("WIZARDS_GAMEPLAY_SMOKE|ROUND_STARTED|players=3|map=" + GAMEPLAY_MAP
                 + "|chests=" + chests.size() + "|snapshotCount=" + snapshots.size());
+
+        // Cast a direct-target damage spell through the production handler. This
+        // verifies that magic damage is not accidentally clamped to melee damage.
+        Object rainbowBeam = Enum.valueOf((Class<? extends Enum>) spellType.asSubclass(Enum.class), "RAINBOW_BEAM");
+        known.put(rainbowBeam, 5);
+        Location beamTarget = findSafeLocationNear(owner);
+        require(beamTarget != null, "could not find a safe nearby test location for the direct-target spell");
+        rival.teleport(beamTarget);
         rival.setNoDamageTicks(0);
         rival.setHealth(1.0D);
-        rival.damage(100.0D, owner);
-        require(rival.isDead(), "the first real player-vs-player elimination did not kill the rival");
+        double manaBeforeBeam = ((Number) field(ownerState, "mana")).doubleValue();
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> beamCooldowns = (Map<Object, Object>) field(ownerState, "cooldowns");
+        beamCooldowns.remove(rainbowBeam);
+        castSpell.invoke(wizards, owner, ownerState, rainbowBeam, rival, null);
+        require(rival.isDead(), "Rainbow Beam damage was clamped or failed to eliminate the one-health target");
+        double manaAfterBeam = ((Number) field(ownerState, "mana")).doubleValue();
+        require(Math.abs((manaBeforeBeam - manaAfterBeam) - 17.0D) < 0.01D,
+                "Rainbow Beam did not charge the level-five cost of 17 mana");
+        require(((Number) field(ownerState, "kills")).intValue() == 1,
+                "the direct-target spell elimination was not credited to its caster");
+        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|SPELL_IMPACT|spell=RAINBOW_BEAM|level=5"
+                + "|damageApplied=true|killCredited=true|manaCost=17");
         getLogger().info("WIZARDS_GAMEPLAY_SMOKE|ELIMINATION|victim=" + rival.getName()
                 + "|attacker=" + owner.getName() + "|stage=1");
         gameplayStage = 2;
@@ -323,10 +342,23 @@ public final class WizardsPaperSmoke extends JavaPlugin {
 
         getLogger().info("WIZARDS_GAMEPLAY_SMOKE|SPECTATOR|player=" + rival.getName()
                 + "|aliveRemaining=2|creditedKills=1");
+        // Finish the last opponent with actual half-heart melee hits, ensuring
+        // the cap remains on melee after spell damage has been separated.
         third.setNoDamageTicks(0);
-        third.setHealth(1.0D);
-        third.damage(100.0D, owner);
-        require(third.isDead(), "the final opponent could not be eliminated in live combat");
+        third.setHealth(20.0D);
+        int meleeStrikes = 0;
+        while (!third.isDead() && meleeStrikes < 48) {
+            third.setNoDamageTicks(0);
+            double before = third.getHealth();
+            third.damage(1.0D, owner);
+            double dealt = before - (third.isDead() ? 0.0D : third.getHealth());
+            require(dealt >= 0.49D && dealt <= 0.51D,
+                    "a direct melee strike did not retain the half-heart damage cap (dealt=" + dealt + ")");
+            meleeStrikes++;
+        }
+        require(third.isDead(), "the final opponent could not be eliminated by repeated capped melee hits");
+        require(((Number) field(ownerState, "kills")).intValue() == 2,
+                "the final melee elimination was not credited to its attacker");
         getLogger().info("WIZARDS_GAMEPLAY_SMOKE|ELIMINATION|victim=" + third.getName()
                 + "|attacker=" + owner.getName() + "|stage=2");
         gameplayStage = 3;
@@ -416,6 +448,33 @@ public final class WizardsPaperSmoke extends JavaPlugin {
                 player.getWalkSpeed(), player.getFlySpeed(), player.getFireTicks(),
                 player.getCompassTarget() == null ? null : player.getCompassTarget().clone(),
                 new ArrayList<>(player.getActivePotionEffects()));
+    }
+
+    private Location findSafeLocationNear(Player anchor) {
+        World world = anchor.getWorld();
+        int originX = anchor.getLocation().getBlockX();
+        int originZ = anchor.getLocation().getBlockZ();
+        for (int radius = 2; radius <= 10; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
+                    int x = originX + dx;
+                    int z = originZ + dz;
+                    int y = world.getHighestBlockYAt(x, z) + 1;
+                    Block floor = world.getBlockAt(x, y - 1, z);
+                    Block feet = world.getBlockAt(x, y, z);
+                    Block head = world.getBlockAt(x, y + 1, z);
+                    if (!floor.getType().isSolid() || !feet.isPassable() || !head.isPassable()) continue;
+                    Material ground = floor.getType();
+                    if (ground == Material.MAGMA_BLOCK || ground == Material.CACTUS
+                            || ground == Material.CAMPFIRE || ground == Material.SOUL_CAMPFIRE
+                            || ground == Material.FIRE || ground == Material.SOUL_FIRE
+                            || ground == Material.POWDER_SNOW) continue;
+                    return new Location(world, x + 0.5D, y, z + 0.5D);
+                }
+            }
+        }
+        return null;
     }
 
     private void validateRestoredPlayer(Player player, PlayerBaseline baseline) {
