@@ -6,6 +6,8 @@ enabled-games:
   - one-in-the-quiver
   - bomb-lobbers
   - bacon-brawl
+  - gladiators
+  - micro-battles
 lobby-selected-game: death-tag
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.

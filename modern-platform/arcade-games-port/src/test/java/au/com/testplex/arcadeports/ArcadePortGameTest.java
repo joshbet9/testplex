@@ -734,6 +734,11 @@ class ArcadePortGameTest {
         assertEquals(6, ArcadePortRules.DRAGONS_BARRAGE_MAX_ARROWS);
     }
 
+    @Test void microBattlesUsesTheOriginalSourceMapArchive() {
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MICRO_BATTLES));
+        assertEquals(java.util.List.of("Micro Battle"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.MICRO_BATTLES));
+    }
+
     @Test void microBattlesSourceKitsFletcherAndIronSkinAreExplicit() {
         assertEquals("archer", ArcadePortRules.normalizeMicroBattlesKit("Archer"));
         assertEquals("worker", ArcadePortRules.normalizeMicroBattlesKit("Worker"));
@@ -1886,7 +1891,16 @@ class ArcadePortGameTest {
         assertEquals(3, ArcadePortRules.gladiatorsTierForRound(4));
     }
 
-    @Test void gladiatorsVoteModesExposeTheCorrectClassicToolAvailability() {
+    @Test void gladiatorsVoteModesExposeTheDefaultAndFourVariants() {
+        GladiatorsMode normal = GladiatorsMode.fromId("normal");
+        assertEquals(5, GladiatorsMode.values().length);
+        assertSame(GladiatorsMode.NORMAL, GladiatorsMode.defaultMode());
+        assertSame(GladiatorsMode.NORMAL, normal);
+        assertTrue(normal.rodAvailable());
+        assertTrue(normal.bowAvailable());
+        assertTrue(normal.hasClassicRangedTools());
+        assertSame(GladiatorsMode.NORMAL, GladiatorsMode.fromId("classic"));
+
         assertTrue(GladiatorsMode.fromId("rodless").bowAvailable());
         assertFalse(GladiatorsMode.fromId("rodless").rodAvailable());
         assertTrue(GladiatorsMode.fromId("bowless").rodAvailable());
