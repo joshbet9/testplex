@@ -114,6 +114,18 @@ The validator continues to report direct Reborn imports separately from Wizards 
 
 ### Two-client round lifecycle smoke (1 November 2026)
 
-A follow-up run ([workflow 41215855946](https://github.com/joshbet9/testplex/actions/runs/41215855946)) connected two real offline Minecraft 26.3 clients (protocol 777), queued both through `/arcadeport join wizards`, selected Mage and Sorcerer, and reached the live-round assertions on the standard Haven archive. This confirms the Paper login, command routing, queue, kit selection and round-start path were exercised with real `Player` entities.
+[Paper 26.3 workflow run 41243403665](https://github.com/joshbet9/testplex/actions/runs/41243403665) passed the complete acceptance pipeline. Two real offline Minecraft 26.3 protocol clients (protocol 777) connected to the disposable Paper server, joined through `/arcadeport join wizards`, selected Mage and Sorcerer, and started the standard Haven source map through the shared Arcade lifecycle.
 
-The first gameplay attempt failed the loot assertion: fewer than eight chest inventories remained occupied after `refillChests()`. The production method writes via `Chest#getBlockInventory()` (the live inventory) and then used `chest.update(true, false)` on the earlier `BlockState` snapshot. That redundant snapshot update could overwrite the live inventory contents, so it has been removed. The next CI run requires **every recovered chest** to contain loot after round start, then verifies that one player leaving triggers the winner/finish path and restores both players' original inventories, locations, health, food, game modes and scoreboards. This round-lifecycle gate is pending; Wizards remains disabled from normal rotation and no VM deployment has occurred.
+The first live-round attempt exposed a production chest-refill bug: `refillChests()` modified the live inventory obtained from `Chest#getBlockInventory()`, then called `chest.update(true, false)` on the older `BlockState` snapshot. Applying that stale snapshot could overwrite the just-written loot. The redundant update was removed.
+
+The corrected strict test verified:
+- **20/20** standard and Nano source archives loaded with no generated-arena fallback;
+- **242/242** Haven chest inventories contained loot after round start;
+- both live players received the expected kits, spawn setup, wands and match scoreboards;
+- a player leaving triggered the winner/finish path;
+- both players' original lobby inventories, locations, health, food, game modes and scoreboards were restored;
+- both protocol clients disconnected cleanly when the disposable Paper server shut down.
+
+The [archived per-map result sheet and Paper/client logs](https://github.com/joshbet9/testplex/actions/runs/41243403665/artifacts/13057759700) contain 20 `PASS` rows and one `GAMEPLAY_PASS` row. The complete workflow also passed the Maven builds/tests, standalone Wizards reference build, package metadata checks, and deployment-recovery/shell-syntax checks. The Hyper-V deployment job was skipped; no VM was changed.
+
+This is a real two-player round lifecycle smoke, not a full human gameplay/fidelity review of all 20 maps. The source snapshots still lack Mineplex `WorldConfig.dat`, original team spawn marker metadata and (for eight Nano maps) original chest block records/inventories. Wizards remains disabled from normal Mixed Arcade rotation pending visual and player-led acceptance.
