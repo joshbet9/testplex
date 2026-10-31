@@ -456,41 +456,6 @@ public final class WizardsPaperSmoke extends JavaPlugin {
             float walkSpeed, float flySpeed, int fireTicks, Location compassTarget,
             List<PotionEffect> effects) {}
 
-    private void validateRestoredPlayer(Player player, PlayerBaseline baseline) {
-        require(baseline != null, "missing original lobby baseline for " + player.getName());
-        require(player.getWorld().equals(baseline.world()), player.getName() + " was not restored to the original world");
-        require(player.getLocation().distanceSquared(baseline.location()) <= 1.0D,
-                player.getName() + " was not restored to the original lobby location");
-        require(player.getGameMode() == baseline.gameMode(),
-                player.getName() + " game mode was not restored");
-        require(player.getScoreboard() == baseline.scoreboard(),
-                player.getName() + " scoreboard was not restored");
-        require(Math.abs(player.getHealth() - baseline.health()) < 0.01D,
-                player.getName() + " health was not restored");
-        require(player.getFoodLevel() == baseline.foodLevel()
-                        && Math.abs(player.getSaturation() - baseline.saturation()) < 0.01F,
-                player.getName() + " food/saturation was not restored");
-
-        ItemStack[] actual = player.getInventory().getContents();
-        ItemStack[] expected = baseline.inventory();
-        require(actual.length == expected.length, player.getName() + " inventory size changed after restoration");
-        for (int slot = 0; slot < expected.length; slot++) {
-            ItemStack before = expected[slot];
-            ItemStack after = actual[slot];
-            if (before == null || before.getType().isAir()) {
-                require(after == null || after.getType().isAir(),
-                        player.getName() + " inventory slot " + slot + " was not restored to empty");
-            } else {
-                require(after != null && before.isSimilar(after) && before.getAmount() == after.getAmount(),
-                        player.getName() + " inventory slot " + slot + " was not restored");
-            }
-        }
-    }
-
-    private record PlayerBaseline(
-            World world, Location location, ItemStack[] inventory, GameMode gameMode,
-            Scoreboard scoreboard, double health, int foodLevel, float saturation) {}
-
     private void validateLivePlayer(Player player, Map<Object, Object> states, String expectedKit) throws Exception {
         require(player != null && player.isOnline(), "a queued test client is no longer online");
         require(player.getWorld().equals(gameplayArena), player.getName() + " was not teleported into source arena");
