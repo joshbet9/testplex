@@ -79,6 +79,7 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 | Rotation | After batting, the previous batter joins the fielders for the next player. |
 | Home run | A fair 100m hit is recorded as a home run. |
 | Sudden death | Multiple home-run players take five-second turns; a finalist must hit another home run to survive the round. |
+| Sudden-death timeout | The hard cap only applies survivor elimination after every finalist has had a turn in that round; an interrupted round keeps all remaining finalists eligible and ranks them on completed match performance. |
 | Match cap | The game ends at 180 seconds of wall-clock time, even if server TPS falls below 20. |
 | Cleanup | Ball, tee Interaction and player inventories are cleaned; online participants return to the shared Arcade lobby. |
 | Repeated rounds | Field generation marker prevents rebuilding the entire field on every match. |
