@@ -6612,7 +6612,7 @@ public final class ArcadePortManager implements Listener {
         if(winner==null&&session.participantsAtStart==1)
             winner=session.players.values().stream().filter(p->p!=null&&p.isOnline()).findFirst().orElse(null);
         if (winner != null) {
-            UUID winningId = winningId;
+            UUID winningId = winner.getUniqueId();
             int highest = session.scores.getOrDefault(winningId, Integer.MIN_VALUE);
             List<UUID> tiedFirst = session.scores.entrySet().stream()
                     .filter(entry -> entry.getValue() == highest)
