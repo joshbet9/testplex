@@ -76,6 +76,7 @@ final class SneakyAssassinsMechanics {
     }
 
     private final ArcadeMechanicsModernPlugin plugin;
+    private final Predicate<UUID> isTestPlayer;
     private final NamespacedKey itemKey;
     private final Map<UUID, String> kitPreferences = new HashMap<>();
 
@@ -112,8 +113,9 @@ final class SneakyAssassinsMechanics {
     private Location lastPowerUpLocation;
     private int tick;
 
-    SneakyAssassinsMechanics(ArcadeMechanicsModernPlugin plugin) {
+    SneakyAssassinsMechanics(ArcadeMechanicsModernPlugin plugin, Predicate<UUID> isTestPlayer) {
         this.plugin = plugin;
+        this.isTestPlayer = isTestPlayer == null ? ignored -> false : isTestPlayer;
         this.itemKey = new NamespacedKey(plugin, "sneaky-assassins-item");
     }
 
@@ -1038,6 +1040,12 @@ final class SneakyAssassinsMechanics {
         }
     }
 
+    void onPlayerRespawn(Player player) {
+        if (player == null || !players.containsKey(player.getUniqueId())) return;
+        players.put(player.getUniqueId(), player);
+        if (scoreboard != null && player.isOnline()) player.setScoreboard(scoreboard);
+    }
+
     void onKill(Player killer, Player victim) {
         if (killer == null || !killer.isOnline() || !players.containsKey(killer.getUniqueId())) return;
         if (victim != null && powerUpCounts.getOrDefault(killer.getUniqueId(), 0) == 0
@@ -1078,14 +1086,14 @@ final class SneakyAssassinsMechanics {
     }
 
     private void incrementLocalStat(UUID playerId, String stat) {
-        if (playerId == null) return;
+        if (playerId == null || isTestPlayer.test(playerId)) return;
         String path = localStatPath(playerId, stat);
         plugin.getConfig().set(path, plugin.getConfig().getInt(path, 0) + 1);
         plugin.saveConfig();
     }
 
     private void unlockTheMastersMaster(Player player) {
-        if (player == null) return;
+        if (player == null || isTestPlayer.test(player.getUniqueId())) return;
         String path = "test-achievements.sneaky-assassins." + player.getUniqueId() + ".the-masters-master";
         if (plugin.getConfig().getBoolean(path, false)) return;
         plugin.getConfig().set(path, true);

@@ -244,7 +244,7 @@ public final class ArcadePortManager implements Listener {
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
         this.testPlayers = new ArcadeTestPlayerManager(plugin);
-        this.sneakyAssassins = new SneakyAssassinsMechanics(plugin);
+        this.sneakyAssassins = new SneakyAssassinsMechanics(plugin, testPlayers::isTestPlayer);
         this.statsActionKey = new NamespacedKey(plugin, "stats-action");
         this.statsCategoryKey = new NamespacedKey(plugin, "stats-category");
         this.statsGameKey = new NamespacedKey(plugin, "stats-game");
@@ -19100,6 +19100,9 @@ public final class ArcadePortManager implements Listener {
             Session session = active;
             if (session == null || !session.players.containsKey(playerId)) return;
             session.players.put(playerId, respawned);
+            if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
+                sneakyAssassins.onPlayerRespawn(respawned);
+            }
             plugin.getLogger().fine("Rebound AFK test player " + respawned.getName()
                     + " after FakePlayerPlugin completed its respawn lifecycle for "
                     + session.type.displayName() + ".");
