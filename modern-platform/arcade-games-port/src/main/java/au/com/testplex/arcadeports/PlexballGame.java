@@ -406,6 +406,7 @@ public final class PlexballGame implements Listener {
         batterId = playerId;
         suddenDeath = playoff;
         abilityUsedThisBall.clear();
+        catchUsedThisBall.clear();
         sureHandsArmed.clear();
         catchAttempts.clear();
         ballHistory.clear();
@@ -459,13 +460,21 @@ public final class PlexballGame implements Listener {
 
     private void startPlayoffAtBat() {
         List<UUID> order = new ArrayList<>(finalists);
+        while (suddenDeathTurnIndex < order.size()) {
+            Player candidate = Bukkit.getPlayer(order.get(suddenDeathTurnIndex));
+            if (candidate != null && candidate.isOnline()) break;
+            suddenDeathTurnIndex++;
+        }
         if (suddenDeathTurnIndex >= order.size()) {
             if (roundSurvivors.size() == 1) {
                 finish(List.of(roundSurvivors.iterator().next()), "Survived sudden death!", true);
                 return;
             }
             if (roundSurvivors.isEmpty()) {
-                finish(rankPlayersByRound(order), "No finalist hit another home run. Longest playoff hit wins.", true);
+                List<UUID> completed = order.stream().filter(id -> Bukkit.getPlayer(id) != null
+                        && Bukkit.getPlayer(id).isOnline()).toList();
+                finish(rankPlayersByRound(completed.isEmpty() ? order : completed),
+                        "No finalist hit another home run. Longest playoff hit wins.", true);
                 return;
             }
             finalists.clear();
@@ -476,10 +485,17 @@ public final class PlexballGame implements Listener {
             order = new ArrayList<>(finalists);
             broadcastMatch(ChatColor.GOLD + "Sudden-death round continues: "
                     + finalists.size() + " home-run hitters remain.");
+            while (suddenDeathTurnIndex < order.size()) {
+                Player candidate = Bukkit.getPlayer(order.get(suddenDeathTurnIndex));
+                if (candidate != null && candidate.isOnline()) break;
+                suddenDeathTurnIndex++;
+            }
+            if (suddenDeathTurnIndex >= order.size()) {
+                finish(List.of(), "All remaining finalists disconnected.", true);
+                return;
+            }
         }
-        if (suddenDeathTurnIndex < order.size()) {
-            startAtBat(order.get(suddenDeathTurnIndex), true);
-        }
+        startAtBat(order.get(suddenDeathTurnIndex), true);
     }
 
     private void advanceAfterAttempt() {
