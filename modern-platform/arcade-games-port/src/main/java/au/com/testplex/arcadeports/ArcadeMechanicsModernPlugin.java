@@ -268,6 +268,17 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 ArcadePortGame requestedGame = mixedArcadeVariant ? mixedJoinGame : ArcadePortGame.fromId(args[1]);
                 manager.queue(requestedGame, player, sub.equals("play"), mixedArcadeVariant);
                 return true;
+            case "leave":
+                if (!(sender instanceof Player leavingPlayer)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                if (args.length < 2 || !"plexball".equalsIgnoreCase(args[1])) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport leave plexball");
+                    return true;
+                }
+                if (plexball != null) plexball.leaveQueue(leavingPlayer);
+                return true;
             case "lobby":
             case "selectgame":
                 if (args.length < 2) {
@@ -368,6 +379,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>" + ChatColor.GRAY + " — quick solo test; starts after a short join window");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play plexball" + ChatColor.GRAY + " — queue for Plexball (2-second quick start)");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join plexball" + ChatColor.GRAY + " — join the Plexball queue");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport leave plexball" + ChatColor.GRAY + " — leave the Plexball queue");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <slugger|technician|curve-artist|sprinter|skyguard>" + ChatColor.GRAY + " — select a Plexball kit");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join <game-id>" + ChatColor.GRAY + " — queue to join a multiplayer test");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
