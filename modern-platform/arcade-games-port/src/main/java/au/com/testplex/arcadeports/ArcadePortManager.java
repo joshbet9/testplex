@@ -6612,7 +6612,8 @@ public final class ArcadePortManager implements Listener {
         if(winner==null&&session.participantsAtStart==1)
             winner=session.players.values().stream().filter(p->p!=null&&p.isOnline()).findFirst().orElse(null);
         if (winner != null) {
-            int highest = session.scores.getOrDefault(winner.getUniqueId(), Integer.MIN_VALUE);
+            UUID winningId = winningId;
+            int highest = session.scores.getOrDefault(winningId, Integer.MIN_VALUE);
             List<UUID> tiedFirst = session.scores.entrySet().stream()
                     .filter(entry -> entry.getValue() == highest)
                     .map(Map.Entry::getKey).toList();
@@ -6625,13 +6626,13 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             Map<UUID, Integer> winnerVotes = session.masterBuilderVotes.getOrDefault(
-                    winner.getUniqueId(), Map.of());
+                    winningId, Map.of());
             int winnerVoteSum = winnerVotes.values().stream().mapToInt(Integer::intValue).sum();
             int winnerVoteCount = winnerVotes.size();
             if (winnerVoteCount > 0) {
                 for (Map.Entry<UUID, Integer> scoreEntry : session.scores.entrySet()) {
                     UUID voterId = scoreEntry.getKey();
-                    if (voterId.equals(winner.getUniqueId())) continue;
+                    if (voterId.equals(winningId) || scoreEntry.getValue() >= highest) continue;
                     Integer voteForWinner = winnerVotes.get(voterId);
                     if (voteForWinner == null || voteForWinner <= 1) continue;
                     int hypotheticalWinnerScore = (int) Math.round(
@@ -6640,7 +6641,7 @@ public final class ArcadePortManager implements Listener {
                     boolean wouldHaveWon = ownScore > hypotheticalWinnerScore
                             && session.scores.entrySet().stream()
                                     .filter(other -> !other.getKey().equals(voterId)
-                                            && !other.getKey().equals(winner.getUniqueId()))
+                                            && !other.getKey().equals(winningId))
                                     .allMatch(other -> ownScore > other.getValue());
                     Player voter = session.players.get(voterId);
                     if (wouldHaveWon && voter != null) {
