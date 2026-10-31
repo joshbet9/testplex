@@ -1063,8 +1063,8 @@ public final class PlexballGame implements Listener {
         if (phase != Phase.BATTING || !player.getUniqueId().equals(batterId)) return;
         int pingEstimate = Math.max(0, player.getPing());
         int rewind = PlexballRules.latencyRewindTicks(pingEstimate);
-        long oneWayNanos = Math.min(INPUT_GRACE_NANOS, pingEstimate * 500_000L);
-        long estimatedInputNanos = System.nanoTime() - oneWayNanos;
+        long estimatedInputDelayNanos = Math.min(INPUT_GRACE_NANOS, pingEstimate * 500_000L);
+        long estimatedInputNanos = System.nanoTime() - estimatedInputDelayNanos;
         if (estimatedInputNanos > battingDeadlineNanos) {
             player.sendActionBar(Component.text("TIME — your swing arrived outside the batting window."));
             return;
