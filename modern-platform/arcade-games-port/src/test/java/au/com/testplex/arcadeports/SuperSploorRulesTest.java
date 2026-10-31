@@ -74,6 +74,15 @@ class SuperSploorRulesTest {
     }
 
     @Test
+    void assistsOnlyCountRecentContributionWithinEightSeconds() {
+        assertTrue(SuperSploorRules.isAssistEligible(20_000L, 12_000L));
+        assertTrue(SuperSploorRules.isAssistEligible(20_000L, 19_999L));
+        assertFalse(SuperSploorRules.isAssistEligible(20_001L, 12_000L));
+        assertFalse(SuperSploorRules.isAssistEligible(20_000L, 0L));
+        assertFalse(SuperSploorRules.isAssistEligible(10_000L, 11_000L));
+    }
+
+    @Test
     void overtimeRequiresAOnePercentLeadAndSquidTravelRejectsTeleports() {
         assertEquals(10, SuperSploorRules.overtimeLeadThreshold(1_000));
         assertFalse(SuperSploorRules.hasDecisiveOvertimeLead(500, 509, 1_000));
