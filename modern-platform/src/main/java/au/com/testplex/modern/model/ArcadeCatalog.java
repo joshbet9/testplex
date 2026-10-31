@@ -330,7 +330,7 @@ public final class ArcadeCatalog {
 
         register(game("super-sploor", "Super Sploor", "INK_SAC",
                 "Paint and reclaim territory as a five-kit team in the NANO-inspired Squid Turf War.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("colour-surge", "Colour Surge", "A vivid wash of team-coloured ink rolls across the winning team's podium.")));
     }
