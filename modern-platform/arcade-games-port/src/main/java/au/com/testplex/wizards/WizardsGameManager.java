@@ -118,6 +118,7 @@ public final class WizardsGameManager implements Listener {
     private final Map<Location, TemporaryBlock> temporaryBlocks = new HashMap<>();
     private final Set<UUID> ownedEntities = new HashSet<>();
     private final Set<UUID> spellDamageSources = new HashSet<>();
+    private final Set<UUID> invulnerabilityResetLogged = new HashSet<>();
     private final Map<UUID, SpectralArrowData> spectralArrows = new HashMap<>();
     private final Map<UUID, SummonedWolfData> summonedWolves = new HashMap<>();
     private final Map<UUID, ManaBoltData> manaBolts = new HashMap<>();
@@ -581,12 +582,21 @@ public final class WizardsGameManager implements Listener {
         // The shared Arcade lobby/session may have applied protection immediately
         // before hand-off. Clear it after teleport as well, then once more on the
         // next server tick so a pending lobby transition cannot leak into combat.
+        boolean invulnerableBeforeReset = player.isInvulnerable();
         player.setInvulnerable(false);
+        plugin.getLogger().info("WIZARDS_PLAYER_HANDOFF|player=" + player.getName()
+                + "|phase=after-teleport|wasInvulnerable=" + invulnerableBeforeReset
+                + "|isInvulnerable=" + player.isInvulnerable()
+                + "|world=" + player.getWorld().getName());
         Bukkit.getScheduler().runTask(plugin, () -> {
             WizardState current = states.get(player.getUniqueId());
             if (player.isOnline() && current == state && current.alive
                     && player.getWorld().equals(arena)) {
+                boolean beforeReset = player.isInvulnerable();
                 player.setInvulnerable(false);
+                plugin.getLogger().info("WIZARDS_PLAYER_HANDOFF|player=" + player.getName()
+                        + "|phase=next-tick|wasInvulnerable=" + beforeReset
+                        + "|isInvulnerable=" + player.isInvulnerable());
             }
         });
         applyMatchScoreboard(player);
@@ -666,6 +676,18 @@ public final class WizardsGameManager implements Listener {
         if (!running) {
             if (queueDeadlineTick >= 0L && tick >= queueDeadlineTick) startQueued();
             return;
+        }
+        for (Map.Entry<UUID, WizardState> entry : states.entrySet()) {
+            if (!entry.getValue().alive) continue;
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player == null || !player.isOnline() || !player.getWorld().equals(arena)) continue;
+            if (player.isInvulnerable()) {
+                player.setInvulnerable(false);
+                if (invulnerabilityResetLogged.add(entry.getKey())) {
+                    plugin.getLogger().warning("WIZARDS_PLAYER_HANDOFF|player=" + player.getName()
+                            + "|phase=active-tick|isInvulnerable=" + player.isInvulnerable());
+                }
+            }
         }
         tickSpectralArrows();
         tickSummonedWolves();
@@ -2702,6 +2724,7 @@ public final class WizardsGameManager implements Listener {
         }
         ownedEntities.clear();
         spellDamageSources.clear();
+        invulnerabilityResetLogged.clear();
 
         for (Map.Entry<UUID, PlayerSnapshot> entry : snapshots.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
