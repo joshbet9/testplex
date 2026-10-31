@@ -98,6 +98,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public void returnPlayerToArcadeLobby(Player player) {
         if (manager != null && player != null && player.isOnline()) manager.returnPlayerToLobby(player);
     }
+    /** Stop any previous Arcade session before the Hoops acceptance harness takes ownership. */
+    public void prepareForHoops() {
+        if (manager != null) manager.stop("Hoops Remastered is taking over the shared Arcade test session.");
+    }
+
     public void stopMonsterMazeRound(String reason) {
         if (manager != null) manager.stop(reason == null ? "Monster Maze stopped" : reason);
     }
