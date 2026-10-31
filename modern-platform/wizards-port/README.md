@@ -17,7 +17,7 @@ All spell books, wands, inventory menus and feedback use ordinary Paper/Minecraf
 - All 21 historical spells now have playable implementations: Anvil Drop, Fireball, Flash, Frost Barrier, Gust, Heal, Ice Prison, Ice Shards, Implode, Lightning Strike, Mana Bolt, Napalm, Rainbow Beam, Rainbow Road, Rumble, Spectral Arrow, Speed Boost, Summon Wolves, Trap Rune, Web Shot and Wizard's Compass.
 - Spell maximum levels, mana deltas, cooldown deltas and loot weights are aligned to the original SpellType definitions. Implode's block removal is opt-in (`destructive-spells: true`) so a generated test arena remains reusable; Napalm fire and Rainbow Road blocks expire and restore automatically.
 
-The repository currently has no Wizards map archive. This module therefore creates a clearly-labelled generated arena for mechanics testing; it does not claim the original map layout or source map chest placements.
+The current repository snapshot has no Wizards map ZIPs, but the shared Arcade source-map importer can also use archives already present on the server. It scans the original `update/maps/Wizards` and `update/maps/Nano Wizards` folders under `source-maps.directory` (default `update/maps`, relative to the server process working directory); set that option to an absolute map-root path when the existing Reborn map store is elsewhere. Only ZIPs within those two approved folders are considered, and path traversal or symbolic-link escapes are rejected. When no matching archive is available in either the plugin bundle or the configured server directory, the game creates a clearly-labelled generated arena for mechanics testing; it does not claim the original map layout or source map chest placements.
 
 ## Shared Arcade test commands
 
