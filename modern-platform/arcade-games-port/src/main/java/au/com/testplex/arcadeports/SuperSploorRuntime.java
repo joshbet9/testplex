@@ -51,7 +51,8 @@ import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.util.Vector;
 
 /**
- * First playable Super Sploor core: territory, Sprayer, four-mark splats,
+ * Super Sploor Turf War runtime: shared territory painting, five distinct kits,
+ * secondary and special abilities, four-mark splats, persistent match metrics,
  * respawns and friendly-paint Squid movement. The runtime is hosted by the
  * shared Testplex Arcade manager and never creates its own Bukkit lifecycle.
  */
