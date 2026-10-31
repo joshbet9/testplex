@@ -8,7 +8,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SourceMapCatalogWizardsPoolTest {
@@ -60,14 +62,14 @@ class SourceMapCatalogWizardsPoolTest {
         Path archive = folder.resolve("Wizards_Forest.zip");
         Files.write(archive, new byte[] {1});
 
-        assertTrue(SourceMapCatalog.resolveExternalArchivePath(
-                mapRoot, "source-maps/Wizards/Wizards_Forest.zip").equals(archive.toAbsolutePath().normalize()));
-        assertFalse(SourceMapCatalog.resolveExternalArchivePath(
-                mapRoot, "source-maps/Wizards/../Death Tag/DeathTag_Map.zip") != null);
-        assertFalse(SourceMapCatalog.resolveExternalArchivePath(
-                mapRoot, "source-maps/Wizards/missing.zip") != null);
-        assertFalse(SourceMapCatalog.resolveExternalArchivePath(
-                mapRoot, "source-maps\\Wizards\\Wizards_Forest.zip") != null);
+        assertEquals(archive.toAbsolutePath().normalize(), SourceMapCatalog.resolveExternalArchivePath(
+                mapRoot, "source-maps/Wizards/Wizards_Forest.zip"));
+        assertNull(SourceMapCatalog.resolveExternalArchivePath(
+                mapRoot, "source-maps/Wizards/../Death Tag/DeathTag_Map.zip"));
+        assertNull(SourceMapCatalog.resolveExternalArchivePath(
+                mapRoot, "source-maps/Wizards/missing.zip"));
+        assertNull(SourceMapCatalog.resolveExternalArchivePath(
+                mapRoot, "source-maps\\Wizards\\Wizards_Forest.zip"));
     }
 
     @Test
