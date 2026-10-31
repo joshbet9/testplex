@@ -7,6 +7,7 @@ description: Mechanics-first prototypes for the other 17 Arcade games on Paper 2
 softdepend:
   - TestplexModernArcade
   - packetevents
+  - FakePlayerPlugin
 commands:
   stats:
     description: Open local Testplex Arcade statistics (optionally for an online player).

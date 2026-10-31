@@ -1700,6 +1700,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
+    /** Refresh the UUID-indexed player reference after FakePlayerPlugin respawns a body. */
+    void onPlayerRespawn(Player player) {
+        if (player == null || !players.containsKey(player.getUniqueId())) return;
+        players.put(player.getUniqueId(), player);
+    }
+
     private List<Player> onlinePlayers() {
         List<Player> result = new ArrayList<>();
         for (Player player : players.values()) if (player != null && player.isOnline()) result.add(player);

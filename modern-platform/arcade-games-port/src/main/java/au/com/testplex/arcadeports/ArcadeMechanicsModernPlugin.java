@@ -96,7 +96,14 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
     public void returnPlayerToArcadeLobby(Player player) {
-        if (manager != null && player != null && player.isOnline()) manager.returnPlayerToLobby(player);
+        if (manager != null && player != null && player.isOnline()) {
+            manager.returnPlayerToLobby(player);
+            // Monster Maze calls this once per participant during its end cleanup.
+            // Defer the idle check so its GameManager can finish transitioning to IDLE.
+            Bukkit.getScheduler().runTask(this, () -> {
+                if (manager != null) manager.cleanupTestPlayersIfNoGameIsRunning();
+            });
+        }
     }
     public void stopMonsterMazeRound(String reason) {
         if (manager != null) manager.stop(reason == null ? "Monster Maze stopped" : reason);
@@ -166,7 +173,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         Player player = event.getPlayer();
         Bukkit.getScheduler().runTask(this, () -> {
             if (player.isOnline() && manager != null) {
-                // The server's only player-facing spawn is the shared Testplex Arcade lobby.
+                // Session fake players must remain in the game lifecycle that just admitted them.
+                if (manager.isTestPlayer(player)) return;
+                // The server's only human-facing spawn is the shared Testplex Arcade lobby.
                 manager.returnPlayerToLobby(player);
                 grantConfiguredAdmin(player);
                 manager.restoreMonsterMazeKitPreference(player);

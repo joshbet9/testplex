@@ -29,6 +29,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -86,8 +87,43 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         displayKey = new NamespacedKey(plugin, "legacy-lobby-datapoint");
         kitNpcKey = new NamespacedKey(plugin, "lobby-kit-npc");
         teamNpcKey = new NamespacedKey(plugin, "lobby-team-npc");
-        loadSavedBots();
+        clearLegacyBots();
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 10L);
+    }
+
+    /**
+     * Removes every old Pig/Sheep/Zombie test-bot entity and clears its persisted
+     * lobby roster. These entities are not player targets and must never survive
+     * a plugin reload or appear in a later game.
+     */
+    private void clearLegacyBots() {
+        int removed = 0;
+        for (World world : Bukkit.getWorlds()) {
+            for (Entity entity : new ArrayList<>(world.getEntities())) {
+                if (entity.getPersistentDataContainer().has(botKey, PersistentDataType.STRING)) {
+                    entity.remove();
+                    removed++;
+                }
+            }
+        }
+        boolean hadSavedBots = plugin.getConfig().contains("test-bots");
+        plugin.getConfig().set("test-bots", null);
+        if (hadSavedBots) plugin.saveConfig();
+        bots.clear();
+        if (removed > 0 || hadSavedBots) {
+            plugin.getLogger().info("Removed " + removed
+                    + " legacy lobby NPC test bot(s); persistent global bot storage is disabled.");
+        }
+    }
+
+    /** Also purge legacy NPC bots from arena chunks that were not loaded at plugin startup. */
+    @EventHandler
+    public void onLegacyBotChunkLoad(ChunkLoadEvent event) {
+        for (Entity entity : event.getChunk().getEntities()) {
+            if (entity.getPersistentDataContainer().has(botKey, PersistentDataType.STRING)) {
+                entity.remove();
+            }
+        }
     }
 
     public void setSelectedGame(ArcadePortGame game) {
@@ -111,7 +147,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         boolean freeForAll = selectedGame == ArcadePortGame.BACON_BRAWL
                 || selectedGame == ArcadePortGame.SKY_WARS;
         display(world, "team-display", ChatColor.BLUE + (freeForAll ? "FREE FOR ALL" : "TEAM QUEUE")
-                + ChatColor.WHITE + " | Queued: " + manager.queuedCount(selectedGame) + ChatColor.GRAY + " | Bots: " + bots.size());
+                + ChatColor.WHITE + " | Queued: " + manager.queuedCount(selectedGame) + ChatColor.GRAY + " | Test Players: created on Start Game");
     }
 
     private void display(World world, String id, String title) {
@@ -503,7 +539,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         Inventory inv=Bukkit.createInventory(null,27,QUEUE_TITLE);
         inv.setItem(4,item(Material.PORKCHOP,ChatColor.GOLD+selectedGame.displayName(),
                 ChatColor.GRAY+(selectedGame==ArcadePortGame.BACON_BRAWL?"Free-for-all: no team is required.":"Team queue for this game."),
-                ChatColor.GRAY+"Human players queued: "+manager.queuedCount(selectedGame),ChatColor.GRAY+"NPC bots available: "+bots.size()));
+                ChatColor.GRAY+"Human players queued: "+manager.queuedCount(selectedGame),ChatColor.GRAY+"AFK player targets: created when the game starts"));
         ItemStack join=item(Material.LIME_DYE,ChatColor.GREEN+"Join Queue",ChatColor.GRAY+"Join the selected game's pre-game queue.");mark(join,"queue-join",null);inv.setItem(11,join);
         ItemStack leave=item(Material.RED_DYE,ChatColor.RED+"Leave Queue",ChatColor.GRAY+"Remove yourself from all waiting queues.");mark(leave,"queue-leave",null);inv.setItem(15,leave);
         inv.setItem(22,item(Material.RED_BED,ChatColor.GRAY+"Back / Close"));p.openInventory(inv);
@@ -571,19 +607,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         return configured || player.isOp() || player.hasPermission("testplex.arcadeports.admin");
     }
 
-    public void handleBotCommand(org.bukkit.command.CommandSender sender,String[] args){
-        if (!hasAdminAccess(sender)) { sender.sendMessage(ChatColor.RED + "Operator permission required to manage test bots."); return; }
-        if(args.length==0){sender.sendMessage(ChatColor.YELLOW+"/arcadeport bot <summon|remove|clear|list|cosmetics|form|kit> ...");return;}
-        switch(args[0].toLowerCase(Locale.ROOT)){
-            case "summon","add","spawn"->{String name=args.length>1?args[1]:"TestBot"+(bots.size()+1);Bot b=createBot(name);if(b==null)sender.sendMessage(ChatColor.RED+"Bot name invalid or already used.");else sender.sendMessage(ChatColor.GREEN+"Summoned NPC bot "+b.name+". Use /arcadeport bot cosmetics "+b.name+" to customise it.");}
-            case "remove","despawn"->{if(args.length<2){sender.sendMessage(ChatColor.YELLOW+"/arcadeport bot remove <name>");return;}if(!removeBot(args[1]))sender.sendMessage(ChatColor.RED+"No bot named "+args[1]+".");else sender.sendMessage(ChatColor.GREEN+"Removed bot "+args[1]+".");}
-            case "clear"->{for(String k:new ArrayList<>(bots.keySet()))removeBot(k);sender.sendMessage(ChatColor.GREEN+"Removed all test NPC bots.");}
-            case "list"->sender.sendMessage(ChatColor.GOLD+"Test bots: "+(bots.isEmpty()?"none":String.join(", ",bots.values().stream().map(b->b.name).toList())));
-            case "cosmetics","menu"->{if(!(sender instanceof Player p)){sender.sendMessage("Players only.");return;}if(args.length<2){sender.sendMessage(ChatColor.YELLOW+"/arcadeport bot cosmetics <name>");return;}Bot b=bots.get(key(args[1]));if(b==null)sender.sendMessage(ChatColor.RED+"No bot named "+args[1]+".");else openBotCosmetics(p,b);}
-            case "form"->{if(args.length<3){sender.sendMessage(ChatColor.YELLOW+"/arcadeport bot form <name> <pig|pink-sheep>");return;}Bot b=bots.get(key(args[1]));if(b==null){sender.sendMessage(ChatColor.RED+"No bot named "+args[1]+".");return;}b.form="pink-sheep".equalsIgnoreCase(args[2])?"pink-sheep":"pig";saveBot(b);replaceBotEntity(b);sender.sendMessage(ChatColor.GREEN+"Updated "+b.name+"'s form.");}
-            case "kit"->{if(args.length<3){sender.sendMessage(ChatColor.YELLOW+"/arcadeport bot kit <name> <kit-id>");return;}Bot b=bots.get(key(args[1]));if(b==null){sender.sendMessage(ChatColor.RED+"No bot named "+args[1]+".");return;}String kit=ArcadePortRules.normalizeBaconBrawlKit(args[2]);if(kit==null){sender.sendMessage(ChatColor.YELLOW+"Bacon Brawl bot kits: el-muchacho-pigo, mama-piggles, pig (Pig Cloak), brutus-bacon.");return;}b.kit=kit;b.form=ArcadePortRules.baconBrawlUsesSheepAvatar(kit)?"pink-sheep":"pig";saveBot(b);replaceBotEntity(b);sender.sendMessage(ChatColor.GREEN+"Updated "+b.name+"'s kit to "+kit+".");}
-            default->sender.sendMessage(ChatColor.YELLOW+"/arcadeport bot <summon|remove|clear|list|cosmetics|form|kit> ...");
-        }
+    public void handleBotCommand(org.bukkit.command.CommandSender sender, String[] args) {
+        sender.sendMessage(ChatColor.YELLOW + "Global lobby bots are disabled.");
+        sender.sendMessage(ChatColor.GRAY + "Testplex creates " + ArcadeTestPlayerManager.TARGET_ROSTER_SIZE
+                + " total server-side Player participants for each game start (human players included).");
+        sender.sendMessage(ChatColor.GRAY + "The AFK test players are removed automatically when that match ends.");
     }
 
     private Bot createBot(String name){String k=key(name);if(k.isBlank()||bots.containsKey(k))return null;Bot b=new Bot(k,name,"porky","pig","el-muchacho-pigo");bots.put(k,b);saveBot(b);spawnBotEntity(b,lobby.spawnLocation().add(bots.size()*1.6D-3.0D,-3.0D,8.0D),false);refreshDisplays();return b;}
@@ -680,7 +708,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             String theme = value.substring("showcase:".length());
             e.getWorld().spawnParticle(particle(theme), e.getLocation().add(0, 1, 0), 3, 0.2, 0.3, 0.2, 0.01);
         }
-        long now=System.currentTimeMillis();for(Bot b:bots.values())tickBot(b,now,world);
+        // No persistent or lobby-wide test bots are ticked here. Match players are
+        // created by ArcadeTestPlayerManager and destroyed when their round ends.
     }
     private void tickBot(Bot b,long now,World lobbyWorld){
         Entity e=b.actor;if(!(e instanceof LivingEntity actor)||!e.isValid()){Location at=b.actorLocation==null?lobby.spawnLocation().add(0,-3,8):b.actorLocation.clone();spawnBotEntity(b,at,b.inGame);return;}
@@ -744,75 +773,24 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         return Particle.CRIT;
     }
 
+    /** No mob NPCs are valid game targets; all test targets are real Player objects. */
     List<LivingEntity> botTargets(World world, ArcadePortGame game) {
-        List<LivingEntity> targets = new ArrayList<>();
-        if (world == null || game == null) return targets;
-        for (Bot bot : bots.values()) {
-            if (!bot.inGame || bot.deployedGame != game || bot.actor == null
-                    || !bot.actor.isValid() || bot.actor.getWorld() != world
-                    || !(bot.actor instanceof LivingEntity living)) continue;
-            targets.add(living);
-        }
-        return targets;
+        return List.of();
     }
 
+    /** Compatibility no-op for older call sites; fake-player participants are queued by ArcadePortManager. */
     public void deployBots(ArcadePortGame game, List<Location> spawns) {
-        deployBots(game, spawns, -1);
+        // Intentionally empty. No entity is carried between games.
     }
 
     public void deployBots(ArcadePortGame game, List<Location> spawns, int bombLobbersTeam) {
-        if (game == null || spawns == null || spawns.isEmpty()) {
-            returnBotsToLobby();
-            return;
-        }
-        int index = 0;
-        for (Bot bot : bots.values()) {
-            Location target = spawns.get(index % spawns.size()).clone();
-            if (game != ArcadePortGame.BOMB_LOBBERS) {
-                target.add(index % 2 == 0 ? 3 : -3, 0, index % 3 == 0 ? 2 : -2);
-            }
-            index++;
-            bot.inGame = true;
-            bot.deployedGame = game;
-            bot.team = game == ArcadePortGame.BOMB_LOBBERS ? bombLobbersTeam : -1;
-            boolean correctEntity = game == ArcadePortGame.BOMB_LOBBERS
-                    ? bot.actor instanceof Zombie : !(bot.actor instanceof Zombie);
-            if (bot.actor == null || !bot.actor.isValid() || !correctEntity) {
-                if (bot.actor != null && bot.actor.isValid()) bot.actor.remove();
-                spawnBotEntity(bot, target, true);
-            } else {
-                bot.actor.teleport(target);
-            }
-            bot.arenaSpawn = target.clone();
-            bot.actorLocation = target.clone();
-            refreshBotAppearance(bot);
-        }
+        // Intentionally empty. Player-backed test participants use normal session setup.
     }
 
     public void returnBotsToLobby() {
-        Location base = lobby.spawnLocation();
-        if (base == null) return;
-        int index = 0;
-        for (Bot bot : bots.values()) {
-            Location home = base.clone().add(index++ * 1.6D - 3, -3, 8);
-            boolean needsLobbyForm = bot.actor == null || !bot.actor.isValid()
-                    || bot.actor instanceof Zombie;
-            bot.inGame = false;
-            bot.deployedGame = null;
-            bot.team = -1;
-            if (needsLobbyForm) {
-                if (bot.actor != null && bot.actor.isValid()) bot.actor.remove();
-                spawnBotEntity(bot, home, false);
-            } else {
-                bot.actor.teleport(home);
-                bot.actor.setVelocity(new Vector());
-                if (bot.actor instanceof Mob mob) mob.setAI(false);
-            }
-            bot.actorLocation = home.clone();
-            bot.arenaSpawn = null;
-            refreshBotAppearance(bot);
-        }
+        // Intentionally empty. ArcadeTestPlayerManager despawns match-scoped players.
     }
+
     @EventHandler(priority=EventPriority.HIGHEST,ignoreCancelled=false)
     public void onBotDamage(EntityDamageEvent e){
         Entity entity=e.getEntity();String key=entity.getPersistentDataContainer().get(botKey,PersistentDataType.STRING);
