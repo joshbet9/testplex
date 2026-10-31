@@ -42,7 +42,7 @@ public final class WizardsPaperSmoke extends JavaPlugin {
             "industrialwest", "alicudi", "thaumaturgecolony", "magicallypossible", "kalamit");
     private static final String GAMEPLAY_MAP = "source-maps/Wizards/haven.zip";
     private static final String OWNER_NAME = "jn_playzmc";
-    private static final int MAX_CLIENT_WAIT_TICKS = 300 * 20 / 5;
+    private static final int MAX_CLIENT_WAIT_TICKS = 120 * 20 / 5;
     private static final int MAX_START_WAIT_TICKS = 60 * 20 / 5;
 
     private final List<String> results = new ArrayList<>();
@@ -143,6 +143,10 @@ public final class WizardsPaperSmoke extends JavaPlugin {
     private void tickGameplaySmoke() {
         if (shuttingDown) return;
         gameplayTicks++;
+        if (gameplayStage == 0 && gameplayTicks % 200 == 0) {
+            getLogger().info("WIZARDS_GAMEPLAY_SMOKE|WAIT_PROGRESS|ticks=" + gameplayTicks
+                    + "|online=" + Bukkit.getOnlinePlayers().stream().map(Player::getName).toList());
+        }
         try {
             switch (gameplayStage) {
                 case 0 -> waitForClientsAndQueue();
