@@ -403,15 +403,16 @@ jobs:
           RECOVERY_HELPER=/usr/local/sbin/testplex-modern-recovery
           # Gate before host prerequisites or service changes. This SSH session
           # already owns the shared flock and keeps it through deploy completion.
-          if sudo -n test -x "$RECOVERY_HELPER"; then
-            sudo -n "$RECOVERY_HELPER" --locked assert-deployable
-          elif sudo -n test -e "$STATE_DIR/current.properties"; then
-            echo "Recovery helper unavailable while a transaction journal exists; refusing all mutation." >&2
-            exit 1
-          fi
+          # Install the exact helper bundled with this build before evaluating the
+          # journal. If a previous deploy lost its SSH response, recover that active
+          # transaction under this same lock before starting a new replacement.
           sudo -n install -m 0750 "$UPLOAD_DIR/testplex-modern-recovery.sh" "$RECOVERY_HELPER"
           sudo -n install -d -m 0700 "$STATE_DIR/backups"
-          sudo -n "$RECOVERY_HELPER" --locked assert-deployable
+          if ! sudo -n "$RECOVERY_HELPER" --locked assert-deployable; then
+            echo "[deploy] unresolved prior transaction detected; attempting verified recovery before this deployment."
+            sudo -n "$RECOVERY_HELPER" --locked recover
+            sudo -n "$RECOVERY_HELPER" --locked assert-deployable
+          fi
           # Separate Monster Maze services are deliberately outside this deployment's scope.
 
           if ! command -v curl >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
@@ -654,7 +655,8 @@ jobs:
           DEPLOYMENT_NONCE="$(cat /proc/sys/kernel/random/uuid)"
           ARCADE_PLUGIN_DATA="$SERVER_DIR/plugins/ArcadeMechanicsModern"
           sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$ARCADE_PLUGIN_DATA"
-          sudo -n rm -f "$ARCADE_PLUGIN_DATA/.monster-maze-readiness.properties"
+          sudo -n rm -f "$ARCADE_PLUGIN_DATA/.monster-maze-readiness.properties" \
+            "$ARCADE_PLUGIN_DATA/.testplex-arcade-readiness.properties"
           printf 'source_sha=%s\nnonce=%s\n' "$BUILD_SHA" "$DEPLOYMENT_NONCE" \
             | sudo -n tee "$ARCADE_PLUGIN_DATA/.testplex-modern-deploy-identity.properties" >/dev/null
           sudo -n chown monstermaze:monstermaze "$ARCADE_PLUGIN_DATA/.testplex-modern-deploy-identity.properties"
@@ -869,8 +871,7 @@ jobs:
           recovered=false
           for attempt in 1 2 3 4 5; do
             echo "Independent artifact recovery SSH attempt $attempt/5."
-            if timeout --foreground --signal=TERM --kill-after=20s 240s ssh "${ssh_opts[@]}" "$remote" bash -s -- \
-              "$BUILD_SHA" <<'REMOTE_RESTORE'
+            if timeout --foreground --signal=TERM --kill-after=20s 240s ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_RESTORE'
           set -euo pipefail
           helper=/usr/local/sbin/testplex-modern-recovery
           if ! sudo -n test -x "$helper"; then
