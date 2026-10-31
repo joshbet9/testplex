@@ -26,9 +26,9 @@ class PlexballRulesTest {
 
     @Test
     void timingBeatCanBeRandomlyPhasedPerAtBat() {
-        assertEquals(0, PlexballRules.timingDistanceTicks(17, 10, 34, 7));
-        assertEquals(1, PlexballRules.timingDistanceTicks(16, 10, 34, 7));
-        assertEquals(1, PlexballRules.timingDistanceTicks(18, 10, 34, 7));
+        assertEquals(0, PlexballRules.timingDistanceTicks(34, 10, 34, 7));
+        assertEquals(1, PlexballRules.timingDistanceTicks(33, 10, 34, 7));
+        assertEquals(1, PlexballRules.timingDistanceTicks(35, 10, 34, 7));
     }
 
     @Test
