@@ -19,29 +19,39 @@ class PlexballProgressionRulesTest {
     }
 
     @Test
-    void distanceAchievementsUseUncaughtDistanceThresholds() {
-        assertFalse(PlexballProgressionRules.shouldAwardSweetSpot(49.99D));
-        assertTrue(PlexballProgressionRules.shouldAwardSweetSpot(50.0D));
-        assertFalse(PlexballProgressionRules.shouldAwardWarningTrack(89.99D));
-        assertTrue(PlexballProgressionRules.shouldAwardWarningTrack(90.0D));
+    void difficultDistanceAchievementsUseRaisedThresholds() {
+        assertFalse(PlexballProgressionRules.shouldAwardSweetSpot(74.99D));
+        assertTrue(PlexballProgressionRules.shouldAwardSweetSpot(75.0D));
+        assertFalse(PlexballProgressionRules.shouldAwardWarningTrack(94.99D));
+        assertTrue(PlexballProgressionRules.shouldAwardWarningTrack(95.0D));
         assertFalse(PlexballProgressionRules.shouldAwardSweetSpot(Double.NaN));
     }
 
     @Test
-    void skillAndFieldingAchievementsHaveMatchScopedRequirements() {
-        assertTrue(PlexballProgressionRules.shouldAwardPerfectContact(1.0D));
-        assertTrue(PlexballProgressionRules.shouldAwardPerfectContact(0.99D));
-        assertFalse(PlexballProgressionRules.shouldAwardPerfectContact(0.98D));
-        assertFalse(PlexballProgressionRules.shouldAwardPerfectContact(Double.NaN));
+    void perfectContactAndFieldingAchievementsRequireRepeatedSkill() {
+        assertTrue(PlexballProgressionRules.isPerfectContact(1.0D));
+        assertTrue(PlexballProgressionRules.isPerfectContact(0.99D));
+        assertFalse(PlexballProgressionRules.isPerfectContact(0.98D));
+        assertFalse(PlexballProgressionRules.isPerfectContact(Double.NaN));
+        assertFalse(PlexballProgressionRules.shouldAwardPerfectContact(2));
+        assertTrue(PlexballProgressionRules.shouldAwardPerfectContact(3));
 
-        assertFalse(PlexballProgressionRules.shouldAwardGoldenGlove(2));
-        assertTrue(PlexballProgressionRules.shouldAwardGoldenGlove(3));
-        assertTrue(PlexballProgressionRules.shouldAwardAllRounder(50.0D, 1));
-        assertFalse(PlexballProgressionRules.shouldAwardAllRounder(50.0D, 0));
-        assertFalse(PlexballProgressionRules.shouldAwardAllRounder(49.9D, 3));
-        assertTrue(PlexballProgressionRules.shouldAwardClutchPerformer(true, 1));
-        assertFalse(PlexballProgressionRules.shouldAwardClutchPerformer(false, 2));
-        assertFalse(PlexballProgressionRules.shouldAwardClutchPerformer(true, 0));
+        assertFalse(PlexballProgressionRules.shouldAwardStickyGloves(2));
+        assertTrue(PlexballProgressionRules.shouldAwardStickyGloves(3));
+        assertFalse(PlexballProgressionRules.shouldAwardGoldenGlove(4));
+        assertTrue(PlexballProgressionRules.shouldAwardGoldenGlove(5));
+        assertTrue(PlexballProgressionRules.shouldAwardAllRounder(75.0D, 1));
+        assertFalse(PlexballProgressionRules.shouldAwardAllRounder(74.99D, 3));
+        assertFalse(PlexballProgressionRules.shouldAwardAllRounder(75.0D, 0));
+    }
+
+    @Test
+    void clutchAndChampionAchievementsNeedBigPerformances() {
+        assertTrue(PlexballProgressionRules.shouldAwardClutchPerformer(true, 2));
+        assertFalse(PlexballProgressionRules.shouldAwardClutchPerformer(true, 1));
+        assertFalse(PlexballProgressionRules.shouldAwardClutchPerformer(false, 3));
+        assertFalse(PlexballProgressionRules.shouldAwardChampion(4));
+        assertTrue(PlexballProgressionRules.shouldAwardChampion(5));
     }
 
     @Test
@@ -52,6 +62,17 @@ class PlexballProgressionRulesTest {
         assertEquals(100, PlexballProgressionRules.milestoneProgressPercent(120, 100));
         assertEquals(100, PlexballProgressionRules.milestoneProgressPercent(0, 0));
         assertEquals(100, PlexballProgressionRules.milestoneProgressPercent(0, -1));
+    }
+
+    @Test
+    void milestoneCatalogueContainsOnlyTheFourRequestedCareerGoals() {
+        assertEquals(4, PlexballMilestone.values().length);
+        assertEquals(250L, milestone(PlexballMilestone.Metric.WINS).target());
+        assertEquals(300L, milestone(PlexballMilestone.Metric.CATCHES).target());
+        assertEquals(100L, milestone(PlexballMilestone.Metric.HOME_RUNS).target());
+        PlexballMilestone distance = milestone(PlexballMilestone.Metric.DISTANCE_TENTHS);
+        assertEquals(100_000L, distance.target());
+        assertEquals("10000.0m", distance.targetLabel());
     }
 
     @Test
@@ -71,6 +92,11 @@ class PlexballProgressionRulesTest {
             assertFalse(milestone.configPath(UUID.randomUUID()).isBlank());
             assertFalse(milestone.targetLabel().isBlank());
         }
-        assertEquals(24, milestoneSlugs.size());
+    }
+
+    private static PlexballMilestone milestone(PlexballMilestone.Metric metric) {
+        return java.util.Arrays.stream(PlexballMilestone.values())
+                .filter(value -> value.metric() == metric)
+                .findFirst().orElseThrow();
     }
 }
