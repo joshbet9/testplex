@@ -19059,6 +19059,28 @@ public final class ArcadePortManager implements Listener {
         checkRoundEnd(session);
     }
 
+    /**
+     * FakePlayerPlugin replaces the backing ServerPlayer instance after a bot dies.
+     * Keep the match's UUID-indexed player registry pointed at the newly respawned
+     * Bukkit Player so game loops and ability handlers never retain the dead body.
+     */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onTestPlayerRespawn(PlayerRespawnEvent event) {
+        Player eventPlayer = event.getPlayer();
+        UUID playerId = eventPlayer.getUniqueId();
+        if (!testPlayers.isTestPlayer(playerId)) return;
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Player respawned = Bukkit.getPlayer(playerId);
+            if (respawned == null || !respawned.isOnline() || !respawned.isValid()) return;
+            Session session = active;
+            if (session == null || !session.players.containsKey(playerId)) return;
+            session.players.put(playerId, respawned);
+            testPlayers.syncMatchRespawnLocation(respawned);
+            plugin.getLogger().fine("Rebound AFK test player " + respawned.getName()
+                    + " to its respawned Bukkit Player entity for " + session.type.displayName() + ".");
+        });
+    }
+
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
