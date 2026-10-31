@@ -329,8 +329,8 @@ public final class SuperSploorRuntime implements Listener {
             long lastRegen = lastInkRegenAt.getOrDefault(id, now);
             if (now - lastRegen >= 1_000L) {
                 int seconds = (int) Math.min(10L, (now - lastRegen) / 1_000L);
-                boolean canRegen = squid && inFriendlyPaint
-                        || now - lastInkUseAt.getOrDefault(id, now) >= 1_000L;
+                boolean canRegen = SuperSploorRules.canRegenerateInk(now,
+                        lastInkUseAt.getOrDefault(id, now), squid, inFriendlyPaint);
                 if (canRegen && seconds > 0) {
                     int updated = SuperSploorRules.nextInkAfterRegeneration(
                             currentInk, seconds, squid && inFriendlyPaint);
