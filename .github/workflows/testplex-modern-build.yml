@@ -120,8 +120,26 @@ jobs:
             echo "Verified $count original map archives: $folder"
             rm -f "$expected_file" "$actual_file"
           }
-          for map_folder in "Death Tag" "One in the Quiver" "Bomb Lobbers" "Bacon Brawl" "Gladiators" "Micro Battle" "Paintball" "Super Paintball" "Speef" "Super Spleef"; do
-            verify_source_map_folder "$map_folder"
+          # Resolve map folders from the actual enabled-game allow-list. Every enabled
+          # game with legacy maps must have an explicit mapping; Plexball is the only
+          # enabled game with a new modern arena and no 1.8 archive folder.
+          IFS=, read -r -a enabled_game_array <<< "$enabled_ids"
+          for game_id in "${enabled_game_array[@]}"; do
+            case "$game_id" in
+              death-tag) map_folders=("Death Tag") ;;
+              one-in-the-quiver) map_folders=("One in the Quiver") ;;
+              bomb-lobbers) map_folders=("Bomb Lobbers") ;;
+              bacon-brawl) map_folders=("Bacon Brawl") ;;
+              gladiators) map_folders=("Gladiators") ;;
+              micro-battles) map_folders=("Micro Battle") ;;
+              paintball) map_folders=("Paintball" "Super Paintball") ;;
+              plexball) map_folders=(); echo "Plexball uses its modern arena; no legacy 1.8 map archive folder exists." ;;
+              spleef) map_folders=("Speef" "Super Spleef") ;;
+              *) echo "No legacy map parity policy is defined for enabled game [$game_id]." >&2; exit 1 ;;
+            esac
+            for map_folder in "${map_folders[@]}"; do
+              verify_source_map_folder "$map_folder"
+            done
           done
           jar tf "$arcade_jar" | grep -Fxq "maps/bomb-lobbers.zip"
           jar tf "$arcade_jar" | grep -Fxq "maps/bacon-brawl.zip"
