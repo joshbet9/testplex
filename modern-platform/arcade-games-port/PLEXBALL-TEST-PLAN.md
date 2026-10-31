@@ -85,6 +85,7 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 | Sudden death | Multiple home-run players take five-second turns; a finalist must hit another home run to survive the round. |
 | Sudden-death timeout | The hard cap only applies survivor elimination after every finalist has had a turn in that round; an interrupted round keeps all remaining finalists eligible and ranks them on completed match performance. |
 | Match cap | The game ends at 180 seconds of wall-clock time, even if server TPS falls below 20. |
+| Catch at match cap | Before final standings, pending catch windows are checked against the last ball positions already recorded by the server; no extra ball tick or match time is simulated. |
 | Cleanup | Plexball removes its ball/tee/HUD state; ArcadePortManager restores participant and spectator snapshots and returns them to the shared Arcade lobby. |
 | Spectator cleanup | ArcadePortManager owns spectator membership and player snapshots; global finish, stop, leave, disconnect and shutdown paths restore the snapshot and return the viewer to the shared Arcade lobby. |
 | Match disconnect | A disconnected batter's turn resolves safely; a disconnected fielder is removed from active catch checks and the remaining players are notified. |
