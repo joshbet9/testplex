@@ -354,6 +354,9 @@ public final class ArcadePortManager implements Listener {
 
     public int queuedCount(ArcadePortGame type) {
         if (type == null) return 0;
+        if (type == ArcadePortGame.CAMERA_SHY) {
+            return cameraShyModule == null ? 0 : cameraShyModule.queuedCount();
+        }
         Map<UUID, Player> queued = queues.get(type.id());
         int count = queued == null ? 0
                 : (int) queued.values().stream().filter(p -> p != null && p.isOnline()).count();
