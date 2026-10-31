@@ -1318,7 +1318,13 @@ public final class ArcadePortManager implements Listener {
                 player.sendMessage(ChatColor.RED + "Another Arcade game is already running.");
             } else if (cameraShyModule == null) {
                 player.sendMessage(ChatColor.RED + "Camera Shy is not loaded.");
-            } else cameraShyModule.queue(player, quickStart);
+            } else {
+                for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
+                    existingQueue.remove(player.getUniqueId());
+                }
+                gladiatorLobbyVotes.remove(player.getUniqueId());
+                cameraShyModule.queue(player, quickStart);
+            }
             return;
         }
         if (cameraShyModule != null && cameraShyModule.isActive()) {
