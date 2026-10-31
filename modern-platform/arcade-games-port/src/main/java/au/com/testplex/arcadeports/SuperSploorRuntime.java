@@ -148,6 +148,8 @@ public final class SuperSploorRuntime implements Listener {
     private final Map<UUID, Long> stampedeNextPaintAt = new HashMap<>();
     private final Map<UUID, Set<UUID>> stampedeHitPlayers = new HashMap<>();
     private final Map<UUID, Set<UUID>> specialTargetsThisActivation = new HashMap<>();
+    private final Map<UUID, Integer> afterimageDashesRemaining = new HashMap<>();
+    private final Map<UUID, Long> afterimageNextAt = new HashMap<>();
     private final List<InkMine> mines = new ArrayList<>();
     private final List<Sprinkler> sprinklers = new ArrayList<>();
     private final List<TrackerFlare> trackerFlares = new ArrayList<>();
@@ -375,6 +377,345 @@ public final class SuperSploorRuntime implements Listener {
         if (requested == null) return "sprayer";
         String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
         return Set.of("sprayer", "roller", "charger", "lobber", "dualies").contains(value) ? value : "sprayer";
+    }
+
+    private Material secondaryIcon(String kit) {
+        return switch (kit) {
+            case "roller" -> Material.STONE_PRESSURE_PLATE;
+            case "charger" -> Material.FIREWORK_ROCKET;
+            case "lobber" -> Material.LILY_PAD;
+            case "dualies" -> Material.MAGMA_CREAM;
+            default -> Material.SNOWBALL;
+        };
+    }
+
+    private String secondaryName(String kit) {
+        return switch (kit) {
+            case "roller" -> "Ink Mine";
+            case "charger" -> "Tracker Flare";
+            case "lobber" -> "Sprinkler";
+            case "dualies" -> "Suction Bomb";
+            default -> "Burst Bomb";
+        };
+    }
+
+    private String secondaryDescription(String kit) {
+        return switch (kit) {
+            case "roller" -> "Right-click to place a proximity mine. 30 ink.";
+            case "charger" -> "Right-click to reveal nearby enemies to your team. 25 ink.";
+            case "lobber" -> "Right-click to launch a temporary area sprinkler. 35 ink.";
+            case "dualies" -> "Right-click to launch a delayed suction blast. 30 ink.";
+            default -> "Right-click to throw an area paint bomb. 25 ink.";
+        };
+    }
+
+    private String specialName(String kit) {
+        return switch (kit) {
+            case "roller" -> "Stampede";
+            case "charger" -> "Prism Beam";
+            case "lobber" -> "Paintstorm";
+            case "dualies" -> "Afterimage Dash";
+            default -> "Colourburst";
+        };
+    }
+
+    private void useSecondary(Player player, UUID id) {
+        String kit = kits.getOrDefault(id, "sprayer");
+        int cost = switch (kit) {
+            case "roller" -> 30;
+            case "charger" -> 25;
+            case "lobber" -> 35;
+            case "dualies" -> 30;
+            default -> 25;
+        };
+        long now = System.currentTimeMillis();
+        if (now < secondaryReadyAt.getOrDefault(id, 0L)) {
+            player.sendActionBar(ChatColor.YELLOW + "Secondary recharging.");
+            return;
+        }
+        int current = ink.getOrDefault(id, 0);
+        if (current < cost) {
+            player.sendActionBar(ChatColor.RED + "Not enough ink for " + secondaryName(kit) + ".");
+            return;
+        }
+        ink.put(id, SuperSploorRules.spendInk(current, cost));
+        secondaryReadyAt.put(id, now + 4_000L);
+
+        if ("roller".equals(kit)) {
+            Location mineLocation = player.getLocation().getBlock().getRelative(0, -1, 0)
+                    .getLocation().add(0.5D, 1.0D, 0.5D);
+            mines.add(new InkMine(id, teams.getOrDefault(id, -1), mineLocation,
+                    now + 800L, now + 8_000L));
+            world.spawnParticle(Particle.DUST, mineLocation, 12, 0.25D, 0.1D, 0.25D, 0.0D,
+                    new Particle.DustOptions(teamColour(teams.get(id)), 1.4F));
+            player.playSound(player.getLocation(), Sound.BLOCK_STONE_PRESSURE_PLATE_CLICK_ON, 0.7F, 1.4F);
+            player.sendActionBar(ChatColor.GREEN + "INK MINE PLACED");
+        } else {
+            String kind = switch (kit) {
+                case "charger" -> "tracker-flare";
+                case "lobber" -> "sprinkler";
+                case "dualies" -> "suction-bomb";
+                default -> "burst-bomb";
+            };
+            launchAbilityProjectile(player, id, kind, 1.45D);
+            player.sendActionBar(ChatColor.GREEN + secondaryName(kit).toUpperCase(java.util.Locale.ROOT)
+                    + ChatColor.GRAY + " launched");
+        }
+        updateInkBar(player, id);
+    }
+
+    private void launchAbilityProjectile(Player player, UUID ownerId, String kind, double speed) {
+        Snowball projectile = player.launchProjectile(Snowball.class);
+        projectile.setItem(new ItemStack(teams.getOrDefault(ownerId, RED) == RED
+                ? Material.RED_DYE : Material.LIGHT_BLUE_DYE));
+        projectile.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(speed));
+        UUID projectileId = projectile.getUniqueId();
+        projectile.getPersistentDataContainer().set(projectileKey, PersistentDataType.BYTE, (byte) 1);
+        projectileOwners.put(projectileId, ownerId);
+        projectileEntities.put(projectileId, projectile);
+        activeProjectiles.add(projectileId);
+        projectilePaintRadii.put(projectileId, 0);
+        projectileKinds.put(projectileId, kind);
+    }
+
+    private void useSpecial(Player player, UUID id) {
+        double charge = specialCharge.getOrDefault(id, 0.0D);
+        if (charge < 100.0D) {
+            player.sendActionBar(ChatColor.LIGHT_PURPLE + "Special " + (int) Math.floor(charge) + "% — keep painting!");
+            return;
+        }
+        String kit = kits.getOrDefault(id, "sprayer");
+        specialCharge.put(id, 0.0D);
+        specialTargetsThisActivation.computeIfAbsent(id, ignored -> new HashSet<>()).clear();
+        MutableStats stats = playerStats.get(id);
+        if (stats != null) stats.specialsUsed++;
+
+        switch (kit) {
+            case "roller" -> {
+                long now = System.currentTimeMillis();
+                stampedeUntil.put(id, now + 4_000L);
+                stampedeNextPaintAt.put(id, now);
+                stampedeHitPlayers.put(id, new HashSet<>());
+                player.setWalkSpeed(0.28F);
+                player.playSound(player.getLocation(), Sound.ENTITY_RAVAGER_ROAR, 0.85F, 1.45F);
+                announceTeam(id, ChatColor.GOLD + player.getName() + " activated STAMPEDE!");
+            }
+            case "charger" -> firePrismBeam(player, id);
+            case "lobber" -> {
+                Block target = player.getTargetBlockExact(18);
+                Location center = target == null
+                        ? player.getEyeLocation().add(player.getLocation().getDirection().multiply(12.0D))
+                        : target.getLocation().add(0.5D, 1.0D, 0.5D);
+                paintstorms.add(new Paintstorm(id, teams.getOrDefault(id, -1), center,
+                        System.currentTimeMillis()));
+                world.spawnParticle(Particle.DUST, center, 20, 1.3D, 0.25D, 1.3D, 0.0D,
+                        new Particle.DustOptions(teamColour(teams.get(id)), 2.0F));
+                world.playSound(center, Sound.BLOCK_BEACON_ACTIVATE, 0.85F, 0.8F);
+                announceTeam(id, ChatColor.GOLD + player.getName() + " launched PAINTSTORM!");
+            }
+            case "dualies" -> {
+                afterimageDashesRemaining.put(id, 3);
+                afterimageNextAt.put(id, System.currentTimeMillis());
+                player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 0.9F, 1.5F);
+                announceTeam(id, ChatColor.GOLD + player.getName() + " activated AFTERIMAGE DASH!");
+            }
+            default -> {
+                launchAbilityProjectile(player, id, "colourburst", 1.45D);
+                player.playSound(player.getLocation(), Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, 0.9F, 1.2F);
+                player.sendActionBar(ChatColor.LIGHT_PURPLE + "COLOURBURST!");
+            }
+        }
+        updateInkBar(player, id);
+    }
+
+    private void announceTeam(UUID ownerId, String message) {
+        int team = teams.getOrDefault(ownerId, -1);
+        for (Map.Entry<UUID, Player> entry : players.entrySet()) {
+            Player recipient = entry.getValue();
+            if (recipient != null && recipient.isOnline() && teams.getOrDefault(entry.getKey(), -2) == team) {
+                recipient.sendMessage(message);
+            }
+        }
+    }
+
+    private void markSpecialTarget(UUID ownerId, Player target) {
+        if (target == null || !target.isOnline()) return;
+        Set<UUID> hits = specialTargetsThisActivation.computeIfAbsent(ownerId, ignored -> new HashSet<>());
+        if (!hits.add(target.getUniqueId())) return;
+        MutableStats stats = playerStats.get(ownerId);
+        if (stats != null) stats.bestSpecialTargets = Math.max(stats.bestSpecialTargets, hits.size());
+        applyMark(ownerId, target.getUniqueId(), target);
+    }
+
+    private void paintArea(UUID ownerId, Location center, int radius, Set<UUID> alreadyHit,
+            boolean special, long now) {
+        if (ownerId == null || center == null || center.getWorld() != world) return;
+        int team = teams.getOrDefault(ownerId, -1);
+        if (team < 0) return;
+        recordPaint(ownerId, engine.paint(center, team, radius));
+        world.spawnParticle(Particle.DUST, center.clone().add(0.0D, 0.25D, 0.0D),
+                22, radius * 0.35D, 0.2D, radius * 0.35D, 0.0D,
+                new Particle.DustOptions(teamColour(team), 1.55F));
+        for (Player target : new ArrayList<>(players.values())) {
+            if (target == null || !target.isOnline() || target.getUniqueId().equals(ownerId)
+                    || teams.getOrDefault(target.getUniqueId(), -2) == team
+                    || respawnAt.containsKey(target.getUniqueId())) continue;
+            if (target.getLocation().distanceSquared(center) > (radius + 0.9D) * (radius + 0.9D)) continue;
+            if (alreadyHit != null && !alreadyHit.add(target.getUniqueId())) continue;
+            if (special) markSpecialTarget(ownerId, target);
+            else applyMark(ownerId, target.getUniqueId(), target);
+        }
+        world.playSound(center, Sound.BLOCK_WOOL_PLACE, 0.8F, 1.0F);
+    }
+
+    private void firePrismBeam(Player player, UUID ownerId) {
+        Location origin = player.getEyeLocation();
+        Vector direction = origin.getDirection().normalize();
+        int team = teams.getOrDefault(ownerId, -1);
+        Set<UUID> hitPlayers = new HashSet<>();
+        for (int step = 1; step <= 56; step++) {
+            Location point = origin.clone().add(direction.clone().multiply(step * 0.5D));
+            Block block = point.getBlock();
+            if (!block.isPassable() && engine.owner(block) == -2) break;
+            recordPaint(ownerId, engine.paint(point, team, 0));
+            world.spawnParticle(Particle.DUST, point, 2, 0.04D, 0.04D, 0.04D, 0.0D,
+                    new Particle.DustOptions(teamColour(team), 1.25F));
+            for (Player target : new ArrayList<>(players.values())) {
+                if (target == null || !target.isOnline() || target.getUniqueId().equals(ownerId)
+                        || teams.getOrDefault(target.getUniqueId(), -2) == team
+                        || respawnAt.containsKey(target.getUniqueId())
+                        || hitPlayers.contains(target.getUniqueId())) continue;
+                if (target.getEyeLocation().distanceSquared(point) <= 1.2D) {
+                    hitPlayers.add(target.getUniqueId());
+                    markSpecialTarget(ownerId, target);
+                }
+            }
+            if (!block.isPassable() && engine.owner(block) != -2) break;
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.55F, 1.8F);
+        announceTeam(ownerId, ChatColor.LIGHT_PURPLE + "PRISM BEAM fired!");
+    }
+
+    private void updateStampedes(long now) {
+        for (UUID id : new ArrayList<>(stampedeUntil.keySet())) {
+            Player player = players.get(id);
+            if (player == null || !player.isOnline() || !stampedeUntil.containsKey(id)) {
+                stampedeUntil.remove(id); stampedeNextPaintAt.remove(id); stampedeHitPlayers.remove(id);
+                continue;
+            }
+            if (now >= stampedeUntil.get(id)) {
+                stampedeUntil.remove(id); stampedeNextPaintAt.remove(id); stampedeHitPlayers.remove(id);
+                player.setWalkSpeed(0.2F);
+                player.sendActionBar(ChatColor.GRAY + "Stampede ended.");
+                continue;
+            }
+            if (now < stampedeNextPaintAt.getOrDefault(id, 0L) || respawnAt.containsKey(id)) continue;
+            stampedeNextPaintAt.put(id, now + 150L);
+            Vector direction = player.getLocation().getDirection().setY(0.0D);
+            if (direction.lengthSquared() < 1.0E-5D) continue;
+            direction.normalize();
+            Location origin = player.getLocation();
+            Set<UUID> alreadyHit = stampedeHitPlayers.computeIfAbsent(id, ignored -> new HashSet<>());
+            for (int step = 0; step <= 3; step++) {
+                Location point = origin.clone().add(direction.clone().multiply(step));
+                recordPaint(id, engine.paint(point, teams.getOrDefault(id, -1), 2));
+            }
+            for (Player target : players.values()) {
+                if (target == null || !target.isOnline() || target.getUniqueId().equals(id)
+                        || teams.getOrDefault(target.getUniqueId(), -2) == teams.getOrDefault(id, -1)
+                        || respawnAt.containsKey(target.getUniqueId())
+                        || alreadyHit.contains(target.getUniqueId())) continue;
+                Vector relative = target.getLocation().toVector().subtract(origin.toVector());
+                double along = relative.dot(direction);
+                if (along < 0.0D || along > 3.2D) continue;
+                double lateral = relative.clone().subtract(direction.clone().multiply(along)).length();
+                if (lateral <= 2.0D) {
+                    alreadyHit.add(target.getUniqueId());
+                    markSpecialTarget(id, target);
+                }
+            }
+        }
+    }
+
+    private void updateTemporaryDevices(long now) {
+        mines.removeIf(mine -> now >= mine.expiresAt);
+        for (InkMine mine : new ArrayList<>(mines)) {
+            if (now < mine.armedAt) continue;
+            Player target = players.values().stream()
+                    .filter(p -> p != null && p.isOnline() && !p.getUniqueId().equals(mine.ownerId)
+                            && teams.getOrDefault(p.getUniqueId(), -2) != mine.team
+                            && !respawnAt.containsKey(p.getUniqueId())
+                            && p.getLocation().distanceSquared(mine.location) <= 2.25D
+                            && !mine.hitPlayers.contains(p.getUniqueId()))
+                    .findFirst().orElse(null);
+            if (target == null) continue;
+            paintArea(mine.ownerId, mine.location, 2, mine.hitPlayers, false, now);
+            mines.remove(mine);
+            break;
+        }
+
+        for (Sprinkler sprinkler : new ArrayList<>(sprinklers)) {
+            if (now >= sprinkler.expiresAt) { sprinklers.remove(sprinkler); continue; }
+            if (now < sprinkler.nextPulseAt) continue;
+            sprinkler.nextPulseAt = now + 650L;
+            recordPaint(sprinkler.ownerId, engine.paint(sprinkler.location, sprinkler.team, 2));
+            for (Player target : players.values()) {
+                if (target == null || !target.isOnline() || target.getUniqueId().equals(sprinkler.ownerId)
+                        || teams.getOrDefault(target.getUniqueId(), -2) == sprinkler.team
+                        || respawnAt.containsKey(target.getUniqueId())
+                        || sprinkler.hitPlayers.contains(target.getUniqueId())) continue;
+                if (target.getLocation().distanceSquared(sprinkler.location) <= 4.0D) {
+                    sprinkler.hitPlayers.add(target.getUniqueId());
+                    applyMark(sprinkler.ownerId, target.getUniqueId(), target);
+                }
+            }
+            world.spawnParticle(Particle.DUST, sprinkler.location, 10, 0.8D, 0.15D, 0.8D, 0.0D,
+                    new Particle.DustOptions(teamColour(sprinkler.team), 1.1F));
+        }
+
+        for (TrackerFlare flare : new ArrayList<>(trackerFlares)) {
+            if (now >= flare.expiresAt) { trackerFlares.remove(flare); continue; }
+            if (now < flare.nextPulseAt) continue;
+            flare.nextPulseAt = now + 400L;
+            for (Player viewer : players.values()) {
+                if (viewer == null || !viewer.isOnline()
+                        || teams.getOrDefault(viewer.getUniqueId(), -2) != flare.team) continue;
+                for (Player enemy : players.values()) {
+                    if (enemy == null || !enemy.isOnline()
+                            || teams.getOrDefault(enemy.getUniqueId(), -2) == flare.team
+                            || respawnAt.containsKey(enemy.getUniqueId())
+                            || enemy.getLocation().distanceSquared(flare.location) > 324.0D) continue;
+                    viewer.spawnParticle(Particle.DUST, enemy.getLocation().add(0.0D, 1.0D, 0.0D),
+                            7, 0.22D, 0.35D, 0.22D, 0.0D,
+                            new Particle.DustOptions(teamColour(1 - flare.team), 1.4F));
+                }
+            }
+        }
+
+        for (DelayedBlast blast : new ArrayList<>(delayedBlasts)) {
+            if (now < blast.detonatesAt) continue;
+            paintArea(blast.ownerId, blast.location, 2, new HashSet<>(), false, now);
+            delayedBlasts.remove(blast);
+        }
+
+        for (Paintstorm storm : new ArrayList<>(paintstorms)) {
+            if (now >= storm.expiresAt || storm.pulsesRemaining <= 0) { paintstorms.remove(storm); continue; }
+            if (now < storm.nextPulseAt) continue;
+            storm.nextPulseAt = now + 400L;
+            storm.pulsesRemaining--;
+            recordPaint(storm.ownerId, engine.paint(storm.center, storm.team, 3));
+            for (Player target : players.values()) {
+                if (target == null || !target.isOnline() || target.getUniqueId().equals(storm.ownerId)
+                        || teams.getOrDefault(target.getUniqueId(), -2) == storm.team
+                        || respawnAt.containsKey(target.getUniqueId())
+                        || target.getLocation().distanceSquared(storm.center) > 16.0D) continue;
+                if (!storm.hitPlayers.add(target.getUniqueId())) continue;
+                markSpecialTarget(storm.ownerId, target);
+            }
+            world.spawnParticle(Particle.DUST, storm.center, 24, 1.5D, 0.25D, 1.5D, 0.0D,
+                    new Particle.DustOptions(teamColour(storm.team), 1.8F));
+            world.playSound(storm.center, Sound.ENTITY_GENERIC_EXPLODE, 0.45F, 1.4F);
+        }
     }
 
     private void giveStarterLoadout(Player player, int team, String kit) {
