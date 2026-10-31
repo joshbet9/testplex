@@ -29,6 +29,8 @@ public final class SuperSploorEngine {
     };
 
     private final World world;
+    private final int redSpawnCount;
+    private final int blueSpawnCount;
     private final Map<Block, BlockData> originals = new LinkedHashMap<>();
     private final Map<Block, Integer> owners = new HashMap<>();
     private int redUnits;
@@ -40,6 +42,14 @@ public final class SuperSploorEngine {
             throw new IllegalArgumentException("Super Sploor requires an archived map with valid X/Z bounds.");
         }
         this.world = world;
+        List<Location> redSpawns = map.teamSpawnLocationsForTeam(0, 2);
+        List<Location> blueSpawns = map.teamSpawnLocationsForTeam(1, 2);
+        if (redSpawns.size() < 2 || blueSpawns.size() < 2) {
+            throw new IllegalArgumentException("Super Sploor map needs at least two authored spawn points for each team; found Red="
+                    + redSpawns.size() + ", Blue=" + blueSpawns.size() + ".");
+        }
+        this.redSpawnCount = redSpawns.size();
+        this.blueSpawnCount = blueSpawns.size();
         int minY = map.hasVerticalBounds() ? map.minY() : Math.max(world.getMinHeight(), 32);
         int maxY = map.hasVerticalBounds() ? map.maxY() : Math.min(world.getMaxHeight() - 1, 128);
         minY = Math.max(world.getMinHeight(), minY);
@@ -165,6 +175,9 @@ public final class SuperSploorEngine {
         }
         return false;
     }
+
+    public int redSpawnCount() { return redSpawnCount; }
+    public int blueSpawnCount() { return blueSpawnCount; }
 
     public int totalUnits() { return owners.size(); }
     public int redUnits() { return redUnits; }
