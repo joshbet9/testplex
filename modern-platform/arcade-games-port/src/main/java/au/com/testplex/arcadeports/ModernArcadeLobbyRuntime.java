@@ -329,6 +329,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     new KitChoice("turf-wars-marksman", "Marksman", Material.BOW),
                     new KitChoice("turf-wars-infiltrator", "Infiltrator", Material.IRON_SWORD),
                     new KitChoice("turf-wars-shredder", "Shredder", Material.ARROW));
+            case CAMERA_SHY -> List.of(
+                    new KitChoice("camera-shy-smoke-artist", "Smoke Artist", Material.POTION),
+                    new KitChoice("camera-shy-decoy", "Decoy", Material.FIREWORK_ROCKET),
+                    new KitChoice("camera-shy-runner", "Runner", Material.SUGAR),
+                    new KitChoice("camera-shy-spotter", "Spotter", Material.COMPASS),
+                    new KitChoice("camera-shy-understudy", "Understudy", Material.ARMOR_STAND));
             default -> List.of();
         };
     }

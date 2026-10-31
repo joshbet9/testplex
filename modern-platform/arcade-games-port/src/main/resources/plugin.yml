@@ -3,7 +3,7 @@ version: 0.1.0-SNAPSHOT
 main: au.com.testplex.arcadeports.ArcadeMechanicsModernPlugin
 api-version: '26.3'
 author: Testplex
-description: Mechanics-first prototypes for the other 17 Arcade games on Paper 26.3
+description: Mechanics-first Arcade prototypes, including Camera Shy, on Paper 26.3
 softdepend:
   - TestplexModernArcade
   - packetevents
@@ -15,7 +15,7 @@ commands:
     aliases: [arcadestats]
   arcadeport:
     description: Start and test a modern Arcade game
-    usage: /arcadeport <play|join|start|kit|ghost|maps|lobby|bot|status|stop>
+    usage: /arcadeport <play|join|start|leave|kit|ghost|maps|lobby|bot|status|stop>
   mm:
     description: Monster Maze game commands managed by Testplex Arcade
     usage: /mm <start|stop|kit|kits|map|mode|pattern|stats|pb|lb|status>

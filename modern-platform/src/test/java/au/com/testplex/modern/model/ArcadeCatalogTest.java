@@ -8,17 +8,17 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeCatalogTest {
     @Test
-    void registersAllTwentyFourArcadeGames() {
+    void registersAllTwentyFiveArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(24, catalog.size());
-        assertEquals(24, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+        assertEquals(25, catalog.size());
+        assertEquals(25, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
     }
 
     @Test
     void eachGameHasItsOwnCosmeticLinesAndWinEffects() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         for (GameDefinition game : catalog.getGames()) {
-            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen", "milk-the-cow", "wither-assault").contains(game.getId());
+            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen", "milk-the-cow", "wither-assault", "camera-shy").contains(game.getId());
             assertEquals(gameplayFirstPort, game.getCosmeticLines().isEmpty(),
                     game.getId() + " cosmetic lines should remain optional during this gameplay-first port");
             assertTrue(game.getWinEffects().size() >= (gameplayFirstPort ? 1 : 3),
@@ -118,9 +118,21 @@ class ArcadeCatalogTest {
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
         assertEquals(4, readyForTest);
-        assertEquals(20, inProgress);
+        assertEquals(21, inProgress);
     }
 
+    @Test
+    void cameraShyIsCataloguedAsAnInProgressSpyglassEliminationGame() {
+        GameDefinition game = new ArcadeCatalog().getGame("camera-shy");
+        assertNotNull(game);
+        assertEquals("Camera Shy", game.getName());
+        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus());
+        assertFalse(game.isReadyForTest());
+        assertTrue(game.getDescription().contains("five exposures"));
+        assertEquals(List.of("last-photographer-standing"),
+                game.getWinEffects().stream().map(CosmeticOption::getId).toList());
+        assertTrue(game.getCosmeticLines().isEmpty());
+    }
     @Test
     void monsterMazeMobFormsCanBeEquippedIndependently() {
         GameDefinition game = new ArcadeCatalog().getGame("monster-maze");

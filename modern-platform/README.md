@@ -25,10 +25,10 @@ The build uses Paper's official Maven repository and a version range for the cur
 - /arcadecosmetics — game-specific cosmetic lines and a separate win-effect selector.
 - /arcadetest status — administrative port-status summary.
 - player-preferences.yml — per-player, per-game, per-line preferences; separate from the legacy profile format.
-- All 18 Arcade games are catalogued with optional future concepts for cosmetic lines and win scenes; these are not current parity acceptance criteria.
+- All 25 Arcade games are catalogued with optional future concepts for cosmetic lines and win scenes; these are not current parity acceptance criteria.
 - `monster-maze-port/` contains the 1.21 Monster Maze gameplay source. It is compiled directly into `ArcadeMechanicsModern.jar` as an in-process game module; it has no Bukkit plugin descriptor, join listener, private lobby, NPC selector or separate server lifecycle.
 - `snake-port/` builds `SnakeModern.jar`, a Paper-native mechanics-first port with an isolated arena.
-- `arcade-games-port/` builds `ArcadeMechanicsModern.jar`, first-pass game loops and dedicated test arenas for the other 16 games, including Draw My Thing and Master Builders.
+- `arcade-games-port/` builds `ArcadeMechanicsModern.jar`, first-pass game loops and dedicated test arenas for the other 17 games, including Draw My Thing and Master Builders.
 - Game Details routes Monster Maze through `/arcadeport play monster-maze`; its participants, queue, stop handling and return-to-lobby flow are owned by Testplex Arcade.
 - Deployment migrates saved module data from both old standalone data folders (`plugins/MonsterMazeStandalone/` and `plugins/MonsterMazeModern/`), then inspects plugin descriptors and quarantines any standalone Monster Maze Bukkit JAR (including the source project's actual `MonsterMazeStandalone.jar` name) in the deployment backup before Paper restarts. The independent `joshbet9/MonsterMaze` project and its separate services are not modified.
 
@@ -48,7 +48,7 @@ Modern server provisioning and deployment use a separate directory, unit (`testp
 
 ## Complete 26-game programme register (31 October 2026)
 
-The overall programme tracks 26 titles/variants: **24 shared Arcade catalogue games**, the separately packaged **Wizards** module, and the planned **Speed Builders Arcade** variant. Speed Builders currently has no implementation branch or runtime code; it is tracked as planned work rather than represented by a non-functional placeholder.
+The overall programme tracks 27 titles/variants: **25 shared Arcade catalogue games**, the separately packaged **Wizards** module, and the planned **Speed Builders Arcade** variant. Speed Builders currently has no implementation branch or runtime code; it is tracked as planned work rather than represented by a non-functional placeholder.
 
 | # | Game | Current implementation state | Test access |
 |---:|---|---|---|
@@ -76,7 +76,8 @@ The overall programme tracks 26 titles/variants: **24 shared Arcade catalogue ga
 | 22 | SkyWars Mixed | Mechanics-first 16-player port integrated | Disabled |
 | 23 | Milk the Cow | Mechanics-first port integrated | Disabled |
 | 24 | Wither Assault | Mechanics-first port integrated; generated test arena | Disabled |
-| 25 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
-| 26 | Speed Builders Arcade | Planned; implementation not started | Not available |
+| 25 | Camera Shy | Spyglass-based photographic elimination game; five exposures eliminate | Disabled |
+| 26 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
+| 27 | Speed Builders Arcade | Planned; implementation not started | Not available |
 
 **Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers and Bacon Brawl form the current shared test queue and can be exercised together in the same test sessions. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable.
