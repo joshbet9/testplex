@@ -879,6 +879,8 @@ public final class PlexballGame implements Listener {
     }
 
     private void swing(Player player) {
+        // One interaction is the only swing for this at-bat. A foul or missed
+        // contact consumes it too, preventing repeated-click timing retries.
         if (phase != Phase.BATTING || !player.getUniqueId().equals(batterId)) return;
         int pingEstimate = Math.max(0, player.getPing());
         int rewind = PlexballRules.latencyRewindTicks(pingEstimate);
