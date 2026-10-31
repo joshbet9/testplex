@@ -161,6 +161,22 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         }
     }
 
+    public void recordMonsterMazeFirstSafePad(java.util.UUID playerId) {
+        if (manager != null) manager.recordMonsterMazeFirstSafePad(playerId);
+    }
+
+    public void recordMonsterMazeHighestStage(java.util.UUID playerId, int stage) {
+        if (manager != null) manager.recordMonsterMazeHighestStage(playerId, stage);
+    }
+
+    public void recordMonsterMazeWin(java.util.UUID playerId, int stage) {
+        if (manager != null) manager.recordMonsterMazeWin(playerId, stage);
+    }
+
+    public void recordMonsterMazeAchievement(java.util.UUID playerId, String achievementId) {
+        if (manager != null) manager.recordMonsterMazeAchievement(playerId, achievementId);
+    }
+
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
@@ -234,8 +250,25 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        // /stats is a root command, not an ArcadePort subcommand. Its argument
+        // array contains only the optional online player name.
+        if ("stats".equalsIgnoreCase(command.getName())) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("Players only.");
+                return true;
+            }
+            manager.openStats(player, args.length > 0 ? args[0] : null);
+            return true;
+        }
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
         switch (sub) {
+            case "stats":
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                manager.openStats(player, args.length > 1 ? args[1] : null);
+                return true;
             case "join":
             case "play":
                 if (!(sender instanceof Player player)) {

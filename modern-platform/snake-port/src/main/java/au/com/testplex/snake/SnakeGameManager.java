@@ -454,9 +454,17 @@ public final class SnakeGameManager implements Listener {
             if (state.reverseUntil > now) {
                 state.lastMovementLocation = head.getLocation().clone();
                 state.lastMovementAt = now;
+                if (state.stayedNearEdge && (mapData == null || state.segments.isEmpty()
+                        || !mapData.isWithinEdgeMargin(state.segments.get(0).getLocation(), 10.0D))) {
+                    state.stayedNearEdge = false;
+                }
                 continue;
             }
             moveSnake(state, now);
+            if (state.stayedNearEdge && (mapData == null
+                    || !mapData.isWithinEdgeMargin(state.segments.get(0).getLocation(), 10.0D))) {
+                state.stayedNearEdge = false;
+            }
         }
         processFood();
         moveAndProcessHazards();
@@ -806,6 +814,15 @@ public final class SnakeGameManager implements Listener {
         ControlDebuff result = outcomes[ThreadLocalRandom.current().nextInt(outcomes.length)];
         state.rouletteHits++;
         int duration = SnakeRules.rouletteDurationSecondsForHit(state.rouletteHits);
+        if (result == state.lastNerf) state.sameNerfStreak++;
+        else {
+            state.lastNerf = result;
+            state.sameNerfStreak = 1;
+        }
+        if (state.sameNerfStreak >= 3
+                && stats.awardAchievement(state.player.getUniqueId(), "busted")) {
+            state.player.sendMessage(ChatColor.GOLD + "Achievement unlocked: Busted");
+        }
         ItemStack original = player.getInventory().getItem(HOTBAR_ROULETTE_SLOT);
         state.rouletteOriginalItem = original == null ? null : original.clone();
         state.rouletteOriginalCaptured = true;
@@ -830,6 +847,7 @@ public final class SnakeGameManager implements Listener {
                 }
                 restoreRouletteSlot(state);
                 state.debuff = result;
+                if (duration == 10) state.survivedTenSecondNerf = true;
                 state.debuffUntil = System.currentTimeMillis() + duration * 1000L;
                 state.lastRawYaw = player.getLocation().getYaw();
                 state.laggedYaw = state.lastRawYaw;
@@ -917,6 +935,11 @@ public final class SnakeGameManager implements Listener {
             SnakeState killerState = snakes.get(killer.getUniqueId());
             if (killerState != null && killerState.alive) {
                 killerState.kills++;
+                long now = System.currentTimeMillis();
+                boolean abilityActive = killerState.speedUntil > now
+                        || killerState.reverseUntil > now || killerState.invulnerableUntil > now;
+                if (abilityActive) killerState.killsWithAbility++;
+                else killerState.killsWithoutAbility++;
                 stats.recordKill(killer, killerState.kills);
             }
         }
@@ -980,6 +1003,14 @@ public final class SnakeGameManager implements Listener {
             removeSegments(state);
             if (recordStats) {
                 boolean won = winner != null && winner.getUniqueId().equals(state.player.getUniqueId());
+                UUID playerId = state.player.getUniqueId();
+                if (won && state.kills == 0) stats.awardAchievement(playerId, "dont-want-none");
+                if (won && state.survivedTenSecondNerf) stats.awardAchievement(playerId, "resilience-snakeified");
+                if (won && !state.usedAbility) stats.awardAchievement(playerId, "one-of-the-ogs");
+                if (won && state.kills > 0 && state.killsWithoutAbility == 0 && state.killsWithAbility == state.kills) {
+                    stats.awardAchievement(playerId, "flawless");
+                }
+                if (won && state.stayedNearEdge) stats.awardAchievement(playerId, "bots-everywhere");
                 boolean knockedOut = !state.alive;
                 stats.recordGameEnd(state.player.getUniqueId(), won, state.kills);
                 stats.publishToArcadeStats(state.player.getUniqueId(), won, state.kills, knockedOut);
@@ -1196,10 +1227,12 @@ public final class SnakeGameManager implements Listener {
         consumeMainHand(event.getPlayer());
 
         if (material == Material.FEATHER && "speed".equals(state.kit)) {
+            state.usedAbility = true;
             state.speedUntil = now + 2_000L;
             state.abilityCooldownUntil = now + 1_000L;
             event.getPlayer().sendMessage(ChatColor.YELLOW + "Speed boost!");
         } else if (material == Material.COOKIE && "reverse".equals(state.kit)) {
+            state.usedAbility = true;
             event.getPlayer().leaveVehicle();
             Collections.reverse(state.segments);
             List<Location> reversedPath = new ArrayList<>();
@@ -1213,6 +1246,7 @@ public final class SnakeGameManager implements Listener {
             state.abilityCooldownUntil = now + 1_000L;
             event.getPlayer().sendMessage(ChatColor.LIGHT_PURPLE + "Reverse!");
         } else if (material == Material.NETHER_STAR && "invulnerable".equals(state.kit)) {
+            state.usedAbility = true;
             state.invulnerableUntil = now + 2_000L;
             state.abilityCooldownUntil = now + 1_000L;
             event.getPlayer().sendMessage(ChatColor.AQUA + "Super Snake: tail collisions ignored briefly.");
@@ -1471,6 +1505,13 @@ public final class SnakeGameManager implements Listener {
         long lastMovementAt;
         long spectateTeleportCooldownUntil;
         int kills;
+        int killsWithAbility;
+        int killsWithoutAbility;
+        int sameNerfStreak;
+        ControlDebuff lastNerf;
+        boolean survivedTenSecondNerf;
+        boolean usedAbility;
+        boolean stayedNearEdge = true;
         int slimesEaten;
         int maxTailLength;
         ItemStack rouletteOriginalItem;

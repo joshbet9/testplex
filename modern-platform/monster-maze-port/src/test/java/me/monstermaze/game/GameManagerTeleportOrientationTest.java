@@ -45,6 +45,15 @@ class GameManagerTeleportOrientationTest {
         assertEquals(0.0F, GameManager.yawToward(null, from), 0.001F);
     }
 
+    @Test
+    void identifiesOnlyASingleMissingMazeCellBetweenOpposingPathTiles() {
+        assertTrue(GameManager.isSingleBlockMazeGap(false, false, true, true));
+        assertTrue(GameManager.isSingleBlockMazeGap(true, true, false, false));
+        assertFalse(GameManager.isSingleBlockMazeGap(true, false, true, false));
+        assertFalse(GameManager.isSingleBlockMazeGap(false, false, false, false));
+        assertFalse(GameManager.isSingleBlockMazeGap(true, true, true, true));
+    }
+
     private static World testWorld() {
         return (World) Proxy.newProxyInstance(World.class.getClassLoader(), new Class<?>[]{World.class},
                 (proxy, method, args) -> {

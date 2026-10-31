@@ -859,6 +859,7 @@ public final class WizardsGameManager implements Listener {
                 return;
             }
             if (event.getClick().isLeftClick()) {
+                if (state.wands[heldSlot] != spell) state.spellsBound++;
                 state.wands[heldSlot] = spell;
                 player.sendMessage(ChatColor.BLUE + "Spell on wand set to " + categoryColour(spell) + spell.displayName());
                 player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 1.2F);
@@ -1241,6 +1242,16 @@ public final class WizardsGameManager implements Listener {
         Player player = event.getEntity();
         WizardState state = states.get(player.getUniqueId());
         if (!running || state == null || !state.alive) return;
+        Player killer = player.getKiller();
+        if (killer == null && player.getLastDamageCause() instanceof EntityDamageByEntityEvent damage
+                && damage.getDamager() instanceof Wolf wolf) {
+            SummonedWolfData wolfData = summonedWolves.get(wolf.getUniqueId());
+            if (wolfData != null) killer = Bukkit.getPlayer(wolfData.owner);
+        }
+        WizardState killerState = killer == null ? null : states.get(killer.getUniqueId());
+        if (killer != null && !killer.equals(player) && killerState != null && killerState.alive) {
+            killerState.kills++;
+        }
         state.alive = false;
         dropDeathLoot(player, state);
         event.setKeepInventory(true);
@@ -2243,6 +2254,7 @@ public final class WizardsGameManager implements Listener {
 
     private void finish(Player winner, String message) {
         running = false;
+        recordWizardsProgress(winner);
         if (message != null) {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 player.sendMessage(ChatColor.GOLD + "Wizards » " + ChatColor.YELLOW + message);
@@ -2286,6 +2298,23 @@ public final class WizardsGameManager implements Listener {
             border.setCenter(0.0D, 0.0D);
             border.setSize((Math.max(32, Math.min(96, plugin.getConfig().getInt("arena-radius", 48))) * 2.0D) + 4.0D);
         }
+    }
+
+    /** Write Wizards progress into the shared Arcade stats store when it is installed. */
+    private void recordWizardsProgress(Player winner) {
+        org.bukkit.plugin.Plugin arcade = Bukkit.getPluginManager().getPlugin("ArcadeMechanicsModern");
+        if (!(arcade instanceof JavaPlugin arcadePlugin)) return;
+        org.bukkit.configuration.file.FileConfiguration config = arcadePlugin.getConfig();
+        for (Map.Entry<UUID, WizardState> entry : states.entrySet()) {
+            UUID playerId = entry.getKey();
+            WizardState state = entry.getValue();
+            WizardsProgressStore.increment(config, playerId, "kills", state.kills);
+            WizardsProgressStore.increment(config, playerId, "spells-bound", state.spellsBound);
+        }
+        if (winner != null && states.containsKey(winner.getUniqueId())) {
+            WizardsProgressStore.increment(config, winner.getUniqueId(), "wins", 1L);
+        }
+        arcadePlugin.saveConfig();
     }
 
     private void restoreTemporaryPlayer(Player player, UUID id) {
@@ -2417,6 +2446,8 @@ public final class WizardsGameManager implements Listener {
         private float mana;
         private int wandCount;
         private int soulStars;
+        private int kills;
+        private int spellsBound;
         private float cooldownModifier = 1.0F;
         private boolean alive = true;
 

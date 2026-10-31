@@ -697,7 +697,10 @@ class ArcadePortGameTest {
     }
 
     @Test void quiverAchievementSetMatchesTheUpdatedRequirements() {
-        assertEquals(4, QuiverAchievement.values().length);
+        assertEquals(6, QuiverAchievement.values().length);
+        assertEquals("HEADS!", QuiverAchievement.HEADS.displayName());
+        assertEquals("Kill a player with a high-arced bow shot.", QuiverAchievement.HEADS.requirement());
+        assertEquals("Win with 10 separate two-kill streaks.", QuiverAchievement.RHYTHM_HEAVEN.requirement());
         assertEquals("The Perfect Game", QuiverAchievement.THE_PERFECT_GAME.displayName());
         assertEquals("Achieve a Perfect Run killstreak in a game.",
                 QuiverAchievement.THE_PERFECT_GAME.requirement());

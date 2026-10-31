@@ -83,6 +83,7 @@ public class KitManager implements Listener {
      *  decrements one use, granting the player full bump immunity while the counter is > 0. */
     private final Map<UUID, Long> bodyRushUntil = new HashMap<UUID, Long>();
     private final Map<UUID, Long> bodyRushHitFeedback = new HashMap<UUID, Long>();
+    private final Map<UUID, Integer> bodyRushLaunches = new HashMap<UUID, Integer>();
     private final Map<UUID, Long> cryoFrozenUntil = new HashMap<UUID, Long>();
 
     /** Slowballer "Cryo Blitz" secondary: last use timestamp (ms epoch). Q-drop freezes mobs
@@ -173,6 +174,7 @@ public class KitManager implements Listener {
         snowballConstructor.clear();
         bodyRushUntil.clear();
         bodyRushHitFeedback.clear();
+        bodyRushLaunches.clear();
         cryoFrozenUntil.clear();
         cryoCooldown.clear();
         for (Entity e : launched.keySet()) {
@@ -373,6 +375,9 @@ public class KitManager implements Listener {
             // (Speed/Modern only; Original keeps the source behaviour.)
             if (game.qolEnabled() && game.isOnAnyPad(p)) continue;
 
+            if (game.isOverOneBlockGap(p)) {
+                game.recordAchievement(p.getUniqueId(), "just-to-suffer");
+            }
             setJumpsLeft(p, feather.getAmount() - 1);
             jumpRecharge.put(p.getUniqueId(), System.currentTimeMillis());
 
@@ -644,6 +649,7 @@ public class KitManager implements Listener {
 
         // Manager.GetCondition().Factory().Slow(..., 2, 1, ...) → 2 seconds, amplifier 1
         target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 40, 1), true);
+        game.noteOutOfCupSlowball(shooter, target);
         target.getWorld().playSound(target.getLocation(), Sound.ENTITY_SLIME_SQUISH, 1f, 1.2f);
     }
 
@@ -877,6 +883,7 @@ public class KitManager implements Listener {
         long now=System.currentTimeMillis();
         Long until=bodyRushUntil.get(id);
         if (until==null || until.longValue()<=now) { bodyRushUntil.remove(id); return 0; }
+        if (bodyRushLaunches.merge(id, 1, Integer::sum) >= 10) game.recordAchievement(id, "stampede");
         long remaining=until.longValue()-2000L;
         bodyRushHitFeedback.put(id,now+750L);
         bodyRushImpactVisual(player);
@@ -969,6 +976,7 @@ public class KitManager implements Listener {
                 frozenCount++;
             }
         }
+        if (frozenCount >= 10) game.recordAchievement(player.getUniqueId(), "blizzard");
         player.playSound(player.getLocation(), Sound.ENTITY_SNOWBALL_THROW, 1.0f, 0.5f);
         TextUtil.title(player, "", ChatColor.AQUA + "" + ChatColor.BOLD + "Cryo Blitz!"
                         + ChatColor.WHITE + " " + frozenCount + " mob(s) frozen", 5, 30, 5);

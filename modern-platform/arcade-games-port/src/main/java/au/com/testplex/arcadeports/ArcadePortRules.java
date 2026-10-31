@@ -1447,9 +1447,48 @@ public final class ArcadePortRules {
         };
     }
 
+    public static final double EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER = 0.75D;
+
     public static double evolutionChargePerTick(int killsThisLife) {
         int extraKills = Math.max(0, killsThisLife - 1);
         return Math.min(0.022D, 0.012D + 0.003D * extraKills);
+    }
+
+    public static double evolutionChargePerTick(int killsThisLife, boolean quickEvolver) {
+        double normal = evolutionChargePerTick(killsThisLife);
+        return quickEvolver ? normal / EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER : normal;
+    }
+
+    public static long evolutionFormChangeTicks(boolean quickEvolver) {
+        return quickEvolver
+                ? (long) Math.ceil(EVOLUTION_FORM_CHANGE_TICKS * EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER)
+                : EVOLUTION_FORM_CHANGE_TICKS;
+    }
+
+    public static long evolutionTotalAnimationTicks(boolean quickEvolver) {
+        return quickEvolver
+                ? (long) Math.ceil(EVOLUTION_TOTAL_ANIMATION_TICKS * EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER)
+                : EVOLUTION_TOTAL_ANIMATION_TICKS;
+    }
+
+    public static boolean shouldAwardEvolutionWrongKitChamp(int attemptedLevel,
+            boolean quickEvolverSelected, boolean currentlyEvolving, long elapsedTicks) {
+        return !quickEvolverSelected && currentlyEvolving
+                && attemptedLevel == EVOLUTION_WIN_LEVEL - 1
+                && elapsedTicks >= evolutionFormChangeTicks(true)
+                && elapsedTicks < EVOLUTION_FORM_CHANGE_TICKS;
+    }
+
+    public static final long BACON_BLAST_KILL_COMBO_WINDOW_MILLIS = BACON_FALL_KILL_CREDIT_WINDOW_MILLIS;
+
+    public static boolean shouldCountMamaCameraBlastKill(boolean mamaPiggles,
+            boolean directBlastKill, java.util.UUID killerId, java.util.UUID comboOwnerId,
+            long nowMillis, long lastComboHitAtMillis) {
+        if (!mamaPiggles) return false;
+        if (directBlastKill) return true;
+        return killerId != null && killerId.equals(comboOwnerId)
+                && lastComboHitAtMillis > 0L && nowMillis >= lastComboHitAtMillis
+                && nowMillis - lastComboHitAtMillis <= BACON_BLAST_KILL_COMBO_WINDOW_MILLIS;
     }
 
     public static long evolutionPityRemainingMillis(long pityDeadline, long now) {
