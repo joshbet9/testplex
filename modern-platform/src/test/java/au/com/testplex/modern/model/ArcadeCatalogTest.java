@@ -97,9 +97,20 @@ class ArcadeCatalogTest {
     }
 
     @Test
+    void drawMasterBuildersAndSneakyAssassinsAreReadyForControlledAcceptance() {
+        ArcadeCatalog catalog = new ArcadeCatalog();
+        for (String id : Set.of("draw-my-thing", "master-builders", "sneaky-assassins")) {
+            GameDefinition game = catalog.getGame(id);
+            assertNotNull(game, id);
+            assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus(), id);
+            assertTrue(game.isReadyForTest(), id);
+        }
+    }
+
+    @Test
     void explicitlyClearedGamesAreAvailableTogetherForInGameAcceptance() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy");
+        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy", "draw-my-thing", "master-builders", "sneaky-assassins");
 
         for (GameDefinition game : catalog.getGames()) {
             if (readyIds.contains(game.getId())) {
@@ -115,8 +126,8 @@ class ArcadeCatalogTest {
         long readyForTest = catalog.getGames().stream().filter(GameDefinition::isReadyForTest).count();
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
-        assertEquals(16, readyForTest);
-        assertEquals(11, inProgress);
+        assertEquals(19, readyForTest);
+        assertEquals(8, inProgress);
     }
 
     @Test
