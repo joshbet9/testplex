@@ -168,17 +168,17 @@ public final class WizardsGameManager implements Listener {
             World imported = createSourceMapArena(sourceMap);
             if (imported != null) return imported;
 
-            // The source ZIP is experimental until it passes a live Paper round.
-            // Never strand Wizards because an archive's terrain cannot be adapted:
-            // fall back to the known generated test arena and keep the rejection in logs.
-            plugin.getLogger().warning("Wizards source map " + sourceMap
-                    + " failed runtime validation; using the generated test arena for this match.");
+            // A selected source map is the actual game board. Never substitute a
+            // generated arena on a live queue: it would hide an import failure and
+            // start a different game from the one the players selected.
+            plugin.getLogger().severe("Selected Wizards source map " + sourceMap
+                    + " failed validation. Refusing to start on a generated substitute.");
             arena = null;
             activeMapResource = null;
             sourceMapData = null;
             sourceSpawnLocations.clear();
             chests.clear();
-            return createGeneratedArena();
+            return null;
         }
 
         if (activeMapResource != null) {
@@ -193,6 +193,10 @@ public final class WizardsGameManager implements Listener {
         sourceMapData = null;
         sourceSpawnLocations.clear();
         chests.clear();
+        if (!plugin.getConfig().getBoolean("wizards.allow-generated-test-arena", false)) {
+            plugin.getLogger().severe("No Wizards source map is selected. Refusing to start without a real source map.");
+            return null;
+        }
         return createGeneratedArena();
     }
 
@@ -421,33 +425,49 @@ public final class WizardsGameManager implements Listener {
             sender.sendMessage(ChatColor.RED + "Wizards is already running.");
             return;
         }
-        String desiredMap = SourceMapCatalog.selectedResourceForFolders(plugin, "wizards", WIZARDS_MAP_FOLDERS);
-        if (arena == null || !java.util.Objects.equals(activeMapResource, desiredMap)) {
-            arena = createArena();
-        }
-        if (arena == null) {
-            sender.sendMessage(ChatColor.RED + "Wizards arena failed to load.");
-            return;
-        }
-
         List<Player> entrants = new ArrayList<>();
         for (Player player : queue.values()) {
             if (player.isOnline()) entrants.add(player);
         }
         int maximum = Math.max(2, Math.min(WizardsRules.MAX_PLAYERS,
                 plugin.getConfig().getInt("wizards.maximum-players", WizardsRules.MAX_PLAYERS)));
-        if (entrants.size() > maximum) entrants = new ArrayList<>(entrants.subList(0, maximum));
         int minimum = Math.max(2, Math.min(maximum,
                 plugin.getConfig().getInt("wizards.minimum-players", WizardsRules.MIN_PLAYERS)));
         boolean allowSolo = plugin.getConfig().getBoolean("wizards.allow-solo-start", false);
         if (entrants.size() < minimum && !(allowSolo && entrants.size() == 1)) {
-            sender.sendMessage(ChatColor.RED + "Wizards needs " + minimum + " queued players to start.");
+            sender.sendMessage(ChatColor.RED + "Wizards needs " + minimum + " queued players to start ("
+                    + entrants.size() + "/" + minimum + ").");
+            // A queue timer is a minimum-player wait, not a one-shot timeout.
+            // Re-arm it so players can keep joining until the match is viable.
+            queueDeadlineTick = queue.isEmpty() ? -1L : tick + 100L;
+            for (Player queued : queue.values()) {
+                if (queued.isOnline()) queued.sendMessage(ChatColor.GRAY + "Waiting for more wizards: "
+                        + entrants.size() + "/" + minimum + " players.");
+            }
             return;
         }
         if (entrants.isEmpty()) {
             sender.sendMessage(ChatColor.RED + "Nobody is queued for Wizards.");
+            queueDeadlineTick = -1L;
             return;
         }
+
+        String desiredMap = SourceMapCatalog.selectedResourceForFolders(plugin, "wizards", WIZARDS_MAP_FOLDERS);
+        if (arena == null || !java.util.Objects.equals(activeMapResource, desiredMap)) {
+            arena = createArena();
+        }
+        if (arena == null) {
+            sender.sendMessage(ChatColor.RED + "Wizards source map failed to load. No substitute arena will be started.");
+            queueDeadlineTick = -1L;
+            return;
+        }
+        if (!sourceSpawnLocations.isEmpty() && entrants.size() > sourceSpawnLocations.size()) {
+            sender.sendMessage(ChatColor.RED + "The selected map has only " + sourceSpawnLocations.size()
+                    + " valid player spawns, but " + entrants.size() + " players are queued. Choose a larger map.");
+            queueDeadlineTick = -1L;
+            return;
+        }
+        if (entrants.size() > maximum) entrants = new ArrayList<>(entrants.subList(0, maximum));
 
         // The shared Arcade manager must return any previous game to the lobby
         // before Wizards snapshots player inventory, location and movement state.

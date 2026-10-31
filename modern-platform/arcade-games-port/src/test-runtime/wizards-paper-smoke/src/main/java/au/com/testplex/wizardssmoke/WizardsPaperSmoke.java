@@ -247,6 +247,38 @@ public final class WizardsPaperSmoke extends JavaPlugin {
         validateLivePlayer(third, states, "MYSTIC");
         validateLootRefilled(chests);
 
+        // Exercise a real supported spell through the production cast path before
+        // forcing eliminations. This checks mana, cooldown and projectile creation.
+        Object ownerState = states.get(owner.getUniqueId());
+        Class<?> spellType = Class.forName("au.com.testplex.wizards.WizardsSpell");
+        @SuppressWarnings("unchecked")
+        Object manaBolt = Enum.valueOf((Class<? extends Enum>) spellType.asSubclass(Enum.class), "MANA_BOLT");
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> known = (Map<Object, Object>) field(ownerState, "known");
+        int spellLevel = ((Number) known.get(manaBolt)).intValue();
+        require(spellLevel >= 1, "the default Wizard did not receive Mana Bolt");
+        double manaBefore = ((Number) field(ownerState, "mana")).doubleValue();
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> manaBoltsBefore = (Map<Object, Object>) field(wizards, "manaBolts");
+        int projectilesBefore = manaBoltsBefore.size();
+        Method castSpell = method(wizards.getClass(), "castSpell", Player.class, ownerState.getClass(),
+                spellType, org.bukkit.entity.Entity.class, Block.class);
+        castSpell.invoke(wizards, owner, ownerState, manaBolt, null, null);
+        double manaAfter = ((Number) field(ownerState, "mana")).doubleValue();
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> manaBoltsAfter = (Map<Object, Object>) field(wizards, "manaBolts");
+        require(Math.abs((manaBefore - manaAfter) - 15.0D) < 0.01D,
+                "Mana Bolt did not debit its configured 15 mana (before=" + manaBefore + ", after=" + manaAfter + ")");
+        require(manaBoltsAfter.size() == projectilesBefore + 1,
+                "Mana Bolt did not create exactly one tracked homing projectile");
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> cooldowns = (Map<Object, Object>) field(ownerState, "cooldowns");
+        require(cooldowns.containsKey(manaBolt)
+                        && ((Number) cooldowns.get(manaBolt)).longValue() > System.currentTimeMillis(),
+                "Mana Bolt did not apply its five-second cooldown");
+        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|SPELL_CAST|spell=MANA_BOLT|level=" + spellLevel
+                + "|manaCost=15|projectiles=" + manaBoltsAfter.size() + "|cooldown=5");
+
         getLogger().info("WIZARDS_GAMEPLAY_SMOKE|ROUND_STARTED|players=3|map=" + GAMEPLAY_MAP
                 + "|chests=" + chests.size() + "|snapshotCount=" + snapshots.size());
         rival.setNoDamageTicks(0);
