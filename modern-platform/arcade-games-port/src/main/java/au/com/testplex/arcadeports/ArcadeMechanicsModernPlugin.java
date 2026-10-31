@@ -250,6 +250,16 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        // /stats is a root command, not an ArcadePort subcommand. Its argument
+        // array contains only the optional online player name.
+        if ("stats".equalsIgnoreCase(command.getName())) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("Players only.");
+                return true;
+            }
+            manager.openStats(player, args.length > 0 ? args[0] : null);
+            return true;
+        }
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
         switch (sub) {
             case "stats":
