@@ -31,12 +31,11 @@ cp "$ARCADE_JAR" "$SERVER_ROOT/plugins/ArcadeMechanicsModern.jar"
 cp "$SMOKE_PLUGIN_JAR" "$SERVER_ROOT/plugins/HoopsPaperSmoke.jar"
 mkdir -p "$SERVER_ROOT/plugins/ArcadeMechanicsModern"
 cat > "$SERVER_ROOT/plugins/ArcadeMechanicsModern/config.yml" <<'CONFIG'
-# Hoops is enabled only inside this disposable CI acceptance server.
-# This file is generated under RUNNER_TEMP; production enabled-games is untouched.
+# The smoke plugin adds Hoops to this disposable server's in-memory
+# enabled-games list after the production READY_FOR_TEST guard runs.
 enabled-games:
   - death-tag
   - one-in-the-quiver
-  - hoops-remastered
 lobby-selected-game: death-tag
 owner-usernames:
   - jn_playzmc
