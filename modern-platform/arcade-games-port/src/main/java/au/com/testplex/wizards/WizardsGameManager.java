@@ -507,6 +507,13 @@ public final class WizardsGameManager implements Listener {
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.setGameMode(GameMode.SURVIVAL);
+        player.getActivePotionEffects().forEach(effect -> player.removePotionEffect(effect.getType()));
+        player.setAbsorptionAmount(0.0D);
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        player.setSprinting(false);
+        player.setWalkSpeed(0.2F);
+        player.setFlySpeed(0.1F);
         player.setFireTicks(0);
         player.setFallDistance(0.0F);
         player.setFoodLevel(20);
@@ -1062,7 +1069,7 @@ public final class WizardsGameManager implements Listener {
             meta.setDisplayName(categoryColour(spell) + spell.displayName());
             meta.setLore(List.of(
                     ChatColor.YELLOW + "Level: " + ChatColor.WHITE + level + "/" + spell.maximumLevel(),
-                    ChatColor.YELLOW + "Mana: " + ChatColor.WHITE + spell.manaCost(level),
+                    ChatColor.YELLOW + "Mana: " + ChatColor.WHITE + spell.manaCost(level, state.cooldownModifier),
                     ChatColor.YELLOW + "Cooldown: " + ChatColor.WHITE + spell.cooldownSeconds(level, state.cooldownModifier) + " seconds",
                     "",
                     ChatColor.GREEN + "Left-click: bind to held wand",
@@ -1704,7 +1711,7 @@ public final class WizardsGameManager implements Listener {
                     Math.max(1, (cooldownUntil - now + 999) / 1000) + "s).");
             return;
         }
-        int manaCost = spell.manaCost(level);
+        int manaCost = spell.manaCost(level, state.cooldownModifier);
         if (state.mana < manaCost) {
             player.sendMessage(ChatColor.BLUE + "You do not have enough mana for " + spell.displayName() + ".");
             player.playSound(player.getLocation(), Sound.BLOCK_FIRE_EXTINGUISH, 0.7F, 0.7F);
@@ -2836,9 +2843,9 @@ public final class WizardsGameManager implements Listener {
     }
 
     private record PlayerSnapshot(Location location, ItemStack[] contents, ItemStack[] armour,
-                                  GameMode gameMode, double health, int food, float saturation,
-                                  int level, float exp, boolean allowFlight, boolean flying,
-                                  float walkSpeed, float flySpeed, int fireTicks,
+                                  GameMode gameMode, double health, double absorption, int food, float saturation,
+                                  int level, float exp, boolean allowFlight, boolean flying, boolean sprinting,
+                                  float walkSpeed, float flySpeed, int fireTicks, Location compassTarget,
                                   List<PotionEffect> effects, Scoreboard scoreboard) {
         static PlayerSnapshot capture(Player player) {
             return new PlayerSnapshot(
@@ -2847,15 +2854,18 @@ public final class WizardsGameManager implements Listener {
                     cloneItems(player.getInventory().getArmorContents()),
                     player.getGameMode(),
                     player.getHealth(),
+                    player.getAbsorptionAmount(),
                     player.getFoodLevel(),
                     player.getSaturation(),
                     player.getLevel(),
                     player.getExp(),
                     player.getAllowFlight(),
                     player.isFlying(),
+                    player.isSprinting(),
                     player.getWalkSpeed(),
                     player.getFlySpeed(),
                     player.getFireTicks(),
+                    player.getCompassTarget() == null ? null : player.getCompassTarget().clone(),
                     new ArrayList<>(player.getActivePotionEffects()),
                     player.getScoreboard());
         }
@@ -2877,9 +2887,12 @@ public final class WizardsGameManager implements Listener {
             player.setAllowFlight(allowFlight);
             if (allowFlight) player.setFlying(flying);
             else player.setFlying(false);
+            player.setSprinting(sprinting);
             double maxHealth = player.getAttribute(Attribute.MAX_HEALTH) == null
                     ? 20.0D : player.getAttribute(Attribute.MAX_HEALTH).getValue();
             player.setHealth(Math.max(1.0D, Math.min(health, maxHealth)));
+            player.setAbsorptionAmount(Math.max(0.0D, absorption));
+            if (compassTarget != null && compassTarget.getWorld() != null) player.setCompassTarget(compassTarget);
             if (location != null && location.getWorld() != null) player.teleport(location);
             if (scoreboard != null) player.setScoreboard(scoreboard);
         }
