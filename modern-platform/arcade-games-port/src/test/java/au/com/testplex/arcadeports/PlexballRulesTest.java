@@ -86,6 +86,13 @@ class PlexballRulesTest {
     }
 
     @Test
+    void catchEvaluationNeverConsumesTicksWithoutARecordedBallSample() {
+        assertEquals(49L, PlexballRules.catchEvaluationThroughTick(50L, 49L));
+        assertEquals(50L, PlexballRules.catchEvaluationThroughTick(50L, 50L));
+        assertEquals(50L, PlexballRules.catchEvaluationThroughTick(50L, 51L));
+    }
+
+    @Test
     void catchCheckUsesSweptBallSegmentRatherThanOnlyEndPosition() {
         Vector player = new Vector(0.0D, 0.0D, 0.0D);
         Vector from = new Vector(-2.0D, 0.0D, 0.0D);
