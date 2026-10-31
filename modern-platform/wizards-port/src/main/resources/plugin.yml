@@ -3,6 +3,8 @@ version: 0.1.0-SNAPSHOT
 main: au.com.testplex.wizards.WizardsModernPlugin
 api-version: '26.3'
 author: Testplex
+softdepend:
+  - ArcadeMechanicsModern
 description: Resource-pack-independent Mineplex Wizards survival port for Paper 26.3
 commands:
   wizards:
