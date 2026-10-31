@@ -322,7 +322,7 @@ public final class SpeedBuildersGame implements Listener {
             giveTemplateBlocks(state.player, currentTemplate);
             state.player.setGameMode(GameMode.SURVIVAL);
             state.player.sendTitle(ChatColor.GREEN + "BUILD!",
-                    ChatColor.YELLOW + buildSeconds + " seconds — recreate the model",
+                    ChatColor.YELLOW.toString() + buildSeconds + " seconds — recreate the model",
                     0, 30, 5);
             state.player.playSound(state.player.getLocation(), org.bukkit.Sound.BLOCK_NOTE_BLOCK_BELL, 0.8F, 1.3F);
         }
