@@ -10,16 +10,16 @@ import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.ScoreboardManager;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * Consistent Testplex lobby sidebar for every Arcade game.
+ * Paper 26.3 port of the actual 1.8 Nautilus Arcade lobby scoreboard.
  *
- * Keeps a compact, Mineplex-style hierarchy while showing the modern lobby's
- * live game and kit selections. The layout always uses the same 15-line order;
- * no individual game gets a different colour scheme or a different sidebar.
+ * The source fields are Players, Kit, Gems (or Crowns on a crowns-enabled
+ * game), and Server. Division was only added for Minecraft League. This
+ * modern acceptance server has no Minecraft League/Crowns integration, so
+ * it deliberately renders the four standard fields only.
  */
 public final class ModernLobbyScoreboard {
     private final JavaPlugin plugin;
@@ -34,105 +34,114 @@ public final class ModernLobbyScoreboard {
         if (manager == null) return;
 
         Scoreboard scoreboard = manager.getNewScoreboard();
-        String selectedGameId = plugin.getConfig().getString("lobby-selected-game", "death-tag");
-        if (selectedGameId == null || selectedGameId.isBlank()) selectedGameId = "death-tag";
-
-        String serverName = plugin.getConfig().getString("lobby-scoreboard.server-name", "Testplex Modern");
-        String website = plugin.getConfig().getString("lobby-scoreboard.website", "www.mineplex.com");
-
-        List<String> owners = new ArrayList<>(plugin.getConfig().getStringList("owner-usernames"));
-        if (owners.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) owners.add("jn_playzmc");
-        boolean owner = owners.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
-
-        List<String> configuredAdmins = new ArrayList<>(plugin.getConfig().getStringList("admin-usernames"));
-        if (configuredAdmins.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) configuredAdmins.add("jn_playzmc");
-        boolean configuredAdmin = configuredAdmins.stream()
-                .anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
-        boolean admin = player.isOp() || configuredAdmin
-                || player.hasPermission("testplex.arcadeports.admin")
-                || player.hasPermission("testplex.modern.admin");
-        String rank = rankName(owner, admin);
-
-        String selectedKitId = plugin.getConfig().getString(
-                "lobby-kit-preferences." + player.getUniqueId() + "." + selectedGameId, "Default");
-        String gameName = formatGameName(selectedGameId);
-        String kitName = formatKitName(selectedKitId);
-        String gems = String.valueOf(plugin.getConfig().getInt(
-                "lobby-scoreboard.gems." + player.getUniqueId(), 0));
-        String shards = String.valueOf(plugin.getConfig().getInt(
-                "lobby-scoreboard.shards." + player.getUniqueId(), 0));
-
-        String title = scoreboardTitleForGame(
-                selectedGameId, plugin.getConfig().getString("lobby-scoreboard.title", "Testplex"));
-        Objective sidebar = scoreboard.registerNewObjective("testplex_lobby", Criteria.DUMMY, title);
+        String status = plugin.getConfig().getString(
+                "lobby-countdown-status", "Waiting for players");
+        Objective sidebar = scoreboard.registerNewObjective(
+                "testplex_lobby", Criteria.DUMMY, scoreboardTitleForStatus(status));
         sidebar.setDisplaySlot(DisplaySlot.SIDEBAR);
 
-        int score = 15;
-        for (String line : sidebarLines(serverName, gameName, kitName, gems, shards, rank, website)) {
+        long currentPlayers = Bukkit.getOnlinePlayers().stream()
+                .filter(online -> ModernArcadeLobby.WORLD_NAME.equals(online.getWorld().getName()))
+                .count();
+        int playerCapacity = plugin.getConfig().getInt(
+                "lobby-scoreboard.player-capacity", Bukkit.getMaxPlayers());
+        if (playerCapacity < 1) playerCapacity = Math.max(1, Bukkit.getMaxPlayers());
+
+        String selectedGameId = plugin.getConfig().getString("lobby-selected-game", "death-tag");
+        if (selectedGameId == null || selectedGameId.isBlank()) selectedGameId = "death-tag";
+        String selectedKitId = plugin.getConfig().getString(
+                "lobby-kit-preferences." + player.getUniqueId() + "." + selectedGameId, "None");
+        String kitName = formatKitName(selectedKitId);
+        String serverName = plugin.getConfig().getString(
+                "lobby-scoreboard.server-name", "Testplex Modern");
+        String gems = String.valueOf(plugin.getConfig().getInt(
+                "lobby-scoreboard.gems." + player.getUniqueId(), 0));
+
+        int score = sidebarLines(
+                formatPlayerCount(currentPlayers, playerCapacity),
+                kitName,
+                gems,
+                serverName
+        ).size();
+        for (String line : sidebarLines(
+                formatPlayerCount(currentPlayers, playerCapacity),
+                kitName,
+                gems,
+                serverName
+        )) {
             sidebar.getScore(line).setScore(score--);
         }
         player.setScoreboard(scoreboard);
     }
 
     /**
-     * Exactly 15 unique entries, with consistent spacing, labels and colours
-     * regardless of the currently selected game.
+     * Matches ArcadeManager's original draw() status title and colour changes.
+     */
+    static String scoreboardTitleForStatus(String status) {
+        String value = status == null || status.isBlank() ? "Waiting for players" : status.trim();
+        String lower = value.toLowerCase(Locale.ROOT);
+
+        if (lower.startsWith("vote ends in ")) {
+            String timer = value.substring("Vote ends in ".length());
+            return ChatColor.BOLD + "Vote ends in "
+                    + ChatColor.GREEN + ChatColor.BOLD + timer;
+        }
+        if (lower.startsWith("starting in ")) {
+            String countdown = value.substring("Starting in ".length());
+            return ChatColor.BOLD + "Starting in "
+                    + ChatColor.GREEN + ChatColor.BOLD + countdown;
+        }
+        return ChatColor.GREEN.toString() + ChatColor.BOLD + value;
+    }
+
+    /**
+     * Mirrors ArcadeScoreboardLine registration order:
+     * Players, Kit, Gems, Server, each with its original blank spacer.
      */
     static List<String> sidebarLines(
-            String serverName, String gameName, String kitName,
-            String gems, String shards, String rank, String website) {
+            String players,
+            String kit,
+            String gems,
+            String server) {
         return List.of(
-                ChatColor.AQUA + "Server: " + ChatColor.WHITE + serverName,
                 spacer(0),
-                ChatColor.GREEN.toString() + ChatColor.BOLD + "Game",
-                ChatColor.WHITE + gameName,
-                ChatColor.GOLD.toString() + ChatColor.BOLD + "Kit",
-                ChatColor.LIGHT_PURPLE + kitName,
+                ChatColor.YELLOW.toString() + ChatColor.BOLD + "Players",
+                ChatColor.WHITE + players,
                 spacer(1),
+                ChatColor.GOLD.toString() + ChatColor.BOLD + "Kit",
+                ChatColor.WHITE + kit,
+                spacer(2),
                 ChatColor.GREEN.toString() + ChatColor.BOLD + "Gems",
                 ChatColor.WHITE + gems,
-                ChatColor.YELLOW.toString() + ChatColor.BOLD + "Shards",
-                ChatColor.GRAY + shards,
-                spacer(2),
-                ChatColor.GOLD.toString() + ChatColor.BOLD + "Rank",
-                ChatColor.DARK_GREEN + rank,
-                ChatColor.RED + "Website: " + ChatColor.DARK_AQUA + website
+                spacer(3),
+                ChatColor.AQUA.toString() + ChatColor.BOLD + "Server",
+                ChatColor.WHITE + server
         );
+    }
+
+    static String formatPlayerCount(long current, int capacity) {
+        int safeCapacity = Math.max(1, capacity);
+        long safeCurrent = Math.max(0L, Math.min(current, safeCapacity));
+        return safeCurrent + "/" + safeCapacity;
+    }
+
+    static String formatKitName(String kitId) {
+        if (kitId == null || kitId.isBlank()) return "None";
+        return titleCase(kitId);
     }
 
     private static String spacer(int index) {
         return switch (index) {
             case 0 -> ChatColor.BLACK + " ";
             case 1 -> ChatColor.DARK_GRAY + " ";
-            default -> ChatColor.GRAY + " ";
+            case 2 -> ChatColor.GRAY + " ";
+            default -> ChatColor.WHITE + " ";
         };
-    }
-
-    /** The sidebar header is intentionally stable across games. */
-    static String scoreboardTitleForGame(String gameId, String defaultTitle) {
-        String title = defaultTitle == null || defaultTitle.isBlank() ? "Testplex" : defaultTitle.trim();
-        return ChatColor.WHITE.toString() + ChatColor.BOLD + title.toUpperCase(Locale.ROOT);
-    }
-
-    static String formatGameName(String gameId) {
-        if (gameId == null || gameId.isBlank()) return "Not selected";
-        ArcadePortGame game = ArcadePortGame.fromId(gameId);
-        return game != null ? game.displayName() : titleCase(gameId);
-    }
-
-    static String formatKitName(String kitId) {
-        if (kitId == null || kitId.isBlank()) return "Default";
-        return titleCase(kitId);
-    }
-
-    static String rankName(boolean owner, boolean admin) {
-        if (owner) return "Owner";
-        return admin ? "Admin" : "No Rank";
     }
 
     private static String titleCase(String value) {
         String normalized = value.trim().replace('_', '-');
-        if (normalized.isEmpty()) return "Default";
+        if (normalized.isEmpty()) return "None";
         StringBuilder result = new StringBuilder();
         for (String word : normalized.split("-")) {
             if (word.isBlank()) continue;
@@ -140,6 +149,6 @@ public final class ModernLobbyScoreboard {
             result.append(Character.toUpperCase(word.charAt(0)));
             if (word.length() > 1) result.append(word.substring(1).toLowerCase(Locale.ROOT));
         }
-        return result.isEmpty() ? "Default" : result.toString();
+        return result.isEmpty() ? "None" : result.toString();
     }
 }
