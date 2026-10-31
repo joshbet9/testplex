@@ -358,13 +358,77 @@ def inspect_zip(path):
             "region_data": region_meta,
         }
         if not roots:
+            # Wizards also publishes WorldDownloader snapshots. Those contain a
+            # complete level.dat + Anvil region world but intentionally omit the
+            # Reborn-only WorldConfig.dat. The dedicated runtime adapter can infer
+            # bounded test-only starts and rebuild chest block entities.
+            snapshot_roots = set()
+            for level_path in level_entries:
+                parent = str(PurePosixPath(level_path).parent)
+                if parent == ".":
+                    parent = ""
+                prefix = f"{parent}/region/" if parent else "region/"
+                matching_regions = [
+                    name for name in region_entries
+                    if name.startswith(prefix) and name.lower().endswith(".mca")
+                ]
+                if matching_regions:
+                    snapshot_roots.add(parent)
+            if len(snapshot_roots) != 1:
+                return {
+                    **base,
+                    "importer_structure": "FAIL",
+                    "error": (
+                        "No WorldConfig.dat root and no unique level.dat + region/*.mca "
+                        "Wizards snapshot root was found."
+                    ),
+                }
+
+            snapshot_root = next(iter(snapshot_roots))
+            prefix = f"{snapshot_root}/region/" if snapshot_root else "region/"
+            regions = [
+                name for name in region_entries
+                if name.startswith(prefix) and name.lower().endswith(".mca")
+            ]
+            region_errors = region_meta.get("region_parse_errors", [])
+            active_chunks = int(region_meta.get("active_chunk_count", 0))
+            chunk_bounds = region_meta.get("chunk_bounds", {})
+            span_x = int(chunk_bounds.get("max_chunk_x", 0)) - int(chunk_bounds.get("min_chunk_x", 0))
+            span_z = int(chunk_bounds.get("max_chunk_z", 0)) - int(chunk_bounds.get("min_chunk_z", 0))
+            if level_meta.get("parse_error") or not regions or active_chunks < 1 or region_errors:
+                return {
+                    **base,
+                    "world_root": snapshot_root or ".",
+                    "importer_structure": "FAIL",
+                    "error": "Wizards snapshot has an invalid level.dat or unreadable/empty Anvil region data.",
+                }
+            if span_x > 128 or span_z > 128:
+                return {
+                    **base,
+                    "world_root": snapshot_root or ".",
+                    "importer_structure": "FAIL",
+                    "error": "Wizards snapshot populated-chunk bounds exceed the safe 128-chunk span.",
+                }
+
+            metadata = {
+                "map_name": level_meta.get("level_name"),
+                "level_dat_spawn_candidate": level_meta.get("spawn"),
+                "active_chunks": active_chunks,
+                "chunk_bounds": chunk_bounds,
+                "chest_block_count": region_meta.get("chest_block_count_from_section_data", 0),
+                "chest_tile_entity_count": region_meta.get("chest_tile_entity_count", 0),
+                "has_world_config": False,
+            }
             return {
                 **base,
-                "importer_structure": "FAIL",
-                "error": (
-                    "No directory contains both level.dat and WorldConfig.dat. "
-                    "This ZIP is not directly installable by SourceMapCatalog."
-                ),
+                "world_root": snapshot_root or ".",
+                "region_files": len(regions),
+                "metadata": metadata,
+                "importer_structure": "WIZARDS_ADAPTER_CANDIDATE",
+                "notes": [
+                    "Eligible for the Wizards-specific terrain adapter; bounds and player starts are inferred at runtime.",
+                    "No original WorldConfig.dat exists; level.dat spawn is recorded as a candidate, not an authoritative Mineplex start.",
+                ],
             }
 
         depth = {root: len(PurePosixPath(root).parts) if root else 0 for root in roots}
@@ -441,7 +505,12 @@ def inspect_one(pool, item):
             result.update({"download_bytes": size, "sha256": digest.hexdigest()})
             inspection = inspect_zip(tmp)
             result.update(inspection)
-            result["status"] = "PASS" if inspection.get("importer_structure") == "PASS" else "UNSUPPORTED_LAYOUT"
+            structure = inspection.get("importer_structure")
+            result["status"] = (
+                "PASS" if structure == "PASS" else
+                "ADAPTER_CANDIDATE" if structure == "WIZARDS_ADAPTER_CANDIDATE" else
+                "UNSUPPORTED_LAYOUT"
+            )
             return result
         except Exception as exc:
             error = str(exc)
@@ -475,9 +544,13 @@ def main():
     map_order = {m[0]: i for i, m in enumerate(MAPS)}
     results.sort(key=lambda r: (pool_order[r["pool"]], map_order[r["slug"]]))
     passed = sum(r["status"] == "PASS" for r in results)
+    adapter_candidates = sum(r["status"] == "ADAPTER_CANDIDATE" for r in results)
+    eligible = passed + adapter_candidates
     report = {"generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
               "source_catalogue": "https://maps.nixuge.me/mineplex/1/",
-              "passed": passed, "failed": len(results) - passed, "total": len(results), "maps": results}
+              "direct_imports": passed, "adapter_candidates": adapter_candidates,
+              "eligible": eligible, "failed": len(results) - eligible,
+              "total": len(results), "maps": results}
     json_path = args.output_dir / "wizards-source-map-validation.json"
     md_path = args.output_dir / "wizards-source-map-validation.md"
     json_path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -486,8 +559,11 @@ def main():
         f"- Generated: {report['generated_at']}",
         "- Source: https://maps.nixuge.me/mineplex/1/",
         "- ZIPs are downloaded to temporary storage, inspected, then deleted; binaries are not rehosted.",
+        f"- Direct Reborn importer format: {passed}/{len(tasks)}",
+        f"- Wizards terrain-adapter candidates: {adapter_candidates}/{len(tasks)}",
+        f"- Structurally eligible (direct + adapter): {eligible}/{len(tasks)}",
         "",
-        "| Pool | Map | Builder | Result | ZIP bytes | World root | Spawns | Data markers | SHA-256 |",
+        "| Pool | Map | Builder | Result | ZIP bytes | World root | Starts | Chests | SHA-256 |",
         "|---|---|---|---|---:|---|---:|---:|---|",
     ]
     for r in results:
@@ -495,8 +571,10 @@ def main():
         lines.append("| {pool} | [{name}]({url}) | {builder} | {status} | {size} | {root} | {spawns} | {data} | {sha} |".format(
             pool=r["pool"], name=r["name"], url=r["url"], builder=r["builder"], status=r["status"],
             size=f"{r.get('download_bytes', 0):,}" if "download_bytes" in r else "—",
-            root=r.get("world_root", "—"), spawns=m.get("spawn_count", "—"),
-            data=m.get("data_location_count", "—"), sha=r.get("sha256", "—")))
+            root=r.get("world_root", "—"),
+            spawns=m.get("spawn_count", m.get("active_chunks", "—")),
+            data=m.get("data_location_count", m.get("chest_block_count", "—")),
+            sha=r.get("sha256", "—")))
         if r.get("error"):
             lines.append(f"  - Finding: {r['error']}")
         inventory = r.get("inventory", {})
@@ -514,9 +592,11 @@ def main():
             lines.append("  - WorldDownloader.txt: " + r["world_downloader_txt"].replace("\n", " / ")[:1000])
         for note in r.get("notes", []):
             lines.append(f"  - Review: {note}")
-    lines += ["", "Structural PASS requires ZIP CRC success, one unambiguous shallowest world root with level.dat and WorldConfig.dat, and at least one region/*.mca terrain file. WorldConfig.dat is parsed for MAP_NAME, bounds, TEAM_SPAWNS, DATA_LOCS and CUSTOM_LOCS.",
-              "", "This is not live Paper 26.3 loading or multiplayer acceptance. Zero spawn markers or missing bounds are flagged for manual review.",
-              "", f"Totals: {passed}/{len(tasks)} archives passed structural validation.", ""]
+    lines += ["",
+              "Direct PASS requires ZIP CRC success, one unambiguous world root with level.dat and WorldConfig.dat, and at least one region/*.mca terrain file.",
+              "ADAPTER_CANDIDATE requires one level.dat + region/*.mca snapshot root, a parseable level.dat, non-empty readable Anvil chunks and bounded populated-chunk extents. The runtime Wizards adapter derives test-only bounds, validates terrain-safe starts, and recovers or replaces chests.",
+              "", "This report is archive-structure validation only. It does not certify Paper 26.3 world migration, successful start placement, chest inventory behaviour, or multiplayer acceptance.",
+              "", f"Totals: {passed} direct imports; {adapter_candidates} Wizards adapter candidates; {len(results) - eligible} rejected.", ""]
     markdown = "\n".join(lines)
     md_path.write_text(markdown, encoding="utf-8")
     summary = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -525,7 +605,7 @@ def main():
             out.write(markdown + "\n")
     print(markdown)
     print(f"Reports: {json_path} and {md_path}")
-    return 0 if passed == len(tasks) else 1
+    return 0 if eligible == len(tasks) else 1
 
 
 if __name__ == "__main__":
