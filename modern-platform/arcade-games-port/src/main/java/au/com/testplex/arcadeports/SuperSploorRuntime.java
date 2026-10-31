@@ -160,6 +160,9 @@ public final class SuperSploorRuntime implements Listener {
     private final List<DelayedBlast> delayedBlasts = new ArrayList<>();
     private final List<Paintstorm> paintstorms = new ArrayList<>();
     private final Map<UUID, String> projectileKinds = new HashMap<>();
+    private final Map<UUID, UUID> projectileVolleyIds = new HashMap<>();
+    private final Map<UUID, Set<UUID>> volleyHitTargets = new HashMap<>();
+    private final Map<UUID, Integer> volleyRemaining = new HashMap<>();
     private final Map<UUID, Integer> dodgeRollCharges = new HashMap<>();
     private final Map<UUID, Long> nextDodgeRollRechargeAt = new HashMap<>();
     private final Map<UUID, Long> dualiesRollExpiresAt = new HashMap<>();
@@ -1046,6 +1049,11 @@ public final class SuperSploorRuntime implements Listener {
             updateInkBar(player, id);
             return;
         }
+        if ("dualies".equals(kit)) {
+            fireDualiesVolley(player, id);
+            updateInkBar(player, id);
+            return;
+        }
 
         Snowball projectile = player.launchProjectile(Snowball.class);
         projectile.setItem(new ItemStack(teams.get(id) == RED ? Material.RED_DYE : Material.LIGHT_BLUE_DYE));
@@ -1077,6 +1085,46 @@ public final class SuperSploorRuntime implements Listener {
         player.playSound(player.getLocation(), Sound.ENTITY_SNOWBALL_THROW, 0.7F,
                 "charger".equals(kit) ? 1.8F : "lobber".equals(kit) ? 0.75F : 1.45F);
         updateInkBar(player, id);
+    }
+
+    private void fireDualiesVolley(Player player, UUID ownerId) {
+        UUID volleyId = UUID.randomUUID();
+        volleyHitTargets.put(volleyId, new HashSet<>());
+        volleyRemaining.put(volleyId, 2);
+        Vector forward = player.getEyeLocation().getDirection().normalize();
+        int team = teams.getOrDefault(ownerId, RED);
+        for (double spread : new double[] {-0.075D, 0.075D}) {
+            Snowball projectile = player.launchProjectile(Snowball.class);
+            projectile.setItem(new ItemStack(team == RED ? Material.RED_DYE : Material.LIGHT_BLUE_DYE));
+            projectile.setVelocity(forward.clone().rotateAroundY(spread).multiply(1.45D));
+            UUID projectileId = projectile.getUniqueId();
+            projectile.getPersistentDataContainer().set(projectileKey, PersistentDataType.BYTE, (byte) 1);
+            projectileOwners.put(projectileId, ownerId);
+            projectileEntities.put(projectileId, projectile);
+            activeProjectiles.add(projectileId);
+            projectilePaintRadii.put(projectileId, 1);
+            projectileVolleyIds.put(projectileId, volleyId);
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_SNOWBALL_THROW, 0.7F, 1.65F);
+    }
+
+    private boolean registerVolleyHit(UUID projectileId, UUID targetId) {
+        UUID volleyId = projectileVolleyIds.get(projectileId);
+        if (volleyId == null) return true;
+        Set<UUID> hitTargets = volleyHitTargets.get(volleyId);
+        return hitTargets != null && hitTargets.add(targetId);
+    }
+
+    private void completeVolleyProjectile(UUID projectileId) {
+        UUID volleyId = projectileVolleyIds.remove(projectileId);
+        if (volleyId == null) return;
+        int remaining = volleyRemaining.getOrDefault(volleyId, 1) - 1;
+        if (remaining <= 0) {
+            volleyRemaining.remove(volleyId);
+            volleyHitTargets.remove(volleyId);
+        } else {
+            volleyRemaining.put(volleyId, remaining);
+        }
     }
 
     private void rollPaintPath(Player player, UUID id) {
@@ -1177,7 +1225,9 @@ public final class SuperSploorRuntime implements Listener {
                 MutableStats ownerStats = playerStats.get(ownerId);
                 if (ownerStats != null) ownerStats.chargerFullHits++;
             }
-            applyMark(ownerId, target.getUniqueId(), target);
+            if (registerVolleyHit(projectileId, target.getUniqueId())) {
+                applyMark(ownerId, target.getUniqueId(), target);
+            }
         } else {
             fullyChargedProjectiles.remove(projectileId);
         }
@@ -1192,6 +1242,7 @@ public final class SuperSploorRuntime implements Listener {
                 owner.playSound(impact, Sound.BLOCK_WOOL_PLACE, 0.65F, 1.4F);
             }
         }
+        completeVolleyProjectile(projectileId);
         projectile.remove();
     }
 
@@ -1475,6 +1526,9 @@ public final class SuperSploorRuntime implements Listener {
         projectilePaintLines.clear();
         projectileLastLocations.clear();
         projectileKinds.clear();
+        projectileVolleyIds.clear();
+        volleyHitTargets.clear();
+        volleyRemaining.clear();
         for (UUID id : new ArrayList<>(squidMode)) {
             Player player = players.get(id);
             exitSquidMode(player, id);
