@@ -388,23 +388,25 @@ public final class SourceMapCatalog {
         try (InputStream raw = openMapArchive(plugin, resource)) {
             if (raw == null) return mapNameFromResource(resource);
             try (ZipInputStream zip = new ZipInputStream(raw)) {
-            ZipEntry entry;
-            while ((entry = zip.getNextEntry()) != null) {
-                if (entry.getName().endsWith("WorldConfig.dat")) {
-                    java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
-                    zip.transferTo(bytes);
-                    for (String line : bytes.toString(StandardCharsets.UTF_8).split("\\R")) {
-                        if (line.trim().toUpperCase(java.util.Locale.ROOT).startsWith("MAP_NAME:")) {
-                            String name = line.substring(line.indexOf(':') + 1).trim();
-                            if (!name.isEmpty()) return name;
+                ZipEntry entry;
+                while ((entry = zip.getNextEntry()) != null) {
+                    if (entry.getName().endsWith("WorldConfig.dat")) {
+                        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+                        zip.transferTo(bytes);
+                        for (String line : bytes.toString(StandardCharsets.UTF_8).split("\\R")) {
+                            if (line.trim().toUpperCase(java.util.Locale.ROOT).startsWith("MAP_NAME:")) {
+                                String name = line.substring(line.indexOf(':') + 1).trim();
+                                if (!name.isEmpty()) return name;
+                            }
                         }
-                    }
                     }
                     zip.closeEntry();
                 }
             }
         } catch (IOException exception) {
-            if (plugin != null) plugin.getLogger().warning("Could not read map name from " + resource + ": " + exception.getMessage());
+            if (plugin != null) {
+                plugin.getLogger().warning("Could not read map name from " + resource + ": " + exception.getMessage());
+            }
         }
         return mapNameFromResource(resource);
     }
