@@ -20,7 +20,7 @@ Camera Shy is an in-process free-for-all: hold right-click with the vanilla spyg
 
 The lobby offers Smoke Artist (smoke screen), Decoy (fake snapshot), Runner (short Speed II escape burst), Spotter (nearby-player scan) and Understudy (player-skin stand-in). A rare Group Photo pickup can photograph two opponents in one frame; Director's Spotlight periodically highlights a player; Final Snapshot speeds up the shutter in the last 30 seconds. The dedicated maze is isolated from the lobby and other game worlds.
 
-The stats menu exposes the 20 Camera Shy achievements and three lifetime milestones: 250 wins, 500 eliminations and 1,000 photographs. This is a new mechanics-first implementation and remains outside the ready-for-test allow-list pending live acceptance.
+`/stats` (or `/stats camera-shy`) exposes Camera Shy's lifetime record, milestone progress and all 20 achievements across four pages. The three lifetime milestones are 250 wins, 500 eliminations and 1,000 photographs. This is a new mechanics-first implementation and remains outside the ready-for-test allow-list pending live acceptance.
 
 ## Games covered in this first pass
 
