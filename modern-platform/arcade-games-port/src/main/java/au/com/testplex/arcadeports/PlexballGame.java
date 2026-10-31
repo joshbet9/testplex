@@ -77,7 +77,7 @@ public final class PlexballGame implements Listener {
     private static final int TURN_BREAK_TICKS = 12;
     private static final int BALL_MAX_FLIGHT_TICKS = 85;
     private static final long INPUT_GRACE_NANOS = PlexballRules.MAX_REWIND_TICKS * 50_000_000L;
-    private static final double BALL_RADIUS = 0.36D;
+    private static final double BALL_RADIUS = 0.24D;
     private static final double CATCH_REACH = PlexballRules.BASE_CATCH_RADIUS;
     private static final double FIELD_PLAYER_EYE_OFFSET = 1.0D;
 
@@ -1096,7 +1096,10 @@ public final class PlexballGame implements Listener {
 
     private void createTeeBall() {
         cleanupBall();
-        teeBallPosition = new Vector(0.5D, FLOOR_Y + 2.1D, 0.0D);
+        // Small per-at-bat tee offset stops a fixed-coordinate click macro from
+        // getting reliable contact without tracking the visible ball.
+        teeBallPosition = new Vector(0.5D + (random.nextDouble() - 0.5D) * 0.36D,
+                FLOOR_Y + 2.1D, (random.nextDouble() - 0.5D) * 0.36D);
         Location ballLocation = new Location(arena, teeBallPosition.getX(), teeBallPosition.getY(), teeBallPosition.getZ());
         ballDisplay = arena.spawn(ballLocation, ItemDisplay.class);
         ballDisplay.setItemStack(new ItemStack(Material.SNOWBALL));
