@@ -35,6 +35,11 @@ public final class CameraShyRules {
                 && !owner.equals(photographer);
     }
 
+    /** Smoke and Mirrors only counts a pursuit actually obscured by the active smoke cloud. */
+    public static boolean shouldAwardSmokeEscape(boolean smokeObscured, long now, long smokeUsedUntil) {
+        return smokeObscured && smokeUsedUntil >= now;
+    }
+
     public static boolean eliminatedAt(int exposures) {
         return exposures >= PHOTOS_TO_ELIMINATE;
     }
