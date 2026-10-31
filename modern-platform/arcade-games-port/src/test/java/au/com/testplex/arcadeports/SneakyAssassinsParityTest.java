@@ -16,6 +16,14 @@ class SneakyAssassinsParityTest {
         assertNull(SneakyAssassinsMechanics.normalizeKit(null));
     }
 
+    @Test void youNeedDirectionsRequiresAConfirmedLethalMasterCompassMeleeHit() {
+        assertTrue(SneakyAssassinsRules.shouldAwardYouNeedDirections(true, true, true, true));
+        assertFalse(SneakyAssassinsRules.shouldAwardYouNeedDirections(false, true, true, true));
+        assertFalse(SneakyAssassinsRules.shouldAwardYouNeedDirections(true, false, true, true));
+        assertFalse(SneakyAssassinsRules.shouldAwardYouNeedDirections(true, true, false, true));
+        assertFalse(SneakyAssassinsRules.shouldAwardYouNeedDirections(true, true, true, false));
+    }
+
     @Test void appliesSourceSwordDamageAcrossThePowerupProgression() {
         assertEquals(4.0D, SneakyAssassinsRules.swordDamage(Material.WOODEN_SWORD), 0.00001D);
         assertEquals(4.5D, SneakyAssassinsRules.swordDamage(Material.STONE_SWORD), 0.00001D);
