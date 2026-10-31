@@ -1531,6 +1531,10 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
+        if (!testPlayers.isStartupCleanupComplete()) {
+            sender.sendMessage(ChatColor.YELLOW + "Test-player cleanup is still running after server startup. Retry Start Game in a moment.");
+            return;
+        }
         int botsNeeded = ArcadeTestPlayerManager.additionalPlayersNeeded(humanIds.size());
         if (botsNeeded <= 0) {
             startQueuedInternal(type, requester, sender, mixedArcadeVariant);
