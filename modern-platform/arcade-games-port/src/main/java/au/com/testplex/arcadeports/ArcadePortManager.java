@@ -12351,7 +12351,15 @@ public final class ArcadePortManager implements Listener {
                 } else {
                     announce(session, ChatColor.YELLOW + "Bacon Brawl ended with no pig left standing.");
                 }
-            } else {
+            } else if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+                if (winner == null) {
+                    announce(session, ChatColor.YELLOW + "Super Sploor ended in a draw.");
+                } else {
+                    int team = session.teams.getOrDefault(winner.getUniqueId(), -1);
+                    String teamName = team == 0 ? "Red" : "Blue";
+                    ChatColor teamColour = team == 0 ? ChatColor.RED : ChatColor.AQUA;
+                    announce(session, teamColour + "" + ChatColor.BOLD + teamName + " team won Super Sploor!");
+                }
                 announce(session, winner == null ? ChatColor.YELLOW + "Round ended." : ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won " + session.type.displayName() + "!");
             }
         }
