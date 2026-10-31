@@ -158,6 +158,28 @@ public class GameManager implements Listener {
     public MazeGenerator getMazeGenerator() { return mazeGenerator; }
     public long getGameLiveTime() { return liveStartMs; }
 
+    /**
+     * True when the live player is airborne over a single missing maze-path cell
+     * with a real path cell on both sides of that gap.
+     */
+    public boolean isOverOneBlockGap(Player player) {
+        if (player == null || center == null || player.getWorld() != center.getWorld()) return false;
+        Location current = player.getLocation();
+        if (current.getY() <= center.getY() || current.getY() > center.getY() + 5.0D) return false;
+        Location pathCell = new Location(current.getWorld(), current.getX(), center.getY(), current.getZ());
+        if (mazeGenerator.isPathRaw(pathCell)) return false;
+        boolean north = mazeGenerator.isPathRaw(pathCell.clone().add(0.0D, 0.0D, -1.0D));
+        boolean south = mazeGenerator.isPathRaw(pathCell.clone().add(0.0D, 0.0D, 1.0D));
+        boolean east = mazeGenerator.isPathRaw(pathCell.clone().add(1.0D, 0.0D, 0.0D));
+        boolean west = mazeGenerator.isPathRaw(pathCell.clone().add(-1.0D, 0.0D, 0.0D));
+        return isSingleBlockMazeGap(north, south, east, west);
+    }
+
+    static boolean isSingleBlockMazeGap(boolean northPath, boolean southPath,
+            boolean eastPath, boolean westPath) {
+        return (northPath && southPath) || (eastPath && westPath);
+    }
+
     /** Index (0/1/2) of the maze pattern loaded for the current game, or -1 if not live. */
     public int getPatternIndex() {
         return state == GameState.LIVE || state == GameState.STARTING

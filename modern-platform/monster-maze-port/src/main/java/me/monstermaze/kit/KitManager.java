@@ -375,6 +375,9 @@ public class KitManager implements Listener {
             // (Speed/Modern only; Original keeps the source behaviour.)
             if (game.qolEnabled() && game.isOnAnyPad(p)) continue;
 
+            if (game.isOverOneBlockGap(p)) {
+                game.recordAchievement(p.getUniqueId(), "just-to-suffer");
+            }
             setJumpsLeft(p, feather.getAmount() - 1);
             jumpRecharge.put(p.getUniqueId(), System.currentTimeMillis());
 

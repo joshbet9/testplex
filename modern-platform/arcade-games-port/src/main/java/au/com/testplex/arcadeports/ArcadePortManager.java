@@ -5368,6 +5368,36 @@ public final class ArcadePortManager implements Listener {
                 postPerkDamage, armourPoints, cause == EntityDamageEvent.DamageCause.FALL);
         if (damage <= 0.0D) return;
 
+        if (attacker != null && projectile instanceof Arrow
+                && "archer".equals(session.microKits.getOrDefault(attacker.getUniqueId(), "archer"))) {
+            int targetTeam = session.teams.getOrDefault(target.getUniqueId(), -1);
+            int shooterTeam = session.teams.getOrDefault(attacker.getUniqueId(), -1);
+            if (targetTeam >= 0 && shooterTeam >= 0 && targetTeam != shooterTeam
+                    && target.getLocation().getY() >= microTeamCenter(session, targetTeam).getY()
+                            + MicroBattlesAchievementRules.SNIPER_MIN_SKYBASE_HEIGHT) {
+                session.microSniperArrowHits.put(target.getUniqueId(),
+                        new MicroBattlesArrowHit(attacker.getUniqueId(), targetTeam,
+                                System.currentTimeMillis(), target.getLocation().getY()));
+            } else {
+                session.microSniperArrowHits.remove(target.getUniqueId());
+            }
+        } else if (attacker != null) {
+            // A later melee/non-archer hit breaks the causal link to an earlier sniper arrow.
+            session.microSniperArrowHits.remove(target.getUniqueId());
+        }
+
+        if (fighter && attacker != null && session.alive.size() == 2
+                && !session.teams.getOrDefault(attacker.getUniqueId(), -1)
+                        .equals(session.teams.getOrDefault(target.getUniqueId(), -2))) {
+            double withoutFighterPerk = ArcadePortRules.microBattlesDamageAfterIronSkin(rawDamage, false);
+            double damageWithoutFighter = ArcadePortRules.microBattlesDamageAfterArmour(
+                    withoutFighterPerk, armourPoints, cause == EntityDamageEvent.DamageCause.FALL);
+            if (MicroBattlesAchievementRules.isCounterfactualFighterSave(
+                    target.getHealth(), damage, damageWithoutFighter)) {
+                session.microBuiltForThisCandidates.add(target.getUniqueId());
+            }
+        }
+
         if (attacker != null) {
             applyMicroBattlesKnockback(attacker, target, projectile, postPerkDamage);
             session.microDamageDealtByPlayer.merge(attacker.getUniqueId(), postPerkDamage, Double::sum);
@@ -5446,6 +5476,77 @@ public final class ArcadePortManager implements Listener {
         if (target.isOnGround()) applied.setY(applied.getY() + 0.2D);
         target.setFallDistance(0.0F);
         target.setVelocity(applied);
+    }
+
+    private void recordMicroPlacedBlockCollision(Session session, Player player,
+            Location from, Location to, long nowMillis) {
+        if (from == null || to == null || player.isOnGround()
+                || from.getWorld() != session.world || to.getWorld() != session.world) return;
+        double horizontalMovement = Math.hypot(to.getX() - from.getX(), to.getZ() - from.getZ());
+        if (horizontalMovement < 0.01D || to.getY() < from.getY() - 0.05D) return;
+
+        int baseX = to.getBlockX();
+        int baseY = to.getBlockY();
+        int baseZ = to.getBlockZ();
+        UUID playerId = player.getUniqueId();
+        int playerTeam = session.teams.getOrDefault(playerId, -1);
+        if (playerTeam < 0) return;
+
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 2; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    Block block = session.world.getBlockAt(baseX + dx, baseY + dy, baseZ + dz);
+                    MicroPlacedBlockOwner placement = session.microPlacedBlockOwners.get(block);
+                    if (placement == null || !block.getType().isSolid()
+                            || !MicroBattlesAchievementRules.isRecent(nowMillis, placement.placedAtMillis(),
+                                    MicroBattlesAchievementRules.PLACED_BLOCK_COLLISION_WINDOW_MILLIS)) continue;
+                    if (placement.ownerId().equals(playerId)
+                            || session.teams.getOrDefault(placement.ownerId(), -1) == playerTeam) continue;
+                    double blockY = block.getY();
+                    if (to.getY() + 1.8D <= blockY || to.getY() >= blockY + 1.0D) continue;
+                    if (MicroBattlesAchievementRules.isApproachingPlacedBlock(
+                            from.getX(), from.getZ(), to.getX(), to.getZ(),
+                            block.getX() + 0.5D, block.getZ() + 0.5D)) {
+                        session.microPlacedBlockKnocks.put(playerId,
+                                new MicroPlacedBlockKnock(placement.ownerId(), nowMillis));
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    private boolean isMicroBattlesLiquid(Location location) {
+        if (location == null) return false;
+        Block feet = location.getBlock();
+        return feet.isLiquid() || feet.getRelative(0, 1, 0).isLiquid();
+    }
+
+    private boolean isMicroBattlesEnvironmentalKnockOut(String reason) {
+        if (reason == null) return false;
+        String normalized = reason.toLowerCase(java.util.Locale.ROOT);
+        return normalized.contains("fell") || normalized.contains("void")
+                || normalized.contains("border") || normalized.contains("lava")
+                || normalized.contains("water");
+    }
+
+    private void recordMicroBattlesSniperKnockout(Session session, Player victim) {
+        UUID victimId = victim.getUniqueId();
+        MicroBattlesArrowHit hit = session.microSniperArrowHits.remove(victimId);
+        if (hit == null) return;
+        int victimTeam = session.teams.getOrDefault(victimId, -1);
+        int shooterTeam = session.teams.getOrDefault(hit.shooterId(), -1);
+        long now = System.currentTimeMillis();
+        if (victimTeam < 0 || victimTeam != hit.targetTeam() || shooterTeam < 0
+                || shooterTeam == victimTeam
+                || !MicroBattlesAchievementRules.isSniperKnockOff(
+                        now, hit.hitAtMillis(), hit.hitY(), victim.getLocation().getY())) return;
+        Set<Integer> knockedTeams = session.microSniperKnockedTeams.computeIfAbsent(
+                hit.shooterId(), ignored -> new HashSet<>());
+        knockedTeams.add(victimTeam);
+        if (MicroBattlesAchievementRules.hasKnockedEveryOpposingTeam(knockedTeams.size())) {
+            awardCatalogAchievement(hit.shooterId(), "micro-battles", "sniper-dawg");
+        }
     }
 
     private void givePaintballKit(Session session, Player player, String kit) {
@@ -10695,6 +10796,36 @@ public final class ArcadePortManager implements Listener {
                 && session.alive.contains(player.getUniqueId())) {
             killer = recentMicroBattlesKiller(session, player.getUniqueId());
         }
+        if (session.type == ArcadePortGame.MICRO_BATTLES) {
+            UUID victimId = player.getUniqueId();
+            String normalizedReason = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT);
+            boolean environmentalKnockOut = isMicroBattlesEnvironmentalKnockOut(reason);
+            if (normalizedReason.contains("border")) session.microBorderDeaths.add(victimId);
+
+            MicroPlacedBlockKnock blockKnock = session.microPlacedBlockKnocks.remove(victimId);
+            boolean blockKnockCredited = false;
+            if (environmentalKnockOut && blockKnock != null
+                    && MicroBattlesAchievementRules.isRecent(System.currentTimeMillis(),
+                            blockKnock.knockedAtMillis(),
+                            MicroBattlesAchievementRules.PLACED_BLOCK_KNOCK_WINDOW_MILLIS)) {
+                Player owner = session.players.get(blockKnock.ownerId());
+                if (owner != null && !owner.getUniqueId().equals(victimId)
+                        && session.teams.getOrDefault(owner.getUniqueId(), -1)
+                                != session.teams.getOrDefault(victimId, -2)) {
+                    killer = owner;
+                    blockKnockCredited = true;
+                    int kills = session.microPlacedBlockKnockKills.merge(owner.getUniqueId(), 1, Integer::sum);
+                    if (MicroBattlesAchievementRules.shouldAwardMicroBattlesKing(kills)) {
+                        awardCatalogAchievement(owner, "micro-battles", "micro-battles-king");
+                    }
+                }
+            }
+            if (environmentalKnockOut && !blockKnockCredited) {
+                recordMicroBattlesSniperKnockout(session, player);
+            } else {
+                session.microSniperArrowHits.remove(victimId);
+            }
+        }
         UUID eliminatedId = player.getUniqueId();
         if (!session.alive.remove(eliminatedId)) return;
         if (session.type == ArcadePortGame.DRAGONS) {
@@ -12263,6 +12394,15 @@ public final class ArcadePortManager implements Listener {
                     if (contributor != null) awardCatalogAchievement(contributor,
                             "micro-battles", "mosh-pit-playroom");
                 }
+            }
+            for (Map.Entry<UUID, Integer> build : session.microBorderBuildBlocks.entrySet()) {
+                if (build.getValue() >= MicroBattlesAchievementRules.BORDER_BUILD_REQUIRED_BLOCKS
+                        && !session.microBorderDeaths.contains(build.getKey())) {
+                    awardCatalogAchievement(build.getKey(), "micro-battles", "phew");
+                }
+            }
+            if (winner != null && session.microBuiltForThisCandidates.contains(winner.getUniqueId())) {
+                awardCatalogAchievement(winner, "micro-battles", "built-for-this");
             }
         }
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
@@ -14177,6 +14317,19 @@ public final class ArcadePortManager implements Listener {
                 if (ArcadePortRules.shouldPunishMicroIslandExit(System.currentTimeMillis() - session.startedAt,
                         ownDistance, nearestOther)) {
                     eliminate(session, player, null, "left the starting island before the opening restriction ended");
+                    return;
+                }
+            }
+            long now = System.currentTimeMillis();
+            recordMicroPlacedBlockCollision(session, player, event.getFrom(), event.getTo(), now);
+            MicroPlacedBlockKnock recentKnock = session.microPlacedBlockKnocks.get(player.getUniqueId());
+            if (recentKnock != null
+                    && MicroBattlesAchievementRules.isRecent(now, recentKnock.knockedAtMillis(),
+                            MicroBattlesAchievementRules.PLACED_BLOCK_KNOCK_WINDOW_MILLIS)
+                    && isMicroBattlesLiquid(event.getTo())) {
+                Player blockOwner = session.players.get(recentKnock.ownerId());
+                if (blockOwner != null) {
+                    eliminate(session, player, blockOwner, "was knocked into lava/water by a placed block");
                     return;
                 }
             }
@@ -17400,6 +17553,7 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             session.microCrumbleBlocks.remove(event.getBlock());
+            session.microPlacedBlockOwners.remove(event.getBlock());
             return;
         }
         if (session.type == ArcadePortGame.TURF_WARS && session.alive.contains(event.getPlayer().getUniqueId())) {
@@ -17487,8 +17641,23 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             // Source MapCrumbleModule tracks every block placed in its game world.
-            if (session.alive.contains(event.getPlayer().getUniqueId())) {
-                session.microCrumbleBlocks.add(event.getBlockPlaced());
+            Player builder = event.getPlayer();
+            if (session.alive.contains(builder.getUniqueId())) {
+                Block placed = event.getBlockPlaced();
+                UUID builderId = builder.getUniqueId();
+                long now = System.currentTimeMillis();
+                session.microCrumbleBlocks.add(placed);
+                session.microPlacedBlockOwners.put(placed, new MicroPlacedBlockOwner(builderId, now));
+
+                WorldBorder border = session.world.getWorldBorder();
+                Location borderCenter = border.getCenter();
+                double halfSize = border.getSize() / 2.0D;
+                double edgeDistance = halfSize - Math.max(
+                        Math.abs(placed.getX() + 0.5D - borderCenter.getX()),
+                        Math.abs(placed.getZ() + 0.5D - borderCenter.getZ()));
+                if (MicroBattlesAchievementRules.isBorderBuildDistance(edgeDistance)) {
+                    session.microBorderBuildBlocks.merge(builderId, 1, Integer::sum);
+                }
             }
             return;
         }
@@ -19475,6 +19644,9 @@ public final class ArcadePortManager implements Listener {
     private enum MasterBuildersPhase { BUILDING, REVIEW }
 
     private record SkyWarsCrumbleCandidate(Block block, double distanceSquared, long sequence) { }
+    private record MicroPlacedBlockOwner(UUID ownerId, long placedAtMillis) { }
+    private record MicroPlacedBlockKnock(UUID ownerId, long knockedAtMillis) { }
+    private record MicroBattlesArrowHit(UUID shooterId, int targetTeam, long hitAtMillis, double hitY) { }
 
     private static final class Session {
         final Map<Block, Long> evolutionWebs = new HashMap<>();
@@ -19800,6 +19972,14 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> turfBarrageFiring = new HashSet<>();
         final Set<UUID> turfTrackedArrows = new HashSet<>();
         final Map<UUID, String> microKits = new HashMap<>();
+        final Map<Block, MicroPlacedBlockOwner> microPlacedBlockOwners = new HashMap<>();
+        final Map<UUID, MicroPlacedBlockKnock> microPlacedBlockKnocks = new HashMap<>();
+        final Map<UUID, Integer> microPlacedBlockKnockKills = new HashMap<>();
+        final Map<UUID, Integer> microBorderBuildBlocks = new HashMap<>();
+        final Set<UUID> microBorderDeaths = new HashSet<>();
+        final Set<UUID> microBuiltForThisCandidates = new HashSet<>();
+        final Map<UUID, MicroBattlesArrowHit> microSniperArrowHits = new HashMap<>();
+        final Map<UUID, Set<Integer>> microSniperKnockedTeams = new HashMap<>();
         final Map<UUID, String> microGlassColours = new HashMap<>();
         final Map<UUID, String> microBorderColours = new HashMap<>();
         final Map<UUID, Set<Block>> microPersonalGlassBlocks = new HashMap<>();
