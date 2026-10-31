@@ -68,7 +68,7 @@ PROPERTIES
 
 console_fifo="$SERVER_ROOT/server-console.fifo"
 server_log="$SERVER_ROOT/server.log"
-result_file="$SERVER_ROOT/plugins/WizardsSourceMapSmoke/results.tsv"
+result_file="$SERVER_ROOT/plugins/WizardsPaperSmoke/results.tsv"
 rm -f "$console_fifo" "$result_file"
 mkfifo "$console_fifo"
 # Keep the console input pipe open; the smoke plugin calls Bukkit.shutdown() when done.
