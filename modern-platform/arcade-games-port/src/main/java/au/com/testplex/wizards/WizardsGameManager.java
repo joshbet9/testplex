@@ -578,6 +578,17 @@ public final class WizardsGameManager implements Listener {
             spawn.setDirection(new Vector(-Math.cos(angle), 0.0D, -Math.sin(angle)));
         }
         player.teleport(spawn);
+        // The shared Arcade lobby/session may have applied protection immediately
+        // before hand-off. Clear it after teleport as well, then once more on the
+        // next server tick so a pending lobby transition cannot leak into combat.
+        player.setInvulnerable(false);
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            WizardState current = states.get(player.getUniqueId());
+            if (player.isOnline() && current == state && current.alive
+                    && player.getWorld().equals(arena)) {
+                player.setInvulnerable(false);
+            }
+        });
         applyMatchScoreboard(player);
 
         for (int slot = 0; slot < MAX_WAND_SLOTS; slot++) {
