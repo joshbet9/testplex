@@ -847,8 +847,15 @@ public final class SuperSploorRuntime implements Listener {
             case "dualies" -> Material.FLINT;
             default -> Material.BLAZE_ROD;
         };
+        String primaryInstructions = switch (kit) {
+            case "charger" -> "Right-click to charge • left-click to fire";
+            case "roller" -> "Right-click to roll and paint a path";
+            case "dualies" -> "Right-click to fire paired volleys";
+            case "lobber" -> "Right-click to lob arcing paint";
+            default -> "Right-click to fire paint";
+        };
         player.getInventory().setItem(0, namedItem(weapon, ChatColor.GOLD + name,
-                "Right-click to use your primary • ink cost depends on kit"));
+                primaryInstructions + " • ink cost depends on kit"));
         player.getInventory().setItem(1, namedItem(secondaryIcon(kit),
                 ChatColor.GREEN + secondaryName(kit), secondaryDescription(kit)));
         player.getInventory().setItem(2, namedItem(Material.BLAZE_POWDER,
@@ -959,8 +966,11 @@ public final class SuperSploorRuntime implements Listener {
     private void beginChargerCharge(Player player, UUID id) {
         if (chargerChargeStartedAt.containsKey(id)) return;
         long now = System.currentTimeMillis();
-        if (ink.getOrDefault(id, 0) < 8) {
-            player.sendActionBar(ChatColor.RED + "Not enough ink to charge.");
+        int minimumShotCost = SuperSploorRules.chargerInkCost(
+                SuperSploorRules.chargerChargeFraction(0L));
+        if (ink.getOrDefault(id, 0) < minimumShotCost) {
+            player.sendActionBar(ChatColor.RED + "Not enough ink to charge (minimum "
+                    + minimumShotCost + ").");
             return;
         }
         long lastShot = lastShotAt.getOrDefault(id, 0L);
