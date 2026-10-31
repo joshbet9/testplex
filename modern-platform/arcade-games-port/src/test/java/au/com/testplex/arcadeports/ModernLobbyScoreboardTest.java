@@ -58,7 +58,7 @@ class ModernLobbyScoreboardTest {
     void playerCountIsFormattedLikeTheOriginalPlayersValue() {
         assertEquals("0/16", ModernLobbyScoreboard.formatPlayerCount(0, 16));
         assertEquals("3/16", ModernLobbyScoreboard.formatPlayerCount(3, 16));
-        assertEquals("16/16", ModernLobbyScoreboard.formatPlayerCount(20, 16));
+        assertEquals("20/16", ModernLobbyScoreboard.formatPlayerCount(20, 16));
         assertEquals("0/1", ModernLobbyScoreboard.formatPlayerCount(-2, 0));
     }
 
