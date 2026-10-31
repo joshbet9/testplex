@@ -483,7 +483,7 @@ public final class SuperSploorRuntime implements Listener {
 
     private void useSpecial(Player player, UUID id) {
         double charge = specialCharge.getOrDefault(id, 0.0D);
-        if (charge < 100.0D) {
+        if (!SuperSploorRules.canUseSpecial(charge)) {
             player.sendActionBar(ChatColor.LIGHT_PURPLE + "Special " + (int) Math.floor(charge) + "% — keep painting!");
             return;
         }
@@ -936,14 +936,14 @@ public final class SuperSploorRuntime implements Listener {
         Long started = chargerChargeStartedAt.remove(id);
         if (started == null) return;
         long elapsed = Math.max(0L, System.currentTimeMillis() - started);
-        double charge = Math.max(0.2D, Math.min(1.0D, elapsed / 900.0D));
+        double charge = SuperSploorRules.chargerChargeFraction(elapsed);
         fireChargedCharger(player, id, charge);
     }
 
     private void fireChargedCharger(Player player, UUID id, double charge) {
         long now = System.currentTimeMillis();
         if (now - lastShotAt.getOrDefault(id, 0L) < 1_000L) return;
-        int cost = 8 + (int) Math.ceil(10.0D * charge);
+        int cost = SuperSploorRules.chargerInkCost(charge);
         int current = ink.getOrDefault(id, 0);
         if (current < cost) {
             player.sendActionBar(ChatColor.RED + "Not enough ink for that charge.");
@@ -953,7 +953,8 @@ public final class SuperSploorRuntime implements Listener {
         lastShotAt.put(id, now);
         Snowball projectile = player.launchProjectile(Snowball.class);
         projectile.setItem(new ItemStack(teams.get(id) == RED ? Material.RED_DYE : Material.LIGHT_BLUE_DYE));
-        projectile.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.8D + charge * 1.2D));
+        projectile.setVelocity(player.getEyeLocation().getDirection().normalize()
+                .multiply(SuperSploorRules.chargerProjectileSpeed(charge)));
         UUID projectileId = projectile.getUniqueId();
         projectile.getPersistentDataContainer().set(projectileKey, PersistentDataType.BYTE, (byte) 1);
         projectileOwners.put(projectileId, id);
@@ -977,8 +978,10 @@ public final class SuperSploorRuntime implements Listener {
                     + Math.max(0L, (readyAt - now + 999L) / 1_000L) + "s");
             return;
         }
-        dodgeRollCharges.put(id, charges - 1);
-        if (charges == 2) nextDodgeRollRechargeAt.put(id, now + 5_000L);
+        dodgeRollCharges.put(id, SuperSploorRules.dodgeRollChargesAfterUse(charges));
+        if (charges == SuperSploorRules.DODGE_ROLL_MAX_CHARGES) {
+            nextDodgeRollRechargeAt.put(id, now + SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS);
+        }
         dualiesRollExpiresAt.put(id, now + 5_000L);
         dualiesRollTargets.computeIfAbsent(id, ignored -> new HashSet<>()).clear();
         Vector direction = player.getLocation().getDirection().setY(0.0D);
@@ -997,9 +1000,11 @@ public final class SuperSploorRuntime implements Listener {
             if (!"dualies".equals(kits.get(id)) || dodgeRollCharges.getOrDefault(id, 0) >= 2) continue;
             long readyAt = nextDodgeRollRechargeAt.getOrDefault(id, Long.MAX_VALUE);
             if (now < readyAt) continue;
-            dodgeRollCharges.merge(id, 1, (oldValue, one) -> Math.min(2, oldValue + 1));
-            nextDodgeRollRechargeAt.put(id, dodgeRollCharges.getOrDefault(id, 0) < 2
-                    ? now + 5_000L : Long.MAX_VALUE);
+            dodgeRollCharges.put(id, SuperSploorRules.nextDodgeRollCharge(
+                    dodgeRollCharges.getOrDefault(id, 0)));
+            nextDodgeRollRechargeAt.put(id,
+                    dodgeRollCharges.getOrDefault(id, 0) < SuperSploorRules.DODGE_ROLL_MAX_CHARGES
+                            ? now + SuperSploorRules.DODGE_ROLL_RECHARGE_MILLIS : Long.MAX_VALUE);
         }
     }
 
@@ -1099,10 +1104,9 @@ public final class SuperSploorRuntime implements Listener {
         if (stats == null || result == null) return;
         stats.territoryPainted += result.changedUnits();
         stats.enemyTerritoryReclaimed += result.enemyReclaimed();
-        if (!specialChargeSuppressed.contains(ownerId)) {
-            specialCharge.merge(ownerId, result.changedUnits() * 0.10D,
-                    (oldValue, gain) -> Math.min(100.0D, oldValue + gain));
-        }
+        double currentCharge = specialCharge.getOrDefault(ownerId, 0.0D);
+        specialCharge.put(ownerId, SuperSploorRules.nextSpecialCharge(
+                currentCharge, result.changedUnits(), specialChargeSuppressed.contains(ownerId)));
         if ("roller".equals(kits.get(ownerId))) stats.rollerTerritory += result.changedUnits();
         if ("lobber".equals(kits.get(ownerId))) stats.lobberEnemyReclaimed += result.enemyReclaimed();
     }
@@ -1227,6 +1231,8 @@ public final class SuperSploorRuntime implements Listener {
         contributors.computeIfAbsent(targetId, ignored -> new HashSet<>()).add(attackerId);
         if (count >= SuperSploorRules.MAX_PAINT_MARKS) {
             kills.merge(attackerId, 1, Integer::sum);
+            specialCharge.put(attackerId,
+                    SuperSploorRules.specialChargeAfterSplat(specialCharge.getOrDefault(attackerId, 0.0D)));
             MutableStats attackerStats = playerStats.get(attackerId);
             if (attackerStats != null) {
                 attackerStats.splats++;
