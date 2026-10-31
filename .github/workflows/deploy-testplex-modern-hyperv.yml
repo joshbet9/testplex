@@ -454,6 +454,26 @@ jobs:
           timeout --foreground --signal=TERM 8m curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$paper_url" -o "$paper_tmp"
           printf '%s  %s\n' "$paper_sha" "$paper_tmp" | sha256sum -c -
 
+          # FakePlayerPlugin is a separate Paper plugin with its own distribution terms.
+          # Fetch the unmodified, pinned release directly onto the user's administered VM:
+          # it is intentionally not bundled into or redistributed with Testplex artifacts.
+          FPP_VERSION="2.1.7"
+          FPP_TMP="$UPLOAD_DIR/fake-player-plugin-$FPP_VERSION.jar"
+          FPP_URL="https://hangarcdn.papermc.io/plugins/Janky-Development/FakePlayerPlugin/versions/$FPP_VERSION/PAPER/fake-player-plugin-$FPP_VERSION.jar"
+          echo "[deploy] downloading FakePlayerPlugin $FPP_VERSION from the official Hangar release (6 minute limit)."
+          timeout --foreground --signal=TERM 6m curl --fail --location --retry 3 --user-agent "$USER_AGENT" \
+            "$FPP_URL" -o "$FPP_TMP"
+          unzip -tq "$FPP_TMP" >/dev/null
+          fpp_descriptor="$(unzip -p "$FPP_TMP" plugin.yml)"
+          fpp_name="$(printf '%s\\n' "$fpp_descriptor" | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\\\"\\r")"
+          fpp_version="$(printf '%s\\n' "$fpp_descriptor" | sed -n 's/^version:[[:space:]]*//p' | head -n 1 | tr -d "'\\\"\\r")"
+          fpp_main="$(printf '%s\\n' "$fpp_descriptor" | sed -n 's/^main:[[:space:]]*//p' | head -n 1 | tr -d "'\\\"\\r")"
+          [[ "$fpp_name" == "FakePlayerPlugin" && "$fpp_version" == "$FPP_VERSION" \
+             && "$fpp_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]] || {
+            echo "Downloaded FakePlayerPlugin descriptor did not match pinned release $FPP_VERSION." >&2
+            exit 1
+          }
+
           # Stage and validate source worlds outside the live Bukkit world folders.
           MAP_STAGE_DIR="$UPLOAD_DIR/mm-map-stage"
           mkdir -p "$MAP_STAGE_DIR"
@@ -569,6 +589,23 @@ jobs:
           for jar in TestplexModernArcade.jar SnakeModern.jar ArcadeMechanicsModern.jar WizardsModern.jar; do
             sudo -n install -o monstermaze -g monstermaze -m 0644 "$UPLOAD_DIR/$jar" "$SERVER_DIR/plugins/$jar"
           done
+
+          # Retire any previously installed FakePlayerPlugin version by descriptor,
+          # not filename. The existing pre-deployment plugins snapshot preserves the
+          # exact prior plugin set for rollback; then install the pinned unmodified jar.
+          for plugin_jar in "$SERVER_DIR"/plugins/*.jar; do
+            [[ -f "$plugin_jar" ]] || continue
+            descriptor="$(sudo -n unzip -p "$plugin_jar" plugin.yml 2>/dev/null || true)"
+            [[ -n "$descriptor" ]] || continue
+            plugin_name="$(printf '%s\\n' "$descriptor" | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\\\"\\r")"
+            plugin_main="$(printf '%s\\n' "$descriptor" | sed -n 's/^main:[[:space:]]*//p' | head -n 1 | tr -d "'\\\"\\r")"
+            if [[ "$plugin_name" == "FakePlayerPlugin" || "$plugin_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]]; then
+              sudo -n rm -f -- "$plugin_jar"
+              echo "Replaced previous FakePlayerPlugin jar $plugin_jar with the pinned Paper 26.3 release."
+            fi
+          done
+          sudo -n install -o monstermaze -g monstermaze -m 0644 \
+            "$FPP_TMP" "$SERVER_DIR/plugins/FakePlayerPlugin.jar"
 
           # Migrate persistent state from both historical standalone data-folder names.
           # The 1.21 source plugin.yml names the plugin MonsterMazeStandalone, so
@@ -781,7 +818,7 @@ jobs:
             rollback
             exit 1
           fi
-          for plugin in TestplexModernArcade SnakeModern ArcadeMechanicsModern WizardsModern; do
+          for plugin in TestplexModernArcade SnakeModern ArcadeMechanicsModern WizardsModern FakePlayerPlugin; do
             if ! sudo -n grep -Fq "$plugin" "$SERVER_DIR/logs/latest.log"; then
               echo "Expected plugin name $plugin not found in the modern server log." >&2
               rollback
