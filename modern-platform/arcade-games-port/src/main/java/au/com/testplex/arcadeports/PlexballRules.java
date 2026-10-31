@@ -13,6 +13,7 @@ import java.util.Set;
  */
 public final class PlexballRules {
     public static final int MAX_PLAYERS = 8;
+    public static final int MAX_SPECTATORS = 16;
     public static final int MIN_PLAYERS = 2;
     public static final int MATCH_LIMIT_TICKS = 20 * 180;
     public static final int NORMAL_BATTING_TICKS = 20 * 10;
@@ -33,6 +34,13 @@ public final class PlexballRules {
      * This estimate is not guaranteed to equal network RTT. It only offsets
      * ordinary input delay and must never be used to judge or punish a player.
      */
+    /** Spectators are admitted only during an active match, outside the player roster. */
+    public static boolean canJoinAsSpectator(boolean matchActive, boolean alreadyPlaying,
+                                             int currentSpectators) {
+        return matchActive && !alreadyPlaying && currentSpectators >= 0
+                && currentSpectators < MAX_SPECTATORS;
+    }
+
     public static int latencyRewindTicks(int pingEstimateMillis) {
         if (pingEstimateMillis <= 0) return 0;
         return Math.max(0, Math.min(MAX_REWIND_TICKS,
