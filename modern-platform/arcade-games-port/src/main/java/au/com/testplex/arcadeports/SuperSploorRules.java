@@ -16,8 +16,61 @@ public final class SuperSploorRules {
     public static final double SQUID_CLIMB_VELOCITY = 0.30D;
     public static final int OVERTIME_MILLIS = 30_000;
     public static final int ROUND_MILLIS = 180_000;
+    public static final long CHARGER_FULL_CHARGE_MILLIS = 900L;
+    public static final long CHARGER_RECHARGE_MILLIS = 1_000L;
+    public static final int CHARGER_MIN_INK_COST = 8;
+    public static final int CHARGER_MAX_INK_COST = 18;
+    public static final double CHARGER_MIN_SPEED = 1.8D;
+    public static final double CHARGER_MAX_SPEED = 3.0D;
+    public static final int DODGE_ROLL_MAX_CHARGES = 2;
+    public static final long DODGE_ROLL_RECHARGE_MILLIS = 5_000L;
+    public static final double SPECIAL_CHARGE_PER_TERRITORY_UNIT = 0.10D;
+    public static final double SPECIAL_CHARGE_PER_SPLAT = 5.0D;
 
     private SuperSploorRules() { }
+
+    public static double chargerChargeFraction(long elapsedMillis) {
+        return Math.max(0.2D, Math.min(1.0D,
+                Math.max(0L, elapsedMillis) / (double) CHARGER_FULL_CHARGE_MILLIS));
+    }
+
+    public static int chargerInkCost(double chargeFraction) {
+        double fraction = Double.isFinite(chargeFraction)
+                ? Math.max(0.2D, Math.min(1.0D, chargeFraction)) : 0.2D;
+        return CHARGER_MIN_INK_COST
+                + (int) Math.ceil((CHARGER_MAX_INK_COST - CHARGER_MIN_INK_COST) * fraction);
+    }
+
+    public static double chargerProjectileSpeed(double chargeFraction) {
+        double fraction = Double.isFinite(chargeFraction)
+                ? Math.max(0.2D, Math.min(1.0D, chargeFraction)) : 0.2D;
+        return CHARGER_MIN_SPEED + (CHARGER_MAX_SPEED - CHARGER_MIN_SPEED) * fraction;
+    }
+
+    public static double nextSpecialCharge(double current, int changedTerritoryUnits,
+            boolean suppressedDuringSpecial) {
+        double safeCurrent = Double.isFinite(current) ? Math.max(0.0D, Math.min(100.0D, current)) : 0.0D;
+        if (suppressedDuringSpecial || changedTerritoryUnits <= 0) return safeCurrent;
+        return Math.min(100.0D, safeCurrent
+                + changedTerritoryUnits * SPECIAL_CHARGE_PER_TERRITORY_UNIT);
+    }
+
+    public static double specialChargeAfterSplat(double current) {
+        double safeCurrent = Double.isFinite(current) ? Math.max(0.0D, Math.min(100.0D, current)) : 0.0D;
+        return Math.min(100.0D, safeCurrent + SPECIAL_CHARGE_PER_SPLAT);
+    }
+
+    public static boolean canUseSpecial(double charge) {
+        return Double.isFinite(charge) && charge >= 100.0D;
+    }
+
+    public static int dodgeRollChargesAfterUse(int current) {
+        return Math.max(0, Math.min(DODGE_ROLL_MAX_CHARGES, current) - 1);
+    }
+
+    public static int nextDodgeRollCharge(int current) {
+        return Math.min(DODGE_ROLL_MAX_CHARGES, Math.max(0, current) + 1);
+    }
 
     public static int clampInk(int ink) {
         return Math.max(0, Math.min(MAX_INK, ink));
