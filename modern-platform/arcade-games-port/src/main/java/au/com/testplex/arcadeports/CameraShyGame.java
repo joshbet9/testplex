@@ -661,28 +661,28 @@ public final class CameraShyGame implements Listener {
         finalSnapshot = false;
 
         try {
-            for (int i = 0; i < all.size(); i++) {
-            Player player = all.get(i);
-            UUID id = player.getUniqueId();
-            players.put(id, player);
-            if (testPlayers.isTestPlayer(player)) bots.add(id);
-            else {
-                humans.add(id);
-                PlayerSnapshot snapshot = new PlayerSnapshot(player);
-                snapshots.put(id, snapshot);
-                // Persist before changing any inventory, game mode or location so an
-                // unclean server stop can still restore the exact pre-match player.
-                snapshot.writeToConfig(plugin, id);
-            }
-            alive.add(id);
-            exposures.put(id, 0);
-            photos.put(id, 0);
-            eliminations.put(id, 0);
-            uniquePhotos.put(id, new LinkedHashSet<>());
-            photographedBy.put(id, new LinkedHashSet<>());
-            spawnLocations.put(id, spawns.get(i % spawns.size()).clone());
-            }
-            plugin.saveConfig();
+                for (int i = 0; i < all.size(); i++) {
+                Player player = all.get(i);
+                UUID id = player.getUniqueId();
+                players.put(id, player);
+                if (testPlayers.isTestPlayer(player)) bots.add(id);
+                else {
+                    humans.add(id);
+                    PlayerSnapshot snapshot = new PlayerSnapshot(player);
+                    snapshots.put(id, snapshot);
+                    // Persist before changing any inventory, game mode or location so an
+                    // unclean server stop can still restore the exact pre-match player.
+                    snapshot.writeToConfig(plugin, id);
+                }
+                alive.add(id);
+                exposures.put(id, 0);
+                photos.put(id, 0);
+                eliminations.put(id, 0);
+                uniquePhotos.put(id, new LinkedHashSet<>());
+                photographedBy.put(id, new LinkedHashSet<>());
+                spawnLocations.put(id, spawns.get(i % spawns.size()).clone());
+                }
+                plugin.saveConfig();
             for (UUID id : players.keySet()) {
                 Player player = players.get(id);
                 if (player != null && player.isOnline()) setupPlayer(player, spawnLocations.get(id));
