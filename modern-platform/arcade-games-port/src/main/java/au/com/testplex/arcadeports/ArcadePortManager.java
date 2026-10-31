@@ -1533,11 +1533,8 @@ public final class ArcadePortManager implements Listener {
         if (requester != null && requester.isOnline() && !testPlayers.isTestPlayer(requester)) {
             humanIds.add(requester.getUniqueId());
         }
-        if (humanIds.isEmpty()) {
-            startQueuedInternal(type, requester, sender, mixedArcadeVariant);
-            return;
-        }
-
+        // Console/admin starts with no queued humans still receive a full 16-player
+        // fixture roster. The human count is simply zero in this case.
         if (!testPlayers.isStartupCleanupComplete()) {
             sender.sendMessage(ChatColor.YELLOW + "Test-player cleanup is still running after server startup. Retry Start Game in a moment.");
             return;
@@ -19080,18 +19077,15 @@ public final class ArcadePortManager implements Listener {
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onTestPlayerRespawn(PlayerRespawnEvent event) {
-        Player eventPlayer = event.getPlayer();
-        UUID playerId = eventPlayer.getUniqueId();
+        UUID playerId = event.getPlayer().getUniqueId();
         if (!testPlayers.isTestPlayer(playerId)) return;
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            Player respawned = Bukkit.getPlayer(playerId);
-            if (respawned == null || !respawned.isOnline() || !respawned.isValid()) return;
+        testPlayers.whenRespawned(playerId, respawned -> {
             Session session = active;
             if (session == null || !session.players.containsKey(playerId)) return;
             session.players.put(playerId, respawned);
-            testPlayers.syncMatchRespawnLocation(respawned);
             plugin.getLogger().fine("Rebound AFK test player " + respawned.getName()
-                    + " to its respawned Bukkit Player entity for " + session.type.displayName() + ".");
+                    + " after FakePlayerPlugin completed its respawn lifecycle for "
+                    + session.type.displayName() + ".");
         });
     }
 
