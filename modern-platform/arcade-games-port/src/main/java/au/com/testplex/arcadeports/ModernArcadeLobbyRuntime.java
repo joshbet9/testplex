@@ -29,6 +29,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.player.PlayerAnimationEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.world.ChunkLoadEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -112,6 +113,16 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if (removed > 0 || hadSavedBots) {
             plugin.getLogger().info("Removed " + removed
                     + " legacy lobby NPC test bot(s); persistent global bot storage is disabled.");
+        }
+    }
+
+    /** Also purge legacy NPC bots from arena chunks that were not loaded at plugin startup. */
+    @EventHandler
+    public void onLegacyBotChunkLoad(ChunkLoadEvent event) {
+        for (Entity entity : event.getChunk().getEntities()) {
+            if (entity.getPersistentDataContainer().has(botKey, PersistentDataType.STRING)) {
+                entity.remove();
+            }
         }
     }
 
