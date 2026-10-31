@@ -118,6 +118,17 @@ class ArcadePortGameTest {
         assertEquals(-50, ModernArcadeLobby.PLANE_MIN);
         assertEquals(50, ModernArcadeLobby.PLANE_MAX_EXCLUSIVE);
         assertEquals(100, ModernArcadeLobby.FLOOR_Y);
+        assertTrue(ModernArcadeLobby.isInsidePlane(-50, -50));
+        assertTrue(ModernArcadeLobby.isInsidePlane(49, 49));
+        assertFalse(ModernArcadeLobby.isInsidePlane(50, 0));
+        assertFalse(ModernArcadeLobby.isInsidePlane(0, -51));
+        assertEquals(org.bukkit.Material.BEDROCK,
+                ModernArcadeLobby.planeLayerMaterial(ModernArcadeLobby.FLOOR_Y - 2));
+        assertEquals(org.bukkit.Material.STONE,
+                ModernArcadeLobby.planeLayerMaterial(ModernArcadeLobby.FLOOR_Y - 1));
+        assertEquals(org.bukkit.Material.GRASS_BLOCK,
+                ModernArcadeLobby.planeLayerMaterial(ModernArcadeLobby.FLOOR_Y));
+        assertNull(ModernArcadeLobby.planeLayerMaterial(ModernArcadeLobby.FLOOR_Y + 1));
         assertEquals(0.0D, ModernArcadeLobby.SPAWN_X, 0.00001D);
         assertEquals(104.0D, ModernArcadeLobby.SPAWN_Y, 0.00001D);
         assertEquals(0.0D, ModernArcadeLobby.SPAWN_Z, 0.00001D);
