@@ -450,7 +450,6 @@ public final class WizardsGameManager implements Listener {
         paceStep = 0;
         startingPlayerCount = entrants.size();
         endgameStarted = false;
-        suddenDeathTriggered = false;
         endgameType = random.nextInt(2);
         endgameMessageCounter = 0;
         nextEndgameStrikeMillis = WizardsRules.ENDGAME_INITIAL_STRIKE_MILLIS;
