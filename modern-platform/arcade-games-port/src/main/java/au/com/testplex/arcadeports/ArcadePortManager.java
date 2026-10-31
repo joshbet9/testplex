@@ -5181,7 +5181,7 @@ public final class ArcadePortManager implements Listener {
         session.microLastTwoAwarded = true;
         for (UUID id : session.alive) {
             Player player = session.players.get(id);
-            if (player == null || !player.isOnline()) continue;
+            if (player == null || !player.isOnline() || testPlayers.isTestPlayer(player)) continue;
             String statsPath = localStatsPath(id, ArcadePortGame.MICRO_BATTLES.id());
             plugin.getConfig().set(statsPath + "last-two-mission-progress",
                     plugin.getConfig().getInt(statsPath + "last-two-mission-progress", 0) + 1);
