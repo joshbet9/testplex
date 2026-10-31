@@ -33,9 +33,6 @@ public final class SpeedBuildersRules {
                 throw new IllegalArgumentException("Template cell is outside the 7x7x7 build volume.");
             }
             Objects.requireNonNull(material, "material");
-            if (material.isAir() || !material.isBlock()) {
-                throw new IllegalArgumentException("Template cells must contain placeable blocks.");
-            }
         }
 
         public Coordinate coordinate() {
