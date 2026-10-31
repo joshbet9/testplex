@@ -143,8 +143,8 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheTwentyThreeMechanicsGamesAndIntegratedMonsterMazeModule() {
-        assertEquals(23, ArcadePortGame.values().length);
+    @Test void exposesTheTwentyFourMechanicsGamesAndIntegratedMonsterMazeModule() {
+        assertEquals(24, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -159,6 +159,7 @@ class ArcadePortGameTest {
         assertEquals(ArcadePortGame.SKY_WARS, ArcadePortGame.fromId("skywars"));
         assertEquals(ArcadePortGame.MILK_THE_COW, ArcadePortGame.fromId("milk-the-cow"));
         assertEquals(ArcadePortGame.WITHER_ASSAULT, ArcadePortGame.fromId("wither-assault"));
+        assertEquals(ArcadePortGame.CAMERA_SHY, ArcadePortGame.fromId("camera-shy"));
     }
 
     @Test void normalizesSpacesAndUnderscoresInTestCommands() {
