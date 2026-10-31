@@ -56,7 +56,7 @@ The overall programme tracks 29 titles/variants: **27 shared Arcade catalogue ga
 | 1 | Bacon Brawl | Controlled acceptance testing; source mechanics and map implemented | Enabled |
 | 2 | Bomb Lobbers | Controlled acceptance testing; original map and core mechanics implemented | Enabled |
 | 3 | Death Tag | Acceptance-ready | Enabled |
-| 4 | Dragon Escape | Mechanics in progress | Disabled |
+| 4 | Dragon Escape | Controlled acceptance candidate; original 30-map race, four source kits and PB ghost implemented | Enabled |
 | 5 | Dragons (Solo) | Source implementation prepared; controlled gameplay acceptance required | Enabled |
 | 6 | Evolution | Mechanics in progress | Disabled |
 | 7 | Gladiators | Controlled acceptance; Normal default plus four voteable rulesets and tournament lifecycle implemented | Enabled |
@@ -83,4 +83,4 @@ The overall programme tracks 29 titles/variants: **27 shared Arcade catalogue ga
 | 28 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
 | 29 | Speed Builders Arcade | Planned; implementation not started | Not available |
 
-**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragons (Solo), Runner and Camera Shy form the shared controlled test queue. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable. The 284 archived map ZIPs for enabled games are tracked in [the legacy map parity register](arcade-games-port/LEGACY-MAP-PARITY.md); Plexball is explicitly documented as using a modern arena.
+**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons (Solo), Runner and Camera Shy form the shared controlled test queue. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable. The 314 archived map ZIPs for enabled games are tracked in [the legacy map parity register](arcade-games-port/LEGACY-MAP-PARITY.md); Plexball is explicitly documented as using a modern arena.
