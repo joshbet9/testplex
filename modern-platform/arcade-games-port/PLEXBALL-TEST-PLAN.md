@@ -62,6 +62,7 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 | Fielder turn | Every non-batter can move throughout the fair triangle. |
 | Fielding hotbar | Fielder can switch between slot 0 (glove) and slot 1 (kit ability); other slots are blocked. |
 | Standings | Distance and successful catches are broadcast after each completed batting attempt. |
+| Final results | Players receive a final hitting/fielding leaderboard and a personal recap with best hit, total uncaught distance, catches, home runs and at-bats. |
 | Player HUD | Every participant sees a live sidebar with phase, match clock, current batter, personal best, catches, kit/ability and the top three distances. |
 | Progression menu | `/stats plexball` opens a read-only inventory page listing all nine achievements, four long-term career goals and the player's saved totals. |
 | Achievement unlocks | Each achievement unlocks once, is saved per UUID, and notifies the player with a message and challenge-complete sound. |
