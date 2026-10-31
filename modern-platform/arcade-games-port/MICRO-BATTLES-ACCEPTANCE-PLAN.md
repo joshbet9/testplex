@@ -48,7 +48,9 @@ Choose a kit before joining or starting:
 - [ ] Vertical border particles appear on the nearest border face at the expected cadence and use the selected border colour.
 - [ ] The spectator compass tracks the nearest opponent; left-click teleports to the nearest living player and right-click opens the opponent selector.
 - [ ] Eliminated players cannot keep a stale warning or personal glass overlay.
-- [ ] All 16 colour selections resolve to a valid glass material and border particle colour; saved preferences persist across rounds.
+- [ ] The combined `Island Glass & Border Colours` menu offers two independent 16-choice groups: private starting glass and shared border particles.
+- [ ] Selecting either colour group preserves the other group selection; the two groups can be changed independently.
+- [ ] All 16 colour selections resolve to a valid glass material and border particle colour; saved preferences persist across rounds, and existing saved selections from the legacy separate lines still load.
 - [ ] The selected personal glass is not visible to other players, while the border particle colour is shared as intended.
 
 ## Achievements and stats
