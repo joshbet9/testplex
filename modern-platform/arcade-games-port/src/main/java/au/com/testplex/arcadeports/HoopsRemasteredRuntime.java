@@ -586,11 +586,11 @@ public final class HoopsRemasteredRuntime implements Listener {
     }
 
     private boolean crossesHoop(Ball ball, Location from, Location to) {
-        if (from.getY() <= HOOP_Y || to.getY() > HOOP_Y || ball.velocity.getY() >= 0.0D) return false;
         double hoopX = ball.defendingTeam == 0 ? LEFT_HOOP_X : RIGHT_HOOP_X;
-        double dx = to.getX() - hoopX;
-        double dz = to.getZ();
-        return dx * dx + dz * dz <= 1.15D * 1.15D;
+        return HoopsRemasteredRules.crossesHoopPlane(
+                from.getX(), from.getY(), from.getZ(),
+                to.getX(), to.getY(), to.getZ(),
+                hoopX, HOOP_Y, HoopsRemasteredRules.RIM_SCORING_RADIUS);
     }
 
     private void scoreBasket(Match current, Ball ball, long now) {
