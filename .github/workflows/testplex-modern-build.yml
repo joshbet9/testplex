@@ -96,6 +96,7 @@ jobs:
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "  - FakePlayerPlugin"
           ! unzip -p "$arcade_jar" plugin.yml | grep -Eq '^  games:'
           jar tf "$arcade_jar" | grep -Fxq "source-maps/Draw My Thing/Draw_Stadium.zip"
+          jar tf "$arcade_jar" | grep -Fxq "maps/bomb-lobbers.zip"
 
           # Guard the deployment path against the real standalone source artifact name.
           deploy_workflow=".github/workflows/deploy-testplex-modern-hyperv.yml"
