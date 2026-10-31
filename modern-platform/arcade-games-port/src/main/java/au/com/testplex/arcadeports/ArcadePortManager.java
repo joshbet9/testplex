@@ -1718,6 +1718,13 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.SUPER_SPLOOR) {
             // Build the authoritative territory index before moving anyone out of the lobby.
             session.superSploorEngine = new SuperSploorEngine(world, sourceMapData.get(type.id()));
+            if (session.superSploorEngine.redSpawnCount() < 8
+                    || session.superSploorEngine.blueSpawnCount() < 8) {
+                plugin.getLogger().warning("Super Sploor map has fewer than eight authored spawn points for a team "
+                        + "(Red=" + session.superSploorEngine.redSpawnCount()
+                        + ", Blue=" + session.superSploorEngine.blueSpawnCount()
+                        + "). Smaller tests can proceed, but 8v8 map acceptance is not met.");
+            }
         }
         active = session;
         long now = System.currentTimeMillis();
