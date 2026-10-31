@@ -84,6 +84,29 @@ A dedicated Wizards-only import path is now implemented in `SourceMapCatalog` an
 5. recovers chest block positions from the loaded world, recreates missing chest block entities, and uses safe replacement locations only when the archive contains no chest blocks;
 6. logs that these positions are inferred and not original Mineplex WorldConfig metadata.
 
-If the adapter cannot find sufficient safe starts or usable chest locations, Wizards falls back to the generated test arena. This is **not yet an in-game acceptance pass**: the next CI build must pass, then each selected map needs a Paper 26.3 load/start/loot/multiplayer smoke test. Maps that have no chest block records (eight Nano variants) are candidates only because their chest positions will be synthesized; they are not fidelity-equivalent to the standard exports.
+If the adapter cannot find sufficient safe starts or usable chest locations, Wizards falls back to the generated test arena. The world-import acceptance gate has now passed on a disposable Paper 26.3 server; full player movement, combat, loot-balance and multiplayer acceptance remain outstanding. Maps that have no chest block records (eight Nano variants) use synthesized replacement chest positions and are not fidelity-equivalent to the standard exports.
 
-The validator has also been updated to report direct Reborn imports separately from Wizards adapter candidates. The post-adapter CI report is pending. The previous detailed NBT/chunk metadata report remains [available as an Actions artifact](https://github.com/joshbet9/testplex/actions/runs/41208131882/artifacts/13045531836). The map ZIPs themselves are not committed or rehosted.
+### Paper 26.3 source-map runtime smoke (1 November 2026)
+
+[Paper 26.3 workflow run 3469](https://github.com/joshbet9/testplex/actions/runs/41214247540) started the actual Arcade plugin on stable Paper 26.3 build 235 and loaded every source archive through the production `WizardsGameManager.createArena()` path. The CI-only smoke plugin also asserted that the selected archive remained active (no generated-arena fallback), that each world had at least four distinct terrain-safe starts, and that every reported chest was a usable Bukkit chest block entity with an inventory.
+
+<badge>20/20 source maps passed</badge>
+
+| Map | Standard starts | Standard usable chests | Nano starts | Nano usable chests |
+|---|---:|---:|---:|---:|
+| Haven | 16 | 242 | 16 | 202 |
+| Wizard Arena | 16 | 233 | 9 | 32 |
+| Orbis Harbor | 16 | 206 | 16 | 32 |
+| Aspen | 16 | 238 | 16 | 32 |
+| Hogwarts | 16 | 191 | 16 | 32 |
+| Industrial West | 16 | 266 | 15 | 32 |
+| Alicudi | 16 | 262 | 16 | 222 |
+| Thaumaturge Colony | 16 | 253 | 16 | 32 |
+| Magically Possible | 16 | 207 | 16 | 32 |
+| Kalamit | 16 | 227 | 15 | 32 |
+
+The chest counts are usable containers after import, not proof of original inventories. Wizards repopulates them with its test loot. The eight Nano variants with no preserved chest block records received 32 safe replacement chests each. Nano Wizard Arena produced nine safe starts—above the four-start acceptance minimum, but it should receive particular visual review before gameplay acceptance.
+
+The per-map `PASS/FAIL` result sheet and Paper server log are retained in the [Wizards Paper 26.3 smoke artifact](https://github.com/joshbet9/testplex/actions/runs/41214247540/artifacts/13047597481). The complete build also passed all Maven tests, packaging checks and deployment-recovery checks. Its Hyper-V deployment job was skipped; no VM was changed.
+
+The validator continues to report direct Reborn imports separately from Wizards adapter candidates: 0/20 direct imports and 20/20 adapter candidates. Original `WorldConfig.dat`, player-start markers and chest inventories remain unavailable, so inferred starts/bounds and replacement Nano chests must not be described as authentic Mineplex metadata. The detailed NBT/chunk metadata report remains [available as an earlier Actions artifact](https://github.com/joshbet9/testplex/actions/runs/41208131882/artifacts/13045531836). The map ZIPs themselves are not committed or rehosted.
