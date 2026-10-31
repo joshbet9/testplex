@@ -84,7 +84,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 + ",cancelled=" + event.isCancelled()
                 + ",victimHealth=" + rival.getHealth()
                 + ",victimMode=" + rival.getGameMode()
-                + ",victimInvulnerable=" + rival.isInvulnerable()
+                + ",victimInvulnerable=" + rival.isMarkedInvulnerable()
                 + ",noDamageTicks=" + rival.getNoDamageTicks();
     }
 
@@ -328,7 +328,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         require(rival.isDead(), "Rainbow Beam damage failed (health="
                 + (rival.isDead() ? 0.0D : rival.getHealth()) + ", expectedDamage=" + expectedBeamDamage
                 + ", distance=" + beamDistance + ", pvp=" + gameplayArena.getPVP()
-                + ", mode=" + rival.getGameMode() + ", invulnerable=" + rival.isInvulnerable()
+                + ", mode=" + rival.getGameMode() + ", invulnerable=" + rival.isMarkedInvulnerable()
                 + ", lastDamage=" + lastDamageObservation + ")");
         double manaAfterBeam = ((Number) field(ownerState, "mana")).doubleValue();
         require(Math.abs((manaBeforeBeam - manaAfterBeam) - 17.0D) < 0.01D,
@@ -476,7 +476,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
     private PlayerBaseline captureBaseline(Player player) {
         return new PlayerBaseline(player.getWorld(), player.getLocation().clone(),
                 cloneItems(player.getInventory().getContents()), cloneItems(player.getInventory().getArmorContents()),
-                player.getGameMode(), player.getScoreboard(), player.isInvulnerable(),
+                player.getGameMode(), player.getScoreboard(), player.isMarkedInvulnerable(),
                 player.getHealth(), player.getAbsorptionAmount(),
                 player.getFoodLevel(), player.getSaturation(), player.getLevel(), player.getExp(),
                 player.getAllowFlight(), player.isFlying(), player.isSprinting(),
@@ -519,7 +519,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 player.getName() + " was not restored to the original lobby location");
         require(player.getGameMode() == baseline.gameMode(),
                 player.getName() + " game mode was not restored");
-        require(player.isInvulnerable() == baseline.invulnerable(),
+        require(player.isMarkedInvulnerable() == baseline.invulnerable(),
                 player.getName() + " lobby invulnerability was not restored");
         require(player.getScoreboard() == baseline.scoreboard(),
                 player.getName() + " scoreboard was not restored");
@@ -602,7 +602,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 player.getName() + " did not receive the Wizards match scoreboard");
         require(player.getActivePotionEffects().isEmpty(),
                 player.getName() + " carried lobby potion effects into the match");
-        require(!player.isInvulnerable(),
+        require(!player.isMarkedInvulnerable(),
                 player.getName() + " carried lobby invulnerability into the match");
         require(player.getAbsorptionAmount() == 0.0D,
                 player.getName() + " carried lobby absorption hearts into the match");
