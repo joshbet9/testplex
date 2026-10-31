@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * Two disposable offline-mode Minecraft 26.3 clients for the Paper acceptance
+ * Three disposable offline-mode Minecraft 26.3 clients for the Paper acceptance
  * harness. They join as real server-side Player entities; the test plugin
  * performs the queue/kit/start/leave commands and checks the resulting state.
  */
@@ -84,7 +84,7 @@ function connect(username) {
         finished.add(username);
         log('BOT_END|' + username + '|' + String(reason || 'server closed connection'));
         if (shuttingDown && finished.size === usernames.length) {
-          log('BOT_SHUTDOWN|PASS|both clients disconnected after Paper shutdown');
+          log('BOT_SHUTDOWN|PASS|all three clients disconnected after Paper shutdown');
           process.exitCode = 0;
         }
       } else if (!settled) {
@@ -102,7 +102,7 @@ function connect(username) {
 async function main() {
   log('BOT_CONNECT|START|host=' + host + '|port=' + port + '|version=26.3');
   await Promise.all(usernames.map(connect));
-  log('BOT_READY|PASS|count=2|users=' + usernames.join(','));
+  log('BOT_READY|PASS|count=3|users=' + usernames.join(','));
   shuttingDown = true;
 
   const watchdog = setTimeout(() => {
