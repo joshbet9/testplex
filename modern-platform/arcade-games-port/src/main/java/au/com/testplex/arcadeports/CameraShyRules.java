@@ -45,6 +45,25 @@ public final class CameraShyRules {
         return smokeObscured && smokeUsedUntil >= now;
     }
 
+    /**
+     * Positive means the first contestant ranks ahead: fewer exposures, then more
+     * photographs, then more eliminations, then a stable UUID tie-break.
+     */
+    public static int compareTimeoutRank(int firstExposures, int secondExposures,
+                                         int firstPhotos, int secondPhotos,
+                                         int firstEliminations, int secondEliminations,
+                                         UUID firstId, UUID secondId) {
+        int exposureOrder = Integer.compare(secondExposures, firstExposures);
+        if (exposureOrder != 0) return exposureOrder;
+        int photoOrder = Integer.compare(firstPhotos, secondPhotos);
+        if (photoOrder != 0) return photoOrder;
+        int eliminationOrder = Integer.compare(firstEliminations, secondEliminations);
+        if (eliminationOrder != 0) return eliminationOrder;
+        if (firstId == null) return secondId == null ? 0 : -1;
+        if (secondId == null) return 1;
+        return firstId.compareTo(secondId);
+    }
+
     public static boolean eliminatedAt(int exposures) {
         return exposures >= PHOTOS_TO_ELIMINATE;
     }
