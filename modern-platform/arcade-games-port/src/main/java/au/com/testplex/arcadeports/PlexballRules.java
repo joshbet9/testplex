@@ -2,6 +2,8 @@ package au.com.testplex.arcadeports;
 
 import org.bukkit.util.Vector;
 
+import java.util.Set;
+
 /**
  * Deterministic Plexball rules shared by the live game and unit tests.
  *
@@ -91,6 +93,16 @@ public final class PlexballRules {
         t = Math.max(0.0D, Math.min(1.0D, t));
         Vector closest = start.clone().add(segment.multiply(t));
         return point.distanceSquared(closest);
+    }
+
+    /**
+     * A sudden-death round is complete only after every finalist has had a
+     * recorded turn. A timeout during a partial round must not eliminate
+     * finalists who have not yet batted.
+     */
+    public static <T> boolean hasCompletedRound(Set<T> finalists, Set<T> completedTurns) {
+        return finalists != null && !finalists.isEmpty()
+                && completedTurns != null && completedTurns.containsAll(finalists);
     }
 
     public static double clamp(double value, double min, double max) {
