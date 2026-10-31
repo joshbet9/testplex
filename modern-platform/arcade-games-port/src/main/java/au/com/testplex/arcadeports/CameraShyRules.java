@@ -35,6 +35,11 @@ public final class CameraShyRules {
                 && !owner.equals(photographer);
     }
 
+    /** A pursuit can only be credited to smoke deployed by the player escaping it. */
+    public static boolean smokeBelongsTo(UUID cloudOwner, UUID requiredOwner) {
+        return cloudOwner != null && (requiredOwner == null || requiredOwner.equals(cloudOwner));
+    }
+
     /** Smoke and Mirrors only counts a pursuit actually obscured by the active smoke cloud. */
     public static boolean shouldAwardSmokeEscape(boolean smokeObscured, long now, long smokeUsedUntil) {
         return smokeObscured && smokeUsedUntil >= now;
