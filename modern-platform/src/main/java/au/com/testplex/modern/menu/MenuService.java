@@ -742,7 +742,7 @@ public final class MenuService implements Listener {
                 if (!isAdmin(player)) {
                     player.sendMessage(ChatColor.RED + "Operator permission required to start a game.");
                 } else {
-                    String selectedGame = plugin.getConfig().getString("game-panel.selected-game", "bacon-brawl");
+                    String selectedGame = plugin.getConfig().getString("game-panel.selected-game", "death-tag");
                     player.closeInventory();
                     try {
                         boolean handled = player.performCommand("arcadeport start " + selectedGame);
