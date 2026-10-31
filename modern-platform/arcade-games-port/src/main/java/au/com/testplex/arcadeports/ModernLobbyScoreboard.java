@@ -128,6 +128,15 @@ public final class ModernLobbyScoreboard {
         return titleCase(kitId);
     }
 
+    /**
+     * A player belongs to one scoreboard team only. Team games therefore combine
+     * the rank sort group and the game-team colour into a single team identifier.
+     */
+    static String tabTeamSortKey(String rank, int teamId) {
+        String rankKey = tabSortKey(rank);
+        return teamId >= 0 && teamId < 4 ? rankKey + "_t" + teamId : rankKey;
+    }
+
     static String tabSortKey(String rank) {
         return switch (rank == null ? "player" : rank.toLowerCase(Locale.ROOT)) {
             case "owner" -> "r0_owner";
@@ -160,7 +169,7 @@ public final class ModernLobbyScoreboard {
         return label.isEmpty() ? "" : colour + "[" + label + "] " + ChatColor.RESET;
     }
 
-    private static String rankId(JavaPlugin plugin, Player player) {
+    static String rankId(JavaPlugin plugin, Player player) {
         String configured = plugin.getConfig().getString("lobby-scoreboard.ranks." + player.getUniqueId(), "");
         if (configured != null && !configured.isBlank()) {
             String value = configured.trim().toLowerCase(Locale.ROOT);
