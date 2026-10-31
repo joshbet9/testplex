@@ -83,6 +83,15 @@ class SuperSploorRulesTest {
     }
 
     @Test
+    void inkRegenerationWaitsAfterPrimaryOrSecondaryUseUnlessSwimmingOnFriendlyPaint() {
+        assertFalse(SuperSploorRules.canRegenerateInk(10_999L, 10_000L, false, false));
+        assertTrue(SuperSploorRules.canRegenerateInk(11_000L, 10_000L, false, false));
+        assertTrue(SuperSploorRules.canRegenerateInk(10_100L, 10_000L, true, true));
+        assertFalse(SuperSploorRules.canRegenerateInk(10_100L, 10_000L, true, false));
+        assertFalse(SuperSploorRules.canRegenerateInk(9_000L, 10_000L, false, false));
+    }
+
+    @Test
     void overtimeRequiresAOnePercentLeadAndSquidTravelRejectsTeleports() {
         assertEquals(10, SuperSploorRules.overtimeLeadThreshold(1_000));
         assertEquals(2, SuperSploorRules.overtimeLeadThreshold(150));
