@@ -1,6 +1,7 @@
 package au.com.testplex.wizards;
 
 import au.com.testplex.arcadeports.ArcadeMechanicsModernPlugin;
+import au.com.testplex.arcadeports.SourceMapCatalog;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -89,6 +90,7 @@ public final class WizardsGameManager implements Listener {
     private static final int MENU_SLOT = 8;
     private static final int ARENA_FLOOR_Y = 63;
     private static final int CHEST_COUNT_FALLBACK = 32;
+    private static final List<String> WIZARDS_MAP_FOLDERS = List.of("Wizards", "Nano Wizards");
 
     private final ArcadeMechanicsModernPlugin plugin;
     private final NamespacedKey spellKey;
@@ -118,9 +120,13 @@ public final class WizardsGameManager implements Listener {
     private final List<BukkitTask> spellTasks = new ArrayList<>();
     private final Map<UUID, MeteorData> endgameMeteors = new HashMap<>();
     private final List<Location> chests = new ArrayList<>();
+    private final List<Location> sourceSpawnLocations = new ArrayList<>();
     private final Random random = new Random();
 
     private World arena;
+    private SourceMapCatalog.MapData sourceMapData;
+    private Location arenaCenter;
+    private String activeMapResource;
     private final BukkitTask tickTask;
     private boolean running;
     private long startedAt;
@@ -158,6 +164,100 @@ public final class WizardsGameManager implements Listener {
     }
 
     private World createArena() {
+        String sourceMap = SourceMapCatalog.selectedResourceForFolders(plugin, "wizards", WIZARDS_MAP_FOLDERS);
+        if (sourceMap != null) return createSourceMapArena(sourceMap);
+
+        activeMapResource = null;
+        sourceMapData = null;
+        sourceSpawnLocations.clear();
+        return createGeneratedArena();
+    }
+
+    private World createSourceMapArena(String resource) {
+        String worldName = plugin.getConfig().getString("wizards.source-map-world", "arcadeport_source_wizards");
+        if (!SourceMapCatalog.resetTestWorld(plugin, worldName)) {
+            plugin.getLogger().severe("Could not safely reset the previous Wizards source-map world " + worldName + ".");
+            return null;
+        }
+        if (!SourceMapCatalog.installResource(plugin, resource, worldName)) {
+            plugin.getLogger().severe("Could not install selected Wizards source map " + resource + ".");
+            return null;
+        }
+        World world = Bukkit.createWorld(new WorldCreator(worldName));
+        if (world == null) {
+            plugin.getLogger().severe("Paper could not load selected Wizards source map " + resource + ".");
+            return null;
+        }
+
+        SourceMapCatalog.MapData data = SourceMapCatalog.read(world);
+        if (data == null || !data.hasBounds() || data.spawnLocations().isEmpty()) {
+            plugin.getLogger().severe("Selected Wizards map " + resource
+                    + " is missing valid WorldConfig bounds or TEAM_SPAWNS markers.");
+            Bukkit.unloadWorld(world, false);
+            return null;
+        }
+
+        sourceMapData = data;
+        sourceSpawnLocations.clear();
+        sourceSpawnLocations.addAll(data.spawnLocations());
+        activeMapResource = resource;
+        arenaCenter = new Location(world, data.centerX(),
+                Math.max(world.getMinHeight() + 1, data.minY() + 1), data.centerZ());
+
+        world.setGameRule(GameRule.DO_MOB_SPAWNING, false);
+        world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+        world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
+        world.setGameRule(GameRule.KEEP_INVENTORY, true);
+        world.setGameRule(GameRule.MOB_GRIEFING, false);
+        world.setTime(6000L);
+        world.setStorm(false);
+        world.setThundering(false);
+
+        List<Location> chestMarkers = data.customLocations("54");
+        if (chestMarkers.isEmpty()) {
+            for (int chunkX = Math.floorDiv(data.minX(), 16); chunkX <= Math.floorDiv(data.maxX(), 16); chunkX++) {
+                for (int chunkZ = Math.floorDiv(data.minZ(), 16); chunkZ <= Math.floorDiv(data.maxZ(), 16); chunkZ++) {
+                    org.bukkit.Chunk chunk = world.getChunkAt(chunkX, chunkZ);
+                    for (org.bukkit.block.BlockState blockState : chunk.getTileEntities()) {
+                        if (blockState instanceof Chest) chestMarkers.add(blockState.getLocation());
+                    }
+                }
+            }
+        }
+        chests.clear();
+        for (Location marker : chestMarkers) {
+            if (marker == null || marker.getWorld() == null || !marker.getWorld().equals(world)) continue;
+            Block block = marker.getBlock();
+            if (block.getType() != Material.CHEST) block.setType(Material.CHEST, false);
+            chests.add(block.getLocation());
+        }
+        if (chests.isEmpty()) {
+            plugin.getLogger().severe("Selected Wizards map " + resource + " has no chest markers or placed chests.");
+            Bukkit.unloadWorld(world, false);
+            sourceMapData = null;
+            sourceSpawnLocations.clear();
+            activeMapResource = null;
+            return null;
+        }
+
+        WorldBorder border = world.getWorldBorder();
+        border.setCenter(data.centerX(), data.centerZ());
+        border.setSize(Math.max(48.0D, Math.max(data.width(), data.depth()) + 8.0D));
+        border.setDamageAmount(0.2D);
+        border.setWarningDistance(5);
+        int spawnY = Math.max(world.getMinHeight() + 1, world.getHighestBlockYAt(
+                (int) Math.floor(data.centerX()), (int) Math.floor(data.centerZ())) + 1);
+        arenaCenter.setY(spawnY);
+        world.setSpawnLocation(arenaCenter.getBlockX(), arenaCenter.getBlockY(), arenaCenter.getBlockZ());
+        for (Entity entity : world.getEntities()) {
+            if (!(entity instanceof Player)) entity.remove();
+        }
+        plugin.getLogger().info("Loaded Wizards source map " + data.mapName() + " from " + resource
+                + " with " + sourceSpawnLocations.size() + " spawn markers and " + chests.size() + " chests.");
+        return world;
+    }
+
+    private World createGeneratedArena() {
         String worldName = plugin.getConfig().getString("wizards.arena-world", "wizards_arena");
         World world = Bukkit.getWorld(worldName);
         if (world == null) {
@@ -187,6 +287,7 @@ public final class WizardsGameManager implements Listener {
         border.setDamageAmount(0.2D);
         border.setWarningDistance(5);
         world.setSpawnLocation(0, ARENA_FLOOR_Y + 1, 0);
+        arenaCenter = new Location(world, 0.5D, ARENA_FLOOR_Y + 1.0D, 0.5D);
 
         // No original Wizards archive is present in this repository. Build a
         // predictable mechanics arena rather than silently substituting another game map.
@@ -285,7 +386,10 @@ public final class WizardsGameManager implements Listener {
             sender.sendMessage(ChatColor.RED + "Wizards is already running.");
             return;
         }
-        if (arena == null) arena = createArena();
+        String desiredMap = SourceMapCatalog.selectedResourceForFolders(plugin, "wizards", WIZARDS_MAP_FOLDERS);
+        if (arena == null || !java.util.Objects.equals(activeMapResource, desiredMap)) {
+            arena = createArena();
+        }
         if (arena == null) {
             sender.sendMessage(ChatColor.RED + "Wizards arena failed to load.");
             return;
@@ -383,11 +487,21 @@ public final class WizardsGameManager implements Listener {
                 ? 20.0D : player.getAttribute(Attribute.MAX_HEALTH).getValue();
         player.setHealth(Math.min(maxHealth, 20.0D));
 
-        double angle = (Math.PI * 2.0D * index) / Math.max(1, count);
-        double spawnRadius = Math.max(20.0D, Math.min(35.0D, plugin.getConfig().getInt("wizards.arena-radius", 48) - 12.0D));
-        Location spawn = new Location(arena, Math.cos(angle) * spawnRadius + 0.5D,
-                ARENA_FLOOR_Y + 1.0D, Math.sin(angle) * spawnRadius + 0.5D);
-        spawn.setDirection(new Vector(-Math.cos(angle), 0.0D, -Math.sin(angle)));
+        Location spawn;
+        if (!sourceSpawnLocations.isEmpty()) {
+            spawn = sourceSpawnLocations.get(index % sourceSpawnLocations.size()).clone();
+            if (index >= sourceSpawnLocations.size()) {
+                int overflow = index / sourceSpawnLocations.size();
+                spawn.add((overflow % 3) * 1.5D, 0.0D, (overflow / 3) * 1.5D);
+            }
+            spawn.setDirection(new Vector(arenaCenter.getX() - spawn.getX(), 0.0D, arenaCenter.getZ() - spawn.getZ()));
+        } else {
+            double angle = (Math.PI * 2.0D * index) / Math.max(1, count);
+            double spawnRadius = Math.max(20.0D, Math.min(35.0D, plugin.getConfig().getInt("wizards.arena-radius", 48) - 12.0D));
+            spawn = new Location(arena, Math.cos(angle) * spawnRadius + arenaCenter.getX(),
+                    ARENA_FLOOR_Y + 1.0D, Math.sin(angle) * spawnRadius + arenaCenter.getZ());
+            spawn.setDirection(new Vector(-Math.cos(angle), 0.0D, -Math.sin(angle)));
+        }
         player.teleport(spawn);
         applyMatchScoreboard(player);
 
@@ -796,6 +910,16 @@ public final class WizardsGameManager implements Listener {
         objective.getScore(ChatColor.DARK_GRAY + " ").setScore(3);
         objective.getScore(phase).setScore(2);
         objective.getScore(ChatColor.WHITE + minuteText).setScore(1);
+    }
+
+    private Location spectatorLocation() {
+        if (arenaCenter != null && arenaCenter.getWorld() != null) {
+            Location location = arenaCenter.clone();
+            int highest = location.getWorld().getHighestBlockYAt(location);
+            location.setY(Math.max(location.getY(), highest + 3.0D));
+            return location;
+        }
+        return arena == null ? null : new Location(arena, 0.5D, ARENA_FLOOR_Y + 2.0D, 0.5D);
     }
 
     private void removeMatchScoreboard(UUID id) {
@@ -1460,7 +1584,8 @@ public final class WizardsGameManager implements Listener {
         }
         WizardState state = states.get(id);
         if (running && state != null && !state.alive && arena != null) {
-            event.setRespawnLocation(new Location(arena, 0.5D, ARENA_FLOOR_Y + 2.0D, 0.5D));
+            Location spectator = spectatorLocation();
+            if (spectator != null) event.setRespawnLocation(spectator);
             Bukkit.getScheduler().runTask(plugin, () -> {
                 Player player = event.getPlayer();
                 if (!player.isOnline() || !running || state.alive) return;
@@ -1511,7 +1636,8 @@ public final class WizardsGameManager implements Listener {
                 player.closeInventory();
                 player.getInventory().clear();
                 player.setGameMode(GameMode.SPECTATOR);
-                player.teleport(new Location(arena, 0.5D, ARENA_FLOOR_Y + 2.0D, 0.5D));
+                Location spectator = spectatorLocation();
+                if (spectator != null) player.teleport(spectator);
                 player.setFlying(true);
                 applyMatchScoreboard(player);
                 player.sendMessage(ChatColor.GRAY + "You rejoined as a spectator. Your lobby state will be restored when the round ends.");
@@ -2467,8 +2593,12 @@ public final class WizardsGameManager implements Listener {
             arena.setStorm(false);
             arena.setThundering(false);
             WorldBorder border = arena.getWorldBorder();
-            border.setCenter(0.0D, 0.0D);
-            border.setSize((Math.max(32, Math.min(96, plugin.getConfig().getInt("wizards.arena-radius", 48))) * 2.0D) + 4.0D);
+            Location center = arenaCenter == null ? new Location(arena, 0.5D, ARENA_FLOOR_Y + 1.0D, 0.5D) : arenaCenter;
+            border.setCenter(center.getX(), center.getZ());
+            double size = sourceMapData == null
+                    ? (Math.max(32, Math.min(96, plugin.getConfig().getInt("wizards.arena-radius", 48))) * 2.0D) + 4.0D
+                    : Math.max(48.0D, Math.max(sourceMapData.width(), sourceMapData.depth()) + 8.0D);
+            border.setSize(size);
         }
     }
 

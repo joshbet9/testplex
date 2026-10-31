@@ -18,6 +18,7 @@ admin-usernames:
 # owned by ArcadeMechanicsModern and cannot create a second independent game server.
 wizards:
   arena-world: testplex_wizards_arena
+  source-map-world: arcadeport_source_wizards
   arena-radius: 48
   chest-count: 32
   allow-solo-start: true

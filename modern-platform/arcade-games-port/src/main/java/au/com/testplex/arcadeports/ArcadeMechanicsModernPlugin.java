@@ -320,7 +320,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport maps <game-id>");
                     return true;
                 }
-                mapMenu.openMapSelection(player, ArcadePortGame.fromId(args[1]));
+                if (isWizardsId(args[1])) mapMenu.openWizardsMapSelection(player);
+                else mapMenu.openMapSelection(player, ArcadePortGame.fromId(args[1]));
                 return true;
             case "start":
                 if (args.length < 2) {
