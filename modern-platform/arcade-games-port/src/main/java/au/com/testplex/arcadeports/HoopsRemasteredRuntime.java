@@ -19,17 +19,25 @@ import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarStyle;
+import org.bukkit.boss.BossBar;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.Player;
+import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -89,11 +97,13 @@ public final class HoopsRemasteredRuntime implements Listener {
 
     /** Build an isolated indoor hardwood court; no production world is touched. */
     public static void buildCourt(World world) {
-        for (int x = -24; x <= 24; x++) {
-            for (int z = -14; z <= 14; z++) {
-                world.getBlockAt(x, FLOOR_Y, z).setType(Material.BIRCH_PLANKS, false);
-                for (int y = FLOOR_Y + 1; y <= FLOOR_Y + 10; y++) {
+        for (int x = -27; x <= 27; x++) {
+            for (int z = -22; z <= 22; z++) {
+                for (int y = FLOOR_Y + 1; y <= FLOOR_Y + 15; y++) {
                     world.getBlockAt(x, y, z).setType(Material.AIR, false);
+                }
+                if (x >= -24 && x <= 24 && z >= -14 && z <= 14) {
+                    world.getBlockAt(x, FLOOR_Y, z).setType(Material.BIRCH_PLANKS, false);
                 }
             }
         }
@@ -121,9 +131,54 @@ public final class HoopsRemasteredRuntime implements Listener {
         world.getBlockAt(9, FLOOR_Y, 0).setType(Material.WHITE_CONCRETE, false);
         drawThreePointArc(world, LEFT_HOOP_X, true);
         drawThreePointArc(world, RIGHT_HOOP_X, false);
+        // A small centre circle makes the tip-off area immediately readable.
+        for (int step = 0; step < 48; step++) {
+            double angle = Math.PI * 2.0D * step / 48.0D;
+            int x = (int) Math.round(Math.cos(angle) * 4.0D);
+            int z = (int) Math.round(Math.sin(angle) * 4.0D);
+            world.getBlockAt(x, FLOOR_Y, z).setType(Material.WHITE_CONCRETE, false);
+        }
         buildHoop(world, -1);
         buildHoop(world, 1);
+        buildArenaShell(world);
         world.setSpawnLocation(0, FLOOR_Y + 1, 0);
+    }
+
+    private static void buildArenaShell(World world) {
+        // Coloured spectator seating beyond the boundary, with a simple enclosed arena shell.
+        for (int x = -22; x <= 22; x++) {
+            for (int row = 0; row < 3; row++) {
+                world.getBlockAt(x, FLOOR_Y + 1 + row, -15 - row).setType(Material.RED_CONCRETE, false);
+                world.getBlockAt(x, FLOOR_Y + 1 + row, 15 + row).setType(Material.LIGHT_BLUE_CONCRETE, false);
+            }
+        }
+        for (int x = -27; x <= 27; x++) {
+            for (int y = FLOOR_Y + 1; y <= FLOOR_Y + 14; y++) {
+                Material wall = y == FLOOR_Y + 6 || y == FLOOR_Y + 10
+                        ? Material.GRAY_STAINED_GLASS : Material.GRAY_CONCRETE;
+                world.getBlockAt(x, y, -22).setType(wall, false);
+                world.getBlockAt(x, y, 22).setType(wall, false);
+            }
+        }
+        for (int z = -22; z <= 22; z++) {
+            for (int y = FLOOR_Y + 1; y <= FLOOR_Y + 14; y++) {
+                Material wall = y == FLOOR_Y + 6 || y == FLOOR_Y + 10
+                        ? Material.GRAY_STAINED_GLASS : Material.GRAY_CONCRETE;
+                world.getBlockAt(-27, y, z).setType(wall, false);
+                world.getBlockAt(27, y, z).setType(wall, false);
+            }
+        }
+        for (int x = -27; x <= 27; x++) {
+            for (int z = -22; z <= 22; z++) {
+                world.getBlockAt(x, FLOOR_Y + 15, z).setType(Material.GRAY_STAINED_GLASS, false);
+            }
+        }
+        for (int x = -20; x <= 20; x += 10) {
+            for (int z = -18; z <= 18; z += 9) {
+                world.getBlockAt(x, FLOOR_Y + 12, z).setType(Material.SEA_LANTERN, false);
+                world.getBlockAt(x, FLOOR_Y + 11, z).setType(Material.IRON_CHAIN, false);
+            }
+        }
     }
 
     private static void drawThreePointArc(World world, double hoopX, boolean left) {
@@ -187,7 +242,9 @@ public final class HoopsRemasteredRuntime implements Listener {
             player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "HOOPS REMASTERED");
             player.sendMessage(ChatColor.GRAY + "Left-click " + ChatColor.WHITE + "to pass / steal"
                     + ChatColor.GRAY + "  •  Right-click " + ChatColor.WHITE + "to shoot / contest");
-            player.sendMessage(ChatColor.GRAY + "First to 21, win by 2. Three-pointers count from beyond the arc.");
+            player.sendMessage(ChatColor.GRAY + "First to 21 wins immediately (no win-by-two).");
+            player.sendMessage(ChatColor.GRAY + "At 5:00, the leader wins; a tie goes to next-basket sudden death.");
+            player.sendMessage(ChatColor.GRAY + "Jump toward the basket and aim at the rim to attempt a dunk.");
             player.setCompassTarget(team == 0 ? new Location(world, RIGHT_HOOP_X, HOOP_Y, 0)
                     : new Location(world, LEFT_HOOP_X, HOOP_Y, 0));
         }
@@ -208,67 +265,124 @@ public final class HoopsRemasteredRuntime implements Listener {
     private Scoreboard createScoreboard(Match current) {
         if (Bukkit.getScoreboardManager() == null) return null;
         Scoreboard board = Bukkit.getScoreboardManager().getNewScoreboard();
-        Objective sidebar = board.registerNewObjective("hoops", "dummy", ChatColor.GOLD + "" + ChatColor.BOLD + "HOOPS");
+        Objective sidebar = board.registerNewObjective("hoops", "dummy",
+                ChatColor.GOLD + "" + ChatColor.BOLD + "HOOPS REMASTERED");
         sidebar.setDisplaySlot(DisplaySlot.SIDEBAR);
         current.sidebar = sidebar;
-        current.scoreboardEntries = List.of(
-                ChatColor.RED + "Red Team", ChatColor.RED + "Red Score",
-                ChatColor.AQUA + "Blue Team", ChatColor.AQUA + "Blue Score",
-                ChatColor.YELLOW + "Clock", ChatColor.GOLD + "Shot clock",
-                ChatColor.GRAY + "First to 21");
+
+        Team red = board.registerNewTeam("hoops_red");
+        red.setColor(ChatColor.RED);
+        red.setPrefix(ChatColor.RED + "[RED] ");
+        red.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.ALWAYS);
+        Team blue = board.registerNewTeam("hoops_blue");
+        blue.setColor(ChatColor.AQUA);
+        blue.setPrefix(ChatColor.AQUA + "[BLUE] ");
+        blue.setOption(Team.Option.NAME_TAG_VISIBILITY, Team.OptionStatus.ALWAYS);
+        for (Player player : current.players.values()) {
+            if (player == null) continue;
+            if (current.teams.getOrDefault(player.getUniqueId(), 0) == 0) red.addEntry(player.getName());
+            else blue.addEntry(player.getName());
+        }
+
         Objective below = board.registerNewObjective("hoopspoints", "dummy", ChatColor.GOLD + "PTS");
         below.setDisplaySlot(DisplaySlot.BELOW_NAME);
         current.belowName = below;
+
+        current.bossBar = Bukkit.createBossBar("HOOPS REMASTERED", BarColor.PURPLE, BarStyle.SEGMENTED_10);
+        current.bossBar.setVisible(true);
+        for (Player player : current.players.values()) {
+            if (player != null && player.isOnline()) current.bossBar.addPlayer(player);
+        }
+
+        TextDisplay display = current.world.spawn(
+                new Location(current.world, 0.0D, FLOOR_Y + 8.0D, 0.0D), TextDisplay.class);
+        display.setBillboard(Display.Billboard.CENTER);
+        display.setAlignment(TextDisplay.TextAlignment.CENTER);
+        display.setDefaultBackground(true);
+        display.setSeeThrough(true);
+        display.setShadowed(true);
+        display.setLineWidth(360);
+        display.setGravity(false);
+        display.setInvulnerable(true);
+        display.setPersistent(false);
+        current.scoreboardDisplay = display;
+        current.entities.add(display.getUniqueId());
         return board;
     }
 
     private void updateHud(Match current, boolean force) {
+        long now = System.currentTimeMillis();
+        long shotRemaining = Math.max(0L, current.shotClockEndsAt - now);
+        long shotSeconds = Math.max(0L, (shotRemaining + 999L) / 1_000L);
+        String clock = current.overtime ? "OVERTIME — NEXT BASKET WINS"
+                : HoopsRemasteredRules.formatClock(current.remainingMillis);
+        Player currentHolder = current.holderId == null ? null : current.players.get(current.holderId);
+        String possession = currentHolder == null ? "LOOSE BALL"
+                : currentHolder.getName() + " (" + teamName(current.teams.getOrDefault(current.holderId, 0)) + ")";
+
         if (current.scoreboard != null && current.sidebar != null) {
-            Scoreboard board = current.scoreboard;
-            for (String entry : current.scoreboardEntries) board.resetScores(entry);
-            current.sidebar.getScore(current.scoreboardEntries.get(0)).setScore(8);
-            current.sidebar.getScore(current.scoreboardEntries.get(1)).setScore(current.teamScore[0]);
-            current.sidebar.getScore(current.scoreboardEntries.get(2)).setScore(6);
-            current.sidebar.getScore(current.scoreboardEntries.get(3)).setScore(current.teamScore[1]);
-            current.sidebar.getScore(current.scoreboardEntries.get(4)).setScore(4);
-            current.sidebar.getScore(current.scoreboardEntries.get(5)).setScore(
-                    (int) Math.ceil(current.remainingMillis / 1000.0D));
-            current.sidebar.getScore(current.scoreboardEntries.get(6)).setScore(2);
-            String possessionEntry = ChatColor.DARK_GRAY + "Ball: " + possession;
-            if (current.possessionEntry != null) board.resetScores(current.possessionEntry);
-            current.sidebar.getScore(possessionEntry).setScore(1);
-            current.possessionEntry = possessionEntry;
-            Objective below = current.belowName;
-            if (below != null) {
+            List<String> entries = List.of(
+                    ChatColor.RED + "RED: " + current.teamScore[0],
+                    ChatColor.AQUA + "BLUE: " + current.teamScore[1],
+                    ChatColor.YELLOW + (current.overtime ? "OVERTIME" : "TIME: " + clock),
+                    ChatColor.GOLD + "SHOT: " + shotSeconds + "s",
+                    ChatColor.WHITE + "BALL: " + possession,
+                    ChatColor.GRAY + (current.overtime ? "NEXT BASKET WINS" : "FIRST TO 21"),
+                    ChatColor.DARK_GRAY + "NO WIN BY 2");
+            for (String entry : current.scoreboardEntries) current.scoreboard.resetScores(entry);
+            int score = entries.size();
+            for (String entry : entries) current.sidebar.getScore(entry).setScore(score--);
+            current.scoreboardEntries = entries;
+
+            if (current.belowName != null) {
                 for (Player player : current.players.values()) {
                     if (player != null && player.isOnline()) {
-                        below.getScore(player.getName()).setScore(
+                        current.belowName.getScore(player.getName()).setScore(
                                 current.playerStats.getOrDefault(player.getUniqueId(), new PlayerStats()).points);
                     }
                 }
             }
         }
-        long now = System.currentTimeMillis();
-        long shotRemaining = Math.max(0L, current.shotClockEndsAt - now);
-        String clock = current.overtime ? "OVERTIME — NEXT BASKET" :
-                HoopsRemasteredRules.formatClock(current.remainingMillis);
-        Player currentHolder = current.holderId == null ? null : current.players.get(current.holderId);
-        String possession = currentHolder == null ? "LOOSE BALL"
-                : currentHolder.getName() + " (" + teamName(current.teams.getOrDefault(current.holderId, 0)) + ")";
+
+        String title = ChatColor.RED + "RED " + current.teamScore[0] + ChatColor.DARK_GRAY + "  -  "
+                + ChatColor.AQUA + "BLUE " + current.teamScore[1] + ChatColor.DARK_GRAY + "  |  "
+                + ChatColor.YELLOW + (current.overtime ? "OVERTIME — NEXT BASKET WINS"
+                : clock + "  |  SHOT " + shotSeconds + "s");
+        if (current.bossBar != null) {
+            current.bossBar.setTitle(title);
+            current.bossBar.setColor(current.overtime ? BarColor.YELLOW
+                    : current.teamScore[0] > current.teamScore[1] ? BarColor.RED
+                    : current.teamScore[1] > current.teamScore[0] ? BarColor.BLUE : BarColor.PURPLE);
+            double progress = current.overtime
+                    ? shotRemaining / (double) HoopsRemasteredRules.SHOT_CLOCK_MILLIS
+                    : current.remainingMillis / (double) HoopsRemasteredRules.REGULATION_MILLIS;
+            current.bossBar.setProgress(Math.max(0.0D, Math.min(1.0D, progress)));
+        }
+        if (current.scoreboardDisplay != null && current.scoreboardDisplay.isValid()) {
+            current.scoreboardDisplay.setText(ChatColor.GOLD + "" + ChatColor.BOLD + "HOOPS REMASTERED\n"
+                    + ChatColor.RED + "RED " + current.teamScore[0] + ChatColor.GRAY + "  -  "
+                    + ChatColor.AQUA + "BLUE " + current.teamScore[1] + "\n"
+                    + ChatColor.YELLOW + (current.overtime ? "OVERTIME — NEXT BASKET WINS"
+                    : clock + " REGULATION") + "\n"
+                    + ChatColor.GOLD + "SHOT CLOCK " + shotSeconds + "s");
+        }
+
         for (Player player : current.players.values()) {
             if (player == null || !player.isOnline()) continue;
             PlayerStats stats = current.playerStats.get(player.getUniqueId());
+            int fieldGoal = stats.shotsAttempted == 0 ? 0
+                    : (int) Math.round(stats.shotsMade * 100.0D / stats.shotsAttempted);
             player.sendActionBar(ChatColor.RED + "" + current.teamScore[0] + ChatColor.GRAY + " - "
                     + ChatColor.AQUA + current.teamScore[1] + ChatColor.DARK_GRAY + "  |  "
                     + ChatColor.YELLOW + clock + ChatColor.DARK_GRAY + "  |  "
-                    + ChatColor.GOLD + "Shot " + Math.max(0L, (shotRemaining + 999L) / 1000L)
-                    + ChatColor.GRAY + "  |  " + ChatColor.WHITE + "P " + stats.points
-                    + "  A " + stats.assists + "  R " + stats.rebounds
-                    + "  B " + stats.blocks + "  S " + stats.steals);
+                    + ChatColor.GOLD + "Shot " + shotSeconds + ChatColor.GRAY + "  |  "
+                    + ChatColor.WHITE + "PTS " + stats.points + " AST " + stats.assists
+                    + " REB " + stats.rebounds + " BLK " + stats.blocks
+                    + " STL " + stats.steals + " FG " + fieldGoal + "%");
             if (force) {
                 int team = current.teams.getOrDefault(player.getUniqueId(), 0);
-                player.setCompassTarget(new Location(current.world, team == 0 ? RIGHT_HOOP_X : LEFT_HOOP_X,
-                        FLOOR_Y, 0.0D));
+                player.setCompassTarget(new Location(current.world,
+                        team == 0 ? RIGHT_HOOP_X : LEFT_HOOP_X, FLOOR_Y, 0.0D));
             }
         }
     }
@@ -394,7 +508,8 @@ public final class HoopsRemasteredRuntime implements Listener {
         }
         ball.display.teleport(ball.location);
         for (Player player : alivePlayers(current)) {
-            if (player.getLocation().distanceSquared(ball.location) > 1.8D) continue;
+            Location catchPoint = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
+            if (catchPoint.distanceSquared(ball.location) > 2.25D) continue;
             boolean rebound = ball.reboundEligible;
             UUID previousTeam = ball.lastToucher;
             int previousPossessionTeam = rebound && ball.shooterId != null
@@ -477,11 +592,15 @@ public final class HoopsRemasteredRuntime implements Listener {
             }
             award(current, ball.shooterId, "buzzer-beater");
         }
-        current.world.spawnParticle(org.bukkit.Particle.FIREWORK, ball.location, 22, 0.5D, 0.35D, 0.5D, 0.08D);
-        current.world.playSound(ball.location, Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1.0F, points == 3 ? 1.4F : 1.1F);
-        announce(current, teamColor(scoringTeam) + "" + ChatColor.BOLD + points + " POINTS! "
+        current.world.spawnParticle(org.bukkit.Particle.FIREWORK, ball.location,
+                ball.dunk ? 36 : 22, 0.5D, ball.dunk ? 0.6D : 0.35D, 0.5D, 0.08D);
+        current.world.playSound(ball.location, Sound.ENTITY_FIREWORK_ROCKET_BLAST, 1.0F,
+                ball.dunk ? 1.6F : points == 3 ? 1.4F : 1.1F);
+        announce(current, teamColor(scoringTeam) + "" + ChatColor.BOLD
+                + (ball.dunk ? "DUNK! " : points + " POINTS! ")
                 + ChatColor.WHITE + shooter.getName()
-                + (points == 3 ? ChatColor.GOLD + " — THREE!" : ChatColor.GRAY + " — TWO!"));
+                + (ball.dunk ? ChatColor.GOLD + " — SLAM!"
+                        : points == 3 ? ChatColor.GOLD + " — THREE!" : ChatColor.GRAY + " — TWO!"));
         removeBall(current);
         if (won) {
             complete(current, scoringTeam);
@@ -532,7 +651,10 @@ public final class HoopsRemasteredRuntime implements Listener {
         Vector velocity;
         if (receiver != null) {
             Vector delta = receiver.getEyeLocation().toVector().subtract(passer.getEyeLocation().toVector());
-            velocity = delta.normalize().multiply(1.45D).setY(Math.max(0.16D, delta.getY() * 0.08D + 0.24D));
+            int flightTicks = (int) Math.max(4L, Math.min(20L, Math.round(delta.length() / 1.45D)));
+            velocity = new Vector(delta.getX() / flightTicks,
+                    (delta.getY() + BALL_GRAVITY * flightTicks * (flightTicks + 1.0D) / 2.0D) / flightTicks,
+                    delta.getZ() / flightTicks);
         } else {
             velocity = passer.getEyeLocation().getDirection().normalize().multiply(1.35D).setY(0.22D);
         }
@@ -563,14 +685,22 @@ public final class HoopsRemasteredRuntime implements Listener {
         Vector toHoop = hoop.toVector().subtract(eye.toVector());
         double projected = toHoop.dot(aim);
         Vector closest = eye.toVector().add(aim.clone().multiply(Math.max(0.0D, projected)));
-        boolean aimedAtHoop = projected > 0.0D && closest.distance(hoop.toVector()) <= 4.5D;
+        double aimMissDistance = closest.distance(hoop.toVector());
+        boolean aimedAtHoop = HoopsRemasteredRules.isAimedAtHoop(projected > 0.0D, aimMissDistance);
         double hoopDistance = Math.sqrt(Math.pow(hoopX - shooter.getLocation().getX(), 2.0D)
                 + Math.pow(shooter.getLocation().getZ(), 2.0D));
-        boolean layup = hoopDistance <= 6.0D;
-        Location target = (aimedAtHoop || layup) ? hoop : eye.clone().add(aim.multiply(18.0D));
+        boolean dunk = HoopsRemasteredRules.isDunkEligible(!shooter.isOnGround(),
+                shooter.getVelocity().getY() > 0.05D, hoopDistance, aimedAtHoop);
+        boolean layup = !dunk && HoopsRemasteredRules.isLayupEligible(
+                shooter.isOnGround(), hoopDistance, aimedAtHoop);
+        Location target = aimedAtHoop ? hoop : eye.clone().add(aim.multiply(18.0D));
         double horizontal = Math.max(1.0D, Math.sqrt(
                 Math.pow(target.getX() - eye.getX(), 2.0D) + Math.pow(target.getZ() - eye.getZ(), 2.0D)));
-        int flightTicks = (int) Math.max(8L, Math.min(22L, Math.round(horizontal / 1.05D)));
+        int flightTicks = dunk
+                ? (int) Math.max(5L, Math.min(8L, Math.round(horizontal / 1.35D)))
+                : layup
+                        ? (int) Math.max(7L, Math.min(11L, Math.round(horizontal / 1.2D)))
+                        : (int) Math.max(8L, Math.min(22L, Math.round(horizontal / 1.05D)));
         Vector velocity = new Vector(
                 (target.getX() - eye.getX()) / flightTicks,
                 (target.getY() - eye.getY() + BALL_GRAVITY * flightTicks * (flightTicks + 1.0D) / 2.0D) / flightTicks,
@@ -584,24 +714,37 @@ public final class HoopsRemasteredRuntime implements Listener {
         spawnLooseBall(current, eye, velocity, BallMode.SHOT, shooter.getUniqueId(),
                 current.lastPasserId, defendingTeam);
         Ball ball = current.ball;
-        ball.points = points;
+        ball.points = dunk ? 2 : points;
+        ball.dunk = dunk;
         ball.releaseDistance = releaseDistance;
         ball.passedAt = current.lastPassAt;
         current.lastPasserId = null;
         current.lastPassAt = 0L;
-        shooter.playSound(shooter.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1.0F, points == 3 ? 1.2F : 0.9F);
-        shooter.sendActionBar(ChatColor.GOLD + (layup ? "LAYUP" : points == 3 ? "THREE-POINT ATTEMPT" : "SHOT ATTEMPT"));
+        shooter.playSound(shooter.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1.0F,
+                dunk ? 1.6F : points == 3 ? 1.2F : 0.9F);
+        shooter.sendActionBar(ChatColor.GOLD + (dunk ? "DUNK ATTEMPT!"
+                : layup ? "LAYUP ATTEMPT" : points == 3 ? "THREE-POINT ATTEMPT" : "SHOT ATTEMPT"));
     }
 
     private void blockShot(Match current, Player defender) {
         Ball ball = current.ball;
         if (ball == null || ball.mode != BallMode.SHOT
                 || current.teams.getOrDefault(ball.shooterId, -1) == current.teams.getOrDefault(defender.getUniqueId(), -2)
-                || defender.getLocation().distanceSquared(ball.location) > HoopsRemasteredRules.BLOCK_RADIUS * HoopsRemasteredRules.BLOCK_RADIUS) {
+                || defender.getLocation().distanceSquared(ball.location)
+                        > HoopsRemasteredRules.BLOCK_RADIUS * HoopsRemasteredRules.BLOCK_RADIUS) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now < current.blockReadyAt.getOrDefault(defender.getUniqueId(), 0L)) return;
+        Vector toBall = ball.location.toVector().subtract(defender.getEyeLocation().toVector());
+        if (toBall.lengthSquared() < 0.001D
+                || defender.getEyeLocation().getDirection().normalize().dot(toBall.normalize()) < 0.25D) {
+            defender.sendActionBar(ChatColor.GRAY + "FACE THE BALL TO BLOCK");
             return;
         }
         PlayerStats stats = current.playerStats.get(defender.getUniqueId());
         if (stats == null) return;
+        current.blockReadyAt.put(defender.getUniqueId(), now + HoopsRemasteredRules.BLOCK_COOLDOWN_MILLIS);
         ball.velocity.add(defender.getLocation().getDirection().normalize().multiply(0.6D).setY(0.35D));
         ball.mode = BallMode.LOOSE;
         ball.lastToucher = defender.getUniqueId();
@@ -617,9 +760,12 @@ public final class HoopsRemasteredRuntime implements Listener {
                         == current.teams.getOrDefault(target.getUniqueId(), -2)) return;
         long now = System.currentTimeMillis();
         long readyAt = current.stealReadyAt.getOrDefault(attacker.getUniqueId(), 0L);
+        Vector toHolder = target.getLocation().clone().add(0.0D, 1.0D, 0.0D)
+                .toVector().subtract(attacker.getEyeLocation().toVector());
         if (now < readyAt || attacker.getLocation().distanceSquared(target.getLocation())
                 > HoopsRemasteredRules.STEAL_RADIUS * HoopsRemasteredRules.STEAL_RADIUS
-                || !attacker.hasLineOfSight(target)) return;
+                || !attacker.hasLineOfSight(target) || toHolder.lengthSquared() < 0.001D
+                || attacker.getEyeLocation().getDirection().normalize().dot(toHolder.normalize()) < 0.20D) return;
         current.stealReadyAt.put(attacker.getUniqueId(), now + 3_000L);
         current.playerStats.get(attacker.getUniqueId()).steals++;
         current.lastPasserId = null;
@@ -640,7 +786,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         display.setGravity(false);
         display.setInvulnerable(true);
         display.setPersistent(false);
-        display.setGlowing(true);
+        display.setGlowing(false);
         current.entities.add(display.getUniqueId());
         Ball ball = new Ball(display, location.clone(), velocity.clone(), mode, shooter, passer,
                 defendingTeam, System.currentTimeMillis());
@@ -720,8 +866,46 @@ public final class HoopsRemasteredRuntime implements Listener {
                         .filter(player -> player != null
                                 && current.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
                         .findFirst().orElse(null));
+        announceFinalResults(current, winningTeam);
         persistCareer(current, winningTeam);
         hooks.finish(representative, true);
+    }
+
+    private void announceFinalResults(Match current, int winningTeam) {
+        String winningName = winningTeam == 0 ? "RED" : "BLUE";
+        announce(current, ChatColor.GOLD + "" + ChatColor.BOLD + "FINAL: "
+                + ChatColor.RED + current.teamScore[0] + ChatColor.GRAY + " - "
+                + ChatColor.AQUA + current.teamScore[1] + ChatColor.GOLD + "  |  "
+                + ChatColor.GREEN + winningName + " TEAM WINS!");
+        List<Player> ranked = alivePlayers(current).stream()
+                .sorted(Comparator.comparingDouble((Player player) ->
+                        performanceRating(current.playerStats.getOrDefault(player.getUniqueId(), new PlayerStats())))
+                        .reversed())
+                .toList();
+        Player mvp = ranked.stream()
+                .filter(player -> current.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
+                .findFirst().orElse(null);
+        if (mvp != null) {
+            PlayerStats stats = current.playerStats.getOrDefault(mvp.getUniqueId(), new PlayerStats());
+            announce(current, ChatColor.GOLD + "" + ChatColor.BOLD + "MVP: "
+                    + ChatColor.YELLOW + mvp.getName() + ChatColor.GRAY
+                    + "  |  PTS " + stats.points + " AST " + stats.assists
+                    + " REB " + stats.rebounds + " BLK " + stats.blocks + " STL " + stats.steals);
+        }
+        for (Player player : ranked.stream().limit(5).toList()) {
+            PlayerStats stats = current.playerStats.getOrDefault(player.getUniqueId(), new PlayerStats());
+            int fg = stats.shotsAttempted == 0 ? 0
+                    : (int) Math.round(stats.shotsMade * 100.0D / stats.shotsAttempted);
+            announce(current, ChatColor.WHITE + player.getName() + ChatColor.GRAY
+                    + " — " + stats.points + " PTS, " + stats.assists + " AST, "
+                    + stats.rebounds + " REB, " + stats.blocks + " BLK, "
+                    + stats.steals + " STL, " + fg + "% FG");
+        }
+    }
+
+    private double performanceRating(PlayerStats stats) {
+        return stats.points + stats.assists * 1.5D + stats.rebounds * 1.2D
+                + stats.blocks * 1.6D + stats.steals * 1.6D;
     }
 
     private void persistCareer(Match current, int winningTeam) {
@@ -798,6 +982,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         if (previous == null) return;
         match = null;
         if (previous.task != null) previous.task.cancel();
+        if (previous.bossBar != null) previous.bossBar.removeAll();
         removeBall(previous);
         for (UUID entityId : previous.entities) {
             org.bukkit.entity.Entity entity = Bukkit.getEntity(entityId);
@@ -823,6 +1008,38 @@ public final class HoopsRemasteredRuntime implements Listener {
 
     public void shutdown() {
         stopRuntime();
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onInventoryClick(InventoryClickEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        Match current = match;
+        if (current != null && !current.ending && current.players.containsKey(player.getUniqueId())
+                && player.getWorld() == current.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) return;
+        Match current = match;
+        if (current != null && !current.ending && current.players.containsKey(player.getUniqueId())
+                && player.getWorld() == current.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onDropItem(PlayerDropItemEvent event) {
+        Match current = match;
+        if (current != null && !current.ending
+                && current.players.containsKey(event.getPlayer().getUniqueId())
+                && event.getPlayer().getWorld() == current.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSwapHands(PlayerSwapHandItemsEvent event) {
+        Match current = match;
+        if (current != null && !current.ending
+                && current.players.containsKey(event.getPlayer().getUniqueId())
+                && event.getPlayer().getWorld() == current.world) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -944,6 +1161,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         final Map<UUID, PlayerStats> playerStats = new HashMap<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
         final Map<UUID, Long> stealReadyAt = new HashMap<>();
+        final Map<UUID, Long> blockReadyAt = new HashMap<>();
         final Map<UUID, Long> hopsReadyAt = new HashMap<>();
         final Map<UUID, Integer> clutchContributions = new HashMap<>();
         final Set<Integer> comebackTeams = new HashSet<>();
@@ -961,6 +1179,8 @@ public final class HoopsRemasteredRuntime implements Listener {
         Ball ball;
         BukkitTask task;
         Scoreboard scoreboard;
+        BossBar bossBar;
+        TextDisplay scoreboardDisplay;
         Objective sidebar;
         Objective belowName;
         List<String> scoreboardEntries = List.of();
@@ -991,6 +1211,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         int points = 2;
         int bounces;
         boolean reboundEligible;
+        boolean dunk;
         double releaseDistance;
         long passedAt;
 

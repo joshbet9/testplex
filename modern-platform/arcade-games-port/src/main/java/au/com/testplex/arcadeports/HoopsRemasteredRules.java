@@ -16,7 +16,11 @@ public final class HoopsRemasteredRules {
     public static final long BUZZER_WINDOW_MILLIS = 3_000L;
     public static final double THREE_POINT_DISTANCE = 12.5D;
     public static final double STEAL_RADIUS = 2.6D;
-    public static final double BLOCK_RADIUS = 2.2D;
+    public static final double BLOCK_RADIUS = 2.5D;
+    public static final long BLOCK_COOLDOWN_MILLIS = 700L;
+    public static final double SHOT_AIM_TOLERANCE = 2.25D;
+    public static final double LAYUP_DISTANCE = 6.0D;
+    public static final double DUNK_DISTANCE = 4.5D;
 
     private HoopsRemasteredRules() { }
 
@@ -29,6 +33,21 @@ public final class HoopsRemasteredRules {
     }
 
     /** A team wins immediately when its score reaches or passes 21. */
+    public static boolean isAimedAtHoop(boolean inFront, double missDistance) {
+        return inFront && Double.isFinite(missDistance) && missDistance <= SHOT_AIM_TOLERANCE;
+    }
+
+    public static boolean isLayupEligible(boolean grounded, double hoopDistance, boolean aimedAtHoop) {
+        return grounded && aimedAtHoop && Double.isFinite(hoopDistance)
+                && hoopDistance <= LAYUP_DISTANCE;
+    }
+
+    public static boolean isDunkEligible(boolean airborne, boolean rising,
+            double hoopDistance, boolean aimedAtHoop) {
+        return airborne && rising && aimedAtHoop && Double.isFinite(hoopDistance)
+                && hoopDistance <= DUNK_DISTANCE;
+    }
+
     public static boolean hasReachedTargetScore(int red, int blue) {
         return red >= TARGET_SCORE || blue >= TARGET_SCORE;
     }

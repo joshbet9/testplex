@@ -22,6 +22,29 @@ class HoopsRemasteredRulesTest {
         assertEquals(2, HoopsRemasteredRules.scoreValue(Double.POSITIVE_INFINITY));
     }
 
+    @Test void shootingRequiresAimingAtTheHoopAndRejectsInvalidAngles() {
+        assertTrue(HoopsRemasteredRules.isAimedAtHoop(true, 2.25D));
+        assertFalse(HoopsRemasteredRules.isAimedAtHoop(true, 2.26D));
+        assertFalse(HoopsRemasteredRules.isAimedAtHoop(false, 0.0D));
+        assertFalse(HoopsRemasteredRules.isAimedAtHoop(true, Double.NaN));
+    }
+
+    @Test void layupsAndDunksHaveSeparatePositionRequirements() {
+        assertTrue(HoopsRemasteredRules.isLayupEligible(true, 6.0D, true));
+        assertFalse(HoopsRemasteredRules.isLayupEligible(false, 4.0D, true));
+        assertFalse(HoopsRemasteredRules.isLayupEligible(true, 6.01D, true));
+        assertTrue(HoopsRemasteredRules.isDunkEligible(true, true, 4.5D, true));
+        assertFalse(HoopsRemasteredRules.isDunkEligible(true, false, 4.0D, true));
+        assertFalse(HoopsRemasteredRules.isDunkEligible(false, true, 4.0D, true));
+        assertFalse(HoopsRemasteredRules.isDunkEligible(true, true, 4.51D, true));
+        assertFalse(HoopsRemasteredRules.isDunkEligible(true, true, 4.0D, false));
+    }
+
+    @Test void timedBlocksHaveAnExplicitCooldown() {
+        assertEquals(700L, HoopsRemasteredRules.BLOCK_COOLDOWN_MILLIS);
+        assertTrue(HoopsRemasteredRules.BLOCK_RADIUS > 2.0D);
+    }
+
     @Test void firstTeamToReachTwentyOneWinsImmediatelyWithoutWinByTwo() {
         assertFalse(HoopsRemasteredRules.hasReachedTargetScore(20, 19));
         assertTrue(HoopsRemasteredRules.hasReachedTargetScore(21, 20));
