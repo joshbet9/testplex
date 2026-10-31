@@ -65,6 +65,15 @@ class ModernLobbyScoreboardTest {
     }
 
     @Test
+    void teamTabGroupsRetainRankPriorityAndAddTeamIdentity() {
+        assertEquals("r0_owner_t0", ModernLobbyScoreboard.tabTeamSortKey("owner", 0));
+        assertEquals("r3_helper_t2", ModernLobbyScoreboard.tabTeamSortKey("helper", 2));
+        assertEquals("r5_player_t3", ModernLobbyScoreboard.tabTeamSortKey("player", 3));
+        assertEquals("r2_mod", ModernLobbyScoreboard.tabTeamSortKey("mod", -1));
+        assertEquals("r2_mod", ModernLobbyScoreboard.tabTeamSortKey("mod", 4));
+    }
+
+    @Test
     void playerCountIsFormattedLikeTheOriginalPlayersValue() {
         assertEquals("0/16", ModernLobbyScoreboard.formatPlayerCount(0, 16));
         assertEquals("3/16", ModernLobbyScoreboard.formatPlayerCount(3, 16));
