@@ -220,7 +220,7 @@ public final class SourceMapCatalog {
     /** Pure path validation, kept separate so the game's resource mapping is unit-testable. */
     static boolean resourcePathBelongsToGame(ArcadePortGame game, String resource) {
         if (game == null || resource == null || resource.isBlank()
-                || resource.startsWith("/") || resource.contains("..") || resource.indexOf('\\\\') >= 0) {
+                || resource.startsWith("/") || resource.contains("..") || resource.indexOf('\\') >= 0) {
             return false;
         }
         if (resource.equals(resourceFor(game))) return true;
@@ -575,12 +575,6 @@ public final class SourceMapCatalog {
             plugin.getLogger().severe("Refusing to install a source map into an unsafe world name: " + worldName);
             return false;
         }
-        String resource = selectedResource(plugin, game);
-        if (resource == null) {
-            plugin.getLogger().warning("No archived map resource is selected for " + (game == null ? "unknown game" : game.displayName()));
-            return false;
-        }
-
         Path container = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
         Path root = container.resolve(worldName).normalize();
         Path staging = container.resolve(worldName + ".installing").normalize();

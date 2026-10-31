@@ -167,9 +167,18 @@ public final class WizardsGameManager implements Listener {
         String sourceMap = SourceMapCatalog.selectedResourceForFolders(plugin, "wizards", WIZARDS_MAP_FOLDERS);
         if (sourceMap != null) return createSourceMapArena(sourceMap);
 
+        if (activeMapResource != null) {
+            String sourceWorld = plugin.getConfig().getString("wizards.source-map-world", "arcadeport_source_wizards");
+            if (!SourceMapCatalog.resetTestWorld(plugin, sourceWorld)) {
+                plugin.getLogger().severe("Could not safely unload the previous Wizards source map " + sourceWorld + ".");
+                return null;
+            }
+            arena = null;
+        }
         activeMapResource = null;
         sourceMapData = null;
         sourceSpawnLocations.clear();
+        chests.clear();
         return createGeneratedArena();
     }
 
