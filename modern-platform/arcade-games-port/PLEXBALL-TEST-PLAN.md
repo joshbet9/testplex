@@ -49,12 +49,12 @@ Test with at least two clients and compare a low-latency client against one with
 
 | Paper ping estimate | Expected compensation |
 | ---: | --- |
-| 0–50ms | 0 ticks |
-| 100ms | 1 tick |
-| 200ms | 2 ticks |
-| 300ms | 3 ticks |
-| 400ms | 4 ticks |
-| 500ms or higher | Capped at 5 ticks (250ms one-way estimate) |
+| 0–49ms | 0 ticks |
+| 50–149ms | 1 tick |
+| 150–249ms | 2 ticks |
+| 250–349ms | 3 ticks |
+| 350–449ms | 4 ticks |
+| 450ms or higher | Capped at 5 ticks (250ms maximum rewind) |
 
 The server uses Paper's ping estimate only to choose a bounded rewind, then validates against server-recorded player and ball history; client-provided timestamps and client-reported ball/catch results are never trusted. Player positions and ball positions are kept in short server-side histories, and catches use a swept-segment test to avoid missing fast balls between ticks.
 
