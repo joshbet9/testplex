@@ -12,6 +12,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
@@ -68,6 +69,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
     private int gameplayTicks;
     private boolean shuttingDown;
     private String lastDamageObservation = "no damage event observed";
+    private String lastAnyDamageObservation = "no entity damage event observed";
 
     @Override
     public void onEnable() {
@@ -75,17 +77,28 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         Bukkit.getScheduler().runTask(this, this::runAll);
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
-    public void observeWizardsDamage(EntityDamageByEntityEvent event) {
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
+    public void observeWizardsDamage(EntityDamageEvent event) {
         if (rival == null || !rival.equals(event.getEntity())) return;
-        lastDamageObservation = "damager=" + event.getDamager().getType()
+        lastAnyDamageObservation = "cause=" + event.getCause()
                 + ",damage=" + event.getDamage()
                 + ",final=" + event.getFinalDamage()
                 + ",cancelled=" + event.isCancelled()
                 + ",victimHealth=" + rival.getHealth()
                 + ",victimMode=" + rival.getGameMode()
                 + ",victimInvulnerable=" + readMarkedInvulnerability(rival)
-                + ",noDamageTicks=" + rival.getNoDamageTicks();
+                + ",noDamageTicks=" + rival.getNoDamageTicks()
+                + ",lastDamage=" + rival.getLastDamage();
+        if (event instanceof EntityDamageByEntityEvent byEntity) {
+            lastDamageObservation = "damager=" + byEntity.getDamager().getType()
+                    + ",damage=" + byEntity.getDamage()
+                    + ",final=" + byEntity.getFinalDamage()
+                    + ",cancelled=" + byEntity.isCancelled()
+                    + ",victimHealth=" + rival.getHealth()
+                    + ",victimMode=" + rival.getGameMode()
+                    + ",victimInvulnerable=" + readMarkedInvulnerability(rival)
+                    + ",noDamageTicks=" + rival.getNoDamageTicks();
+        }
     }
 
     private void runAll() {
@@ -309,6 +322,29 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
 
         // Cast a direct-target damage spell through the production handler. This
         // verifies that magic damage is not accidentally clamped to melee damage.
+        // Establish how Paper 26.3 handles ordinary and caster-attributed
+        // player damage on this exact target before testing the spell path.
+        rival.setInvulnerable(false);
+        rival.setNoDamageTicks(0);
+        rival.setLastDamage(0.0D);
+        rival.setHealth(10.0D);
+        double genericBefore = rival.getHealth();
+        lastAnyDamageObservation = "no entity damage event observed";
+        rival.damage(1.0D);
+        double genericAfter = rival.isDead() ? 0.0D : rival.getHealth();
+        getLogger().info("WIZARDS_DAMAGE_PROBE|GENERIC|health=" + genericBefore + "->" + genericAfter
+                + "|observed=" + lastAnyDamageObservation);
+
+        rival.setNoDamageTicks(0);
+        rival.setLastDamage(0.0D);
+        rival.setHealth(10.0D);
+        double attributedBefore = rival.getHealth();
+        lastAnyDamageObservation = "no entity damage event observed";
+        rival.damage(1.0D, owner);
+        double attributedAfter = rival.isDead() ? 0.0D : rival.getHealth();
+        getLogger().info("WIZARDS_DAMAGE_PROBE|ATTRIBUTED|health=" + attributedBefore + "->" + attributedAfter
+                + "|observed=" + lastAnyDamageObservation);
+
         Object rainbowBeam = Enum.valueOf((Class<? extends Enum>) spellType.asSubclass(Enum.class), "RAINBOW_BEAM");
         known.put(rainbowBeam, 5);
         Location beamTarget = findSafeLocationNear(owner);
@@ -354,7 +390,8 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 + ", distance=" + beamDistance + ", pvp=" + gameplayArena.getPVP()
                 + ", mode=" + rival.getGameMode() + ", invulnerable=" + readMarkedInvulnerability(rival)
                 + ", noDamageTicks=" + rival.getNoDamageTicks()
-                + ", lastDamage=" + lastDamageObservation + ")");
+                + ", lastDamage=" + lastDamageObservation
+                + ", lastAnyDamage=" + lastAnyDamageObservation + ")");
         require(Math.abs((manaBeforeBeam - manaAfterBeam) - 17.0D) < 0.01D,
                 "Rainbow Beam did not charge the level-five cost of 17 mana");
         require(((Number) field(ownerState, "kills")).intValue() == 1,
