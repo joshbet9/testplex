@@ -1209,6 +1209,8 @@ public final class ArcadePortManager implements Listener {
         if (active != session || target == null || !session.alive.contains(target.getUniqueId())) return;
         UUID targetId = target.getUniqueId();
         session.turfDeaths.merge(targetId, 1, Integer::sum);
+        session.turfInfiltratorReturned.add(targetId);
+        session.turfInfiltratorKillStreak.remove(targetId);
         UUID shredder = session.turfLastShredderShotByVictim.remove(targetId);
         if (shredder != null && killer != null && shredder.equals(killer.getUniqueId())
                 && "marksman".equals(session.turfWarsKits.getOrDefault(targetId, "marksman"))) {
@@ -5878,20 +5880,15 @@ public final class ArcadePortManager implements Listener {
             Player last = living.get(0);
             UUID id = last.getUniqueId();
             if (last.getLocation().getPitch() >= 75.0F) {
-                Location stareLocation = session.paintballGroundStareLocations.get(id);
-                if (stareLocation == null || stareLocation.distanceSquared(last.getLocation()) > 0.25D) {
-                    session.paintballGroundStareSince.put(id, now);
-                    session.paintballGroundStareLocations.put(id, last.getLocation().clone());
-                } else if (now - session.paintballGroundStareSince.getOrDefault(id, now) >= 20_000L) {
+                long since = session.paintballGroundStareSince.computeIfAbsent(id, ignored -> now);
+                if (now - since >= 20_000L) {
                     awardCatalogAchievement(last, "paintball", "how-does-he-know");
                 }
             } else {
                 session.paintballGroundStareSince.remove(id);
-                session.paintballGroundStareLocations.remove(id);
             }
         } else {
             session.paintballGroundStareSince.clear();
-            session.paintballGroundStareLocations.clear();
         }
         for (Player player : alivePlayers(session)) {
             UUID id = player.getUniqueId();
@@ -14835,6 +14832,10 @@ public final class ArcadePortManager implements Listener {
                         && "infiltrator".equals(session.turfWarsKits.getOrDefault(playerId, "marksman"))) {
                     session.turfInfiltratorReturned.add(playerId);
                     session.turfInfiltratorKillStreak.remove(playerId);
+                } else if (!returnedToOwnSide
+                        && "infiltrator".equals(session.turfWarsKits.getOrDefault(playerId, "marksman"))
+                        && session.turfInfiltratorReturned.remove(playerId)) {
+                    session.turfInfiltratorKillStreak.remove(playerId);
                 }
             }
         }
@@ -14913,8 +14914,9 @@ public final class ArcadePortManager implements Listener {
                 session.runnerLastBlockStepOwner.put(playerId, owner);
                 session.runnerLastBlockStepAt.put(playerId, System.currentTimeMillis());
             }
-            if (current.getBlock().isLiquid() || below.isLiquid()
-                    || current.getY() <= session.world.getMinHeight() + 2.0D) {
+            boolean falling = player.getVelocity().getY() < -0.05D || player.getFallDistance() > 0.5F;
+            if (falling && (current.getBlock().isLiquid() || below.isLiquid()
+                    || current.getY() <= session.world.getMinHeight() + 2.0D)) {
                 session.runnerIceCandidates.add(playerId);
             }
             if (System.currentTimeMillis() - session.startedAt <= 3_000L
@@ -15358,7 +15360,8 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.spleefLeapReadyAt.put(id, now + ArcadePortRules.SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS);
-        if (session.spleefBrawlerSelfSpleefCandidates.contains(id)) {
+        if (session.spleefBrawlerSelfSpleefCandidates.contains(id)
+                && player.getFallDistance() >= 1.0F) {
             session.spleefBrawlerLeapAfterSelfSpleef.add(id);
         }
         Vector launch = ArcadePortRules.spleefLeapVelocity(
@@ -15515,7 +15518,11 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Leap ready in " + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s.");
             return;
         }
-        if (player.getFallDistance() >= 20.0F) session.runnerSpecialPlayCandidates.add(id);
+        if (player.getFallDistance() >= 20.0F && player.getVelocity().getY() < -0.25D
+                && player.getWorld().rayTraceBlocks(player.getLocation(), new Vector(0.0D, -1.0D, 0.0D),
+                        3.0D) != null) {
+            session.runnerSpecialPlayCandidates.add(id);
+        }
         session.runnerLeapReadyAt.put(id, now + ArcadePortRules.RUNNER_LEAP_COOLDOWN_MILLIS);
         Vector velocity = player.getLocation().getDirection().normalize().multiply(1.2D);
         velocity.setY(1.2D);
@@ -16375,8 +16382,11 @@ public final class ArcadePortManager implements Listener {
         boolean inOpponentTerritory = team == 0
                 ? player.getLocation().getX() > session.turfFrontlineX
                 : team == 1 && player.getLocation().getX() < session.turfFrontlineX;
-        if (inOpponentTerritory && !player.isOnGround()) {
+        long bounceLaunchUntil = session.turfBounceLaunchUntil.getOrDefault(id, 0L);
+        boolean recentlyShotUp = now <= bounceLaunchUntil && player.getVelocity().getY() > 0.12D;
+        if (inOpponentTerritory && !player.isOnGround() && recentlyShotUp) {
             session.turfBounceArrowOwners.put(arrow.getUniqueId(), id);
+            session.turfBounceLaunchUntil.remove(id);
             if (session.turfAir360Ready.remove(id)) session.turf360BounceArrows.add(arrow.getUniqueId());
         }
         if ("shredder".equals(session.turfWarsKits.getOrDefault(id, "marksman"))
@@ -16466,6 +16476,13 @@ public final class ArcadePortManager implements Listener {
             UUID barrageOwner = session.turfBarrageArrowOwners.remove(turfArrow.getUniqueId());
             if (event.getHitEntity() instanceof Player target
                     && turfArrow.getShooter() instanceof Player shooter) {
+                int shooterTeam = session.teams.getOrDefault(shooter.getUniqueId(), -1);
+                int targetTeam = session.teams.getOrDefault(target.getUniqueId(), -1);
+                if (shooterTeam >= 0 && targetTeam >= 0 && shooterTeam != targetTeam
+                        && target.getVelocity().getY() > 0.12D) {
+                    session.turfBounceLaunchUntil.put(target.getUniqueId(),
+                            System.currentTimeMillis() + 4_000L);
+                }
                 UUID bounceOwner = session.turfBounceArrowOwners.remove(turfArrow.getUniqueId());
                 boolean bounceShot = bounceOwner != null && bounceOwner.equals(shooter.getUniqueId());
                 if (bounceShot) {
@@ -20676,7 +20693,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> paintballRifleShots = new HashMap<>();
         final Set<UUID> paintballRifleMissed = new HashSet<>();
         final Map<UUID, Long> paintballGroundStareSince = new HashMap<>();
-        final Map<UUID, Location> paintballGroundStareLocations = new HashMap<>();
+
         final Map<UUID, UUID> runnerFrostballLastHitBy = new HashMap<>();
         final Map<UUID, Long> runnerFrostballLastHitAt = new HashMap<>();
         final Map<UUID, UUID> runnerArcherLastHitBy = new HashMap<>();
@@ -20726,6 +20743,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, UUID> turfBarrageArrowOwners = new HashMap<>();
         final Map<UUID, Set<UUID>> turfBarrageTargetsByOwner = new HashMap<>();
         final Map<UUID, UUID> turfBounceArrowOwners = new HashMap<>();
+        final Map<UUID, Long> turfBounceLaunchUntil = new HashMap<>();
         final Set<UUID> turf360BounceArrows = new HashSet<>();
         final Map<UUID, Integer> turfBounceShotStreak = new HashMap<>();
         final Map<UUID, Double> turfAirYawTravel = new HashMap<>();

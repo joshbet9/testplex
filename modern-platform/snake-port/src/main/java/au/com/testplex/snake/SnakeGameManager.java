@@ -454,6 +454,10 @@ public final class SnakeGameManager implements Listener {
             if (state.reverseUntil > now) {
                 state.lastMovementLocation = head.getLocation().clone();
                 state.lastMovementAt = now;
+                if (state.stayedNearEdge && (mapData == null || state.segments.isEmpty()
+                        || !mapData.isWithinEdgeMargin(state.segments.get(0).getLocation(), 10.0D))) {
+                    state.stayedNearEdge = false;
+                }
                 continue;
             }
             moveSnake(state, now);
@@ -810,7 +814,6 @@ public final class SnakeGameManager implements Listener {
         ControlDebuff result = outcomes[ThreadLocalRandom.current().nextInt(outcomes.length)];
         state.rouletteHits++;
         int duration = SnakeRules.rouletteDurationSecondsForHit(state.rouletteHits);
-        if (duration == 10) state.survivedTenSecondNerf = true;
         if (result == state.lastNerf) state.sameNerfStreak++;
         else {
             state.lastNerf = result;
@@ -844,6 +847,7 @@ public final class SnakeGameManager implements Listener {
                 }
                 restoreRouletteSlot(state);
                 state.debuff = result;
+                if (duration == 10) state.survivedTenSecondNerf = true;
                 state.debuffUntil = System.currentTimeMillis() + duration * 1000L;
                 state.lastRawYaw = player.getLocation().getYaw();
                 state.laggedYaw = state.lastRawYaw;
