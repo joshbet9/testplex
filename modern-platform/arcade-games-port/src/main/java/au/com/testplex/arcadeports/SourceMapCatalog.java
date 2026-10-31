@@ -654,6 +654,51 @@ public final class SourceMapCatalog {
                 && Files.isRegularFile(folder.resolve("WorldConfig.dat"));
     }
 
+    /** WorldDownloader map snapshots have level.dat and legacy region files, but no Reborn config. */
+    private static boolean hasWizardsTerrainMetadata(Path folder) {
+        if (folder == null || !Files.isRegularFile(folder.resolve("level.dat"))) return false;
+        Path region = folder.resolve("region");
+        if (!Files.isDirectory(region) || Files.isSymbolicLink(region)) return false;
+        try (Stream<Path> paths = Files.list(region)) {
+            return paths.anyMatch(path -> Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                    && path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".mca"));
+        } catch (IOException exception) {
+            return false;
+        }
+    }
+
+    /** Terrain after the Paper 26.3 legacy-world layout conversion. */
+    private static boolean hasPaper26TerrainMetadata(Path folder) {
+        if (folder == null || !Files.isRegularFile(folder.resolve("level.dat"))) return false;
+        Path region = folder.resolve("dimensions").resolve("minecraft").resolve("overworld").resolve("region");
+        if (!Files.isDirectory(region) || Files.isSymbolicLink(region)) return false;
+        try (Stream<Path> paths = Files.list(region)) {
+            return paths.anyMatch(path -> Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                    && path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".mca"));
+        } catch (IOException exception) {
+            return false;
+        }
+    }
+
+    /** Locate one unambiguous world root from a level.dat plus region/*.mca snapshot. */
+    static Path locateWizardsMapRoot(Path extractedRoot) throws IOException {
+        if (extractedRoot == null || !Files.isDirectory(extractedRoot)) return null;
+        Path root = extractedRoot.toAbsolutePath().normalize();
+        if (hasWizardsTerrainMetadata(root)) return root;
+        List<Path> candidates;
+        try (Stream<Path> paths = Files.walk(root, 6)) {
+            candidates = paths.filter(Files::isDirectory)
+                    .filter(path -> !path.equals(root))
+                    .filter(SourceMapCatalog::hasWizardsTerrainMetadata)
+                    .sorted(Comparator.comparingInt(Path::getNameCount))
+                    .toList();
+        }
+        if (candidates.isEmpty()) return null;
+        int shallowest = candidates.get(0).getNameCount();
+        List<Path> nearest = candidates.stream().filter(path -> path.getNameCount() == shallowest).toList();
+        return nearest.size() == 1 ? nearest.get(0) : null;
+    }
+
     private static void deleteExtractionTree(Path target, Path container) throws IOException {
         Path safeContainer = container.toAbsolutePath().normalize();
         Path safeTarget = target.toAbsolutePath().normalize();
@@ -693,6 +738,26 @@ public final class SourceMapCatalog {
 
     /** Extract a selected archive discovered from any validated source-map folder pool. */
     public static boolean installResource(JavaPlugin plugin, String resource, String worldName) {
+        return installResourceInternal(plugin, resource, worldName, false);
+    }
+
+    /**
+     * Wizards accepts Mineplex WorldDownloader snapshots that retain level.dat and
+     * Anvil terrain but omit the Reborn-only WorldConfig.dat. Its arena metadata is
+     * reconstructed only after the source world has been loaded and inspected.
+     */
+    public static boolean installWizardsResource(
+            JavaPlugin plugin, String resource, String worldName, List<String> mapFolders) {
+        if (!resourcePathBelongsToFolders(mapFolders, resource)) {
+            if (plugin != null) plugin.getLogger().severe(
+                    "Refusing a Wizards source map outside the approved folder pool: " + resource);
+            return false;
+        }
+        return installResourceInternal(plugin, resource, worldName, true);
+    }
+
+    private static boolean installResourceInternal(
+            JavaPlugin plugin, String resource, String worldName, boolean allowWizardsWorldWithoutConfig) {
         if (plugin == null || resource == null || resource.isBlank()) {
             if (plugin != null) plugin.getLogger().warning("Selected source map resource is missing: " + resource);
             return false;
@@ -717,7 +782,8 @@ public final class SourceMapCatalog {
             plugin.getLogger().severe("Refusing to follow a symbolic link while installing source map " + worldName);
             return false;
         }
-        if (hasWorldMetadata(root)) {
+        if (hasWorldMetadata(root)
+                || (allowWizardsWorldWithoutConfig && hasWizardsTerrainMetadata(root))) {
             try {
                 preparePaper26WorldStorage(root);
                 return true;
@@ -758,7 +824,8 @@ public final class SourceMapCatalog {
                 }
             }
 
-            Path archiveRoot = locateMapRoot(staging);
+            Path archiveRoot = allowWizardsWorldWithoutConfig
+                    ? locateWizardsMapRoot(staging) : locateMapRoot(staging);
             if (archiveRoot == null) {
                 String entries;
                 try (Stream<Path> paths = Files.list(staging)) {
@@ -788,9 +855,10 @@ public final class SourceMapCatalog {
             // fails while creating the world; retrying the same ZIP cannot help.
             preparePaper26WorldStorage(root);
 
-            if (!hasWorldMetadata(root)) {
+            if (!hasWorldMetadata(root)
+                    && !(allowWizardsWorldWithoutConfig && hasPaper26TerrainMetadata(root))) {
                 plugin.getLogger().warning("Original map archive " + resource
-                        + " was extracted but its normalized world root is missing required metadata at " + root);
+                        + " was extracted but its normalized world root is missing required terrain/metadata at " + root);
                 return false;
             }
             plugin.getLogger().info("Installed authentic map archive " + resource
@@ -939,6 +1007,232 @@ public final class SourceMapCatalog {
                     "Could not read WorldConfig.dat from source archive " + resource, exception);
             return null;
         }
+    }
+
+    /**
+     * Load original Wizards metadata when present. For WorldDownloader exports without
+     * WorldConfig.dat, derive a bounded test arena from populated Anvil chunks, find
+     * safe surface starts, and recover chest block positions even when chest NBT was
+     * stripped by the downloader. This does not claim to recreate Mineplex's original
+     * TEAM_SPAWNS or map bounds: the inferred data is explicitly test-only.
+     */
+    public static MapData readWizardsResource(JavaPlugin plugin, String resource, World world) {
+        if (plugin == null || resource == null || world == null) return null;
+        MapData original = readResource(plugin, resource, world);
+        if (original != null && original.hasBounds() && !original.spawnLocations().isEmpty()) {
+            List<Location> chestMarkers = original.customLocations("54");
+            if (chestMarkers.isEmpty()) chestMarkers = findWizardsChestBlocks(world, original);
+            if (chestMarkers.isEmpty()) {
+                chestMarkers = findSafeSurfaceLocations(world, original, 32, 0.18D);
+                plugin.getLogger().warning("Wizards map " + resource
+                        + " has no recoverable chest blocks; placing test-only replacement chests.");
+            }
+            if (!chestMarkers.isEmpty()) original.customLocations.put("54", chestMarkers);
+            return original;
+        }
+
+        ChunkBounds bounds = readRegionChunkBounds(plugin, resource);
+        if (bounds == null) {
+            plugin.getLogger().warning("Wizards archive " + resource
+                    + " has no populated legacy region chunks from which to derive arena bounds.");
+            return null;
+        }
+
+        MapData inferred = new MapData();
+        inferred.mapName = mapNameFromResource(resource);
+        inferred.minX = bounds.minChunkX() * 16;
+        inferred.maxX = (bounds.maxChunkX() + 1) * 16 - 1;
+        inferred.minZ = bounds.minChunkZ() * 16;
+        inferred.maxZ = (bounds.maxChunkZ() + 1) * 16 - 1;
+        inferred.minY = world.getMinHeight();
+        inferred.maxY = world.getMaxHeight() - 1;
+        inferred.hasMinX = inferred.hasMaxX = inferred.hasMinZ = inferred.hasMaxZ = true;
+        inferred.hasMinY = inferred.hasMaxY = true;
+
+        List<Location> spawns = findSafeSurfaceLocations(world, inferred, 16, 0.28D);
+        if (spawns.size() < 4) {
+            plugin.getLogger().warning("Wizards archive " + resource
+                    + " yielded only " + spawns.size() + " safe inferred starts; refusing to invent player spawns.");
+            return null;
+        }
+        inferred.teamSpawns.put("INFERRED_TEST_STARTS", spawns);
+
+        List<Location> chests = findWizardsChestBlocks(world, inferred);
+        if (chests.isEmpty()) {
+            chests = findSafeSurfaceLocations(world, inferred, 32, 0.16D);
+            plugin.getLogger().warning("Wizards archive " + resource
+                    + " contains no recoverable chest blocks; placing " + chests.size()
+                    + " test-only replacement chests on safe terrain.");
+        }
+        if (chests.size() < 8) {
+            plugin.getLogger().warning("Wizards archive " + resource
+                    + " has only " + chests.size() + " recovered/replacement chest positions.");
+        }
+        if (!chests.isEmpty()) inferred.customLocations.put("54", chests);
+
+        plugin.getLogger().warning("Using inferred Wizards test metadata for " + resource
+                + ": bounds derived from " + bounds.activeChunks() + " populated chunks, "
+                + spawns.size() + " terrain-checked starts, " + chests.size()
+                + " recovered/replacement chest positions. This is not original Mineplex WorldConfig data.");
+        return inferred;
+    }
+
+    /** Bounds of populated legacy chunk slots in a source archive. */
+    static record ChunkBounds(int minChunkX, int maxChunkX, int minChunkZ, int maxChunkZ, int activeChunks) {}
+
+    private static ChunkBounds readRegionChunkBounds(JavaPlugin plugin, String resource) {
+        int minX = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE, count = 0;
+        try (InputStream input = openMapArchive(plugin, resource);
+             ZipInputStream zip = input == null ? null : new ZipInputStream(input)) {
+            if (zip == null) return null;
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                String name = entry.getName().replace('\\', '/');
+                int marker = name.lastIndexOf("region/");
+                if (marker < 0 || !name.toLowerCase(java.util.Locale.ROOT).endsWith(".mca")) {
+                    zip.closeEntry();
+                    continue;
+                }
+                String filename = name.substring(marker + "region/".length());
+                String[] parts = filename.substring(0, filename.length() - 4).split("\\.");
+                if (parts.length != 3 || !parts[0].equals("r")) {
+                    zip.closeEntry();
+                    continue;
+                }
+                int regionX, regionZ;
+                try {
+                    regionX = Integer.parseInt(parts[1]);
+                    regionZ = Integer.parseInt(parts[2]);
+                } catch (NumberFormatException ignored) {
+                    zip.closeEntry();
+                    continue;
+                }
+                byte[] header = zip.readNBytes(8192);
+                ChunkBounds region = chunkBoundsFromRegionHeader(regionX, regionZ, header);
+                zip.closeEntry();
+                if (region == null) continue;
+                minX = Math.min(minX, region.minChunkX());
+                maxX = Math.max(maxX, region.maxChunkX());
+                minZ = Math.min(minZ, region.minChunkZ());
+                maxZ = Math.max(maxZ, region.maxChunkZ());
+                count += region.activeChunks();
+                if (count > 8192 || maxX - minX > 128 || maxZ - minZ > 128) {
+                    plugin.getLogger().warning("Refusing oversized Wizards source-map chunk bounds for " + resource);
+                    return null;
+                }
+            }
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Could not derive Wizards chunk bounds from " + resource + ": "
+                    + exception.getMessage());
+            return null;
+        }
+        if (count == 0 || minX == Integer.MAX_VALUE) return null;
+        return new ChunkBounds(minX, maxX, minZ, maxZ, count);
+    }
+
+    /** Pure Anvil location-table parser, also used by unit tests. */
+    static ChunkBounds chunkBoundsFromRegionHeader(int regionX, int regionZ, byte[] header) {
+        if (header == null || header.length < 8192) return null;
+        int minX = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
+        int maxX = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE, count = 0;
+        for (int slot = 0; slot < 1024; slot++) {
+            int offset = ((header[slot * 4] & 0xff) << 16)
+                    | ((header[slot * 4 + 1] & 0xff) << 8)
+                    | (header[slot * 4 + 2] & 0xff);
+            int sectors = header[slot * 4 + 3] & 0xff;
+            if (offset == 0 || sectors == 0) continue;
+            int chunkX = regionX * 32 + (slot % 32);
+            int chunkZ = regionZ * 32 + (slot / 32);
+            minX = Math.min(minX, chunkX);
+            maxX = Math.max(maxX, chunkX);
+            minZ = Math.min(minZ, chunkZ);
+            maxZ = Math.max(maxZ, chunkZ);
+            count++;
+        }
+        return count == 0 ? null : new ChunkBounds(minX, maxX, minZ, maxZ, count);
+    }
+
+    private static List<Location> findSafeSurfaceLocations(World world, MapData data, int wanted, double radiusFactor) {
+        List<Location> found = new ArrayList<>();
+        double radiusX = Math.max(4.0D, Math.min(data.width() * radiusFactor, data.width() / 2.0D - 4.0D));
+        double radiusZ = Math.max(4.0D, Math.min(data.depth() * radiusFactor, data.depth() / 2.0D - 4.0D));
+        for (int index = 0; index < wanted * 3 && found.size() < wanted; index++) {
+            double angle = (Math.PI * 2.0D * index) / Math.max(1, wanted * 3);
+            int x = (int) Math.round(data.centerX() + Math.cos(angle) * radiusX);
+            int z = (int) Math.round(data.centerZ() + Math.sin(angle) * radiusZ);
+            addDistinctSafeLocation(found, findSafeSurfaceLocation(world, data, x, z, 8), 8.0D);
+        }
+
+        int step = Math.max(8, (int) Math.min(data.width(), data.depth()) / 8);
+        for (int x = data.minX + 4; x <= data.maxX - 4 && found.size() < wanted; x += step) {
+            for (int z = data.minZ + 4; z <= data.maxZ - 4 && found.size() < wanted; z += step) {
+                addDistinctSafeLocation(found, findSafeSurfaceLocation(world, data, x, z, 4), 8.0D);
+            }
+        }
+        return found;
+    }
+
+    private static void addDistinctSafeLocation(List<Location> locations, Location candidate, double minimumDistance) {
+        if (candidate == null) return;
+        double minimumSquared = minimumDistance * minimumDistance;
+        for (Location existing : locations) {
+            if (existing.distanceSquared(candidate) < minimumSquared) return;
+        }
+        locations.add(candidate);
+    }
+
+    private static Location findSafeSurfaceLocation(World world, MapData data, int targetX, int targetZ, int searchRadius) {
+        for (int radius = 0; radius <= searchRadius; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (radius > 0 && Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
+                    int x = targetX + dx, z = targetZ + dz;
+                    if (x < data.minX + 2 || x > data.maxX - 2 || z < data.minZ + 2 || z > data.maxZ - 2) continue;
+                    int y = world.getHighestBlockYAt(x, z);
+                    if (y < world.getMinHeight() || y + 2 >= world.getMaxHeight()) continue;
+                    org.bukkit.block.Block floor = world.getBlockAt(x, y, z);
+                    org.bukkit.Material material = floor.getType();
+                    if (!material.isSolid() || material == org.bukkit.Material.MAGMA_BLOCK
+                            || material == org.bukkit.Material.CACTUS || material == org.bukkit.Material.CAMPFIRE
+                            || material == org.bukkit.Material.SOUL_CAMPFIRE || material == org.bukkit.Material.FIRE
+                            || material == org.bukkit.Material.SOUL_FIRE || material == org.bukkit.Material.POWDER_SNOW) continue;
+                    if (!world.getBlockAt(x, y + 1, z).isPassable()
+                            || !world.getBlockAt(x, y + 2, z).isPassable()) continue;
+                    return new Location(world, x + 0.5D, y + 1.0D, z + 0.5D);
+                }
+            }
+        }
+        return null;
+    }
+
+    private static List<Location> findWizardsChestBlocks(World world, MapData data) {
+        List<Location> found = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        int minY = world.getMinHeight();
+        int baseMaxY = Math.min(world.getMaxHeight() - 1, minY + 96);
+        int maxY = world.getMaxHeight() - 1;
+        for (int x = data.minX; x <= data.maxX; x++) {
+            for (int z = data.minZ; z <= data.maxZ; z++) {
+                int surfaceY = Math.min(maxY, world.getHighestBlockYAt(x, z));
+                int upperStart = Math.max(baseMaxY + 1, surfaceY - 128);
+                for (int y = minY; y <= Math.min(baseMaxY, surfaceY); y++) {
+                    addChestIfPresent(world, x, y, z, found, seen);
+                }
+                for (int y = upperStart; y <= surfaceY; y++) {
+                    addChestIfPresent(world, x, y, z, found, seen);
+                }
+            }
+        }
+        return found;
+    }
+
+    private static void addChestIfPresent(
+            World world, int x, int y, int z, List<Location> found, java.util.Set<String> seen) {
+        org.bukkit.Material type = world.getBlockAt(x, y, z).getType();
+        if (type != org.bukkit.Material.CHEST && type != org.bukkit.Material.TRAPPED_CHEST) return;
+        String key = x + ":" + y + ":" + z;
+        if (seen.add(key)) found.add(new Location(world, x, y, z));
     }
 
     /** Read an already-extracted WorldConfig.dat or its UTF-8 contents into source map data. */
