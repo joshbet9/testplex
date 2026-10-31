@@ -1543,13 +1543,13 @@ public final class ArcadePortManager implements Listener {
             sender.sendMessage(ChatColor.RED + "Start cancelled: Testplex could not verify cleanup of fake players from the previous server session. Check FakePlayerPlugin's startup log and restart the server.");
             return;
         }
+        if (testPlayerStartPending || testPlayers.isCleanupInProgress()) {
+            sender.sendMessage(ChatColor.YELLOW + "Start cancelled: a previous test-player batch is still joining or being cleaned up. Retry after that lifecycle finishes.");
+            return;
+        }
         int botsNeeded = ArcadeTestPlayerManager.additionalPlayersNeeded(humanIds.size());
         if (botsNeeded <= 0) {
             startQueuedInternal(type, requester, sender, mixedArcadeVariant);
-            return;
-        }
-        if (testPlayerStartPending) {
-            sender.sendMessage(ChatColor.YELLOW + "The previous test-player batch is still joining. Please retry Start Game once it finishes.");
             return;
         }
         if (!testPlayers.isAvailableForDamageablePlayers()) {
