@@ -15,6 +15,7 @@ class ArcadePortGameTest {
         assertEquals(java.util.List.of("Dragon Escape"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.DRAGON_ESCAPE));
         assertEquals(java.util.List.of("Paintball", "Super Paintball"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.PAINTBALL));
+        assertEquals(java.util.List.of("Sploor"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.SUPER_SPLOOR));
         assertEquals(java.util.List.of("Speef", "Super Spleef"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.SPLEEF));
         assertEquals(java.util.List.of("Death Tag"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.DEATH_TAG));
@@ -148,7 +149,7 @@ class ArcadePortGameTest {
 
 
     @Test void exposesTheMechanicsGamesAndIntegratedMonsterMazeModuleWithPlexball() {
-        assertEquals(24, ArcadePortGame.values().length);
+        assertEquals(25, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -170,6 +171,7 @@ class ArcadePortGameTest {
         assertEquals(ArcadePortGame.SKY_WARS, ArcadePortGame.fromId("skywars"));
         assertEquals(ArcadePortGame.MILK_THE_COW, ArcadePortGame.fromId("milk-the-cow"));
         assertEquals(ArcadePortGame.WITHER_ASSAULT, ArcadePortGame.fromId("wither-assault"));
+        assertEquals(ArcadePortGame.SUPER_SPLOOR, ArcadePortGame.fromId("super-sploor"));
     }
 
     @Test void normalizesSpacesAndUnderscoresInTestCommands() {

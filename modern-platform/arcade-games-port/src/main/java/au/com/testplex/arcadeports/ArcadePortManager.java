@@ -189,6 +189,7 @@ public final class ArcadePortManager implements Listener {
     private static final long JOIN_WINDOW_TICKS = 100L;
     static final int MANUAL_START_COUNTDOWN_SECONDS = 0;
     private final ArcadeMechanicsModernPlugin plugin;
+    private final SuperSploorRuntime superSploor;
     private final ArcadeTestPlayerManager testPlayers;
     private boolean testPlayerStartPending;
     private final SneakyAssassinsMechanics sneakyAssassins;
@@ -198,6 +199,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<String, SourceMapCatalog.MapData> sourceMapData = new HashMap<>();
     private final Map<UUID, PlayerSnapshot> pendingRestore = new HashMap<>();
     private final Map<UUID, String> paintballKitPreferences = new HashMap<>();
+    private final Map<UUID, String> superSploorKitPreferences = new HashMap<>();
     private final Map<UUID, String> castleAssaultKitPreferences = new HashMap<>();
     private final Map<UUID, String> heroesOfGwenHeroPreferences = new HashMap<>();
     private final Map<UUID, String> deathTagRunnerKitPreferences = new HashMap<>();
@@ -243,6 +245,7 @@ public final class ArcadePortManager implements Listener {
 
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
+        this.superSploor = new SuperSploorRuntime(plugin);
         this.testPlayers = new ArcadeTestPlayerManager(plugin);
         this.sneakyAssassins = new SneakyAssassinsMechanics(plugin, testPlayers::isTestPlayer);
         this.statsActionKey = new NamespacedKey(plugin, "stats-action");
@@ -764,6 +767,7 @@ public final class ArcadePortManager implements Listener {
                 case DRAGONS -> { selectDragonsKit(player, value); return; }
                 case DRAGON_ESCAPE -> { selectDragonEscapeKit(player, value); return; }
                 case PAINTBALL -> { selectPaintballKit(player, value); return; }
+                case SUPER_SPLOOR -> { selectSuperSploorKit(player, value); return; }
                 case DEATH_TAG -> { selectDeathTagRunnerKit(player, value); return; }
                 case RUNNER -> { selectRunnerKit(player, value); return; }
                 case SNEAKY_ASSASSINS -> { sneakyAssassins.selectKit(player, value); return; }
@@ -800,7 +804,46 @@ public final class ArcadePortManager implements Listener {
         else if (value.startsWith("runnerkit-")) selectRunnerKit(player, value);
         else if (SneakyAssassinsMechanics.normalizeKit(value) != null) sneakyAssassins.selectKit(player, value);
         else if (ArcadePortRules.normalizeTurfWarsKit(value) != null) selectTurfWarsKit(player, value);
+        else if (normalizeSuperSploorKit(value) != null) selectSuperSploorKit(player, value);
         else selectDeathTagRunnerKit(player, value);
+    }
+
+    private String normalizeSuperSploorKit(String requestedKit) {
+        if (requestedKit == null) return null;
+        String value = requestedKit.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return Set.of("sprayer", "roller", "charger", "lobber", "dualies").contains(value) ? value : null;
+    }
+
+    private void selectSuperSploorKit(Player player, String requestedKit) {
+        if (player == null) return;
+        String kit = normalizeSuperSploorKit(requestedKit);
+        if (kit == null) {
+            player.sendMessage(ChatColor.YELLOW + "Super Sploor kits: sprayer, roller, charger, lobber, dualies.");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        superSploorKitPreferences.put(id, kit);
+        plugin.getConfig().set("lobby-kit-preferences." + id + ".super-sploor", kit);
+        plugin.saveConfig();
+        boolean activeMatch = active != null && active.type == ArcadePortGame.SUPER_SPLOOR
+                && active.players.containsKey(id);
+        player.sendMessage(ChatColor.GREEN + "Super Sploor kit set to " + kit
+                + (activeMatch ? " for your next match. Kits are locked during a round." : "."));
+    }
+
+    private Map<UUID, String> superSploorKitSelections(Session session) {
+        Map<UUID, String> selected = new HashMap<>();
+        if (session == null) return selected;
+        for (UUID id : session.players.keySet()) {
+            String saved = superSploorKitPreferences.getOrDefault(id,
+                    plugin.getConfig().getString("lobby-kit-preferences." + id + ".super-sploor", "sprayer"));
+            String kit = normalizeSuperSploorKit(saved);
+            if (kit == null) kit = "sprayer";
+            superSploorKitPreferences.put(id, kit);
+            selected.put(id, kit);
+        }
+        return selected;
     }
 
     public void selectSkyWarsKit(Player player, String requestedKit) {
@@ -1888,6 +1931,10 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (type == ArcadePortGame.SUPER_SPLOOR && participants.size() > 16) {
+            sender.sendMessage(ChatColor.RED + "Super Sploor supports up to 16 players (8 per team).");
+            return;
+        }
         if (type == ArcadePortGame.MASTER_BUILDERS
                 && !ArcadePortRules.supportsMasterBuildersPlayerCount(participants.size())) {
             sender.sendMessage(ChatColor.RED + "Master Builders supports up to 16 builders (one per plot).");
@@ -1993,6 +2040,17 @@ public final class ArcadePortManager implements Listener {
         }
         if (!sourceMapWorlds.contains(type.id())) buildArena(type, world);
         Session session = new Session(type, world, participants, mixedArcadeVariant);
+        if (type == ArcadePortGame.SUPER_SPLOOR) {
+            // Build the authoritative territory index before moving anyone out of the lobby.
+            session.superSploorEngine = new SuperSploorEngine(world, sourceMapData.get(type.id()));
+            if (session.superSploorEngine.redSpawnCount() < 8
+                    || session.superSploorEngine.blueSpawnCount() < 8) {
+                plugin.getLogger().warning("Super Sploor map has fewer than eight authored spawn points for a team "
+                        + "(Red=" + session.superSploorEngine.redSpawnCount()
+                        + ", Blue=" + session.superSploorEngine.blueSpawnCount()
+                        + "). Smaller tests can proceed, but 8v8 map acceptance is not met.");
+            }
+        }
         active = session;
         long now = System.currentTimeMillis();
         session.startedAt = now;
@@ -2022,7 +2080,7 @@ public final class ArcadePortManager implements Listener {
                 || type == ArcadePortGame.SNEAKY_ASSASSINS
                 || type == ArcadePortGame.DRAW_MY_THING
                 || type == ArcadePortGame.MASTER_BUILDERS
-                || type == ArcadePortGame.GLADIATORS
+                || type == ArcadePortGame.GLADIATORS || type == ArcadePortGame.SUPER_SPLOOR
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 0L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
@@ -2219,7 +2277,7 @@ public final class ArcadePortManager implements Listener {
             boolean teamMode = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST
                     || type == ArcadePortGame.BOMB_LOBBERS || type == ArcadePortGame.PAINTBALL
                     || type == ArcadePortGame.TURF_WARS || type == ArcadePortGame.CASTLE_ASSAULT
-                    || type == ArcadePortGame.HEROES_OF_GWEN;
+                    || type == ArcadePortGame.HEROES_OF_GWEN || type == ArcadePortGame.SUPER_SPLOOR;
             SourceMapCatalog.MapData selectedMap = sourceMapData.get(type.id());
             int teamId = (type == ArcadePortGame.MILK_THE_COW || type == ArcadePortGame.WITHER_ASSAULT)
                     ? (specialTeamSlots.contains(i) ? 1 : 0)
@@ -2307,7 +2365,7 @@ public final class ArcadePortManager implements Listener {
             player.setGameMode(type == ArcadePortGame.MASTER_BUILDERS ? GameMode.CREATIVE
                     : type == ArcadePortGame.BACON_BRAWL || type == ArcadePortGame.DEATH_TAG
                     || type == ArcadePortGame.DRAGONS || type == ArcadePortGame.DRAW_MY_THING
-                    || type == ArcadePortGame.SNEAKY_ASSASSINS
+                    || type == ArcadePortGame.SNEAKY_ASSASSINS || type == ArcadePortGame.SUPER_SPLOOR
                     ? GameMode.ADVENTURE : GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
@@ -2522,6 +2580,11 @@ public final class ArcadePortManager implements Listener {
         }
         if (participants.size() == 1) announce(session, ChatColor.GRAY + "Solo test mode: the run will remain available for practice until the timer ends or you reset it.");
         session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
+        if (type == ArcadePortGame.SUPER_SPLOOR) {
+            superSploor.start(session.superSploorEngine, session.players, session.teams, session.lastLocations,
+                    superSploorKitSelections(session),
+                    winningTeam -> finish(session, superSploorRepresentative(session, winningTeam), true));
+        }
         sender.sendMessage(ChatColor.GREEN + "Started " + type.displayName() + " with " + participants.size() + (participants.size() == 1 ? " player." : " players."));
     }
 
@@ -6655,6 +6718,10 @@ public final class ArcadePortManager implements Listener {
             updatePaintballKitState(session, now);
             updatePaintballPelletCosmetics(session);
         }
+        if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+            superSploor.tick(now);
+            if (active != session) return;
+        }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWars(session, now);
          updateTitles(session);
         checkRoundEnd(session);
@@ -10510,6 +10577,8 @@ public final class ArcadePortManager implements Listener {
             case MICRO_BATTLES -> "team " + (session.teams.getOrDefault(id, 0) + 1) + "/4";
             case ONE_IN_THE_QUIVER -> "kills " + scoreFor(session, id) + "/20";
             case PAINTBALL -> "armour " + session.paintPiecesRemaining.getOrDefault(id, 4) + "/4";
+            case SUPER_SPLOOR -> "ink " + player.getLevel() + "% | Squid "
+                    + (player.getInventory().getHeldItemSlot() == 7 ? "ON" : "OFF");
             case RUNNER -> "unstable tiles " + session.runnerBlocks.size();
             case SHEEP_QUEST -> "pens R" + sheepQuestTeamCount(session, 0)
                     + " A" + sheepQuestTeamCount(session, 1) + " G" + sheepQuestTeamCount(session, 2)
@@ -10559,7 +10628,9 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
-        if (session.type == ArcadePortGame.DRAW_MY_THING || session.type == ArcadePortGame.MASTER_BUILDERS) return;
+        if (session.type == ArcadePortGame.SUPER_SPLOOR
+                || session.type == ArcadePortGame.DRAW_MY_THING
+                || session.type == ArcadePortGame.MASTER_BUILDERS) return;
         // Castle Assault and Heroes of Gwen end through their objective controllers, not last-player rules.
         if (session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN) {
             if (session.alive.isEmpty() && session.respawning.isEmpty()) finish(session, null, true);
@@ -12303,7 +12374,18 @@ public final class ArcadePortManager implements Listener {
      * Resolve time-limit winners using each game's actual objective. In team
      * modes, a personal high score must not announce a losing team as winner.
      */
+    private Player superSploorRepresentative(Session session, int winningTeam) {
+        if (session == null || winningTeam < 0) return null;
+        return session.players.values().stream()
+                .filter(player -> player != null && player.isOnline()
+                        && session.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
+                .findFirst().orElse(null);
+    }
+
     private Player timeoutWinner(Session session) {
+        if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+            return superSploorRepresentative(session, superSploor.leadingTeam());
+        }
         if (session.type == ArcadePortGame.DEATH_TAG) {
             List<Player> runners = alivePlayers(session).stream()
                     .filter(player -> !session.tagged.contains(player.getUniqueId()))
@@ -12400,6 +12482,11 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+            session.superSploorPlayerStats = superSploor.snapshotStats();
+            session.superSploorTerritory = superSploor.snapshotTerritory();
+            superSploor.stop();
+        }
         if (announceWinner && session.type == ArcadePortGame.DEATH_TAG) {
             recordDeathTagRewards(session);
         }
@@ -12445,8 +12532,16 @@ public final class ArcadePortManager implements Listener {
                 } else {
                     announce(session, ChatColor.YELLOW + "Bacon Brawl ended with no pig left standing.");
                 }
-            } else {
-                announce(session, winner == null ? ChatColor.YELLOW + "Round ended." : ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won " + session.type.displayName() + "!");
+            } else if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+                if (winner == null) {
+                    announce(session, ChatColor.YELLOW + "Super Sploor ended in a draw.");
+                } else {
+                    int team = session.teams.getOrDefault(winner.getUniqueId(), -1);
+                    String teamName = team == 0 ? "Red" : "Blue";
+                    ChatColor teamColour = team == 0 ? ChatColor.RED : ChatColor.AQUA;
+                    announce(session, teamColour + "" + ChatColor.BOLD + teamName + " team won Super Sploor!");
+                }
+
             }
         }
         for (Map.Entry<Block, BlockData> entry : session.deathTagOriginalLightBlocks.entrySet()) {
@@ -12954,6 +13049,113 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void awardSuperSploorAchievement(UUID playerId, Player player, String gameId, String achievementId) {
+        if (playerId == null || !"super-sploor".equals(gameId) || testPlayers.isTestPlayer(playerId)) return;
+        SuperSploorProgressCatalog.Achievement achievement = SuperSploorProgressCatalog.achievement(achievementId);
+        if (achievement == null) return;
+        String key = SuperSploorProgressCatalog.achievementConfigKey(playerId, achievementId);
+        if (plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD
+                + "Achievement unlocked: " + achievement.name());
+    }
+
+    private void recordSuperSploorPlayerStats(Session session, UUID playerId,
+            Player player, boolean won, String statsPath) {
+        SuperSploorRuntime.PlayerMatchStats stats = session.superSploorPlayerStats.get(playerId);
+        if (stats == null) return;
+
+        plugin.getConfig().set(statsPath + "territory-blocks-painted",
+                plugin.getConfig().getLong(statsPath + "territory-blocks-painted", 0L) + stats.territoryPainted());
+        plugin.getConfig().set(statsPath + "enemy-blocks-reclaimed",
+                plugin.getConfig().getLong(statsPath + "enemy-blocks-reclaimed", 0L)
+                        + stats.enemyTerritoryReclaimed());
+        plugin.getConfig().set(statsPath + "neutral-territory-claimed",
+                plugin.getConfig().getLong(statsPath + "neutral-territory-claimed", 0L)
+                        + stats.neutralTerritoryClaimed());
+        plugin.getConfig().set(statsPath + "splats",
+                plugin.getConfig().getInt(statsPath + "splats", 0) + stats.splats());
+        plugin.getConfig().set(statsPath + "deaths",
+                plugin.getConfig().getInt(statsPath + "deaths", 0) + stats.deaths());
+        plugin.getConfig().set(statsPath + "assists",
+                plugin.getConfig().getInt(statsPath + "assists", 0) + stats.assists());
+        plugin.getConfig().set(statsPath + "squid-distance-blocks",
+                plugin.getConfig().getLong(statsPath + "squid-distance-blocks", 0L)
+                        + Math.max(0L, Math.round(stats.squidTravelBlocks())));
+        plugin.getConfig().set(statsPath + "wall-climb-blocks",
+                plugin.getConfig().getLong(statsPath + "wall-climb-blocks", 0L)
+                        + Math.max(0L, Math.round(stats.wallClimbBlocks())));
+        plugin.getConfig().set(statsPath + "specials-used",
+                plugin.getConfig().getInt(statsPath + "specials-used", 0) + stats.specialsUsed());
+        plugin.getConfig().set(statsPath + "roller-territory",
+                plugin.getConfig().getLong(statsPath + "roller-territory", 0L) + stats.rollerTerritory());
+        plugin.getConfig().set(statsPath + "charger-full-hits",
+                plugin.getConfig().getInt(statsPath + "charger-full-hits", 0) + stats.chargerFullHits());
+        plugin.getConfig().set(statsPath + "lobber-enemy-reclaimed",
+                plugin.getConfig().getLong(statsPath + "lobber-enemy-reclaimed", 0L) + stats.lobberEnemyReclaimed());
+        plugin.getConfig().set(statsPath + "dualies-post-roll-splats",
+                plugin.getConfig().getInt(statsPath + "dualies-post-roll-splats", 0) + stats.dualiesPostRollSplats());
+        plugin.getConfig().set(statsPath + "best-special-targets",
+                Math.max(plugin.getConfig().getInt(statsPath + "best-special-targets", 0), stats.bestSpecialTargets()));
+
+        awardSuperSploorAchievement(playerId, player, "super-sploor", "first-splash");
+        if (stats.neutralTerritoryClaimed() >= 500L) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "fresh-canvas");
+        }
+        if (stats.enemyTerritoryReclaimed() >= 200L) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "reclaimer");
+        }
+        if (stats.squidTravelBlocks() >= 500.0D) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "squid-express");
+        }
+        if (stats.wallClimbBlocks() >= 25.0D) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "wall-to-wall");
+        }
+        if (stats.assists() >= 5) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "team-palette");
+        }
+        if (won && stats.deaths() == 0) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "clean-sweep");
+        }
+        if ("sprayer".equals(stats.kit()) && stats.neutralTerritoryClaimed() >= 350L) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "colour-outside-the-lines");
+        }
+        if (stats.rollerTerritory() >= 500L) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "road-roller");
+        }
+        if (stats.chargerFullHits() >= 5) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "needle-threader");
+        }
+        if (stats.lobberEnemyReclaimed() >= 150L) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "splash-zone");
+        }
+        if (stats.dualiesPostRollSplats() >= 3) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "blink-and-youll-miss-it");
+        }
+        if (stats.bestSpecialTargets() >= 3) {
+            awardSuperSploorAchievement(playerId, player, "super-sploor", "special-delivery");
+        }
+        if (won) {
+            String kit = stats.kit() == null ? "sprayer" : stats.kit();
+            String kitWinsPath = statsPath + "kit-wins." + kit;
+            plugin.getConfig().set(kitWinsPath, plugin.getConfig().getInt(kitWinsPath, 0) + 1);
+            boolean masteredAllKits = List.of("sprayer", "roller", "charger", "lobber", "dualies")
+                    .stream().allMatch(value -> plugin.getConfig().getInt(statsPath + "kit-wins." + value, 0) > 0);
+            if (masteredAllKits) {
+                awardSuperSploorAchievement(playerId, player, "super-sploor", "master-of-the-palette");
+            }
+        }
+        if (won && session.superSploorTerritory != null) {
+            int total = Math.max(1, session.superSploorTerritory.totalUnits());
+            int margin = Math.abs(session.superSploorTerritory.redUnits()
+                    - session.superSploorTerritory.blueUnits());
+            if (margin * 100.0D <= total * 2.0D) {
+                awardSuperSploorAchievement(playerId, player, "super-sploor", "close-shave");
+            }
+        }
+    }
+
+
     private void recordLocalStats(Session session, Player winner, boolean completed) {
         if (!completed) return;
         if (session.type == ArcadePortGame.DRAGONS && winner != null && !testPlayers.isTestPlayer(winner)) {
@@ -12983,7 +13185,10 @@ public final class ArcadePortManager implements Listener {
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean paintballWinner = session.type == ArcadePortGame.PAINTBALL
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean superSploorWinner = session.type == ArcadePortGame.SUPER_SPLOOR
+                    && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean won = winnerId != null && (winnerId.equals(id) || turfWarsWinner || paintballWinner
+                    || superSploorWinner
                     || ((session.type == ArcadePortGame.BOMB_LOBBERS
                             || session.type == ArcadePortGame.MICRO_BATTLES)
                         && session.alive.contains(id)
@@ -13017,6 +13222,9 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().set(path + "blocks-broken",
                         plugin.getConfig().getInt(path + "blocks-broken", 0)
                                 + session.spleefBlocksBroken.getOrDefault(id, 0));
+            }
+            if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+                recordSuperSploorPlayerStats(session, id, entry.getValue(), won, path);
             }
             if (session.type == ArcadePortGame.DEATH_TAG) {
                 int roundKills = Math.max(0, session.scores.getOrDefault(id, 0));
@@ -13161,6 +13369,7 @@ public final class ArcadePortManager implements Listener {
             {"turf-wars", "Turf Wars", "RED_TERRACOTTA"},
             {"runner", "Runner", "LEATHER_BOOTS"},
             {"spleef", "Super Spleef", "IRON_SHOVEL"},
+            {"super-sploor", "Super Sploor", "INK_SAC"},
             {"death-tag", "Death Tag", "SKELETON_SKULL"},
             {"snake", "Snake", "GRAY_WOOL"},
             {"bacon-brawl", "Bacon Brawl", "PORKCHOP"},
@@ -13626,6 +13835,39 @@ public final class ArcadePortManager implements Listener {
                                 ChatColor.DARK_GRAY + "Local source-style stat tracker."),
                         "noop", null, null));
             }
+        } else if ("super-sploor".equals(gameId)) {
+            int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16, 17, 19, 20, 21, 23, 24, 25, 26};
+            List<SuperSploorProgressCatalog.Achievement> achievements = SuperSploorProgressCatalog.achievements();
+            for (int i = 0; i < achievements.size(); i++) {
+                SuperSploorProgressCatalog.Achievement achievement = achievements.get(i);
+                boolean unlocked = plugin.getConfig().getBoolean(
+                        SuperSploorProgressCatalog.achievementConfigKey(targetId, achievement.id()), false);
+                inventory.setItem(achievementSlots[i], statsItem(
+                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
+                        List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
+                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : "Not yet unlocked"),
+                        "noop", null, null));
+            }
+            int[] statSlots = {29, 30, 31, 32, 33, 34, 35, 36};
+            String[] statKeys = {"territory-blocks-painted", "enemy-blocks-reclaimed", "neutral-territory-claimed",
+                    "splats", "deaths", "assists", "squid-distance-blocks", "specials-used"};
+            String[] statNames = {"Territory Painted", "Enemy Turf Reclaimed", "Neutral Turf Claimed",
+                    "Splats", "Deaths", "Assists", "Squid Travel", "Specials Used"};
+            Material[] statIcons = {Material.PAINTING, Material.CYAN_DYE, Material.WHITE_DYE,
+                    Material.IRON_SWORD, Material.SKELETON_SKULL, Material.GREEN_DYE,
+                    Material.INK_SAC, Material.FIREWORK_ROCKET};
+            for (int i = 0; i < statKeys.length; i++) {
+                long value = plugin.getConfig().getLong(path + statKeys[i], 0L);
+                inventory.setItem(statSlots[i], statsItem(value > 0L ? Material.EXPERIENCE_BOTTLE : statIcons[i],
+                        (value > 0L ? ChatColor.GREEN : ChatColor.GRAY) + statNames[i],
+                        List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: " + ChatColor.WHITE + value),
+                        "noop", null, null));
+            }
+            inventory.setItem(40, statsItem(Material.AMETHYST_SHARD, ChatColor.LIGHT_PURPLE + "Milestones",
+                    List.of(" ", ChatColor.GRAY + "Seven lifetime tracks, each with four stages.",
+                            ChatColor.RESET + "Click to view your Super Sploor milestones."),
+                    "open-super-sploor-milestones", null, gameId));
         } else {
             int[] slots = {29, 30, 31, 32};
             int[] values = {played, wins, score, knockouts};
@@ -13652,6 +13894,45 @@ public final class ArcadePortManager implements Listener {
                 "back-arcade", null, null));
         inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(),
                 "close", null, null));
+        viewer.openInventory(inventory);
+    }
+
+    private void openSuperSploorMilestones(Player viewer, UUID targetId, String targetName) {
+        String gameId = "super-sploor";
+        Inventory inventory = createStatsInventory(StatsPage.GAME, targetId, targetName,
+                targetName + "'s Super Sploor Milestones", gameId);
+        String path = localStatsPath(targetId, gameId);
+        int slot = 10;
+        for (SuperSploorProgressCatalog.Milestone milestone : SuperSploorProgressCatalog.milestones()) {
+            long value = Math.max(0L, plugin.getConfig().getLong(path + milestone.statKey(), 0L));
+            long[] stages = milestone.stages();
+            int completed = 0;
+            for (long stage : stages) if (value >= stage) completed++;
+            long next = completed < stages.length ? stages[completed] : milestone.maximum();
+            List<String> lore = new ArrayList<>();
+            lore.add(" ");
+            lore.add(ChatColor.GRAY + "Progress: " + ChatColor.WHITE + String.format(java.util.Locale.ROOT,
+                    "%,d %s", value, milestone.unit()) + ChatColor.GRAY + " / " + ChatColor.WHITE
+                    + String.format(java.util.Locale.ROOT, "%,d %s", milestone.maximum(), milestone.unit()));
+            lore.add(ChatColor.LIGHT_PURPLE + "Stages completed: " + completed + "/" + stages.length);
+            if (completed < stages.length) {
+                lore.add(ChatColor.YELLOW + "Next stage: " + ChatColor.WHITE
+                        + String.format(java.util.Locale.ROOT, "%,d %s", next, milestone.unit()));
+                int filled = next <= 0 ? 10 : (int) Math.min(10L, value * 10L / next);
+                lore.add(ChatColor.LIGHT_PURPLE + "▰".repeat(filled)
+                        + ChatColor.DARK_GRAY + "▱".repeat(10 - filled));
+            } else lore.add(ChatColor.GREEN + "Milestone maxed out!");
+            lore.add(" ");
+            lore.add(ChatColor.DARK_GRAY + "Stages: " + java.util.Arrays.stream(stages)
+                    .mapToObj(stage -> String.format(java.util.Locale.ROOT, "%,d", stage))
+                    .collect(java.util.stream.Collectors.joining(" → ")));
+            inventory.setItem(slot++, statsItem(completed == stages.length ? Material.NETHER_STAR : Material.AMETHYST_SHARD,
+                    (completed == stages.length ? ChatColor.GREEN : ChatColor.LIGHT_PURPLE) + milestone.name(),
+                    lore, "noop", null, gameId));
+        }
+        inventory.setItem(4, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back", List.of(),
+                "back-super-sploor", null, gameId));
+        inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(), "close", null, null));
         viewer.openInventory(inventory);
     }
 
@@ -13727,6 +14008,20 @@ public final class ArcadePortManager implements Listener {
         if ("spleef".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Blocks Broken: " + ChatColor.WHITE
                     + plugin.getConfig().getInt(path + "blocks-broken", 0));
+        }
+        if ("super-sploor".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Territory Painted: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "territory-blocks-painted", 0L));
+            lore.add(ChatColor.GRAY + "Enemy Turf Reclaimed: " + ChatColor.WHITE
+                    + plugin.getConfig().getLong(path + "enemy-blocks-reclaimed", 0L));
+            lore.add(ChatColor.GRAY + "Splats: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(path + "splats", 0));
+            long unlocked = SuperSploorProgressCatalog.achievements().stream()
+                    .filter(achievement -> plugin.getConfig().getBoolean(
+                            SuperSploorProgressCatalog.achievementConfigKey(targetId, achievement.id()), false))
+                    .count();
+            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/"
+                    + SuperSploorProgressCatalog.achievements().size());
         }
         if ("turf-wars".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Blocks Placed: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "blocks-placed", 0));
@@ -17764,6 +18059,10 @@ public final class ArcadePortManager implements Listener {
                 case "open-category" -> openStatsCategory(player, holder.targetId, holder.targetName,
                         category == null ? "global" : category);
                 case "open-game" -> openStatsGame(player, holder.targetId, holder.targetName, gameId);
+                case "open-super-sploor-milestones" ->
+                        openSuperSploorMilestones(player, holder.targetId, holder.targetName);
+                case "back-super-sploor" ->
+                        openStatsGame(player, holder.targetId, holder.targetName, "super-sploor");
                 case "open-dragon-escape-pbs" -> openDragonEscapePersonalBests(player, holder.targetId, holder.targetName);
                 case "open-dragon-escape-colours" -> openDragonEscapeBeaconColours(player, holder.targetId, holder.targetName);
                 case "toggle-dragon-ghost" -> {
@@ -19366,6 +19665,9 @@ public final class ArcadePortManager implements Listener {
 
     private static final class Session {
         final Map<Block, Long> evolutionWebs = new HashMap<>();
+        SuperSploorEngine superSploorEngine;
+        Map<UUID, SuperSploorRuntime.PlayerMatchStats> superSploorPlayerStats = Map.of();
+        SuperSploorRuntime.TerritorySummary superSploorTerritory;
         final ArcadePortGame type;
         final World world;
         final Map<UUID, Player> players = new LinkedHashMap<>();
