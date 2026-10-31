@@ -38,6 +38,19 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         enabledGames = new java.util.ArrayList<>(new java.util.LinkedHashSet<>(enabledGames));
         getConfig().set("enabled-games", enabledGames);
 
+        // The automatic selector's pool is a subset of the explicitly cleared test games.
+        // Preserve an explicitly empty pool, but seed a missing setting from the acceptance allow-list.
+        String rotationPoolPath = "game-preferences.automatic-rotation.enabled-games";
+        if (!getConfig().contains(rotationPoolPath)) {
+            getConfig().set(rotationPoolPath, new java.util.ArrayList<>(enabledGames));
+        } else {
+            java.util.List<String> rotationPool = new java.util.ArrayList<>();
+            for (String gameId : getConfig().getStringList(rotationPoolPath)) {
+                if (enabledGames.contains(gameId) && !rotationPool.contains(gameId)) rotationPool.add(gameId);
+            }
+            getConfig().set(rotationPoolPath, rotationPool);
+        }
+
         String selectedLobbyGame = getConfig().getString("lobby-selected-game", "death-tag");
         if (!enabledGames.contains(selectedLobbyGame)) {
             getConfig().set("lobby-selected-game", enabledGames.isEmpty() ? "death-tag" : enabledGames.get(0));
