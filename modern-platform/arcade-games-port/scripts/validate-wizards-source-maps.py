@@ -184,6 +184,9 @@ def inspect_region_chunks(zf, region_paths):
     import struct
     active_chunks = []
     chests = []
+    chest_blocks = []
+    chunk_min_x = chunk_min_z = None
+    chunk_max_x = chunk_max_z = None
     failures = []
     for region_path in region_paths:
         try:
@@ -210,10 +213,29 @@ def inspect_region_chunks(zf, region_paths):
                 chunk_x = region_x * 32 + (index % 32)
                 chunk_z = region_z * 32 + (index // 32)
                 active_chunks.append([chunk_x, chunk_z])
+                chunk_min_x = chunk_x if chunk_min_x is None else min(chunk_min_x, chunk_x)
+                chunk_min_z = chunk_z if chunk_min_z is None else min(chunk_min_z, chunk_z)
+                chunk_max_x = chunk_x if chunk_max_x is None else max(chunk_max_x, chunk_x)
+                chunk_max_z = chunk_z if chunk_max_z is None else max(chunk_max_z, chunk_z)
                 try:
                     payload = decompress_nbt(raw[location + 5:location + 4 + length], compression)
                     chunk = read_nbt(payload)
                     level = chunk.get("Level", chunk)
+                    sections = level.get("Sections", []) if isinstance(level, dict) else []
+                    for section in sections:
+                        if not isinstance(section, dict): continue
+                        blocks = section.get("Blocks")
+                        if not isinstance(blocks, bytes) or len(blocks) != 4096: continue
+                        try: section_y = int(section.get("Y", 0))
+                        except (TypeError, ValueError): section_y = 0
+                        for block_index, block_id in enumerate(blocks):
+                            if block_id in (54, 146):
+                                chest_blocks.append({
+                                    "x": chunk_x * 16 + (block_index & 15),
+                                    "y": section_y * 16 + ((block_index >> 8) & 15),
+                                    "z": chunk_z * 16 + ((block_index >> 4) & 15),
+                                    "block_id": block_id,
+                                })
                     for tile in level.get("TileEntities", []) if isinstance(level, dict) else []:
                         if not isinstance(tile, dict): continue
                         tile_id = str(tile.get("id", "")).lower()
@@ -228,8 +250,14 @@ def inspect_region_chunks(zf, region_paths):
             failures.append(region_path + ": " + str(error))
     return {
         "active_chunk_count": len(active_chunks),
+        "chunk_bounds": {
+            "min_chunk_x": chunk_min_x, "max_chunk_x": chunk_max_x,
+            "min_chunk_z": chunk_min_z, "max_chunk_z": chunk_max_z,
+        },
         "active_chunk_coordinates_sample": active_chunks[:100],
         "chest_tile_entity_count": len(chests),
+        "chest_block_count_from_section_data": len(chest_blocks),
+        "chest_blocks_sample": chest_blocks[:100],
         "chest_tile_entities_sample": chests[:100],
         "region_parse_errors": failures[:20],
     }
