@@ -25,8 +25,8 @@ case "$cmd" in
     printf active > "$statefile"
     [[ "$statefile" != "$TESTPLEX_STUB_REBORN_ACTIVE" ]] || exit 0
     printf 'Paper server Done (3.0s)!\n' >> "$TESTPLEX_SERVER_DIR/logs/latest.log"
-    printf 'status=READY\nmodule=monster-maze\nmanager=testplex-arcade\nsource_sha=%s\nnonce=123e4567-e89b-12d3-a456-426614174000\ninvocation_id=0123456789abcdef0123456789abcdef\nprocess_id=4242\n' \
-      "$(cat "$TESTPLEX_SERVER_DIR/.testplex-modern-deployed-build")" > "$TESTPLEX_SERVER_DIR/plugins/ArcadeMechanicsModern/.monster-maze-readiness.properties"
+    printf 'status=READY\nmodule=arcade-lobby\nmanager=testplex-arcade\nworld=testplex_arcade_lobby_v1\nplane=100x100\nfloor_y=100\nsource_sha=%s\nnonce=123e4567-e89b-12d3-a456-426614174000\ninvocation_id=0123456789abcdef0123456789abcdef\nprocess_id=4242\n' \
+      "$(cat "$TESTPLEX_SERVER_DIR/.testplex-modern-deployed-build")" > "$TESTPLEX_SERVER_DIR/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties"
     ;;
   enable) printf enabled > "$TESTPLEX_STUB_ENABLED" ;;
   disable)
@@ -134,13 +134,15 @@ status=$status
 EOF
   cp "$STATE/current.properties" "$BACKUP/transaction.properties"
 }
-run_helper() { "$HELPER" "$@"; }
+run_helper() { bash "$HELPER" "$@"; }
 assert_eq() { [[ "$1" == "$2" ]] || { echo "ASSERT expected '$2', got '$1'" >&2; exit 1; }; }
 assert_file_text() { [[ "$(cat "$1")" == "$2" ]] || { echo "ASSERT unexpected contents: $1" >&2; exit 1; }; }
 
 # Fresh process recovery models the original SSH/deployment process disappearing.
 write_txn REPLACING true true
-run_helper recover "$target_sha"
+# Independent recovery must recover the current journal even when the retrying
+# workflow's build SHA differs from the failed deployment's target SHA.
+run_helper recover
 run_helper assert-deployable >/dev/null
 assert_file_text "$SERVER/plugins/ArcadeMechanicsModern/plugin.dat" 'old plugin payload'
 assert_file_text "$SERVER/mm_void/region.dat" 'old map payload'
@@ -295,18 +297,18 @@ printf 'first-install artifact\n' > "$FIRST_SERVER/paper.jar"
 printf '%s\n' "$target_sha" > "$FIRST_SERVER/.testplex-modern-deployed-build"
 TESTPLEX_SERVER_DIR="$FIRST_SERVER" TESTPLEX_STATE_DIR="$FIRST_STATE" TESTPLEX_UNIT_FILE="$FIRST_UNIT" \
 TESTPLEX_STUB_ACTIVE="$TMP/first-active" TESTPLEX_STUB_ENABLED="$TMP/first-enabled" \
-  "$HELPER" --locked begin first-install "$target_sha" "$FIRST_BACKUP" none none false not-found false false false false false '' ''
+  bash "$HELPER" --locked begin first-install "$target_sha" "$FIRST_BACKUP" none none false not-found false false false false false '' ''
 TESTPLEX_SERVER_DIR="$FIRST_SERVER" TESTPLEX_STATE_DIR="$FIRST_STATE" TESTPLEX_UNIT_FILE="$FIRST_UNIT" \
 TESTPLEX_STUB_ACTIVE="$TMP/first-active" TESTPLEX_STUB_ENABLED="$TMP/first-enabled" \
-  "$HELPER" --locked set-field backup_sha "$(awk '{print $1}' "$FIRST_BACKUP/server-artifacts.sha256")"
+  bash "$HELPER" --locked set-field backup_sha "$(awk '{print $1}' "$FIRST_BACKUP/server-artifacts.sha256")"
 TESTPLEX_SERVER_DIR="$FIRST_SERVER" TESTPLEX_STATE_DIR="$FIRST_STATE" TESTPLEX_UNIT_FILE="$FIRST_UNIT" \
 TESTPLEX_STUB_ACTIVE="$TMP/first-active" TESTPLEX_STUB_ENABLED="$TMP/first-enabled" \
-  "$HELPER" --locked set-field backup_complete true
+  bash "$HELPER" --locked set-field backup_complete true
 TESTPLEX_SERVER_DIR="$FIRST_SERVER" TESTPLEX_STATE_DIR="$FIRST_STATE" TESTPLEX_UNIT_FILE="$FIRST_UNIT" \
 TESTPLEX_STUB_ACTIVE="$TMP/first-active" TESTPLEX_STUB_ENABLED="$TMP/first-enabled" \
-  "$HELPER" --locked set-phase REPLACING
+  bash "$HELPER" --locked set-phase REPLACING
 output="$(TESTPLEX_SERVER_DIR="$FIRST_SERVER" TESTPLEX_STATE_DIR="$FIRST_STATE" TESTPLEX_UNIT_FILE="$FIRST_UNIT" \
-TESTPLEX_STUB_ACTIVE="$TMP/first-active" TESTPLEX_STUB_ENABLED="$TMP/first-enabled" "$HELPER" recover "$target_sha")"
+TESTPLEX_STUB_ACTIVE="$TMP/first-active" TESTPLEX_STUB_ENABLED="$TMP/first-enabled" bash "$HELPER" recover "$target_sha")"
 grep -q '^no-prior-deployment-restored:' <<< "$output"
 [[ ! -e "$FIRST_SERVER" && ! -e "$FIRST_UNIT" ]]
 [[ -f "$FIRST_BACKUP/failed-artifacts/attempt-001/no-prior-server-directory/paper.jar" ]]

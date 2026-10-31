@@ -108,6 +108,16 @@ jobs:
           grep -Fxq "enabled: false" <<< "$snake_config"
           echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 24 shared Arcade catalogue games are packaged, Wizards is built as a separate module, Speed Builders Arcade is tracked as planned work, only Death Tag and One in the Quiver are enabled, and Snake and Wizards remain gated."
 
+      - name: Validate independent deployment recovery and shell syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod 0755 .github/testplex-modern-recovery.sh
+          bash -n .github/testplex-modern-recovery.sh
+          bash -n .github/testplex-modern-recovery-test.sh
+          bash .github/testplex-modern-recovery-test.sh
+          git diff --check
+
       - name: Upload modern plugin artifact
         uses: actions/upload-artifact@v4
         with:

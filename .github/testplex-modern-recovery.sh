@@ -118,11 +118,14 @@ systemctl_query() { "$TIMEOUT" --foreground --signal=TERM 15s "$SYSTEMCTL" "$@";
 service_active() { systemctl_query is-active --quiet "$SERVICE" >/dev/null 2>&1; }
 port_listening() { "$TIMEOUT" --foreground --signal=TERM 15s "$SS" -ltn | awk '$4 ~ /:25568$/ {found=1} END {exit !found}'; }
 runtime_record_matches() {
-  local sha="$1" invocation="$2" pid="$3" readiness="$SERVER_DIR/plugins/ArcadeMechanicsModern/.monster-maze-readiness.properties" nonce
+  local sha="$1" invocation="$2" pid="$3" readiness="$SERVER_DIR/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties" nonce
   nonce="$(sed -n 's/^nonce=//p' "$SERVER_DIR/plugins/ArcadeMechanicsModern/.testplex-modern-deploy-identity.properties" 2>/dev/null | head -n 1 || true)"
   [[ -n "$nonce" && -s "$readiness" ]] || return 1
-  grep -Fxq 'status=READY' "$readiness" && grep -Fxq 'module=monster-maze' "$readiness" &&
-    grep -Fxq 'manager=testplex-arcade' "$readiness" && grep -Fxq "source_sha=$sha" "$readiness" &&
+  grep -Fxq 'status=READY' "$readiness" && grep -Fxq 'module=arcade-lobby' "$readiness" &&
+    grep -Fxq 'manager=testplex-arcade' "$readiness" &&
+    grep -Fxq 'world=testplex_arcade_lobby_v1' "$readiness" &&
+    grep -Fxq 'plane=100x100' "$readiness" && grep -Fxq 'floor_y=100' "$readiness" &&
+    grep -Fxq "source_sha=$sha" "$readiness" &&
     grep -Fxq "nonce=$nonce" "$readiness" && grep -Fxq "invocation_id=$invocation" "$readiness" &&
     grep -Fxq "process_id=$pid" "$readiness"
 }
