@@ -148,6 +148,12 @@ jobs:
               verify_source_map_folder "$map_folder"
             done
           done
+
+          # Runner is the next near-ready 1.8 candidate. Keep it disabled until
+          # live acceptance passes, but verify every original archive now.
+          verify_source_map_folder "Runner"
+          jar tf "$arcade_jar" | grep -Fxq "maps/runner.zip"
+
           jar tf "$arcade_jar" | grep -Fxq "maps/bomb-lobbers.zip"
           jar tf "$arcade_jar" | grep -Fxq "maps/bacon-brawl.zip"
           jar tf "$arcade_jar" | grep -Fxq "maps/gladiators.zip"
@@ -162,7 +168,7 @@ jobs:
           grep -Fq 'retired-monster-maze-plugins' "$deploy_workflow"
           snake_config="$(unzip -p "$snake_jar" config.yml)"
           grep -Fxq "enabled: false" <<< "$snake_config"
-          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 25 shared Arcade catalogue games are packaged, Wizards is built as a separate module, Speed Builders Arcade is tracked as planned work, and Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball and Spleef are enabled for controlled acceptance; all individual 1.8 source map archives for every enabled game are compared against the packaged JAR; other unfinished games remain gated."
+          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 25 shared Arcade catalogue games are packaged, Wizards is built as a separate module, Speed Builders Arcade is tracked as planned work, and Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball and Spleef are enabled for controlled acceptance; all individual 1.8 source map archives for every enabled game plus all 22 gated Runner map archives are compared against the packaged JAR; other unfinished games remain gated."
 
       - name: Validate independent deployment recovery and shell syntax
         shell: bash
