@@ -1673,7 +1673,15 @@ public final class ArcadePortManager implements Listener {
     private List<ArcadePortGame> automaticRotationCandidates() {
         List<ArcadePortGame> candidates = new ArrayList<>();
         Set<String> seen = new HashSet<>();
-        for (String id : plugin.getConfig().getStringList("enabled-games")) {
+        String poolPath = "game-preferences.automatic-rotation.enabled-games";
+        List<String> pool = plugin.getConfig().contains(poolPath)
+                ? plugin.getConfig().getStringList(poolPath)
+                : plugin.getConfig().getStringList("enabled-games");
+        Set<String> clearedGames = new HashSet<>(plugin.getConfig().getStringList("enabled-games"));
+        for (String id : pool) {
+            // The Game Panel may narrow the rotation pool, never bypass the reviewed
+            // READY_FOR_TEST allow-list enforced by ArcadeMechanicsModernPlugin.
+            if (!clearedGames.contains(id)) continue;
             ArcadePortGame game = ArcadePortGame.fromId(id);
             if (game == null || !isGameEnabled(game) || !seen.add(game.id())) continue;
             if (SourceMapCatalog.hasMap(game)) {
