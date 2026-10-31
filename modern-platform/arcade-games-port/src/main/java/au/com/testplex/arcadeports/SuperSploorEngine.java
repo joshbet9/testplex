@@ -124,11 +124,12 @@ public final class SuperSploorEngine {
                     Block block = world.getBlockAt(cx + dx, cy + dy, cz + dz);
                     Integer previous = owners.get(block);
                     if (previous == null) continue;
-                    if (previous == team) {
-                        friendly++;
+                    int transition = SuperSploorRules.territoryPaintTransition(previous, team);
+                    if (transition == 0) {
+                        if (previous == team) friendly++;
                         continue;
                     }
-                    if (previous == -1) neutral++;
+                    if (transition == 1) neutral++;
                     else enemy++;
                     owners.put(block, team);
                     if (team == 0) {
