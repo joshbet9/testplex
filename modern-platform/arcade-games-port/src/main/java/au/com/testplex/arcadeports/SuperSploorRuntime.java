@@ -1558,16 +1558,33 @@ public final class SuperSploorRuntime implements Listener {
         if (!running) return;
         running = false;
         IntConsumer callback = finishMatch;
+        int total = Math.max(1, engine == null ? 0 : engine.totalUnits());
+        String red = String.format(java.util.Locale.ROOT, "%.1f%%",
+                (engine == null ? 0 : engine.redUnits()) * 100.0D / total);
+        String blue = String.format(java.util.Locale.ROOT, "%.1f%%",
+                (engine == null ? 0 : engine.blueUnits()) * 100.0D / total);
+        String resultLine = ChatColor.RED + "Red " + red + ChatColor.GRAY + "  |  "
+                + ChatColor.AQUA + "Blue " + blue;
         for (Map.Entry<UUID, Player> entry : players.entrySet()) {
             Player player = entry.getValue();
             MutableStats stats = playerStats.get(entry.getKey());
-            if (player != null && player.isOnline() && stats != null) {
-                player.sendMessage(ChatColor.GOLD + "Your Super Sploor stats: "
-                        + ChatColor.WHITE + stats.territoryPainted + " territory | "
-                        + ChatColor.AQUA + stats.enemyTerritoryReclaimed + " reclaimed | "
-                        + ChatColor.RED + stats.splats + " splats | "
-                        + ChatColor.GREEN + stats.assists + " assists.");
-            }
+            if (player == null || !player.isOnline() || stats == null) continue;
+            int playerTeam = teams.getOrDefault(entry.getKey(), -1);
+            String title = winningTeam < 0 ? ChatColor.YELLOW + "DRAW"
+                    : playerTeam == winningTeam ? ChatColor.GREEN + "" + ChatColor.BOLD + "VICTORY"
+                    : ChatColor.RED + "" + ChatColor.BOLD + "DEFEAT";
+            player.sendTitle(title, resultLine, 5, 55, 15);
+            player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "SUPER SPLOOR — MATCH SUMMARY");
+            player.sendMessage(ChatColor.WHITE + "Territory painted: " + ChatColor.AQUA + stats.territoryPainted
+                    + ChatColor.GRAY + "  |  Reclaimed: " + ChatColor.AQUA + stats.enemyTerritoryReclaimed
+                    + ChatColor.GRAY + "  |  Neutral claimed: " + ChatColor.AQUA + stats.neutralTerritoryClaimed);
+            player.sendMessage(ChatColor.WHITE + "Splats: " + ChatColor.RED + stats.splats
+                    + ChatColor.GRAY + "  |  Assists: " + ChatColor.GREEN + stats.assists
+                    + ChatColor.GRAY + "  |  Specials: " + ChatColor.LIGHT_PURPLE + stats.specialsUsed);
+            player.sendMessage(ChatColor.WHITE + "Squid travel: " + ChatColor.AQUA
+                    + Math.round(stats.squidTravelBlocks) + " blocks"
+                    + ChatColor.GRAY + "  |  Wall climbed: " + ChatColor.AQUA
+                    + Math.round(stats.wallClimbBlocks) + " blocks");
         }
         if (callback != null) callback.accept(winningTeam);
     }
