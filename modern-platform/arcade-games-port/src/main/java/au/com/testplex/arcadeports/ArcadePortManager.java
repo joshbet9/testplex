@@ -311,7 +311,7 @@ public final class ArcadePortManager implements Listener {
                 || !isGameEnabled(ArcadePortGame.MONSTER_MAZE)) return false;
         LinkedHashMap<UUID, Player> selected = new LinkedHashMap<>();
         for (Player player : requestedParticipants) {
-            if (player == null || !player.isOnline()) continue;
+            if (player == null || !player.isOnline() || testPlayers.isTestPlayer(player)) continue;
             for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(player.getUniqueId());
             lobby.ensurePlayerInLobby(player);
             selected.put(player.getUniqueId(), player);
@@ -1541,6 +1541,10 @@ public final class ArcadePortManager implements Listener {
             sender.sendMessage(ChatColor.YELLOW + "Test-player cleanup is still running after server startup. Retry Start Game in a moment.");
             return;
         }
+        if (!testPlayers.isStartupCleanupSuccessful()) {
+            sender.sendMessage(ChatColor.RED + "Start cancelled: Testplex could not verify cleanup of fake players from the previous server session. Check FakePlayerPlugin's startup log and restart the server.");
+            return;
+        }
         int botsNeeded = ArcadeTestPlayerManager.additionalPlayersNeeded(humanIds.size());
         if (botsNeeded <= 0) {
             startQueuedInternal(type, requester, sender, mixedArcadeVariant);
@@ -1645,7 +1649,12 @@ public final class ArcadePortManager implements Listener {
         LinkedHashMap<UUID, Player> queue = queues.get(selectedQueueKey);
         List<Player> participants = new ArrayList<>();
         if (queue != null) {
-            for (Player player : queue.values()) if (player != null && player.isOnline()) participants.add(player);
+            for (Player player : queue.values()) {
+                if (player != null && player.isOnline()
+                        && (!testPlayers.isTestPlayer(player) || testPlayers.isManagedTestPlayer(player.getUniqueId()))) {
+                    participants.add(player);
+                }
+            }
         }
         if (requester != null && requester.isOnline() && participants.stream().noneMatch(p -> p.getUniqueId().equals(requester.getUniqueId()))) {
             participants.add(requester);
