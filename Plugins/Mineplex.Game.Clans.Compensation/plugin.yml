@@ -1,4 +1,0 @@
-name: Compensation
-main: mineplex.game.clans.compensation.ClansCompensation
-version: 1.0
-depend: [Clans]

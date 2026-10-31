@@ -1,6 +1,0 @@
-# Owners/admins for the isolated Testplex Modern 26.3 server.
-# jn_playzmc is also enforced in code so a pre-existing disk config cannot silently remove access.
-owner-usernames:
-  - jn_playzmc
-admin-usernames:
-  - jn_playzmc

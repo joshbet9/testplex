@@ -1,5 +1,0 @@
-# Snake is packaged with Testplex Modern but remains unavailable until READY_FOR_TEST.
-enabled: false
-test-mode: true
-selected-map: Snake_Pit.zip
-kits: {}

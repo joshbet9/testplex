@@ -261,14 +261,21 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=40)
-          # Every modern deployment used to leave a full maps archive under a new commit-specific
-          # directory in /var/tmp. The legacy and modern deploy jobs share one Hyper-V disk and are
-          # serialized by testplex-isolated-hyperv-server, so only these generated staging directories
-          # are safe to prune here; never clean server worlds, plugin directories, databases or backups.
-          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" <<'REMOTE_STAGE_PREP'
+          # The legacy and modern deploy jobs share one Hyper-V disk and are serialized.
+          # Only generated, abandoned staging directories are eligible for pruning; never
+          # clean server worlds, installed plugins, databases or recovery backups.
+          stage_kb="$(du -sk "$STAGE_DIR" | awk '{print $1}')"
+          [[ "$stage_kb" =~ ^[0-9]+$ ]] && (( stage_kb > 0 )) || { echo "Could not determine the verified deployment payload size." >&2; exit 1; }
+          # During transfer/assembly a second copy of the largest JAR/map archives can exist.
+          # Keep a full 1 GiB free after reserving two copies of this exact payload.
+          required_free_kb=$((stage_kb * 2 + 1048576))
+          timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" "$required_free_kb" "$stage_kb" <<'REMOTE_STAGE_PREP'
           set -euo pipefail
           build_sha="$1"
+          required_free_kb="$2"
+          stage_kb="$3"
           [[ "$build_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid build SHA for artifact staging." >&2; exit 1; }
+          [[ "$required_free_kb" =~ ^[0-9]+$ && "$stage_kb" =~ ^[0-9]+$ ]] || { echo "Invalid deployment storage budget." >&2; exit 1; }
           upload_dir="/var/tmp/testplex-modern-artifacts-$build_sha"
           echo "Disk usage before staging-cache cleanup:"
           df -h /var/tmp
@@ -280,17 +287,20 @@ jobs:
             name="${existing##*/}"
             [[ "$name" =~ ^testplex-modern-artifacts-[0-9a-f]{40}$ ]] || continue
             [[ "$existing" == "$upload_dir" ]] && continue
-            # All modern deploy invocations share this workflow's concurrency group, so no
-            # other modern upload can be active while this staging step runs. These directories
-            # contain generated transfer chunks only; the installed JARs and recovery backups live
-            # elsewhere and are never touched here.
-            size="$(du -sh -- "$existing" 2>/dev/null | cut -f1 || true)"
-            echo "Removing prior modern deployment staging cache: $existing (${size:-size unavailable})"
-            sudo -n rm -rf -- "$existing"
+            # Another workflow may be actively uploading to a different SHA-named
+            # directory. Only prune caches that have been untouched for >24h.
+            mtime="$(stat -c %Y -- "$existing" 2>/dev/null || printf '0')"
+            if [[ "$mtime" =~ ^[0-9]+$ ]] && (( now_epoch - mtime > 86400 )); then
+              size="$(du -sh -- "$existing" 2>/dev/null | cut -f1 || true)"
+              echo "Removing abandoned modern deployment cache (>24h old): $existing (${size:-size unavailable})"
+              sudo -n rm -rf -- "$existing"
+            else
+              echo "Leaving recent/possibly active modern staging directory untouched: $existing"
+            fi
           done
           sudo -n rm -rf -- "$upload_dir"
           # Downloaded package archives are reproducible cache, not installed software.
-          # Clearing them is safe and can recover the last few MiB needed for an atomic upload.
+          # This safely recovers small amounts of space without touching worlds or backups.
           apt_cache_before="$(sudo -n du -sh /var/cache/apt/archives 2>/dev/null | cut -f1 || true)"
           sudo -n apt-get clean
           echo "Cleared downloaded APT package cache (${apt_cache_before:-size unavailable}); installed packages were not removed."
@@ -298,11 +308,11 @@ jobs:
           df -h /var/tmp
           df -i /var/tmp
           avail_kb="$(df -Pk /var/tmp | awk 'END {print $4}')"
-          if [[ ! "$avail_kb" =~ ^[0-9]+$ ]] || (( avail_kb < 2097152 )); then
-            echo "Only ${avail_kb:-unknown} KiB free in /var/tmp after staging cleanup; refusing upload unless at least 2 GiB is available." >&2
+          if [[ ! "$avail_kb" =~ ^[0-9]+$ ]] || (( avail_kb < required_free_kb )); then
+            echo "Only ${avail_kb:-unknown} KiB free in /var/tmp after staging cleanup; deployment needs at least $required_free_kb KiB (two $stage_kb KiB payload copies plus a 1 GiB safety reserve)." >&2
             exit 1
           fi
-          echo "Available space after stale-cache cleanup: $((avail_kb / 1024)) MiB."
+          echo "Available space: $((avail_kb / 1024)) MiB; payload: $((stage_kb / 1024)) MiB; required free-space reserve: $((required_free_kb / 1024)) MiB."
           install -d -m 0700 -- "$upload_dir"
           REMOTE_STAGE_PREP
           # Use the SFTP subsystem rather than legacy SCP's single remote sink process.
