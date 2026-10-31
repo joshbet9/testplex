@@ -133,9 +133,14 @@ public final class CameraShyGame implements Listener {
         }
     }
     private static final class SmokeCloud {
+        final UUID owner;
         final Location center;
         final long expiresAt;
-        SmokeCloud(Location center, long expiresAt) { this.center = center.clone(); this.expiresAt = expiresAt; }
+        SmokeCloud(UUID owner, Location center, long expiresAt) {
+            this.owner = owner;
+            this.center = center.clone();
+            this.expiresAt = expiresAt;
+        }
     }
     private static final class FakeFlash {
         final UUID owner;
@@ -1224,7 +1229,7 @@ public final class CameraShyGame implements Listener {
         switch (kit) {
             case SMOKE_ARTIST -> {
                 Location center = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
-                smokeClouds.add(new SmokeCloud(center, now + SMOKE_LIFETIME_MILLIS));
+                smokeClouds.add(new SmokeCloud(id, center, now + SMOKE_LIFETIME_MILLIS));
                 smokeUsedUntil.put(id, now + 7_000L);
                 player.getWorld().spawnParticle(Particle.CLOUD, center, 65, 1.4D, 1.0D, 1.4D, 0.025D);
                 player.getWorld().spawnParticle(Particle.SMOKE, center, 55, 1.2D, 0.9D, 1.2D, 0.025D);
@@ -1327,11 +1332,20 @@ public final class CameraShyGame implements Listener {
     }
 
     private boolean isBlockedBySmoke(Location from, Location to) {
+        return isBlockedBySmoke(from, to, null);
+    }
+
+    private boolean isBlockedBySmokeOwnedBy(Location from, Location to, UUID owner) {
+        return isBlockedBySmoke(from, to, owner);
+    }
+
+    private boolean isBlockedBySmoke(Location from, Location to, UUID requiredOwner) {
         Vector start = from.toVector();
         Vector end = to.toVector();
         long now = System.currentTimeMillis();
         for (SmokeCloud cloud : smokeClouds) {
             if (cloud.expiresAt > now && cloud.center.getWorld() == from.getWorld()
+                    && (requiredOwner == null || requiredOwner.equals(cloud.owner))
                     && CameraShyRules.segmentIntersectsSphere(start, end, cloud.center.toVector(), 2.4D)) return true;
         }
         return false;
@@ -1393,6 +1407,8 @@ public final class CameraShyGame implements Listener {
                         && pursuer.getWorld() == victim.getWorld();
                 boolean smokeObscured = sameWorld
                         && isBlockedBySmoke(victim.getEyeLocation(), pursuer.getEyeLocation());
+                boolean ownSmokeObscured = sameWorld
+                        && isBlockedBySmokeOwnedBy(victim.getEyeLocation(), pursuer.getEyeLocation(), victimId);
                 boolean withinPursuitRange = sameWorld
                         && victim.getLocation().distanceSquared(pursuer.getLocation()) <= 24.0D * 24.0D;
                 boolean visible = sameWorld && alive.contains(pursuerId)
@@ -1405,7 +1421,7 @@ public final class CameraShyGame implements Listener {
                 if (pursuit.lostSightSince < 0L) {
                     pursuit.lostSightSince = now;
                     pursuit.lostSightDueToSmoke = alive.contains(pursuerId) && withinPursuitRange
-                            && CameraShyRules.shouldAwardSmokeEscape(smokeObscured, now,
+                            && CameraShyRules.shouldAwardSmokeEscape(ownSmokeObscured, now,
                                     smokeUsedUntil.getOrDefault(victimId, 0L));
                 }
                 boolean escaped = pursuer == null || !pursuer.isOnline() || !alive.contains(pursuerId)
