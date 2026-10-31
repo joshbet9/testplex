@@ -1662,6 +1662,10 @@ public final class ArcadePortManager implements Listener {
         if (beginAutomaticVote) beginAutomaticRotationVote();
     }
 
+    String previousRotationGameId() {
+        return lastAutomaticRotationGameId;
+    }
+
     private List<Player> automaticRotationLobbyPlayers() {
         List<Player> eligible = new ArrayList<>();
         for (Player player : Bukkit.getOnlinePlayers()) {
