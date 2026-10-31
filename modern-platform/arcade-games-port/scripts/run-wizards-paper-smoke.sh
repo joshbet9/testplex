@@ -51,7 +51,7 @@ wizards:
   allow-solo-start: false
   minimum-players: 2
   kits:
-    default: MAGE
+    default: WIZARD
   destructive-spells: false
   temporary-spell-fire: true
   destructive-endgame-blocks: false

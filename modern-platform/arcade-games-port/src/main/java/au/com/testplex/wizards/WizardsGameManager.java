@@ -136,7 +136,6 @@ public final class WizardsGameManager implements Listener {
     private int startingPlayerCount;
     private int paceStep;
     private boolean endgameStarted;
-    private boolean suddenDeathTriggered;
     private int endgameType;
     private int endgameMessageCounter;
     private int nextEndgameStrikeMillis = WizardsRules.ENDGAME_INITIAL_STRIKE_MILLIS;
@@ -407,8 +406,8 @@ public final class WizardsGameManager implements Listener {
     }
 
     private WizardsKit defaultKit() {
-        WizardsKit kit = WizardsKit.parse(plugin.getConfig().getString("wizards.kits.default", "MAGE"));
-        return kit == null ? WizardsKit.MAGE : kit;
+        WizardsKit kit = WizardsKit.parse(plugin.getConfig().getString("wizards.kits.default", "WIZARD"));
+        return kit == null ? WizardsKit.WIZARD : kit;
     }
 
     public void start(org.bukkit.command.CommandSender sender) {
@@ -632,7 +631,7 @@ public final class WizardsGameManager implements Listener {
         while (paceStep < WizardsRules.GAME_PACE_MINUTES.length
                 && elapsed >= WizardsRules.GAME_PACE_MINUTES[paceStep] * 60_000L) {
             paceStep++;
-            float modifier = Math.max(0.5F, 1.0F - paceStep * 0.1F);
+            float modifier = (float) Math.pow(0.9D, paceStep);
             for (WizardState state : states.values()) state.cooldownModifier = modifier;
             for (Player player : alivePlayers()) {
                 player.sendMessage(ChatColor.YELLOW + "Power surges through the battlefield! Spell costs and cooldowns are reduced.");
@@ -692,10 +691,6 @@ public final class WizardsGameManager implements Listener {
             }
         }
 
-        if (!suddenDeathTriggered && elapsed >= WizardsRules.SUDDEN_DEATH_MINUTES * 60_000L) {
-            suddenDeathTriggered = true;
-            applySuddenDeath();
-        }
     }
 
     private void announceEndgameWarning(int index) {
@@ -748,6 +743,7 @@ public final class WizardsGameManager implements Listener {
     }
 
     private void makeEndgameLightning() {
+        endgameSize = Math.min(10.0F, endgameSize + 0.04F);
         Location location = getEndgameLocation();
         if (location == null) return;
         World world = location.getWorld();
@@ -876,18 +872,6 @@ public final class WizardsGameManager implements Listener {
         }
     }
 
-    private void applySuddenDeath() {
-        List<Player> players = alivePlayers();
-        if (players.size() <= 1) return;
-        players.sort(Comparator.comparingDouble(Player::getHealth).reversed());
-        for (int i = 0; i < players.size() - 1; i++) {
-            Player player = players.get(i);
-            player.sendMessage(ChatColor.RED.toString() + ChatColor.BOLD + "The final magic consumes all but one wizard!");
-            player.damage(9999.0D);
-        }
-        Bukkit.getScheduler().runTaskLater(plugin, this::checkWinner, 2L);
-    }
-
     private List<Player> alivePlayers() {
         List<Player> players = new ArrayList<>();
         for (Map.Entry<UUID, WizardState> entry : states.entrySet()) {
@@ -992,7 +976,7 @@ public final class WizardsGameManager implements Listener {
             lore.add(ChatColor.GRAY + "Right-click to choose a spell");
         } else {
             int level = state.known.getOrDefault(spell, 1);
-            lore.add(ChatColor.YELLOW + "Mana: " + ChatColor.WHITE + spell.manaCost(level));
+            lore.add(ChatColor.YELLOW + "Mana: " + ChatColor.WHITE + spell.manaCost(level, state.cooldownModifier));
             lore.add(ChatColor.YELLOW + "Cooldown: " + ChatColor.WHITE + spell.cooldownSeconds(level, state.cooldownModifier) + "s");
             lore.add(ChatColor.GRAY + "Left-click to cast");
             lore.add(ChatColor.GRAY + "Right-click to change spell");
@@ -1274,7 +1258,7 @@ public final class WizardsGameManager implements Listener {
                 int level = lightning.getPersistentDataContainer().getOrDefault(
                         anvilLevelKey, PersistentDataType.INTEGER, 1);
                 victim.setFireTicks(80);
-                victim.damage(2.0D + 4.0D * level, owner);
+                victim.damage(WizardsRules.lightningStrikeDamage(level), owner);
                 victim.getWorld().spawnParticle(Particle.ELECTRIC_SPARK,
                         victim.getLocation().add(0.0D, 1.0D, 0.0D), 18, 0.35D, 0.45D, 0.35D, 0.08D);
             }
@@ -1306,11 +1290,10 @@ public final class WizardsGameManager implements Listener {
                     event.setCancelled(true);
                     return;
                 }
-                if ("web-shot".equals(projectileSpell) || "ice-prison".equals(projectileSpell)
-                        || "fireball".equals(projectileSpell)) {
+                if ("ice-prison".equals(projectileSpell) || "fireball".equals(projectileSpell)) {
                     // Fireball damage is resolved once by the custom impact/AOE
                     // handler below; allowing vanilla's direct hit as well would
-                    // damage the direct target twice.
+                    // damage the direct target twice. Ice Prison is a control spell.
                     event.setCancelled(true);
                     return;
                 }
@@ -1821,8 +1804,7 @@ public final class WizardsGameManager implements Listener {
                 if (victim != null) {
                     end = victim.getEyeLocation();
                     double distance = caster.getEyeLocation().distance(end);
-                    double damage = (level * 2.0D) + 2.0D;
-                    if (distance > 16.0D) damage = Math.max(1.0D, damage * (1.0D - (distance - 16.0D) / 64.0D));
+                    double damage = WizardsRules.rainbowBeamDamage(level, distance);
                     victim.damage(damage, caster);
                     victim.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, victim.getLocation().add(0.0D, 1.0D, 0.0D),
                             18, 0.35D, 0.45D, 0.35D, 0.08D);
@@ -1960,7 +1942,8 @@ public final class WizardsGameManager implements Listener {
                 projectile.getPersistentDataContainer().set(projectileKey, PersistentDataType.STRING, spell.id());
                 projectile.getPersistentDataContainer().set(projectileOwnerKey, PersistentDataType.STRING, caster.getUniqueId().toString());
                 projectile.getPersistentDataContainer().set(anvilLevelKey, PersistentDataType.INTEGER, level);
-                double damage = spell == WizardsSpell.MANA_BOLT ? 4.0D + level * 2.0D : level + 6.0D;
+                double damage = spell == WizardsSpell.MANA_BOLT
+                        ? WizardsRules.manaBoltDamage(level) : WizardsRules.fireballDamage(level);
                 projectile.getPersistentDataContainer().set(projectileDamageKey, PersistentDataType.DOUBLE, damage);
                 if (spell == WizardsSpell.MANA_BOLT) {
                     manaBolts.put(projectile.getUniqueId(), new ManaBoltData(caster.getUniqueId(), level, caster.getLocation().clone()));
@@ -2014,9 +1997,8 @@ public final class WizardsGameManager implements Listener {
                 Vector facing = caster.getLocation().getDirection().setY(0.0D);
                 if (facing.lengthSquared() < 0.001D) facing.setZ(1.0D);
                 facing.normalize();
-                Vector gustVelocity = facing.clone().multiply(1.5D).setY(0.3D)
-                        .multiply(1.2D + level * 0.4D);
-                double gustSize = level * 3.0D + 10.0D;
+                Vector gustVelocity = facing.clone().multiply(0.3D * level).setY(0.1D * level);
+                double gustSize = level * 10.0D;
                 List<Map.Entry<Player, Double>> affected = new ArrayList<>();
                 for (Player target : alivePlayers()) {
                     if (target.equals(caster) || !target.getWorld().equals(caster.getWorld())
@@ -2052,7 +2034,7 @@ public final class WizardsGameManager implements Listener {
             case HEAL: {
                 double maximum = caster.getAttribute(Attribute.MAX_HEALTH) == null
                         ? 20.0D : caster.getAttribute(Attribute.MAX_HEALTH).getValue();
-                double heal = 3.0D + level;
+                double heal = WizardsRules.healAmount(level);
                 if (caster.getHealth() >= maximum) {
                     caster.sendMessage(ChatColor.YELLOW + "You are already at full health.");
                     return false;
@@ -2084,7 +2066,7 @@ public final class WizardsGameManager implements Listener {
                 return true;
             }
             case WIZARDS_COMPASS: {
-                Player target = findTargetPlayer(caster, 100.0D);
+                Player target = findNearestPlayer(caster, 100.0D);
                 if (target == null) {
                     caster.sendMessage(ChatColor.GRAY + "No other living wizard could be found.");
                     return false;
@@ -2195,7 +2177,7 @@ public final class WizardsGameManager implements Listener {
                 Material.LIGHT_BLUE_STAINED_GLASS, Material.BLUE_STAINED_GLASS, Material.PURPLE_STAINED_GLASS,
                 Material.MAGENTA_STAINED_GLASS, Material.PINK_STAINED_GLASS
         };
-        final int maximumSteps = 3 + 10 * level;
+        final int maximumSteps = 10 * level;
         scheduleSpellTask(new BukkitRunnable() {
             private int steps;
             private int colourIndex;
@@ -2283,7 +2265,7 @@ public final class WizardsGameManager implements Listener {
                         double height = feet.getY() - block.getY();
                         if (height < 0.0D || height > 3.0D) continue;
                         hit.add(victim.getUniqueId());
-                        victim.damage(4.0D + level * 2.0D, caster);
+                        victim.damage(WizardsRules.rumbleDamage(level), caster);
                         victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 60,
                                 Math.max(0, level - 1), true, true, true));
                         break;
@@ -2313,7 +2295,7 @@ public final class WizardsGameManager implements Listener {
             if (victim.equals(caster) || !victim.getWorld().equals(centre.getWorld())) continue;
             double distance = victim.getLocation().distance(centre);
             if (distance >= 2.0D) continue;
-            double damage = (1.0D + level / 5.0D) * (2.0D - distance);
+            double damage = WizardsRules.rumbleExplosionDamage(level);
             victim.damage(damage, caster);
             Vector push = victim.getLocation().toVector().subtract(centre.toVector());
             if (push.lengthSquared() > 0.001D) victim.setVelocity(push.normalize().multiply(0.8D).setY(0.38D));
@@ -2323,7 +2305,8 @@ public final class WizardsGameManager implements Listener {
     private boolean placeTrapRune(Player caster, int level, Block clickedBlock) {
         Block target = clickedBlock != null ? clickedBlock : caster.getTargetBlockExact(WizardsRules.trapRuneRange(level));
         if (target == null || !target.getType().isSolid()) {
-            caster.sendMessage(ChatColor.RED + "Trap Rune needs a solid floor within " + (level * 4 + 4) + " blocks.");
+            caster.sendMessage(ChatColor.RED + "Trap Rune needs a solid floor within "
+                    + WizardsRules.trapRuneRange(level) + " blocks.");
             return false;
         }
         Location centre = target.getLocation().add(0.5D, 1.0D, 0.5D);
@@ -2355,12 +2338,12 @@ public final class WizardsGameManager implements Listener {
             }
             long ageTicks = (now - rune.createdAt) / 50L;
             boolean armed = ageTicks >= 100L;
-            if (tick % 5 == 0) drawTrapRune(rune.centre, rune.size, armed);
+            if (!armed && tick % 5 == 0) drawTrapRune(rune.centre, rune.size, false);
             if (!armed) continue;
 
             Player trigger = null;
             for (Player victim : alivePlayers()) {
-                if (victim.equals(owner) || !victim.getWorld().equals(rune.centre.getWorld())) continue;
+                if (!victim.getWorld().equals(rune.centre.getWorld())) continue;
                 Location loc = victim.getLocation();
                 if (Math.abs(loc.getX() - rune.centre.getX()) <= rune.size
                         && Math.abs(loc.getZ() - rune.centre.getZ()) <= rune.size
@@ -2509,6 +2492,7 @@ public final class WizardsGameManager implements Listener {
         Snowball web = caster.launchProjectile(Snowball.class);
         web.setVelocity(caster.getEyeLocation().getDirection().normalize().multiply(1.5D));
         web.getPersistentDataContainer().set(projectileKey, PersistentDataType.STRING, "web-shot");
+        web.getPersistentDataContainer().set(projectileDamageKey, PersistentDataType.DOUBLE, 2.0D);
         ownedEntities.add(web.getUniqueId());
     }
 
@@ -2523,6 +2507,20 @@ public final class WizardsGameManager implements Listener {
             }
         }
         return null;
+    }
+
+    private Player findNearestPlayer(Player caster, double range) {
+        Player nearest = null;
+        double nearestDistance = range * range;
+        for (Player candidate : alivePlayers()) {
+            if (candidate.equals(caster) || !candidate.getWorld().equals(caster.getWorld())) continue;
+            double distance = caster.getLocation().distanceSquared(candidate.getLocation());
+            if (distance < nearestDistance) {
+                nearest = candidate;
+                nearestDistance = distance;
+            }
+        }
+        return nearest;
     }
 
     private Player findTargetPlayer(Player caster, double range) {
@@ -2760,6 +2758,7 @@ public final class WizardsGameManager implements Listener {
 
     private String prettyKit(WizardsKit kit) {
         return switch (kit) {
+            case WIZARD -> "Wizard";
             case MAGE -> "Mage";
             case SORCERER -> "Sorcerer";
             case MYSTIC -> "Mystic";

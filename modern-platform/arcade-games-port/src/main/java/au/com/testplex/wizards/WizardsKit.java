@@ -3,6 +3,7 @@ package au.com.testplex.wizards;
 import java.util.Locale;
 
 public enum WizardsKit {
+    WIZARD(100.0F, 2.5F, 2),
     MAGE(100.0F, 2.5F, 2),
     SORCERER(100.0F, 2.5F, 3),
     MYSTIC(100.0F, 2.75F, 2),

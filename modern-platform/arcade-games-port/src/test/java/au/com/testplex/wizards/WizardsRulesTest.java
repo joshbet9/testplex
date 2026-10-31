@@ -54,6 +54,39 @@ class WizardsRulesTest {
     }
 
     @Test
+    void usesTheOriginalMineplexKitPerksAndWizardDefault() {
+        assertEquals(WizardsKit.WIZARD, WizardsKit.parse("wizard"));
+        assertEquals(100.0F, WizardsRules.maximumMana(WizardsKit.WIZARD));
+        assertEquals(2.5F, WizardsRules.manaPerSecond(WizardsKit.WIZARD, 0));
+        assertEquals(2, WizardsRules.startingWands(WizardsKit.WIZARD));
+        assertEquals(2, WizardsRules.startingWands(WizardsKit.MAGE));
+        assertEquals(3, WizardsRules.startingWands(WizardsKit.SORCERER));
+        assertEquals(2.75F, WizardsRules.manaPerSecond(WizardsKit.MYSTIC, 0));
+        assertEquals(150.0F, WizardsRules.maximumMana(WizardsKit.WITCH_DOCTOR));
+    }
+
+    @Test
+    void followsTheOriginalPowerSurgeScheduleAndSpellFormulas() {
+        assertEquals(java.util.List.of(4, 5, 6, 7, 8, 9), WizardsRules.gamePaceMinutes());
+        assertEquals(5, WizardsSpell.ICE_SHARDS.maximumLevel());
+        assertEquals(5, WizardsSpell.RUMBLE.maximumLevel());
+        assertEquals(3.0D, WizardsRules.manaBoltDamage(1), 0.000001D);
+        assertEquals(4.0D, WizardsRules.fireballDamage(1), 0.000001D);
+        assertEquals(4.0D, WizardsRules.lightningStrikeDamage(1), 0.000001D);
+        assertEquals(2.0D, WizardsRules.healAmount(1), 0.000001D);
+        assertEquals(4.0D, WizardsRules.healAmount(5), 0.000001D);
+        assertEquals(5.0D, WizardsRules.rainbowBeamDamage(3, 30), 0.000001D);
+        assertEquals(3.0D, WizardsRules.rainbowBeamDamage(3, 40), 0.000001D);
+        assertEquals(3, WizardsRules.summonedWolfCount(1));
+        assertEquals(16, WizardsRules.trapRuneRange(1));
+        assertEquals(1.0D, WizardsRules.trapRuneSize(1), 0.000001D);
+        assertEquals(5.0D, WizardsRules.trapRuneDamage(1), 0.000001D);
+        assertEquals(3.0D, WizardsRules.spectralArrowDamage(1, 0), 0.000001D);
+        assertEquals(3.0D, WizardsRules.rumbleDamage(1), 0.000001D);
+        assertEquals(0.25D, WizardsRules.rumbleExplosionDamage(1), 0.000001D);
+    }
+
+    @Test
     void rejectsNegativeOrNonFiniteDamageInputs() {
         assertEquals(0.0D, WizardsRules.capMeleeDamage(-1.0D), 0.000001D);
         assertEquals(0.0D, WizardsRules.capMeleeDamage(Double.NaN), 0.000001D);

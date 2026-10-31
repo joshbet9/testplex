@@ -352,19 +352,19 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
                 if (args.length >= 2 && isWizardsId(args[1])) {
                     if (args.length < 3) {
-                        player.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit wizards <mage|sorcerer|mystic|witchdoctor>");
+                        player.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit wizards <wizard|mage|sorcerer|mystic|witchdoctor>");
                         return true;
                     }
                     WizardsKit kit = WizardsKit.parse(args[2]);
                     if (kit == null) {
-                        player.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit wizards <mage|sorcerer|mystic|witchdoctor>");
+                        player.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit wizards <wizard|mage|sorcerer|mystic|witchdoctor>");
                     } else if (wizards != null) {
                         wizards.setKit(player, kit);
                     }
                     return true;
                 }
                 if (args.length < 2) {
-                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit <game-kit>; use /arcadeport kit wizards <mage|sorcerer|mystic|witchdoctor> for Wizards");
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit <game-kit>; use /arcadeport kit wizards <wizard|mage|sorcerer|mystic|witchdoctor> for Wizards");
                     return true;
                 }
                 manager.selectKit(player, args[1]);

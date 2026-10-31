@@ -12,9 +12,8 @@ public final class WizardsRules {
     public static final int MAGE_STARTER_SPELL_SELECTION_ATTEMPTS = 100;
     public static final int BASE_MANA_BOOK_CONVERSION = 50;
     public static final int FULL_WAND_CONVERSION = 100;
-    public static final int GAME_PACE_MINUTES[] = {2, 4, 6, 8, 9};
+    public static final int[] GAME_PACE_MINUTES = {4, 5, 6, 7, 8, 9};
     public static final int ENDGAME_START_MINUTES = 10;
-    public static final int SUDDEN_DEATH_MINUTES = 20;
     public static final int ENDGAME_INITIAL_STRIKE_MILLIS = 6_000;
     public static final int ENDGAME_MIN_STRIKE_MILLIS = 750;
     public static final int ENDGAME_STRIKE_REDUCTION_PER_TICK_MILLIS = 2;
@@ -70,7 +69,7 @@ public final class WizardsRules {
     }
 
     public static int summonedWolfCount(int spellLevel) {
-        return Math.max(0, spellLevel);
+        return Math.max(0, spellLevel) + 2;
     }
 
     public static int webShotCount(int spellLevel) {
@@ -78,20 +77,51 @@ public final class WizardsRules {
     }
 
     public static int trapRuneRange(int spellLevel) {
-        return Math.max(0, spellLevel) * 4 + 4;
+        return Math.max(0, spellLevel) * 4 + 12;
     }
 
     public static double trapRuneSize(int spellLevel) {
-        return Math.max(1.0D, Math.max(0, spellLevel) * 0.8D);
+        return Math.max(0, spellLevel);
     }
 
     public static double trapRuneDamage(int spellLevel) {
-        return Math.max(0, spellLevel) * 4.0D + 6.0D;
+        return Math.max(0, spellLevel) * 2.0D + 3.0D;
     }
 
     public static double spectralArrowDamage(int spellLevel, double travelledBlocks) {
         if (!Double.isFinite(travelledBlocks) || travelledBlocks < 0) return 0.0D;
-        return 6.0D + travelledBlocks / Math.max(1.0D, 7.0D - Math.max(1, spellLevel));
+        int level = Math.max(1, Math.min(3, spellLevel));
+        return 3.0D + travelledBlocks / (7.0D - level);
+    }
+
+    public static double manaBoltDamage(int spellLevel) {
+        return Math.max(0, spellLevel) + 2.0D;
+    }
+
+    public static double fireballDamage(int spellLevel) {
+        return Math.max(0, spellLevel) + 3.0D;
+    }
+
+    public static double lightningStrikeDamage(int spellLevel) {
+        return Math.max(0, spellLevel) * 2.0D + 2.0D;
+    }
+
+    public static double healAmount(int spellLevel) {
+        return Math.max(0, spellLevel) / 2.0D + 1.5D;
+    }
+
+    public static double rainbowBeamDamage(int spellLevel, double travelledBlocks) {
+        if (!Double.isFinite(travelledBlocks) || travelledBlocks < 0) return 0.0D;
+        return Math.max(0.0D, Math.max(0, spellLevel) + 2.0D
+                - Math.max(0.0D, travelledBlocks - 30.0D) * 0.2D);
+    }
+
+    public static double rumbleDamage(int spellLevel) {
+        return Math.max(0, spellLevel) + 2.0D;
+    }
+
+    public static double rumbleExplosionDamage(int spellLevel) {
+        return Math.max(0, spellLevel) / 4.0D;
     }
 
     public static double manaBoltVelocity() { return 0.3D; }
@@ -145,6 +175,6 @@ public final class WizardsRules {
     }
 
     public static List<Integer> gamePaceMinutes() {
-        return List.of(2, 4, 6, 8, 9);
+        return List.of(4, 5, 6, 7, 8, 9);
     }
 }
