@@ -13,7 +13,8 @@ Plexball is an experimental in-process mode hosted by `ArcadeMechanicsModern`. I
 - `/stats` or `/stats plexball` — open the Plexball career page with achievements, milestone progress and lifetime statistics.
 - `/arcadeport join plexball` — normal five-second queue countdown.
 - `/arcadeport play plexball` — quick two-second queue countdown.
-- `/arcadeport leave plexball` — leave the queue before a match starts.
+- `/arcadeport spectate plexball` — join an active match as a non-playing spectator.
+- `/arcadeport leave plexball` — leave the queue or stop spectating and return to the Arcade lobby.
 - `/arcadeport start plexball` — operator-only immediate start for two or more queued players.
 - `/arcadeport status` — shows the Plexball queue or current phase.
 - `/arcadeport stop` — operator stop and return to lobby.
@@ -57,6 +58,7 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 | Test | Expected |
 | --- | --- |
 | Join with 2–8 players | Queue starts and every participant enters the separate Plexball arena. |
+| Spectate active match | `/arcadeport spectate plexball` joins an active game as a spectator, outside the player roster; spectators do not bat, field, score, unlock progression or change match results. |
 | Queue leave | A player can remove themselves while queued; countdown resets if the queue falls below two players. |
 | Queue disconnect | A queued player's disconnect immediately updates the queue and cancels the countdown if fewer than two players remain. |
 | Batter turn | Only the selected batter can hit; movement is locked but look direction remains available. |
@@ -66,6 +68,7 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 | Standings | Distance and successful catches are broadcast after each completed batting attempt. |
 | Final results | Players receive a final hitting/fielding leaderboard and a personal recap with best hit, total uncaught distance, catches, home runs and at-bats. |
 | Player HUD | Every participant sees a live sidebar with phase, match clock, current batter, personal best, catches, kit/ability and the top three distances. |
+| Spectator camera and HUD | Spectators follow the batter between turns and the ItemDisplay ball during flight; a spectator-only scoreboard shows match time, batter, players and top five distances. |
 | Progression menu | `/stats plexball` opens a read-only inventory page listing all nine achievements, four long-term career goals and the player's saved totals. |
 | Achievement unlocks | Each achievement unlocks once, is saved per UUID, and notifies the player with a message and challenge-complete sound. |
 | Milestone unlocks | Wins (250), successful catches (300), home runs (100) and uncaught hit distance (10km) progress cumulatively and persist between restarts. |
@@ -83,6 +86,7 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 | Sudden-death timeout | The hard cap only applies survivor elimination after every finalist has had a turn in that round; an interrupted round keeps all remaining finalists eligible and ranks them on completed match performance. |
 | Match cap | The game ends at 180 seconds of wall-clock time, even if server TPS falls below 20. |
 | Cleanup | Ball, tee Interaction and player inventories are cleaned; online participants return to the shared Arcade lobby. |
+| Spectator cleanup | Spectators are returned to the Arcade lobby when the match ends or is stopped, when they use `/arcadeport leave plexball`, or on server shutdown. |
 | Match disconnect | A disconnected batter's turn resolves safely; a disconnected fielder is removed from active catch checks and the remaining players are notified. |
 | Repeated rounds | Field generation marker prevents rebuilding the entire field on every match. |
 
@@ -118,4 +122,4 @@ A high-ping client must not receive a catch merely because its packet arrived la
 - The current version uses right-click to swing at the tee Interaction entity and right-click the glove to attempt a catch. The match HUD uses a persistent scoreboard, role-specific action-bar prompts and phase/result titles. It does not provide a custom client-side crosshair overlay or a full swing animation.
 - Ball rendering is an ItemDisplay moved by the server-side simulation. Its visual smoothness may vary by client FPS/network, but the server path and score do not.
 - The current catch rewind is capped at five ticks (approximately 250ms one-way estimate). Do not advertise Plexball as completely ping independent; validate the RTT matrix and adjust only with measured evidence.
-- Achievements and career milestones are implemented in a local Testplex profile (`plexball-progression.yml`). They provide unlock notifications and a stats menu, but do not award production Mineplex currency, XP, titles or cosmetics. Ranked leaderboards, spectator controls and public matchmaking are still out of scope.
+- Achievements and career milestones are implemented in a local Testplex profile (`plexball-progression.yml`). They provide unlock notifications and a stats menu, but do not award production Mineplex currency, XP, titles or cosmetics. Ranked leaderboards and public matchmaking are still out of scope. Spectating is a read-only observer role for active test matches, limited to 16 concurrent viewers.
