@@ -88,6 +88,10 @@ final class ArcadeTestPlayerManager {
         return Math.max(0, TARGET_ROSTER_SIZE - Math.max(0, humanPlayers));
     }
 
+    static boolean canFitHumanPlayers(int humanPlayers) {
+        return Math.max(0, humanPlayers) <= TARGET_ROSTER_SIZE;
+    }
+
     boolean isTestPlayer(UUID id) {
         if (id == null) return false;
         if (activeHandles.containsKey(id) || retiringHandles.containsKey(id)) return true;

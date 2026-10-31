@@ -1535,6 +1535,12 @@ public final class ArcadePortManager implements Listener {
         }
         // Console/admin starts with no queued humans still receive a full 16-player
         // fixture roster. The human count is simply zero in this case.
+        if (!ArcadeTestPlayerManager.canFitHumanPlayers(humanIds.size())) {
+            sender.sendMessage(ChatColor.RED + "Start cancelled: the test roster is limited to 16 total players. "
+                    + "Remove " + (humanIds.size() - ArcadeTestPlayerManager.TARGET_ROSTER_SIZE)
+                    + " queued human player(s) and retry.");
+            return;
+        }
         if (!testPlayers.isStartupCleanupComplete()) {
             sender.sendMessage(ChatColor.YELLOW + "Test-player cleanup is still running after server startup. Retry Start Game in a moment.");
             return;

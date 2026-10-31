@@ -3,6 +3,8 @@ package au.com.testplex.arcadeports;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ArcadeTestPlayerManagerTest {
     @Test
@@ -15,6 +17,14 @@ class ArcadeTestPlayerManagerTest {
         assertEquals(0, ArcadeTestPlayerManager.additionalPlayersNeeded(16));
         assertEquals(0, ArcadeTestPlayerManager.additionalPlayersNeeded(20));
         assertEquals(16, ArcadeTestPlayerManager.additionalPlayersNeeded(-3));
+    }
+
+    @Test
+    void rejectsHumanQueuesLargerThanTheSixteenPlayerFixtureRoster() {
+        assertTrue(ArcadeTestPlayerManager.canFitHumanPlayers(0));
+        assertTrue(ArcadeTestPlayerManager.canFitHumanPlayers(16));
+        assertFalse(ArcadeTestPlayerManager.canFitHumanPlayers(17));
+        assertFalse(ArcadeTestPlayerManager.canFitHumanPlayers(20));
     }
 
     @Test
