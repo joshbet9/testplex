@@ -63,7 +63,7 @@ A high-ping client must not receive a catch merely because its packet arrived la
 ## Anti-cheat checks
 
 - Repeated fixed-delay swing macros must not consistently obtain perfect timing because each at-bat receives a server-generated random phase and cycle.
-- Repeated clicks cannot produce more than one swing; once contact is accepted the phase leaves BATTING.
+- Repeated clicks cannot produce more than one swing; the first click on the tee Interaction consumes the at-bat even when it misses or is foul.
 - The larger tee Interaction entity is only an interaction target; the server ray must hit the actual ball sphere.
 - Catch spamming cannot create repeated windows; each fielder has one catch action per ball.
 - Client timestamps, reported trajectory, reported hit power and reported distance are not inputs to the result.
@@ -72,7 +72,7 @@ A high-ping client must not receive a catch merely because its packet arrived la
 
 ## Known experimental limits
 
-- The current version uses right-click to swing at the tee Interaction entity and right-click the glove to attempt a catch. It does not yet provide a custom client-side crosshair overlay or a fully animated timing meter.
+- The current version uses right-click to swing at the tee Interaction entity and right-click the glove to attempt a catch. It has a simple action-bar beat indicator, but not a custom client-side crosshair overlay or a full swing animation.
 - Ball rendering is an ItemDisplay moved by the server-side simulation. Its visual smoothness may vary by client FPS/network, but the server path and score do not.
 - The current catch rewind is capped at five ticks (approximately 250ms one-way estimate). Do not advertise Plexball as completely ping independent; validate the RTT matrix and adjust only with measured evidence.
 - Cosmetics, achievements, ranked statistics, spectator controls and a public matchmaking/lobby selector are not part of this first mechanics prototype.
