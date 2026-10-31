@@ -13,6 +13,7 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
@@ -43,6 +44,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
@@ -146,6 +148,11 @@ public final class HoopsRemasteredRuntime implements Listener {
 
     private static void buildArenaShell(World world) {
         // Coloured spectator seating beyond the boundary, with a simple enclosed arena shell.
+        for (int x = -23; x <= 23; x++) {
+            for (int z = -21; z <= 21; z++) {
+                if (z < -14 || z > 14) world.getBlockAt(x, FLOOR_Y, z).setType(Material.GRAY_CONCRETE, false);
+            }
+        }
         for (int x = -22; x <= 22; x++) {
             for (int row = 0; row < 3; row++) {
                 world.getBlockAt(x, FLOOR_Y + 1 + row, -15 - row).setType(Material.RED_CONCRETE, false);
@@ -208,8 +215,8 @@ public final class HoopsRemasteredRuntime implements Listener {
         world.getBlockAt(rimX + 1, 66, 0).setType(Material.IRON_BARS, false);
         world.getBlockAt(rimX, 66, -1).setType(Material.IRON_BARS, false);
         world.getBlockAt(rimX, 66, 1).setType(Material.IRON_BARS, false);
-        world.getBlockAt(rimX - 1, 65, 0).setType(Material.CHAIN, false);
-        world.getBlockAt(rimX + 1, 65, 0).setType(Material.CHAIN, false);
+        world.getBlockAt(rimX - 1, 65, 0).setType(Material.IRON_CHAIN, false);
+        world.getBlockAt(rimX + 1, 65, 0).setType(Material.IRON_CHAIN, false);
     }
 
     public boolean isActive(World world) {
@@ -237,6 +244,7 @@ public final class HoopsRemasteredRuntime implements Listener {
             player.setFlying(false);
             player.getInventory().clear();
             player.getInventory().setHeldItemSlot(0);
+            equipTeamUniform(player, team);
             player.setWalkSpeed(0.2F);
             player.setGameMode(org.bukkit.GameMode.ADVENTURE);
             player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "HOOPS REMASTERED");
@@ -260,6 +268,27 @@ public final class HoopsRemasteredRuntime implements Listener {
         current.task = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(current), 1L, 1L);
         updateHud(current, true);
         announce(current, ChatColor.GREEN + "Tip-off! " + ChatColor.YELLOW + first.getName() + ChatColor.GREEN + " has the ball.");
+    }
+
+    private void equipTeamUniform(Player player, int team) {
+        Color colour = team == 0 ? Color.fromRGB(190, 48, 52) : Color.fromRGB(48, 122, 205);
+        ItemStack[] armour = new ItemStack[] {
+                new ItemStack(Material.LEATHER_BOOTS),
+                new ItemStack(Material.LEATHER_LEGGINGS),
+                new ItemStack(Material.LEATHER_CHESTPLATE),
+                null
+        };
+        String teamName = team == 0 ? "RED" : "BLUE";
+        for (ItemStack piece : armour) {
+            if (piece == null) continue;
+            ItemMeta meta = piece.getItemMeta();
+            if (meta instanceof LeatherArmorMeta leather) {
+                leather.setColor(colour);
+                leather.setDisplayName(ChatColor.WHITE + teamName + " Hoops Uniform");
+                piece.setItemMeta(leather);
+            }
+        }
+        player.getInventory().setArmorContents(armour);
     }
 
     private Scoreboard createScoreboard(Match current) {
@@ -328,7 +357,7 @@ public final class HoopsRemasteredRuntime implements Listener {
                     ChatColor.GOLD + "SHOT: " + shotSeconds + "s",
                     ChatColor.WHITE + "BALL: " + possession,
                     ChatColor.GRAY + (current.overtime ? "NEXT BASKET WINS" : "FIRST TO 21"),
-                    ChatColor.DARK_GRAY + "NO WIN BY 2");
+                    ChatColor.DARK_GRAY + "WIN BY TWO: OFF");
             for (String entry : current.scoreboardEntries) current.scoreboard.resetScores(entry);
             int score = entries.size();
             for (String entry : entries) current.sidebar.getScore(entry).setScore(score--);
@@ -347,7 +376,8 @@ public final class HoopsRemasteredRuntime implements Listener {
         String title = ChatColor.RED + "RED " + current.teamScore[0] + ChatColor.DARK_GRAY + "  -  "
                 + ChatColor.AQUA + "BLUE " + current.teamScore[1] + ChatColor.DARK_GRAY + "  |  "
                 + ChatColor.YELLOW + (current.overtime ? "OVERTIME — NEXT BASKET WINS"
-                : clock + "  |  SHOT " + shotSeconds + "s");
+                : clock + "  |  SHOT " + shotSeconds + "s")
+                + (current.overtime ? ChatColor.DARK_GRAY + "  |  SHOT " + shotSeconds + "s" : "");
         if (current.bossBar != null) {
             current.bossBar.setTitle(title);
             current.bossBar.setColor(current.overtime ? BarColor.YELLOW
@@ -796,11 +826,13 @@ public final class HoopsRemasteredRuntime implements Listener {
     }
 
     private ItemStack basketballItem() {
-        ItemStack item = new ItemStack(Material.SLIME_BALL);
+        ItemStack item = new ItemStack(Material.MAGMA_CREAM);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             meta.setDisplayName(ChatColor.GOLD + "" + ChatColor.BOLD + "Basketball");
-            meta.setLore(List.of(ChatColor.GRAY + "Left-click: pass", ChatColor.GRAY + "Right-click: shoot"));
+            meta.setLore(List.of(ChatColor.GRAY + "Left-click: pass",
+                    ChatColor.GRAY + "Right-click: shoot / layup",
+                    ChatColor.GRAY + "Jump toward rim + right-click: dunk"));
             meta.getPersistentDataContainer().set(ballItemKey, PersistentDataType.BYTE, (byte) 1);
             item.setItemMeta(meta);
         }
@@ -808,7 +840,7 @@ public final class HoopsRemasteredRuntime implements Listener {
     }
 
     private ItemStack ballDisplayItem() {
-        ItemStack item = new ItemStack(Material.SLIME_BALL);
+        ItemStack item = new ItemStack(Material.MAGMA_CREAM);
         ItemMeta meta = item.getItemMeta();
         if (meta != null) {
             meta.setDisplayName(ChatColor.GOLD + "Basketball");

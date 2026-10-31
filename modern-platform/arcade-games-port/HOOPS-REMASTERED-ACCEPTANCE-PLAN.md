@@ -31,7 +31,8 @@
 - Maven compile/test must pass on Paper 26.3 / Java 25.
 
 ## Live acceptance still required
-- Confirm the enclosed court, seating, lighting, centre display scoreboard and hoop geometry look correct from both ends.
+- Confirm the enclosed court, coloured spectator seating/platforms, lighting, centre display scoreboard and hoop geometry look correct from both ends.
+- Confirm RED / BLUE vanilla dyed leather uniforms and name colours survive the match and are fully restored afterward.
 - Verify bossbar, sidebar, floating scoreboard, team-coloured names and tab-list entries stay in sync for every player.
 - Test crosshair shooting at several angles, layups, rising-jump dunks, both hoops, two/three-point line boundary, missed-shot rebound and blocked shot.
 - Test passes under pressure, teammate catches, missed pass recovery, facing-dependent steals, timed/facing-dependent blocks, shot-clock turnover, inventory/drop protection and disconnect while holding the ball.
