@@ -28,12 +28,15 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
+import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -337,6 +340,8 @@ public final class SuperSploorRuntime implements Listener {
         Player player = event.getPlayer();
         UUID id = player.getUniqueId();
         if (!players.containsKey(id) || !player.isOnline() || respawnAt.containsKey(id)) return;
+        // Map interaction is disabled during the match; only the current primary weapon fires.
+        event.setCancelled(true);
         if (!event.getAction().isRightClick()) return;
         ItemStack held = event.getItem();
         if (held == null || held.getType() != Material.BLAZE_ROD
@@ -394,6 +399,23 @@ public final class SuperSploorRuntime implements Listener {
             }
         }
         projectile.remove();
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onBlockBreak(BlockBreakEvent event) {
+        if (running && players.containsKey(event.getPlayer().getUniqueId())
+                && event.getBlock().getWorld() == world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onBlockPlace(BlockPlaceEvent event) {
+        if (running && players.containsKey(event.getPlayer().getUniqueId())
+                && event.getBlock().getWorld() == world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onDrop(PlayerDropItemEvent event) {
+        if (running && players.containsKey(event.getPlayer().getUniqueId())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
