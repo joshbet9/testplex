@@ -124,4 +124,9 @@ public final class SuperSploorRules {
         return !teleport && Double.isFinite(horizontalDistance)
                 && horizontalDistance > 0.0D && horizontalDistance <= 2.0D;
     }
+
+    public static boolean isAssistEligible(long nowMillis, long lastContributionAtMillis) {
+        return lastContributionAtMillis > 0L && nowMillis >= lastContributionAtMillis
+                && nowMillis - lastContributionAtMillis <= 8_000L;
+    }
 }
