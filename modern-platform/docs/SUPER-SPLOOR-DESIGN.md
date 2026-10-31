@@ -571,4 +571,17 @@ Cosmetics, additional modes (including Splat Zones), ranked rules and win-scene 
 - Modern platform architecture: modern-platform/README.md
 - Progression catalogue and four-stage milestone model: modern-platform/arcade-games-port/src/main/java/au/com/testplex/arcadeports/ArcadeProgressCatalog.java
 
-**Implementation boundary:** this specification is the design baseline only. No game code, map conversion, runtime registration, achievement unlock, milestone tracking or public test enablement is implied by adding this document. Those changes must be implemented and accepted phase by phase.
+## 17. Current implementation status
+
+The feature branch now contains a substantial first implementation slice:
+
+- Game registration and the original NANO Sploor source-map selection are wired into the shared Testplex Arcade lifecycle.
+- The territory engine scans authored map bounds, excludes a protected footprint around authored team spawn markers, tracks unique ownership transitions and restores original block data.
+- The live runtime contains all five primary kits (Sprayer, Roller, Charger, Lobber and Dualies), their secondary equipment and special abilities.
+- Four-mark splats, respawns, assists, ink economy, Squid Mode and painted-wall climbing are implemented.
+- Match metrics are committed to the existing per-player Arcade stats store; the 15 achievements and seven four-stage milestone tracks are registered and have event-based unlock conditions.
+- Rule and catalogue tests cover kit/progression definitions, hit/assist eligibility, ink timing, spawn-room exclusion and overtime thresholds.
+
+**Not yet accepted for live play:** a green build does not prove multiplayer correctness. The original Excavation archive still needs an in-game visual and spawn audit; all five kits and abilities need human-client testing and balance; and territory restoration, progression idempotency, disconnects, forced stops and performance under 8v8 load still need live verification. The game should remain a draft test feature until those checks pass.
+
+**Implementation boundary:** this document is the design and acceptance baseline. The code above is committed on `feat/super-sploor-design-26.3` and reviewed through draft PR #66; it is not a claim that live acceptance or public enablement is complete.
