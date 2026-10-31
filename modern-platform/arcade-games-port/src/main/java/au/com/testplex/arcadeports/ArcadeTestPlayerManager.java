@@ -409,7 +409,7 @@ final class ArcadeTestPlayerManager implements Listener {
     void syncMatchRespawnLocation(Player player) {
         if (player == null) return;
         Object handle = activeHandles.get(player.getUniqueId());
-        if (handle == null || !player.isOnline()) return;
+        if (handle == null || retiringHandles.containsKey(player.getUniqueId()) || !player.isOnline()) return;
         try {
             invoke(handle, "teleport", new Class<?>[] {Location.class}, player.getLocation().clone());
         } catch (Exception exception) {
@@ -418,42 +418,247 @@ final class ArcadeTestPlayerManager implements Listener {
         }
     }
 
-    void despawnSessionPlayers() {
-        cancelPendingSpawn();
-        Object api = pendingApi;
-        if (api == null && (!activeHandles.isEmpty() || !pendingHandles.isEmpty())) {
-            try { api = api(); } catch (Exception ignored) { }
+    /**
+     * FakePlayerPlugin replaces the ServerPlayer backing a bot after a death.
+     * Poll its public handle until its respawn task has rebound getEntity(), then
+     * refresh Testplex's UUID-indexed reference and FakePlayerPlugin's own respawn point.
+     */
+    void whenRespawned(UUID playerId, Consumer<Player> completion) {
+        Object handle = activeHandles.get(playerId);
+        if (handle == null || completion == null || retiringHandles.containsKey(playerId)) return;
+        Plugin schedulerOwner = cleanupSchedulerOwner();
+        if (schedulerOwner == null) {
+            host.getLogger().warning("Cannot wait for FakePlayerPlugin respawn: no active scheduler owner.");
+            return;
         }
-        if (api != null) {
-            despawnBatch(api, new ArrayList<>(pendingHandles));
-            despawnBatch(api, new ArrayList<>(activeHandles.values()));
-        }
-        clearPendingHandles();
-        activeHandles.clear();
-        activePlayers.clear();
+        final int[] elapsed = {0};
+        final BukkitTask[] task = new BukkitTask[1];
+        task[0] = Bukkit.getScheduler().runTaskTimer(schedulerOwner, () -> {
+            if (shuttingDown || retiringHandles.containsKey(playerId)
+                    || activeHandles.get(playerId) != handle) {
+                task[0].cancel();
+                return;
+            }
+            try {
+                boolean respawning = Boolean.TRUE.equals(invoke(handle, "isRespawning"));
+                Object rawPlayer = invoke(handle, "getEntity");
+                if (!respawning && rawPlayer instanceof Player player && player.isOnline() && player.isValid()) {
+                    configureAsAfkPlayer(handle, player, false);
+                    activePlayers.put(playerId, player);
+                    syncMatchRespawnLocation(player);
+                    task[0].cancel();
+                    completion.accept(player);
+                    return;
+                }
+                if (++elapsed[0] >= CLEANUP_TIMEOUT_TICKS) {
+                    host.getLogger().warning("Timed out waiting for FakePlayerPlugin to finish respawning "
+                            + "test player " + playerId + ".");
+                    task[0].cancel();
+                }
+            } catch (Exception exception) {
+                host.getLogger().warning("Could not rebind respawned Testplex player " + playerId + ": "
+                        + rootMessage(exception));
+                task[0].cancel();
+            }
+        }, 1L, 1L);
     }
 
-    private void despawnBatch(Object api, Collection<?> handles) {
-        if (api == null || handles == null) return;
-        for (Object handle : handles) {
-            try {
-                // These players are disposable test fixtures. Remove their match/lobby
-                // kit before FPP deletes them so no item drops or persisted inventory
-                // snapshots can leak into the next game session.
-                Object rawPlayer = invoke(handle, "getEntity");
-                if (rawPlayer instanceof Player player && player.isOnline()) {
-                    player.getInventory().clear();
-                    player.getInventory().setArmorContents(null);
-                    player.setTotalExperience(0);
-                    player.setLevel(0);
-                    player.setExp(0.0F);
+    @EventHandler
+    public void onTestPlayerRespawn(PlayerRespawnEvent event) {
+        UUID id = event.getPlayer().getUniqueId();
+        if (isTestPlayer(id)) {
+            whenRespawned(id, ignored -> { /* ArcadePortManager owns the session reference. */ });
+        }
+    }
+
+    void despawnSessionPlayers() {
+        cancelPendingSpawn();
+        Object api = pendingApi != null ? pendingApi : retiringApi;
+        List<Object> handles = new ArrayList<>(pendingHandles);
+        handles.addAll(activeHandles.values());
+        clearPendingHandles();
+        if (api == null && !handles.isEmpty()) {
+            try { api = api(); } catch (Exception ignored) { }
+        }
+        scheduleCleanup(api, handles, List.of(), null);
+    }
+
+    private void scheduleCleanup(Object api, Collection<?> handles, Collection<UUID> orphanIds,
+            Runnable completion) {
+        if (completion != null) cleanupCallbacks.add(completion);
+        if (api != null) retiringApi = api;
+        if (handles != null) {
+            for (Object handle : handles) {
+                if (handle == null) continue;
+                try {
+                    UUID id = (UUID) invoke(handle, "getUuid");
+                    retiringHandles.putIfAbsent(id, new RetiringTestPlayer(handle));
+                } catch (Exception exception) {
+                    host.getLogger().warning("Could not identify a FakePlayerPlugin handle during cleanup: "
+                            + rootMessage(exception));
                 }
-                despawn(api, handle);
+            }
+        }
+        if (orphanIds != null) {
+            for (UUID id : orphanIds) {
+                if (id != null) retiringHandles.putIfAbsent(id, new RetiringTestPlayer(null));
+            }
+        }
+        if (retiringHandles.isEmpty()) {
+            finishCleanupIfEmpty();
+            return;
+        }
+        if (cleanupTask != null) return;
+        Plugin schedulerOwner = cleanupSchedulerOwner();
+        if (schedulerOwner == null) {
+            host.getLogger().severe("No scheduler is available to finish Testplex fake-player cleanup.");
+            forceCleanupWithoutScheduler();
+            return;
+        }
+        cleanupTask = Bukkit.getScheduler().runTaskTimer(schedulerOwner, this::tickCleanup, 1L, 1L);
+    }
+
+    private Plugin cleanupSchedulerOwner() {
+        Plugin fakePlayerPlugin = Bukkit.getPluginManager().getPlugin(FPP_PLUGIN_NAME);
+        if (fakePlayerPlugin != null && fakePlayerPlugin.isEnabled()) return fakePlayerPlugin;
+        return host.isEnabled() ? host : null;
+    }
+
+    private void tickCleanup() {
+        if (retiringHandles.isEmpty()) {
+            finishCleanupIfEmpty();
+            return;
+        }
+
+        java.util.Set<UUID> registeredIds = new java.util.HashSet<>();
+        boolean registryReadable = false;
+        Object api = retiringApi;
+        if (api != null) {
+            try {
+                for (Object bot : collection(invoke(api, "getBots"))) {
+                    registeredIds.add((UUID) invoke(bot, "getUuid"));
+                }
+                registryReadable = true;
             } catch (Exception exception) {
-                host.getLogger().warning("Could not despawn a Testplex fake player: "
+                host.getLogger().warning("Could not read FakePlayerPlugin handles during teardown: "
                         + rootMessage(exception));
             }
         }
+
+        for (Map.Entry<UUID, RetiringTestPlayer> entry : new ArrayList<>(retiringHandles.entrySet())) {
+            UUID id = entry.getKey();
+            RetiringTestPlayer state = entry.getValue();
+            state.elapsedTicks++;
+            Player online = Bukkit.getPlayer(id);
+            boolean playerOnline = online != null && online.isOnline();
+            Object rawPlayer = null;
+            boolean respawning = false;
+            if (state.handle != null) {
+                try {
+                    respawning = Boolean.TRUE.equals(invoke(state.handle, "isRespawning"));
+                    rawPlayer = invoke(state.handle, "getEntity");
+                } catch (Exception exception) {
+                    host.getLogger().warning("Could not inspect retiring test player " + id + ": "
+                            + rootMessage(exception));
+                }
+            }
+            boolean bodyAvailable = rawPlayer instanceof Player body && body.isOnline() && body.isValid();
+            boolean handleRegistered = state.handle != null
+                    && (!registryReadable || registeredIds.contains(id));
+            CleanupAction action = cleanupAction(handleRegistered, respawning, bodyAvailable,
+                    playerOnline, state.despawnRequested, state.elapsedTicks >= CLEANUP_TIMEOUT_TICKS);
+
+            switch (action) {
+                case WAIT_FOR_RESPAWN, WAIT_FOR_ENTITY, WAIT_FOR_DISCONNECT -> {
+                    // FakePlayerPlugin owns the respawn hand-off and the eventual quit.
+                }
+                case DESPAWN -> {
+                    clearDisposablePlayerState((Player) rawPlayer);
+                    try {
+                        despawn(retiringApi, state.handle);
+                        state.despawnRequested = true;
+                        state.elapsedTicks = 0;
+                    } catch (Exception exception) {
+                        host.getLogger().warning("Could not despawn Testplex fake player " + id + ": "
+                                + rootMessage(exception));
+                    }
+                }
+                case KICK_ORPHAN -> {
+                    if (playerOnline && online.getName().startsWith(RESERVED_NAME_PREFIX)) {
+                        clearDisposablePlayerState(online);
+                        online.kick(Component.empty());
+                    }
+                    if (handleRegistered && retiringApi != null && !state.despawnRequested) {
+                        try {
+                            despawn(retiringApi, state.handle);
+                            state.despawnRequested = true;
+                        } catch (Exception exception) {
+                            host.getLogger().warning("Fallback FakePlayerPlugin despawn failed for " + id + ": "
+                                    + rootMessage(exception));
+                        }
+                    } else {
+                        state.despawnRequested = true;
+                    }
+                    state.elapsedTicks = 0;
+                }
+                case COMPLETE -> {
+                    retiringHandles.remove(id);
+                    activeHandles.remove(id);
+                    activePlayers.remove(id);
+                }
+            }
+        }
+        finishCleanupIfEmpty();
+    }
+
+    private void clearDisposablePlayerState(Player player) {
+        if (player == null || !player.isOnline()) return;
+        player.getInventory().clear();
+        player.getInventory().setArmorContents(null);
+        player.getInventory().setExtraContents(null);
+        player.setTotalExperience(0);
+        player.setLevel(0);
+        player.setExp(0.0F);
+    }
+
+    private void finishCleanupIfEmpty() {
+        if (!retiringHandles.isEmpty()) return;
+        if (cleanupTask != null) {
+            cleanupTask.cancel();
+            cleanupTask = null;
+        }
+        retiringApi = null;
+        clearPendingHandles();
+        List<Runnable> callbacks = new ArrayList<>(cleanupCallbacks);
+        cleanupCallbacks.clear();
+        for (Runnable callback : callbacks) {
+            try { callback.run(); }
+            catch (RuntimeException exception) {
+                host.getLogger().warning("A Testplex fake-player cleanup callback failed: "
+                        + rootMessage(exception));
+            }
+        }
+    }
+
+    private void forceCleanupWithoutScheduler() {
+        for (UUID id : new ArrayList<>(retiringHandles.keySet())) {
+            Player online = Bukkit.getPlayer(id);
+            if (online != null && online.isOnline() && online.getName().startsWith(RESERVED_NAME_PREFIX)) {
+                clearDisposablePlayerState(online);
+                online.kick(Component.empty());
+            }
+            activeHandles.remove(id);
+            activePlayers.remove(id);
+            retiringHandles.remove(id);
+        }
+        finishCleanupIfEmpty();
+    }
+
+    private static final class RetiringTestPlayer {
+        final Object handle;
+        int elapsedTicks;
+        boolean despawnRequested;
+        RetiringTestPlayer(Object handle) { this.handle = handle; }
     }
 
     private void clearPendingHandles() {
@@ -476,8 +681,9 @@ final class ArcadeTestPlayerManager implements Listener {
         return api;
     }
 
-    private void despawn(Object api, Object handle) throws Exception {
-        findSingleArgumentMethod(api.getClass(), "despawnBot", handle).invoke(api, handle);
+    private boolean despawn(Object api, Object handle) throws Exception {
+        Object result = findSingleArgumentMethod(api.getClass(), "despawnBot", handle).invoke(api, handle);
+        return !(result instanceof Boolean accepted) || accepted;
     }
 
     private static Method findSingleArgumentMethod(Class<?> type, String name, Object argument)
