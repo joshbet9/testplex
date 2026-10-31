@@ -1388,7 +1388,8 @@ public final class CameraShyGame implements Listener {
                         int escapes = encounterEscapes.merge(victimId, 1, Integer::sum);
                         if (escapes >= 3) award(victimId, "now-you-see-me");
                         if (runnerUsedUntil.getOrDefault(victimId, 0L) > now) award(victimId, "catch-me-if-you-can");
-                        if (smokeObscured && smokeUsedUntil.getOrDefault(victimId, 0L) >= now) {
+                        if (CameraShyRules.shouldAwardSmokeEscape(smokeObscured, now,
+                                smokeUsedUntil.getOrDefault(victimId, 0L))) {
                             int smoke = smokeEscapes.merge(victimId, 1, Integer::sum);
                             if (smoke >= 3) award(victimId, "smoke-and-mirrors");
                         }
