@@ -24,18 +24,18 @@ The Testplex importer accepts ZIPs from these server-local folders:
 
 The configured source-maps.directory value is the common root above those folders. It defaults to update/maps relative to the server process working directory; use an absolute path if the existing Reborn map store is elsewhere. Both folders are scanned, but unrelated games' archives are not.
 
-The importer requires a uniquely identifiable world root with both level.dat and WorldConfig.dat. Paper 26.3 conversion also requires region terrain files (region/*.mca). WorldConfig.dat supplies map bounds, player/team spawn groups and data/custom markers. A generated arena is only a fallback when neither source folder contains an archive.
+The normal Reborn source-map importer remains strict: it requires a unique world root containing both level.dat and WorldConfig.dat, plus region terrain files (region/*.mca). Wizards has a separate, opt-in adapter for these WorldDownloader snapshots: it accepts a unique level.dat + region/*.mca root, derives conservative test bounds from populated Anvil chunks, searches loaded terrain for safe player starts, and recovers chest block positions or places replacement test chests. It does **not** recreate original Mineplex TEAM_SPAWNS, bounds, or chest inventories. If a selected source archive fails runtime validation, Wizards falls back to the generated test arena instead of failing to start.
 
 ## Automated archive inspection
 
-The dedicated GitHub Actions workflow, Validate Wizards Source Maps, downloads all 20 source ZIPs into temporary runner storage and checks ZIP CRCs, safe paths, unique world-root structure, terrain region files, WorldConfig.dat metadata and SHA-256. It uploads a small JSON/Markdown report as an Actions artifact. Downloaded ZIPs are deleted after inspection; this repository intentionally does not mirror or redistribute map binaries.
+The dedicated GitHub Actions workflow, Validate Wizards Source Maps, downloads all 20 source ZIPs into temporary runner storage and checks ZIP CRCs, safe paths, world-root structure, level.dat NBT, Anvil region headers/chunks, chest block data and SHA-256. It distinguishes directly importable Reborn worlds from **Wizards adapter candidates** (WorldDownloader exports without WorldConfig.dat). It uploads a small JSON/Markdown report as an Actions artifact. Downloaded ZIPs are deleted after inspection; this repository intentionally does not mirror or redistribute map binaries.
 
 Builder credits are copied from the upstream catalogue. No independent map redistribution licence has been verified. A structural pass is not a substitute for loading each world on Paper 26.3 and playing a multiplayer Wizards round; maps with no spawn markers or incomplete bounds are flagged for manual review.
 
 
 ## Inspection results (31 October 2026)
 
-The dedicated CI job downloaded and CRC-checked all 20 archive variants. They are **Minecraft world snapshots**, not schematics: each uses the root-level layout `WorldDownloader.txt`, `level.dat`, `playerdata/`, `region/` and `session.lock`. The archives contain active Anvil `.mca` terrain chunks, but **none includes Mineplex's `WorldConfig.dat`**. As a result, none is directly installable by the current `SourceMapCatalog`, which requires both `level.dat` and `WorldConfig.dat` in the same world root before it accepts a source world.
+The dedicated CI job downloaded and CRC-checked all 20 archive variants. They are **Minecraft world snapshots**, not schematics: each uses the root-level layout `WorldDownloader.txt`, `level.dat`, `playerdata/`, `region/` and `session.lock`. The archives contain active Anvil `.mca` terrain chunks, but **none includes Mineplex's `WorldConfig.dat`**. They cannot pass the generic Reborn importer; they need the Wizards-specific adapter described below. The level.dat spawn and populated chunk extents are useful evidence, but neither is an original Mineplex arena marker or official map boundary.
 
 | Map | Standard level.dat spawn | Standard active chunks | Nano level.dat spawn | Nano active chunks |
 |---|---:|---:|---:|---:|
@@ -54,13 +54,36 @@ Spawn coordinates above are the values stored in each archive's `level.dat`; the
 
 ### Chest and marker limitations
 
-- The initial NBT inspection found 211 chest tile-entity records in the standard Alicudi archive; none were found in the other 19 snapshots.
-- Nano Wizards `WorldDownloader.txt` includes `ServerName=eu.mineplex.com` and the downloader setting `LOAD_TILE_ENTITY=false`. That means its exported files cannot be assumed to preserve chest tile-entity NBT or other tile entities.
-- The source-specific `WorldConfig.dat` data is absent throughout, so the original map bounds, `TEAM_SPAWNS` groups and custom chest marker list are not available from these ZIPs.
-- A follow-up diagnostic was added to scan legacy chunk section block arrays for chest block IDs, but that additional scan has not yet produced a CI report. A chest block in terrain without its tile-entity data still needs in-server testing before it can be treated as a usable loot chest.
+The follow-up Anvil-section scan found these legacy chest block IDs (54) in the downloaded region data:
 
-### Engineering decision
+| Map | Standard Wizards | Nano Wizards |
+|---|---:|---:|
+| Haven | 242 | 202 |
+| Wizard Arena | 233 | 0 |
+| Orbis Harbor | 206 | 0 |
+| Aspen | 238 | 0 |
+| Hogwarts | 191 | 0 |
+| Industrial West | 266 | 0 |
+| Alicudi | 262 | 222 |
+| Thaumaturge Colony | 253 | 0 |
+| Magically Possible | 207 | 0 |
+| Kalamit | 227 | 0 |
 
-Keep these as recorded source assets, but do not mark any as ready for the existing Wizards importer. A proper adapter would need to accept a world export containing `level.dat` plus region files, derive bounded arena extents from populated chunks, verify safe spawn positions from the actual terrain, and recover or reconstruct usable chest locations. It must not silently treat the `level.dat` world spawn as an authoritative Mineplex `TEAM_SPAWNS` marker.
+These are chest **block records**, not proof that usable chest block entities or original inventories survived. The initial NBT inspection found 211 chest tile-entity records in the standard Alicudi archive; the Nano downloader metadata includes `LOAD_TILE_ENTITY=false`, so Nano snapshots in particular cannot be assumed to preserve chest block-entity NBT. The runtime adapter recreates the chest block entity before Wizards populates it with test loot. Nano maps with no remaining chest blocks receive replacement test chests on terrain-checked locations.
 
-The current implementation therefore keeps the generated test arena as the safe fallback until that adapter and a live Paper 26.3 acceptance pass are implemented. The detailed NBT/chunk metadata report is [available as an Actions artifact](https://github.com/joshbet9/testplex/actions/runs/41207936209/artifacts/13044847925). The map ZIPs themselves are not committed or rehosted.
+The source-specific `WorldConfig.dat` data is absent throughout. Original map bounds, `TEAM_SPAWNS` groups, and custom chest marker metadata are therefore unavailable. The adapter uses the Anvil location tables to derive a conservative rectangle around populated chunks, then checks the loaded terrain for safe start and replacement-chest positions. `level.dat` spawn coordinates are never silently promoted to original Mineplex starts.
+
+### Engineering decision and acceptance status
+
+A dedicated Wizards-only import path is now implemented in `SourceMapCatalog` and wired into `WizardsGameManager`. It does not weaken the generic importer used by other games. The adapter:
+
+1. accepts only the two approved Wizards source folders and a unique root with `level.dat` plus legacy Anvil region files;
+2. converts the legacy region layout to Paper 26.3's custom-world layout;
+3. derives test-only horizontal bounds from populated chunk coordinates;
+4. checks terrain for clear, safe player starts instead of assuming the saved world spawn is correct;
+5. recovers chest block positions from the loaded world, recreates missing chest block entities, and uses safe replacement locations only when the archive contains no chest blocks;
+6. logs that these positions are inferred and not original Mineplex WorldConfig metadata.
+
+If the adapter cannot find sufficient safe starts or usable chest locations, Wizards falls back to the generated test arena. This is **not yet an in-game acceptance pass**: the next CI build must pass, then each selected map needs a Paper 26.3 load/start/loot/multiplayer smoke test. Maps that have no chest block records (eight Nano variants) are candidates only because their chest positions will be synthesized; they are not fidelity-equivalent to the standard exports.
+
+The validator has also been updated to report direct Reborn imports separately from Wizards adapter candidates. The post-adapter CI report is pending. The previous detailed NBT/chunk metadata report remains [available as an Actions artifact](https://github.com/joshbet9/testplex/actions/runs/41208131882/artifacts/13045531836). The map ZIPs themselves are not committed or rehosted.
