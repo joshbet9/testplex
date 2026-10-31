@@ -23,7 +23,6 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -496,7 +495,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         String message = failure.getClass().getSimpleName() + ": " + String.valueOf(failure.getMessage());
         getLogger().severe("HOOPS_SMOKE|FAIL|" + message);
         try {
-            if (arcade != null) invoke(arcade, "prepareForHoops");
+            if (arcade != null) invoke(arcade, "prepareForHoops", new Class<?>[0]);
         } catch (Throwable cleanup) {
             getLogger().warning("Hoops smoke cleanup also failed: " + cleanup.getMessage());
         }
