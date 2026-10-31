@@ -8,6 +8,9 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.Chest;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
@@ -63,10 +66,25 @@ public final class WizardsPaperSmoke extends JavaPlugin {
     private int gameplayStage;
     private int gameplayTicks;
     private boolean shuttingDown;
+    private String lastDamageObservation = "no damage event observed";
 
     @Override
     public void onEnable() {
+        Bukkit.getPluginManager().registerEvents(this, this);
         Bukkit.getScheduler().runTask(this, this::runAll);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void observeWizardsDamage(EntityDamageByEntityEvent event) {
+        if (rival == null || !rival.equals(event.getEntity())) return;
+        lastDamageObservation = "damager=" + event.getDamager().getType()
+                + ",damage=" + event.getDamage()
+                + ",final=" + event.getFinalDamage()
+                + ",cancelled=" + event.isCancelled()
+                + ",victimHealth=" + rival.getHealth()
+                + ",victimMode=" + rival.getGameMode()
+                + ",victimInvulnerable=" + rival.isInvulnerable()
+                + ",noDamageTicks=" + rival.getNoDamageTicks();
     }
 
     private void runAll() {
@@ -308,7 +326,9 @@ public final class WizardsPaperSmoke extends JavaPlugin {
         castSpell.invoke(wizards, owner, ownerState, rainbowBeam, rival, null);
         require(rival.isDead(), "Rainbow Beam damage failed (health="
                 + (rival.isDead() ? 0.0D : rival.getHealth()) + ", expectedDamage=" + expectedBeamDamage
-                + ", distance=" + beamDistance + ", pvp=" + gameplayArena.getPVP() + ")");
+                + ", distance=" + beamDistance + ", pvp=" + gameplayArena.getPVP()
+                + ", mode=" + rival.getGameMode() + ", invulnerable=" + rival.isInvulnerable()
+                + ", lastDamage=" + lastDamageObservation + ")");
         double manaAfterBeam = ((Number) field(ownerState, "mana")).doubleValue();
         require(Math.abs((manaBeforeBeam - manaAfterBeam) - 17.0D) < 0.01D,
                 "Rainbow Beam did not charge the level-five cost of 17 mana");
