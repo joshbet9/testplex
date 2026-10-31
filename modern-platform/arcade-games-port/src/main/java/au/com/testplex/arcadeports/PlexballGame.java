@@ -42,6 +42,8 @@ import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -164,6 +166,7 @@ public final class PlexballGame implements Listener {
     private final Map<UUID, Deque<PlayerFrame>> playerHistory = new HashMap<>();
     private final Map<UUID, CatchAttempt> catchAttempts = new HashMap<>();
     private final Set<UUID> abilityUsedThisBall = new HashSet<>();
+    private final Set<UUID> catchUsedThisBall = new HashSet<>();
     private final Set<UUID> sureHandsArmed = new HashSet<>();
     private final LinkedHashSet<UUID> homeRunPlayers = new LinkedHashSet<>();
     private final LinkedHashSet<UUID> finalists = new LinkedHashSet<>();
@@ -178,8 +181,10 @@ public final class PlexballGame implements Listener {
     private long serverTick;
     private long queueCountdownTick = -1L;
     private long matchEndTick;
+    private long matchEndNanos;
     private long phaseEndTick;
     private long battingDeadlineTick;
+    private long battingDeadlineNanos;
     private long battingStartTick;
     private long ballStartTick;
     private int initialTurnIndex;
@@ -215,7 +220,7 @@ public final class PlexballGame implements Listener {
         }
         return phase.name().toLowerCase(java.util.Locale.ROOT)
                 + ", players=" + matchPlayers.size()
-                + ", time=" + Math.max(0L, (matchEndTick - serverTick) / 20L) + "s";
+                + ", time=" + Math.max(0L, (matchEndNanos - System.nanoTime()) / 1_000_000_000L) + "s";
     }
 
     public boolean selectKit(Player player, String id) {
@@ -306,7 +311,7 @@ public final class PlexballGame implements Listener {
         }
 
         recordPlayerSnapshots();
-        if (serverTick >= matchEndTick) {
+        if (System.nanoTime() >= matchEndNanos) {
             finishAtTimeLimit();
             return;
         }
@@ -317,7 +322,7 @@ public final class PlexballGame implements Listener {
             }
             case BATTING -> {
                 updateBattingHud();
-                if (serverTick >= battingDeadlineTick) {
+                if (System.nanoTime() >= battingDeadlineNanos) {
                     plugin.getLogger().fine("Plexball batting timeout for " + batterId);
                     resolveAttempt(0.0D, false, false, "Strike! No swing in time.");
                 }
@@ -352,12 +357,14 @@ public final class PlexballGame implements Listener {
         catchAttempts.clear();
         ballHistory.clear();
         abilityUsedThisBall.clear();
+        catchUsedThisBall.clear();
         sureHandsArmed.clear();
         initialTurnIndex = 0;
         suddenDeathTurnIndex = 0;
         suddenDeath = false;
         batterId = null;
         matchEndTick = serverTick + PlexballRules.MATCH_LIMIT_TICKS;
+        matchEndNanos = System.nanoTime() + 180_000_000_000L;
         phase = Phase.INTRO;
         phaseEndTick = serverTick + INTRO_TICKS;
 
@@ -378,11 +385,16 @@ public final class PlexballGame implements Listener {
     }
 
     private void startNormalAtBat() {
-        if (initialTurnIndex >= matchPlayers.size()) {
-            completeInitialRound();
-            return;
+        while (initialTurnIndex < matchPlayers.size()) {
+            UUID candidate = matchPlayers.get(initialTurnIndex);
+            Player player = Bukkit.getPlayer(candidate);
+            if (player != null && player.isOnline()) {
+                startAtBat(candidate, false);
+                return;
+            }
+            initialTurnIndex++;
         }
-        startAtBat(matchPlayers.get(initialTurnIndex), false);
+        completeInitialRound();
     }
 
     private void startAtBat(UUID playerId, boolean playoff) {
@@ -418,6 +430,7 @@ public final class PlexballGame implements Listener {
         int battingTicks = playoff ? PlexballRules.SUDDEN_DEATH_BATTING_TICKS
                 : PlexballRules.NORMAL_BATTING_TICKS;
         battingDeadlineTick = serverTick + battingTicks;
+        battingDeadlineNanos = System.nanoTime() + battingTicks * 50_000_000L;
         phase = Phase.BATTING;
         broadcastMatch(ChatColor.GOLD + batter.getName() + ChatColor.YELLOW
                 + (playoff ? " — sudden death! Hit another 100m home run." : " is batting!"));
@@ -483,7 +496,7 @@ public final class PlexballGame implements Listener {
             initialTurnIndex++;
             batterId = null;
             if (initialTurnIndex >= matchPlayers.size()) completeInitialRound();
-            else startAtBat(matchPlayers.get(initialTurnIndex), false);
+            else startNormalAtBat();
             return;
         }
         suddenDeathTurnIndex++;
@@ -627,7 +640,7 @@ public final class PlexballGame implements Listener {
         long effectiveTick = serverTick;
         int phase = PlexballRules.timingDistanceTicks(effectiveTick, battingStartTick,
                 timingCycleTicks, timingPhaseOffset);
-        int remaining = (int) Math.max(0L, (battingDeadlineTick - serverTick + 19L) / 20L);
+        int remaining = (int) Math.max(0L, (battingDeadlineNanos - System.nanoTime() + 999_999_999L) / 1_000_000_000L);
         String marker = "•".repeat(Math.max(0, Math.min(phase, 10)));
         batter.sendActionBar(Component.text("BAT  " + remaining + "s  |  " + marker + "  AIM AT THE BALL + RIGHT-CLICK"));
         for (UUID id : matchPlayers) {
@@ -661,12 +674,15 @@ public final class PlexballGame implements Listener {
         if (phase != Phase.BALL_FLIGHT) return;
 
         double distance = PlexballRules.horizontalDistance(teeBallPosition, ballPosition);
-        if (!PlexballRules.isInsideField(ballPosition.getX(), ballPosition.getZ())) {
-            resolveAttempt(0.0D, false, false, "Foul ball — outside the fair triangle.");
+        boolean inFairTriangle = PlexballRules.isInsideField(ballPosition.getX(), ballPosition.getZ());
+        boolean fairFenceCrossing = ballPosition.getZ() <= -PlexballRules.HOME_RUN_METRES
+                && Math.abs(ballPosition.getX()) <= PlexballRules.fieldHalfWidthAtZ(-PlexballRules.HOME_RUN_METRES);
+        if (distance >= PlexballRules.HOME_RUN_METRES && (inFairTriangle || fairFenceCrossing)) {
+            resolveAttempt(PlexballRules.HOME_RUN_METRES, false, true, null);
             return;
         }
-        if (distance >= PlexballRules.HOME_RUN_METRES) {
-            resolveAttempt(PlexballRules.HOME_RUN_METRES, false, true, null);
+        if (!inFairTriangle) {
+            resolveAttempt(0.0D, false, false, "Foul ball — outside the fair triangle.");
             return;
         }
         if (ballPosition.getY() <= FLOOR_Y + 0.28D || ballFlightTicks >= BALL_MAX_FLIGHT_TICKS) {
@@ -714,7 +730,10 @@ public final class PlexballGame implements Listener {
         Vector ballBefore = ballHistory.get(tick - 1L);
         if (frame == null || ballNow == null) return false;
         if (ballBefore == null) ballBefore = ballNow;
-        Vector glovePoint = frame.feet().add(new Vector(0.0D, FIELD_PLAYER_EYE_OFFSET, 0.0D));
+        double yaw = Math.toRadians(frame.yaw);
+        Vector facing = new Vector(-Math.sin(yaw), 0.0D, Math.cos(yaw)).normalize();
+        Vector glovePoint = frame.feet().add(new Vector(0.0D, FIELD_PLAYER_EYE_OFFSET, 0.0D))
+                .add(facing.multiply(0.35D));
         return PlexballRules.distanceSquaredToSegment(glovePoint, ballBefore, ballNow) <= radius * radius;
     }
 
@@ -751,6 +770,10 @@ public final class PlexballGame implements Listener {
         Vector eyeDirection = aimFrame.eyeLocation(arena, player.getEyeHeight()).getDirection().normalize();
         Vector eyeOrigin = aimFrame.eyeLocation(arena, player.getEyeHeight()).toVector();
         Vector normal = contactNormal(eyeOrigin, eyeDirection, teeBallPosition, BALL_RADIUS);
+        if (normal == null) {
+            player.sendActionBar(Component.text("MISS — put your crosshair on the ball."));
+            return;
+        }
         double contactY = PlexballRules.clamp(normal.getY(), -1.0D, 1.0D);
         double yawRadians = Math.toRadians(aimFrame.yaw);
         Vector forward = new Vector(-Math.sin(yawRadians), 0.0D, Math.cos(yawRadians)).normalize();
@@ -758,10 +781,21 @@ public final class PlexballGame implements Listener {
         double contactSide = PlexballRules.clamp(normal.dot(right), -1.0D, 1.0D);
         Kit kit = selectedKits.getOrDefault(player.getUniqueId(), Kit.TECHNICIAN);
 
-        double horizontalSpeed = (1.62D + 0.53D * timing)
-                * kit.battingPower * (1.0D - 0.08D * Math.abs(contactY));
-        double verticalSpeed = PlexballRules.clamp(0.22D - 0.20D * contactY, 0.16D, 0.42D);
-        double sideSpeed = contactSide * (kit == Kit.CURVE_ARTIST ? 0.25D : 0.12D);
+        int gradedTimingDistance = kit == Kit.TECHNICIAN ? Math.max(0, timingDistance - 2) : timingDistance;
+        timing = PlexballRules.timingMultiplier(gradedTimingDistance);
+        // Server-tick physics are tuned as a pair: lower contact is a loft,
+        // upper contact is a faster line drive, and good timing preserves power.
+        double horizontalSpeed = (4.0D + 1.5D * contactY)
+                * (0.65D + 0.35D * timing) * kit.battingPower;
+        double verticalSpeed = PlexballRules.clamp(0.47D - 0.25D * contactY, 0.20D, 0.75D);
+        if (kit == Kit.SPRINTER) {
+            horizontalSpeed *= 1.08D;
+            verticalSpeed = Math.min(verticalSpeed, 0.30D);
+        } else if (kit == Kit.SKYGUARD) {
+            horizontalSpeed *= 0.94D;
+            verticalSpeed = Math.min(0.78D, verticalSpeed + 0.08D);
+        }
+        double sideSpeed = contactSide * (kit == Kit.CURVE_ARTIST ? 0.25D : 0.10D);
         ballVelocity = forward.multiply(horizontalSpeed).add(right.multiply(sideSpeed));
         ballVelocity.setY(verticalSpeed);
         curveDirection = right.clone().multiply(contactSide);
@@ -783,20 +817,16 @@ public final class PlexballGame implements Listener {
     }
 
     private Vector contactNormal(Vector origin, Vector direction, Vector centre, double radius) {
+        // The Interaction entity is only an event target. The server-side aim
+        // ray must also intersect the actual ball sphere to produce a valid hit.
         Vector offset = origin.clone().subtract(centre);
         double b = offset.dot(direction);
         double c = offset.lengthSquared() - radius * radius;
         double discriminant = b * b - c;
-        if (discriminant >= 0.0D) {
-            double t = -b - Math.sqrt(discriminant);
-            if (t >= 0.0D) return origin.clone().add(direction.clone().multiply(t))
-                    .subtract(centre).normalize();
-        }
-        Vector closest = origin.clone().add(direction.clone().multiply(
-                Math.max(0.0D, centre.clone().subtract(origin).dot(direction))));
-        Vector normal = closest.subtract(centre);
-        if (normal.lengthSquared() < 1.0E-6D) return new Vector(0.0D, -0.4D, 1.0D).normalize();
-        return normal.normalize();
+        if (discriminant < 0.0D) return null;
+        double t = -b - Math.sqrt(discriminant);
+        if (t < 0.0D) return null;
+        return origin.clone().add(direction.clone().multiply(t)).subtract(centre).normalize();
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -817,8 +847,8 @@ public final class PlexballGame implements Listener {
 
     private void startCatch(Player player) {
         UUID id = player.getUniqueId();
-        if (catchAttempts.containsKey(id)) {
-            player.sendActionBar(Component.text("Your catch attempt is already active."));
+        if (!catchUsedThisBall.add(id)) {
+            player.sendActionBar(Component.text("You have already used your catch attempt on this ball."));
             return;
         }
         int rewind = PlexballRules.latencyRewindTicks(Math.max(0, player.getPing()));
@@ -998,7 +1028,7 @@ public final class PlexballGame implements Listener {
 
     private void createTeeBall() {
         cleanupBall();
-        teeBallPosition = new Vector(0.5D, FLOOR_Y + 2.1D, -0.25D);
+        teeBallPosition = new Vector(0.5D, FLOOR_Y + 2.1D, 0.0D);
         Location ballLocation = new Location(arena, teeBallPosition.getX(), teeBallPosition.getY(), teeBallPosition.getZ());
         ballDisplay = arena.spawn(ballLocation, ItemDisplay.class);
         ballDisplay.setItemStack(new ItemStack(Material.SNOWBALL));
@@ -1065,6 +1095,8 @@ public final class PlexballGame implements Listener {
     }
 
     private void buildFieldSurface(World world) {
+        File marker = new File(world.getWorldFolder(), "TESTPLEX_PLEXBALL_FIELD_V1");
+        if (marker.isFile() && hasExpectedFieldSamples(world)) return;
         for (int z = ARENA_MIN_Z; z <= 0; z++) {
             int halfWidth = (int) Math.ceil(PlexballRules.fieldHalfWidthAtZ(z));
             for (int x = -halfWidth; x <= halfWidth; x++) {
@@ -1085,6 +1117,23 @@ public final class PlexballGame implements Listener {
         }
         world.getBlockAt(0, FLOOR_Y + 1, 0).setType(Material.OAK_FENCE, false);
         world.getBlockAt(0, FLOOR_Y + 2, 0).setType(Material.OAK_FENCE, false);
+        if (!hasExpectedFieldSamples(world)) throw new IllegalStateException("Plexball triangular field generation did not validate.");
+        try {
+            Files.writeString(marker.toPath(), "TESTPLEX_PLEXBALL_FIELD_V1" + System.lineSeparator()
+                    + "Triangle field X/Z -100..0; grass surface Y=64; home-run fence 100m.", StandardCharsets.UTF_8);
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Could not write Plexball field marker: " + exception.getMessage());
+        }
+    }
+
+    private boolean hasExpectedFieldSamples(World world) {
+        int[][] samples = {{0, -1}, {0, -50}, {0, -99}, {-10, -50}, {10, -50}};
+        for (int[] sample : samples) {
+            if (world.getBlockAt(sample[0], FLOOR_Y, sample[1]).getType() != Material.GRASS_BLOCK
+                    || world.getBlockAt(sample[0], FLOOR_Y - 1, sample[1]).getType() != Material.STONE
+                    || world.getBlockAt(sample[0], FLOOR_Y - 2, sample[1]).getType() != Material.BEDROCK) return false;
+        }
+        return true;
     }
 
     private void updateBattingHudIfNeeded() {
