@@ -22,10 +22,9 @@
 ## Kit acceptance
 - Smoke Artist: smoke sphere blocks camera rays. Confirm the escaping player's own active cloud causes the initial loss of pursuit visibility, then move far enough away to escape; the cloud need not still intersect the line when the escape timer completes. Another player's cloud, wall-only or range-only escapes must not count toward Smoke and Mirrors.
 - Decoy: fake shutter/flash fools three distinct human opponents. Looking at a fake flash through a solid wall does not count; a genuine approach to its location still does.
-- Understudy: its owner is credited only when a different human photographs the stand-in; photographing your own stand-in cannot unlock Method Actor.
 - Runner: Speed II for three seconds; shutter is disabled during the burst; a successful escape within the follow-up window unlocks Catch Me If You Can.
 - Spotter: only reveals opponents within 18 blocks and clear line of sight; a private marker repeatedly tracks each detected opponent for the full 15 seconds and must lead to three distinct photographs.
-- Understudy: deploys a player-skin stand-in; photographing the stand-in awards Method Actor and does not add exposure.
+- Understudy: deploys a player-skin stand-in; only a different human photographing it fools the owner and unlocks Method Actor. It adds no exposure, and self-photographs do not count.
 
 ## Match mechanics
 - Group Photo pickup grants one charged shutter that can photograph a second target in the same narrow camera cone. The charge is retained if a valid second target is not present.
