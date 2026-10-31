@@ -176,6 +176,10 @@ public final class CameraShyGame implements Listener {
         final boolean invulnerable;
         final boolean collidable;
         final boolean glowing;
+        final int heldSlot;
+        final int fireTicks;
+        final float fallDistance;
+        final Vector velocity;
         PlayerSnapshot(Player player) {
             location = player.getLocation().clone();
             contents = cloneItems(player.getInventory().getContents());
@@ -190,6 +194,10 @@ public final class CameraShyGame implements Listener {
             allowFlight = player.getAllowFlight(); flying = player.isFlying();
             invulnerable = player.isInvulnerable(); collidable = player.isCollidable();
             glowing = player.isGlowing();
+            heldSlot = player.getInventory().getHeldItemSlot();
+            fireTicks = player.getFireTicks();
+            fallDistance = player.getFallDistance();
+            velocity = player.getVelocity().clone();
         }
         PlayerSnapshot(ConfigurationSection section) {
             Object savedLocation = section.get("location");
@@ -225,6 +233,11 @@ public final class CameraShyGame implements Listener {
             invulnerable = section.getBoolean("invulnerable");
             collidable = section.getBoolean("collidable", true);
             glowing = section.getBoolean("glowing", false);
+            heldSlot = section.getInt("held-slot", 0);
+            fireTicks = section.getInt("fire-ticks", 0);
+            fallDistance = (float) section.getDouble("fall-distance", 0.0D);
+            Object savedVelocity = section.get("velocity");
+            velocity = savedVelocity instanceof Vector saved ? saved.clone() : new Vector(0.0D, 0.0D, 0.0D);
         }
         private static ItemStack[] readItems(List<?> values) {
             if (values == null) return new ItemStack[0];
@@ -268,6 +281,10 @@ public final class CameraShyGame implements Listener {
             section.set("invulnerable", invulnerable);
             section.set("collidable", collidable);
             section.set("glowing", glowing);
+            section.set("held-slot", heldSlot);
+            section.set("fire-ticks", fireTicks);
+            section.set("fall-distance", fallDistance);
+            section.set("velocity", velocity.clone());
         }
         void persist(JavaPlugin plugin, UUID playerId) {
             writeToConfig(plugin, playerId);
@@ -281,6 +298,7 @@ public final class CameraShyGame implements Listener {
             player.getInventory().setContents(cloneItems(contents));
             player.getInventory().setArmorContents(cloneItems(armor));
             player.getInventory().setItemInOffHand(offhand == null ? null : offhand.clone());
+            player.getInventory().setHeldItemSlot(Math.max(0, Math.min(8, heldSlot)));
             for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) {
                 player.removePotionEffect(effect.getType());
             }
@@ -294,7 +312,9 @@ public final class CameraShyGame implements Listener {
             player.setAllowFlight(allowFlight);
             if (allowFlight) player.setFlying(flying);
             player.setHealth(Math.max(1.0D, Math.min(health, player.getMaxHealth())));
-            player.setFireTicks(0);
+            player.setFireTicks(Math.max(0, fireTicks));
+            player.setFallDistance(Math.max(0.0F, fallDistance));
+            player.setVelocity(velocity.clone());
         }
         private static ItemStack[] cloneItems(ItemStack[] source) {
             ItemStack[] result = new ItemStack[source.length];
