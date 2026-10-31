@@ -15380,14 +15380,16 @@ public final class ArcadePortManager implements Listener {
                 wool.setType(Material.AIR, false);
                 if (turfArrow.getShooter() instanceof Player shooter) {
                     shooter.playSound(shooter.getLocation(), Sound.BLOCK_NOTE_BLOCK_BELL, 0.7F, 1.5F);
-                    String base = localStatsPath(shooter.getUniqueId(), "turf-wars");
-                    if (woolType == Material.RED_WOOL || woolType == Material.LIGHT_BLUE_WOOL) {
-                        plugin.getConfig().set(base + "blocks-broken",
-                                plugin.getConfig().getInt(base + "blocks-broken", 0) + 1);
-                    }
-                    if ("shredder".equals(session.turfWarsKits.getOrDefault(shooter.getUniqueId(), "marksman"))) {
-                        plugin.getConfig().set(base + "the-shreddinator",
-                                plugin.getConfig().getInt(base + "the-shreddinator", 0) + 1);
+                    if (!testPlayers.isTestPlayer(shooter)) {
+                        String base = localStatsPath(shooter.getUniqueId(), "turf-wars");
+                        if (woolType == Material.RED_WOOL || woolType == Material.LIGHT_BLUE_WOOL) {
+                            plugin.getConfig().set(base + "blocks-broken",
+                                    plugin.getConfig().getInt(base + "blocks-broken", 0) + 1);
+                        }
+                        if ("shredder".equals(session.turfWarsKits.getOrDefault(shooter.getUniqueId(), "marksman"))) {
+                            plugin.getConfig().set(base + "the-shreddinator",
+                                    plugin.getConfig().getInt(base + "the-shreddinator", 0) + 1);
+                        }
                     }
                 }
                 session.world.playEffect(wool.getLocation(), Effect.STEP_SOUND, woolType);
@@ -16080,9 +16082,11 @@ public final class ArcadePortManager implements Listener {
                 sparkler.setVelocity(direction.multiply(0.8D).setY(direction.getY() * 0.8D + 0.1D));
                 session.entities.add(sparkler);
                 session.dragonSparklerItems.add(sparkler.getUniqueId());
-                String sparklezPath = localStatsPath(id, "dragons") + "sparklez";
-                plugin.getConfig().set(sparklezPath, plugin.getConfig().getInt(sparklezPath, 0) + 1);
-                plugin.saveConfig(); // SparklezStatTracker records each ThrowSparklerEvent immediately.
+                if (!testPlayers.isTestPlayer(id)) {
+                    String sparklezPath = localStatsPath(id, "dragons") + "sparklez";
+                    plugin.getConfig().set(sparklezPath, plugin.getConfig().getInt(sparklezPath, 0) + 1);
+                    plugin.saveConfig(); // SparklezStatTracker records each ThrowSparklerEvent immediately.
+                }
                 player.playSound(player.getLocation(), Sound.ENTITY_EGG_THROW, 0.8F, 1.2F);
                 return;
             }
@@ -18285,8 +18289,10 @@ public final class ArcadePortManager implements Listener {
                 if (directHitDamage > 0.0D) {
                     session.bombPlayersDamaged.add(target.getUniqueId());
                     recordBombLobbersDamage(session, target, ownerId, now);
-                    String directHitsPath = localStatsPath(ownerId, "bomb-lobbers") + "direct-hits";
-                    plugin.getConfig().set(directHitsPath, plugin.getConfig().getInt(directHitsPath, 0) + 1);
+                    if (!testPlayers.isTestPlayer(ownerId)) {
+                        String directHitsPath = localStatsPath(ownerId, "bomb-lobbers") + "direct-hits";
+                        plugin.getConfig().set(directHitsPath, plugin.getConfig().getInt(directHitsPath, 0) + 1);
+                    }
                 }
                 if (target.getHealth() <= directHitDamage) {
                     int killsFromThisTnt = session.bombKillsByTnt.merge(bombId, 1, Integer::sum);
@@ -18582,8 +18588,10 @@ public final class ArcadePortManager implements Listener {
         String powerupType = bombLobbersPowerupType(held);
         if (powerupType == null) powerupType = "normal";
         session.bombLastThrowAt.put(ownerId, now);
-        String throwsPath = localStatsPath(ownerId, "bomb-lobbers") + "thrown";
-        plugin.getConfig().set(throwsPath, plugin.getConfig().getInt(throwsPath, 0) + 1);
+        if (!testPlayers.isTestPlayer(ownerId)) {
+            String throwsPath = localStatsPath(ownerId, "bomb-lobbers") + "thrown";
+            plugin.getConfig().set(throwsPath, plugin.getConfig().getInt(throwsPath, 0) + 1);
+        }
         consumeHeld(player);
 
         Location spawn = player.getEyeLocation().add(player.getLocation().getDirection().multiply(1.0D));
