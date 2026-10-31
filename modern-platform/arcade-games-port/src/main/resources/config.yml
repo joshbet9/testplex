@@ -1,6 +1,6 @@
 # The 27 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
 # READY_FOR_TEST games are available together for the shared controlled test session.
-# Dragon Escape, Super Sploor, Dragons, Runner and Camera Shy join the controlled queue; other games remain disabled until promoted.
+# Dragon Escape, Sheep Quest, Super Sploor, Dragons, Runner and Camera Shy join the controlled queue; other games remain disabled until promoted.
 enabled-games:
   - death-tag
   - one-in-the-quiver
@@ -15,6 +15,7 @@ enabled-games:
   - dragon-escape
   - dragons
   - runner
+  - sheep-quest
   - camera-shy
 lobby-selected-game: death-tag
 
