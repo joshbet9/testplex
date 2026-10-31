@@ -1,6 +1,6 @@
 # Dragons (Solo) — Paper 26.3 source-parity acceptance plan
 
-**Readiness:** `MECHANICS_IN_PROGRESS` — disabled in the shared `enabled-games` allow-list.  
+**Readiness:** `READY_FOR_TEST` — enabled in the shared controlled queue. Live multiplayer acceptance is still outstanding.  
 **Legacy reference:** Mineplex Reborn `Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/game/games/dragons/Dragons.java`, `MineplexDragon.java` and the three `kits/Kit*.java` files.  
 **Map source:** `update/maps/Dragons/` — 40 original ZIP archives.  
 **Scope:** Solo Dragons only. The separate legacy **Dragons Teams** variant is not included or implied to be implemented.
@@ -100,12 +100,8 @@ The similarly named Balloon Town, Sky Ship and Voyage files are distinct origina
 - [ ] Check scoreboards, damage counters, kit displays, participant snapshots and original locations are restored when a match finishes or is stopped.
 - [ ] No dragons, sparkler entities, flare protection, scheduled tasks, target references, world items, cooldown state or temporary effects survive a session reset.
 
-## Promotion gate
+## Controlled-queue acceptance gate
 
-Dragons (Solo) remains gated until:
-1. The Paper 26.3 build and existing Dragon rule regression tests pass.
-2. CI confirms all 40 original map archive filenames match the packaged JAR exactly.
-3. All 40 maps load correctly and the dragon/kit/flare/spectator cases above pass on the isolated live server.
-4. The separate Dragons Teams variant remains clearly excluded from the catalogue and test commands unless it receives its own port and acceptance work.
+Dragons (Solo) is enabled for combined controlled testing because its source implementation, regression coverage and exact 40-map packaging comparison are present in the Paper 26.3 build. This is **not** a claim that live gameplay has already been accepted.
 
-Only then should a separate readiness change add `dragons` to the shared allow-list and map policy. This plan does not claim that live acceptance has already occurred.
+Before calling Dragons gameplay-accepted, load all 40 maps, verify RED-marker dragon spawns and run the kit, target/contact, flare, spectator and cleanup scenarios above on the isolated live server. Fix each observed defect and rerun affected tests. The separate legacy Dragons Teams variant remains excluded from the catalogue and test commands unless it receives its own port and acceptance work.
