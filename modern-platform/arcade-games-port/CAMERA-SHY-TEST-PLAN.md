@@ -51,4 +51,5 @@
 - Operator stop and plugin shutdown restore player state and clean up the test-player roster.
 - Disconnect during a live round, reconnect both before and after match end, and confirm the exact pre-match location, inventory, armour, offhand, mode, effects, experience, health, food, movement, flight, invulnerability, collision and glowing state are restored; verify the pending restore is cleared after successful recovery.
 - Stop/restart the server after deleting the dedicated Camera Shy world folder while retaining plugin config; the maze must be regenerated rather than leaving an empty flat world.
+- Start a round, verify each human's pending recovery snapshot is saved before their inventory/location changes, then simulate an unclean JVM stop. After restart, reconnect and confirm the full pre-match state is restored and the pending record is removed.
 - `mvn -pl modern-platform/arcade-games-port -am test` and the modern platform tests pass.
