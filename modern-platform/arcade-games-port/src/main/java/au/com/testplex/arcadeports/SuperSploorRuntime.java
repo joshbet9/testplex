@@ -32,6 +32,8 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
@@ -50,6 +52,27 @@ import org.bukkit.util.Vector;
  * shared Testplex Arcade manager and never creates its own Bukkit lifecycle.
  */
 public final class SuperSploorRuntime implements Listener {
+    public record PlayerMatchStats(long territoryPainted, long enemyTerritoryReclaimed,
+            int splats, int deaths, int assists, double squidTravelBlocks,
+            double wallClimbBlocks, int specialsUsed) { }
+    public record TerritorySummary(int redUnits, int blueUnits, int totalUnits) { }
+
+    private static final class MutableStats {
+        long territoryPainted;
+        long enemyTerritoryReclaimed;
+        int splats;
+        int deaths;
+        int assists;
+        double squidTravelBlocks;
+        double wallClimbBlocks;
+        int specialsUsed;
+
+        PlayerMatchStats snapshot() {
+            return new PlayerMatchStats(territoryPainted, enemyTerritoryReclaimed, splats, deaths,
+                    assists, squidTravelBlocks, wallClimbBlocks, specialsUsed);
+        }
+    }
+
     private static final int RED = 0;
     private static final int BLUE = 1;
     private static final int PRIMARY_SLOT = 0;
@@ -69,6 +92,7 @@ public final class SuperSploorRuntime implements Listener {
     private final Map<UUID, Long> spawnProtectedUntil = new HashMap<>();
     private final Map<UUID, Long> respawnAt = new HashMap<>();
     private final Map<UUID, Integer> kills = new HashMap<>();
+    private final Map<UUID, MutableStats> playerStats = new HashMap<>();
     private final Map<UUID, Set<UUID>> contributors = new HashMap<>();
     private final Set<UUID> squidMode = new HashSet<>();
     private final Set<UUID> activeProjectiles = new HashSet<>();
@@ -93,6 +117,19 @@ public final class SuperSploorRuntime implements Listener {
     }
 
     public boolean isRunning() { return running; }
+
+    public Map<UUID, PlayerMatchStats> snapshotStats() {
+        Map<UUID, PlayerMatchStats> copy = new HashMap<>();
+        for (Map.Entry<UUID, MutableStats> entry : playerStats.entrySet()) {
+            copy.put(entry.getKey(), entry.getValue().snapshot());
+        }
+        return Map.copyOf(copy);
+    }
+
+    public TerritorySummary snapshotTerritory() {
+        if (engine == null) return new TerritorySummary(0, 0, 0);
+        return new TerritorySummary(engine.redUnits(), engine.blueUnits(), engine.totalUnits());
+    }
 
     public int leadingTeam() {
         if (engine == null) return -1;
@@ -129,6 +166,7 @@ public final class SuperSploorRuntime implements Listener {
             lastInkRegenAt.put(id, now);
             spawnProtectedUntil.put(id, now + SuperSploorRules.SPAWN_PROTECTION_MILLIS);
             kills.put(id, 0);
+            playerStats.put(id, new MutableStats());
             contributors.put(id, new HashSet<>());
             giveStarterLoadout(player, team);
             player.setGameMode(GameMode.ADVENTURE);
@@ -343,6 +381,11 @@ public final class SuperSploorRuntime implements Listener {
         if (owner != null && owner.isOnline()) {
             int team = teams.getOrDefault(ownerId, -1);
             SuperSploorEngine.PaintResult result = engine.paint(impact, team, 2);
+            MutableStats stats = playerStats.get(ownerId);
+            if (stats != null) {
+                stats.territoryPainted += result.changedUnits();
+                stats.enemyTerritoryReclaimed += result.enemyReclaimed();
+            }
             if (result.changedUnits() > 0) {
                 impact.getWorld().spawnParticle(Particle.DUST, impact.clone().add(0.0D, 0.3D, 0.0D),
                         18, 0.55D, 0.35D, 0.55D, 0.0D,
@@ -390,13 +433,15 @@ public final class SuperSploorRuntime implements Listener {
         contributors.computeIfAbsent(targetId, ignored -> new HashSet<>()).add(attackerId);
         if (count >= SuperSploorRules.MAX_PAINT_MARKS) {
             kills.merge(attackerId, 1, Integer::sum);
-            splat(targetId, target);
+            MutableStats attackerStats = playerStats.get(attackerId);
+            if (attackerStats != null) attackerStats.splats++;
+            splat(targetId, target, attackerId);
         } else {
             target.sendActionBar(ChatColor.RED + "SPLAT MARK " + count + "/4");
         }
     }
 
-    private void splat(UUID targetId, Player target) {
+    private void splat(UUID targetId, Player target, UUID killerId) {
         if (!running || respawnAt.containsKey(targetId)) return;
         long now = System.currentTimeMillis();
         respawnAt.put(targetId, now + SuperSploorRules.SPLAT_RESPAWN_MILLIS);
@@ -409,7 +454,16 @@ public final class SuperSploorRuntime implements Listener {
         target.getWorld().spawnParticle(Particle.SPLASH, target.getLocation().add(0.0D, 1.0D, 0.0D),
                 45, 0.7D, 0.8D, 0.7D, 0.1D);
         announce(ChatColor.GRAY + target.getName() + " was splatted.");
-        contributors.remove(targetId);
+        MutableStats victimStats = playerStats.get(targetId);
+        if (victimStats != null) victimStats.deaths++;
+        Set<UUID> helpers = contributors.remove(targetId);
+        if (helpers != null) {
+            for (UUID helperId : helpers) {
+                if (helperId.equals(killerId)) continue;
+                MutableStats helperStats = playerStats.get(helperId);
+                if (helperStats != null) helperStats.assists++;
+            }
+        }
     }
 
     private void respawn(UUID id, long now) {
@@ -447,6 +501,32 @@ public final class SuperSploorRuntime implements Listener {
         nextMarkRecoveryAt.put(id, now + SuperSploorRules.MARK_RECOVERY_INTERVAL_MILLIS);
         paintArmour(player, teams.get(id), next);
         player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.45F, 1.8F);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onMove(PlayerMoveEvent event) {
+        if (!running || event instanceof PlayerTeleportEvent || event.getTo() == null) return;
+        UUID id = event.getPlayer().getUniqueId();
+        if (!players.containsKey(id) || respawnAt.containsKey(id) || !squidMode.contains(id)) return;
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (from.getWorld() != world || to.getWorld() != world) return;
+        int team = teams.getOrDefault(id, -1);
+        MutableStats stats = playerStats.get(id);
+        if (stats == null) return;
+        double dx = to.getX() - from.getX();
+        double dz = to.getZ() - from.getZ();
+        double horizontal = Math.sqrt(dx * dx + dz * dz);
+        if (engine.isFriendlySurface(to, team)
+                && SuperSploorRules.shouldCountSquidTravel(horizontal, false)) {
+            stats.squidTravelBlocks += horizontal;
+        }
+        double vertical = to.getY() - from.getY();
+        if (vertical > 0.0D && vertical <= 1.25D
+                && engine.isFriendlyWallAdjacent(from, team)
+                && engine.isFriendlyWallAdjacent(to, team)) {
+            stats.wallClimbBlocks += vertical;
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -569,6 +649,7 @@ public final class SuperSploorRuntime implements Listener {
         spawnProtectedUntil.clear();
         respawnAt.clear();
         kills.clear();
+        playerStats.clear();
         contributors.clear();
         squidMode.clear();
         sidebarEntries.clear();
