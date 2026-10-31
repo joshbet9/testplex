@@ -173,7 +173,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         Player player = event.getPlayer();
         Bukkit.getScheduler().runTask(this, () -> {
             if (player.isOnline() && manager != null) {
-                // The server's only player-facing spawn is the shared Testplex Arcade lobby.
+                // Session fake players must remain in the game lifecycle that just admitted them.
+                if (manager.isTestPlayer(player)) return;
+                // The server's only human-facing spawn is the shared Testplex Arcade lobby.
                 manager.returnPlayerToLobby(player);
                 grantConfiguredAdmin(player);
                 manager.restoreMonsterMazeKitPreference(player);
