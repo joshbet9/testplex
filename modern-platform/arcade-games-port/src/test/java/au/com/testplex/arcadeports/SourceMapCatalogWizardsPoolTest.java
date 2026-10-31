@@ -73,6 +73,54 @@ class SourceMapCatalogWizardsPoolTest {
     }
 
     @Test
+    void locatesAWorldDownloaderSnapshotWithoutWorldConfigDat(@TempDir Path extracted) throws IOException {
+        Path world = Files.createDirectories(extracted.resolve("downloaded-world"));
+        Files.write(world.resolve("level.dat"), new byte[] {1});
+        Path region = Files.createDirectories(world.resolve("region"));
+        Files.write(region.resolve("r.0.0.mca"), new byte[8192]);
+
+        assertEquals(world.toAbsolutePath().normalize(), SourceMapCatalog.locateWizardsMapRoot(extracted));
+    }
+
+    @Test
+    void rejectsAmbiguousWizardsWorldRoots(@TempDir Path extracted) throws IOException {
+        for (String name : List.of("first", "second")) {
+            Path world = Files.createDirectories(extracted.resolve(name));
+            Files.write(world.resolve("level.dat"), new byte[] {1});
+            Path region = Files.createDirectories(world.resolve("region"));
+            Files.write(region.resolve("r.0.0.mca"), new byte[8192]);
+        }
+
+        assertNull(SourceMapCatalog.locateWizardsMapRoot(extracted));
+    }
+
+    @Test
+    void derivesExactNegativeAndPositiveChunkBoundsFromAnvilLocationTable() {
+        byte[] header = new byte[8192];
+        setChunkLocation(header, 0, 2, 1);
+        setChunkLocation(header, 33, 3, 2);
+
+        SourceMapCatalog.ChunkBounds bounds =
+                SourceMapCatalog.chunkBoundsFromRegionHeader(1, -2, header);
+
+        assertEquals(new SourceMapCatalog.ChunkBounds(32, 33, -64, -63, 2), bounds);
+    }
+
+    @Test
+    void ignoresEmptyAnvilRegionHeaders() {
+        assertNull(SourceMapCatalog.chunkBoundsFromRegionHeader(0, 0, new byte[8192]));
+        assertNull(SourceMapCatalog.chunkBoundsFromRegionHeader(0, 0, new byte[100]));
+    }
+
+    private static void setChunkLocation(byte[] header, int slot, int sectorOffset, int sectorCount) {
+        int index = slot * 4;
+        header[index] = (byte) ((sectorOffset >>> 16) & 0xff);
+        header[index + 1] = (byte) ((sectorOffset >>> 8) & 0xff);
+        header[index + 2] = (byte) (sectorOffset & 0xff);
+        header[index + 3] = (byte) (sectorCount & 0xff);
+    }
+
+    @Test
     void rejectsMissingFolderPoolsAndMissingResourceNames() {
         assertFalse(SourceMapCatalog.resourcePathBelongsToFolders(
                 List.of(), "source-maps/Wizards/Map.zip"));
