@@ -828,6 +828,7 @@ public final class ArcadePortRules {
     public static String normalizeMicroBattlesKit(String requested) {
         if (requested == null) return null;
         String kit = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (kit.startsWith("micro-")) kit = kit.substring("micro-".length());
         return switch (kit) {
             case "archer" -> "archer";
             case "worker" -> "worker";
@@ -871,6 +872,7 @@ public final class ArcadePortRules {
     public static String normalizeSpleefKit(String requested) {
         if (requested == null) return null;
         String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (value.startsWith("spleef-")) value = value.substring("spleef-".length());
         return switch (value) {
             case "snowballer" -> "snowballer";
             case "brawler" -> "brawler";
