@@ -41,6 +41,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -64,6 +65,11 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.util.Vector;
+import org.bukkit.scoreboard.Criteria;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.ScoreboardManager;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -101,6 +107,7 @@ public final class WizardsGameManager implements Listener {
     private final Map<UUID, PlayerSnapshot> snapshots = new HashMap<>();
     private final Map<UUID, PlayerSnapshot> pendingRestore = new HashMap<>();
     private final Map<UUID, BossBar> manaBars = new HashMap<>();
+    private final Map<UUID, Objective> matchObjectives = new HashMap<>();
     private final Map<Location, TemporaryBlock> temporaryBlocks = new HashMap<>();
     private final Set<UUID> ownedEntities = new HashSet<>();
     private final Map<UUID, SpectralArrowData> spectralArrows = new HashMap<>();
@@ -132,6 +139,7 @@ public final class WizardsGameManager implements Listener {
     private double endgameAccuracy;
     private float endgameSize = 1.5F;
     private float meteorSpeed = 0.05F;
+    private boolean armorModifierWarningLogged;
 
     public WizardsGameManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
@@ -381,6 +389,7 @@ public final class WizardsGameManager implements Listener {
                 ARENA_FLOOR_Y + 1.0D, Math.sin(angle) * spawnRadius + 0.5D);
         spawn.setDirection(new Vector(-Math.cos(angle), 0.0D, -Math.sin(angle)));
         player.teleport(spawn);
+        applyMatchScoreboard(player);
 
         for (int slot = 0; slot < MAX_WAND_SLOTS; slot++) {
             if (slot < state.wandCount) {
@@ -463,6 +472,7 @@ public final class WizardsGameManager implements Listener {
         tickEndgame();
         tickEndgameMeteors();
         expireTemporaryBlocks();
+        if (tick % 20 == 0) updateMatchScoreboards();
         long elapsed = System.currentTimeMillis() - startedAt;
 
         while (paceStep < WizardsRules.GAME_PACE_MINUTES.length
@@ -748,6 +758,55 @@ public final class WizardsGameManager implements Listener {
         if (bar != null) bar.removeAll();
     }
 
+    private void applyMatchScoreboard(Player player) {
+        ScoreboardManager manager = Bukkit.getScoreboardManager();
+        if (manager == null) return;
+        Objective previous = matchObjectives.remove(player.getUniqueId());
+        if (previous != null) previous.unregister();
+
+        Scoreboard scoreboard = manager.getNewScoreboard();
+        Objective objective = scoreboard.registerNewObjective("wizards", Criteria.DUMMY, ChatColor.YELLOW + "Wizards");
+        objective.setDisplaySlot(DisplaySlot.SIDEBAR);
+        matchObjectives.put(player.getUniqueId(), objective);
+        player.setScoreboard(scoreboard);
+        updateMatchScoreboard(player, objective);
+    }
+
+    private void updateMatchScoreboards() {
+        if (!running || matchObjectives.isEmpty()) return;
+        for (Map.Entry<UUID, Objective> entry : new ArrayList<>(matchObjectives.entrySet())) {
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player != null && player.isOnline()) updateMatchScoreboard(player, entry.getValue());
+        }
+    }
+
+    private void updateMatchScoreboard(Player player, Objective objective) {
+        if (objective == null || objective.getScoreboard() == null) return;
+        Scoreboard scoreboard = objective.getScoreboard();
+        for (String entry : new HashSet<>(scoreboard.getEntries())) scoreboard.resetScores(entry);
+
+        long alive = states.values().stream().filter(state -> state.alive).count();
+        long remainingMillis = (10L * 60L * 1000L) - Math.max(0L, System.currentTimeMillis() - startedAt);
+        long minutes = Math.max(0L, (Math.abs(remainingMillis) + 59_999L) / 60_000L);
+        String phase = remainingMillis >= 0L ? ChatColor.YELLOW + "Time Left" : ChatColor.RED + "Overtime";
+        String minuteText = minutes + " minute" + (minutes == 1L ? "" : "s");
+
+        objective.getScore(ChatColor.YELLOW + "Players Alive").setScore(5);
+        objective.getScore(ChatColor.WHITE + Long.toString(alive)).setScore(4);
+        objective.getScore(ChatColor.DARK_GRAY + " ").setScore(3);
+        objective.getScore(phase).setScore(2);
+        objective.getScore(ChatColor.WHITE + minuteText).setScore(1);
+    }
+
+    private void removeMatchScoreboard(UUID id) {
+        Objective objective = matchObjectives.remove(id);
+        if (objective != null) objective.unregister();
+    }
+
+    private void clearMatchScoreboards() {
+        for (UUID id : new ArrayList<>(matchObjectives.keySet())) removeMatchScoreboard(id);
+    }
+
     private void updateWandLabels(Player player, WizardState state) {
         PlayerInventory inventory = player.getInventory();
         for (int slot = 0; slot < state.wandCount; slot++) {
@@ -1008,6 +1067,33 @@ public final class WizardsGameManager implements Listener {
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (event.getPlayer().isOnline()) updateWandLabels(event.getPlayer(), state);
         });
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onArmorRebalance(EntityDamageEvent event) {
+        if (!running || !(event.getEntity() instanceof Player victim)) return;
+        WizardState state = states.get(victim.getUniqueId());
+        if (state == null || !state.alive || event.getDamage() <= 0.0D) return;
+
+        ItemStack[] armour = victim.getInventory().getArmorContents();
+        Material[] pieces = new Material[armour.length];
+        for (int i = 0; i < armour.length; i++) {
+            pieces[i] = armour[i] == null ? Material.AIR : armour[i].getType();
+        }
+        double protection = WizardsRules.armorProtection(pieces);
+        if (protection <= 0.0D) return;
+
+        EntityDamageEvent.DamageModifier modifier = EntityDamageEvent.DamageModifier.ARMOR;
+        if (!event.isApplicable(modifier)) {
+            if (!armorModifierWarningLogged) {
+                armorModifierWarningLogged = true;
+                plugin.getLogger().warning("Paper did not expose the ARMOR damage modifier for a Wizards hit; source armor rebalance could not be applied to that damage event.");
+            }
+            return;
+        }
+        // Replace vanilla's armor modifier with the original Mineplex percentage
+        // reduction. Other modifiers (enchantments, resistance, absorption) remain intact.
+        event.setDamage(modifier, -event.getDamage() * protection);
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -1381,6 +1467,7 @@ public final class WizardsGameManager implements Listener {
                 player.getInventory().clear();
                 player.setGameMode(GameMode.SPECTATOR);
                 player.setFlying(true);
+                applyMatchScoreboard(player);
                 player.sendMessage(ChatColor.GRAY + "You are spectating the remaining wizards.");
             });
         }
@@ -1426,6 +1513,7 @@ public final class WizardsGameManager implements Listener {
                 player.setGameMode(GameMode.SPECTATOR);
                 player.teleport(new Location(arena, 0.5D, ARENA_FLOOR_Y + 2.0D, 0.5D));
                 player.setFlying(true);
+                applyMatchScoreboard(player);
                 player.sendMessage(ChatColor.GRAY + "You rejoined as a spectator. Your lobby state will be restored when the round ends.");
             }, 1L);
         }
@@ -2368,6 +2456,7 @@ public final class WizardsGameManager implements Listener {
             }
         }
         snapshots.clear();
+        clearMatchScoreboards();
         states.clear();
         queue.clear();
         selectedKits.clear();
@@ -2402,6 +2491,7 @@ public final class WizardsGameManager implements Listener {
         if (snapshot != null) snapshot.restore(player);
         states.remove(id);
         removeManaBar(id);
+        removeMatchScoreboard(id);
         checkWinner();
     }
 
@@ -2587,7 +2677,7 @@ public final class WizardsGameManager implements Listener {
                                   GameMode gameMode, double health, int food, float saturation,
                                   int level, float exp, boolean allowFlight, boolean flying,
                                   float walkSpeed, float flySpeed, int fireTicks,
-                                  List<PotionEffect> effects) {
+                                  List<PotionEffect> effects, Scoreboard scoreboard) {
         static PlayerSnapshot capture(Player player) {
             return new PlayerSnapshot(
                     player.getLocation().clone(),
@@ -2604,7 +2694,8 @@ public final class WizardsGameManager implements Listener {
                     player.getWalkSpeed(),
                     player.getFlySpeed(),
                     player.getFireTicks(),
-                    new ArrayList<>(player.getActivePotionEffects()));
+                    new ArrayList<>(player.getActivePotionEffects()),
+                    player.getScoreboard());
         }
 
         void restore(Player player) {
@@ -2628,6 +2719,7 @@ public final class WizardsGameManager implements Listener {
                     ? 20.0D : player.getAttribute(Attribute.MAX_HEALTH).getValue();
             player.setHealth(Math.max(1.0D, Math.min(health, maxHealth)));
             if (location != null && location.getWorld() != null) player.teleport(location);
+            if (scoreboard != null) player.setScoreboard(scoreboard);
         }
 
         private static ItemStack[] cloneItems(ItemStack[] source) {

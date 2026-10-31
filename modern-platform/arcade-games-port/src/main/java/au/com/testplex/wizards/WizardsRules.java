@@ -1,5 +1,7 @@
 package au.com.testplex.wizards;
 
+import org.bukkit.Material;
+
 import java.util.List;
 
 public final class WizardsRules {
@@ -29,6 +31,33 @@ public final class WizardsRules {
     public static double capMeleeDamage(double incomingDamage) {
         if (!Double.isFinite(incomingDamage) || incomingDamage < 0.0D) return 0.0D;
         return Math.min(incomingDamage, 0.5D);
+    }
+
+    /** Original Mineplex protection for a single equipped armour piece. */
+    public static double armourPieceProtection(Material piece) {
+        if (piece == null) return 0.0D;
+        String name = piece.name();
+        double protection;
+        if (name.contains("LEATHER")) protection = 0.10D;
+        else if (name.contains("GOLD") || name.contains("CHAINMAIL")) protection = 0.15D;
+        else if (name.contains("IRON")) protection = 0.19D;
+        else if (name.contains("DIAMOND")) protection = 0.25D;
+        else return 0.0D;
+
+        if (name.endsWith("_BOOTS")) protection /= 3.0D;
+        else if (name.endsWith("_LEGGINGS")) protection /= 1.5D;
+        else if (name.endsWith("_CHESTPLATE")) { /* full piece value */ }
+        else if (name.endsWith("_HELMET")) protection /= 2.0D;
+        else return 0.0D;
+        return protection;
+    }
+
+    /** Adds the four original piece-specific percentages, without vanilla armour points. */
+    public static double armorProtection(Material... pieces) {
+        if (pieces == null) return 0.0D;
+        double protection = 0.0D;
+        for (Material piece : pieces) protection += armourPieceProtection(piece);
+        return Math.max(0.0D, Math.min(1.0D, protection));
     }
 
     public static List<WizardsSpell> initialKnownSpells() {
