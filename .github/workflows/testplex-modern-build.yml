@@ -83,6 +83,8 @@ jobs:
           jar tf "$arcade_jar" | grep -Fxq "plugin.yml"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadePortManager.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/PlexballGame.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/PlexballRules.class"
           jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/MonsterMazePlugin.class"
           jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/game/GameManager.class"
           jar tf "$arcade_jar" | grep -Fxq "monster-maze/maps.yml"
