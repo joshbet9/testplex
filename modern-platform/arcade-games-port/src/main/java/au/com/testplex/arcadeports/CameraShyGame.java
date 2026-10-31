@@ -659,9 +659,9 @@ public final class CameraShyGame implements Listener {
         nextSpotlightAt = startedAt + SPOTLIGHT_INTERVAL_MILLIS;
         nextGroupPickupAt = startedAt + GROUP_PICKUP_INTERVAL_MILLIS;
         finalSnapshot = false;
-        phase = Phase.LIVE;
 
-        for (int i = 0; i < all.size(); i++) {
+        try {
+            for (int i = 0; i < all.size(); i++) {
             Player player = all.get(i);
             UUID id = player.getUniqueId();
             players.put(id, player);
@@ -681,13 +681,13 @@ public final class CameraShyGame implements Listener {
             uniquePhotos.put(id, new LinkedHashSet<>());
             photographedBy.put(id, new LinkedHashSet<>());
             spawnLocations.put(id, spawns.get(i % spawns.size()).clone());
-        }
-        try {
+            }
             plugin.saveConfig();
             for (UUID id : players.keySet()) {
                 Player player = players.get(id);
                 if (player != null && player.isOnline()) setupPlayer(player, spawnLocations.get(id));
             }
+            phase = Phase.LIVE;
         } catch (RuntimeException startupFailure) {
             plugin.getLogger().log(java.util.logging.Level.SEVERE,
                     "Camera Shy could not finish preparing every player; restoring the captured pre-match state.",
