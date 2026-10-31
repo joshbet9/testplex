@@ -19,6 +19,9 @@ All spell books, wands, inventory menus and feedback use ordinary Paper/Minecraf
 
 The repository currently has no Wizards map archive. This module therefore creates a clearly-labelled generated arena for mechanics testing; it does not claim the original map layout or source map chest placements.
 
+
+When `ArcadeMechanicsModern` is installed alongside WizardsModern, the game writes lifetime **wins**, **kills** and **spells-bound** into the shared `local-stats.<uuid>.wizards.*` keys used by the Arcade `/stats` milestone browser. The plugin declares a soft dependency so the shared stats owner loads first. If Wizards is run without the Arcade host, gameplay remains independent and the shared milestone bridge is simply unavailable.
+
 ## Test commands
 
 - /wizards join — queue for the next round.
