@@ -9,6 +9,7 @@ import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.ScoreboardManager;
+import org.bukkit.scoreboard.Team;
 
 import java.util.List;
 import java.util.Locale;
@@ -67,6 +68,7 @@ public final class ModernLobbyScoreboard {
         for (String line : lines) {
             sidebar.getScore(line).setScore(score--);
         }
+        applyLobbyTabTeams(scoreboard);
         player.setScoreboard(scoreboard);
     }
 
@@ -124,6 +126,63 @@ public final class ModernLobbyScoreboard {
     static String formatKitName(String kitId) {
         if (kitId == null || kitId.isBlank()) return "None";
         return titleCase(kitId);
+    }
+
+    static String tabSortKey(String rank) {
+        return switch (rank == null ? "player" : rank.toLowerCase(Locale.ROOT)) {
+            case "owner" -> "r0_owner";
+            case "admin" -> "r1_admin";
+            case "mod" -> "r2_mod";
+            case "helper" -> "r3_helper";
+            case "ultra" -> "r4_ultra";
+            default -> "r5_player";
+        };
+    }
+
+    static String rankPrefix(JavaPlugin plugin, Player player) {
+        String rank = rankId(plugin, player);
+        ChatColor colour = switch (rank) {
+            case "owner" -> ChatColor.DARK_RED;
+            case "admin" -> ChatColor.RED;
+            case "mod" -> ChatColor.GOLD;
+            case "helper" -> ChatColor.GREEN;
+            case "ultra" -> ChatColor.AQUA;
+            default -> ChatColor.GRAY;
+        };
+        String label = switch (rank) {
+            case "owner" -> "OWNER";
+            case "admin" -> "ADMIN";
+            case "mod" -> "MOD";
+            case "helper" -> "HELPER";
+            case "ultra" -> "ULTRA";
+            default -> "";
+        };
+        return label.isEmpty() ? "" : colour + "[" + label + "] " + ChatColor.RESET;
+    }
+
+    private static String rankId(JavaPlugin plugin, Player player) {
+        String configured = plugin.getConfig().getString("lobby-scoreboard.ranks." + player.getUniqueId(), "");
+        if (configured != null && !configured.isBlank()) {
+            String value = configured.trim().toLowerCase(Locale.ROOT);
+            if (List.of("owner", "admin", "mod", "helper", "ultra", "player").contains(value)) return value;
+        }
+        if (player.hasPermission("testplex.rank.owner")) return "owner";
+        if (player.hasPermission("testplex.rank.admin") || player.isOp()) return "admin";
+        if (player.hasPermission("testplex.rank.mod")) return "mod";
+        if (player.hasPermission("testplex.rank.helper")) return "helper";
+        if (player.hasPermission("testplex.rank.ultra")) return "ultra";
+        return "player";
+    }
+
+    private void applyLobbyTabTeams(Scoreboard scoreboard) {
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (!ModernArcadeLobby.WORLD_NAME.equals(online.getWorld().getName())) continue;
+            String rank = rankId(plugin, online);
+            Team team = scoreboard.getTeam(tabSortKey(rank));
+            if (team == null) team = scoreboard.registerNewTeam(tabSortKey(rank));
+            team.setPrefix(rankPrefix(plugin, online));
+            team.addEntry(online.getName());
+        }
     }
 
     private static String spacer(int index) {

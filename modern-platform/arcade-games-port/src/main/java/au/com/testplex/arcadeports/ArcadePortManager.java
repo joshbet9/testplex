@@ -656,6 +656,13 @@ public final class ArcadePortManager implements Listener {
     public void selectKit(Player player, String requestedKit) {
         if (player == null || requestedKit == null) return;
         String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if (lobby.isLobbyWorld(player.getWorld())) {
+            ArcadePortGame lobbyGame = ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", "death-tag"));
+            if (lobbyGame != null && !lobbyRuntime.hasKit(lobbyGame, value)) {
+                player.sendMessage(ChatColor.RED + "That kit is not available for " + lobbyGame.displayName() + ".");
+                return;
+            }
+        }
         boolean explicitMonsterMazeKit = value.startsWith("monster-maze-");
         if (explicitMonsterMazeKit) value = value.substring("monster-maze-".length());
         boolean monsterMazeLobby = "monster-maze".equals(

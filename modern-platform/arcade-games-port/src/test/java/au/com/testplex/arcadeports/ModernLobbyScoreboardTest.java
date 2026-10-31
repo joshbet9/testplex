@@ -55,6 +55,16 @@ class ModernLobbyScoreboardTest {
     }
 
     @Test
+    void tabListRankOrderMatchesLegacyPriority() {
+        assertEquals("r0_owner", ModernLobbyScoreboard.tabSortKey("owner"));
+        assertEquals("r1_admin", ModernLobbyScoreboard.tabSortKey("admin"));
+        assertEquals("r2_mod", ModernLobbyScoreboard.tabSortKey("mod"));
+        assertEquals("r3_helper", ModernLobbyScoreboard.tabSortKey("helper"));
+        assertEquals("r4_ultra", ModernLobbyScoreboard.tabSortKey("ultra"));
+        assertEquals("r5_player", ModernLobbyScoreboard.tabSortKey("player"));
+    }
+
+    @Test
     void playerCountIsFormattedLikeTheOriginalPlayersValue() {
         assertEquals("0/16", ModernLobbyScoreboard.formatPlayerCount(0, 16));
         assertEquals("3/16", ModernLobbyScoreboard.formatPlayerCount(3, 16));

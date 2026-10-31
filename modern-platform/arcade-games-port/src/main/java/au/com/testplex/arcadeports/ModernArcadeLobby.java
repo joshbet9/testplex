@@ -363,7 +363,13 @@ public final class ModernArcadeLobby implements Listener {
         display(world, "game-panel", new Location(world, 0.0D, 106.0D, 3.0D),
                 ChatColor.AQUA + "" + ChatColor.BOLD + "GAME PANEL");
         display(world, "game-text", new Location(world, 0.0D, 130.0D, GAME_TEXT_Z),
-                ChatColor.AQUA + "" + ChatColor.BOLD + "ARCADE GAME PANEL");
+                ChatColor.AQUA + "" + ChatColor.BOLD + "ARCADE");
+        display(world, "game-map", new Location(world, 0.0D, 124.0D, GAME_TEXT_Z),
+                ChatColor.WHITE + "Map: Default");
+        display(world, "game-mode", new Location(world, 0.0D, 118.0D, GAME_TEXT_Z),
+                ChatColor.WHITE + "Mode: Standard");
+        display(world, "game-status", new Location(world, 0.0D, 112.0D, GAME_TEXT_Z),
+                ChatColor.GREEN + "Waiting for players");
         display(world, "kit-text", new Location(world, KIT_TEXT_X, KIT_TEXT_Y, 0.0D),
                 ChatColor.GREEN + "" + ChatColor.BOLD + "KIT SELECT");
         display(world, "team-text", new Location(world, TEAM_TEXT_X, TEAM_TEXT_Y, 0.0D),

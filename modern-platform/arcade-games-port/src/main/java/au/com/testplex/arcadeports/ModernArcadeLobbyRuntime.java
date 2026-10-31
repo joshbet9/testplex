@@ -71,7 +71,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private final Map<java.util.UUID, Long> lastBotSwingAtByAttacker = new LinkedHashMap<>();
     private final List<Entity> showcase = new ArrayList<>();
     private final List<Entity> kitNpcs = new ArrayList<>();
-    private Entity teamNpc;
+    private final List<Entity> teamNpcs = new ArrayList<>();
     private ArcadePortGame selectedGame = ArcadePortGame.BACON_BRAWL;
     private BukkitTask task;
 
@@ -138,13 +138,38 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         World world = lobby.ensureWorld();
         if (world == null) return;
         String name = selectedGame.displayName();
+        String map = SourceMapCatalog.selectedResource(plugin, selectedGame);
+        String mode = plugin.getConfig().getString("lobby-selected-mode." + selectedGame.id(), "");
+        String status = plugin.getConfig().getString("lobby-countdown-status", "Waiting for players");
+        display(world, "game-text", ChatColor.AQUA + "" + ChatColor.BOLD + name);
+        display(world, "game-map", ChatColor.WHITE + "Map: " + (map == null || map.isBlank() ? "Default" : map));
+        display(world, "game-mode", ChatColor.WHITE + "Mode: " + (mode == null || mode.isBlank() ? "Standard" : mode));
+        display(world, "game-status", ChatColor.GREEN + status);
         display(world, "kit-text", ChatColor.GREEN + "" + ChatColor.BOLD + "KIT SELECT | " + name);
-        display(world, "team-text", ChatColor.BLUE + "" + ChatColor.BOLD + "TEAM / QUEUE | " + name);
+        display(world, "team-text", ChatColor.BLUE + "" + ChatColor.BOLD
+                + (ArcadePortManager.teamCountForGame(selectedGame) > 0 ? "TEAM SELECT | " : "QUEUE | ") + name);
         display(world, "kit-display", ChatColor.GREEN + "Choose a " + name + " kit");
-        boolean freeForAll = selectedGame == ArcadePortGame.BACON_BRAWL
-                || selectedGame == ArcadePortGame.SKY_WARS;
-        display(world, "team-display", ChatColor.BLUE + (freeForAll ? "FREE FOR ALL" : "TEAM QUEUE")
-                + ChatColor.WHITE + " | Queued: " + manager.queuedCount(selectedGame) + ChatColor.GRAY + " | Test Players: created on Start Game");
+        int teamCount = ArcadePortManager.teamCountForGame(selectedGame);
+        if (teamCount > 0) {
+            StringBuilder counts = new StringBuilder();
+            String[] labels = {"Red", "Blue", "Green", "Yellow"};
+            ChatColor[] colours = {ChatColor.RED, ChatColor.BLUE, ChatColor.GREEN, ChatColor.YELLOW};
+            for (int team = 0; team < teamCount; team++) {
+                if (counts.length() > 0) counts.append(ChatColor.WHITE).append("  |  ");
+                counts.append(colours[team]).append(labels[team]).append(" ")
+                        .append(manager.queuedCountForTeam(selectedGame, team));
+            }
+            display(world, "team-display", counts.toString());
+        } else {
+            display(world, "team-display", ChatColor.BLUE + "FREE FOR ALL"
+                    + ChatColor.WHITE + " | Queued: " + manager.queuedCount(selectedGame));
+        }
+    }
+
+    boolean hasKit(ArcadePortGame game, String kitId) {
+        if (game == null || kitId == null) return false;
+        String normalized = kitId.trim().toLowerCase(Locale.ROOT).replace('_', '-').replace(' ', '-');
+        return kitChoicesFor(game).stream().anyMatch(choice -> choice.id.equals(normalized));
     }
 
     private void display(World world, String id, String title) {
@@ -157,27 +182,31 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private void refreshKitAndTeamNpcs() {
         World world = lobby.ensureWorld();
-        for (Entity entity : new ArrayList<>(kitNpcs)) {
-            if (entity != null && entity.isValid()) entity.remove();
-        }
+        for (Entity entity : new ArrayList<>(kitNpcs)) if (entity != null && entity.isValid()) entity.remove();
         kitNpcs.clear();
-        if (teamNpc != null && teamNpc.isValid()) teamNpc.remove();
-        teamNpc = null;
+        for (Entity entity : new ArrayList<>(teamNpcs)) if (entity != null && entity.isValid()) entity.remove();
+        teamNpcs.clear();
         if (world == null) return;
 
         List<KitChoice> choices = kitChoicesFor(selectedGame);
-
-        // Clear the previous game's station footprints before creating the new
-        // layout. Otherwise switching from five kits to three leaves old wool,
-        // slabs and coloured borders visible behind the current stations.
         clearKitAndQueuePedestalAreas(world);
-
         List<Pedestal> pedestals = new ArrayList<>();
         for (int i = 0; i < choices.size(); i++) {
             int centerZ = kitPedestalCenterZ(choices.size(), i);
             pedestals.add(new Pedestal(KIT_PEDESTAL_X, centerZ, choices.get(i).unlock.pedestalColor));
         }
-        pedestals.add(new Pedestal(QUEUE_PEDESTAL_X, 0, Material.BLUE_WOOL));
+        int teamCount = ArcadePortManager.teamCountForGame(selectedGame);
+        int[] teamCentres = teamCount == 4 ? new int[] {9, 3, -3, -9} : new int[] {3, -3};
+        Material[] teamWools = {Material.RED_WOOL, Material.BLUE_WOOL, Material.GREEN_WOOL, Material.YELLOW_WOOL};
+        DyeColor[] teamDyes = {DyeColor.RED, DyeColor.BLUE, DyeColor.GREEN, DyeColor.YELLOW};
+        String[] teamLabels = {"Red Team", "Blue Team", "Green Team", "Yellow Team"};
+        if (teamCount > 0) {
+            for (int team = 0; team < teamCount; team++) {
+                pedestals.add(new Pedestal(QUEUE_PEDESTAL_X, teamCentres[team], teamWools[team]));
+            }
+        } else {
+            pedestals.add(new Pedestal(QUEUE_PEDESTAL_X, 0, Material.BLUE_WOOL));
+        }
         buildLegacyPedestals(world, pedestals);
 
         for (int i = 0; i < choices.size(); i++) {
@@ -185,30 +214,41 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             int centerZ = pedestals.get(i).centerZ;
             Location at = new Location(world, KIT_PEDESTAL_X + 0.5D,
                     ModernArcadeLobby.FLOOR_Y + 2.5D, centerZ + 0.5D);
-            // The legacy kit stands faced back toward the spawn platform.
             at.setYaw(-90.0F);
-            LivingEntity npc = spawnKitNpc(world, at, choice);
-            kitNpcs.add(npc);
+            kitNpcs.add(spawnKitNpc(world, at, choice));
         }
+        if (teamCount > 0) {
+            for (int team = 0; team < teamCount; team++) {
+                Location at = new Location(world, QUEUE_PEDESTAL_X + 0.5D,
+                        ModernArcadeLobby.FLOOR_Y + 2.5D, teamCentres[team] + 0.5D);
+                at.setYaw(90.0F);
+                Sheep sheep = world.spawn(at, Sheep.class);
+                sheep.setColor(teamDyes[team]);
+                configureLobbySheep(sheep, ChatColor.BOLD.toString() + teamLabels[team]);
+                sheep.getPersistentDataContainer().set(teamNpcKey, PersistentDataType.STRING, "team:" + team);
+                teamNpcs.add(sheep);
+            }
+        } else {
+            Location at = new Location(world, QUEUE_PEDESTAL_X + 0.5D,
+                    ModernArcadeLobby.FLOOR_Y + 2.5D, 0.5D);
+            at.setYaw(90.0F);
+            Sheep queue = world.spawn(at, Sheep.class);
+            configureLobbySheep(queue, ChatColor.AQUA + ChatColor.BOLD.toString() + "Free For All");
+            queue.getPersistentDataContainer().set(teamNpcKey, PersistentDataType.STRING, "queue");
+            teamNpcs.add(queue);
+        }
+    }
 
-        Location queueAt = new Location(world, QUEUE_PEDESTAL_X + 0.5D,
-                ModernArcadeLobby.FLOOR_Y + 2.5D, 0.5D);
-        queueAt.setYaw(90.0F);
-        Sheep team = world.spawn(queueAt, Sheep.class);
-        team.setColor(DyeColor.GRAY);
-        String queueLabel = selectedGame == ArcadePortGame.BACON_BRAWL
-                ? "Free For All" : "Team / Queue";
-        team.setCustomName(ChatColor.AQUA + ChatColor.BOLD.toString() + queueLabel);
-        team.setCustomNameVisible(true);
-        team.setInvulnerable(true);
-        team.setRemoveWhenFarAway(false);
-        team.setPersistent(false);
-        team.setSilent(true);
-        team.setGravity(false);
-        team.setCollidable(false);
-        team.setAI(false);
-        team.getPersistentDataContainer().set(teamNpcKey, PersistentDataType.STRING, "queue");
-        teamNpc = team;
+    private void configureLobbySheep(Sheep sheep, String label) {
+        sheep.setCustomName(label);
+        sheep.setCustomNameVisible(true);
+        sheep.setInvulnerable(true);
+        sheep.setRemoveWhenFarAway(false);
+        sheep.setPersistent(false);
+        sheep.setSilent(true);
+        sheep.setGravity(false);
+        sheep.setCollidable(false);
+        sheep.setAI(false);
     }
 
     private LivingEntity spawnKitNpc(World world, Location at, KitChoice choice) {
@@ -250,7 +290,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private void clearKitAndQueuePedestalAreas(World world) {
         clearPedestalArea(world, -22, -13, -20, 20);
-        clearPedestalArea(world, 15, 21, -4, 4);
+        clearPedestalArea(world, 15, 21, -13, 13);
     }
 
     private void clearPedestalArea(World world, int minX, int maxX, int minZ, int maxZ) {
@@ -628,24 +668,52 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     @EventHandler
     public void onLobbyNpcUse(PlayerInteractEntityEvent e) {
-        Entity entity=e.getRightClicked();
-        String kit=entity.getPersistentDataContainer().get(kitNpcKey,PersistentDataType.STRING);
-        String queue=entity.getPersistentDataContainer().get(teamNpcKey,PersistentDataType.STRING);
-        String bot=entity.getPersistentDataContainer().get(botKey,PersistentDataType.STRING);
-        if(kit!=null){
+        Entity entity = e.getRightClicked();
+        String kit = entity.getPersistentDataContainer().get(kitNpcKey, PersistentDataType.STRING);
+        String queue = entity.getPersistentDataContainer().get(teamNpcKey, PersistentDataType.STRING);
+        String bot = entity.getPersistentDataContainer().get(botKey, PersistentDataType.STRING);
+        if (kit != null) {
             e.setCancelled(true);
-            if ("none".equals(kit)) {
-                openKitMenu(e.getPlayer());
-                return;
-            }
-            manager.selectKit(e.getPlayer(),kit);
-            plugin.getConfig().set("lobby-kit-preferences."+e.getPlayer().getUniqueId()+"."+selectedGame.id(),kit); plugin.saveConfig();
-            lobby.refreshPlayerScoreboard(e.getPlayer());
-            e.getPlayer().sendMessage(ChatColor.GREEN+"Selected "+kit.replace('-',' ')+" for "+selectedGame.displayName()+".");
-        }else if(queue!=null){e.setCancelled(true);openQueueMenu(e.getPlayer());}
-        else if(bot!=null && hasAdminAccess(e.getPlayer())){
-            e.setCancelled(true); Bot b=bots.get(bot); if(b!=null)openBotCosmetics(e.getPlayer(),b);
+            if ("none".equals(kit)) { openKitMenu(e.getPlayer()); return; }
+            Player player = e.getPlayer();
+            manager.selectKit(player, kit);
+            plugin.getConfig().set("lobby-kit-preferences." + player.getUniqueId() + "." + selectedGame.id(), kit);
+            plugin.saveConfig();
+            lobby.refreshPlayerScoreboard(player);
+            player.sendMessage(ChatColor.GREEN + "Selected " + kit.replace('-', ' ')
+                    + " for " + selectedGame.displayName() + ".");
+            return;
         }
+        if (queue != null) {
+            e.setCancelled(true);
+            Player player = e.getPlayer();
+            if (queue.startsWith("team:")) {
+                int team = Integer.parseInt(queue.substring("team:".length()));
+                manager.selectLobbyTeam(player, selectedGame, team);
+                manager.queue(selectedGame, player, false);
+                player.sendMessage(ChatColor.GREEN + "Selected " + teamName(team) + " and joined the "
+                        + selectedGame.displayName() + " queue.");
+                refreshDisplays();
+                openQueueMenu(player);
+            } else {
+                openQueueMenu(player);
+            }
+            return;
+        }
+        if (bot != null && hasAdminAccess(e.getPlayer())) {
+            e.setCancelled(true);
+            Bot b = bots.get(bot);
+            if (b != null) openBotCosmetics(e.getPlayer(), b);
+        }
+    }
+
+    private static String teamName(int team) {
+        return switch (team) {
+            case 0 -> "Red Team";
+            case 1 -> "Blue Team";
+            case 2 -> "Green Team";
+            default -> "Yellow Team";
+        };
     }
 
     private void openKitMenu(Player p) {
@@ -668,14 +736,36 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         inv.setItem(22, item(Material.RED_BED, ChatColor.GRAY + "Back / Close"));
         p.openInventory(inv);
     }
-    private void openQueueMenu(Player p){
-        Inventory inv=Bukkit.createInventory(null,27,QUEUE_TITLE);
-        inv.setItem(4,item(Material.PORKCHOP,ChatColor.GOLD+selectedGame.displayName(),
-                ChatColor.GRAY+(selectedGame==ArcadePortGame.BACON_BRAWL?"Free-for-all: no team is required.":"Team queue for this game."),
-                ChatColor.GRAY+"Human players queued: "+manager.queuedCount(selectedGame),ChatColor.GRAY+"AFK player targets: created when the game starts"));
-        ItemStack join=item(Material.LIME_DYE,ChatColor.GREEN+"Join Queue",ChatColor.GRAY+"Join the selected game's pre-game queue.");mark(join,"queue-join",null);inv.setItem(11,join);
-        ItemStack leave=item(Material.RED_DYE,ChatColor.RED+"Leave Queue",ChatColor.GRAY+"Remove yourself from all waiting queues.");mark(leave,"queue-leave",null);inv.setItem(15,leave);
-        inv.setItem(22,item(Material.RED_BED,ChatColor.GRAY+"Back / Close"));p.openInventory(inv);
+    private void openQueueMenu(Player p) {
+        Inventory inv = Bukkit.createInventory(null, 27, QUEUE_TITLE);
+        int teamCount = ArcadePortManager.teamCountForGame(selectedGame);
+        int selectedTeam = manager.lobbyTeamPreference(p, selectedGame, teamCount);
+        inv.setItem(4, item(Material.PORKCHOP, ChatColor.GOLD + selectedGame.displayName(),
+                ChatColor.GRAY + (teamCount > 0 ? "Choose a team, then join the queue." : "Free-for-all: no team is required."),
+                ChatColor.GRAY + "Players queued: " + manager.queuedCount(selectedGame)));
+        if (teamCount > 0) {
+            Material[] dyes = {Material.RED_DYE, Material.BLUE_DYE, Material.GREEN_DYE, Material.YELLOW_DYE};
+            ChatColor[] colours = {ChatColor.RED, ChatColor.BLUE, ChatColor.GREEN, ChatColor.YELLOW};
+            for (int team = 0; team < teamCount; team++) {
+                ItemStack choice = item(dyes[team], colours[team] + teamName(team),
+                        ChatColor.GRAY + "Queued: " + manager.queuedCountForTeam(selectedGame, team),
+                        ChatColor.YELLOW + (selectedTeam == team ? "Your current team" : "Click to select and queue"));
+                mark(choice, "team:" + team, null);
+                inv.setItem(new int[] {10, 12, 14, 16}[team], choice);
+            }
+        }
+        ItemStack join = item(Material.LIME_DYE, ChatColor.GREEN + "Join Queue",
+                ChatColor.GRAY + (teamCount > 0 && selectedTeam < 0
+                        ? "Choose a team first, or you will be balanced automatically."
+                        : "Join the selected game's pre-game queue."));
+        mark(join, "queue-join", null);
+        inv.setItem(11, join);
+        ItemStack leave = item(Material.RED_DYE, ChatColor.RED + "Leave Queue",
+                ChatColor.GRAY + "Remove yourself from all waiting queues.");
+        mark(leave, "queue-leave", null);
+        inv.setItem(15, leave);
+        inv.setItem(22, item(Material.RED_BED, ChatColor.GRAY + "Back / Close"));
+        p.openInventory(inv);
     }
 
     @EventHandler
@@ -691,10 +781,23 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 String kit=action.substring(4);manager.selectKit(p,kit);
                 plugin.getConfig().set("lobby-kit-preferences."+p.getUniqueId()+"."+selectedGame.id(),kit);plugin.saveConfig();lobby.refreshPlayerScoreboard(p);p.closeInventory();
             }else if(e.getSlot()==22)p.closeInventory();
-        }else if(QUEUE_TITLE.equals(title)){
-            if("queue-join".equals(action)){manager.queue(selectedGame,p,false);refreshDisplays();openQueueMenu(p);}
-            else if("queue-leave".equals(action)){manager.removeFromQueues(p);p.sendMessage(ChatColor.YELLOW+"You have left the Arcade queue.");refreshDisplays();openQueueMenu(p);}
-            else if(e.getSlot()==22)p.closeInventory();
+        } else if (QUEUE_TITLE.equals(title)) {
+            if (action != null && action.startsWith("team:")) {
+                int team = Integer.parseInt(action.substring("team:".length()));
+                manager.selectLobbyTeam(p, selectedGame, team);
+                manager.queue(selectedGame, p, false);
+                refreshDisplays();
+                openQueueMenu(p);
+            } else if ("queue-join".equals(action)) {
+                manager.queue(selectedGame, p, false);
+                refreshDisplays();
+                openQueueMenu(p);
+            } else if ("queue-leave".equals(action)) {
+                manager.removeFromQueues(p);
+                p.sendMessage(ChatColor.YELLOW + "You have left the Arcade queue.");
+                refreshDisplays();
+                openQueueMenu(p);
+            } else if (e.getSlot() == 22) p.closeInventory();
         }else{
             String key=it.getItemMeta().getPersistentDataContainer().get(botKey,PersistentDataType.STRING);
             Bot b=key==null?null:bots.get(key);if(b==null)return;
@@ -1160,7 +1263,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         showBotImpact(bot, target, null, null, null);
     }
 
-    public void shutdown(){if(task!=null)task.cancel();returnBotsToLobby();for(Entity e:new ArrayList<>(showcase))if(e!=null&&e.isValid())e.remove();for(Entity e:new ArrayList<>(kitNpcs))if(e!=null&&e.isValid())e.remove();if(teamNpc!=null&&teamNpc.isValid())teamNpc.remove();}
+    public void shutdown(){if(task!=null)task.cancel();returnBotsToLobby();for(Entity e:new ArrayList<>(showcase))if(e!=null&&e.isValid())e.remove();for(Entity e:new ArrayList<>(kitNpcs))if(e!=null&&e.isValid())e.remove();for (Entity entity : new ArrayList<>(teamNpcs)) if (entity != null && entity.isValid()) entity.remove(); teamNpcs.clear();}
 
     private final class Bot{
         final String key,name;String theme,form,kit;Entity actor;Location actorLocation,arenaSpawn;boolean inGame;ArcadePortGame deployedGame;int team=-1;long nextAttackAt,knockbackUntil;
