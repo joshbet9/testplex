@@ -125,6 +125,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             getLogger().info("TESTPLEX_ARCADE_LOBBY_READY world=" + ModernArcadeLobby.WORLD_NAME
                     + " plane=100x100 floor-y=" + ModernArcadeLobby.FLOOR_Y
                     + " deployment-signal=" + deploymentSignal);
+            if (!deploymentSignal && System.getenv("TESTPLEX_DEPLOYED_BUILD_SHA") != null) {
+                throw new IllegalStateException("Systemd deployment identity is missing from "
+                        + getDataFolder() + "; refusing to report Arcade lobby as deployment-ready.");
+            }
         } catch (java.io.IOException exception) {
             throw new IllegalStateException("Could not publish Testplex Arcade lobby readiness.", exception);
         }

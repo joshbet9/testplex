@@ -251,9 +251,14 @@ public final class ArcadePortManager implements Listener {
         this.gladiatorPotionKey = new NamespacedKey(plugin, "gladiators-healing-pot");
         this.gladiatorHotbarKey = new NamespacedKey(plugin, "gladiators-hotbar-editor");
         this.lobby = new ModernArcadeLobby(plugin);
+        World lobbyWorld = lobby.ensureWorld();
+        if (lobbyWorld == null) {
+            throw new IllegalStateException("Testplex Arcade cannot start without its dedicated 100x100 lobby world.");
+        }
         Bukkit.getPluginManager().registerEvents(this, plugin);
         Bukkit.getPluginManager().registerEvents(lobby, plugin);
-        lobby.ensureWorld();
+        plugin.getLogger().info("TESTPLEX_ARCADE_LOBBY_READY world=" + ModernArcadeLobby.WORLD_NAME
+                + " bounds=-50..49 floor-y=" + ModernArcadeLobby.FLOOR_Y);
         this.lobbyRuntime = new ModernArcadeLobbyRuntime(plugin, this, lobby);
         Bukkit.getPluginManager().registerEvents(lobbyRuntime, plugin);
         lobbyRuntime.setSelectedGame(ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", "bacon-brawl")));
@@ -1398,6 +1403,11 @@ public final class ArcadePortManager implements Listener {
             }
         }
 
+        if (sender instanceof Player requestingPlayer && requestingPlayer.isOnline()) {
+            // A tester who invokes Start Game from Paper's default world is moved
+            // into the dedicated Arcade lobby and included in the requested queue.
+            lobby.ensurePlayerInLobby(requestingPlayer);
+        }
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (player.isOnline() && lobby.isLobbyWorld(player.getWorld())) {
                 for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
