@@ -63,6 +63,7 @@ public final class SourceMapCatalog {
             case MICRO_BATTLES -> List.of("Micro Battle");
             case ONE_IN_THE_QUIVER -> List.of("One in the Quiver");
             case PAINTBALL -> List.of("Paintball", "Super Paintball");
+            case SUPER_SPLOOR -> List.of("Sploor");
             case RUNNER -> List.of("Runner");
             case SHEEP_QUEST -> List.of("Sheep Quest");
             case SPLEEF -> List.of("Speef", "Super Spleef");

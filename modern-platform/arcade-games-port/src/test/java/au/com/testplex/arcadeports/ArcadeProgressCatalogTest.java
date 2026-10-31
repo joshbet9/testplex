@@ -30,12 +30,25 @@ class ArcadeProgressCatalogTest {
     @Test
     void firstBatchCatalogContainsAllProvidedGameCriteria() {
         String[] games = {"bacon-brawl", "bomb-lobbers", "death-tag", "dragon-escape", "dragons",
-                "evolution", "gladiators", "micro-battles", "monster-maze"};
-        int[] achievementCounts = {5, 4, 2, 4, 6, 5, 4, 6, 9};
+                "evolution", "gladiators", "micro-battles", "monster-maze", "super-sploor"};
+        int[] achievementCounts = {5, 4, 2, 4, 6, 5, 4, 6, 9, 15};
         for (int i = 0; i < games.length; i++) {
             assertTrue(ArcadeProgressCatalog.milestones(games[i]).size() >= 2, games[i]);
             assertTrue(ArcadeProgressCatalog.achievements(games[i]).size() >= achievementCounts[i], games[i]);
         }
+    }
+
+    @Test
+    void superSploorMilestonesUseFourExplicitStages() {
+        assertArrayEquals(new long[] {10, 25, 100, 250}, stages("super-sploor", "wins"));
+        assertArrayEquals(new long[] {1_000, 10_000, 50_000, 250_000},
+                stages("super-sploor", "territory-painted"));
+        assertArrayEquals(new long[] {250, 2_000, 10_000, 50_000},
+                stages("super-sploor", "enemy-territory"));
+        assertArrayEquals(new long[] {250, 2_500, 25_000, 100_000},
+                stages("super-sploor", "squid-travel"));
+        assertEquals(15, ArcadeProgressCatalog.achievements("super-sploor").size());
+        assertEquals(7, ArcadeProgressCatalog.milestones("super-sploor").size());
     }
 
     private long[] stages(String gameId, String id) {

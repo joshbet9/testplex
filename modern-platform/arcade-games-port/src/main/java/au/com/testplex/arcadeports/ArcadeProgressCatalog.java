@@ -102,7 +102,23 @@ public final class ArcadeProgressCatalog {
                     a("stampede", "Stampede", "Send 10 mobs flying with Body Rush in one game."),
                     a("perfect-run", "Perfect Run", "Win after reaching every first safe pad."),
                     a("breakaway", "Breakaway", "Reach a safe pad first while the closest player is more than 30 blocks away."),
-                    a("photo-finish", "Photo Finish", "Win on the final second with an opponent within 3 blocks."))));
+                    a("photo-finish", "Photo Finish", "Win on the final second with an opponent within 3 blocks."))),
+            Map.entry("super-sploor", List.of(
+                    a("first-splash", "First Splash", "Complete your first Super Sploor match."),
+                    a("fresh-canvas", "Fresh Canvas", "Claim 500 previously neutral territory units in one match."),
+                    a("reclaimer", "Reclaimer", "Reclaim 200 enemy-owned territory units in one match."),
+                    a("squid-express", "Squid Express", "Travel 500 blocks in Squid Mode during one match."),
+                    a("wall-to-wall", "Wall to Wall", "Climb 25 vertical blocks on friendly-painted walls in one match."),
+                    a("team-palette", "Team Palette", "Earn 5 assists in one match."),
+                    a("close-shave", "Close Shave", "Win a match by 2 percentage points or less."),
+                    a("clean-sweep", "Clean Sweep", "Win a match without being splatted."),
+                    a("colour-outside-the-lines", "Colour Outside the Lines", "As Sprayer, claim 350 neutral territory units in one match."),
+                    a("road-roller", "Road Roller", "As Roller, paint 500 territory units using the rolling path in one match."),
+                    a("needle-threader", "Needle Threader", "As Charger, land 5 fully charged primary hits on opponents in one match."),
+                    a("splash-zone", "Splash Zone", "As Lobber, reclaim 150 enemy-owned territory units in one match."),
+                    a("blink-and-youll-miss-it", "Blink and You'll Miss It", "As Dualies, splat 3 different opponents within 5 seconds of a Dodge Roll in one match."),
+                    a("special-delivery", "Special Delivery", "Mark 3 different opponents with one special activation."),
+                    a("master-of-the-palette", "Master of the Palette", "Win at least one match using each of the five kits."))));
 
     private static final Map<String, List<Milestone>> MILESTONES = Map.ofEntries(
             Map.entry("bacon-brawl", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 1000, "kills"))),
@@ -116,7 +132,15 @@ public final class ArcadeProgressCatalog {
             Map.entry("monster-maze", List.of(
                     ms("wins", "Wins", "wins", 250, "wins", 25, 50, 100, 250),
                     ms("first-safe-pads", "First Safe Pads", "first-safe-pads", 1000, "pads", 100, 250, 500, 1000),
-                    ms("highest-stage", "Highest Stage", "highest-stage", 21, "stage", 12, 15, 18, 21))));
+                    ms("highest-stage", "Highest Stage", "highest-stage", 21, "stage", 12, 15, 18, 21))),
+            Map.entry("super-sploor", List.of(
+                    ms("wins", "Turf War Wins", "wins", 250, "wins", 10, 25, 100, 250),
+                    ms("territory-painted", "Territory Painted", "territory-blocks-painted", 250_000, "blocks", 1_000, 10_000, 50_000, 250_000),
+                    ms("enemy-territory", "Enemy Turf Reclaimed", "enemy-blocks-reclaimed", 50_000, "blocks", 250, 2_000, 10_000, 50_000),
+                    ms("splats", "Opponents Splatted", "splats", 1_000, "splats", 10, 50, 250, 1_000),
+                    ms("assists", "Team Assists", "assists", 500, "assists", 5, 25, 100, 500),
+                    ms("squid-travel", "Squid Travel", "squid-distance-blocks", 100_000, "blocks", 250, 2_500, 25_000, 100_000),
+                    ms("specials", "Specials Activated", "specials-used", 250, "specials", 5, 25, 100, 250))));
 
     private ArcadeProgressCatalog() { }
 
