@@ -189,6 +189,7 @@ public final class ArcadePortManager implements Listener {
     static final int MANUAL_START_COUNTDOWN_SECONDS = 0;
     private final ArcadeMechanicsModernPlugin plugin;
     private final SneakyAssassinsMechanics sneakyAssassins;
+    private final HoopsRemasteredRuntime hoops;
     private final Map<String, LinkedHashMap<UUID, Player>> queues = new HashMap<>();
     private final Map<String, World> worlds = new HashMap<>();
     private final Set<String> sourceMapWorlds = new HashSet<>();
@@ -242,6 +243,12 @@ public final class ArcadePortManager implements Listener {
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
         this.sneakyAssassins = new SneakyAssassinsMechanics(plugin);
+        this.hoops = new HoopsRemasteredRuntime(plugin, (winner, announceWinner) -> {
+            Session hoopsSession = active;
+            if (hoopsSession != null && hoopsSession.type == ArcadePortGame.HOOPS_REMASTERED) {
+                ArcadePortManager.this.finish(hoopsSession, winner, announceWinner);
+            }
+        });
         this.statsActionKey = new NamespacedKey(plugin, "stats-action");
         this.statsCategoryKey = new NamespacedKey(plugin, "stats-category");
         this.statsGameKey = new NamespacedKey(plugin, "stats-game");
@@ -258,6 +265,7 @@ public final class ArcadePortManager implements Listener {
         }
         Bukkit.getPluginManager().registerEvents(this, plugin);
         Bukkit.getPluginManager().registerEvents(lobby, plugin);
+        Bukkit.getPluginManager().registerEvents(hoops, plugin);
         plugin.getLogger().info("TESTPLEX_ARCADE_LOBBY_READY world=" + ModernArcadeLobby.WORLD_NAME
                 + " bounds=-50..49 floor-y=" + ModernArcadeLobby.FLOOR_Y);
         this.lobbyRuntime = new ModernArcadeLobbyRuntime(plugin, this, lobby);
@@ -1696,6 +1704,11 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (type == ArcadePortGame.HOOPS_REMASTERED
+                && !HoopsRemasteredRules.supportsPlayerCount(participants.size())) {
+            sender.sendMessage(ChatColor.RED + "Hoops Remastered supports 2–16 players (8 per team).");
+            return;
+        }
         if (type == ArcadePortGame.MASTER_BUILDERS
                 && !ArcadePortRules.supportsMasterBuildersPlayerCount(participants.size())) {
             sender.sendMessage(ChatColor.RED + "Master Builders supports up to 16 builders (one per plot).");
@@ -1831,6 +1844,7 @@ public final class ArcadePortManager implements Listener {
                 || type == ArcadePortGame.DRAW_MY_THING
                 || type == ArcadePortGame.MASTER_BUILDERS
                 || type == ArcadePortGame.GLADIATORS
+                || type == ArcadePortGame.HOOPS_REMASTERED
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 0L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
@@ -2030,7 +2044,8 @@ public final class ArcadePortManager implements Listener {
                         now + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
             }
             int teamCount = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST ? 4 : 2;
-            boolean teamMode = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST
+            boolean teamMode = type == ArcadePortGame.HOOPS_REMASTERED
+                    || type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST
                     || type == ArcadePortGame.BOMB_LOBBERS || type == ArcadePortGame.PAINTBALL
                     || type == ArcadePortGame.TURF_WARS || type == ArcadePortGame.CASTLE_ASSAULT
                     || type == ArcadePortGame.HEROES_OF_GWEN;
@@ -2377,6 +2392,10 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (participants.size() == 1) announce(session, ChatColor.GRAY + "Solo test mode: the run will remain available for practice until the timer ends or you reset it.");
+        if (type == ArcadePortGame.HOOPS_REMASTERED) {
+            hoops.start(world, participants, session.teams);
+            announce(session, ChatColor.GOLD + "Hoops Remastered is live — pass, shoot, defend and chase 21!");
+        }
         session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
         sender.sendMessage(ChatColor.GREEN + "Started " + type.displayName() + " with " + participants.size() + (participants.size() == 1 ? " player." : " players."));
     }
@@ -2537,6 +2556,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void buildArena(ArcadePortGame type, World world) {
+        if (type == ArcadePortGame.HOOPS_REMASTERED) {
+            HoopsRemasteredRuntime.buildCourt(world);
+            return;
+        }
         if (type == ArcadePortGame.SNEAKY_ASSASSINS) {
             sneakyAssassins.buildArena(world);
             return;
@@ -2606,6 +2629,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private List<Location> spawnLocations(ArcadePortGame type, int count) {
+        if (type == ArcadePortGame.HOOPS_REMASTERED) {
+            return HoopsRemasteredRuntime.spawnLocations(worlds.get(type.id()), count);
+        }
         if (type == ArcadePortGame.MASTER_BUILDERS) {
             List<Location> locations = new ArrayList<>();
             World world = worlds.get(type.id());
@@ -10807,6 +10833,9 @@ public final class ArcadePortManager implements Listener {
                     : "guesses " + Math.max(0, DRAW_MY_THING_MAX_GUESSES - session.drawGuessAttempts.getOrDefault(id, 0)) + "/10";
             case MASTER_BUILDERS -> session.masterBuilderPhase == MasterBuildersPhase.BUILDING
                     ? "building | " + session.masterBuilderTheme : "review | " + session.masterBuilderTheme;
+            case HOOPS_REMASTERED -> "basketball | "
+                    + (session.teams.getOrDefault(id, 0) == 0 ? "RED" : "BLUE")
+                    + " | " + scoreFor(session, id) + " pts";
             // Monster Maze owns its own in-process GameManager session and does not
             // create an ArcadePortManager Session object.
             case MONSTER_MAZE -> "Monster Maze";
@@ -10837,7 +10866,8 @@ public final class ArcadePortManager implements Listener {
 
     private void checkRoundEnd(Session session) {
         if (active != session) return;
-        if (session.type == ArcadePortGame.DRAW_MY_THING || session.type == ArcadePortGame.MASTER_BUILDERS) return;
+        if (session.type == ArcadePortGame.DRAW_MY_THING || session.type == ArcadePortGame.MASTER_BUILDERS
+                || session.type == ArcadePortGame.HOOPS_REMASTERED) return;
         // Castle Assault and Heroes of Gwen end through their objective controllers, not last-player rules.
         if (session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN) {
             if (session.alive.isEmpty() && session.respawning.isEmpty()) finish(session, null, true);
@@ -12949,6 +12979,7 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        if (session.type == ArcadePortGame.HOOPS_REMASTERED) hoops.onManagerFinish();
         if (announceWinner && session.type == ArcadePortGame.WITHER_ASSAULT && winner != null
                 && session.teams.getOrDefault(winner.getUniqueId(), -1) == 0
                 && !session.witherHumanDamaged.contains(winner.getUniqueId())) {
@@ -13109,6 +13140,11 @@ public final class ArcadePortManager implements Listener {
                 } else {
                     announce(session, ChatColor.YELLOW + "Bacon Brawl ended with no pig left standing.");
                 }
+            } else if (session.type == ArcadePortGame.HOOPS_REMASTERED && winner != null) {
+                int winningTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
+                ChatColor colour = winningTeam == 0 ? ChatColor.RED : ChatColor.AQUA;
+                announce(session, colour + (winningTeam == 0 ? "RED" : "BLUE")
+                        + ChatColor.GOLD + " team wins Hoops Remastered!");
             } else {
                 announce(session, winner == null ? ChatColor.YELLOW + "Round ended." : ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won " + session.type.displayName() + "!");
             }
@@ -13789,7 +13825,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void recordLocalStats(Session session, Player winner, boolean completed) {
-        if (!completed) return;
+        if (!completed || session.type == ArcadePortGame.HOOPS_REMASTERED) return;
         if (session.type == ArcadePortGame.DRAGONS) awardDragonEndGems(session, winner);
         UUID winnerId = winner == null ? null : winner.getUniqueId();
         int winningTeam = winnerId == null ? -1 : session.teams.getOrDefault(winnerId, -1);
@@ -14929,6 +14965,7 @@ public final class ArcadePortManager implements Listener {
         List<Player> participantsToReturn = stopping == null
                 ? List.of() : new ArrayList<>(stopping.players.values());
         if (stopping != null) finish(stopping, null, false);
+        else hoops.shutdown();
         if (monsterMazeRunning() && monsterMazeModule != null
                 && monsterMazeModule.getGameManager() != null) {
             monsterMazeModule.getGameManager().forceStop();

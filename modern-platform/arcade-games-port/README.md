@@ -133,3 +133,12 @@ The catalogue and renderer contract are covered by unit tests. A passing build d
 ## Wither Assault: smoother movement
 
 Wither flight speed follows a continuous altitude curve. Near the spawn height, an eased transition blends the source hover speed into the altitude-based curve, while a per-tick rate limit prevents sudden changes during climbs and descents.
+
+
+## Hoops Remastered — first modern gameplay slice
+
+Hoops Remastered is being rebuilt as a two-team basketball match inside the shared Arcade session lifecycle. The first implementation adds a generated indoor hardwood court, balanced RED / BLUE team assignment for 2–16 players (up to 8v8), a five-minute match limit or first-to-21 scoring (whichever comes first), with no win-by-two; a tied five-minute score enters sudden-death overtime where the next basket wins, a 24-second shot clock, two- and three-point shots, server-simulated ball flight, possession passing, close-range steals, shot blocks, recoverable rebounds and the returning Hops double-jump (eight-second cooldown). The live action bar shows the player's points, assists, rebounds, blocks and steals; the sidebar shows team scores and clocks. Career data is stored under the existing local Hoops progress namespace, including PPG / APG / RPG, and the existing achievements / milestones are wired to match results.
+
+Controls: left-click to pass while holding the ball; right-click to shoot while holding the ball; jump toward the rim and right-click while rising to attempt a dunk; left-click an opposing carrier while facing them to attempt a steal; right-click near an opposing airborne shot while facing the ball to attempt a timed block. The ball uses a vanilla magma-cream model; teams wear ordinary dyed leather armour with matching scoreboard name colours. The arena uses built-in Paper BossBar, TextDisplay and Dialog APIs, vanilla scoreboard teams, blocks, particles and sounds; no resource pack or extra runtime plugin is required.
+
+Hoops is intentionally **not** added to the deployed READY_FOR_TEST allow-list yet. It remains disabled from normal test selection until Paper 26.3 build validation and the live acceptance plan in `HOOPS-REMASTERED-ACCEPTANCE-PLAN.md` are complete. Automated rule tests cover scoring, clocks, five-minute time-limit and sudden-death overtime, shot aiming, layup/dunk eligibility, timed blocks, assists, box-score achievements and player limits; they do not prove live ball feel or rim geometry.
