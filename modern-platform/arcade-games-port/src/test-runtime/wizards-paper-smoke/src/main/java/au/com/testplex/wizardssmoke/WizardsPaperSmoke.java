@@ -10,6 +10,7 @@ import org.bukkit.block.Chest;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -40,7 +41,7 @@ import java.util.Set;
  *
  * This plugin is only packaged in the temporary CI smoke server, never in Testplex jars.
  */
-public final class WizardsPaperSmoke extends JavaPlugin {
+public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
     private static final List<String> POOLS = List.of("Wizards", "Nano Wizards");
     private static final List<String> MAPS = List.of(
             "haven", "wizardarena", "orbisharbor", "aspen", "hogwarts",
