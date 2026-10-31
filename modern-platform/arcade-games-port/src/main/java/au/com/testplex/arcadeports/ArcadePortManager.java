@@ -1405,10 +1405,11 @@ public final class ArcadePortManager implements Listener {
         } else if (teamOne < teamZero) {
             team = 1;
         } else {
-            int leader = ArcadePortRules.teamWithBestTimeoutStanding(
-                    teamZero, teamOne, timeoutTeamKills(session, 0), timeoutTeamKills(session, 1));
-            // Equal team sizes go to the side currently behind. In a true tie,
-            // alternate to blue/red by the current frontline direction for balance.
+            int leader = ArcadePortRules.turfWarsTimeoutLeader(
+                    session.turfFrontlineX, session.turfInitialFrontlineX,
+                    timeoutTeamKills(session, 0), timeoutTeamKills(session, 1));
+            // If the player counts are equal, put the new player on the team
+            // currently behind on territory (kill count is the tie-breaker).
             if (leader == 0) team = 1;
             else if (leader == 1) team = 0;
             else team = session.turfFrontlineX >= session.turfInitialFrontlineX ? 1 : 0;
