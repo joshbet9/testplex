@@ -12510,8 +12510,14 @@ public final class ArcadePortManager implements Listener {
 
         UUID attackerId = attacker.getUniqueId();
         UUID targetId = target.getUniqueId();
+        if (QuiverAchievementRules.shouldAwardHeads(
+                session.quiverPendingHighArcKillers.remove(attackerId), true)) {
+            awardCatalogAchievement(attackerId, "one-in-the-quiver", "heads");
+        }
         int streak = session.quiverKillStreaks.merge(attackerId, 1, Integer::sum);
-        if (streak == 2) session.quiverTwoKillStreaks.merge(attackerId, 1, Integer::sum);
+        if (QuiverAchievementRules.countsSeparateTwoKillStreak(streak)) {
+            session.quiverTwoKillStreaks.merge(attackerId, 1, Integer::sum);
+        }
         String streakTitle = ArcadePortRules.quiverKillstreakTitle(streak);
         if (ArcadePortRules.isQuiverKillstreakAnnouncement(streak) && streakTitle != null) {
             for (Player viewer : session.world.getPlayers()) {
@@ -12718,7 +12724,8 @@ public final class ArcadePortManager implements Listener {
             awardQuiverAchievement(winner, QuiverAchievement.WHATS_A_BOW,
                     "What's A bow? — won with 20 kills without using archery.");
         }
-        if (session.quiverTwoKillStreaks.getOrDefault(id, 0) >= 10) {
+        if (QuiverAchievementRules.hasTenTwoKillStreaks(
+                session.quiverTwoKillStreaks.getOrDefault(id, 0))) {
             awardQuiverAchievement(winner, QuiverAchievement.RHYTHM_HEAVEN,
                     "Rhythm Heaven — won with 10 separate two-kill streaks.");
         }
@@ -12812,12 +12819,17 @@ public final class ArcadePortManager implements Listener {
             session.entities.remove(projectile);
             projectile.remove();
         } else if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
-            if (session.quiverHighArcArrows.remove(projectile.getUniqueId())) {
-                awardCatalogAchievement(shooter, "one-in-the-quiver", "heads");
+            boolean highArcArrow = session.quiverHighArcArrows.remove(projectile.getUniqueId());
+            if (highArcArrow) session.quiverPendingHighArcKillers.add(shooter.getUniqueId());
+            try {
+                tryQuiverRebound(session, projectile, shooter,
+                        projectile.getLocation().clone().add(projectile.getVelocity()));
+                // OITQ resolves a confirmed live-player arrow impact as a kill in scoreQuiverKill.
+                // The pending marker is consumed there, so a high-arc hit alone never awards HEADS!.
+                handlePlayerHit(session, shooter, target, "arrow hit");
+            } finally {
+                if (highArcArrow) session.quiverPendingHighArcKillers.remove(shooter.getUniqueId());
             }
-            tryQuiverRebound(session, projectile, shooter,
-                    projectile.getLocation().clone().add(projectile.getVelocity()));
-            handlePlayerHit(session, shooter, target, "arrow hit");
             session.entities.remove(projectile);
             projectile.remove();
         } else if (session.type == ArcadePortGame.MICRO_BATTLES) {
@@ -13176,6 +13188,8 @@ public final class ArcadePortManager implements Listener {
         }
         session.paintballSaveMeLocations.clear();
         session.quiverArrowBounces.clear();
+        session.quiverHighArcArrows.clear();
+        session.quiverPendingHighArcKillers.clear();
         session.quiverKillStreaks.clear();
         session.quiverFistKills.clear();
         session.quiverUsedBow.clear();
@@ -21119,6 +21133,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> bombSpectateNextTeleportAt = new HashMap<>();
 
         final Set<UUID> quiverHighArcArrows = new HashSet<>();
+        final Set<UUID> quiverPendingHighArcKillers = new HashSet<>();
         final Map<UUID, Integer> quiverTwoKillStreaks = new HashMap<>();
         final Map<UUID, UUID> paintballProjectileShotIds = new HashMap<>();
         final Map<UUID, UUID> paintballShotOwners = new HashMap<>();
