@@ -1584,16 +1584,19 @@ public final class ArcadePortManager implements Listener {
                 targetQueue.put(bot.getUniqueId(), bot);
                 insertedBotIds.add(bot.getUniqueId());
             }
+            boolean startFailed = false;
             try {
                 startQueuedInternal(type, requester, sender, mixedArcadeVariant);
             } catch (RuntimeException exception) {
+                startFailed = true;
                 plugin.getLogger().log(java.util.logging.Level.SEVERE,
                         "Could not start " + type.displayName() + " with its game-scoped fake-player roster.", exception);
                 sender.sendMessage(ChatColor.RED + "Start failed while initialising the game. Test players were removed.");
+                if (active != null || monsterMazeRunning()) stop("failed " + type.id() + " test-player start");
             }
-            boolean started = active != null && active.type == type
+            boolean started = !startFailed && (active != null && active.type == type
                     && active.mixedArcadeVariant == mixedArcadeVariant
-                    || type == ArcadePortGame.MONSTER_MAZE && monsterMazeRunning();
+                    || type == ArcadePortGame.MONSTER_MAZE && monsterMazeRunning());
             if (!started) {
                 for (LinkedHashMap<UUID, Player> queue : queues.values()) {
                     for (UUID botId : insertedBotIds) queue.remove(botId);
