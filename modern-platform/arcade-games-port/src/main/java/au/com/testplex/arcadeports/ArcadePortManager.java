@@ -1125,7 +1125,7 @@ public final class ArcadePortManager implements Listener {
                     while (now - state.lastSecondAt >= 1_000L) {
                         state.lastSecondAt += 1_000L;
                         state.seconds++;
-                        if (state.seconds > 15) {
+                        if (state.seconds > 15 && !testPlayers.isTestPlayer(id)) {
                             String statPath = "local-stats." + id + ".turf-wars.behind-enemy-lines";
                             plugin.getConfig().set(statPath, plugin.getConfig().getInt(statPath, 0) + 1);
                         }
@@ -17087,9 +17087,11 @@ public final class ArcadePortManager implements Listener {
                         || (team == 1 && broken == Material.LIGHT_BLUE_WOOL)) {
                     event.setDropItems(false);
                     event.setExpToDrop(0);
-                    String base = "local-stats." + event.getPlayer().getUniqueId() + ".turf-wars.";
-                    plugin.getConfig().set(base + "blocks-broken",
-                            plugin.getConfig().getInt(base + "blocks-broken", 0) + 1);
+                    if (!testPlayers.isTestPlayer(event.getPlayer())) {
+                        String base = "local-stats." + event.getPlayer().getUniqueId() + ".turf-wars.";
+                        plugin.getConfig().set(base + "blocks-broken",
+                                plugin.getConfig().getInt(base + "blocks-broken", 0) + 1);
+                    }
                     return;
                 }
             }
@@ -17195,7 +17197,7 @@ public final class ArcadePortManager implements Listener {
             if (!allowed) {
                 event.setCancelled(true);
                 player.sendMessage(ChatColor.YELLOW + "You can only build on your own coloured turf, within five blocks of the clay.");
-            } else {
+            } else if (!testPlayers.isTestPlayer(player)) {
                 String base = "local-stats." + player.getUniqueId() + ".turf-wars.";
                 plugin.getConfig().set(base + "blocks-placed",
                         plugin.getConfig().getInt(base + "blocks-placed", 0) + 1);
