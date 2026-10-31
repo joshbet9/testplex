@@ -289,6 +289,11 @@ public final class ArcadePortManager implements Listener {
                 && module.getGameManager() != null;
     }
 
+    /** Called after Monster Maze returns its roster; only despawn when the embedded module is truly idle. */
+    public void cleanupTestPlayersIfNoGameIsRunning() {
+        if (active == null && !monsterMazeRunning()) testPlayers.despawnSessionPlayers();
+    }
+
     public void returnPlayerToLobby(Player player) {
         if (player != null && player.isOnline()) lobby.sendToLobby(player);
     }
@@ -1526,7 +1531,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
-        int botsNeeded = testPlayers.additionalPlayersNeeded(humanIds.size());
+        int botsNeeded = ArcadeTestPlayerManager.additionalPlayersNeeded(humanIds.size());
         if (botsNeeded <= 0) {
             startQueuedInternal(type, requester, sender, mixedArcadeVariant);
             return;
