@@ -580,7 +580,7 @@ public final class MenuService implements Listener {
                 return;
             }
             switch (optionId) {
-                case "public-server" -> Bukkit.setWhitelist(Bukkit.hasWhitelist());
+                case "public-server" -> Bukkit.setWhitelist(!Bukkit.hasWhitelist());
                 case "enforce-whitelist" -> Bukkit.setWhitelist(!Bukkit.hasWhitelist());
                 case "game-auto-start" -> {
                     JavaPlugin engine = arcadeMechanicsPlugin();
