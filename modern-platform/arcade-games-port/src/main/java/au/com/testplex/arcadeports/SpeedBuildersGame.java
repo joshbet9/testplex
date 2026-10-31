@@ -419,6 +419,7 @@ public final class SpeedBuildersGame implements Listener {
         } else {
             Bukkit.broadcastMessage(ChatColor.YELLOW + "Speed Builders ended. " + stopReason);
         }
+        persistMatchProgress(winner);
         for (PlayerState state : new ArrayList<>(players.values())) {
             Player player = state.player;
             if (player.isOnline()) {
@@ -431,6 +432,26 @@ public final class SpeedBuildersGame implements Listener {
         }
         players.clear();
         refreshHud();
+    }
+
+    private void persistMatchProgress(Player winner) {
+        UUID winnerId = winner == null ? null : winner.getUniqueId();
+        for (PlayerState state : players.values()) {
+            UUID playerId = state.player.getUniqueId();
+            SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-placed", state.blocksPlaced);
+            SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "perfect-builds", state.perfectBuilds);
+            if (playerId.equals(winnerId)) {
+                SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "wins", 1L);
+            }
+        }
+        if (!players.isEmpty()) plugin.saveConfig();
+    }
+
+    private void persistPlayerProgress(PlayerState state) {
+        UUID playerId = state.player.getUniqueId();
+        SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-placed", state.blocksPlaced);
+        SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "perfect-builds", state.perfectBuilds);
+        plugin.saveConfig();
     }
 
     private int score(Plot plot) {
@@ -607,6 +628,7 @@ public final class SpeedBuildersGame implements Listener {
             event.setCancelled(true);
             return;
         }
+        state.blocksPlaced++;
         Bukkit.getScheduler().runTask(plugin, () -> checkPerfectBuild(state));
     }
 
@@ -670,6 +692,7 @@ public final class SpeedBuildersGame implements Listener {
         queueDeadlineTick = queue.size() < SpeedBuildersRules.MIN_PLAYERS ? -1L : queueDeadlineTick;
         PlayerState removed = players.remove(id);
         if (removed == null || phase == Phase.IDLE) return;
+        persistPlayerProgress(removed);
         if (alivePlayers().size() <= 1) {
             List<PlayerState> alive = alivePlayers();
             finishMatch(alive.isEmpty() ? null : alive.getFirst().player, "The last builder standing wins.");
@@ -843,6 +866,7 @@ public final class SpeedBuildersGame implements Listener {
         private boolean empty;
         private int score;
         private int perfectBuilds;
+        private int blocksPlaced;
 
         private PlayerState(Player player, Plot plot) {
             this.player = player;
