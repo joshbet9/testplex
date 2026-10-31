@@ -840,7 +840,16 @@ jobs:
             rollback
             exit 1
           fi
-          sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR"
+          # All new artifacts are assigned monstermaze ownership at installation time;
+          # source-map trees are chowned individually when copied. Do not recursively
+          # traverse the entire server directory here: it includes large survival/map
+          # worlds and plugin data and can stall SSH after the server is already ready.
+          sudo -n chown monstermaze:monstermaze "$SERVER_DIR" "$SERVER_DIR/plugins"
+
+          echo "[deploy] Verified Testplex Arcade runtime readiness identity:"
+          sudo -n awk -F= '$1 ~ /^(status|module|manager|world|plane|floor_y|source_sha|invocation_id|process_id)$/ { print }' "$readiness_file"
+          sudo -n grep -F 'TESTPLEX_ARCADE_LOBBY_READY' "$SERVER_DIR/logs/latest.log" | tail -n 1 || true
+
           sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-phase DEPLOYMENT_VERIFIED
           echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby; Death Tag and One in the Quiver are enabled for acceptance; Monster Maze registration is reported separately above; Snake, Wizards and all other unfinished game ports remain disabled; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "On successful deployment, testplex-reborn.service remains stopped if it was active during preflight; a failed deployment restores services that were active before preflight. Separate Monster Maze project services/data were not modified."
