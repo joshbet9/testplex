@@ -72,7 +72,7 @@ class PlexballProgressionRulesTest {
         assertEquals(100L, milestone(PlexballMilestone.Metric.HOME_RUNS).target());
         PlexballMilestone distance = milestone(PlexballMilestone.Metric.DISTANCE_TENTHS);
         assertEquals(100_000L, distance.target());
-        assertEquals("10000.0m", distance.targetLabel());
+        assertEquals("10km", distance.targetLabel());
     }
 
     @Test
