@@ -313,6 +313,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     new KitChoice("sniper", "Sniper", Material.CROSSBOW),
                     new KitChoice("shotgun", "Shotgun", Material.BLAZE_ROD),
                     new KitChoice("machine-gun", "Machine Gun", Material.DISPENSER));
+            case SUPER_SPLOOR -> List.of(
+                    new KitChoice("sprayer", "Sprayer", Material.BLAZE_ROD),
+                    new KitChoice("roller", "Roller", Material.IRON_HOE),
+                    new KitChoice("charger", "Charger", Material.CROSSBOW),
+                    new KitChoice("lobber", "Lobber", Material.SNOWBALL),
+                    new KitChoice("dualies", "Dualies", Material.FLINT));
             case PLEXBALL -> List.of(
                     new KitChoice("slugger", "Slugger", Material.IRON_SWORD),
                     new KitChoice("technician", "Technician", Material.SHIELD),
