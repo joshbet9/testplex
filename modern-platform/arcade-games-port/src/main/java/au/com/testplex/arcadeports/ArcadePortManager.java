@@ -188,6 +188,8 @@ public final class ArcadePortManager implements Listener {
     private static final long JOIN_WINDOW_TICKS = 100L;
     static final int MANUAL_START_COUNTDOWN_SECONDS = 0;
     private final ArcadeMechanicsModernPlugin plugin;
+    private final ArcadeTestPlayerManager testPlayers;
+    private boolean testPlayerStartPending;
     private final SneakyAssassinsMechanics sneakyAssassins;
     private final Map<String, LinkedHashMap<UUID, Player>> queues = new HashMap<>();
     private final Map<String, World> worlds = new HashMap<>();
@@ -240,6 +242,7 @@ public final class ArcadePortManager implements Listener {
 
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
+        this.testPlayers = new ArcadeTestPlayerManager(plugin);
         this.sneakyAssassins = new SneakyAssassinsMechanics(plugin);
         this.statsActionKey = new NamespacedKey(plugin, "stats-action");
         this.statsCategoryKey = new NamespacedKey(plugin, "stats-category");
@@ -260,6 +263,7 @@ public final class ArcadePortManager implements Listener {
         plugin.getLogger().info("TESTPLEX_ARCADE_LOBBY_READY world=" + ModernArcadeLobby.WORLD_NAME
                 + " bounds=-50..49 floor-y=" + ModernArcadeLobby.FLOOR_Y);
         this.lobbyRuntime = new ModernArcadeLobbyRuntime(plugin, this, lobby);
+        this.testPlayers.cleanupStaleSessionPlayers();
         Bukkit.getPluginManager().registerEvents(lobbyRuntime, plugin);
         lobbyRuntime.setSelectedGame(ArcadePortGame.fromId(plugin.getConfig().getString("lobby-selected-game", "bacon-brawl")));
         registerOptionalBaconPacketBridge();
@@ -305,7 +309,7 @@ public final class ArcadePortManager implements Listener {
         // Tournament matches have a fixed bracket participant list, not a public join window.
         queues.remove(ArcadePortGame.MONSTER_MAZE.id());
         queues.put(ArcadePortGame.MONSTER_MAZE.id(), selected);
-        startQueued(ArcadePortGame.MONSTER_MAZE, null, Bukkit.getConsoleSender(), false);
+        startQueuedInternal(ArcadePortGame.MONSTER_MAZE, null, Bukkit.getConsoleSender(), false);
         return monsterMazeRunning();
     }
 
@@ -1500,6 +1504,96 @@ public final class ArcadePortManager implements Listener {
 
     public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
+        if (type == null || !isGameEnabled(type) || active != null || monsterMazeRunning()) {
+            startQueuedInternal(type, requester, sender, mixedArcadeVariant);
+            return;
+        }
+        String selectedQueueKey = queueKey(type, mixedArcadeVariant);
+        LinkedHashMap<UUID, Player> queued = queues.get(selectedQueueKey);
+        Set<UUID> humanIds = new HashSet<>();
+        if (queued != null) {
+            for (Player player : queued.values()) {
+                if (player != null && player.isOnline() && !testPlayers.isTestPlayer(player)) {
+                    humanIds.add(player.getUniqueId());
+                }
+            }
+        }
+        if (requester != null && requester.isOnline() && !testPlayers.isTestPlayer(requester)) {
+            humanIds.add(requester.getUniqueId());
+        }
+        if (humanIds.isEmpty()) {
+            startQueuedInternal(type, requester, sender, mixedArcadeVariant);
+            return;
+        }
+
+        int botsNeeded = testPlayers.additionalPlayersNeeded(humanIds.size());
+        if (botsNeeded <= 0) {
+            startQueuedInternal(type, requester, sender, mixedArcadeVariant);
+            return;
+        }
+        if (testPlayerStartPending) {
+            sender.sendMessage(ChatColor.YELLOW + "The previous test-player batch is still joining. Please retry Start Game once it finishes.");
+            return;
+        }
+        if (!testPlayers.isAvailableForDamageablePlayers()) {
+            sender.sendMessage(ChatColor.RED + "Start cancelled: install/enable FakePlayerPlugin for Paper 26.3 and set body.damageable: true. "
+                    + "Testplex will not substitute mob NPCs for player targets.");
+            return;
+        }
+
+        testPlayerStartPending = true;
+        Location lobbySpawn = lobby.spawnLocation();
+        Player owner = requester != null && requester.isOnline() ? requester
+                : sender instanceof Player player && player.isOnline() ? player : null;
+        testPlayers.spawnForMatch(botsNeeded, lobbySpawn, owner, result -> {
+            testPlayerStartPending = false;
+            if (!result.succeeded()) {
+                sender.sendMessage(ChatColor.RED + "Start cancelled: could not create the full "
+                        + ArcadeTestPlayerManager.TARGET_ROSTER_SIZE + "-player test roster. " + result.error());
+                testPlayers.despawnSessionPlayers();
+                return;
+            }
+            if (active != null || monsterMazeRunning()) {
+                testPlayers.despawnSessionPlayers();
+                sender.sendMessage(ChatColor.RED + "Start cancelled because another Arcade game became active while the test players were joining.");
+                return;
+            }
+
+            LinkedHashMap<UUID, Player> targetQueue =
+                    queues.computeIfAbsent(selectedQueueKey, ignored -> new LinkedHashMap<>());
+            List<UUID> insertedBotIds = new ArrayList<>();
+            for (Player bot : result.players()) {
+                lobby.ensurePlayerInLobby(bot);
+                targetQueue.put(bot.getUniqueId(), bot);
+                insertedBotIds.add(bot.getUniqueId());
+            }
+            try {
+                startQueuedInternal(type, requester, sender, mixedArcadeVariant);
+            } catch (RuntimeException exception) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                        "Could not start " + type.displayName() + " with its game-scoped fake-player roster.", exception);
+                sender.sendMessage(ChatColor.RED + "Start failed while initialising the game. Test players were removed.");
+            }
+            boolean started = active != null && active.type == type
+                    && active.mixedArcadeVariant == mixedArcadeVariant
+                    || type == ArcadePortGame.MONSTER_MAZE && monsterMazeRunning();
+            if (!started) {
+                for (LinkedHashMap<UUID, Player> queue : queues.values()) {
+                    for (UUID botId : insertedBotIds) queue.remove(botId);
+                }
+                testPlayers.despawnSessionPlayers();
+            } else {
+                for (Player bot : result.players()) {
+                    if (bot.isOnline()) {
+                        bot.sendMessage(ChatColor.GRAY + "AFK Test Player — controlled by Testplex game testing.");
+                    }
+                }
+            }
+        });
+    }
+
+    private void startQueuedInternal(ArcadePortGame type, Player requester,
+            org.bukkit.command.CommandSender sender, boolean mixedArcadeVariant) {
         if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
             sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
             return;
@@ -12301,7 +12395,7 @@ public final class ArcadePortManager implements Listener {
         session.alive.clear();
         session.players.clear();
         session.snapshots.clear();
-        lobbyRuntime.returnBotsToLobby();
+        testPlayers.despawnSessionPlayers();
         if (session.type == ArcadePortGame.BACON_BRAWL) baconSourceSpawnOverrides = List.of();
         lobbyRuntime.refreshDisplays();
     }
@@ -12636,11 +12730,14 @@ public final class ArcadePortManager implements Listener {
 
     private void recordLocalStats(Session session, Player winner, boolean completed) {
         if (!completed) return;
-        if (session.type == ArcadePortGame.DRAGONS) awardDragonEndGems(session, winner);
+        if (session.type == ArcadePortGame.DRAGONS && winner != null && !testPlayers.isTestPlayer(winner)) {
+            awardDragonEndGems(session, winner);
+        }
         UUID winnerId = winner == null ? null : winner.getUniqueId();
         int winningTeam = winnerId == null ? -1 : session.teams.getOrDefault(winnerId, -1);
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             UUID id = entry.getKey();
+            if (testPlayers.isTestPlayer(id)) continue;
             String path = localStatsPath(id, session.type.id());
             if (session.type == ArcadePortGame.DRAGONS) {
                 double totalLocalGems = plugin.getConfig().getDouble(path + "test-gems", 0.0D)
@@ -13544,6 +13641,7 @@ public final class ArcadePortManager implements Listener {
                 && monsterMazeModule.getGameManager() != null) {
             monsterMazeModule.getGameManager().forceStop();
         }
+        testPlayers.despawnSessionPlayers();
         // Make the explicit Stop Game action authoritative: every participant from
         // the stopped session is put at the lobby spawn after round state is cleaned.
         for (Player player : participantsToReturn) {
@@ -13570,6 +13668,7 @@ public final class ArcadePortManager implements Listener {
         manualStartType = null;
         clearLobbyCountdownStatus();
         stop("plugin shutdown");
+        testPlayers.shutdown();
         lobbyRuntime.shutdown();
         unregisterOptionalBaconPacketBridge();
         baconAvatarOwnersByEntityId.clear();
