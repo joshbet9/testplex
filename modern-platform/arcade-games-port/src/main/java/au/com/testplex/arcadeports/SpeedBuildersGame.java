@@ -339,8 +339,9 @@ public final class SpeedBuildersGame implements Listener {
             PlayerState state = alive.get(i);
             state.score = score(state.plot);
             state.empty = isPlotEmpty(state.plot);
+            boolean wasAlreadyPerfect = state.perfect;
             state.perfect = state.score == currentTemplate.cells().size();
-            if (state.perfect) state.perfectBuilds++;
+            if (state.perfect && !wasAlreadyPerfect) state.perfectBuilds++;
             state.player.getInventory().clear();
             state.player.setGameMode(GameMode.SPECTATOR);
             Location view = new Location(arena,
@@ -820,10 +821,10 @@ public final class SpeedBuildersGame implements Listener {
         }
         for (int y = 1; y <= 4; y++) b.add(3, y, 3, Material.QUARTZ_BLOCK);
         b.add(3, 5, 3, Material.SEA_LANTERN);
-        b.add(2, 4, 3, Material.WATER);
-        b.add(4, 4, 3, Material.WATER);
-        b.add(3, 4, 2, Material.WATER);
-        b.add(3, 4, 4, Material.WATER);
+        b.add(2, 4, 3, Material.LIGHT_BLUE_STAINED_GLASS);
+        b.add(4, 4, 3, Material.LIGHT_BLUE_STAINED_GLASS);
+        b.add(3, 4, 2, Material.LIGHT_BLUE_STAINED_GLASS);
+        b.add(3, 4, 4, Material.LIGHT_BLUE_STAINED_GLASS);
         return b.build();
     }
 
