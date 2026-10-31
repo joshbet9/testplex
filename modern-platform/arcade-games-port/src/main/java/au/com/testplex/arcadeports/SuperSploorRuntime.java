@@ -144,6 +144,7 @@ public final class SuperSploorRuntime implements Listener {
     private final Map<UUID, Long> lastInkRegenAt = new HashMap<>();
     private final Map<UUID, Long> chargerChargeStartedAt = new HashMap<>();
     private final Map<UUID, Double> specialCharge = new HashMap<>();
+    private final Set<UUID> specialChargeSuppressed = new HashSet<>();
     private final Map<UUID, Long> secondaryReadyAt = new HashMap<>();
     private final Map<UUID, Long> stampedeUntil = new HashMap<>();
     private final Map<UUID, Long> stampedeNextPaintAt = new HashMap<>();
@@ -488,6 +489,7 @@ public final class SuperSploorRuntime implements Listener {
         }
         String kit = kits.getOrDefault(id, "sprayer");
         specialCharge.put(id, 0.0D);
+        specialChargeSuppressed.add(id);
         specialTargetsThisActivation.computeIfAbsent(id, ignored -> new HashSet<>()).clear();
         MutableStats stats = playerStats.get(id);
         if (stats != null) stats.specialsUsed++;
@@ -596,6 +598,7 @@ public final class SuperSploorRuntime implements Listener {
         }
         player.playSound(player.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.55F, 1.8F);
         announceTeam(ownerId, ChatColor.LIGHT_PURPLE + "PRISM BEAM fired!");
+        specialChargeSuppressed.remove(ownerId);
     }
 
     private void updateStampedes(long now) {
@@ -607,6 +610,7 @@ public final class SuperSploorRuntime implements Listener {
             }
             if (now >= stampedeUntil.get(id)) {
                 stampedeUntil.remove(id); stampedeNextPaintAt.remove(id); stampedeHitPlayers.remove(id);
+                specialChargeSuppressed.remove(id);
                 player.setWalkSpeed(0.2F);
                 player.sendActionBar(ChatColor.GRAY + "Stampede ended.");
                 continue;
@@ -656,7 +660,10 @@ public final class SuperSploorRuntime implements Listener {
                 world.spawnParticle(Particle.DUST, impact, 18, 0.35D, 0.15D, 0.35D, 0.0D,
                         new Particle.DustOptions(teamColour(team), 1.6F));
             }
-            case "colourburst" -> paintArea(ownerId, impact, 5, new HashSet<>(), true, now);
+            case "colourburst" -> {
+                paintArea(ownerId, impact, 5, new HashSet<>(), true, now);
+                specialChargeSuppressed.remove(ownerId);
+            }
             default -> { }
         }
     }
@@ -668,6 +675,7 @@ public final class SuperSploorRuntime implements Listener {
             if (player == null || !player.isOnline() || respawnAt.containsKey(id) || remaining <= 0) {
                 afterimageDashesRemaining.remove(id);
                 afterimageNextAt.remove(id);
+                specialChargeSuppressed.remove(id);
                 continue;
             }
             if (now < afterimageNextAt.getOrDefault(id, 0L)) continue;
@@ -757,7 +765,13 @@ public final class SuperSploorRuntime implements Listener {
         }
 
         for (Paintstorm storm : new ArrayList<>(paintstorms)) {
-            if (now >= storm.expiresAt || storm.pulsesRemaining <= 0) { paintstorms.remove(storm); continue; }
+            if (now >= storm.expiresAt || storm.pulsesRemaining <= 0) {
+                paintstorms.remove(storm);
+                if (paintstorms.stream().noneMatch(other -> other.ownerId.equals(storm.ownerId))) {
+                    specialChargeSuppressed.remove(storm.ownerId);
+                }
+                continue;
+            }
             if (now < storm.nextPulseAt) continue;
             storm.nextPulseAt = now + 400L;
             storm.pulsesRemaining--;
@@ -1085,7 +1099,7 @@ public final class SuperSploorRuntime implements Listener {
         if (stats == null || result == null) return;
         stats.territoryPainted += result.changedUnits();
         stats.enemyTerritoryReclaimed += result.enemyReclaimed();
-        if (!stampedeUntil.containsKey(ownerId)) {
+        if (!specialChargeSuppressed.contains(ownerId)) {
             specialCharge.merge(ownerId, result.changedUnits() * 0.10D,
                     (oldValue, gain) -> Math.min(100.0D, oldValue + gain));
         }
@@ -1445,6 +1459,7 @@ public final class SuperSploorRuntime implements Listener {
         dualiesRollExpiresAt.clear();
         dualiesRollTargets.clear();
         specialCharge.clear();
+        specialChargeSuppressed.clear();
         secondaryReadyAt.clear();
         stampedeUntil.clear();
         stampedeNextPaintAt.clear();
@@ -1492,6 +1507,7 @@ public final class SuperSploorRuntime implements Listener {
         dualiesRollExpiresAt.remove(id);
         dualiesRollTargets.remove(id);
         specialCharge.remove(id);
+        specialChargeSuppressed.remove(id);
         secondaryReadyAt.remove(id);
         stampedeUntil.remove(id);
         stampedeNextPaintAt.remove(id);
