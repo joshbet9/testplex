@@ -1513,17 +1513,17 @@ public final class SuperSploorRuntime implements Listener {
         for (String old : sidebarEntries) scoreboard.resetScores(old);
         sidebarEntries.clear();
         int total = Math.max(1, engine.totalUnits());
-        int red = (int) Math.round(engine.redUnits() * 100.0D / total);
-        int blue = (int) Math.round(engine.blueUnits() * 100.0D / total);
-        int neutral = Math.max(0, 100 - red - blue);
+        String red = String.format(java.util.Locale.ROOT, "%.1f%%", engine.redUnits() * 100.0D / total);
+        String blue = String.format(java.util.Locale.ROOT, "%.1f%%", engine.blueUnits() * 100.0D / total);
+        String neutral = String.format(java.util.Locale.ROOT, "%.1f%%", engine.neutralUnits() * 100.0D / total);
         long remain = overtime ? Math.max(0L, overtimeEndsAt - now) : Math.max(0L, matchEndsAt - now);
         String timer = String.format(java.util.Locale.ROOT, "%d:%02d", remain / 60_000L, (remain / 1_000L) % 60L);
         List<String> lines = List.of(
                 ChatColor.WHITE + "Time: " + ChatColor.YELLOW + timer + (overtime ? ChatColor.GOLD + " OT" : ""),
-                ChatColor.RED + "Red: " + red + "%",
-                ChatColor.AQUA + "Blue: " + blue + "%",
-                ChatColor.GRAY + "Neutral: " + neutral + "%",
-                ChatColor.LIGHT_PURPLE + "Special: charged in hotbar",
+                ChatColor.RED + "Red: " + red,
+                ChatColor.AQUA + "Blue: " + blue,
+                ChatColor.GRAY + "Neutral: " + neutral,
+                ChatColor.LIGHT_PURPLE + "Special: see action bar",
                 ChatColor.DARK_GRAY + " ",
                 ChatColor.WHITE + "Ink: " + ChatColor.AQUA + "XP bar");
         int score = lines.size();
@@ -1532,13 +1532,9 @@ public final class SuperSploorRuntime implements Listener {
             objective.getScore(line).setScore(score--);
         }
         lastScoreboardAt = now;
-        int teamRed = engine.redUnits();
-        int teamBlue = engine.blueUnits();
         for (Player player : players.values()) {
             if (!player.isOnline()) continue;
-            player.sendActionBar(ChatColor.AQUA + "INK " + ink.getOrDefault(player.getUniqueId(), 0)
-                    + "%" + ChatColor.GRAY + " | " + ChatColor.RED + teamRed
-                    + ChatColor.GRAY + " : " + ChatColor.AQUA + teamBlue);
+            updateInkBar(player, player.getUniqueId());
         }
     }
 
