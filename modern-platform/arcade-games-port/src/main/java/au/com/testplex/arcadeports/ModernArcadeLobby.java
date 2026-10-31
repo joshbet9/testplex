@@ -46,6 +46,7 @@ public final class ModernArcadeLobby implements Listener {
     public static final int PLANE_MAX_EXCLUSIVE = 50;
     public static final int FLOOR_Y = 100;
     public static final int HOTBAR_COSMETICS_SLOT = 4;
+    public static final int HOTBAR_GAME_PREFERENCES_SLOT = 6;
     public static final int HOTBAR_GAME_PANEL_SLOT = 8;
 
     public static final double SPAWN_X = 0.0D;
@@ -188,6 +189,12 @@ public final class ModernArcadeLobby implements Listener {
                         ChatColor.YELLOW + "Right-click to browse.",
                         ChatColor.DARK_GRAY + "Command: /cosmetics"), "cosmetics"));
         // Speckled Melon (1.8) became Glistering Melon Slice in modern Minecraft.
+        inventory.setItem(HOTBAR_GAME_PREFERENCES_SLOT, createHotbarItem(Material.WRITABLE_BOOK,
+                ChatColor.AQUA + "Game Preferences",
+                List.of(ChatColor.GRAY + "Like, dislike or stay neutral on each game.",
+                        ChatColor.YELLOW + "Right-click to rate games.",
+                        ChatColor.GRAY + "See the live selection likelihood for each game.",
+                        ChatColor.DARK_GRAY + "Command: /gamepreferences"), "gamepreferences"));
         inventory.setItem(HOTBAR_GAME_PANEL_SLOT, createHotbarItem(Material.GLISTERING_MELON_SLICE,
                 ChatColor.GREEN + "" + ChatColor.BOLD + "Game Panel",
                 List.of(ChatColor.GRAY + "Open the Testplex Arcade game selector.",
