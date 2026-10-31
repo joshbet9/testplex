@@ -18,6 +18,12 @@ game-preferences:
     minimum-players: 6
     vote-seconds: 60
     avoid-consecutive-games: true
+    # This may be narrowed by Game Panel > Edit Game Rotation, but cannot
+    # include a game outside enabled-games or without an installed selected map.
+    enabled-games:
+      - death-tag
+      - one-in-the-quiver
+      - bomb-lobbers
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
