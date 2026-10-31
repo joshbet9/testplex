@@ -6,6 +6,7 @@ import org.bukkit.util.Vector;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadePortGameTest {
@@ -143,8 +144,8 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheTwentyThreeMechanicsGamesAndIntegratedMonsterMazeModule() {
-        assertEquals(23, ArcadePortGame.values().length);
+    @Test void exposesTheMechanicsGamesAndIntegratedMonsterMazeModuleWithExperimentalPlexballIdentity() {
+        assertEquals(24, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -152,6 +153,11 @@ class ArcadePortGameTest {
             assertNotNull(game.floor());
         }
         assertEquals(ArcadePortGame.MONSTER_MAZE, ArcadePortGame.fromId("monster-maze"));
+        assertEquals(ArcadePortGame.PLEXBALL, ArcadePortGame.fromId("plexball"));
+        assertEquals("Plexball", ArcadePortGame.PLEXBALL.displayName());
+        assertFalse(ArcadePortRules.isArcadePortGameEnabled(
+                ArcadePortGame.PLEXBALL.id(), List.of("death-tag", "one-in-the-quiver")),
+                "Plexball has an Arcade identity but must remain outside the READY_FOR_TEST allow-list.");
         assertNull(ArcadePortGame.fromId("snake"));
         assertEquals(ArcadePortGame.DRAW_MY_THING, ArcadePortGame.fromId("Draw My Thing"));
         assertEquals(ArcadePortGame.MASTER_BUILDERS, ArcadePortGame.fromId("master_builders"));
