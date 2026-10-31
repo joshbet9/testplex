@@ -1375,6 +1375,17 @@ public final class ArcadePortRules {
         return elapsedMillis >= RUNNER_BLOCK_DECAY_MILLIS;
     }
 
+    public static String normalizeDeathTagRunnerKit(String requested) {
+        if (requested == null) return null;
+        String kit = requested.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        if (kit.startsWith("runner-")) kit = kit.substring("runner-".length());
+        return switch (kit) {
+            case "basher", "archer", "traitor", "null" -> kit;
+            default -> null;
+        };
+    }
+
     public static String normalizeRunnerKit(String requested) {
         if (requested == null) return null;
         String kit = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
