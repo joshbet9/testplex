@@ -875,7 +875,7 @@ jobs:
                   ssh "${verify_ssh_opts[@]}" "$remote" \
                   sudo -n flock -n /var/lock/testplex-modern-deploy.lock \
                   /usr/local/sbin/testplex-modern-recovery --locked verify-deployment "$BUILD_SHA" 2>&1)"; then
-                printf '%s\\n' "$verification_output"
+                printf '%s\n' "$verification_output"
                 if grep -Fq "Deployment already verified: target artifact SHA=$BUILD_SHA; runtime SHA=$BUILD_SHA; process identity=VERIFIED" \
                     <<< "$verification_output"; then
                   deployment_verified=true
@@ -885,7 +885,7 @@ jobs:
                 break
               else
                 verify_exit=$?
-                printf '%s\\n' "$verification_output" >&2
+                printf '%s\n' "$verification_output" >&2
                 echo "[deploy] Fresh verification connection failed with exit $verify_exit." >&2
               fi
               sleep 5
