@@ -23,8 +23,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
     private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of(
             "death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl",
-            "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "camera-shy");
-    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-dragon-escape-super-sploor-dragons-runner-camera-shy-20261101-v2";
+            "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "camera-shy");
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-dragon-escape-sheep-quest-super-sploor-dragons-runner-camera-shy-20261101-v3";
 
     @Override
     public void onEnable() {
