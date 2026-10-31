@@ -120,6 +120,7 @@ public final class PlexballGame implements Listener {
         private double bestDistance;
         private int catches;
         private int homeRuns;
+        private int atBats;
     }
 
     private static final class PlayerFrame {
@@ -352,10 +353,11 @@ public final class PlexballGame implements Listener {
     }
 
     private void startMatch() {
-        List<Player> participants = queue.values().stream()
+        List<Player> participants = new ArrayList<>(queue.values().stream()
                 .filter(Player::isOnline)
                 .limit(PlexballRules.MAX_PLAYERS)
-                .toList();
+                .toList());
+        Collections.shuffle(participants, random);
         queue.clear();
         queueCountdownTick = -1L;
         if (participants.size() < PlexballRules.MIN_PLAYERS) return;
@@ -545,6 +547,7 @@ public final class PlexballGame implements Listener {
         UUID battingPlayer = batterId;
         if (battingPlayer == null) return;
         PlayerResult result = results.computeIfAbsent(battingPlayer, ignored -> new PlayerResult());
+        result.atBats++;
         double recordedDistance = caught ? 0.0D : PlexballRules.clamp(distance, 0.0D, PlexballRules.HOME_RUN_METRES);
         result.bestDistance = Math.max(result.bestDistance, recordedDistance);
         if (homeRun && !caught) {
@@ -591,14 +594,32 @@ public final class PlexballGame implements Listener {
     }
 
     private void finishAtTimeLimit() {
-        if (phase == Phase.BALL_FLIGHT && ballPosition != null && batterId != null) {
+        if (batterId != null && phase == Phase.BALL_FLIGHT && ballPosition != null) {
+            PlayerResult current = results.computeIfAbsent(batterId, ignored -> new PlayerResult());
+            current.atBats++;
             double distance = PlexballRules.horizontalDistance(teeBallPosition, ballPosition);
-            results.get(batterId).bestDistance = Math.max(results.get(batterId).bestDistance,
+            current.bestDistance = Math.max(current.bestDistance,
                     Math.min(PlexballRules.HOME_RUN_METRES, distance));
+        } else if (batterId != null && phase == Phase.BATTING) {
+            results.computeIfAbsent(batterId, ignored -> new PlayerResult()).atBats++;
         }
-        List<UUID> candidates = suddenDeath && !finalists.isEmpty()
-                ? new ArrayList<>(finalists) : matchPlayers;
-        finish(rankPlayers(candidates), "Three-minute time limit reached.", true);
+
+        if (suddenDeath && !finalists.isEmpty()) {
+            List<UUID> candidates;
+            if (!roundSurvivors.isEmpty()) candidates = new ArrayList<>(roundSurvivors);
+            else if (!roundDistances.isEmpty()) candidates = new ArrayList<>(roundDistances.keySet());
+            else candidates = new ArrayList<>(finalists);
+            List<UUID> winners = !roundDistances.isEmpty() && !roundSurvivors.isEmpty()
+                    ? rankPlayersByRound(candidates)
+                    : (!roundDistances.isEmpty() ? rankPlayersByRound(candidates) : rankPlayers(candidates));
+            finish(winners, "Three-minute time limit reached during sudden death.", true);
+            return;
+        }
+
+        List<UUID> completedAttempts = matchPlayers.stream()
+                .filter(id -> results.getOrDefault(id, new PlayerResult()).atBats > 0)
+                .toList();
+        finish(rankPlayers(completedAttempts), "Three-minute time limit reached.", true);
     }
 
     private List<UUID> rankPlayers(List<UUID> candidates) {
