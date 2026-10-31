@@ -800,7 +800,8 @@ public final class PlexballGame implements Listener {
             Player fielder = Bukkit.getPlayer(id);
             if (fielder == null || !fielder.isOnline()) continue;
             Kit kit = selectedKits.getOrDefault(id, Kit.TECHNICIAN);
-            fielder.sendActionBar(Component.text("FIELDING  |  Watch the ball  |  [1] Glove  [2] " + kit.abilityName()));
+            fielder.sendActionBar(Component.text("FIELDING  |  Move under ball  |  [1] Right-click glove  [2] "
+                    + kit.abilityName()));
         }
     }
 
@@ -851,10 +852,24 @@ public final class PlexballGame implements Listener {
         lines.add(ChatColor.GOLD.toString() + ChatColor.BOLD + phaseLabel);
         lines.add(ChatColor.WHITE + "Time left: " + formatMatchTime());
         Player currentBatter = batterId == null ? null : Bukkit.getPlayer(batterId);
-        lines.add(ChatColor.YELLOW + "At bat: " + (currentBatter == null ? "—" : currentBatter.getName()));
-        lines.add(viewer.getUniqueId().equals(batterId)
-                ? ChatColor.GREEN + "Right-click bat once"
-                : ChatColor.AQUA + "Run to ball; use glove");
+        String batterLabel = phase == Phase.INTRO ? "First up: "
+                : (phase == Phase.TURN_BREAK ? "Next turn: " : "At bat: ");
+        String batterName = phase == Phase.TURN_BREAK ? "Preparing"
+                : (currentBatter == null ? "—" : currentBatter.getName());
+        lines.add(ChatColor.YELLOW + batterLabel + batterName);
+        String roleInstruction;
+        if (phase == Phase.INTRO) {
+            roleInstruction = "Get ready; follow your title cue";
+        } else if (phase == Phase.TURN_BREAK) {
+            roleInstruction = "Next batting turn is starting";
+        } else if (viewer.getUniqueId().equals(batterId) && phase == Phase.BATTING) {
+            roleInstruction = "Right-click bat once";
+        } else if (viewer.getUniqueId().equals(batterId)) {
+            roleInstruction = "Watch your hit; wait for next turn";
+        } else {
+            roleInstruction = "Run to ball; right-click glove";
+        }
+        lines.add((viewer.getUniqueId().equals(batterId) ? ChatColor.GREEN : ChatColor.AQUA) + roleInstruction);
         PlayerResult ownResult = results.getOrDefault(viewer.getUniqueId(), new PlayerResult());
         lines.add(ChatColor.GREEN + "Best hit: " + formatDistance(ownResult.bestDistance));
         lines.add(ChatColor.AQUA + "Catches: " + ownResult.catches);
@@ -959,6 +974,12 @@ public final class PlexballGame implements Listener {
             return;
         }
         if (serverTick % 4L == 0L) {
+            Player batter = batterId == null ? null : Bukkit.getPlayer(batterId);
+            if (batter != null && batter.isOnline()) {
+                batter.sendActionBar(Component.text("YOUR HIT  |  "
+                        + String.format(java.util.Locale.ROOT, "%.1fm", distance)
+                        + "  |  Watch the ball; 100m is a home run"));
+            }
             for (UUID id : matchPlayers) {
                 if (id.equals(batterId)) continue;
                 Player fielder = Bukkit.getPlayer(id);
