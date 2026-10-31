@@ -134,6 +134,8 @@ class ArcadeProgressCatalogTest {
         assertMilestone("speed-builders-arcade", "wins", "wins", 250, new long[] {25, 63, 125, 250});
         assertMilestone("speed-builders-arcade", "perfect-builds", "perfect-builds", 1000, new long[] {100, 250, 500, 1000});
         assertMilestone("speed-builders-arcade", "blocks-placed", "blocks-placed", 50000, new long[] {5000, 12500, 25000, 50000});
+        assertMilestone("wizards", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("wizards", "kills", "kills", 1000, new long[] {100, 250, 500, 1000});
         assertMilestone("wizards", "spells-bound", "spells-bound", 5000, new long[] {500, 1250, 2500, 5000});
         assertMilestone("wither-assault", "revives", "revives", 500, new long[] {50, 125, 250, 500});
         assertMilestone("hoops-remastered", "points", "points", 500, new long[] {50, 125, 250, 500});
