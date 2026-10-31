@@ -4,6 +4,7 @@ import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Difficulty;
+import org.bukkit.FluidCollisionMode;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -12,6 +13,7 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
+import org.bukkit.block.data.type.Leaves;
 import org.bukkit.WorldType;
 import org.bukkit.attribute.Attribute;
 import org.bukkit.configuration.ConfigurationSection;
@@ -1362,7 +1364,8 @@ public final class CameraShyGame implements Listener {
                 Vector toward = flash.location.toVector().subtract(player.getEyeLocation().toVector());
                 boolean lookedAt = toward.lengthSquared() > 0.01D
                         && player.getEyeLocation().getDirection().normalize().dot(toward.normalize()) >= 0.70D
-                        && distanceSquared <= 11.0D * 11.0D;
+                        && distanceSquared <= 11.0D * 11.0D
+                        && hasClearSightToLocation(player, flash.location);
                 if (approached || lookedAt) {
                     flash.fooled.add(id);
                     if (humans.contains(flash.owner)) {
@@ -1374,6 +1377,20 @@ public final class CameraShyGame implements Listener {
                 }
             }
         }
+    }
+
+    /** A fake flash only fools a player looking at it when solid blocks do not occlude it. */
+    private boolean hasClearSightToLocation(Player player, Location target) {
+        if (player == null || target == null || !player.isOnline()
+                || player.getWorld() != target.getWorld()) return false;
+        Location eye = player.getEyeLocation();
+        Vector toward = target.toVector().subtract(eye.toVector());
+        double distance = toward.length();
+        if (distance < 0.1D) return true;
+        RayTraceResult obstruction = player.getWorld().rayTraceBlocks(
+                eye, toward.multiply(1.0D / distance), distance, FluidCollisionMode.NEVER, true);
+        return obstruction == null
+                || obstruction.getHitPosition().distanceSquared(target.toVector()) <= 1.0D;
     }
 
     private void updateSpotlight(long now) {
@@ -1758,7 +1775,11 @@ public final class CameraShyGame implements Listener {
             int bx = horizontal ? x + offset : x;
             int bz = horizontal ? z : z + offset;
             for (int y = FLOOR_Y + 1; y <= FLOOR_Y + 4; y++) {
-                world.getBlockAt(bx, y, bz).setType(Material.OAK_LEAVES, false);
+                org.bukkit.block.Block block = world.getBlockAt(bx, y, bz);
+                block.setType(Material.OAK_LEAVES, false);
+                Leaves leaves = (Leaves) block.getBlockData();
+                leaves.setPersistent(true);
+                block.setBlockData(leaves, false);
             }
         }
     }
