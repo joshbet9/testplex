@@ -289,7 +289,12 @@ jobs:
             sudo -n rm -rf -- "$existing"
           done
           sudo -n rm -rf -- "$upload_dir"
-          echo "Disk usage after staging-cache cleanup:"
+          # Downloaded package archives are reproducible cache, not installed software.
+          # Clearing them is safe and can recover the last few MiB needed for an atomic upload.
+          apt_cache_before="$(sudo -n du -sh /var/cache/apt/archives 2>/dev/null | cut -f1 || true)"
+          sudo -n apt-get clean
+          echo "Cleared downloaded APT package cache (${apt_cache_before:-size unavailable}); installed packages were not removed."
+          echo "Disk usage after staging-cache and package-cache cleanup:"
           df -h /var/tmp
           df -i /var/tmp
           avail_kb="$(df -Pk /var/tmp | awk 'END {print $4}')"
