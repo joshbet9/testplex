@@ -461,6 +461,10 @@ public final class PlexballGame implements Listener {
     }
 
     private void completeInitialRound() {
+        homeRunPlayers.removeIf(id -> {
+            Player player = Bukkit.getPlayer(id);
+            return player == null || !player.isOnline();
+        });
         if (homeRunPlayers.size() == 1) {
             finish(List.of(homeRunPlayers.iterator().next()), "Home run!", true);
             return;
@@ -488,6 +492,10 @@ public final class PlexballGame implements Listener {
             suddenDeathTurnIndex++;
         }
         if (suddenDeathTurnIndex >= order.size()) {
+            roundSurvivors.removeIf(id -> {
+                Player player = Bukkit.getPlayer(id);
+                return player == null || !player.isOnline();
+            });
             if (roundSurvivors.size() == 1) {
                 finish(List.of(roundSurvivors.iterator().next()), "Survived sudden death!", true);
                 return;
@@ -644,8 +652,13 @@ public final class PlexballGame implements Listener {
 
     private List<UUID> rankPlayersByRound(List<UUID> candidates) {
         if (candidates == null || candidates.isEmpty()) return List.of();
-        double best = candidates.stream().mapToDouble(id -> roundDistances.getOrDefault(id, 0.0D)).max().orElse(0.0D);
-        List<UUID> distanceTied = candidates.stream()
+        List<UUID> activeCandidates = candidates.stream().filter(id -> {
+            Player player = Bukkit.getPlayer(id);
+            return player != null && player.isOnline();
+        }).toList();
+        if (activeCandidates.isEmpty()) return List.of();
+        double best = activeCandidates.stream().mapToDouble(id -> roundDistances.getOrDefault(id, 0.0D)).max().orElse(0.0D);
+        List<UUID> distanceTied = activeCandidates.stream()
                 .filter(id -> Math.abs(roundDistances.getOrDefault(id, 0.0D) - best) < 0.05D)
                 .toList();
         int mostCatches = distanceTied.stream()
