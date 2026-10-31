@@ -48,6 +48,7 @@ final class ArcadeTestPlayerManager {
     private BukkitTask pendingSpawnTask;
     private boolean shuttingDown;
     private boolean startupCleanupComplete;
+    private boolean startupCleanupSucceeded;
 
     ArcadeTestPlayerManager(JavaPlugin host) {
         this.host = host;
@@ -72,6 +73,14 @@ final class ArcadeTestPlayerManager {
 
     boolean isStartupCleanupComplete() {
         return startupCleanupComplete;
+    }
+
+    boolean isStartupCleanupSuccessful() {
+        return startupCleanupSucceeded;
+    }
+
+    boolean isManagedTestPlayer(UUID id) {
+        return id != null && activeHandles.containsKey(id);
     }
 
     int activeCount() {
@@ -103,6 +112,7 @@ final class ArcadeTestPlayerManager {
                     host.getLogger().warning("Removed " + removed
                             + " stale Testplex game-scoped fake player(s) from a previous session.");
                 }
+                startupCleanupSucceeded = true;
             } catch (Exception exception) {
                 host.getLogger().warning("Could not inspect FakePlayerPlugin for stale Testplex bots: "
                         + rootMessage(exception));
