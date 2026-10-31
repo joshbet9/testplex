@@ -300,9 +300,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if ("stats".equalsIgnoreCase(command.getName())) return handleStatsCommand(sender, args);
-        if ("stats".equalsIgnoreCase(label) || "arcadestats".equalsIgnoreCase(label)) {
-            if (args.length == 0 || (args.length == 1 && "plexball".equalsIgnoreCase(args[0]))) {
+        if ("stats".equalsIgnoreCase(command.getName())
+                || "stats".equalsIgnoreCase(label) || "arcadestats".equalsIgnoreCase(label)) {
+            if (CameraShyRules.routesToPlexballStats(args)) {
                 if (!(sender instanceof Player player)) {
                     sender.sendMessage("Players only.");
                     return true;
@@ -311,8 +311,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 else sender.sendMessage(ChatColor.RED + "Plexball progression is unavailable.");
                 return true;
             }
-            sender.sendMessage(ChatColor.YELLOW + "Usage: /stats [plexball]");
-            return true;
+            return handleStatsCommand(sender, args);
         }
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
         switch (sub) {

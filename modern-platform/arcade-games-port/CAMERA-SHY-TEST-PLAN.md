@@ -40,7 +40,7 @@
 - AFK Test Player objects never receive human progression records.
 
 ## Player progression and stats
-- `/stats` or `/stats camera-shy` shows the viewer's Camera Shy lifetime record.
+- `/stats camera-shy` shows the viewer's Camera Shy lifetime record; bare `/stats` remains the existing Plexball default.
 - `/stats camera-shy <1-4>` pages through all 20 achievements; every ID appears exactly once.
 - `/stats <online-player> camera-shy [page]` can inspect another online test participant's record.
 - Each lifetime milestone displays current progress toward 250 wins, 500 eliminations or 1,000 photographs and marks completed thresholds.

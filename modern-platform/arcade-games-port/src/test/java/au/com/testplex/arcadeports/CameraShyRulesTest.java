@@ -61,6 +61,18 @@ class CameraShyRulesTest {
     }
 
     @Test
+    void statsRoutingPreservesPlexballDefaultAndRequiresExplicitCameraShySelection() {
+        assertTrue(CameraShyRules.routesToPlexballStats(null));
+        assertTrue(CameraShyRules.routesToPlexballStats(new String[0]));
+        assertTrue(CameraShyRules.routesToPlexballStats(new String[] {"plexball"}));
+        assertTrue(CameraShyRules.routesToPlexballStats(new String[] {"PLEXBALL"}));
+        assertFalse(CameraShyRules.routesToPlexballStats(new String[] {"camera-shy"}));
+        assertFalse(CameraShyRules.routesToPlexballStats(new String[] {"camera-shy", "2"}));
+        assertFalse(CameraShyRules.routesToPlexballStats(new String[] {"tester", "camera-shy", "3"}));
+        assertFalse(CameraShyRules.routesToPlexballStats(new String[] {"tester"}));
+    }
+
+    @Test
     void fiveExposureThresholdIsInclusive() {
         assertFalse(CameraShyRules.eliminatedAt(4));
         assertTrue(CameraShyRules.eliminatedAt(5));

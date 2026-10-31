@@ -64,6 +64,12 @@ public final class CameraShyRules {
         return firstId.compareTo(secondId);
     }
 
+    /** Keep the existing default /stats route for Plexball; Camera Shy is explicitly selected. */
+    public static boolean routesToPlexballStats(String[] args) {
+        return args == null || args.length == 0
+                || (args.length == 1 && "plexball".equalsIgnoreCase(args[0]));
+    }
+
     public static boolean eliminatedAt(int exposures) {
         return exposures >= PHOTOS_TO_ELIMINATE;
     }
