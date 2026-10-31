@@ -12285,7 +12285,11 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
-        if (session.type == ArcadePortGame.SUPER_SPLOOR) superSploor.stop();
+        if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+            session.superSploorPlayerStats = superSploor.snapshotStats();
+            session.superSploorTerritory = superSploor.snapshotTerritory();
+            superSploor.stop();
+        }
         if (announceWinner && session.type == ArcadePortGame.DEATH_TAG) {
             recordDeathTagRewards(session);
         }
@@ -13004,6 +13008,63 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    private void recordSuperSploorPlayerStats(Session session, UUID playerId,
+            Player player, boolean won, String statsPath) {
+        SuperSploorRuntime.PlayerMatchStats stats = session.superSploorPlayerStats.get(playerId);
+        if (stats == null) return;
+
+        plugin.getConfig().set(statsPath + "territory-blocks-painted",
+                plugin.getConfig().getLong(statsPath + "territory-blocks-painted", 0L) + stats.territoryPainted());
+        plugin.getConfig().set(statsPath + "enemy-blocks-reclaimed",
+                plugin.getConfig().getLong(statsPath + "enemy-blocks-reclaimed", 0L)
+                        + stats.enemyTerritoryReclaimed());
+        plugin.getConfig().set(statsPath + "splats",
+                plugin.getConfig().getInt(statsPath + "splats", 0) + stats.splats());
+        plugin.getConfig().set(statsPath + "deaths",
+                plugin.getConfig().getInt(statsPath + "deaths", 0) + stats.deaths());
+        plugin.getConfig().set(statsPath + "assists",
+                plugin.getConfig().getInt(statsPath + "assists", 0) + stats.assists());
+        plugin.getConfig().set(statsPath + "squid-distance-blocks",
+                plugin.getConfig().getLong(statsPath + "squid-distance-blocks", 0L)
+                        + Math.max(0L, Math.round(stats.squidTravelBlocks())));
+        plugin.getConfig().set(statsPath + "wall-climb-blocks",
+                plugin.getConfig().getLong(statsPath + "wall-climb-blocks", 0L)
+                        + Math.max(0L, Math.round(stats.wallClimbBlocks())));
+        plugin.getConfig().set(statsPath + "specials-used",
+                plugin.getConfig().getInt(statsPath + "specials-used", 0) + stats.specialsUsed());
+
+        awardCatalogAchievement(playerId, player, "super-sploor", "first-splash");
+        if (stats.territoryPainted() >= 500L) {
+            awardCatalogAchievement(playerId, player, "super-sploor", "fresh-canvas");
+        }
+        if (stats.enemyTerritoryReclaimed() >= 200L) {
+            awardCatalogAchievement(playerId, player, "super-sploor", "reclaimer");
+        }
+        if (stats.squidTravelBlocks() >= 500.0D) {
+            awardCatalogAchievement(playerId, player, "super-sploor", "squid-express");
+        }
+        if (stats.wallClimbBlocks() >= 25.0D) {
+            awardCatalogAchievement(playerId, player, "super-sploor", "wall-to-wall");
+        }
+        if (stats.assists() >= 5) {
+            awardCatalogAchievement(playerId, player, "super-sploor", "team-palette");
+        }
+        if (won && stats.deaths() == 0) {
+            awardCatalogAchievement(playerId, player, "super-sploor", "clean-sweep");
+        }
+        if (stats.territoryPainted() >= 350L) {
+            awardCatalogAchievement(playerId, player, "super-sploor", "colour-outside-the-lines");
+        }
+        if (won && session.superSploorTerritory != null) {
+            int total = Math.max(1, session.superSploorTerritory.totalUnits());
+            int margin = Math.abs(session.superSploorTerritory.redUnits()
+                    - session.superSploorTerritory.blueUnits());
+            if (margin * 100.0D <= total * 2.0D) {
+                awardCatalogAchievement(playerId, player, "super-sploor", "close-shave");
+            }
+        }
+    }
+
     private void recordLocalStats(Session session, Player winner, boolean completed) {
         if (!completed) return;
         if (session.type == ArcadePortGame.DRAGONS) awardDragonEndGems(session, winner);
@@ -13087,6 +13148,9 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().set(path + "blocks-broken",
                         plugin.getConfig().getInt(path + "blocks-broken", 0)
                                 + session.spleefBlocksBroken.getOrDefault(id, 0));
+            }
+            if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+                recordSuperSploorPlayerStats(session, id, entry.getValue(), won, path);
             }
             if (session.type == ArcadePortGame.DEATH_TAG) {
                 int roundKills = Math.max(0, session.scores.getOrDefault(id, 0));
@@ -19516,6 +19580,8 @@ public final class ArcadePortManager implements Listener {
     private static final class Session {
         final Map<Block, Long> evolutionWebs = new HashMap<>();
         SuperSploorEngine superSploorEngine;
+        Map<UUID, SuperSploorRuntime.PlayerMatchStats> superSploorPlayerStats = Map.of();
+        SuperSploorRuntime.TerritorySummary superSploorTerritory;
         final ArcadePortGame type;
         final World world;
         final Map<UUID, Player> players = new LinkedHashMap<>();
