@@ -110,7 +110,7 @@ public final class GamePreferenceMenu implements Listener {
 
         ItemStack pageInfo = createItem(Material.MAP,
                 ChatColor.AQUA + "Page " + (page + 1) + "/" + pageCount,
-                ChatColor.GRAY + games.size() + " enabled game(s) in the current selection pool.",
+                ChatColor.GRAY.toString() + games.size() + " enabled game(s) in the current selection pool.",
                 ChatColor.GRAY + "Chance is calculated from each game's base weight and lobby preferences.");
         markAction(pageInfo, "page-info", page);
         inventory.setItem(49, pageInfo);
