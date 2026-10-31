@@ -1,0 +1,73 @@
+# Plexball — Paper 26.3 test plan
+
+Plexball is an experimental in-process mode hosted by `ArcadeMechanicsModern`. It is deliberately **not** added to the READY_FOR_TEST allow-list or the normal rotating lobby queue. It uses a separate generated world named `testplex_plexball_arena_v1` and returns participants to the shared Testplex Arcade lobby when the match ends.
+
+## Start and kit selection
+
+- `/arcadeport kit slugger`
+- `/arcadeport kit technician`
+- `/arcadeport kit curve-artist`
+- `/arcadeport kit sprinter`
+- `/arcadeport kit skyguard`
+- `/arcadeport join plexball` — normal five-second queue countdown.
+- `/arcadeport play plexball` — quick two-second queue countdown.
+- `/arcadeport start plexball` — operator-only immediate start for two or more queued players.
+- `/arcadeport status` — shows the Plexball queue or current phase.
+- `/arcadeport stop` — operator stop and return to lobby.
+
+At least two and at most eight players are supported. Each player gets one initial batting turn. Everyone other than the current batter fields. The first round is capped at ten seconds per batter. Multiple home runs enter five-second sudden death, bounded by the same 180-second wall-clock match limit.
+
+## Gameplay acceptance
+
+| Test | Expected |
+| --- | --- |
+| Join with 2–8 players | Queue starts and every participant enters the separate Plexball arena. |
+| Batter turn | Only the selected batter can hit; movement is locked but look direction remains available. |
+| Fielder turn | Every non-batter can move throughout the fair triangle. |
+| Crosshair | Clicking the tee Interaction entity only counts if the server-side eye ray intersects the smaller ball sphere. |
+| Timing | Each at-bat gets a newly phased beat; near-perfect timing grades progressively rather than binary hit/miss. |
+| Direction | Swing yaw must be inside the fair cone; off-cone direction is a foul. |
+| Ball physics | Server simulates position, gravity, spin and distance; no client projectile velocity or reported distance is accepted. |
+| Catch | A fielder gets one catch attempt per ball; catch is based on the server's swept ball segment and buffered fielder position. |
+| Catch tiebreak | A valid catch voids the batter's hit and increments the catcher's count. |
+| Kits | Slugger, Technician, Curve Artist, Sprinter and Skyguard have distinct batting/fielding identities. |
+| Rotation | After batting, the previous batter joins the fielders for the next player. |
+| Home run | A fair 100m hit is recorded as a home run. |
+| Sudden death | Multiple home-run players take five-second turns; a finalist must hit another home run to survive the round. |
+| Match cap | The game ends at 180 seconds of wall-clock time, even if server TPS falls below 20. |
+| Cleanup | Ball, tee Interaction and player inventories are cleaned; online participants return to the shared Arcade lobby. |
+| Repeated rounds | Field generation marker prevents rebuilding the entire field on every match. |
+
+## Latency and fairness matrix
+
+Test with at least two clients and compare a low-latency client against one with controlled network delay. Record server-observed ping, swing timing grade, catch timing, actual path intersection, and result.
+
+| Approx. RTT | Expected compensation |
+| ---: | --- |
+| 0–50ms | 0 ticks |
+| 100ms | 1 tick |
+| 200ms | 2 ticks |
+| 300ms | 3 ticks |
+| 400ms | 4 ticks |
+| 500ms or higher | Capped at 5 ticks (250ms one-way estimate) |
+
+The server uses its own observed ping to estimate a bounded effective input tick; client-provided timestamps and client-reported ball/catch results are never trusted. Player positions and ball positions are kept in short server-side histories, and catches use a swept-segment test to avoid missing fast balls between ticks.
+
+A high-ping client must not receive a catch merely because its packet arrived later: the historical ball path and historical player position must still intersect the catch window. Conversely, ordinary RTT should not make valid input lose just because its packet arrived later. Compensation is intentionally bounded; latency above the cap can still affect play and must be measured during acceptance.
+
+## Anti-cheat checks
+
+- Repeated fixed-delay swing macros must not consistently obtain perfect timing because each at-bat receives a server-generated random phase and cycle.
+- Repeated clicks cannot produce more than one swing; once contact is accepted the phase leaves BATTING.
+- The larger tee Interaction entity is only an interaction target; the server ray must hit the actual ball sphere.
+- Catch spamming cannot create repeated windows; each fielder has one catch action per ball.
+- Client timestamps, reported trajectory, reported hit power and reported distance are not inputs to the result.
+- Movement outside the triangle or above the permitted field height is rejected; normal movement is otherwise left to Paper.
+- Ability use is one per fielder per ball and is checked by the game module.
+
+## Known experimental limits
+
+- The current version uses right-click to swing at the tee Interaction entity and right-click the glove to attempt a catch. It does not yet provide a custom client-side crosshair overlay or a fully animated timing meter.
+- Ball rendering is an ItemDisplay moved by the server-side simulation. Its visual smoothness may vary by client FPS/network, but the server path and score do not.
+- The current catch rewind is capped at five ticks (approximately 250ms one-way estimate). Do not advertise Plexball as completely ping independent; validate the RTT matrix and adjust only with measured evidence.
+- Cosmetics, achievements, ranked statistics, spectator controls and a public matchmaking/lobby selector are not part of this first mechanics prototype.
