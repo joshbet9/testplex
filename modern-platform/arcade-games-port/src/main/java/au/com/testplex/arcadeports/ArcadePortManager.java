@@ -2996,7 +2996,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void awardGladiatorsAchievement(Player player, String achievementId, String displayName) {
-        if (player == null) return;
+        if (player == null || testPlayers.isTestPlayer(player)) return;
         String path = ArcadePortRules.gladiatorsAchievementConfigKey(player.getUniqueId(), achievementId);
         if (plugin.getConfig().getBoolean(path, false)) return;
         plugin.getConfig().set(path, true);
@@ -3006,7 +3006,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void recordGladiatorsLoserBracketWin(Player player) {
-        if (player == null) return;
+        if (player == null || testPlayers.isTestPlayer(player)) return;
         String path = ArcadePortRules.gladiatorsMilestoneConfigKey(player.getUniqueId());
         int wins = plugin.getConfig().getInt(path, 0) + 1;
         plugin.getConfig().set(path, wins);
@@ -8706,7 +8706,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void recordDragonEscapeFinish(Session session, Player player, long now) {
-        if (session == null || player == null || session.dragonEscapeMapResource == null) return;
+        if (session == null || player == null || testPlayers.isTestPlayer(player)
+                || session.dragonEscapeMapResource == null) return;
         UUID id = player.getUniqueId();
         long elapsed = Math.max(1L, now - session.startedAt);
         Map<Integer, Long> splits = session.dragonEscapeRunSplitMillis.computeIfAbsent(id, ignored -> new HashMap<>());
@@ -8921,7 +8922,8 @@ public final class ArcadePortManager implements Listener {
         long elapsed = Math.max(0L, now - session.startedAt);
         for (UUID id : new ArrayList<>(session.alive)) {
             Player player = session.players.get(id);
-            if (player == null || !player.isOnline() || player.getWorld() != session.world) continue;
+            if (player == null || testPlayers.isTestPlayer(player)
+                    || !player.isOnline() || player.getWorld() != session.world) continue;
             List<DragonEscapeGhostFrame> frames = session.dragonEscapeRunGhostFrames
                     .computeIfAbsent(id, ignored -> new ArrayList<>());
             appendDragonEscapeGhostFrame(frames, dragonEscapeGhostFrame(player, elapsed, player.getLocation()));
@@ -9863,18 +9865,18 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void recordSheepQuestStat(UUID playerId, String stat) {
-        if (playerId == null || stat == null || stat.isBlank()) return;
+        if (playerId == null || testPlayers.isTestPlayer(playerId) || stat == null || stat.isBlank()) return;
         String key = localStatsPath(playerId, "sheep-quest") + stat;
         plugin.getConfig().set(key, plugin.getConfig().getInt(key, 0) + 1);
         plugin.saveConfig();
     }
 
     private void recordSheepQuestRewards(Session session, Player winner) {
-        if (session == null || winner == null) return;
+        if (session == null || winner == null || testPlayers.isTestPlayer(winner)) return;
         int winnerTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
         if (winnerTeam < 0 || sheepQuestTeamCount(session, winnerTeam) <= 12) return;
         for (Player player : session.players.values()) {
-            if (player == null || !player.isOnline()
+            if (player == null || !player.isOnline() || testPlayers.isTestPlayer(player)
                     || session.teams.getOrDefault(player.getUniqueId(), -2) != winnerTeam) continue;
             String key = "test-achievements.sheep-quest." + player.getUniqueId() + ".selfish";
             if (plugin.getConfig().getBoolean(key, false)) continue;
@@ -12015,7 +12017,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void awardQuiverAchievement(Player player, QuiverAchievement achievement, String description) {
-        if (player == null || achievement == null) return;
+        if (player == null || testPlayers.isTestPlayer(player) || achievement == null) return;
         String key = achievement.configKey(player.getUniqueId());
         if (key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
@@ -12437,7 +12439,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void awardRunnerAchievement(Player player, String key, String description) {
-        if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
+        if (player == null || testPlayers.isTestPlayer(player)
+                || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
         if (player != null && player.isOnline()) {
             player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
@@ -12577,7 +12580,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void awardEvolutionAchievement(Player player, String key, String description) {
-        if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
+        if (player == null || testPlayers.isTestPlayer(player)
+                || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
         if (player != null && player.isOnline()) {
             player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
@@ -12586,14 +12590,16 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void awardBombLobbersAchievement(Player player, String key, String description) {
-        if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
+        if (player == null || testPlayers.isTestPlayer(player)
+                || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
         if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
         plugin.saveConfig();
     }
 
     private void awardMicroBattlesAchievement(Player player, String key, String description) {
-        if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
+        if (player == null || testPlayers.isTestPlayer(player)
+                || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
         if (player != null && player.isOnline()) {
             player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
@@ -12604,7 +12610,7 @@ public final class ArcadePortManager implements Listener {
 
 
     private void awardBaconAchievement(Player player, String key, String description) {
-        if (plugin.getConfig().getBoolean(key, false)) return;
+        if (player == null || testPlayers.isTestPlayer(player) || plugin.getConfig().getBoolean(key, false)) return;
         plugin.getConfig().set(key, true);
         player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
         plugin.saveConfig();
@@ -12647,7 +12653,7 @@ public final class ArcadePortManager implements Listener {
      * Keep the source Death Tag payout schedule in a clearly labelled local test ledger.
      */
     private void awardDeathTagTestGems(Session session, UUID playerId, int amount, String reason) {
-        if (playerId == null || amount <= 0) return;
+        if (playerId == null || testPlayers.isTestPlayer(playerId) || amount <= 0) return;
         String path = localStatsPath(playerId, session.type.id());
         int balance = plugin.getConfig().getInt(path + "test-gems-earned", 0) + amount;
         plugin.getConfig().set(path + "test-gems-earned", balance);
@@ -12696,7 +12702,7 @@ public final class ArcadePortManager implements Listener {
 
     /** Store completed local acceptance runs only; operator-aborted sessions aren't counted. */
     private void awardDragonSurvivalGems(Session session, UUID playerId, long outAt) {
-        if (session.type != ArcadePortGame.DRAGONS || playerId == null
+        if (session.type != ArcadePortGame.DRAGONS || playerId == null || testPlayers.isTestPlayer(playerId)
                 || !session.dragonSurvivalGemsPaid.add(playerId)) return;
         double amount = ArcadePortRules.dragonSurvivalGems(Math.max(0L, outAt - session.startedAt));
         if (amount <= 0.0D) return;
@@ -12707,7 +12713,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void awardDragonTestGems(UUID playerId, double amount) {
-        if (playerId == null || amount <= 0.0D) return;
+        if (playerId == null || testPlayers.isTestPlayer(playerId) || amount <= 0.0D) return;
         String path = localStatsPath(playerId, "dragons");
         plugin.getConfig().set(path + "test-gems",
                 plugin.getConfig().getDouble(path + "test-gems", 0.0D) + amount);
@@ -12715,6 +12721,7 @@ public final class ArcadePortManager implements Listener {
 
     private void awardDragonEndGems(Session session, Player winner) {
         if (session.type != ArcadePortGame.DRAGONS || session.dragonEndGemsPaid) return;
+        if (winner != null && testPlayers.isTestPlayer(winner)) winner = null;
         session.dragonEndGemsPaid = true;
         if (winner != null) awardDragonSurvivalGems(session, winner.getUniqueId(), System.currentTimeMillis());
 
