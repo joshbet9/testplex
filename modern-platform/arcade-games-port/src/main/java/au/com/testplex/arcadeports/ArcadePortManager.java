@@ -16383,7 +16383,8 @@ public final class ArcadePortManager implements Listener {
                 ? player.getLocation().getX() > session.turfFrontlineX
                 : team == 1 && player.getLocation().getX() < session.turfFrontlineX;
         long bounceLaunchUntil = session.turfBounceLaunchUntil.getOrDefault(id, 0L);
-        boolean recentlyShotUp = now <= bounceLaunchUntil && player.getVelocity().getY() > 0.12D;
+        boolean recentlyShotUp = System.currentTimeMillis() <= bounceLaunchUntil
+                && player.getVelocity().getY() > 0.12D;
         if (inOpponentTerritory && !player.isOnGround() && recentlyShotUp) {
             session.turfBounceArrowOwners.put(arrow.getUniqueId(), id);
             session.turfBounceLaunchUntil.remove(id);
