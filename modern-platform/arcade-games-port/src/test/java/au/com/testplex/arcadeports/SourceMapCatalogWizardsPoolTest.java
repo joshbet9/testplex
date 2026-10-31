@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -107,6 +108,19 @@ class SourceMapCatalogWizardsPoolTest {
                 32, 33, -64, -63, 2,
                 List.of(new SourceMapCatalog.ChunkCoordinate(32, -64),
                         new SourceMapCatalog.ChunkCoordinate(33, -63))), bounds);
+    }
+
+    @Test
+    void inferredWizardsStartsNeverProbeChunksOutsideTheOriginalAnvilFootprint() {
+        Set<Long> populated = Set.of(
+                SourceMapCatalog.chunkKey(-1, -1),
+                SourceMapCatalog.chunkKey(2, 3));
+
+        assertTrue(SourceMapCatalog.isBlockInPopulatedChunks(-1, -1, populated));
+        assertTrue(SourceMapCatalog.isBlockInPopulatedChunks(47, 63, populated));
+        assertFalse(SourceMapCatalog.isBlockInPopulatedChunks(0, 0, populated));
+        assertFalse(SourceMapCatalog.isBlockInPopulatedChunks(64, 48, populated));
+        assertTrue(SourceMapCatalog.isBlockInPopulatedChunks(0, 0, null));
     }
 
     @Test
