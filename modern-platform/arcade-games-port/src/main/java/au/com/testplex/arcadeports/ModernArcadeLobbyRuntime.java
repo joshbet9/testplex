@@ -145,8 +145,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         display(world, "team-text", ChatColor.BLUE + "" + ChatColor.BOLD + "TEAM / QUEUE | " + name);
         display(world, "kit-display", ChatColor.GREEN + "Choose a " + name + " kit");
         boolean freeForAll = selectedGame == ArcadePortGame.BACON_BRAWL
-                || selectedGame == ArcadePortGame.SKY_WARS;
-        display(world, "team-display", ChatColor.BLUE + (freeForAll ? "FREE FOR ALL" : "TEAM QUEUE")
+                || selectedGame == ArcadePortGame.SKY_WARS || selectedGame == ArcadePortGame.PLEXBALL;
+        display(world, "team-display", ChatColor.BLUE + (selectedGame == ArcadePortGame.PLEXBALL
+                ? "INDIVIDUAL QUEUE" : (freeForAll ? "FREE FOR ALL" : "TEAM QUEUE"))
                 + ChatColor.WHITE + " | Queued: " + manager.queuedCount(selectedGame) + ChatColor.GRAY + " | Test Players: created on Start Game");
     }
 
@@ -312,6 +313,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     new KitChoice("sniper", "Sniper", Material.CROSSBOW),
                     new KitChoice("shotgun", "Shotgun", Material.BLAZE_ROD),
                     new KitChoice("machine-gun", "Machine Gun", Material.DISPENSER));
+            case PLEXBALL -> List.of(
+                    new KitChoice("slugger", "Slugger", Material.IRON_SWORD),
+                    new KitChoice("technician", "Technician", Material.SHIELD),
+                    new KitChoice("curve-artist", "Curve Artist", Material.COMPASS),
+                    new KitChoice("sprinter", "Sprinter", Material.SUGAR),
+                    new KitChoice("skyguard", "Skyguard", Material.FEATHER));
             case RUNNER -> List.of(
                     new KitChoice("runnerkit-leaper", "Leaper", Material.RABBIT_FOOT),
                     new KitChoice("runnerkit-archer", "Archer", Material.BOW),
@@ -560,7 +567,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             }else if(e.getSlot()==22)p.closeInventory();
         }else if(QUEUE_TITLE.equals(title)){
             if("queue-join".equals(action)){manager.queue(selectedGame,p,false);refreshDisplays();openQueueMenu(p);}
-            else if("queue-leave".equals(action)){manager.removeFromQueues(p);p.sendMessage(ChatColor.YELLOW+"You have left the Arcade queue.");refreshDisplays();openQueueMenu(p);}
+            else if("queue-leave".equals(action)){
+                if(manager.leaveQueue(selectedGame,p)) p.sendMessage(ChatColor.YELLOW+"You have left the Arcade queue.");
+                else p.sendMessage(ChatColor.YELLOW+"You are not queued for "+selectedGame.displayName()+".");
+                refreshDisplays();openQueueMenu(p);
+            }
             else if(e.getSlot()==22)p.closeInventory();
         }else{
             String key=it.getItemMeta().getPersistentDataContainer().get(botKey,PersistentDataType.STRING);
