@@ -153,6 +153,10 @@ final class ArcadeTestPlayerManager {
             config.set("persistence.enabled", false);
             changed = true;
         }
+        if (!config.getBoolean("body.drop-items-on-despawn", false)) {
+            config.set("body.drop-items-on-despawn", true);
+            changed = true;
+        }
         if (config.getInt("persistence.autosave-interval-seconds", 120) != 0) {
             config.set("persistence.autosave-interval-seconds", 0);
             changed = true;
@@ -347,6 +351,18 @@ final class ArcadeTestPlayerManager {
         if (api == null || handles == null) return;
         for (Object handle : handles) {
             try {
+                // These players are disposable test fixtures. Remove their match/lobby
+                // kit before FPP deletes them so no item drops or persisted inventory
+                // snapshots can leak into the next game session.
+                Object rawPlayer = invoke(handle, "getEntity");
+                if (rawPlayer instanceof Player player && player.isOnline()) {
+                    player.getInventory().clear();
+                    player.getInventory().setArmorContents(null);
+                    player.getInventory().setExtraContents(null);
+                    player.setTotalExperience(0);
+                    player.setLevel(0);
+                    player.setExp(0.0F);
+                }
                 despawn(api, handle);
             } catch (Exception exception) {
                 host.getLogger().warning("Could not despawn a Testplex fake player: "
