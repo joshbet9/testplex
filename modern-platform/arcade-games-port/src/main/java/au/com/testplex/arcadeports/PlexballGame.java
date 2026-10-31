@@ -9,6 +9,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
@@ -29,10 +30,12 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.generator.BlockPopulator;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.generator.ChunkGenerator.ChunkData;
 import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
@@ -124,9 +127,33 @@ public final class PlexballGame implements Listener {
 
     private static final class PlayerResult {
         private double bestDistance;
+        private double totalDistance;
         private int catches;
         private int homeRuns;
+        private int suddenDeathHomeRuns;
+        private int perfectContacts;
         private int atBats;
+    }
+
+    private static final class PlayerProgress {
+        private long matches;
+        private long wins;
+        private long atBats;
+        private long totalDistanceTenths;
+        private long catches;
+        private long homeRuns;
+        private long perfectHits;
+
+        private long value(PlexballMilestone.Metric metric) {
+            return switch (metric) {
+                case MATCHES -> matches;
+                case WINS -> wins;
+                case AT_BATS -> atBats;
+                case CATCHES -> catches;
+                case HOME_RUNS -> homeRuns;
+                case DISTANCE_TENTHS -> totalDistanceTenths;
+            };
+        }
     }
 
     private static final class PlayerHud {
@@ -179,6 +206,8 @@ public final class PlexballGame implements Listener {
     private final ArcadeMechanicsModernPlugin plugin;
     private final NamespacedKey actionKey;
     private final File kitFile;
+    private final File progressionFile;
+    private final YamlConfiguration progressionData;
     private final Map<UUID, Kit> selectedKits = new HashMap<>();
     private final LinkedHashMap<UUID, Player> queue = new LinkedHashMap<>();
     private final List<UUID> matchPlayers = new ArrayList<>();
@@ -231,6 +260,8 @@ public final class PlexballGame implements Listener {
         this.plugin = plugin;
         this.actionKey = new NamespacedKey(plugin, "plexball-action");
         this.kitFile = new File(plugin.getDataFolder(), "plexball-player-kits.yml");
+        this.progressionFile = new File(plugin.getDataFolder(), "plexball-progression.yml");
+        this.progressionData = YamlConfiguration.loadConfiguration(progressionFile);
         loadKits();
         ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
     }
@@ -246,6 +277,72 @@ public final class PlexballGame implements Listener {
         return phase.name().toLowerCase(java.util.Locale.ROOT)
                 + ", players=" + matchPlayers.size()
                 + ", time=" + Math.max(0L, (matchEndNanos - System.nanoTime()) / 1_000_000_000L) + "s";
+    }
+
+    /** Open the local Plexball career page used by /stats plexball. */
+    public void openStats(Player player) {
+        if (player == null || !player.isOnline()) return;
+        UUID id = player.getUniqueId();
+        PlayerProgress profile = readProgress(id);
+        Inventory inventory = Bukkit.createInventory(null, 54, STATS_MENU_TITLE);
+        ItemStack filler = progressItem(Material.BLACK_STAINED_GLASS_PANE, " ", List.of());
+        for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, filler);
+
+        inventory.setItem(4, progressItem(Material.BOOK, ChatColor.GOLD + "Career Summary", List.of(
+                ChatColor.GRAY + "Matches: " + ChatColor.WHITE + profile.matches,
+                ChatColor.GRAY + "Wins: " + ChatColor.WHITE + profile.wins,
+                ChatColor.GRAY + "At-bats: " + ChatColor.WHITE + profile.atBats,
+                ChatColor.GRAY + "Uncaught distance: " + ChatColor.GREEN
+                        + String.format(java.util.Locale.ROOT, "%.1fm", profile.totalDistanceTenths / 10.0D),
+                ChatColor.GRAY + "Catches: " + ChatColor.AQUA + profile.catches,
+                ChatColor.GRAY + "Home runs: " + ChatColor.GOLD + profile.homeRuns,
+                ChatColor.GRAY + "Perfect contacts: " + ChatColor.LIGHT_PURPLE + profile.perfectHits)));
+
+        inventory.setItem(9, progressItem(Material.PAPER,
+                ChatColor.YELLOW + "" + ChatColor.BOLD + "ACHIEVEMENTS", List.of(
+                        ChatColor.GRAY + "One-time challenges earned through play.")));
+        PlexballAchievement[] achievements = PlexballAchievement.values();
+        for (int index = 0; index < achievements.length; index++) {
+            PlexballAchievement achievement = achievements[index];
+            boolean unlocked = progressionData.getBoolean(achievement.configPath(id), false);
+            List<String> lore = new ArrayList<>();
+            lore.add(ChatColor.GRAY + achievement.requirement());
+            lore.add(unlocked ? ChatColor.GREEN + "UNLOCKED" : ChatColor.RED + "LOCKED");
+            inventory.setItem(10 + index, progressItem(
+                    unlocked ? achievement.icon() : Material.GRAY_DYE,
+                    (unlocked ? ChatColor.GREEN : ChatColor.WHITE) + achievement.displayName(), lore));
+        }
+
+        inventory.setItem(27, progressItem(Material.WRITABLE_BOOK,
+                ChatColor.AQUA + "" + ChatColor.BOLD + "CAREER MILESTONES", List.of(
+                        ChatColor.GRAY + "Cumulative progress across all Plexball matches.")));
+        for (int index = 0; index < PlexballMilestone.values().length; index++) {
+            PlexballMilestone milestone = PlexballMilestone.values()[index];
+            long current = profile.value(milestone.metric());
+            boolean unlocked = progressionData.getBoolean(milestone.configPath(id), false);
+            int percent = PlexballProgressionRules.milestoneProgressPercent(current, milestone.target());
+            List<String> lore = new ArrayList<>();
+            lore.add(ChatColor.GRAY + milestone.metric().displayName());
+            lore.add(ChatColor.WHITE + formatMilestoneValue(milestone.metric(), current)
+                    + ChatColor.GRAY + " / " + ChatColor.WHITE + milestone.targetLabel());
+            lore.add(progressBar(percent));
+            lore.add(unlocked ? ChatColor.GREEN + "COMPLETED" : ChatColor.YELLOW + percent + "% complete");
+            inventory.setItem(28 + index, progressItem(
+                    unlocked ? Material.EMERALD : milestoneIcon(milestone.metric()),
+                    (unlocked ? ChatColor.GREEN : ChatColor.WHITE) + milestone.displayName(), lore));
+        }
+        inventory.setItem(53, progressItem(Material.BARRIER, ChatColor.RED + "Close",
+                List.of(ChatColor.GRAY + "Click to close this page.")));
+        player.openInventory(inventory);
+    }
+
+    @EventHandler
+    public void onProgressMenuClick(InventoryClickEvent event) {
+        if (!STATS_MENU_TITLE.equals(event.getView().getTitle())) return;
+        event.setCancelled(true);
+        if (event.getWhoClicked() instanceof Player player && event.getRawSlot() == 53) {
+            player.closeInventory();
+        }
     }
 
     public boolean selectKit(Player player, String id) {
@@ -598,10 +695,14 @@ public final class PlexballGame implements Listener {
         result.atBats++;
         double recordedDistance = caught ? 0.0D : PlexballRules.clamp(distance, 0.0D, PlexballRules.HOME_RUN_METRES);
         result.bestDistance = Math.max(result.bestDistance, recordedDistance);
+        result.totalDistance += recordedDistance;
         if (homeRun && !caught) {
             result.homeRuns++;
             if (!suddenDeath) homeRunPlayers.add(battingPlayer);
-            else roundSurvivors.add(battingPlayer);
+            else {
+                result.suddenDeathHomeRuns++;
+                roundSurvivors.add(battingPlayer);
+            }
         }
         if (suddenDeath) roundDistances.put(battingPlayer, recordedDistance);
         if (message != null && !message.isBlank()) broadcastMatch(message);
@@ -714,6 +815,7 @@ public final class PlexballGame implements Listener {
 
     private void finish(List<UUID> winners, String reason, boolean announce) {
         List<UUID> participants = new ArrayList<>(matchPlayers);
+        if (announce && !participants.isEmpty()) updateCareerProgress(participants, winners);
         cleanupBall();
         if (announce && !participants.isEmpty()) {
             if (winners == null || winners.isEmpty()) {
@@ -1100,6 +1202,10 @@ public final class PlexballGame implements Listener {
 
         int gradedTimingDistance = kit == Kit.TECHNICIAN ? Math.max(0, timingDistance - 2) : timingDistance;
         timing = PlexballRules.timingMultiplier(gradedTimingDistance);
+        if (PlexballProgressionRules.shouldAwardPerfectContact(timing)) {
+            PlayerResult result = results.get(player.getUniqueId());
+            if (result != null) result.perfectContacts++;
+        }
         // Server-tick physics are tuned as a pair: lower contact is a loft,
         // upper contact is a faster line drive, and good timing preserves power.
         double horizontalSpeed = (3.0D + 1.1D * contactY)
@@ -1479,6 +1585,136 @@ public final class PlexballGame implements Listener {
         for (UUID id : matchPlayers) {
             Player player = Bukkit.getPlayer(id);
             if (player != null && player.isOnline()) player.sendMessage(message);
+        }
+    }
+
+    private ItemStack progressItem(Material material, String name, List<String> lore) {
+        ItemStack item = new ItemStack(material);
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(name);
+        meta.setLore(lore);
+        item.setItemMeta(meta);
+        return item;
+    }
+
+    private static Material milestoneIcon(PlexballMilestone.Metric metric) {
+        return switch (metric) {
+            case MATCHES -> Material.CLOCK;
+            case WINS -> Material.GOLD_INGOT;
+            case AT_BATS -> Material.IRON_SWORD;
+            case CATCHES -> Material.SHIELD;
+            case HOME_RUNS -> Material.FIREWORK_STAR;
+            case DISTANCE_TENTHS -> Material.COMPASS;
+        };
+    }
+
+    private static String formatMilestoneValue(PlexballMilestone.Metric metric, long value) {
+        return metric == PlexballMilestone.Metric.DISTANCE_TENTHS
+                ? String.format(java.util.Locale.ROOT, "%.1fm", value / 10.0D)
+                : Long.toString(value);
+    }
+
+    private static String progressBar(int percent) {
+        int filled = Math.max(0, Math.min(10, percent / 10));
+        return ChatColor.GREEN + "[" + "■".repeat(filled)
+                + ChatColor.DARK_GRAY + "■".repeat(10 - filled) + ChatColor.WHITE + "]";
+    }
+
+    private PlayerProgress readProgress(UUID playerId) {
+        String root = "players." + playerId + ".";
+        PlayerProgress profile = new PlayerProgress();
+        profile.matches = progressionData.getLong(root + "matches");
+        profile.wins = progressionData.getLong(root + "wins");
+        profile.atBats = progressionData.getLong(root + "at-bats");
+        profile.totalDistanceTenths = progressionData.getLong(root + "total-distance-tenths");
+        profile.catches = progressionData.getLong(root + "catches");
+        profile.homeRuns = progressionData.getLong(root + "home-runs");
+        profile.perfectHits = progressionData.getLong(root + "perfect-contacts");
+        return profile;
+    }
+
+    private void updateCareerProgress(List<UUID> participants, List<UUID> winners) {
+        Set<UUID> winnerIds = winners == null ? Set.of() : new HashSet<>(winners);
+        for (UUID id : participants) {
+            PlayerResult match = results.getOrDefault(id, new PlayerResult());
+            String root = "players." + id + ".";
+            PlayerProgress before = readProgress(id);
+            PlayerProgress profile = new PlayerProgress();
+            profile.matches = before.matches + 1L;
+            profile.wins = before.wins + (winnerIds.contains(id) ? 1L : 0L);
+            profile.atBats = before.atBats + match.atBats;
+            profile.totalDistanceTenths = before.totalDistanceTenths
+                    + PlexballProgressionRules.distanceToTenths(match.totalDistance);
+            profile.catches = before.catches + match.catches;
+            profile.homeRuns = before.homeRuns + match.homeRuns;
+            profile.perfectHits = before.perfectHits + match.perfectContacts;
+
+            progressionData.set(root + "matches", profile.matches);
+            progressionData.set(root + "wins", profile.wins);
+            progressionData.set(root + "at-bats", profile.atBats);
+            progressionData.set(root + "total-distance-tenths", profile.totalDistanceTenths);
+            progressionData.set(root + "catches", profile.catches);
+            progressionData.set(root + "home-runs", profile.homeRuns);
+            progressionData.set(root + "perfect-contacts", profile.perfectHits);
+
+            if (PlexballProgressionRules.shouldAwardSweetSpot(match.bestDistance)) {
+                unlockAchievement(id, PlexballAchievement.SWEET_SPOT);
+            }
+            if (PlexballProgressionRules.shouldAwardWarningTrack(match.bestDistance)) {
+                unlockAchievement(id, PlexballAchievement.WARNING_TRACK);
+            }
+            if (match.homeRuns > 0) unlockAchievement(id, PlexballAchievement.OUT_OF_THE_PARK);
+            if (match.perfectContacts > 0) unlockAchievement(id, PlexballAchievement.PERFECT_CONTACT);
+            if (match.catches > 0) unlockAchievement(id, PlexballAchievement.STICKY_GLOVES);
+            if (PlexballProgressionRules.shouldAwardGoldenGlove(match.catches)) {
+                unlockAchievement(id, PlexballAchievement.GOLDEN_GLOVE);
+            }
+            if (PlexballProgressionRules.shouldAwardAllRounder(match.bestDistance, match.catches)) {
+                unlockAchievement(id, PlexballAchievement.ALL_ROUNDER);
+            }
+            boolean won = winnerIds.contains(id);
+            if (won) unlockAchievement(id, PlexballAchievement.CHAMPION);
+            if (PlexballProgressionRules.shouldAwardClutchPerformer(won, match.suddenDeathHomeRuns)) {
+                unlockAchievement(id, PlexballAchievement.CLUTCH_PERFORMER);
+            }
+
+            for (PlexballMilestone milestone : PlexballMilestone.values()) {
+                String milestonePath = milestone.configPath(id);
+                if (!progressionData.getBoolean(milestonePath, false)
+                        && profile.value(milestone.metric()) >= milestone.target()) {
+                    progressionData.set(milestonePath, true);
+                    notifyProgressUnlock(id, "MILESTONE", milestone.displayName(),
+                            milestone.metric().displayName() + " reached " + milestone.targetLabel());
+                }
+            }
+        }
+        saveProgression();
+    }
+
+    private void unlockAchievement(UUID id, PlexballAchievement achievement) {
+        String path = achievement.configPath(id);
+        if (progressionData.getBoolean(path, false)) return;
+        progressionData.set(path, true);
+        notifyProgressUnlock(id, "ACHIEVEMENT", achievement.displayName(), achievement.requirement());
+    }
+
+    private void notifyProgressUnlock(UUID id, String kind, String name, String detail) {
+        Player player = Bukkit.getPlayer(id);
+        if (player == null || !player.isOnline()) return;
+        player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + kind + " UNLOCKED "
+                + ChatColor.YELLOW + name + ChatColor.GRAY + " — " + detail);
+        player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.0F);
+    }
+
+    private void saveProgression() {
+        try {
+            File parent = progressionFile.getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                throw new IOException("Could not create Plexball progression directory.");
+            }
+            progressionData.save(progressionFile);
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Could not save Plexball progression: " + exception.getMessage());
         }
     }
 
