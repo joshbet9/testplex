@@ -934,6 +934,8 @@ public final class CameraShyGame implements Listener {
         UUID id = player.getUniqueId();
         queue.remove(id);
         if (phase != Phase.LIVE || !humans.contains(id) || !alive.remove(id)) return;
+        ArmorStand understudy = understudyStands.remove(id);
+        if (understudy != null && understudy.isValid()) understudy.remove();
         PlayerSnapshot snapshot = snapshots.remove(id);
         if (snapshot != null) {
             if (player.isOnline()) {
@@ -1116,6 +1118,8 @@ public final class CameraShyGame implements Listener {
         target.sendTitle(ChatColor.DARK_RED + "ELIMINATED", ChatColor.GRAY + "Five photographs. Your match is over.", 5, 45, 10);
         target.playSound(target.getLocation(), Sound.ENTITY_WITHER_DEATH, 0.65F, 1.5F);
         removePlayerPresentation(targetId);
+        ArmorStand understudy = understudyStands.remove(targetId);
+        if (understudy != null && understudy.isValid()) understudy.remove();
 
         eliminations.merge(killerId, 1, Integer::sum);
         Long previous = lastEliminationAt.get(killerId);
@@ -1340,7 +1344,9 @@ public final class CameraShyGame implements Listener {
             }
             Player shooter = players.get(key.shooter());
             Player target = players.get(key.target());
-            if (shooter != null && target != null && target.isOnline()
+            if (shooter != null && target != null && shooter.isOnline() && target.isOnline()
+                    && alive.contains(key.shooter()) && alive.contains(key.target())
+                    && shooter.getWorld() == arena && target.getWorld() == arena
                     && (!shooter.hasLineOfSight(target)
                     || target.getLocation().distanceSquared(attempt.targetOrigin) >= 16.0D)) {
                 if (humans.contains(key.target())) award(key.target(), "out-of-focus");
@@ -1361,17 +1367,19 @@ public final class CameraShyGame implements Listener {
                 UUID pursuerId = pursuitEntry.getKey();
                 Player pursuer = players.get(pursuerId);
                 Pursuit pursuit = pursuitEntry.getValue();
-                boolean visible = pursuer != null && pursuer.isOnline() && alive.contains(pursuerId)
-                        && pursuer.getWorld() == victim.getWorld()
+                boolean sameWorld = pursuer != null && pursuer.isOnline()
+                        && pursuer.getWorld() == victim.getWorld();
+                boolean smokeObscured = sameWorld
+                        && isBlockedBySmoke(victim.getEyeLocation(), pursuer.getEyeLocation());
+                boolean visible = sameWorld && alive.contains(pursuerId)
                         && victim.getLocation().distanceSquared(pursuer.getLocation()) <= 24.0D * 24.0D
-                        && victim.hasLineOfSight(pursuer)
-                        && !isBlockedBySmoke(victim.getEyeLocation(), pursuer.getEyeLocation());
+                        && victim.hasLineOfSight(pursuer) && !smokeObscured;
                 if (visible) {
                     pursuit.lostSightSince = -1L;
                     continue;
                 }
                 if (pursuit.lostSightSince < 0L) pursuit.lostSightSince = now;
-                boolean escaped = pursuer == null || !pursuer.isOnline()
+                boolean escaped = pursuer == null || !pursuer.isOnline() || !alive.contains(pursuerId)
                         || victim.getWorld() != pursuer.getWorld()
                         || victim.getLocation().distanceSquared(pursuer.getLocation()) >= PURSUIT_ESCAPE_DISTANCE * PURSUIT_ESCAPE_DISTANCE;
                 if (escaped && now - pursuit.lostSightSince >= PURSUIT_ESCAPE_MILLIS) {
@@ -1380,8 +1388,7 @@ public final class CameraShyGame implements Listener {
                         int escapes = encounterEscapes.merge(victimId, 1, Integer::sum);
                         if (escapes >= 3) award(victimId, "now-you-see-me");
                         if (runnerUsedUntil.getOrDefault(victimId, 0L) > now) award(victimId, "catch-me-if-you-can");
-                        if (smokeUsedUntil.getOrDefault(victimId, 0L) > 0L
-                                && now <= smokeUsedUntil.getOrDefault(victimId, 0L)) {
+                        if (smokeObscured && smokeUsedUntil.getOrDefault(victimId, 0L) >= now) {
                             int smoke = smokeEscapes.merge(victimId, 1, Integer::sum);
                             if (smoke >= 3) award(victimId, "smoke-and-mirrors");
                         }
