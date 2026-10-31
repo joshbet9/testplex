@@ -53,6 +53,10 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     private Object secondMatch;
     private UUID firstDisplayId;
     private UUID secondDisplayId;
+    private UUID firstPasserId;
+    private UUID firstShooterId;
+    private UUID blockerId;
+    private int firstScoringTeam = -1;
     private int stage;
     private long ticks;
     private boolean closing;
@@ -111,7 +115,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         owner = players.get(0);
         owner.setOp(true);
 
-        invoke(arcade, "prepareForHoops");
+        invoke(arcade, "prepareForHoops", new Class<?>[0]);
         for (int i = 0; i < players.size(); i++) {
             Player player = players.get(i);
             seedBaselineProfile(player, i);
@@ -204,7 +208,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         receiver.teleport(new Location(world, receiveX, 64.0D, 0.0D));
         receiver.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
 
-        invoke(runtime, "pass", firstMatch.getClass(), Player.class, passer);
+        invoke(runtime, "pass", new Class<?>[] {firstMatch.getClass(), Player.class}, firstMatch, passer);
         Object ball = field(firstMatch, "ball");
         require(ball != null && "PASS".equals(String.valueOf(field(ball, "mode"))),
                 "left-click pass did not create a flying pass ball");
@@ -242,7 +246,10 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         shooter.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
         int[] scores = (int[]) field(firstMatch, "teamScore");
         scores[team] = 19;
-        invoke(runtime, "shoot", firstMatch.getClass(), Player.class, shooter);
+        firstPasserId = passerId;
+        firstShooterId = shooter.getUniqueId();
+        firstScoringTeam = team;
+        invoke(runtime, "shoot", new Class<?>[] {firstMatch.getClass(), Player.class}, firstMatch, shooter);
         Object shot = field(firstMatch, "ball");
         require(shot != null && "SHOT".equals(String.valueOf(field(shot, "mode"))),
                 "right-click shooting did not create a shot trajectory");
@@ -255,29 +262,17 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     }
 
     private void waitForTwoPointWinAndStartSecondMatch() throws Exception {
-        @SuppressWarnings("unchecked")
-        Map<UUID, Integer> teams = (Map<UUID, Integer>) field(firstMatch, "teams");
-        Player shooter = player((UUID) field(firstMatch, "holderId"));
-        if (shooter == null) {
-            // The holder becomes null as soon as the shot is released; locate the shot owner instead.
-            Object ball = field(firstMatch, "ball");
-            if (ball != null) shooter = player((UUID) field(ball, "shooterId"));
-        }
-        int team = shooter == null ? -1 : teams.getOrDefault(shooter.getUniqueId(), -1);
         int[] scores = (int[]) field(firstMatch, "teamScore");
-        if (team >= 0 && scores[team] >= 21) {
+        if (firstScoringTeam >= 0 && scores[firstScoringTeam] >= 21) {
             @SuppressWarnings("unchecked")
             Map<UUID, Object> stats = (Map<UUID, Object>) field(firstMatch, "playerStats");
-            UUID passerId = null;
-            for (UUID id : stats.keySet()) {
-                if (((Number) field(stats.get(id), "assists")).intValue() > 0) passerId = id;
-            }
-            require(passerId != null, "completed basket did not award a pass assist");
-            require(((Number) field(stats.get(shooter.getUniqueId()), "points")).intValue() == 2,
+            require(firstPasserId != null && firstShooterId != null,
+                    "first round lost its saved passer/shooter identities");
+            require(((Number) field(stats.get(firstShooterId), "points")).intValue() == 2,
                     "two-point basket was not added to the shooter's box score");
-            require(((Number) field(stats.get(shooter.getUniqueId()), "shotsMade")).intValue() == 1,
+            require(((Number) field(stats.get(firstShooterId), "shotsMade")).intValue() == 1,
                     "made shot count was not incremented");
-            require(((Number) field(stats.get(passerId), "assists")).intValue() == 1,
+            require(((Number) field(stats.get(firstPasserId), "assists")).intValue() == 1,
                     "passer did not receive exactly one assist");
             TextDisplay display = (TextDisplay) Bukkit.getEntity(firstDisplayId);
             require(display == null || !display.isValid(), "centre scoreboard display survived match cleanup");
@@ -285,12 +280,12 @@ public final class HoopsPaperSmoke extends JavaPlugin {
                 if (ticks >= 100L) throw new IllegalStateException("winner transition did not restore all players");
                 return;
             }
-            verifyCareerStats(firstMatch, passerId, shooter.getUniqueId(), team);
+            verifyCareerStats(firstMatch, firstPasserId, firstShooterId, firstScoringTeam);
             getLogger().info("HOOPS_SMOKE|TWO_POINT_WIN|score=" + scores[0] + "-" + scores[1]
                     + "|assist=PASS|restoration=PASS");
 
             firstMatch = null;
-            invoke(arcade, "prepareForHoops");
+            invoke(arcade, "prepareForHoops", new Class<?>[0]);
             queueAndStart();
             stage = 4;
             ticks = 0L;
@@ -333,7 +328,8 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         thief.teleport(thiefLoc);
         initialHolder.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
         thief.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
-        invoke(runtime, "trySteal", secondMatch.getClass(), Player.class, Player.class, thief, initialHolder);
+        invoke(runtime, "trySteal", new Class<?>[] {secondMatch.getClass(), Player.class, Player.class},
+                secondMatch, thief, initialHolder);
         require(thief.getUniqueId().equals(field(secondMatch, "holderId")),
                 "facing/range-valid steal did not transfer possession");
         @SuppressWarnings("unchecked")
@@ -353,7 +349,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         release.setDirection(new Vector(hoopX, 66.2D - 65.62D, 0.0D));
         thief.teleport(release);
         thief.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
-        invoke(runtime, "shoot", secondMatch.getClass(), Player.class, thief);
+        invoke(runtime, "shoot", new Class<?>[] {secondMatch.getClass(), Player.class}, secondMatch, thief);
         Object shot = field(secondMatch, "ball");
         require(((Integer) field(shot, "points")) == 3, "centre-court release was not classified as three points");
         require((Boolean) field(shot, "reboundEligible"), "three-point shot was not reboundable");
@@ -366,12 +362,13 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         defenderLocation.setDirection(ballLocation.toVector().subtract(defenderEye.toVector()));
         initialHolder.teleport(defenderLocation);
         initialHolder.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
-        invoke(runtime, "blockShot", secondMatch.getClass(), Player.class, initialHolder);
+        invoke(runtime, "blockShot", new Class<?>[] {secondMatch.getClass(), Player.class}, secondMatch, initialHolder);
         require("LOOSE".equals(String.valueOf(field(shot, "mode"))),
                 "valid facing block did not deflect the shot into a loose ball");
         require((Boolean) field(shot, "reboundEligible"), "blocked shot was not left recoverable");
         require(((Number) field(stats.get(initialHolder.getUniqueId()), "blocks")).intValue() == 1,
                 "successful block was not recorded");
+        blockerId = initialHolder.getUniqueId();
 
         Vector nextVelocity = ((Vector) field(shot, "velocity")).clone();
         nextVelocity.setY(nextVelocity.getY() - GRAVITY);
@@ -388,14 +385,14 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         UUID holder = (UUID) field(secondMatch, "holderId");
         @SuppressWarnings("unchecked")
         Map<UUID, Object> stats = (Map<UUID, Object>) field(secondMatch, "playerStats");
-        Object blockerStats = stats.get(ownerOrOriginalHolder());
-        if (holder != null && holder.equals(ownerOrOriginalHolder())
+        Object blockerStats = stats.get(blockerId);
+        if (blockerId != null && holder != null && holder.equals(blockerId)
                 && ((Number) field(blockerStats, "rebounds")).intValue() >= 1) {
-            int shotClock = (int) (long) field(secondMatch, "shotClockEndsAt");
-            require(shotClock > 0, "rebound did not leave a live possession/shot clock");
+            long shotClock = ((Number) field(secondMatch, "shotClockEndsAt")).longValue();
+            require(shotClock > System.currentTimeMillis(), "rebound did not leave a live possession/shot clock");
             TextDisplay display = (TextDisplay) Bukkit.getEntity(secondDisplayId);
             require(display != null && display.isValid(), "second match scoreboard unexpectedly disappeared before stop");
-            invoke(arcade, "prepareForHoops");
+            invoke(arcade, "prepareForHoops", new Class<?>[0]);
             stage = 6;
             ticks = 0L;
             getLogger().info("HOOPS_SMOKE|REBOUND|PASS|defensive-rebound=PASS");
@@ -403,12 +400,8 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         }
         if (ticks >= 50L) {
             throw new IllegalStateException("blocked shot was not recovered by the defender; holder=" + holder
-                    + ", rebounds=" + field(blockerStats, "rebounds"));
+                    + ", rebounds=" + (blockerStats == null ? "n/a" : field(blockerStats, "rebounds")));
         }
-    }
-
-    private UUID ownerOrOriginalHolder() {
-        return owner.getUniqueId();
     }
 
     private void verifyFinalRestoration() throws Exception {
@@ -540,15 +533,11 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         return method;
     }
 
-    private static void invoke(Object target, String methodName, Class<?>... signatureAndArgs) throws Exception {
-        int argCount = 0;
-        for (Class<?> ignored : signatureAndArgs) argCount++;
-        Method method = target.getClass().getDeclaredMethod(methodName,
-                Arrays.copyOf(signatureAndArgs, argCount - 1));
+    private static Object invoke(Object target, String methodName,
+            Class<?>[] parameterTypes, Object... arguments) throws Exception {
+        Method method = target.getClass().getDeclaredMethod(methodName, parameterTypes);
         method.setAccessible(true);
-        Object[] args = new Object[argCount - 1];
-        System.arraycopy(signatureAndArgs, argCount - 1, args, 0, args.length);
-        method.invoke(target, args);
+        return method.invoke(target, arguments);
     }
 
     private static Field findField(Class<?> type, String name) throws Exception {
