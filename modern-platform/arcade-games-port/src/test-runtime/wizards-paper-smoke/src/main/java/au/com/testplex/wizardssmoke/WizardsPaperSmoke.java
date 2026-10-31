@@ -84,7 +84,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 + ",cancelled=" + event.isCancelled()
                 + ",victimHealth=" + rival.getHealth()
                 + ",victimMode=" + rival.getGameMode()
-                + ",victimInvulnerable=" + isInvulnerableToGenericDamage(rival)
+                + ",victimInvulnerable=" + readMarkedInvulnerability(rival)
                 + ",noDamageTicks=" + rival.getNoDamageTicks();
     }
 
@@ -328,7 +328,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         require(rival.isDead(), "Rainbow Beam damage failed (health="
                 + (rival.isDead() ? 0.0D : rival.getHealth()) + ", expectedDamage=" + expectedBeamDamage
                 + ", distance=" + beamDistance + ", pvp=" + gameplayArena.getPVP()
-                + ", mode=" + rival.getGameMode() + ", invulnerable=" + isInvulnerableToGenericDamage(rival)
+                + ", mode=" + rival.getGameMode() + ", invulnerable=" + readMarkedInvulnerability(rival)
                 + ", lastDamage=" + lastDamageObservation + ")");
         double manaAfterBeam = ((Number) field(ownerState, "mana")).doubleValue();
         require(Math.abs((manaBeforeBeam - manaAfterBeam) - 17.0D) < 0.01D,
@@ -476,7 +476,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
     private PlayerBaseline captureBaseline(Player player) {
         return new PlayerBaseline(player.getWorld(), player.getLocation().clone(),
                 cloneItems(player.getInventory().getContents()), cloneItems(player.getInventory().getArmorContents()),
-                player.getGameMode(), player.getScoreboard(), isInvulnerableToGenericDamage(player),
+                player.getGameMode(), player.getScoreboard(), Boolean.TRUE.equals(readMarkedInvulnerability(player)),
                 player.getHealth(), player.getAbsorptionAmount(),
                 player.getFoodLevel(), player.getSaturation(), player.getLevel(), player.getExp(),
                 player.getAllowFlight(), player.isFlying(), player.isSprinting(),
@@ -519,7 +519,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 player.getName() + " was not restored to the original lobby location");
         require(player.getGameMode() == baseline.gameMode(),
                 player.getName() + " game mode was not restored");
-        require(isInvulnerableToGenericDamage(player) == baseline.invulnerable(),
+        require(Boolean.TRUE.equals(readMarkedInvulnerability(player)) == baseline.invulnerable(),
                 player.getName() + " lobby invulnerability was not restored");
         require(player.getScoreboard() == baseline.scoreboard(),
                 player.getName() + " scoreboard was not restored");
@@ -584,9 +584,19 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
             float walkSpeed, float flySpeed, int fireTicks, Location compassTarget,
             List<PotionEffect> effects) {}
 
-    private static boolean isInvulnerableToGenericDamage(Player player) {
-        return player.isInvulnerableTo(org.bukkit.damage.DamageSource
-                .builder(org.bukkit.damage.DamageType.GENERIC).build());
+    /**
+     * The target Paper runtime may expose isMarkedInvulnerable even when the
+     * project's shared Bukkit compile surface does not. Reflect rather than
+     * compiling against a version-specific getter.
+     */
+    private static Boolean readMarkedInvulnerability(Player player) {
+        try {
+            java.lang.reflect.Method getter = player.getClass().getMethod("isMarkedInvulnerable");
+            Object value = getter.invoke(player);
+            return value instanceof Boolean flag ? flag : null;
+        } catch (ReflectiveOperationException | SecurityException ignored) {
+            return null;
+        }
     }
 
     private void validateLivePlayer(Player player, Map<Object, Object> states, String expectedKit) throws Exception {
@@ -607,7 +617,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 player.getName() + " did not receive the Wizards match scoreboard");
         require(player.getActivePotionEffects().isEmpty(),
                 player.getName() + " carried lobby potion effects into the match");
-        require(!isInvulnerableToGenericDamage(player),
+        require(!Boolean.TRUE.equals(readMarkedInvulnerability(player)),
                 player.getName() + " carried lobby invulnerability into the match");
         require(player.getAbsorptionAmount() == 0.0D,
                 player.getName() + " carried lobby absorption hearts into the match");
