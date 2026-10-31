@@ -161,12 +161,24 @@ public final class SourceMapCatalog {
         return List.copyOf(maps);
     }
 
+    /** Pure path validation for a named embedded source-map folder pool. */
+    static boolean resourcePathBelongsToFolders(List<String> mapFolders, String resource) {
+        if (resource == null || resource.isBlank() || resource.startsWith("/")
+                || resource.contains("..") || resource.indexOf('\\') >= 0
+                || !resource.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) return false;
+        if (mapFolders == null || mapFolders.isEmpty()) return false;
+        return mapFolders.stream().filter(folder -> folder != null && !folder.isBlank())
+                .map(folder -> "source-maps/" + folder + "/")
+                .anyMatch(resource::startsWith);
+    }
+
     /** Resolve the configured selection against a set of bundled source folders. */
     public static String selectedResourceForFolders(JavaPlugin plugin, String selectionKey, List<String> mapFolders) {
         if (plugin == null || selectionKey == null || selectionKey.isBlank()) return null;
         List<String> resources = bundledMapResources(plugin, mapFolders, selectionKey);
         String configured = plugin.getConfig().getString("selected-maps." + selectionKey);
-        if (configured != null && resources.contains(configured) && plugin.getResource(configured) != null) return configured;
+        if (configured != null && resourcePathBelongsToFolders(mapFolders, configured)
+                && resources.contains(configured) && plugin.getResource(configured) != null) return configured;
         return resources.isEmpty() ? null : resources.get(0);
     }
 
@@ -208,7 +220,7 @@ public final class SourceMapCatalog {
     /** Pure path validation, kept separate so the game's resource mapping is unit-testable. */
     static boolean resourcePathBelongsToGame(ArcadePortGame game, String resource) {
         if (game == null || resource == null || resource.isBlank()
-                || resource.startsWith("/") || resource.contains("..") || resource.contains("\\\\")) {
+                || resource.startsWith("/") || resource.contains("..") || resource.indexOf('\\\\') >= 0) {
             return false;
         }
         if (resource.equals(resourceFor(game))) return true;
@@ -536,7 +548,16 @@ public final class SourceMapCatalog {
 
     /** Extract a game's selected source archive into its dedicated, isolated test world. */
     public static boolean install(JavaPlugin plugin, ArcadePortGame game, String worldName) {
-        return installResource(plugin, selectedResource(plugin, game), worldName);
+        return installResource(plugin, selectedResource(plugin, game), worldName, mapFoldersFor(game));
+    }
+
+    /** Extract a source archive only when it belongs to the caller's expected folder pool. */
+    public static boolean installResource(JavaPlugin plugin, String resource, String worldName, List<String> mapFolders) {
+        if (!resourcePathBelongsToFolders(mapFolders, resource)) {
+            if (plugin != null) plugin.getLogger().severe("Refusing a source map outside the selected folder pool: " + resource);
+            return false;
+        }
+        return installResource(plugin, resource, worldName);
     }
 
     /** Extract a selected archive discovered from any validated source-map folder pool. */
@@ -546,7 +567,7 @@ public final class SourceMapCatalog {
             return false;
         }
         if (!resource.startsWith("source-maps/") || !resource.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")
-                || resource.contains("..") || resource.contains("\\\\")) {
+                || resource.contains("..") || resource.indexOf('\\') >= 0) {
             plugin.getLogger().severe("Refusing to install an invalid embedded source map resource: " + resource);
             return false;
         }
@@ -742,6 +763,55 @@ public final class SourceMapCatalog {
         } catch (IOException exception) {
             plugin.getLogger().log(java.util.logging.Level.WARNING,
                     "Could not read WorldConfig.dat from selected map archive " + resource, exception);
+            return null;
+        }
+    }
+
+    /**
+     * Read a selected source archive's WorldConfig.dat. Paper's custom-world
+     * migration does not preserve this Reborn-only metadata beside the imported
+     * terrain, so archive lookup is the authoritative fallback after load.
+     */
+    public static MapData readResource(JavaPlugin plugin, String resource, World world) {
+        if (plugin == null || resource == null || world == null) return null;
+        Path config = resolveWorldConfigPath(world.getWorldFolder().toPath(),
+                Bukkit.getWorldContainer().toPath(), world.getName());
+        if (config != null && Files.isRegularFile(config)) {
+            try {
+                return parseMapConfig(world, Files.readAllLines(config, StandardCharsets.UTF_8));
+            } catch (IOException exception) {
+                plugin.getLogger().log(java.util.logging.Level.WARNING,
+                        "Could not read on-disk WorldConfig.dat for " + world.getName()
+                                + "; retrying from selected embedded source archive " + resource,
+                        exception);
+            }
+        }
+        try (InputStream input = plugin.getResource(resource)) {
+            if (input == null) {
+                plugin.getLogger().warning("Cannot read source map metadata: selected embedded archive is missing: " + resource);
+                return null;
+            }
+            try (ZipInputStream zip = new ZipInputStream(input)) {
+                ZipEntry entry;
+                while ((entry = zip.getNextEntry()) != null) {
+                    String name = entry.getName().replace('\\', '/');
+                    if (name.equals("WorldConfig.dat") || name.endsWith("/WorldConfig.dat")) {
+                        String contents = new String(zip.readAllBytes(), StandardCharsets.UTF_8);
+                        MapData parsed = parseMapConfig(world, java.util.Arrays.asList(contents.split("\\R", -1)));
+                        if (parsed != null) {
+                            plugin.getLogger().info("Loaded " + world.getName()
+                                    + " WorldConfig.dat from selected source archive " + resource + ".");
+                        }
+                        return parsed;
+                    }
+                    zip.closeEntry();
+                }
+            }
+            plugin.getLogger().warning("Selected map archive " + resource + " has no WorldConfig.dat entry.");
+            return null;
+        } catch (IOException exception) {
+            plugin.getLogger().log(java.util.logging.Level.WARNING,
+                    "Could not read WorldConfig.dat from source archive " + resource, exception);
             return null;
         }
     }
