@@ -112,6 +112,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          chmod 0755 .github/testplex-modern-recovery.sh
           bash -n .github/testplex-modern-recovery.sh
           bash -n .github/testplex-modern-recovery-test.sh
           bash .github/testplex-modern-recovery-test.sh
