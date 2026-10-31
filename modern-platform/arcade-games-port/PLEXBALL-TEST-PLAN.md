@@ -58,6 +58,7 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 | --- | --- |
 | Join with 2–8 players | Queue starts and every participant enters the separate Plexball arena. |
 | Queue leave | A player can remove themselves while queued; countdown resets if the queue falls below two players. |
+| Queue disconnect | A queued player's disconnect immediately updates the queue and cancels the countdown if fewer than two players remain. |
 | Batter turn | Only the selected batter can hit; movement is locked but look direction remains available. |
 | Single swing | The first click on the tee consumes the at-bat, including a miss or foul; repeated clicking cannot retry until timing improves. |
 | Fielder turn | Every non-batter can move throughout the fair triangle. |
@@ -82,6 +83,7 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 | Sudden-death timeout | The hard cap only applies survivor elimination after every finalist has had a turn in that round; an interrupted round keeps all remaining finalists eligible and ranks them on completed match performance. |
 | Match cap | The game ends at 180 seconds of wall-clock time, even if server TPS falls below 20. |
 | Cleanup | Ball, tee Interaction and player inventories are cleaned; online participants return to the shared Arcade lobby. |
+| Match disconnect | A disconnected batter's turn resolves safely; a disconnected fielder is removed from active catch checks and the remaining players are notified. |
 | Repeated rounds | Field generation marker prevents rebuilding the entire field on every match. |
 
 ## Latency and fairness matrix
