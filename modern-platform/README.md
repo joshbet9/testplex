@@ -8,7 +8,7 @@ This is a separate modern platform inside the Testplex repository. It does **not
 - Paper **26.3**
 - Java **25**
 - Maven 3.9+
-- **FakePlayerPlugin 2.1.7** installed separately on the modern Paper server for actual server-side fake-player participants. It targets Paper 26.3; set its `body.damageable` option to `true`. The plugin is a separate proprietary dependency and is not bundled or redistributed by this repository: https://modrinth.com/plugin/fake-player-plugin-fpp
+- **FakePlayerPlugin 2.1.7** installed separately on the modern Paper server for actual server-side fake-player participants. It targets Paper 26.3; set its `body.damageable` option to `true`. On first use, Testplex configures the dedicated FPP runtime for respawn-on-death, 16-player capacity, disabled restart persistence and disposable (no item-drop) teardown. FPP is a separate proprietary dependency; this repository neither bundles nor redistributes it: https://hangar.papermc.io/Janky-Development/FakePlayerPlugin/versions/2.1.7
 
 ## Game-scoped test players
 
