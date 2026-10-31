@@ -324,13 +324,32 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         @SuppressWarnings("unchecked")
         Map<Object, Object> beamCooldowns = (Map<Object, Object>) field(ownerState, "cooldowns");
         beamCooldowns.remove(rainbowBeam);
+        // The game setup already disables invulnerability. Reassert the same
+        // portable Bukkit flag at the direct-damage boundary and report the
+        // marked flag separately, so the smoke distinguishes state from API defaults.
+        owner.setInvulnerable(false);
+        rival.setInvulnerable(false);
         castSpell.invoke(wizards, owner, ownerState, rainbowBeam, rival, null);
+        double manaAfterBeam = ((Number) field(ownerState, "mana")).doubleValue();
+        long beamCooldownUntil = ((Number) beamCooldowns.getOrDefault(rainbowBeam, 0L)).longValue();
+        getLogger().info("WIZARDS_BEAM_DIAGNOSTIC|mana=" + manaBeforeBeam + "->" + manaAfterBeam
+                + "|knownLevel=" + known.get(rainbowBeam)
+                + "|cooldownUntil=" + beamCooldownUntil
+                + "|valid=" + rival.isValid() + "|dead=" + rival.isDead()
+                + "|sameWorld=" + rival.getWorld().equals(gameplayArena)
+                + "|noDamageTicks=" + rival.getNoDamageTicks()
+                + "|markedInvulnerable=" + readMarkedInvulnerability(rival)
+                + "|health=" + (rival.isDead() ? 0.0D : rival.getHealth()));
+        require(Math.abs((manaBeforeBeam - manaAfterBeam) - 17.0D) < 0.01D,
+                "Rainbow Beam did not pass its production cast gates (mana=" + manaBeforeBeam + "->"
+                        + manaAfterBeam + ", knownLevel=" + known.get(rainbowBeam)
+                        + ", cooldown=" + beamCooldownUntil + ")");
         require(rival.isDead(), "Rainbow Beam damage failed (health="
                 + (rival.isDead() ? 0.0D : rival.getHealth()) + ", expectedDamage=" + expectedBeamDamage
                 + ", distance=" + beamDistance + ", pvp=" + gameplayArena.getPVP()
                 + ", mode=" + rival.getGameMode() + ", invulnerable=" + readMarkedInvulnerability(rival)
+                + ", noDamageTicks=" + rival.getNoDamageTicks()
                 + ", lastDamage=" + lastDamageObservation + ")");
-        double manaAfterBeam = ((Number) field(ownerState, "mana")).doubleValue();
         require(Math.abs((manaBeforeBeam - manaAfterBeam) - 17.0D) < 0.01D,
                 "Rainbow Beam did not charge the level-five cost of 17 mana");
         require(((Number) field(ownerState, "kills")).intValue() == 1,
