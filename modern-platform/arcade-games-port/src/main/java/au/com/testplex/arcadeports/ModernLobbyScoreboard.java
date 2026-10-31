@@ -57,18 +57,14 @@ public final class ModernLobbyScoreboard {
         String gems = String.valueOf(plugin.getConfig().getInt(
                 "lobby-scoreboard.gems." + player.getUniqueId(), 0));
 
-        int score = sidebarLines(
+        List<String> lines = sidebarLines(
                 formatPlayerCount(currentPlayers, playerCapacity),
                 kitName,
                 gems,
                 serverName
-        ).size();
-        for (String line : sidebarLines(
-                formatPlayerCount(currentPlayers, playerCapacity),
-                kitName,
-                gems,
-                serverName
-        )) {
+        );
+        int score = lines.size();
+        for (String line : lines) {
             sidebar.getScore(line).setScore(score--);
         }
         player.setScoreboard(scoreboard);
@@ -121,7 +117,7 @@ public final class ModernLobbyScoreboard {
 
     static String formatPlayerCount(long current, int capacity) {
         int safeCapacity = Math.max(1, capacity);
-        long safeCurrent = Math.max(0L, Math.min(current, safeCapacity));
+        long safeCurrent = Math.max(0L, current);
         return safeCurrent + "/" + safeCapacity;
     }
 
