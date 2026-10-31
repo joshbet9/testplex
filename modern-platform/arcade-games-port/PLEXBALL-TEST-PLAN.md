@@ -9,6 +9,7 @@ Plexball is an experimental in-process mode hosted by `ArcadeMechanicsModern`. I
 - `/arcadeport kit curve-artist`
 - `/arcadeport kit sprinter`
 - `/arcadeport kit skyguard`
+- `/arcadeport kit plexball` — open the visual kit selector and choose a saved kit.
 - `/stats` or `/stats plexball` — open the Plexball career page with achievements, milestone progress and lifetime statistics.
 - `/arcadeport join plexball` — normal five-second queue countdown.
 - `/arcadeport play plexball` — quick two-second queue countdown.
@@ -74,6 +75,7 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 | Catch | A fielder gets one catch attempt per ball; catch is based on the server's swept ball segment and buffered fielder position. |
 | Catch tiebreak | A valid catch voids the batter's hit and increments the catcher's count. |
 | Kits | Slugger, Technician, Curve Artist, Sprinter and Skyguard have distinct batting/fielding identities. |
+| Kit selector | `/arcadeport kit plexball` shows all five kits, their abilities and current selection; clicking a kit persists it for the next match and inventory actions cannot move items. |
 | Rotation | After batting, the previous batter joins the fielders for the next player. |
 | Home run | A fair 100m hit is recorded as a home run. |
 | Sudden death | Multiple home-run players take five-second turns; a finalist must hit another home run to survive the round. |
