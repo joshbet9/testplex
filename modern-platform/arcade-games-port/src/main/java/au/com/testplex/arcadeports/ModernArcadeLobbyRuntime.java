@@ -210,7 +210,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         buildLegacyPedestals(world, pedestals);
 
         for (int i = 0; i < choices.size(); i++) {
-            KitChoice choice = choices.get(i);
+            ArcadeLobbyKitCatalogue.KitChoice choice = choices.get(i);
             int centerZ = pedestals.get(i).centerZ;
             Location at = new Location(world, KIT_PEDESTAL_X + 0.5D,
                     ModernArcadeLobby.FLOOR_Y + 2.5D, centerZ + 0.5D);
@@ -557,7 +557,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     "The legacy kit datapoint remains available."));
         } else {
             for (int i = 0; i < choices.size() && i < KIT_MENU_SLOTS.length; i++) {
-                KitChoice choice = choices.get(i);
+                ArcadeLobbyKitCatalogue.KitChoice choice = choices.get(i);
                 ItemStack it = item(choice.icon, ChatColor.YELLOW + choice.name,
                         ChatColor.GRAY + "Choose this kit for your next " + selectedGame.displayName() + ".",
                         ChatColor.GREEN + "Click to select");
