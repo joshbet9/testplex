@@ -819,6 +819,12 @@ public final class PlexballGame implements Listener {
     }
 
     private void finishAtTimeLimit() {
+        // The hard cap is checked before the normal flight tick. Resolve catch
+        // windows against ball samples already recorded by the server, without
+        // advancing the ball or extending the match clock.
+        if (phase == Phase.BALL_FLIGHT && !ballHistory.isEmpty()) {
+            checkCatchWindows();
+        }
         if (batterId != null && phase == Phase.BALL_FLIGHT) {
             PlayerResult current = results.computeIfAbsent(batterId, ignored -> new PlayerResult());
             current.atBats++;
@@ -1339,11 +1345,12 @@ public final class PlexballGame implements Listener {
     }
 
     private void checkCatchWindows() {
-        if (catchAttempts.isEmpty()) return;
+        if (catchAttempts.isEmpty() || ballHistory.isEmpty()) return;
+        long latestBallTick = PlexballRules.catchEvaluationThroughTick(serverTick, ballHistory.lastKey());
         for (Map.Entry<UUID, CatchAttempt> entry : new ArrayList<>(catchAttempts.entrySet())) {
             UUID catcherId = entry.getKey();
             CatchAttempt attempt = entry.getValue();
-            while (attempt.nextCheckTick <= serverTick && attempt.nextCheckTick <= attempt.endTick) {
+            while (attempt.nextCheckTick <= latestBallTick && attempt.nextCheckTick <= attempt.endTick) {
                 long checkTick = attempt.nextCheckTick++;
                 if (checkCatchAt(catcherId, checkTick, attempt.radius)) {
                     Player catcher = Bukkit.getPlayer(catcherId);
