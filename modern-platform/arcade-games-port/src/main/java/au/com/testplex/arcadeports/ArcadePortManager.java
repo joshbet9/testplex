@@ -196,6 +196,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<String, SourceMapCatalog.MapData> sourceMapData = new HashMap<>();
     private final Map<UUID, PlayerSnapshot> pendingRestore = new HashMap<>();
     private final Map<UUID, String> paintballKitPreferences = new HashMap<>();
+    private final Map<UUID, String> superSploorKitPreferences = new HashMap<>();
     private final Map<UUID, String> castleAssaultKitPreferences = new HashMap<>();
     private final Map<UUID, String> heroesOfGwenHeroPreferences = new HashMap<>();
     private final Map<UUID, String> deathTagRunnerKitPreferences = new HashMap<>();
@@ -638,6 +639,7 @@ public final class ArcadePortManager implements Listener {
                 case DRAGONS -> { selectDragonsKit(player, value); return; }
                 case DRAGON_ESCAPE -> { selectDragonEscapeKit(player, value); return; }
                 case PAINTBALL -> { selectPaintballKit(player, value); return; }
+                case SUPER_SPLOOR -> { selectSuperSploorKit(player, value); return; }
                 case DEATH_TAG -> { selectDeathTagRunnerKit(player, value); return; }
                 case RUNNER -> { selectRunnerKit(player, value); return; }
                 case SNEAKY_ASSASSINS -> { sneakyAssassins.selectKit(player, value); return; }
@@ -661,7 +663,46 @@ public final class ArcadePortManager implements Listener {
         else if (value.startsWith("runnerkit-")) selectRunnerKit(player, value);
         else if (SneakyAssassinsMechanics.normalizeKit(value) != null) sneakyAssassins.selectKit(player, value);
         else if (ArcadePortRules.normalizeTurfWarsKit(value) != null) selectTurfWarsKit(player, value);
+        else if (normalizeSuperSploorKit(value) != null) selectSuperSploorKit(player, value);
         else selectDeathTagRunnerKit(player, value);
+    }
+
+    private String normalizeSuperSploorKit(String requestedKit) {
+        if (requestedKit == null) return null;
+        String value = requestedKit.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return Set.of("sprayer", "roller", "charger", "lobber", "dualies").contains(value) ? value : null;
+    }
+
+    private void selectSuperSploorKit(Player player, String requestedKit) {
+        if (player == null) return;
+        String kit = normalizeSuperSploorKit(requestedKit);
+        if (kit == null) {
+            player.sendMessage(ChatColor.YELLOW + "Super Sploor kits: sprayer, roller, charger, lobber, dualies.");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        superSploorKitPreferences.put(id, kit);
+        plugin.getConfig().set("lobby-kit-preferences." + id + ".super-sploor", kit);
+        plugin.saveConfig();
+        boolean activeMatch = active != null && active.type == ArcadePortGame.SUPER_SPLOOR
+                && active.players.containsKey(id);
+        player.sendMessage(ChatColor.GREEN + "Super Sploor kit set to " + kit
+                + (activeMatch ? " for your next match. Kits are locked during a round." : "."));
+    }
+
+    private Map<UUID, String> superSploorKitSelections(Session session) {
+        Map<UUID, String> selected = new HashMap<>();
+        if (session == null) return selected;
+        for (UUID id : session.players.keySet()) {
+            String saved = superSploorKitPreferences.getOrDefault(id,
+                    plugin.getConfig().getString("lobby-kit-preferences." + id + ".super-sploor", "sprayer"));
+            String kit = normalizeSuperSploorKit(saved);
+            if (kit == null) kit = "sprayer";
+            superSploorKitPreferences.put(id, kit);
+            selected.put(id, kit);
+        }
+        return selected;
     }
 
     public void selectSkyWarsKit(Player player, String requestedKit) {
@@ -2247,6 +2288,7 @@ public final class ArcadePortManager implements Listener {
         session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
         if (type == ArcadePortGame.SUPER_SPLOOR) {
             superSploor.start(session.superSploorEngine, session.players, session.teams, session.lastLocations,
+                    superSploorKitSelections(session),
                     winningTeam -> finish(session, superSploorRepresentative(session, winningTeam), true));
         }
         sender.sendMessage(ChatColor.GREEN + "Started " + type.displayName() + " with " + participants.size() + (participants.size() == 1 ? " player." : " players."));
