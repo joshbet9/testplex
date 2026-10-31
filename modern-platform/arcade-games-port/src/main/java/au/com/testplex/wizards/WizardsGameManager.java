@@ -1322,18 +1322,35 @@ public final class WizardsGameManager implements Listener {
      * player-melee cap or wand attack handler rewrite/re-enter the spell.
      */
     private void damageFromSpell(Player caster, LivingEntity victim, double damage) {
-        if (victim == null || victim.isDead() || !victim.isValid() || damage <= 0.0D) return;
-        if (caster == null || !caster.isOnline()) {
-            victim.damage(damage);
+        if (victim == null || victim.isDead() || !victim.isValid() || damage <= 0.0D) {
+            plugin.getLogger().warning("WIZARDS_SPELL_DAMAGE|SKIP|victim="
+                    + (victim == null ? "null" : victim.getType())
+                    + "|dead=" + (victim != null && victim.isDead())
+                    + "|valid=" + (victim != null && victim.isValid()) + "|damage=" + damage);
             return;
         }
-        UUID casterId = caster.getUniqueId();
-        spellDamageSources.add(casterId);
-        try {
-            victim.damage(damage, caster);
-        } finally {
-            spellDamageSources.remove(casterId);
+        double before = victim.getHealth();
+        plugin.getLogger().info("WIZARDS_SPELL_DAMAGE|BEGIN|victim=" + victim.getUniqueId()
+                + "|caster=" + (caster == null ? "null" : caster.getUniqueId())
+                + "|health=" + before + "|damage=" + damage
+                + "|world=" + victim.getWorld().getName());
+        if (caster == null || !caster.isOnline()) {
+            victim.setNoDamageTicks(0);
+            victim.damage(damage);
+        } else {
+            UUID casterId = caster.getUniqueId();
+            spellDamageSources.add(casterId);
+            try {
+                victim.setNoDamageTicks(0);
+                victim.damage(damage, caster);
+            } finally {
+                spellDamageSources.remove(casterId);
+            }
         }
+        plugin.getLogger().info("WIZARDS_SPELL_DAMAGE|END|victim=" + victim.getUniqueId()
+                + "|healthBefore=" + before + "|healthAfter=" + (victim.isDead() ? 0.0D : victim.getHealth())
+                + "|dead=" + victim.isDead() + "|noDamageTicks=" + victim.getNoDamageTicks()
+                + "|lastDamage=" + victim.getLastDamageCause());
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -1907,6 +1924,10 @@ public final class WizardsGameManager implements Listener {
                     end = victim.getEyeLocation();
                     double distance = caster.getEyeLocation().distance(end);
                     double damage = WizardsRules.rainbowBeamDamage(level, distance);
+                    plugin.getLogger().info("WIZARDS_RAINBOW_BEAM|TARGET|caster=" + caster.getName()
+                            + "|victim=" + victim.getName() + "|directTarget="
+                            + (directTarget == null ? "null" : directTarget.getType())
+                            + "|distance=" + distance + "|damage=" + damage);
                     damageFromSpell(caster, victim, damage);
                     victim.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, victim.getLocation().add(0.0D, 1.0D, 0.0D),
                             18, 0.35D, 0.45D, 0.35D, 0.08D);
