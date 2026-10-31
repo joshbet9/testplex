@@ -102,7 +102,7 @@ jobs:
 
           arcade_config="$(unzip -p "$arcade_jar" config.yml)"
           enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config" | paste -sd, -)"
-          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,gladiators,micro-battles,paintball,plexball,spleef" ]] || {
+          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,gladiators,micro-battles,paintball,plexball,spleef,dragons,runner" ]] || {
             echo "Only the explicitly reviewed acceptance queue may be enabled. Found: [$enabled_ids]" >&2
             exit 1
           }
@@ -142,17 +142,22 @@ jobs:
               paintball) map_folders=("Paintball" "Super Paintball") ;;
               plexball) map_folders=(); echo "Plexball uses its modern arena; no legacy 1.8 map archive folder exists." ;;
               spleef) map_folders=("Speef" "Super Spleef") ;;
+              dragons) map_folders=("Dragons") ;;
+              runner) map_folders=("Runner") ;;
               *) echo "No legacy map parity policy is defined for enabled game [$game_id]." >&2; exit 1 ;;
             esac
             for map_folder in "${map_folders[@]}"; do
               verify_source_map_folder "$map_folder"
             done
           done
+
           jar tf "$arcade_jar" | grep -Fxq "maps/bomb-lobbers.zip"
           jar tf "$arcade_jar" | grep -Fxq "maps/bacon-brawl.zip"
           jar tf "$arcade_jar" | grep -Fxq "maps/gladiators.zip"
           jar tf "$arcade_jar" | grep -Fxq "maps/micro-battles.zip"
           jar tf "$arcade_jar" | grep -Fxq "maps/paintball.zip"
+          jar tf "$arcade_jar" | grep -Fxq "maps/dragons.zip"
+          jar tf "$arcade_jar" | grep -Fxq "maps/runner.zip"
 
           # Guard the deployment path against the real standalone source artifact name.
           deploy_workflow=".github/workflows/deploy-testplex-modern-hyperv.yml"
@@ -162,7 +167,7 @@ jobs:
           grep -Fq 'retired-monster-maze-plugins' "$deploy_workflow"
           snake_config="$(unzip -p "$snake_jar" config.yml)"
           grep -Fxq "enabled: false" <<< "$snake_config"
-          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 25 shared Arcade catalogue games are packaged, Wizards is built as a separate module, Speed Builders Arcade is tracked as planned work, and Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball and Spleef are enabled for controlled acceptance; all individual 1.8 source map archives for every enabled game are compared against the packaged JAR; other unfinished games remain gated."
+          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 25 shared Arcade catalogue games are packaged, Wizards is built as a separate module, Speed Builders Arcade is tracked as planned work, and Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Dragons (Solo) and Runner are enabled for controlled acceptance; all individual 1.8 source map archives for every enabled game are compared against the packaged JAR; other unfinished games remain gated."
 
       - name: Validate independent deployment recovery and shell syntax
         shell: bash
@@ -204,12 +209,12 @@ jobs:
             echo
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
-            echo "- Catalogue: 25 shared Arcade games (nine READY_FOR_TEST, 16 MECHANICS_IN_PROGRESS)"
+            echo "- Catalogue: 25 shared Arcade games (11 READY_FOR_TEST, 14 MECHANICS_IN_PROGRESS)"
             echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar, ArcadeMechanicsModern.jar and WizardsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
             echo "- Gameplay ports: 25 shared Arcade catalogue entries are packaged; Plexball joins the controlled READY_FOR_TEST queue, Wizards is a separate disabled module, and Speed Builders Arcade is planned but not implemented"
-            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball and Spleef; the remaining catalogue entries, Snake and Wizards remain gated pending readiness promotion"
+            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Dragons (Solo) and Runner; the remaining catalogue entries, Snake and Wizards remain gated pending readiness promotion"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
 
