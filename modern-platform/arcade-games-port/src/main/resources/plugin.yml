@@ -14,7 +14,7 @@ commands:
     aliases: [arcadestats]
   arcadeport:
     description: Start and test a modern Arcade game
-    usage: /arcadeport <play|join|start|kit|ghost|maps|lobby|bot|status|stop>
+    usage: /arcadeport <play|join|leave|start|kit|stats|ghost|maps|lobby|bot|status|stop>
   mm:
     description: Monster Maze game commands managed by Testplex Arcade
     usage: /mm <start|stop|kit|kits|map|mode|pattern|stats|pb|lb|status>
