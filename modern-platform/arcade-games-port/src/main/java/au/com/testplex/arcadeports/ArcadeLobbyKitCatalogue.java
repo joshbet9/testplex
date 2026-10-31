@@ -12,6 +12,7 @@ import org.bukkit.entity.Zombie;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 
@@ -28,6 +29,15 @@ final class ArcadeLobbyKitCatalogue {
     }
 
     static List<KitChoice> forGame(ArcadePortGame game, List<String> hiddenKitIds) {
+        return forGame(game, hiddenKitIds, List.of());
+    }
+
+    /**
+     * Resolves configured order first, then retains the source catalogue order for
+     * any remaining choices. Unknown IDs are ignored so config drift is harmless.
+     */
+    static List<KitChoice> forGame(
+            ArcadePortGame game, List<String> hiddenKitIds, List<String> configuredOrder) {
         if (game == null) return List.of();
         List<KitChoice> choices = switch (game) {
             case BACON_BRAWL -> List.of(
@@ -154,8 +164,20 @@ final class ArcadeLobbyKitCatalogue {
         for (String value : hiddenKitIds) {
             if (value != null && !value.isBlank()) hidden.add(value.trim().toLowerCase(Locale.ROOT));
         }
-        return choices.stream().filter(choice -> !hidden.contains(
+        List<KitChoice> visible = choices.stream().filter(choice -> !hidden.contains(
                 game.id().toLowerCase(Locale.ROOT) + ":" + choice.id.toLowerCase(Locale.ROOT))).toList();
+        if (configuredOrder == null || configuredOrder.isEmpty()) return visible;
+
+        Map<String, KitChoice> byId = new java.util.LinkedHashMap<>();
+        for (KitChoice choice : visible) byId.put(choice.id.toLowerCase(Locale.ROOT), choice);
+        List<KitChoice> ordered = new java.util.ArrayList<>();
+        for (String value : configuredOrder) {
+            if (value == null || value.isBlank()) continue;
+            KitChoice choice = byId.remove(value.trim().toLowerCase(Locale.ROOT));
+            if (choice != null) ordered.add(choice);
+        }
+        ordered.addAll(byId.values());
+        return List.copyOf(ordered);
     }
 
 
