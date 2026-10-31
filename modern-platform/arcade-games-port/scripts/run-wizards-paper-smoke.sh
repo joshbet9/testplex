@@ -201,9 +201,9 @@ echo
 echo "=== Wizards Paper 26.3 source-map and gameplay results ==="
 cat "$result_file"
 echo
-pass_count="$(grep -c $'^PASS\\t' "$result_file" || true)"
-fail_count="$(grep -Ec $'^(FAIL|GAMEPLAY_FAIL|HARNESS_FAIL)\\t' "$result_file" || true)"
-gameplay_pass_count="$(grep -c $'^GAMEPLAY_PASS\\t' "$result_file" || true)"
+pass_count="$(grep -c '^PASS[[:space:]]' "$result_file" || true)"
+fail_count="$(grep -Ec '^(FAIL|GAMEPLAY_FAIL|HARNESS_FAIL)[[:space:]]' "$result_file" || true)"
+gameplay_pass_count="$(grep -c '^GAMEPLAY_PASS[[:space:]]' "$result_file" || true)"
 bots_ready_count="$(grep -c 'BOT_READY|PASS|count=2' "$client_log" || true)"
 echo "Paper exit=$server_exit; map PASS=$pass_count; FAIL=$fail_count; gameplay PASS=$gameplay_pass_count; bot clients ready=$bots_ready_count; client exit=$client_exit"
 if [[ "$pass_count" -ne 20 || "$fail_count" -ne 0 || "$gameplay_pass_count" -ne 1 \
