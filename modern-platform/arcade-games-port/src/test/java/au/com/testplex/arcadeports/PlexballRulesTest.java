@@ -7,7 +7,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PlexballRulesTest {
     @Test
-    void pingCompensationUsesServerMeasuredRoundTripAndIsBounded() {
+    void paperPingEstimateProvidesOnlyBoundedCompensation() {
         assertEquals(0, PlexballRules.latencyRewindTicks(-1));
         assertEquals(0, PlexballRules.latencyRewindTicks(0));
         assertEquals(0, PlexballRules.latencyRewindTicks(49));
