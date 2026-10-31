@@ -10417,6 +10417,7 @@ public final class ArcadePortManager implements Listener {
                     : "guesses " + Math.max(0, DRAW_MY_THING_MAX_GUESSES - session.drawGuessAttempts.getOrDefault(id, 0)) + "/10";
             case MASTER_BUILDERS -> session.masterBuilderPhase == MasterBuildersPhase.BUILDING
                     ? "building | " + session.masterBuilderTheme : "review | " + session.masterBuilderTheme;
+            case PLEXBALL -> "Plexball | " + session.alive.size() + " active";
             // Monster Maze owns its own in-process GameManager session and does not
             // create an ArcadePortManager Session object.
             case MONSTER_MAZE -> "Monster Maze";
