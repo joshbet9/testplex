@@ -5372,8 +5372,19 @@ public final class ArcadePortManager implements Listener {
 
     private String microBattlesColourSelection(YamlConfiguration preferences, UUID playerId, String lineId) {
         if (preferences == null) return ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR;
-        String selected = preferences.getString("players." + playerId + ".games.micro-battles.cosmetics."
-                + lineId + ".selected", ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR);
+        String group = "middle-glass-colour".equals(lineId) ? "glass" : "border";
+        String groupedPath = "players." + playerId
+                + ".games.micro-battles.cosmetics.island-visuals.selected";
+        String groupedSelection = preferences.getStringList(groupedPath).stream()
+                .filter(optionId -> optionId != null && optionId.startsWith(group + "-"))
+                .map(optionId -> optionId.substring(group.length() + 1))
+                .findFirst().orElse(null);
+        // Read the previous independent cosmetic line as a migration fallback for existing players.
+        String legacySelection = preferences.getString("players." + playerId
+                + ".games.micro-battles.cosmetics." + lineId + ".selected", null);
+        String selected = groupedSelection != null ? groupedSelection
+                : legacySelection != null ? legacySelection
+                : ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR;
         String normalized = ArcadePortRules.normalizeMicroBattlesColour(selected);
         return normalized == null ? ArcadePortRules.MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR : normalized;
     }
