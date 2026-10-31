@@ -51,8 +51,8 @@ class ArcadeCatalogTest {
         assertFalse(heroesOfGwen.isReadyForTest());
         GameDefinition superSploor = catalog.getGame("super-sploor");
         assertNotNull(superSploor);
-        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, superSploor.getPortStatus());
-        assertFalse(superSploor.isReadyForTest());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, superSploor.getPortStatus());
+        assertTrue(superSploor.isReadyForTest());
     }
 
     @Test
