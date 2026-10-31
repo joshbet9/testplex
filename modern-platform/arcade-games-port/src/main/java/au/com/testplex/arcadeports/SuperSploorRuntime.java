@@ -63,6 +63,7 @@ public final class SuperSploorRuntime implements Listener {
     private final Map<UUID, Integer> ink = new HashMap<>();
     private final Map<UUID, Integer> marks = new HashMap<>();
     private final Map<UUID, Long> lastShotAt = new HashMap<>();
+    private final Map<UUID, Long> lastInkRegenAt = new HashMap<>();
     private final Map<UUID, Long> lastHitAt = new HashMap<>();
     private final Map<UUID, Long> nextMarkRecoveryAt = new HashMap<>();
     private final Map<UUID, Long> spawnProtectedUntil = new HashMap<>();
@@ -125,6 +126,7 @@ public final class SuperSploorRuntime implements Listener {
             ink.put(id, SuperSploorRules.MAX_INK);
             marks.put(id, 0);
             lastShotAt.put(id, now - SuperSploorRules.PRIMARY_SHOT_INTERVAL_MILLIS);
+            lastInkRegenAt.put(id, now);
             spawnProtectedUntil.put(id, now + SuperSploorRules.SPAWN_PROTECTION_MILLIS);
             kills.put(id, 0);
             contributors.put(id, new HashSet<>());
@@ -151,9 +153,7 @@ public final class SuperSploorRuntime implements Listener {
 
     public void tick(long now) {
         if (!running || engine == null) return;
-        long elapsed = Math.max(0L, Math.min(5_000L, now - lastTickAt));
         lastTickAt = now;
-        int seconds = (int) Math.max(0L, Math.min(5L, elapsed / 1_000L));
         for (UUID id : new ArrayList<>(players.keySet())) {
             Player player = players.get(id);
             if (player == null || !player.isOnline()) continue;
@@ -169,12 +169,20 @@ public final class SuperSploorRuntime implements Listener {
                 exitSquidMode(player, id);
                 squid = false;
             }
-            if (seconds > 0) {
-                int updated = SuperSploorRules.nextInkAfterRegeneration(currentInk, seconds, squid && inFriendlyPaint);
-                if (updated != currentInk) {
-                    ink.put(id, updated);
-                    updateInkBar(player, id);
+            long lastRegen = lastInkRegenAt.getOrDefault(id, now);
+            if (now - lastRegen >= 1_000L) {
+                int seconds = (int) Math.min(10L, (now - lastRegen) / 1_000L);
+                boolean canRegen = squid && inFriendlyPaint
+                        || now - lastShotAt.getOrDefault(id, 0L) >= 1_000L;
+                if (canRegen && seconds > 0) {
+                    int updated = SuperSploorRules.nextInkAfterRegeneration(
+                            currentInk, seconds, squid && inFriendlyPaint);
+                    if (updated != currentInk) {
+                        ink.put(id, updated);
+                        updateInkBar(player, id);
+                    }
                 }
+                lastInkRegenAt.put(id, lastRegen + seconds * 1_000L);
             }
 
             long protectedUntil = spawnProtectedUntil.getOrDefault(id, 0L);
@@ -196,7 +204,6 @@ public final class SuperSploorRuntime implements Listener {
                         2, 0.2D, 0.1D, 0.2D, 0.0D,
                         new Particle.DustOptions(teamColour(teams.get(id)), 0.8F));
             }
-            updateInkBar(player, id);
         }
 
         if (now >= matchEndsAt && !overtime) {
@@ -330,8 +337,7 @@ public final class SuperSploorRuntime implements Listener {
         UUID ownerId = projectileOwners.remove(projectile.getUniqueId());
         Player owner = ownerId == null ? null : players.get(ownerId);
         Location impact = projectile.getLocation().clone();
-        if (event.getHitEntity() instanceof Player target && owner != null
-                && target.getUniqueId().equals(target.getUniqueId())) {
+        if (event.getHitEntity() instanceof Player target && owner != null) {
             applyMark(ownerId, target.getUniqueId(), target);
         }
         if (owner != null && owner.isOnline()) {
@@ -524,19 +530,15 @@ public final class SuperSploorRuntime implements Listener {
         if (!running) return;
         running = false;
         IntConsumer callback = finishMatch;
-        if (winningTeam < 0) announce(ChatColor.YELLOW + "Super Sploor ended in a draw.");
-        else announce((winningTeam == RED ? ChatColor.RED : ChatColor.AQUA) + "" + ChatColor.BOLD
-                + (winningTeam == RED ? "Red" : "Blue") + " team wins Super Sploor!");
         if (callback != null) callback.accept(winningTeam);
     }
 
     public void stop() {
         running = false;
-        for (UUID id : new ArrayList<>(activeProjectiles)) {
-            for (World candidate : Bukkit.getWorlds()) {
-                Entity entity = candidate.getEntities().stream()
-                        .filter(e -> e.getUniqueId().equals(id)).findFirst().orElse(null);
-                if (entity != null) entity.remove();
+        if (world != null) {
+            Set<UUID> projectileIds = new HashSet<>(activeProjectiles);
+            for (Entity entity : new ArrayList<>(world.getEntities())) {
+                if (projectileIds.contains(entity.getUniqueId())) entity.remove();
             }
         }
         activeProjectiles.clear();
@@ -561,6 +563,7 @@ public final class SuperSploorRuntime implements Listener {
         ink.clear();
         marks.clear();
         lastShotAt.clear();
+        lastInkRegenAt.clear();
         lastHitAt.clear();
         nextMarkRecoveryAt.clear();
         spawnProtectedUntil.clear();
@@ -593,6 +596,7 @@ public final class SuperSploorRuntime implements Listener {
         respawnAt.remove(id);
         spawnProtectedUntil.remove(id);
         lastShotAt.remove(id);
+        lastInkRegenAt.remove(id);
         lastHitAt.remove(id);
         nextMarkRecoveryAt.remove(id);
         contributors.remove(id);
