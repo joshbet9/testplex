@@ -256,13 +256,13 @@ public final class ArcadeCatalog {
 
         register(game("draw-my-thing", "Draw My Thing", "PAINTING",
                 "Take one 30-second drawing turn, reveal timed hints, and guess using a limited number of attempts.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("whiteboard-reveal", "Whiteboard Reveal", "The final drawing is framed above the winning guesser.")));
 
         register(game("master-builders", "Master Builders", "GRASS_BLOCK",
                 "Build your theme in three minutes, then review and rate the other plots.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("builders-podium", "Builder's Podium", "The top-rated build rises above the winning builder.")));
 
@@ -316,7 +316,7 @@ public final class ArcadeCatalog {
 
         register(game("sneaky-assassins", "Sneaky Assassins", "VILLAGER_SPAWN_EGG",
                 "Stay disguised as a villager, collect power-ups and be the last assassin alive.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("last-assassin-standing", "Last Assassin Standing",
                         "A simple survivor podium; no additional game-specific cosmetics are claimed yet.")));
