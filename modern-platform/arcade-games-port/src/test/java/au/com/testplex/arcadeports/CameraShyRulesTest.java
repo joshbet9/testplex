@@ -1,11 +1,33 @@
 package au.com.testplex.arcadeports;
 
+import org.bukkit.Material;
 import org.bukkit.util.Vector;
+
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class CameraShyRulesTest {
+    @Test
+    void aMissingOrCorruptArenaMarkerForcesTheMazeToBeRebuilt() {
+        assertTrue(CameraShyRules.arenaBuildRequired(false, Material.DEEPSLATE_TILES, Material.COARSE_DIRT));
+        assertTrue(CameraShyRules.arenaBuildRequired(true, Material.AIR, Material.AIR));
+        assertTrue(CameraShyRules.arenaBuildRequired(true, Material.DEEPSLATE_TILES, Material.AIR));
+        assertFalse(CameraShyRules.arenaBuildRequired(true, Material.DEEPSLATE_TILES, Material.COARSE_DIRT));
+    }
+
+    @Test
+    void anUnderstudyOnlyAwardsItsOwnerWhenAnOpposingHumanPhotographsIt() {
+        UUID owner = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID opponent = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        assertTrue(CameraShyRules.shouldAwardUnderstudy(owner, opponent, true, true));
+        assertFalse(CameraShyRules.shouldAwardUnderstudy(owner, owner, true, true));
+        assertFalse(CameraShyRules.shouldAwardUnderstudy(owner, opponent, true, false));
+        assertFalse(CameraShyRules.shouldAwardUnderstudy(owner, opponent, false, true));
+        assertFalse(CameraShyRules.shouldAwardUnderstudy(null, opponent, true, true));
+    }
+
     @Test
     void fiveExposureThresholdIsInclusive() {
         assertFalse(CameraShyRules.eliminatedAt(4));
