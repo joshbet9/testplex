@@ -75,27 +75,25 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void microBattlesHasIndependentPersonalGlassAndSharedBorderColourLines() {
+    void microBattlesUsesOneCombinedLineWithIndependentPrivateAndSharedColourGroups() {
         GameDefinition game = new ArcadeCatalog().getGame("micro-battles");
         assertNotNull(game);
-        CosmeticLineDefinition middleGlass = game.getCosmeticLines().stream()
-                .filter(line -> line.getId().equals("middle-glass-colour"))
-                .findFirst().orElseThrow();
-        CosmeticLineDefinition borderParticles = game.getCosmeticLines().stream()
-                .filter(line -> line.getId().equals("border-particle-colour"))
-                .findFirst().orElseThrow();
-
-        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, middleGlass.getSelectionMode());
-        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, borderParticles.getSelectionMode());
-        assertEquals("light-blue", middleGlass.getDefaultOptionId());
-        assertEquals("light-blue", borderParticles.getDefaultOptionId());
-        assertEquals(16, middleGlass.getOptions().size());
-        assertEquals(16, borderParticles.getOptions().size());
-        assertTrue(middleGlass.getDescription().contains("Only you"));
-        assertTrue(borderParticles.getDescription().contains("Everyone"));
-        assertEquals(
-                middleGlass.getOptions().stream().map(CosmeticOption::getId).toList(),
-                borderParticles.getOptions().stream().map(CosmeticOption::getId).toList());
+        assertEquals(1, game.getCosmeticLines().size());
+        CosmeticLineDefinition visuals = game.getCosmeticLines().get(0);
+        assertEquals("island-visuals", visuals.getId());
+        assertEquals(CosmeticLineDefinition.SelectionMode.MULTI, visuals.getSelectionMode());
+        assertEquals("glass-light-blue", visuals.getDefaultOptionId());
+        assertEquals(32, visuals.getOptions().size());
+        assertEquals(16, visuals.getOptions().stream()
+                .filter(option -> "glass".equals(option.getSelectionGroup())).count());
+        assertEquals(16, visuals.getOptions().stream()
+                .filter(option -> "border".equals(option.getSelectionGroup())).count());
+        assertTrue(visuals.getOptions().stream()
+                .filter(option -> "glass".equals(option.getSelectionGroup()))
+                .allMatch(option -> option.getDescription().contains("Only you")));
+        assertTrue(visuals.getOptions().stream()
+                .filter(option -> "border".equals(option.getSelectionGroup()))
+                .allMatch(option -> option.getDescription().contains("Everyone")));
     }
 
     @Test
