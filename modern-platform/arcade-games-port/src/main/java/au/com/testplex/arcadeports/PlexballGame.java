@@ -145,12 +145,12 @@ public final class PlexballGame implements Listener {
         private long catches;
         private long homeRuns;
         private long perfectHits;
+        private long currentWinStreak;
+        private long bestWinStreak;
 
         private long value(PlexballMilestone.Metric metric) {
             return switch (metric) {
-                case MATCHES -> matches;
                 case WINS -> wins;
-                case AT_BATS -> atBats;
                 case CATCHES -> catches;
                 case HOME_RUNS -> homeRuns;
                 case DISTANCE_TENTHS -> totalDistanceTenths;
@@ -293,9 +293,11 @@ public final class PlexballGame implements Listener {
         inventory.setItem(4, progressItem(Material.BOOK, ChatColor.GOLD + "Career Summary", List.of(
                 ChatColor.GRAY + "Matches: " + ChatColor.WHITE + profile.matches,
                 ChatColor.GRAY + "Wins: " + ChatColor.WHITE + profile.wins,
+                ChatColor.GRAY + "Win streak: " + ChatColor.GOLD + profile.currentWinStreak
+                        + ChatColor.GRAY + " (best " + ChatColor.GOLD + profile.bestWinStreak + ChatColor.GRAY + ")",
                 ChatColor.GRAY + "At-bats: " + ChatColor.WHITE + profile.atBats,
                 ChatColor.GRAY + "Uncaught distance: " + ChatColor.GREEN
-                        + String.format(java.util.Locale.ROOT, "%.1fm", profile.totalDistanceTenths / 10.0D),
+                        + formatMilestoneValue(PlexballMilestone.Metric.DISTANCE_TENTHS, profile.totalDistanceTenths),
                 ChatColor.GRAY + "Best hit: " + ChatColor.GREEN
                         + String.format(java.util.Locale.ROOT, "%.1fm", profile.bestDistanceTenths / 10.0D),
                 ChatColor.GRAY + "Catches: " + ChatColor.AQUA + profile.catches,
@@ -1610,9 +1612,7 @@ public final class PlexballGame implements Listener {
 
     private static Material milestoneIcon(PlexballMilestone.Metric metric) {
         return switch (metric) {
-            case MATCHES -> Material.CLOCK;
             case WINS -> Material.GOLD_INGOT;
-            case AT_BATS -> Material.IRON_SWORD;
             case CATCHES -> Material.SHIELD;
             case HOME_RUNS -> Material.FIREWORK_STAR;
             case DISTANCE_TENTHS -> Material.COMPASS;
@@ -1620,9 +1620,11 @@ public final class PlexballGame implements Listener {
     }
 
     private static String formatMilestoneValue(PlexballMilestone.Metric metric, long value) {
-        return metric == PlexballMilestone.Metric.DISTANCE_TENTHS
-                ? String.format(java.util.Locale.ROOT, "%.1fm", value / 10.0D)
-                : Long.toString(value);
+        if (metric != PlexballMilestone.Metric.DISTANCE_TENTHS) return Long.toString(value);
+        double metres = value / 10.0D;
+        return metres >= 1_000.0D
+                ? String.format(java.util.Locale.ROOT, "%.1fkm", metres / 1_000.0D)
+                : String.format(java.util.Locale.ROOT, "%.1fm", metres);
     }
 
     private static String progressBar(int percent) {
@@ -1642,6 +1644,8 @@ public final class PlexballGame implements Listener {
         profile.catches = progressionData.getLong(root + "catches");
         profile.homeRuns = progressionData.getLong(root + "home-runs");
         profile.perfectHits = progressionData.getLong(root + "perfect-contacts");
+        profile.currentWinStreak = progressionData.getLong(root + "current-win-streak");
+        profile.bestWinStreak = progressionData.getLong(root + "best-win-streak");
         return profile;
     }
 
@@ -1653,7 +1657,10 @@ public final class PlexballGame implements Listener {
             PlayerProgress before = readProgress(id);
             PlayerProgress profile = new PlayerProgress();
             profile.matches = before.matches + 1L;
-            profile.wins = before.wins + (winnerIds.contains(id) ? 1L : 0L);
+            boolean won = winnerIds.contains(id);
+            profile.wins = before.wins + (won ? 1L : 0L);
+            profile.currentWinStreak = won ? before.currentWinStreak + 1L : 0L;
+            profile.bestWinStreak = Math.max(before.bestWinStreak, profile.currentWinStreak);
             profile.atBats = before.atBats + match.atBats;
             profile.totalDistanceTenths = before.totalDistanceTenths
                     + PlexballProgressionRules.distanceToTenths(match.totalDistance);
@@ -1671,6 +1678,8 @@ public final class PlexballGame implements Listener {
             progressionData.set(root + "catches", profile.catches);
             progressionData.set(root + "home-runs", profile.homeRuns);
             progressionData.set(root + "perfect-contacts", profile.perfectHits);
+            progressionData.set(root + "current-win-streak", profile.currentWinStreak);
+            progressionData.set(root + "best-win-streak", profile.bestWinStreak);
 
             if (PlexballProgressionRules.shouldAwardSweetSpot(match.bestDistance)) {
                 unlockAchievement(id, PlexballAchievement.SWEET_SPOT);
@@ -1679,16 +1688,22 @@ public final class PlexballGame implements Listener {
                 unlockAchievement(id, PlexballAchievement.WARNING_TRACK);
             }
             if (match.homeRuns > 0) unlockAchievement(id, PlexballAchievement.OUT_OF_THE_PARK);
-            if (match.perfectContacts > 0) unlockAchievement(id, PlexballAchievement.PERFECT_CONTACT);
-            if (match.catches > 0) unlockAchievement(id, PlexballAchievement.STICKY_GLOVES);
+            if (PlexballProgressionRules.shouldAwardPerfectContact(profile.perfectHits)) {
+                unlockAchievement(id, PlexballAchievement.PERFECT_CONTACT);
+            }
+            if (PlexballProgressionRules.shouldAwardStickyGloves(match.catches)) {
+                unlockAchievement(id, PlexballAchievement.STICKY_GLOVES);
+            }
             if (PlexballProgressionRules.shouldAwardGoldenGlove(match.catches)) {
                 unlockAchievement(id, PlexballAchievement.GOLDEN_GLOVE);
             }
             if (PlexballProgressionRules.shouldAwardAllRounder(match.bestDistance, match.catches)) {
                 unlockAchievement(id, PlexballAchievement.ALL_ROUNDER);
             }
-            boolean won = winnerIds.contains(id);
-            if (won) unlockAchievement(id, PlexballAchievement.CHAMPION);
+            if (PlexballProgressionRules.shouldAwardChampion((int) Math.min(
+                    Integer.MAX_VALUE, profile.currentWinStreak))) {
+                unlockAchievement(id, PlexballAchievement.CHAMPION);
+            }
             if (PlexballProgressionRules.shouldAwardClutchPerformer(won, match.suddenDeathHomeRuns)) {
                 unlockAchievement(id, PlexballAchievement.CLUTCH_PERFORMER);
             }
