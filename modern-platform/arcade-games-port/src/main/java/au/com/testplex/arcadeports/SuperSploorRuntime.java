@@ -285,6 +285,7 @@ public final class SuperSploorRuntime implements Listener {
         rechargeDodgeRolls(now);
         updateTemporaryDevices(now);
         updateStampedes(now);
+        updateAfterimages(now);
         for (Map.Entry<UUID, Long> charge : new ArrayList<>(chargerChargeStartedAt.entrySet())) {
             Player chargingPlayer = players.get(charge.getKey());
             if (chargingPlayer != null && chargingPlayer.isOnline()) {
@@ -634,6 +635,62 @@ public final class SuperSploorRuntime implements Listener {
                     markSpecialTarget(id, target);
                 }
             }
+        }
+    }
+
+    private void resolveAbilityProjectile(UUID ownerId, String kind, Location impact) {
+        if (ownerId == null || !players.containsKey(ownerId) || impact == null || impact.getWorld() != world) return;
+        int team = teams.getOrDefault(ownerId, -1);
+        long now = System.currentTimeMillis();
+        switch (kind) {
+            case "burst-bomb" -> paintArea(ownerId, impact, 3, new HashSet<>(), false, now);
+            case "tracker-flare" -> trackerFlares.add(new TrackerFlare(ownerId, team, impact, now));
+            case "sprinkler" -> {
+                sprinklers.add(new Sprinkler(ownerId, team, impact, now));
+                world.spawnParticle(Particle.DUST, impact, 16, 0.35D, 0.2D, 0.35D, 0.0D,
+                        new Particle.DustOptions(teamColour(team), 1.7F));
+            }
+            case "suction-bomb" -> {
+                delayedBlasts.add(new DelayedBlast(ownerId, team, impact, now + 1_400L));
+                world.spawnParticle(Particle.DUST, impact, 18, 0.35D, 0.15D, 0.35D, 0.0D,
+                        new Particle.DustOptions(teamColour(team), 1.6F));
+            }
+            case "colourburst" -> paintArea(ownerId, impact, 5, new HashSet<>(), true, now);
+            default -> { }
+        }
+    }
+
+    private void updateAfterimages(long now) {
+        for (UUID id : new ArrayList<>(afterimageDashesRemaining.keySet())) {
+            Player player = players.get(id);
+            int remaining = afterimageDashesRemaining.getOrDefault(id, 0);
+            if (player == null || !player.isOnline() || respawnAt.containsKey(id) || remaining <= 0) {
+                afterimageDashesRemaining.remove(id);
+                afterimageNextAt.remove(id);
+                continue;
+            }
+            if (now < afterimageNextAt.getOrDefault(id, 0L)) continue;
+            Vector direction = player.getLocation().getDirection().setY(0.0D);
+            if (direction.lengthSquared() < 1.0E-5D) direction = new Vector(0.0D, 0.0D, 1.0D);
+            direction.normalize();
+            player.setVelocity(direction.clone().multiply(1.2D).setY(0.16D));
+            Location origin = player.getLocation().clone();
+            int team = teams.getOrDefault(id, -1);
+            for (int step = 0; step <= 2; step++) {
+                Location point = origin.clone().add(direction.clone().multiply(step * 1.2D));
+                recordPaint(id, engine.paint(point, team, 1));
+            }
+            for (Player target : players.values()) {
+                if (target == null || !target.isOnline() || target.getUniqueId().equals(id)
+                        || teams.getOrDefault(target.getUniqueId(), -2) == team
+                        || respawnAt.containsKey(target.getUniqueId())) continue;
+                if (target.getLocation().distanceSquared(origin) <= 4.0D) markSpecialTarget(id, target);
+            }
+            world.spawnParticle(Particle.DUST, origin, 18, 0.45D, 0.3D, 0.45D, 0.0D,
+                    new Particle.DustOptions(teamColour(team), 1.5F));
+            world.playSound(origin, Sound.ENTITY_ENDERMAN_TELEPORT, 0.45F, 1.7F);
+            afterimageDashesRemaining.put(id, remaining - 1);
+            afterimageNextAt.put(id, now + 260L);
         }
     }
 
@@ -1069,8 +1126,15 @@ public final class SuperSploorRuntime implements Listener {
         projectilePaintRadii.remove(projectileId);
         projectilePaintLines.remove(projectileId);
         projectileLastLocations.remove(projectileId);
-        Player owner = ownerId == null ? null : players.get(ownerId);
+        String abilityKind = projectileKinds.remove(projectileId);
         Location impact = projectile.getLocation().clone();
+        if (abilityKind != null) {
+            resolveAbilityProjectile(ownerId, abilityKind, impact);
+            fullyChargedProjectiles.remove(projectileId);
+            projectile.remove();
+            return;
+        }
+        Player owner = ownerId == null ? null : players.get(ownerId);
         if (event.getHitEntity() instanceof Player target && owner != null) {
             if (fullyChargedProjectiles.remove(projectileId)) {
                 MutableStats ownerStats = playerStats.get(ownerId);
@@ -1351,6 +1415,7 @@ public final class SuperSploorRuntime implements Listener {
         projectilePaintRadii.clear();
         projectilePaintLines.clear();
         projectileLastLocations.clear();
+        projectileKinds.clear();
         for (UUID id : new ArrayList<>(squidMode)) {
             Player player = players.get(id);
             exitSquidMode(player, id);
@@ -1378,6 +1443,19 @@ public final class SuperSploorRuntime implements Listener {
         nextDodgeRollRechargeAt.clear();
         dualiesRollExpiresAt.clear();
         dualiesRollTargets.clear();
+        specialCharge.clear();
+        secondaryReadyAt.clear();
+        stampedeUntil.clear();
+        stampedeNextPaintAt.clear();
+        stampedeHitPlayers.clear();
+        specialTargetsThisActivation.clear();
+        afterimageDashesRemaining.clear();
+        afterimageNextAt.clear();
+        mines.clear();
+        sprinklers.clear();
+        trackerFlares.clear();
+        delayedBlasts.clear();
+        paintstorms.clear();
         lastHitAt.clear();
         nextMarkRecoveryAt.clear();
         spawnProtectedUntil.clear();
@@ -1412,6 +1490,19 @@ public final class SuperSploorRuntime implements Listener {
         nextDodgeRollRechargeAt.remove(id);
         dualiesRollExpiresAt.remove(id);
         dualiesRollTargets.remove(id);
+        specialCharge.remove(id);
+        secondaryReadyAt.remove(id);
+        stampedeUntil.remove(id);
+        stampedeNextPaintAt.remove(id);
+        stampedeHitPlayers.remove(id);
+        specialTargetsThisActivation.remove(id);
+        afterimageDashesRemaining.remove(id);
+        afterimageNextAt.remove(id);
+        mines.removeIf(mine -> mine.ownerId.equals(id));
+        sprinklers.removeIf(device -> device.ownerId.equals(id));
+        trackerFlares.removeIf(flare -> flare.ownerId.equals(id));
+        delayedBlasts.removeIf(blast -> blast.ownerId.equals(id));
+        paintstorms.removeIf(storm -> storm.ownerId.equals(id));
         ink.remove(id);
         marks.remove(id);
         respawnAt.remove(id);
