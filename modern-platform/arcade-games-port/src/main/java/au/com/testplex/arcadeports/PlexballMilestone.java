@@ -3,7 +3,7 @@ package au.com.testplex.arcadeports;
 /** Four long-term Plexball career goals. Distance thresholds are stored in tenths of a metre. */
 public enum PlexballMilestone {
     WINNING_LEGEND("winning-legend", "Winning Legend", Metric.WINS, 250),
-    WALL_OF_LEATHER("wall-of-leather", "Wall of Leather", Metric.CATCHES, 300),
+    WALL_OF_LEATHER("wall-of-leather-300", "Wall of Leather", Metric.CATCHES, 300),
     HOME_RUN_HERO("home-run-hero", "Home Run Hero", Metric.HOME_RUNS, 100),
     TEN_KILOMETRE_CLUB("ten-kilometre-club", "10 Kilometre Club", Metric.DISTANCE_TENTHS, 100_000);
 
