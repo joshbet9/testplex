@@ -188,6 +188,7 @@ public final class ArcadePortManager implements Listener {
     private static final long JOIN_WINDOW_TICKS = 100L;
     static final int MANUAL_START_COUNTDOWN_SECONDS = 0;
     private final ArcadeMechanicsModernPlugin plugin;
+    private final SuperSploorRuntime superSploor;
     private final SneakyAssassinsMechanics sneakyAssassins;
     private final Map<String, LinkedHashMap<UUID, Player>> queues = new HashMap<>();
     private final Map<String, World> worlds = new HashMap<>();
@@ -240,6 +241,7 @@ public final class ArcadePortManager implements Listener {
 
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
+        this.superSploor = new SuperSploorRuntime(plugin);
         this.sneakyAssassins = new SneakyAssassinsMechanics(plugin);
         this.statsActionKey = new NamespacedKey(plugin, "stats-action");
         this.statsCategoryKey = new NamespacedKey(plugin, "stats-category");
@@ -1563,6 +1565,10 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (type == ArcadePortGame.SUPER_SPLOOR && participants.size() > 16) {
+            sender.sendMessage(ChatColor.RED + "Super Sploor supports up to 16 players (8 per team).");
+            return;
+        }
         if (type == ArcadePortGame.MASTER_BUILDERS
                 && !ArcadePortRules.supportsMasterBuildersPlayerCount(participants.size())) {
             sender.sendMessage(ChatColor.RED + "Master Builders supports up to 16 builders (one per plot).");
@@ -1668,6 +1674,10 @@ public final class ArcadePortManager implements Listener {
         }
         if (!sourceMapWorlds.contains(type.id())) buildArena(type, world);
         Session session = new Session(type, world, participants, mixedArcadeVariant);
+        if (type == ArcadePortGame.SUPER_SPLOOR) {
+            // Build the authoritative territory index before moving anyone out of the lobby.
+            session.superSploorEngine = new SuperSploorEngine(world, sourceMapData.get(type.id()));
+        }
         active = session;
         long now = System.currentTimeMillis();
         session.startedAt = now;
@@ -1697,7 +1707,7 @@ public final class ArcadePortManager implements Listener {
                 || type == ArcadePortGame.SNEAKY_ASSASSINS
                 || type == ArcadePortGame.DRAW_MY_THING
                 || type == ArcadePortGame.MASTER_BUILDERS
-                || type == ArcadePortGame.GLADIATORS
+                || type == ArcadePortGame.GLADIATORS || type == ArcadePortGame.SUPER_SPLOOR
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 0L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
@@ -1895,7 +1905,7 @@ public final class ArcadePortManager implements Listener {
             boolean teamMode = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST
                     || type == ArcadePortGame.BOMB_LOBBERS || type == ArcadePortGame.PAINTBALL
                     || type == ArcadePortGame.TURF_WARS || type == ArcadePortGame.CASTLE_ASSAULT
-                    || type == ArcadePortGame.HEROES_OF_GWEN;
+                    || type == ArcadePortGame.HEROES_OF_GWEN || type == ArcadePortGame.SUPER_SPLOOR;
             SourceMapCatalog.MapData selectedMap = sourceMapData.get(type.id());
             int teamId = (type == ArcadePortGame.MILK_THE_COW || type == ArcadePortGame.WITHER_ASSAULT)
                     ? (specialTeamSlots.contains(i) ? 1 : 0)
@@ -1989,7 +1999,7 @@ public final class ArcadePortManager implements Listener {
             player.setGameMode(type == ArcadePortGame.MASTER_BUILDERS ? GameMode.CREATIVE
                     : type == ArcadePortGame.BACON_BRAWL || type == ArcadePortGame.DEATH_TAG
                     || type == ArcadePortGame.DRAGONS || type == ArcadePortGame.DRAW_MY_THING
-                    || type == ArcadePortGame.SNEAKY_ASSASSINS
+                    || type == ArcadePortGame.SNEAKY_ASSASSINS || type == ArcadePortGame.SUPER_SPLOOR
                     ? GameMode.ADVENTURE : GameMode.SURVIVAL);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
@@ -2235,6 +2245,10 @@ public final class ArcadePortManager implements Listener {
         }
         if (participants.size() == 1) announce(session, ChatColor.GRAY + "Solo test mode: the run will remain available for practice until the timer ends or you reset it.");
         session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
+        if (type == ArcadePortGame.SUPER_SPLOOR) {
+            superSploor.start(session.superSploorEngine, session.players, session.teams, session.lastLocations,
+                    winningTeam -> finish(session, superSploorRepresentative(session, winningTeam), true));
+        }
         sender.sendMessage(ChatColor.GREEN + "Started " + type.displayName() + " with " + participants.size() + (participants.size() == 1 ? " player." : " players."));
     }
 
@@ -6394,6 +6408,10 @@ public final class ArcadePortManager implements Listener {
             updatePaintballKitState(session, now);
             updatePaintballPelletCosmetics(session);
         }
+        if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+            superSploor.tick(now);
+            if (active != session) return;
+        }
         if (session.type == ArcadePortGame.TURF_WARS) updateTurfWars(session, now);
          updateTitles(session);
         checkRoundEnd(session);
@@ -10323,7 +10341,9 @@ public final class ArcadePortManager implements Listener {
 
     private void checkRoundEnd(Session session) {
         if (active != session) return;
-        if (session.type == ArcadePortGame.DRAW_MY_THING || session.type == ArcadePortGame.MASTER_BUILDERS) return;
+        if (session.type == ArcadePortGame.SUPER_SPLOOR
+                || session.type == ArcadePortGame.DRAW_MY_THING
+                || session.type == ArcadePortGame.MASTER_BUILDERS) return;
         // Castle Assault and Heroes of Gwen end through their objective controllers, not last-player rules.
         if (session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN) {
             if (session.alive.isEmpty() && session.respawning.isEmpty()) finish(session, null, true);
@@ -12155,7 +12175,18 @@ public final class ArcadePortManager implements Listener {
      * Resolve time-limit winners using each game's actual objective. In team
      * modes, a personal high score must not announce a losing team as winner.
      */
+    private Player superSploorRepresentative(Session session, int winningTeam) {
+        if (session == null || winningTeam < 0) return null;
+        return session.players.values().stream()
+                .filter(player -> player != null && player.isOnline()
+                        && session.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
+                .findFirst().orElse(null);
+    }
+
     private Player timeoutWinner(Session session) {
+        if (session.type == ArcadePortGame.SUPER_SPLOOR) {
+            return superSploorRepresentative(session, superSploor.leadingTeam());
+        }
         if (session.type == ArcadePortGame.DEATH_TAG) {
             List<Player> runners = alivePlayers(session).stream()
                     .filter(player -> !session.tagged.contains(player.getUniqueId()))
@@ -12252,6 +12283,7 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        if (session.type == ArcadePortGame.SUPER_SPLOOR) superSploor.stop();
         if (announceWinner && session.type == ArcadePortGame.DEATH_TAG) {
             recordDeathTagRewards(session);
         }
@@ -12988,10 +13020,12 @@ public final class ArcadePortManager implements Listener {
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean paintballWinner = session.type == ArcadePortGame.PAINTBALL
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean superSploorWinner = session.type == ArcadePortGame.SUPER_SPLOOR
+                    && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean deathTagWinner = session.type == ArcadePortGame.DEATH_TAG && winnerId != null
                     && session.tagged.contains(id) == session.tagged.contains(winnerId);
             boolean won = winnerId != null && (winnerId.equals(id) || turfWarsWinner || paintballWinner
-                    || deathTagWinner
+                    || superSploorWinner || deathTagWinner
                     || ((session.type == ArcadePortGame.BOMB_LOBBERS
                             || session.type == ArcadePortGame.MICRO_BATTLES)
                         && session.alive.contains(id)
@@ -19471,6 +19505,7 @@ public final class ArcadePortManager implements Listener {
 
     private static final class Session {
         final Map<Block, Long> evolutionWebs = new HashMap<>();
+        SuperSploorEngine superSploorEngine;
         final ArcadePortGame type;
         final World world;
         final Map<UUID, Player> players = new LinkedHashMap<>();
