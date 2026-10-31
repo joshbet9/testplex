@@ -58,9 +58,10 @@ public final class ArcadeMapSelectionMenu implements Listener {
         inventory.setItem(4, back);
 
         if (maps.isEmpty()) {
-            inventory.setItem(22, createItem(Material.BARRIER, ChatColor.RED + "No Wizards Maps Bundled",
-                    ChatColor.GRAY + "The compatibility marker is present, but this checkout contains no Wizards map ZIPs.",
-                    ChatColor.GRAY + "The map list will populate automatically when the Wizards/Nano Wizards archives are bundled."));
+            inventory.setItem(22, createItem(Material.BARRIER, ChatColor.RED + "No Wizards Source Maps Found",
+                    ChatColor.GRAY + "No Wizards ZIPs were found in the plugin or server map directory.",
+                    ChatColor.GRAY + "Set source-maps.directory in the plugin config to the existing update/maps folder.",
+                    ChatColor.GRAY + "Both Wizards and Nano Wizards folders are scanned."));
             player.openInventory(inventory);
             return;
         }
