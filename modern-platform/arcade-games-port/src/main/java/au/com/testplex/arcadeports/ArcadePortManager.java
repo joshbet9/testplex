@@ -1572,7 +1572,9 @@ public final class ArcadePortManager implements Listener {
                     queues.computeIfAbsent(selectedQueueKey, ignored -> new LinkedHashMap<>());
             List<UUID> insertedBotIds = new ArrayList<>();
             for (Player bot : result.players()) {
-                lobby.ensurePlayerInLobby(bot);
+                // Reset restored FPP inventory/XP/effects before the normal match snapshot
+                // so every game begins with the same clean lobby state as a human.
+                lobby.sendToLobby(bot);
                 targetQueue.put(bot.getUniqueId(), bot);
                 insertedBotIds.add(bot.getUniqueId());
             }
