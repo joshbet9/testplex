@@ -340,7 +340,10 @@ public final class WizardsPaperSmoke extends JavaPlugin {
                     .filter(item -> item != null && !item.getType().isAir()).count();
             if (occupied > 0) nonEmpty++;
         }
-        require(nonEmpty >= 8, "fewer than eight chests were refilled with actual Wizards loot");
+        require(nonEmpty == chests.size(),
+                "only " + nonEmpty + "/" + chests.size() + " chests were refilled with actual Wizards loot");
+        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|LOOT_REFILL|occupied=" + nonEmpty
+                + "|total=" + chests.size());
     }
 
     private void validateStarts(World world, List<Location> starts) {
