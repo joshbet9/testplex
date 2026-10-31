@@ -99,26 +99,26 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void onlyExplicitlyClearedGamesAreReadyForInGameAcceptance() {
+    void explicitlyClearedGamesAreAvailableTogetherForInGameAcceptance() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers");
+        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl");
 
         for (GameDefinition game : catalog.getGames()) {
             if (readyIds.contains(game.getId())) {
                 assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus(),
-                        game.getId() + " is explicitly cleared for controlled in-game acceptance");
+                        game.getId() + " is explicitly cleared for the shared in-game test queue");
                 assertTrue(game.isReadyForTest());
             } else {
                 assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus(),
-                        game.getId() + " must remain gated until it is selected for acceptance");
+                        game.getId() + " must remain gated until it is promoted to the shared test queue");
                 assertFalse(game.isReadyForTest());
             }
         }
         long readyForTest = catalog.getGames().stream().filter(GameDefinition::isReadyForTest).count();
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
-        assertEquals(3, readyForTest);
-        assertEquals(21, inProgress);
+        assertEquals(4, readyForTest);
+        assertEquals(20, inProgress);
     }
 
     @Test
