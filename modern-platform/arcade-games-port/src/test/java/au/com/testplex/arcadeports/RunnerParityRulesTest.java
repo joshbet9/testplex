@@ -68,4 +68,48 @@ final class RunnerParityRulesTest {
         assertEquals("cyan", ArcadePortRules.resolveRunnerTrailColour("red", Map.of()));
         assertEquals("cyan", ArcadePortRules.resolveRunnerTrailColour("unknown", Map.of()));
     }
+
+    @Test
+    void sourceBlockDecayAndFallingBlockLifetimeMatchReborn() {
+        assertEquals(600L, ArcadePortRules.RUNNER_BLOCK_DECAY_MILLIS);
+        assertEquals(1_200L, ArcadePortRules.RUNNER_BLOCK_LIFETIME_MILLIS);
+        assertFalse(ArcadePortRules.shouldDropRunnerBlock(599L));
+        assertTrue(ArcadePortRules.shouldDropRunnerBlock(600L));
+    }
+
+    @Test
+    void sourceKitCooldownsAndFrostyRechargeMatchReborn() {
+        assertEquals(8_000L, ArcadePortRules.RUNNER_LEAP_COOLDOWN_MILLIS);
+        assertEquals(6_000L, ArcadePortRules.RUNNER_QUICKSHOT_COOLDOWN_MILLIS);
+        assertEquals(500L, ArcadePortRules.RUNNER_FROSTBALL_INTERVAL_MILLIS);
+        assertEquals(16, ArcadePortRules.RUNNER_MAX_FROSTBALLS);
+        assertEquals(40, ArcadePortRules.RUNNER_FROSTBALL_SLOW_TICKS);
+        assertEquals(2, ArcadePortRules.RUNNER_FROSTBALL_SLOW_AMPLIFIER);
+    }
+
+    @Test
+    void sourceKitAliasesNormalizeToTheThreeLegacyKits() {
+        assertEquals("leaper", ArcadePortRules.normalizeRunnerKit("runnerkit-leaper"));
+        assertEquals("archer", ArcadePortRules.normalizeRunnerKit("Runner-Archer"));
+        assertEquals("frosty", ArcadePortRules.normalizeRunnerKit("frosty"));
+        assertEquals(null, ArcadePortRules.normalizeRunnerKit("tank"));
+        assertEquals(null, ArcadePortRules.normalizeRunnerKit(null));
+    }
+
+    @Test
+    void onlyEligibleExposedBlocksAreMarkedForTheRunnerTrail() {
+        assertTrue(ArcadePortRules.shouldMarkRunnerBlock(true, false, false, true, false));
+        assertFalse(ArcadePortRules.shouldMarkRunnerBlock(false, false, false, true, false));
+        assertFalse(ArcadePortRules.shouldMarkRunnerBlock(true, true, false, true, false));
+        assertFalse(ArcadePortRules.shouldMarkRunnerBlock(true, false, true, true, false));
+        assertFalse(ArcadePortRules.shouldMarkRunnerBlock(true, false, false, false, false));
+        assertFalse(ArcadePortRules.shouldMarkRunnerBlock(true, false, false, true, true));
+    }
+
+    @Test
+    void fallingBlockCollisionOnlyHitsPlayersAtOrBelowTheBlock() {
+        assertTrue(ArcadePortRules.shouldRunnerFallingBlockHit(10.0D, 10.0D));
+        assertTrue(ArcadePortRules.shouldRunnerFallingBlockHit(9.0D, 10.0D));
+        assertFalse(ArcadePortRules.shouldRunnerFallingBlockHit(10.51D, 10.0D));
+    }
 }
