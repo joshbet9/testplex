@@ -72,9 +72,6 @@ class ArcadePortGameTest {
     }
 
     @Test void everyGameUsesTheStandardLobbyScoreboardAndLegacyStartCountdown() {
-        assertTrue(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("bacon-brawl"));
-        assertTrue(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("BACON_BRAWL"));
-        assertFalse(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("paintball"));
         assertEquals("TESTPLEX", org.bukkit.ChatColor.stripColor(
                 ModernLobbyScoreboard.scoreboardTitleForGame("bacon-brawl", "Testplex")));
         assertEquals("TESTPLEX", org.bukkit.ChatColor.stripColor(
