@@ -41,4 +41,36 @@ class PlayerPreferenceStoreTest {
 
         assertEquals(Set.of("chrome-marker", "paint-drip"), selected);
     }
+    private CosmeticLineDefinition microBattlesLine() {
+        GameDefinition game = new ArcadeCatalog().getGame("micro-battles");
+        return game.getCosmeticLines().get(0);
+    }
+
+    @Test
+    void selectingPrivateMicroGlassKeepsSharedBorderColourEquipped() {
+        CosmeticLineDefinition line = microBattlesLine();
+        Set<String> selected = PlayerPreferenceStore.selectionAfterChoice(
+                line, Set.of("glass-light-blue", "border-light-blue"), "glass-purple");
+
+        assertEquals(Set.of("glass-purple", "border-light-blue"), selected);
+    }
+
+    @Test
+    void selectingSharedMicroBorderColourKeepsPrivateGlassEquipped() {
+        CosmeticLineDefinition line = microBattlesLine();
+        Set<String> selected = PlayerPreferenceStore.selectionAfterChoice(
+                line, Set.of("glass-orange", "border-light-blue"), "border-cyan");
+
+        assertEquals(Set.of("glass-orange", "border-cyan"), selected);
+    }
+
+    @Test
+    void selectingMicroColourWithinOneGroupReplacesOnlyThatGroupsPreviousChoice() {
+        CosmeticLineDefinition line = microBattlesLine();
+        Set<String> selected = PlayerPreferenceStore.selectionAfterChoice(
+                line, Set.of("glass-orange", "border-cyan"), "border-red");
+
+        assertEquals(Set.of("glass-orange", "border-red"), selected);
+    }
+
 }
