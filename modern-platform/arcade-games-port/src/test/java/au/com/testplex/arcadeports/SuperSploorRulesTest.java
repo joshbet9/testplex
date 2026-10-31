@@ -85,8 +85,12 @@ class SuperSploorRulesTest {
     @Test
     void overtimeRequiresAOnePercentLeadAndSquidTravelRejectsTeleports() {
         assertEquals(10, SuperSploorRules.overtimeLeadThreshold(1_000));
+        assertEquals(2, SuperSploorRules.overtimeLeadThreshold(150));
+        assertEquals(1, SuperSploorRules.overtimeLeadThreshold(100));
         assertFalse(SuperSploorRules.hasDecisiveOvertimeLead(500, 509, 1_000));
         assertTrue(SuperSploorRules.hasDecisiveOvertimeLead(500, 510, 1_000));
+        assertFalse(SuperSploorRules.hasDecisiveOvertimeLead(50, 51, 150));
+        assertTrue(SuperSploorRules.hasDecisiveOvertimeLead(50, 52, 150));
         assertTrue(SuperSploorRules.shouldCountSquidTravel(1.5, false));
         assertFalse(SuperSploorRules.shouldCountSquidTravel(200, false));
         assertFalse(SuperSploorRules.shouldCountSquidTravel(1.5, true));
