@@ -266,9 +266,10 @@ jobs:
           # clean server worlds, installed plugins, databases or recovery backups.
           stage_kb="$(du -sk "$STAGE_DIR" | awk '{print $1}')"
           [[ "$stage_kb" =~ ^[0-9]+$ ]] && (( stage_kb > 0 )) || { echo "Could not determine the verified deployment payload size." >&2; exit 1; }
-          # During transfer/assembly a second copy of the largest JAR/map archives can exist.
-          # Keep a full 1 GiB free after reserving two copies of this exact payload.
-          required_free_kb=$((stage_kb * 2 + 1048576))
+          # Uploaded chunk parts are replaced by sequential assembly, deleting each part only
+          # after it has been appended. Peak staging use stays within one payload copy.
+          # Keep a full 1 GiB free after reserving the single staged payload.
+          required_free_kb=$((stage_kb + 1048576))
           timeout --foreground --signal=TERM --kill-after=15s 5m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" "$required_free_kb" "$stage_kb" <<'REMOTE_STAGE_PREP'
           set -euo pipefail
           build_sha="$1"
@@ -309,7 +310,7 @@ jobs:
           df -i /var/tmp
           avail_kb="$(df -Pk /var/tmp | awk 'END {print $4}')"
           if [[ ! "$avail_kb" =~ ^[0-9]+$ ]] || (( avail_kb < required_free_kb )); then
-            echo "Only ${avail_kb:-unknown} KiB free in /var/tmp after staging cleanup; deployment needs at least $required_free_kb KiB (two $stage_kb KiB payload copies plus a 1 GiB safety reserve)." >&2
+            echo "Only ${avail_kb:-unknown} KiB free in /var/tmp after staging cleanup; deployment needs at least $required_free_kb KiB (one $stage_kb KiB payload copy plus a 1 GiB safety reserve)." >&2
             exit 1
           fi
           echo "Available space: $((avail_kb / 1024)) MiB; payload: $((stage_kb / 1024)) MiB; required free-space reserve: $((required_free_kb / 1024)) MiB."
@@ -355,12 +356,21 @@ jobs:
           arcade_parts=(ArcadeMechanicsModern.jar.part.*)
           [[ ${#map_parts[@]} -gt 0 ]] || { echo "No map archive parts arrived." >&2; exit 1; }
           [[ ${#arcade_parts[@]} -gt 0 ]] || { echo "No Arcade JAR parts arrived." >&2; exit 1; }
-          cat "${map_parts[@]}" > MonsterMazeMaps.tar.gz.tmp
+          # Assemble each payload in place: remove a chunk only after it has been
+          # appended successfully. This bounds the peak of (remaining parts + output)
+          # to one copy of each source file instead of retaining two full copies.
+          : > MonsterMazeMaps.tar.gz.tmp
+          for part in "${map_parts[@]}"; do
+            cat "$part" >> MonsterMazeMaps.tar.gz.tmp
+            rm -- "$part"
+          done
           mv MonsterMazeMaps.tar.gz.tmp MonsterMazeMaps.tar.gz
-          rm -f -- "${map_parts[@]}"
-          cat "${arcade_parts[@]}" > ArcadeMechanicsModern.jar.tmp
+          : > ArcadeMechanicsModern.jar.tmp
+          for part in "${arcade_parts[@]}"; do
+            cat "$part" >> ArcadeMechanicsModern.jar.tmp
+            rm -- "$part"
+          done
           mv ArcadeMechanicsModern.jar.tmp ArcadeMechanicsModern.jar
-          rm -f -- "${arcade_parts[@]}"
           echo "Assembled MonsterMazeMaps.tar.gz ($(stat -c %s MonsterMazeMaps.tar.gz) bytes)."
           echo "Assembled ArcadeMechanicsModern.jar ($(stat -c %s ArcadeMechanicsModern.jar) bytes)."
           REMOTE_ASSEMBLE_ARCADE
