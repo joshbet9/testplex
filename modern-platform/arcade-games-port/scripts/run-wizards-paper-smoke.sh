@@ -74,8 +74,15 @@ mkfifo "$console_fifo"
 # Keep the console input pipe open; the smoke plugin calls Bukkit.shutdown() when done.
 exec 3<> "$console_fifo"
 
+server_alive() {
+  [[ -n "${SERVER_PID:-}" ]] || return 1
+  local state
+  state="$(ps -o stat= -p "$SERVER_PID" 2>/dev/null | awk '{print $1}')"
+  [[ -n "$state" && "$state" != Z* ]]
+}
+
 cleanup() {
-  if [[ -n "${SERVER_PID:-}" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
+  if server_alive; then
     kill "$SERVER_PID" 2>/dev/null || true
     wait "$SERVER_PID" 2>/dev/null || true
   fi
@@ -91,10 +98,10 @@ SERVER_PID=$!
 
 deadline=$((SECONDS + 1200))
 while (( SECONDS < deadline )); do
-  if [[ -s "$result_file" ]]; then
+  if [[ -s "$result_file" ]] && [[ "$(wc -l < "$result_file")" -ge 20 ]]; then
     break
   fi
-  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+  if ! server_alive; then
     echo "[wizards-smoke] Paper exited before the smoke plugin produced results." >&2
     tail -n 240 "$server_log" >&2 || true
     exit 1
@@ -102,7 +109,7 @@ while (( SECONDS < deadline )); do
   sleep 2
 done
 
-if [[ ! -s "$result_file" ]]; then
+if [[ ! -s "$result_file" ]] || [[ "$(wc -l < "$result_file")" -lt 20 ]]; then
   echo "[wizards-smoke] Timed out waiting for all map imports." >&2
   tail -n 240 "$server_log" >&2 || true
   exit 1
@@ -110,10 +117,10 @@ fi
 
 # Bukkit.shutdown() follows the report write. Allow Paper time to save/unload and exit.
 shutdown_deadline=$((SECONDS + 120))
-while kill -0 "$SERVER_PID" 2>/dev/null && (( SECONDS < shutdown_deadline )); do
+while server_alive && (( SECONDS < shutdown_deadline )); do
   sleep 2
 done
-if kill -0 "$SERVER_PID" 2>/dev/null; then
+if server_alive; then
   echo "[wizards-smoke] Paper did not stop after the smoke test completed." >&2
   tail -n 160 "$server_log" >&2 || true
   exit 1
