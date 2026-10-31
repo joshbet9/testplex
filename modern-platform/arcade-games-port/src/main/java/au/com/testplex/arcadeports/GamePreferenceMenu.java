@@ -168,11 +168,24 @@ public final class GamePreferenceMenu implements Listener {
     }
 
     private List<ArcadePortGame> enabledGames() {
+        Set<String> cleared = new LinkedHashSet<>(plugin.getConfig().getStringList("enabled-games"));
+        String poolPath = "game-preferences.automatic-rotation.enabled-games";
+        List<String> pool = plugin.getConfig().contains(poolPath)
+                ? plugin.getConfig().getStringList(poolPath)
+                : plugin.getConfig().getStringList("enabled-games");
         Set<String> seen = new LinkedHashSet<>();
         List<ArcadePortGame> games = new ArrayList<>();
-        for (String id : plugin.getConfig().getStringList("enabled-games")) {
+        for (String id : pool) {
+            if (!cleared.contains(id)) continue;
             ArcadePortGame game = ArcadePortGame.fromId(id);
-            if (game != null && seen.add(game.id())) games.add(game);
+            if (game == null || !seen.add(game.id())) continue;
+            if (SourceMapCatalog.hasMap(game)) {
+                String selectedResource = plugin.getConfig().getString("selected-maps." + game.id(),
+                        SourceMapCatalog.selectedResource(plugin, game));
+                if (selectedResource == null
+                        || !SourceMapCatalog.isInstalledResource(plugin, game, selectedResource)) continue;
+            }
+            games.add(game);
         }
         return games;
     }
