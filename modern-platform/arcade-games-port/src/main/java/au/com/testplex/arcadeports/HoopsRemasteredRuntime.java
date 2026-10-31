@@ -924,16 +924,16 @@ public final class HoopsRemasteredRuntime implements Listener {
             int fieldGoal = stats.shotsAttempted == 0 ? 0
                     : (int) Math.round(stats.shotsMade * 100.0D / stats.shotsAttempted);
             String mvpName = mvp == null ? "Unavailable" : mvp.getName();
-            String body = "FINAL SCORE\\n"
-                    + "RED  " + current.teamScore[0] + "   -   BLUE  " + current.teamScore[1] + "\\n"
-                    + winner + " TEAM WINS\\n\\n"
-                    + "MATCH MVP\\n" + mvpName + "\\n\\n"
-                    + "YOUR BOX SCORE\\n"
-                    + "Points: " + stats.points + "\\n"
-                    + "Assists: " + stats.assists + "\\n"
-                    + "Rebounds: " + stats.rebounds + "\\n"
-                    + "Blocks: " + stats.blocks + "\\n"
-                    + "Steals: " + stats.steals + "\\n"
+            String body = "FINAL SCORE\n"
+                    + "RED  " + current.teamScore[0] + "   -   BLUE  " + current.teamScore[1] + "\n"
+                    + winner + " TEAM WINS\n\n"
+                    + "MATCH MVP\n" + mvpName + "\n\n"
+                    + "YOUR BOX SCORE\n"
+                    + "Points: " + stats.points + "\n"
+                    + "Assists: " + stats.assists + "\n"
+                    + "Rebounds: " + stats.rebounds + "\n"
+                    + "Blocks: " + stats.blocks + "\n"
+                    + "Steals: " + stats.steals + "\n"
                     + "Field goals: " + stats.shotsMade + "/" + stats.shotsAttempted
                     + " (" + fieldGoal + "%)";
             Dialog dialog = Dialog.create(builder -> builder.empty()
