@@ -245,7 +245,7 @@ final class ArcadeTestPlayerManager {
         invoke(handle, "setFrozen", new Class<?>[] {boolean.class}, true);
         player.setInvulnerable(false);
         player.setCollidable(true);
-        player.setCanPickupItems(false);
+        player.setCanPickupItems(true);
         player.setOp(false);
         player.setGameMode(org.bukkit.GameMode.SURVIVAL);
         player.setListed(true);
