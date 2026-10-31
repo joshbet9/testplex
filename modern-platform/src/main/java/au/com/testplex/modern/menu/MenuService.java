@@ -129,7 +129,7 @@ public final class MenuService implements Listener {
             String description = switch (ids[i]) {
                 case "public-server" -> "Public access is enabled when the server whitelist is off.";
                 case "enforce-whitelist" -> "Only whitelisted players may join.";
-                default -> "Runs the 60-second preference vote after each completed round.";
+                default -> "Runs preference-weighted rotation after each completed round.";
             };
             ItemStack item = makeItem(available ? materials[i] : Material.BARRIER,
                     (enabled && available ? ChatColor.GREEN : available ? ChatColor.RED : ChatColor.GRAY)
@@ -566,6 +566,10 @@ public final class MenuService implements Listener {
 
         if (("Edit Game Rotation".equals(title) || SET_GAME_TITLE.equals(title))
                 && "panel-game-page".equals(action) && optionId != null) {
+            if (!isAdmin(player)) {
+                player.sendMessage(ChatColor.RED + "Operator permission required to browse game settings.");
+                return;
+            }
             try {
                 openGameSelection(player, "Edit Game Rotation".equals(title), Integer.parseInt(optionId));
             } catch (NumberFormatException ignored) {
@@ -713,6 +717,10 @@ public final class MenuService implements Listener {
         }
         if (SET_GAME_TITLE.equals(title) && "panel-game-select".equals(action)
                 && game != null && event.getClick().isRightClick()) {
+            if (!isAdmin(player)) {
+                player.sendMessage(ChatColor.RED + "Operator permission required to change the selected game's map.");
+                return;
+            }
             plugin.getConfig().set("game-panel.selected-game", game.getId());
             plugin.saveConfig();
             if (!Bukkit.getPluginManager().isPluginEnabled("ArcadeMechanicsModern")) {
@@ -727,8 +735,13 @@ public final class MenuService implements Listener {
             return;
         }
         if (PANEL_TITLE.equals(title)) {
-            if ("panel-set-game".equals(action)) openGameSelection(player, false);
-            else if ("panel-rotation".equals(action)) openGameSelection(player, true);
+            if ("panel-set-game".equals(action)) {
+                if (isAdmin(player)) openGameSelection(player, false);
+                else player.sendMessage(ChatColor.RED + "Operator permission required to select the lobby game.");
+            } else if ("panel-rotation".equals(action)) {
+                if (isAdmin(player)) openGameSelection(player, true);
+                else player.sendMessage(ChatColor.RED + "Operator permission required to edit game rotation.");
+            }
             else if ("panel-options".equals(action)) openGameOptions(player);
             else if ("panel-remove".equals(action)) openPlayerList(player, false);
             else if ("panel-unremove".equals(action)) openPlayerList(player, true);
@@ -767,6 +780,10 @@ public final class MenuService implements Listener {
             }
         } else if ((SET_GAME_TITLE.equals(title) || "Edit Game Rotation".equals(title))
                 && ("panel-game-select".equals(action) || "panel-rotation-select".equals(action))) {
+            if (!isAdmin(player)) {
+                player.sendMessage(ChatColor.RED + "Operator permission required to change game settings.");
+                return;
+            }
             if (game == null) return;
             if ("panel-rotation-select".equals(action)) {
                 JavaPlugin engine = arcadeMechanicsPlugin();
