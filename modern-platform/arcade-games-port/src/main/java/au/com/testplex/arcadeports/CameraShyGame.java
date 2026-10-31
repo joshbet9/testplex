@@ -1345,7 +1345,7 @@ public final class CameraShyGame implements Listener {
         long now = System.currentTimeMillis();
         for (SmokeCloud cloud : smokeClouds) {
             if (cloud.expiresAt > now && cloud.center.getWorld() == from.getWorld()
-                    && (requiredOwner == null || requiredOwner.equals(cloud.owner))
+                    && CameraShyRules.smokeBelongsTo(cloud.owner, requiredOwner)
                     && CameraShyRules.segmentIntersectsSphere(start, end, cloud.center.toVector(), 2.4D)) return true;
         }
         return false;
