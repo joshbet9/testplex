@@ -21,7 +21,7 @@
 
 ## Kit acceptance
 - Smoke Artist: smoke sphere blocks camera rays; encounter escape achievement counts three distinct escapes.
-- Decoy: fake shutter/flash fools three distinct human opponents.
+- Decoy: fake shutter/flash fools three distinct human opponents. Looking at a fake flash through a solid wall does not count; a genuine approach to its location still does.
 - Runner: Speed II for three seconds; shutter is disabled during the burst; a successful escape within the follow-up window unlocks Catch Me If You Can.
 - Spotter: only reveals opponents within 18 blocks and clear line of sight; marks last 15 seconds and must lead to three distinct photographs.
 - Understudy: deploys a player-skin stand-in; photographing the stand-in awards Method Actor and does not add exposure.
@@ -30,7 +30,7 @@
 - Group Photo pickup grants one charged shutter that can photograph a second target in the same narrow camera cone. The charge is retained if a valid second target is not present.
 - Director's Spotlight periodically marks one living human player.
 - Final Snapshot begins with 30 seconds remaining and shortens shutter cooldown.
-- Smoke, fake flashes, decoys and pickup entities are removed at match end.
+- Smoke, fake flashes, decoys and pickup entities are removed at match end. Hedge leaves remain persistent and intact after several minutes of world ticks.
 
 ## Progression acceptance
 - All 20 IDs in `CameraShyProgressCatalog` have a unique name and condition.
