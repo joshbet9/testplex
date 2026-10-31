@@ -108,10 +108,6 @@ public final class ModernLobbyScoreboard {
         };
     }
 
-    static boolean usesBaconBrawlLobbySidebar(String gameId) {
-        return gameId != null && "bacon-brawl".equalsIgnoreCase(gameId.trim().replace('_', '-'));
-    }
-
     /** The sidebar header is intentionally stable across games. */
     static String scoreboardTitleForGame(String gameId, String defaultTitle) {
         String title = defaultTitle == null || defaultTitle.isBlank() ? "Testplex" : defaultTitle.trim();
