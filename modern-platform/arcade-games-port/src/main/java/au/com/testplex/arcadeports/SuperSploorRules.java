@@ -86,6 +86,14 @@ public final class SuperSploorRules {
                 && nowMillis - lastShotAtMillis >= PRIMARY_SHOT_INTERVAL_MILLIS;
     }
 
+    /** 0 = no change, 1 = neutral claim, 2 = enemy reclaim. */
+    public static int territoryPaintTransition(int currentOwner, int attackingTeam) {
+        if (attackingTeam != 0 && attackingTeam != 1) return 0;
+        if (currentOwner == attackingTeam) return 0;
+        if (currentOwner == -1) return 1;
+        return currentOwner == 1 - attackingTeam ? 2 : 0;
+    }
+
     public static int markCountAfterHit(int currentMarks) {
         return Math.min(MAX_PAINT_MARKS, Math.max(0, currentMarks) + 1);
     }
