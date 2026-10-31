@@ -270,6 +270,17 @@ public final class PlexballGame implements Listener {
         }
     }
 
+    public void leaveQueue(Player player) {
+        UUID id = player.getUniqueId();
+        if (queue.remove(id) == null) {
+            player.sendMessage(ChatColor.YELLOW + "You are not queued for Plexball.");
+            return;
+        }
+        player.sendMessage(ChatColor.GREEN + "You left the Plexball queue.");
+        if (queue.size() < PlexballRules.MIN_PLAYERS) queueCountdownTick = -1L;
+        broadcastQueue(ChatColor.YELLOW + player.getName() + " left Plexball (" + queue.size() + " queued).");
+    }
+
     public void startQueued(org.bukkit.command.CommandSender sender) {
         if (isActive()) {
             sender.sendMessage(ChatColor.RED + "Plexball is already running.");
@@ -553,8 +564,30 @@ public final class PlexballGame implements Listener {
                     + String.format(java.util.Locale.ROOT, "%.1fm", distance));
         }
         cleanupBall();
+        broadcastLeaderboard();
         phase = Phase.TURN_BREAK;
         phaseEndTick = serverTick + TURN_BREAK_TICKS;
+    }
+
+    private void broadcastLeaderboard() {
+        List<UUID> ordered = matchPlayers.stream()
+                .sorted((first, second) -> {
+                    PlayerResult a = results.getOrDefault(first, new PlayerResult());
+                    PlayerResult b = results.getOrDefault(second, new PlayerResult());
+                    int distance = Double.compare(b.bestDistance, a.bestDistance);
+                    return distance != 0 ? distance : Integer.compare(b.catches, a.catches);
+                }).toList();
+        broadcastMatch(ChatColor.GOLD + "" + ChatColor.BOLD + "PLEXBALL STANDINGS");
+        int rank = 1;
+        for (UUID id : ordered) {
+            Player participant = Bukkit.getPlayer(id);
+            if (participant == null) continue;
+            PlayerResult result = results.getOrDefault(id, new PlayerResult());
+            broadcastMatch(ChatColor.YELLOW + "" + rank++ + ". " + ChatColor.WHITE + participant.getName()
+                    + ChatColor.GRAY + " — " + ChatColor.GREEN
+                    + String.format(java.util.Locale.ROOT, "%.1fm", result.bestDistance)
+                    + ChatColor.GRAY + " | catches: " + ChatColor.AQUA + result.catches);
+        }
     }
 
     private void finishAtTimeLimit() {
@@ -1026,7 +1059,13 @@ public final class PlexballGame implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onHeldSlotChange(PlayerItemHeldEvent event) {
-        if (matchPlayers.contains(event.getPlayer().getUniqueId())) event.setCancelled(true);
+        UUID id = event.getPlayer().getUniqueId();
+        if (!matchPlayers.contains(id)) return;
+        // Slot 0 is the glove and slot 1 is the kit ability. Let fielders switch
+        // between those two actions, while preventing access to empty/admin items.
+        if (id.equals(batterId) ? event.getNewSlot() != 0 : event.getNewSlot() > 1) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler
