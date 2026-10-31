@@ -19100,6 +19100,9 @@ public final class ArcadePortManager implements Listener {
             Session session = active;
             if (session == null || !session.players.containsKey(playerId)) return;
             session.players.put(playerId, respawned);
+            if (session.variantRuntime != null) {
+                session.variantRuntime.onPlayerRespawn(respawned);
+            }
             if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
                 sneakyAssassins.onPlayerRespawn(respawned);
             }
