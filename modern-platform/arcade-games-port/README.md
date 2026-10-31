@@ -1,6 +1,6 @@
 # Modern Arcade mechanics prototypes (Paper 26.3)
 
-This plugin adds first-pass playable mechanics harnesses for the 15 Arcade games outside the dedicated Monster Maze and Snake modules. It is a compatibility/work-in-progress layer intended to expose API and game-loop problems early; it is **not** a claim that all original Mineplex mechanics or maps have been faithfully ported yet.
+This plugin adds first-pass playable mechanics harnesses for the 16 Arcade games outside the dedicated Monster Maze and Snake modules. It is a compatibility/work-in-progress layer intended to expose API and game-loop problems early; it is **not** a claim that all original Mineplex mechanics or maps have been faithfully ported yet.
 
 ## SkyWars — fast Mixed Arcade FFA
 
@@ -52,7 +52,7 @@ Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Tu
 - `/arcadeport ghost <on|off|toggle>` — enable or hide your Dragon Escape translucent PB player ghost.
 - `/arcadeport status`, `/arcadeport stop` (operator only).
 
-Game IDs are: `bacon-brawl`, `bomb-lobbers`, `castle-assault`, `death-tag`, `dragon-escape`, `dragons`, `draw-my-thing`, `evolution`, `gladiators`, `heroes-of-gwen`, `master-builders`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. Mixed Arcade aliases use `<game-id>-mixed` or `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Castle Assault and Heroes of Gwen remain disabled pending acceptance.
+Game IDs are: `bacon-brawl`, `bomb-lobbers`, `castle-assault`, `death-tag`, `dragon-escape`, `dragons`, `draw-my-thing`, `evolution`, `gladiators`, `heroes-of-gwen`, `hoops-remastered`, `master-builders`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. Mixed Arcade aliases use `<game-id>-mixed` or `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Castle Assault and Heroes of Gwen remain disabled pending acceptance.
 
 ## Acceptance boundary
 
@@ -135,7 +135,7 @@ The catalogue and renderer contract are covered by unit tests. A passing build d
 Wither flight speed follows a continuous altitude curve. Near the spawn height, an eased transition blends the source hover speed into the altitude-based curve, while a per-tick rate limit prevents sudden changes during climbs and descents.
 
 
-## Hoops Remastered — first modern gameplay slice
+## Hoops Remastered — modern basketball port
 
 Hoops Remastered is being rebuilt as a two-team basketball match inside the shared Arcade session lifecycle. The first implementation adds a generated indoor hardwood court, balanced RED / BLUE team assignment for 2–16 players (up to 8v8), a five-minute match limit or first-to-21 scoring (whichever comes first), with no win-by-two; a tied five-minute score enters sudden-death overtime where the next basket wins, a 24-second shot clock, two- and three-point shots, server-simulated ball flight, possession passing, close-range steals, shot blocks, recoverable rebounds and the returning Hops double-jump (eight-second cooldown). The live action bar shows the player's points, assists, rebounds, blocks and steals; the sidebar shows team scores and clocks. Career data is stored under the existing local Hoops progress namespace, including PPG / APG / RPG, and the existing achievements / milestones are wired to match results.
 

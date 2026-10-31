@@ -22,7 +22,7 @@
 - Action bar: current player points, assists, rebounds, blocks, steals and field-goal percentage.
 - Native Paper Dialog final-results screen after players return to the lobby: final score, winning team, match MVP and the player's own full box score; chat also broadcasts the top-five summary.
 - Local lifetime totals: games, wins, losses, points, assists, rebounds, blocks, steals, shots attempted/made and PPG/APG/RPG.
-- Court presentation uses only vanilla blocks, Paper's built-in BossBar/TextDisplay APIs, built-in particles and sounds. No resource pack or extra runtime plugin is required.
+- Court presentation uses only vanilla blocks, Paper's built-in BossBar, TextDisplay and Dialog APIs, built-in particles and sounds. No resource pack or extra runtime plugin is required.
 - Hoops Remastered achievements use the existing progress catalogue; career milestones remain in its existing wins/points/assists/rebounds/steals/blocks catalogue.
 
 ## Automated validation
