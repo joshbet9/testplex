@@ -1,6 +1,9 @@
 package au.com.testplex.arcadeports;
 
+import org.bukkit.Material;
 import org.bukkit.util.Vector;
+
+import java.util.UUID;
 
 /** Deterministic rules shared by the Camera Shy match controller and its tests. */
 public final class CameraShyRules {
@@ -18,6 +21,19 @@ public final class CameraShyRules {
     public static final long DOUBLE_ELIMINATION_WINDOW_MILLIS = 15_000L;
 
     private CameraShyRules() { }
+
+    /** Rebuild a dedicated arena if its persisted build flag or in-world floor marker is missing. */
+    public static boolean arenaBuildRequired(boolean buildFlag, Material foundationMarker, Material floorMarker) {
+        return !buildFlag || foundationMarker != Material.DEEPSLATE_TILES
+                || floorMarker != Material.COARSE_DIRT;
+    }
+
+    /** Only a real opposing human may be credited for being fooled by an Understudy. */
+    public static boolean shouldAwardUnderstudy(UUID owner, UUID photographer,
+                                                 boolean ownerIsHuman, boolean photographerIsHuman) {
+        return owner != null && photographer != null && ownerIsHuman && photographerIsHuman
+                && !owner.equals(photographer);
+    }
 
     public static boolean eliminatedAt(int exposures) {
         return exposures >= PHOTOS_TO_ELIMINATE;
