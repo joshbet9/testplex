@@ -43,6 +43,16 @@ class CameraShyRulesTest {
     }
 
     @Test
+    void soloTestWinnerMustClearAllAfkTargetsButMultiplayerEndsWithOneHuman() {
+        assertFalse(CameraShyRules.shouldEndMatch(16, 1, 1));
+        assertFalse(CameraShyRules.shouldEndMatch(2, 1, 1));
+        assertTrue(CameraShyRules.shouldEndMatch(1, 1, 1));
+        assertTrue(CameraShyRules.shouldEndMatch(10, 0, 1));
+        assertTrue(CameraShyRules.shouldEndMatch(10, 1, 4));
+        assertFalse(CameraShyRules.shouldEndMatch(14, 2, 4));
+    }
+
+    @Test
     void smokeBlocksOnlyWhenItsSphereIntersectsTheCameraRay() {
         assertTrue(CameraShyRules.segmentIntersectsSphere(
                 new Vector(0, 0, 0), new Vector(10, 0, 0), new Vector(5, 0, 0), 1.0D));
