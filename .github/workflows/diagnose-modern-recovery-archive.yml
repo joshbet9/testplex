@@ -60,29 +60,31 @@ jobs:
           timeout --foreground --signal=TERM --kill-after=10s 4m ssh "${ssh_opts[@]}" "$remote" \
             sudo -n flock -s /var/lock/testplex-modern-deploy.lock bash -s <<'REMOTE_INSPECT'
           set -u
+          bounded() { timeout --foreground --signal=TERM --kill-after=2s "${1}s" "${@:2}" 2>&1 || echo "COMMAND_TIMEOUT_OR_FAILURE: ${*:2}"; }
           SERVER=/home/monstermaze/servers/testplex-modern
           STATE=/var/lib/testplex-modern-deploy
           echo "=== HOST ==="
           date -Is
-          uptime
-          free -h
-          df -h / /var/tmp
+          bounded 5 uptime
+          bounded 5 free -h
+          bounded 5 df -h / /var/tmp
           echo "=== SERVICES ==="
-          systemctl is-active testplex-modern.service || true
-          systemctl is-active testplex-reborn.service || true
-          systemctl show testplex-modern.service --property=MainPID,InvocationID,ActiveState,SubState,ExecMainStatus --no-pager || true
+          bounded 5 systemctl is-active testplex-modern.service
+          bounded 5 systemctl is-active testplex-reborn.service
+          bounded 5 systemctl show testplex-modern.service --property=MainPID,InvocationID,ActiveState,SubState,ExecMainStatus --no-pager
           echo "=== CURRENT JOURNAL ==="
-          sudo -n cat "$STATE/current.properties" 2>&1 || true
-          BACKUP="$(sudo -n sed -n 's/^backup_dir=//p' "$STATE/current.properties" 2>/dev/null | head -n 1)"
+          bounded 8 stat -c '%n | %s bytes | %a | %U:%G' "$STATE/current.properties"
+          bounded 8 cat "$STATE/current.properties"
+          BACKUP="$(bounded 5 awk -F= '$1 == "backup_dir" {print substr($0,index($0,"=")+1); exit}' "$STATE/current.properties" | tail -n 1)"
           echo "=== BACKUP DIRECTORY ==="
           printf 'backup_dir=%s\\n' "$BACKUP"
           if [[ -n "$BACKUP" && -d "$BACKUP" ]]; then
-            sudo -n stat -c '%n | type=%F | size=%s | mode=%a | owner=%U:%G | mtime=%y' "$BACKUP" "$BACKUP/server-artifacts.tar" "$BACKUP/server-artifacts.sha256" 2>&1 || true
+            bounded 8 stat -c '%n | type=%F | size=%s | mode=%a | owner=%U:%G | mtime=%y' "$BACKUP" "$BACKUP/server-artifacts.tar" "$BACKUP/server-artifacts.sha256"
             echo "=== BACKUP CHECKSUM ==="
-            sudo -n cat "$BACKUP/server-artifacts.sha256" 2>&1 || true
-            sudo -n sha256sum "$BACKUP/server-artifacts.tar" 2>&1 || true
+            bounded 8 cat "$BACKUP/server-artifacts.sha256"
+            bounded 12 sha256sum "$BACKUP/server-artifacts.tar"
             echo "=== ARCHIVE MEMBER HEADER AUDIT (seeks over file payloads) ==="
-            sudo -n python3 - "$BACKUP/server-artifacts.tar" <<'PY'
+            python3 - "$BACKUP/server-artifacts.tar" <<'PY'
           import sys
           path = sys.argv[1]
           expected = {
@@ -129,23 +131,23 @@ jobs:
           PY
             echo "=== ARCHIVE LIST COMPLETE ==="
             echo "=== BACKUP TRANSACTION COPY ==="
-            sudo -n cat "$BACKUP/transaction.properties" 2>&1 || true
+            bounded 8 cat "$BACKUP/transaction.properties"
           else
             echo "BACKUP_DIRECTORY_NOT_FOUND"
           fi
           echo "=== LIVE SERVER ROOT ARTIFACTS ==="
           for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps .testplex-plugin-sha256sums .testplex-modern-sandbox plugins; do
-            if sudo -n test -e "$SERVER/$item"; then
-              sudo -n stat -c '%n | type=%F | size=%s | mode=%a | owner=%U:%G | mtime=%y' "$SERVER/$item"
+            if test -e "$SERVER/$item"; then
+              bounded 8 stat -c '%n | type=%F | size=%s | mode=%a | owner=%U:%G | mtime=%y' "$SERVER/$item"
             else
               echo "LIVE_MISSING $item"
             fi
           done
           echo "=== LIVE BUILD MARKERS ==="
-          sudo -n cat "$SERVER/.testplex-modern-deployed-build" "$SERVER/.testplex-paper-build" 2>&1 || true
+          bounded 8 cat "$SERVER/.testplex-modern-deployed-build" "$SERVER/.testplex-paper-build"
           echo "=== LIVE PLUGIN JARS ==="
-          sudo -n find "$SERVER/plugins" -maxdepth 1 -type f -name '*.jar' -printf '%f | %s bytes | %u:%g | %TY-%Tm-%TdT%TH:%TM:%TS\\n' 2>&1 | sort || true
+          bounded 8 find "$SERVER/plugins" -maxdepth 1 -type f -name '*.jar' -printf '%f | %s bytes | %u:%g\\n' | sort
           echo "=== CURRENT SERVER LOG TAIL ==="
-          sudo -n tail -n 100 "$SERVER/logs/latest.log" 2>&1 || true
+          bounded 8 tail -n 50 "$SERVER/logs/latest.log"
           echo "=== END READ-ONLY INSPECTION ==="
           REMOTE_INSPECT
