@@ -11,8 +11,8 @@ on:
 permissions:
   contents: read
 
-# Share the same Hyper-V serialization group as the modern and Reborn deploys.
-# This audit is read-only and must not overlap a deployment transaction.
+# Share the modern deploy serialization group and also take a shared remote flock.
+# The audit is read-only and must not overlap a deployment transaction.
 concurrency:
   group: testplex-isolated-hyperv-server-v2-20261031
   cancel-in-progress: false
@@ -42,11 +42,11 @@ jobs:
           test -n "$SSH_KNOWN_HOSTS" || { echo "HYPERV_SSH_KNOWN_HOSTS is not configured." >&2; exit 1; }
           mkdir -p "$HOME/.ssh"
           chmod 0700 "$HOME/.ssh"
-          printf '%s\\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/testplex_hyperv"
-          printf '%s\\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/testplex_hyperv"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 0600 "$HOME/.ssh/testplex_hyperv" "$HOME/.ssh/known_hosts"
 
-      - name: Inspect journal, all retained snapshots and modern runtime without changing server state
+      - name: Inspect journal, retained snapshots and modern runtime without changing server state
         shell: bash
         env:
           HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
@@ -63,7 +63,8 @@ jobs:
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=15 -o ServerAliveInterval=10 -o ServerAliveCountMax=4)
 
-          timeout --foreground --signal=TERM --kill-after=15s 9m ssh "${ssh_opts[@]}" "$remote" bash -s <<'REMOTE_AUDIT'
+          timeout --foreground --signal=TERM --kill-after=15s 9m ssh "${ssh_opts[@]}" "$remote" \
+            "sudo -n flock -s -w 60 /var/lock/testplex-modern-deploy.lock bash -s" <<'REMOTE_AUDIT'
           set -uo pipefail
           STATE_DIR=/var/lib/testplex-modern-deploy
           SERVER_DIR=/home/monstermaze/servers/testplex-modern
@@ -84,33 +85,34 @@ jobs:
           run_bounded 8 df -i / /var/tmp
 
           echo "=== Modern transaction journal ==="
-          if sudo -n test -f "$MANIFEST"; then
-            sudo -n sed -n '1,100p' "$MANIFEST"
-            BACKUP_DIR="$(sudo -n sed -n 's/^backup_dir=//p' "$MANIFEST" | head -n 1)"
+          BACKUP_DIR=""
+          if [[ -f "$MANIFEST" ]]; then
+            sed -n '1,100p' "$MANIFEST"
+            BACKUP_DIR="$(sed -n 's/^backup_dir=//p' "$MANIFEST" | head -n 1)"
           else
             echo "No current transaction manifest exists."
-            BACKUP_DIR=""
           fi
 
           if [[ -n "$BACKUP_DIR" && "$BACKUP_DIR" == "$STATE_DIR"/backups/* ]]; then
             echo "=== Current transaction backup metadata ==="
             for file in server-artifacts.tar server-artifacts.sha256 unit.tar unit.sha256 transaction.properties recovery-attempts; do
-              if sudo -n test -e "$BACKUP_DIR/$file"; then
-                sudo -n stat -c '%n | size=%s | mode=%a | owner=%U:%G | modified=%y' "$BACKUP_DIR/$file"
+              if [[ -e "$BACKUP_DIR/$file" ]]; then
+                stat -c '%n | size=%s | mode=%a | owner=%U:%G | modified=%y' "$BACKUP_DIR/$file"
               else
                 echo "MISSING: $BACKUP_DIR/$file"
               fi
             done
-            if sudo -n test -s "$BACKUP_DIR/server-artifacts.sha256"; then
+            if [[ -s "$BACKUP_DIR/server-artifacts.sha256" ]]; then
               echo "Snapshot checksum:"
-              sudo -n sha256sum -c "$BACKUP_DIR/server-artifacts.sha256" 2>&1 || true
+              sha256sum -c "$BACKUP_DIR/server-artifacts.sha256" 2>&1 || true
             fi
-            if sudo -n test -s "$BACKUP_DIR/server-artifacts.tar"; then
+            if [[ -s "$BACKUP_DIR/server-artifacts.tar" ]]; then
               echo "Snapshot member list (first 160 entries):"
-              sudo -n tar -tf "$BACKUP_DIR/server-artifacts.tar" 2>&1 | sed -n '1,160p'
+              tar -tf "$BACKUP_DIR/server-artifacts.tar" 2>&1 | sed -n '1,160p'
               echo "Required top-level members:"
               for member in paper.jar plugins .testplex-modern-deployed-build server.properties; do
-                if sudo -n tar -tf "$BACKUP_DIR/server-artifacts.tar" 2>/dev/null | grep -Eq "^(\\./)?${member//./\\.}/?$"; then
+                if tar -tf "$BACKUP_DIR/server-artifacts.tar" 2>/dev/null |
+                     awk -v m="$member" '$0 == m || $0 == "./" m || (m == "plugins" && ($0 == "plugins/" || $0 == "./plugins/")) { found=1 } END { exit !found }'; then
                   echo "PRESENT: $member"
                 else
                   echo "MISSING: $member"
@@ -122,51 +124,50 @@ jobs:
           fi
 
           echo "=== All retained backup transaction summaries ==="
-          if sudo -n test -d "$STATE_DIR/backups"; then
+          if [[ -d "$STATE_DIR/backups" ]]; then
             while IFS= read -r transaction; do
               [[ -n "$transaction" ]] || continue
               echo "--- $transaction ---"
-              sudo -n grep -E '^(deployment_id|target_sha|previous_sha|previous_state|status|backup_dir|backup_complete|replacement_started|prior_files|had_old_paper|had_old_plugins)=' "$transaction" 2>/dev/null || true
+              grep -E '^(deployment_id|target_sha|previous_sha|previous_state|status|backup_dir|backup_complete|replacement_started|prior_files|had_old_paper|had_old_plugins)=' "$transaction" 2>/dev/null || true
               backup_dir="${transaction%/transaction.properties}"
               archive="$backup_dir/server-artifacts.tar"
-              if sudo -n test -s "$archive"; then
-                if sudo -n test -s "$backup_dir/server-artifacts.sha256"; then
-                  sudo -n sha256sum -c "$backup_dir/server-artifacts.sha256" 2>&1 || true
+              if [[ -s "$archive" ]]; then
+                if [[ -s "$backup_dir/server-artifacts.sha256" ]]; then
+                  (cd "$backup_dir" && sha256sum -c server-artifacts.sha256) 2>&1 || true
                 fi
-                sudo -n tar -tf "$archive" 2>/dev/null | grep -E '(^|/)(paper\\.jar|plugins/?|\\.testplex-modern-deployed-build)$' | sed -n '1,30p' || true
+                tar -tf "$archive" 2>/dev/null |
+                  awk '/(^|\/)paper[.]jar$/ || /(^|\/)plugins\// || /(^|\/)\.testplex-modern-deployed-build$/ { print; count++; if (count == 30) exit }' || true
               else
                 echo "No server-artifacts.tar in $backup_dir"
               fi
-            done < <(sudo -n find "$STATE_DIR/backups" -mindepth 2 -maxdepth 2 -type f -name transaction.properties -print 2>/dev/null | sort)
+            done < <(find "$STATE_DIR/backups" -mindepth 2 -maxdepth 2 -type f -name transaction.properties -print 2>/dev/null | sort)
           else
             echo "No backups directory exists."
           fi
 
           echo "=== Current modern server artifacts (metadata only) ==="
-          if sudo -n test -d "$SERVER_DIR"; then
-            sudo -n find "$SERVER_DIR" -maxdepth 2 -type f \\( -name 'paper.jar' -o -name '*.jar' -o -name '.testplex-modern-deployed-build' -o -name '.testplex-paper-build' -o -name '.testplex-modern-sandbox' \\) -printf '%P | size=%s | modified=%TY-%Tm-%TdT%TH:%TM:%TS\\n' 2>/dev/null | sort | sed -n '1,100p'
+          if [[ -d "$SERVER_DIR" ]]; then
+            find "$SERVER_DIR" -maxdepth 2 -type f \\( -name 'paper.jar' -o -name '*.jar' -o -name '.testplex-modern-deployed-build' -o -name '.testplex-paper-build' -o -name '.testplex-modern-sandbox' \\) -print 2>/dev/null | sort | sed -n '1,100p'
             for file in "$SERVER_DIR/paper.jar" "$SERVER_DIR/.testplex-modern-deployed-build" "$SERVER_DIR/plugins/TestplexModernArcade.jar" "$SERVER_DIR/plugins/ArcadeMechanicsModern.jar" "$SERVER_DIR/plugins/SnakeModern.jar" "$SERVER_DIR/plugins/WizardsModern.jar"; do
-              if sudo -n test -s "$file"; then
-                sudo -n sha256sum "$file"
-              fi
+              if [[ -s "$file" ]]; then sha256sum "$file"; fi
             done
           else
             echo "Modern server directory does not exist."
           fi
 
           echo "=== Modern service and port state ==="
-          run_bounded 10 sudo -n systemctl show testplex-modern.service --property=LoadState,ActiveState,SubState,Result,MainPID,InvocationID,ExecMainStatus,NRestarts,ExecStart,WorkingDirectory
-          run_bounded 10 sudo -n systemctl is-active testplex-modern.service
-          run_bounded 10 sudo -n systemctl is-enabled testplex-modern.service
-          run_bounded 10 sudo -n systemctl show testplex-reborn.service --property=ActiveState,SubState,MainPID,Result
-          run_bounded 10 sudo -n ss -ltn
+          run_bounded 10 systemctl show testplex-modern.service --property=LoadState,ActiveState,SubState,Result,MainPID,InvocationID,ExecMainStatus,NRestarts,ExecStart,WorkingDirectory
+          run_bounded 10 systemctl is-active testplex-modern.service
+          run_bounded 10 systemctl is-enabled testplex-modern.service
+          run_bounded 10 systemctl show testplex-reborn.service --property=ActiveState,SubState,MainPID,Result
+          run_bounded 10 ss -ltn
           echo "=== Recent modern service errors (credentials redacted) ==="
-          run_bounded 12 sudo -n journalctl -u testplex-modern.service -n 160 --no-pager -o short-iso |
+          run_bounded 12 journalctl -u testplex-modern.service -n 160 --no-pager -o short-iso |
             grep -i -E 'error|severe|exception|caused by|failed|out of memory|oom|killed|timeout|paper|arcade' |
-            sed -E 's/(bearer[[:space:]]+)[^[:space:]]+/\\1[REDACTED]/Ig; s/((token|password|secret)[=:])[A-Za-z0-9_+\\/=.-]+/\\1[REDACTED]/Ig' |
+            sed -E 's/(bearer[[:space:]]+)[^[:space:]]+/\1[REDACTED]/Ig; s/((token|password|secret)[=:])[A-Za-z0-9_+\/=.-]+/\1[REDACTED]/Ig' |
             tail -n 100 || true
           echo "=== Kernel OOM indicators ==="
-          run_bounded 10 sudo -n dmesg -T 2>/dev/null |
+          run_bounded 10 dmesg -T 2>/dev/null |
             grep -i -E 'out of memory|oom|killed process|java' | tail -n 40 || true
           echo "=== Audit finished; no server state was changed ==="
           REMOTE_AUDIT
