@@ -13584,7 +13584,7 @@ public final class ArcadePortManager implements Listener {
                         "noop", null, null));
             }
         } else if ("bomb-lobbers".equals(gameId)) {
-            int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16, 17};
+            int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16, 17, 18};
             BombLobbersAchievement[] achievements = BombLobbersAchievement.values();
             for (int i = 0; i < achievements.length; i++) {
                 BombLobbersAchievement achievement = achievements[i];
@@ -13872,30 +13872,24 @@ public final class ArcadePortManager implements Listener {
             lore.add(ChatColor.GRAY + "Flawless Victory: " + ChatColor.WHITE
                     + plugin.getConfig().getInt(path + "flawless-victory", 0));
         }
-        if ("bacon-brawl".equals(gameId)) {
-            long unlocked = java.util.Arrays.stream(BaconBrawlAchievement.values())
-                    .filter(achievement -> plugin.getConfig().getBoolean(achievement.configKey(targetId), false))
+        if (!ArcadeProgressCatalog.achievements(gameId).isEmpty()) {
+            List<ArcadeProgressCatalog.Achievement> achievements = ArcadeProgressCatalog.achievements(gameId);
+            long unlocked = achievements.stream()
+                    .filter(achievement -> plugin.getConfig().getBoolean(
+                            arcadeAchievementConfigKey(targetId, gameId, achievement.id()), false))
                     .count();
             lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked
-                    + "/" + BaconBrawlAchievement.values().length);
-        } else if ("gladiators".equals(gameId)) {
-            long unlocked = java.util.stream.Stream.of("are-you-not-entertained", "not-even-close")
-                    .filter(id -> plugin.getConfig().getBoolean(
-                            ArcadePortRules.gladiatorsAchievementConfigKey(targetId, id), false))
-                    .count();
-            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/2");
+                    + "/" + achievements.size());
+        }
+        if ("gladiators".equals(gameId)) {
             lore.add(ChatColor.LIGHT_PURPLE + "Silky Seconds: " + ChatColor.WHITE
                     + plugin.getConfig().getInt(ArcadePortRules.gladiatorsMilestoneConfigKey(targetId), 0)
                     + " loser-bracket wins");
         } else if ("bomb-lobbers".equals(gameId)) {
-            long unlocked = java.util.Arrays.stream(BombLobbersAchievement.values())
-                    .filter(achievement -> plugin.getConfig().getBoolean(achievement.configKey(targetId), false))
-                    .count();
-            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked
-                    + "/" + BombLobbersAchievement.values().length);
             lore.add(ChatColor.GRAY + "TNT thrown: " + plugin.getConfig().getInt(path + "thrown", 0));
             lore.add(ChatColor.GRAY + "Direct hits: " + plugin.getConfig().getInt(path + "direct-hits", 0));
-        } else if ("runner".equals(gameId)) {
+        }
+        if ("runner".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Marathon Runner: " + ChatColor.WHITE
                     + plugin.getConfig().getInt(path + "marathon-runner", 0) + " blocks");
             String[] slugs = {"gettin-those-steps-in", "hop-to-it", "flash"};
