@@ -10,9 +10,14 @@ class PlexballRulesTest {
     void pingCompensationUsesServerMeasuredRoundTripAndIsBounded() {
         assertEquals(0, PlexballRules.latencyRewindTicks(-1));
         assertEquals(0, PlexballRules.latencyRewindTicks(0));
-        assertEquals(1, PlexballRules.latencyRewindTicks(100));
+        assertEquals(0, PlexballRules.latencyRewindTicks(49));
+        assertEquals(1, PlexballRules.latencyRewindTicks(50));
+        assertEquals(1, PlexballRules.latencyRewindTicks(149));
+        assertEquals(2, PlexballRules.latencyRewindTicks(150));
         assertEquals(2, PlexballRules.latencyRewindTicks(200));
         assertEquals(4, PlexballRules.latencyRewindTicks(400));
+        assertEquals(4, PlexballRules.latencyRewindTicks(449));
+        assertEquals(PlexballRules.MAX_REWIND_TICKS, PlexballRules.latencyRewindTicks(450));
         assertEquals(PlexballRules.MAX_REWIND_TICKS, PlexballRules.latencyRewindTicks(1200));
     }
 
