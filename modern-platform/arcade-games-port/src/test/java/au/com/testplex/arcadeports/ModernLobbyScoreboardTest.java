@@ -5,51 +5,68 @@ import org.junit.jupiter.api.Test;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ModernLobbyScoreboardTest {
     @Test
-    void everyGameUsesTheSameFifteenLineSidebarStructure() {
-        List<String> deathTag = ModernLobbyScoreboard.sidebarLines(
-                "Testplex Modern", "Death Tag", "Runner Basher", "0", "0", "Owner", "www.mineplex.com");
-        List<String> baconBrawl = ModernLobbyScoreboard.sidebarLines(
-                "Testplex Modern", "Bacon Brawl", "El Muchacho Pigo", "0", "0", "Owner", "www.mineplex.com");
+    void rendersOnlyTheOriginalFourArcadeScoreboardSections() {
+        List<String> lines = ModernLobbyScoreboard.sidebarLines(
+                "2/16", "Runner Basher", "0", "Testplex Modern");
 
-        assertEquals(15, deathTag.size());
-        assertEquals(15, baconBrawl.size());
-        assertEquals(15, new HashSet<>(deathTag).size());
-        assertEquals(15, new HashSet<>(baconBrawl).size());
-        assertEquals(ChatColor.AQUA + "Server: " + ChatColor.WHITE + "Testplex Modern", deathTag.get(0));
-        assertEquals(ChatColor.GREEN.toString() + ChatColor.BOLD + "Game", deathTag.get(2));
-        assertEquals(ChatColor.GOLD.toString() + ChatColor.BOLD + "Kit", deathTag.get(4));
-        assertEquals(ChatColor.RED + "Website: " + ChatColor.DARK_AQUA + "www.mineplex.com", deathTag.get(14));
+        assertEquals(12, lines.size());
+        assertEquals(12, new HashSet<>(lines).size());
+
+        assertEquals(ChatColor.YELLOW.toString() + ChatColor.BOLD + "Players", lines.get(1));
+        assertEquals(ChatColor.WHITE + "2/16", lines.get(2));
+        assertEquals(ChatColor.GOLD.toString() + ChatColor.BOLD + "Kit", lines.get(4));
+        assertEquals(ChatColor.WHITE + "Runner Basher", lines.get(5));
+        assertEquals(ChatColor.GREEN.toString() + ChatColor.BOLD + "Gems", lines.get(7));
+        assertEquals(ChatColor.WHITE + "0", lines.get(8));
+        assertEquals(ChatColor.AQUA.toString() + ChatColor.BOLD + "Server", lines.get(10));
+        assertEquals(ChatColor.WHITE + "Testplex Modern", lines.get(11));
+
+        String visible = String.join("|", lines.stream().map(ChatColor::stripColor).toList());
+        assertTrue(visible.contains("Players"));
+        assertTrue(visible.contains("Kit"));
+        assertTrue(visible.contains("Gems"));
+        assertTrue(visible.contains("Server"));
+        assertTrue(!visible.contains("Shards"));
+        assertTrue(!visible.contains("Rank"));
+        assertTrue(!visible.contains("Website"));
+        assertTrue(!visible.contains("Game"));
     }
 
     @Test
-    void scoreboardHeaderDoesNotChangeForBaconBrawlOrOtherGames() {
-        String defaultTitle = "Testplex";
-        String expected = ChatColor.WHITE.toString() + ChatColor.BOLD + "TESTPLEX";
-
-        assertEquals(expected, ModernLobbyScoreboard.scoreboardTitleForGame("bacon-brawl", defaultTitle));
-        assertEquals(expected, ModernLobbyScoreboard.scoreboardTitleForGame("death-tag", defaultTitle));
-        assertEquals(expected, ModernLobbyScoreboard.scoreboardTitleForGame("bomb-lobbers", defaultTitle));
+    void titleMatchesTheOriginalArcadeLifecycleStates() {
+        assertEquals(ChatColor.GREEN.toString() + ChatColor.BOLD + "Waiting for players",
+                ModernLobbyScoreboard.scoreboardTitleForStatus("Waiting for players"));
+        assertEquals(ChatColor.BOLD + "Starting in "
+                        + ChatColor.GREEN + ChatColor.BOLD + "10 Seconds",
+                ModernLobbyScoreboard.scoreboardTitleForStatus("Starting in 10 Seconds"));
+        assertEquals(ChatColor.BOLD + "Vote ends in "
+                        + ChatColor.GREEN + ChatColor.BOLD + "15",
+                ModernLobbyScoreboard.scoreboardTitleForStatus("Vote ends in 15"));
+        assertEquals(ChatColor.GREEN.toString() + ChatColor.BOLD + "Loading...",
+                ModernLobbyScoreboard.scoreboardTitleForStatus("Loading..."));
+        assertEquals(ChatColor.GREEN.toString() + ChatColor.BOLD + "In Progress...",
+                ModernLobbyScoreboard.scoreboardTitleForStatus("In Progress..."));
     }
 
     @Test
-    void rankFormattingKeepsOwnerHigherPriorityThanAdmin() {
-        assertEquals("Owner", ModernLobbyScoreboard.rankName(true, true));
-        assertEquals("Admin", ModernLobbyScoreboard.rankName(false, true));
-        assertEquals("No Rank", ModernLobbyScoreboard.rankName(false, false));
+    void playerCountIsFormattedLikeTheOriginalPlayersValue() {
+        assertEquals("0/16", ModernLobbyScoreboard.formatPlayerCount(0, 16));
+        assertEquals("3/16", ModernLobbyScoreboard.formatPlayerCount(3, 16));
+        assertEquals("16/16", ModernLobbyScoreboard.formatPlayerCount(20, 16));
+        assertEquals("0/1", ModernLobbyScoreboard.formatPlayerCount(-2, 0));
     }
 
     @Test
-    void baconBrawlAndOtherGamesShareTheSameLineCount() {
-        assertEquals(
-                ModernLobbyScoreboard.sidebarLines("Testplex Modern", "Bacon Brawl", "Default", "0", "0", "Admin", "www.mineplex.com").size(),
-                ModernLobbyScoreboard.sidebarLines("Testplex Modern", "Death Tag", "Default", "0", "0", "Admin", "www.mineplex.com").size());
+    void selectedKitUsesReadableNamesAndTheLegacyNoneFallback() {
+        assertEquals("El Muchacho Pigo", ModernLobbyScoreboard.formatKitName("el-muchacho-pigo"));
+        assertEquals("Runner Basher", ModernLobbyScoreboard.formatKitName("runner-basher"));
+        assertEquals("None", ModernLobbyScoreboard.formatKitName("None"));
+        assertEquals("None", ModernLobbyScoreboard.formatKitName(""));
     }
 }
