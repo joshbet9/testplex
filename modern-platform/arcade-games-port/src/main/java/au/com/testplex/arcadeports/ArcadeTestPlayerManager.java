@@ -10,6 +10,9 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerRespawnEvent;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -34,18 +37,23 @@ import java.util.function.Consumer;
  * separately-installed server plugin with a proprietary distribution licence.
  * This project neither bundles nor copies any of its implementation.
  */
-final class ArcadeTestPlayerManager {
+final class ArcadeTestPlayerManager implements Listener {
     static final int TARGET_ROSTER_SIZE = 16;
     private static final String FPP_PLUGIN_NAME = "FakePlayerPlugin";
     private static final String RESERVED_NAME_PREFIX = "TPXTEST";
+    private static final int CLEANUP_TIMEOUT_TICKS = 200;
 
     private final JavaPlugin host;
     private final NamespacedKey markerKey;
     private final Map<UUID, Object> activeHandles = new LinkedHashMap<>();
     private final Map<UUID, Player> activePlayers = new LinkedHashMap<>();
+    private final Map<UUID, RetiringTestPlayer> retiringHandles = new LinkedHashMap<>();
+    private final List<Runnable> cleanupCallbacks = new ArrayList<>();
     private List<Object> pendingHandles = List.of();
     private Object pendingApi;
+    private Object retiringApi;
     private BukkitTask pendingSpawnTask;
+    private BukkitTask cleanupTask;
     private boolean shuttingDown;
     private boolean startupCleanupComplete;
     private boolean startupCleanupSucceeded;
@@ -53,6 +61,31 @@ final class ArcadeTestPlayerManager {
     ArcadeTestPlayerManager(JavaPlugin host) {
         this.host = host;
         this.markerKey = new NamespacedKey(host, "session-test-player");
+        Bukkit.getPluginManager().registerEvents(this, host);
+    }
+
+    enum CleanupAction {
+        WAIT_FOR_RESPAWN,
+        WAIT_FOR_ENTITY,
+        DESPAWN,
+        WAIT_FOR_DISCONNECT,
+        KICK_ORPHAN,
+        COMPLETE
+    }
+
+    /** Pure lifecycle decision used by the cleanup loop and its regression tests. */
+    static CleanupAction cleanupAction(boolean handleRegistered, boolean respawning,
+            boolean bodyAvailable, boolean playerOnline, boolean despawnRequested, boolean timedOut) {
+        if (despawnRequested) {
+            if (!playerOnline) return CleanupAction.COMPLETE;
+            return timedOut ? CleanupAction.KICK_ORPHAN : CleanupAction.WAIT_FOR_DISCONNECT;
+        }
+        if (handleRegistered) {
+            if (respawning) return timedOut ? CleanupAction.KICK_ORPHAN : CleanupAction.WAIT_FOR_RESPAWN;
+            if (bodyAvailable && playerOnline) return CleanupAction.DESPAWN;
+            return timedOut ? CleanupAction.KICK_ORPHAN : CleanupAction.WAIT_FOR_ENTITY;
+        }
+        return playerOnline ? CleanupAction.KICK_ORPHAN : CleanupAction.COMPLETE;
     }
 
     static int additionalPlayersNeeded(int humanPlayers) {
@@ -61,7 +94,7 @@ final class ArcadeTestPlayerManager {
 
     boolean isTestPlayer(UUID id) {
         if (id == null) return false;
-        if (activeHandles.containsKey(id)) return true;
+        if (activeHandles.containsKey(id) || retiringHandles.containsKey(id)) return true;
         Player player = Bukkit.getPlayer(id);
         return player != null && (player.getName().startsWith(RESERVED_NAME_PREFIX)
                 || player.getPersistentDataContainer().has(markerKey, PersistentDataType.BYTE));
@@ -80,7 +113,7 @@ final class ArcadeTestPlayerManager {
     }
 
     boolean isManagedTestPlayer(UUID id) {
-        return id != null && activeHandles.containsKey(id);
+        return id != null && (activeHandles.containsKey(id) || retiringHandles.containsKey(id));
     }
 
     int activeCount() {
@@ -97,29 +130,62 @@ final class ArcadeTestPlayerManager {
                 startupCleanupComplete = true;
                 return;
             }
+            boolean cleanupScheduled = false;
             try {
                 Object api = api();
                 Collection<?> bots = collection(invoke(api, "getBots"));
-                int removed = 0;
+                List<Object> staleHandles = new ArrayList<>();
+                java.util.Set<UUID> staleIds = new java.util.HashSet<>();
                 for (Object bot : bots) {
                     String name = string(invoke(bot, "getName"));
                     if (name != null && name.startsWith(RESERVED_NAME_PREFIX)) {
-                        despawn(api, bot);
-                        removed++;
+                        staleHandles.add(bot);
+                        staleIds.add((UUID) invoke(bot, "getUuid"));
                     }
                 }
-                if (removed > 0) {
-                    host.getLogger().warning("Removed " + removed
-                            + " stale Testplex game-scoped fake player(s) from a previous session.");
+
+                // Catch a Bukkit Player whose FakePlayerPlugin registry entry was lost
+                // after an interrupted respawn/despawn hand-off.
+                List<UUID> orphanIds = new ArrayList<>();
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    boolean reservedName = player.getName().startsWith(RESERVED_NAME_PREFIX);
+                    boolean marked = player.getPersistentDataContainer().has(markerKey, PersistentDataType.BYTE);
+                    if ((reservedName || marked) && !staleIds.contains(player.getUniqueId())) {
+                        orphanIds.add(player.getUniqueId());
+                    }
+                }
+
+                if (!staleHandles.isEmpty() || !orphanIds.isEmpty()) {
+                    host.getLogger().warning("Cleaning " + staleHandles.size()
+                            + " stale FakePlayerPlugin handle(s) and " + orphanIds.size()
+                            + " orphaned Testplex player(s) from a previous session.");
+                    cleanupScheduled = true;
+                    scheduleCleanup(api, staleHandles, orphanIds, () -> {
+                        startupCleanupSucceeded = noOnlineTestPlayersRemain();
+                        startupCleanupComplete = true;
+                        if (!startupCleanupSucceeded) {
+                            host.getLogger().severe("Startup cleanup could not remove every stale TPXTEST player; game starts remain disabled.");
+                        }
+                    });
+                    return;
                 }
                 startupCleanupSucceeded = true;
             } catch (Exception exception) {
                 host.getLogger().warning("Could not inspect FakePlayerPlugin for stale Testplex bots: "
                         + rootMessage(exception));
+                startupCleanupSucceeded = false;
             } finally {
-                startupCleanupComplete = true;
+                if (!cleanupScheduled) startupCleanupComplete = true;
             }
         }, 40L);
+    }
+
+    private boolean noOnlineTestPlayersRemain() {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player.getName().startsWith(RESERVED_NAME_PREFIX)
+                    || player.getPersistentDataContainer().has(markerKey, PersistentDataType.BYTE)) return false;
+        }
+        return true;
     }
 
     boolean isAvailableForDamageablePlayers() {
@@ -171,6 +237,10 @@ final class ArcadeTestPlayerManager {
             config.set("body.drop-items-on-despawn", true);
             changed = true;
         }
+        if (!config.getBoolean("body.pick-up-items", true)) {
+            config.set("body.pick-up-items", true);
+            changed = true;
+        }
         if (config.getInt("persistence.autosave-interval-seconds", 120) != 0) {
             config.set("persistence.autosave-interval-seconds", 0);
             changed = true;
@@ -192,7 +262,8 @@ final class ArcadeTestPlayerManager {
             completion.accept(new SpawnResult(List.of(), null));
             return;
         }
-        if (shuttingDown || pendingSpawnTask != null || !activeHandles.isEmpty()) {
+        if (shuttingDown || pendingSpawnTask != null || !activeHandles.isEmpty()
+                || !retiringHandles.isEmpty() || cleanupTask != null) {
             completion.accept(new SpawnResult(List.of(), "A previous test-player batch is still being cleaned up."));
             return;
         }
@@ -237,9 +308,7 @@ final class ArcadeTestPlayerManager {
                 handles.add(result.get());
             }
         } catch (Exception exception) {
-            for (Object handle : handles) {
-                try { despawn(api, handle); } catch (Exception ignored) { }
-            }
+            scheduleCleanup(api, handles, List.of(), null);
             completion.accept(new SpawnResult(List.of(), rootMessage(exception)));
             return;
         }
@@ -266,13 +335,13 @@ final class ArcadeTestPlayerManager {
                         allReady = false;
                         continue;
                     }
-                    configureAsAfkPlayer(handle, player);
+                    configureAsAfkPlayer(handle, player, true);
                     ready.add(player);
                 }
             } catch (Exception exception) {
                 cancelPendingSpawn();
-                despawnBatch(api, handles);
                 clearPendingHandles();
+                scheduleCleanup(api, handles, List.of(), null);
                 completion.accept(new SpawnResult(List.of(),
                         "FakePlayerPlugin created an incomplete player batch: " + rootMessage(exception)));
                 return;
@@ -295,8 +364,8 @@ final class ArcadeTestPlayerManager {
 
             if (elapsed[0] >= timeoutTicks) {
                 cancelPendingSpawn();
-                despawnBatch(api, handles);
                 clearPendingHandles();
+                scheduleCleanup(api, handles, List.of(), null);
                 completion.accept(new SpawnResult(List.of(),
                         "Timed out waiting for all " + handles.size()
                                 + " server-side fake players to complete their join lifecycle."));
@@ -304,7 +373,7 @@ final class ArcadeTestPlayerManager {
         }, 1L, 1L);
     }
 
-    private void configureAsAfkPlayer(Object handle, Player player) throws Exception {
+    private void configureAsAfkPlayer(Object handle, Player player, boolean initialSpawn) throws Exception {
         // FPP's AFK bot type does not run player input/AI. Freeze it as well so the
         // target remains stationary until the game itself moves, teleports or kills it.
         invoke(handle, "setFrozen", new Class<?>[] {boolean.class}, true);
@@ -318,7 +387,8 @@ final class ArcadeTestPlayerManager {
         player.setCollidable(true);
         player.setCanPickupItems(true);
         player.setOp(false);
-        player.setGameMode(org.bukkit.GameMode.SURVIVAL);
+        // Preserve a game-assigned respawn mode (for example, spectator).
+        if (initialSpawn) player.setGameMode(org.bukkit.GameMode.SURVIVAL);
         // Listed visibility is exposed by some Paper builds and hidden behind the
         // server implementation in others; keep this optional so Player setup still
         // compiles against the exact server API without depending on CraftPlayer.
