@@ -144,6 +144,7 @@ public final class SuperSploorRuntime implements Listener {
     private final Map<UUID, Integer> marks = new HashMap<>();
     private final Map<UUID, Long> lastShotAt = new HashMap<>();
     private final Map<UUID, Long> lastInkRegenAt = new HashMap<>();
+    private final Map<UUID, Long> lastInkUseAt = new HashMap<>();
     private final Map<UUID, Long> chargerChargeStartedAt = new HashMap<>();
     private final Map<UUID, Double> specialCharge = new HashMap<>();
     private final Set<UUID> specialChargeSuppressed = new HashSet<>();
@@ -253,6 +254,7 @@ public final class SuperSploorRuntime implements Listener {
             marks.put(id, 0);
             lastShotAt.put(id, now - 2_000L);
             lastInkRegenAt.put(id, now);
+            lastInkUseAt.put(id, now);
             spawnProtectedUntil.put(id, now + SuperSploorRules.SPAWN_PROTECTION_MILLIS);
             kills.put(id, 0);
             MutableStats stats = new MutableStats();
@@ -308,6 +310,10 @@ public final class SuperSploorRuntime implements Listener {
         for (UUID id : new ArrayList<>(players.keySet())) {
             Player player = players.get(id);
             if (player == null || !player.isOnline()) continue;
+            if (!respawnAt.containsKey(id) && player.getLocation().getY() <= world.getMinHeight() + 4.0D) {
+                splat(id, player, null);
+                continue;
+            }
             if (respawnAt.containsKey(id)) {
                 if (now >= respawnAt.get(id)) respawn(id, now);
                 continue;
@@ -324,7 +330,7 @@ public final class SuperSploorRuntime implements Listener {
             if (now - lastRegen >= 1_000L) {
                 int seconds = (int) Math.min(10L, (now - lastRegen) / 1_000L);
                 boolean canRegen = squid && inFriendlyPaint
-                        || now - lastShotAt.getOrDefault(id, 0L) >= 1_000L;
+                        || now - lastInkUseAt.getOrDefault(id, now) >= 1_000L;
                 if (canRegen && seconds > 0) {
                     int updated = SuperSploorRules.nextInkAfterRegeneration(
                             currentInk, seconds, squid && inFriendlyPaint);
@@ -451,6 +457,7 @@ public final class SuperSploorRuntime implements Listener {
             return;
         }
         ink.put(id, SuperSploorRules.spendInk(current, cost));
+        lastInkUseAt.put(id, now);
         secondaryReadyAt.put(id, now + 4_000L);
 
         if ("roller".equals(kit)) {
@@ -960,6 +967,7 @@ public final class SuperSploorRuntime implements Listener {
         }
         ink.put(id, SuperSploorRules.spendInk(current, cost));
         lastShotAt.put(id, now);
+        lastInkUseAt.put(id, now);
         Snowball projectile = player.launchProjectile(Snowball.class);
         projectile.setItem(new ItemStack(teams.get(id) == RED ? Material.RED_DYE : Material.LIGHT_BLUE_DYE));
         projectile.setVelocity(player.getEyeLocation().getDirection().normalize()
@@ -1042,6 +1050,7 @@ public final class SuperSploorRuntime implements Listener {
         }
         ink.put(id, SuperSploorRules.spendInk(current, cost));
         lastShotAt.put(id, now);
+        lastInkUseAt.put(id, now);
 
         if ("roller".equals(kit)) {
             rollPaintPath(player, id);
@@ -1564,6 +1573,7 @@ public final class SuperSploorRuntime implements Listener {
         marks.clear();
         lastShotAt.clear();
         lastInkRegenAt.clear();
+        lastInkUseAt.clear();
         chargerChargeStartedAt.clear();
         dodgeRollCharges.clear();
         nextDodgeRollRechargeAt.clear();
@@ -1634,12 +1644,26 @@ public final class SuperSploorRuntime implements Listener {
         trackerFlares.removeIf(flare -> flare.ownerId.equals(id));
         delayedBlasts.removeIf(blast -> blast.ownerId.equals(id));
         paintstorms.removeIf(storm -> storm.ownerId.equals(id));
+        for (UUID projectileId : new ArrayList<>(activeProjectiles)) {
+            if (!id.equals(projectileOwners.get(projectileId))) continue;
+            Projectile projectile = projectileEntities.remove(projectileId);
+            if (projectile != null && projectile.isValid()) projectile.remove();
+            activeProjectiles.remove(projectileId);
+            projectileOwners.remove(projectileId);
+            fullyChargedProjectiles.remove(projectileId);
+            projectilePaintRadii.remove(projectileId);
+            projectilePaintLines.remove(projectileId);
+            projectileLastLocations.remove(projectileId);
+            projectileKinds.remove(projectileId);
+            completeVolleyProjectile(projectileId);
+        }
         ink.remove(id);
         marks.remove(id);
         respawnAt.remove(id);
         spawnProtectedUntil.remove(id);
         lastShotAt.remove(id);
         lastInkRegenAt.remove(id);
+        lastInkUseAt.remove(id);
         lastHitAt.remove(id);
         nextMarkRecoveryAt.remove(id);
         contributors.remove(id);
