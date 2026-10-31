@@ -12879,6 +12879,9 @@ public final class ArcadePortManager implements Listener {
             session.variantRuntime.stop();
             session.variantRuntime = null;
         }
+        if (announceWinner && session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
+            sneakyAssassins.finish(winner);
+        }
         if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) sneakyAssassins.stop();
         if (announceWinner && session.type == ArcadePortGame.BOMB_LOBBERS) {
             recordBombLobbersAchievements(session, winner);
@@ -13679,7 +13682,7 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             if (java.util.Set.of("bacon-brawl", "bomb-lobbers", "evolution", "gladiators", "micro-battles",
-                    "one-in-the-quiver", "turf-wars").contains(session.type.id())) {
+                    "one-in-the-quiver", "turf-wars", "sneaky-assassins").contains(session.type.id())) {
                 int priorKills = plugin.getConfig().getInt(path + "kills", 0);
                 plugin.getConfig().set(path + "kills", priorKills + score);
             }
@@ -13866,7 +13869,17 @@ public final class ArcadePortManager implements Listener {
             {"evolution", "Evolution", "SLIME_SPAWN_EGG"},
             {"monster-maze", "Monster Maze", "ROTTEN_FLESH"},
             {"gladiators", "Gladiators", "IRON_SWORD"},
-            {"sneaky-assassins", "Sneaky Assassins", "VILLAGER_SPAWN_EGG"}
+            {"sneaky-assassins", "Sneaky Assassins", "VILLAGER_SPAWN_EGG"},
+            {"speed-builders-arcade", "Speed Builders Arcade", "QUARTZ_BLOCK"},
+            {"wizards", "Arcade Wizards", "BLAZE_ROD"},
+            {"wither-assault", "Wither Assault", "WITHER_SKELETON_SKULL"},
+            {"hoops-remastered", "Hoops Remastered", "SLIME_BALL"},
+            {"milk-the-cow", "Milk the Cow", "MILK_BUCKET"},
+            {"skywars", "Arcade SkyWars", "ENDER_CHEST"},
+            {"draw-my-thing", "Draw My Thing", "WRITABLE_BOOK"},
+            {"master-builders", "Arcade Master Builders", "OAK_PLANKS"},
+            {"heroes-of-gwen", "Heroes of GWEN", "PRISMARINE_SHARD"},
+            {"castle-assault", "Castle Assault", "TNT"}
     };
 
     private static final List<String> DRAGON_ESCAPE_BEACON_COLOR_NAMES =
@@ -14011,17 +14024,36 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void openStatsArcade(Player viewer, UUID targetId, String targetName) {
-        Inventory inventory = createStatsInventory(StatsPage.ARCADE, targetId, targetName, "Arcade Games", "arcade");
-        int slot = 9;
-        for (String[] def : ARCADE_STATS_GAMES) {
+        openStatsArcade(viewer, targetId, targetName, 0);
+    }
+
+    private void openStatsArcade(Player viewer, UUID targetId, String targetName, int requestedPage) {
+        final int[] slots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
+        int pageCount = (ARCADE_STATS_GAMES.length + slots.length - 1) / slots.length;
+        int page = Math.max(0, Math.min(pageCount - 1, requestedPage));
+        Inventory inventory = createStatsInventory(StatsPage.ARCADE, targetId, targetName,
+                "Arcade Games (" + (page + 1) + "/" + pageCount + ")", "arcade-page-" + page);
+        int startIndex = page * slots.length;
+        int endIndex = Math.min(ARCADE_STATS_GAMES.length, startIndex + slots.length);
+        for (int index = startIndex; index < endIndex; index++) {
+            String[] def = ARCADE_STATS_GAMES[index];
             String gameId = def[0];
             ItemStack item = statsItem(materialOrChest(def[2]), ChatColor.BOLD + def[1],
                     gameStatsLore(targetId, gameId, true), "open-game", null, gameId);
-            inventory.setItem(slot, item);
-            slot += ((slot + 1) % 9 == 0) ? 1 : 2;
+            inventory.setItem(slots[index - startIndex], item);
         }
         inventory.setItem(4, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back", List.of(),
                 "back-main", null, null));
+        if (page > 0) {
+            inventory.setItem(45, statsItem(Material.ARROW, ChatColor.YELLOW + "Previous Page",
+                    List.of(ChatColor.GRAY + "Return to Arcade games page " + page + "."), "open-arcade-page",
+                    String.valueOf(page - 1), null));
+        }
+        if (page + 1 < pageCount) {
+            inventory.setItem(53, statsItem(Material.ARROW, ChatColor.YELLOW + "Next Page",
+                    List.of(ChatColor.GRAY + "Open Arcade games page " + (page + 2) + "."), "open-arcade-page",
+                    String.valueOf(page + 1), null));
+        }
         inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(),
                 "close", null, null));
         viewer.openInventory(inventory);
@@ -14095,6 +14127,9 @@ public final class ArcadePortManager implements Listener {
             renderGameMilestones(inventory, targetId, gameId);
         } else if (!ArcadeProgressCatalog.achievements(gameId).isEmpty()) {
             renderGameAchievements(inventory, targetId, gameId);
+            if ("sneaky-assassins".equals(gameId)) {
+                renderSneakyAssassinsStats(inventory, targetId, played, wins, score, knockouts);
+            }
         } else if ("bacon-brawl".equals(gameId)) {
             // Match the 1.8 achievement-bottle pattern: unlocked achievements use
             // experience bottles, and unearned achievements use glass bottles.
@@ -14370,6 +14405,33 @@ public final class ArcadePortManager implements Listener {
         viewer.openInventory(inventory);
     }
 
+    private void renderSneakyAssassinsStats(Inventory inventory, UUID targetId,
+                                                int played, int wins, int score, int knockouts) {
+        String legacyAchievementPath = "test-achievements.sneaky-assassins." + targetId + ".the-masters-master";
+        boolean legacyUnlocked = plugin.getConfig().getBoolean(legacyAchievementPath, false);
+        inventory.setItem(16, statsItem(legacyUnlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                (legacyUnlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + "The Master’s Master",
+                List.of(" ", ChatColor.GRAY + "Defeat an assassin with at least four power-ups while you have none.",
+                        " ", legacyUnlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
+                "noop", null, null));
+        String path = localStatsPath(targetId, "sneaky-assassins");
+        int[] slots = {29, 30, 31, 32, 33, 34, 35, 36};
+        int[] values = {played, wins, score, knockouts,
+                plugin.getConfig().getInt(path + "master-assassin", 0),
+                plugin.getConfig().getInt(path + "i-see-you", 0),
+                plugin.getConfig().getInt(path + "incompetence", 0),
+                plugin.getConfig().getInt(path + "powerups", 0)};
+        String[] labels = {"Games Played", "Wins", "Kills", "Knockouts",
+                "Master Assassin", "I See You", "Incompetence", "Power-ups"};
+        for (int i = 0; i < slots.length; i++) {
+            int value = values[i];
+            inventory.setItem(slots[i], statsItem(value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                    (value > 0 ? ChatColor.GREEN : ChatColor.RED) + labels[i],
+                    List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: "
+                            + ChatColor.WHITE + value), "noop", null, null));
+        }
+    }
+
     private void renderGameAchievements(Inventory inventory, UUID targetId, String gameId) {
         List<ArcadeProgressCatalog.Achievement> achievements = ArcadeProgressCatalog.achievements(gameId);
         int slot = 10;
@@ -14589,11 +14651,22 @@ public final class ArcadePortManager implements Listener {
 
     private int totalLocalStat(UUID targetId, String metric) {
         int total = 0;
+        Set<String> counted = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
-            total += plugin.getConfig().getInt(localStatsPath(targetId, game.id()) + metric, 0);
+            if (counted.add(game.id())) {
+                total += plugin.getConfig().getInt(localStatsPath(targetId, game.id()) + metric, 0);
+            }
         }
+        counted.add("monster-maze");
+        counted.add("snake");
         total += plugin.getConfig().getInt(localStatsPath(targetId, "monster-maze") + metric, 0);
         total += plugin.getConfig().getInt(localStatsPath(targetId, "snake") + metric, 0);
+        for (String[] definition : ARCADE_STATS_GAMES) {
+            String gameId = definition[0];
+            if (counted.add(gameId)) {
+                total += plugin.getConfig().getInt(localStatsPath(targetId, gameId) + metric, 0);
+            }
+        }
         return total;
     }
 
@@ -18762,6 +18835,12 @@ public final class ArcadePortManager implements Listener {
             switch (action == null ? "" : action) {
                 case "close" -> player.closeInventory();
                 case "open-arcade" -> openStatsArcade(player, holder.targetId, holder.targetName);
+                case "open-arcade-page" -> {
+                    int page = 0;
+                    try { page = Integer.parseInt(category == null ? "0" : category); }
+                    catch (NumberFormatException ignored) { }
+                    openStatsArcade(player, holder.targetId, holder.targetName, page);
+                }
                 case "open-category" -> openStatsCategory(player, holder.targetId, holder.targetName,
                         category == null ? "global" : category);
                 case "open-game" -> openStatsGame(player, holder.targetId, holder.targetName, gameId);

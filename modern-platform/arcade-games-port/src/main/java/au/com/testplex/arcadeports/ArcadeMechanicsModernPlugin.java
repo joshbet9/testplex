@@ -252,6 +252,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
         switch (sub) {
+            case "stats":
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                manager.openStats(player, args.length > 1 ? args[1] : null);
+                return true;
             case "join":
             case "play":
                 if (!(sender instanceof Player player)) {

@@ -103,6 +103,49 @@ class ArcadeProgressCatalogTest {
         assertMilestone("turf-wars", "blocks-broken", "blocks-broken", 10000, new long[] {1000, 2500, 5000, 10000});
     }
 
+    @Test
+    void secondAchievementBatchContainsTheRequestedTitles() {
+        assertTrue(hasAchievement("sneaky-assassins", "you-need-directions", "You Need Directions?"));
+        assertTrue(hasAchievement("sneaky-assassins", "not-so-sneaky", "Not So Sneaky"));
+        assertTrue(hasAchievement("sneaky-assassins", "prosecutor", "Prosecutor"));
+        assertTrue(hasAchievement("sneaky-assassins", "idiot", "Idiot"));
+        assertTrue(hasAchievement("sneaky-assassins", "the-duels-duels-duel", "The Duel’s Duel’s Duel"));
+        assertTrue(hasAchievement("sneaky-assassins", "disappointment-is-immeasurable", "Disappointment is Immeasurable"));
+        assertTrue(hasAchievement("speed-builders-arcade", "speedrunner", "Speedrunner"));
+        assertTrue(hasAchievement("speed-builders-arcade", "unlucky", "Unlucky"));
+        assertTrue(hasAchievement("speed-builders-arcade", "bad-builds", "Bad Builds"));
+        assertTrue(hasAchievement("speed-builders-arcade", "right-on-time", "Right on time"));
+        assertTrue(hasAchievement("wizards", "trifecta", "Trifecta"));
+        assertTrue(hasAchievement("wither-assault", "savior", "Savior"));
+        assertTrue(hasAchievement("hoops-remastered", "quintuple-double", "Quintuple Double"));
+        assertTrue(hasAchievement("milk-the-cow", "got-the-chops", "Got the Chops"));
+        assertTrue(hasAchievement("draw-my-thing", "for-the-people", "For the people"));
+        assertTrue(hasAchievement("master-builders", "architect", "Architect"));
+        assertTrue(hasAchievement("heroes-of-gwen", "know-your-enemy", "Know Your Enemy"));
+        assertTrue(hasAchievement("castle-assault", "moral-exercise", "Moral Exercise"));
+        assertTrue(ArcadeProgressCatalog.achievements("skywars").isEmpty());
+    }
+
+    @Test
+    void secondMilestoneBatchUsesAllRequestedLifetimeTargets() {
+        assertMilestone("sneaky-assassins", "kills", "kills", 1000, new long[] {100, 250, 500, 1000});
+        assertMilestone("sneaky-assassins", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("sneaky-assassins", "powerups", "powerups", 750, new long[] {75, 188, 375, 750});
+        assertMilestone("speed-builders-arcade", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("speed-builders-arcade", "perfect-builds", "perfect-builds", 1000, new long[] {100, 250, 500, 1000});
+        assertMilestone("speed-builders-arcade", "blocks-placed", "blocks-placed", 50000, new long[] {5000, 12500, 25000, 50000});
+        assertMilestone("wizards", "spells-bound", "spells-bound", 5000, new long[] {500, 1250, 2500, 5000});
+        assertMilestone("wither-assault", "revives", "revives", 500, new long[] {50, 125, 250, 500});
+        assertMilestone("hoops-remastered", "points", "points", 500, new long[] {50, 125, 250, 500});
+        assertMilestone("hoops-remastered", "blocks", "blocks", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("milk-the-cow", "buckets-digested", "buckets-digested", 1500, new long[] {150, 375, 750, 1500});
+        assertMilestone("skywars", "tnt-kills", "tnt-kills", 100, new long[] {10, 25, 50, 100});
+        assertMilestone("draw-my-thing", "first-guesses", "first-guesses", 500, new long[] {50, 125, 250, 500});
+        assertMilestone("master-builders", "fair-votes", "fair-votes", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("heroes-of-gwen", "mage-wins", "mage-wins", 100, new long[] {10, 25, 50, 100});
+        assertMilestone("castle-assault", "crystals-destroyed", "crystals-destroyed", 250, new long[] {25, 63, 125, 250});
+    }
+
     private void assertMilestone(String game, String id, String statKey, long maximum, long[] stages) {
         var milestone = ArcadeProgressCatalog.milestones(game).stream()
                 .filter(entry -> entry.id().equals(id))
