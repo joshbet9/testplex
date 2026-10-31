@@ -1,6 +1,6 @@
-# The 26 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
+# The 27 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
 # READY_FOR_TEST games are available together for the shared controlled test session.
-# Super Sploor, Dragons, Runner and Camera Shy join the controlled queue; other games remain disabled until promoted.
+# Dragon Escape, Super Sploor, Dragons, Runner and Camera Shy join the controlled queue; other games remain disabled until promoted.
 enabled-games:
   - death-tag
   - one-in-the-quiver
@@ -12,6 +12,7 @@ enabled-games:
   - plexball
   - spleef
   - super-sploor
+  - dragon-escape
   - dragons
   - runner
   - camera-shy
