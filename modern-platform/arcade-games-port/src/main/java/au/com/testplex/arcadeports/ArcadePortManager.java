@@ -14129,6 +14129,8 @@ public final class ArcadePortManager implements Listener {
             renderGameAchievements(inventory, targetId, gameId);
             if ("sneaky-assassins".equals(gameId)) {
                 renderSneakyAssassinsStats(inventory, targetId, played, wins, score, knockouts);
+            } else if ("hoops-remastered".equals(gameId)) {
+                renderHoopsRemasteredStats(inventory, targetId, played, wins);
             }
         } else if ("bacon-brawl".equals(gameId)) {
             // Match the 1.8 achievement-bottle pattern: unlocked achievements use
@@ -14403,6 +14405,36 @@ public final class ArcadePortManager implements Listener {
         inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(),
                 "close", null, null));
         viewer.openInventory(inventory);
+    }
+
+    private void renderHoopsRemasteredStats(Inventory inventory, UUID targetId, int played, int wins) {
+        String path = localStatsPath(targetId, "hoops-remastered");
+        int losses = plugin.getConfig().getInt(path + "losses", Math.max(0, played - wins));
+        double divisor = Math.max(1.0D, played);
+        double ppg = plugin.getConfig().getDouble(path + "ppg",
+                plugin.getConfig().getDouble(path + "points", 0.0D) / divisor);
+        double apg = plugin.getConfig().getDouble(path + "apg",
+                plugin.getConfig().getDouble(path + "assists", 0.0D) / divisor);
+        double rpg = plugin.getConfig().getDouble(path + "rpg",
+                plugin.getConfig().getDouble(path + "rebounds", 0.0D) / divisor);
+        int[] slots = {29, 30, 31, 32, 33};
+        String[] labels = {"Wins", "Losses", "PPG", "APG", "RPG"};
+        String[] values = {
+                Integer.toString(wins),
+                Integer.toString(losses),
+                String.format(java.util.Locale.ROOT, "%.2f", ppg),
+                String.format(java.util.Locale.ROOT, "%.2f", apg),
+                String.format(java.util.Locale.ROOT, "%.2f", rpg)
+        };
+        for (int i = 0; i < slots.length; i++) {
+            boolean recorded = i < 2 ? Integer.parseInt(values[i]) > 0 : Double.parseDouble(values[i]) > 0.0D;
+            inventory.setItem(slots[i], statsItem(recorded ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                    (recorded ? ChatColor.GREEN : ChatColor.RED) + labels[i],
+                    List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: "
+                            + ChatColor.WHITE + values[i],
+                            i < 2 ? ChatColor.DARK_GRAY + "Career total" : ChatColor.DARK_GRAY + "Average per game"),
+                    "noop", null, null));
+        }
     }
 
     private void renderSneakyAssassinsStats(Inventory inventory, UUID targetId,
