@@ -244,7 +244,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if ("stats".equalsIgnoreCase(label) || "arcadestats".equalsIgnoreCase(label)) {
-            if (args.length == 1 && "plexball".equalsIgnoreCase(args[0])) {
+            if (args.length == 0 || (args.length == 1 && "plexball".equalsIgnoreCase(args[0]))) {
                 if (!(sender instanceof Player player)) {
                     sender.sendMessage("Players only.");
                     return true;
@@ -252,7 +252,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 plexball.openStats(player);
                 return true;
             }
-            sender.sendMessage(ChatColor.YELLOW + "Usage: /stats plexball");
+            sender.sendMessage(ChatColor.YELLOW + "Usage: /stats [plexball]");
             return true;
         }
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
