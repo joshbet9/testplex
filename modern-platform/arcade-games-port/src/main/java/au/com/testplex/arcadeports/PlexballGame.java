@@ -393,7 +393,7 @@ public final class PlexballGame implements Listener {
             results.put(id, new PlayerResult());
             setupPlayer(player);
             if (i == 0) teleportToBatter(player);
-            else teleportToField(player, i - 1);
+            else teleportToField(player, i);
             player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "PLEXBALL"
                     + ChatColor.GRAY + " — " + selectedKits.getOrDefault(id, Kit.TECHNICIAN).displayName());
             player.sendMessage(ChatColor.YELLOW + "You get one 10-second batting turn. Everyone else fields.");
