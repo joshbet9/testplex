@@ -112,6 +112,11 @@ final class ArcadeTestPlayerManager {
         return id != null && (activeHandles.containsKey(id) || retiringHandles.containsKey(id));
     }
 
+    boolean isCleanupInProgress() {
+        return cleanupTask != null || !retiringHandles.isEmpty()
+                || pendingSpawnTask != null || !pendingHandles.isEmpty();
+    }
+
     int activeCount() {
         return activeHandles.size();
     }
@@ -438,7 +443,8 @@ final class ArcadeTestPlayerManager {
             try {
                 boolean respawning = Boolean.TRUE.equals(invoke(handle, "isRespawning"));
                 Object rawPlayer = invoke(handle, "getEntity");
-                if (!respawning && rawPlayer instanceof Player player && player.isOnline() && player.isValid()) {
+                if (!respawning && rawPlayer instanceof Player player && player.isOnline()
+                        && player.isValid() && !player.isDead()) {
                     configureAsAfkPlayer(handle, player, false);
                     activePlayers.put(playerId, player);
                     syncMatchRespawnLocation(player);
@@ -550,7 +556,8 @@ final class ArcadeTestPlayerManager {
                             + rootMessage(exception));
                 }
             }
-            boolean bodyAvailable = rawPlayer instanceof Player body && body.isOnline() && body.isValid();
+            boolean bodyAvailable = rawPlayer instanceof Player body && body.isOnline()
+                    && body.isValid() && !body.isDead();
             boolean handleRegistered = state.handle != null && retiringApi != null
                     && (!registryReadable || registeredIds.contains(id));
             CleanupAction action = cleanupAction(handleRegistered, respawning, bodyAvailable,
