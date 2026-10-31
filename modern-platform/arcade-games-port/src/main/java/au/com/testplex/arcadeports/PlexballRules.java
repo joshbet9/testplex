@@ -19,7 +19,7 @@ public final class PlexballRules {
     public static final double HOME_RUN_METRES = 100.0D;
     public static final double FIELD_HALF_WIDTH_PER_DEPTH = 0.65D;
     public static final double FAIR_ANGLE_DEGREES = 34.0D;
-    public static final double BALL_GRAVITY_PER_TICK = 0.018D;
+    public static final double BALL_GRAVITY_PER_TICK = 0.030D;
     public static final int BASE_CATCH_WINDOW_TICKS = 8;
     public static final double BASE_CATCH_RADIUS = 1.25D;
 
