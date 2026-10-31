@@ -47,6 +47,20 @@ class CameraShyRulesTest {
     }
 
     @Test
+    void timeoutRankingUsesAllMatchMetricsThenAStableUuidTieBreak() {
+        UUID lower = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID higher = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        assertTrue(CameraShyRules.compareTimeoutRank(1, 2, 0, 99, 0, 99, lower, higher) > 0,
+                "lower exposure wins before any other metric");
+        assertTrue(CameraShyRules.compareTimeoutRank(2, 2, 4, 3, 0, 99, lower, higher) > 0,
+                "more photographs breaks an exposure tie");
+        assertTrue(CameraShyRules.compareTimeoutRank(2, 2, 4, 4, 2, 1, lower, higher) > 0,
+                "more eliminations breaks the remaining tie");
+        assertTrue(CameraShyRules.compareTimeoutRank(2, 2, 4, 4, 1, 1, higher, lower) > 0,
+                "UUID provides a stable final tie-break");
+    }
+
+    @Test
     void fiveExposureThresholdIsInclusive() {
         assertFalse(CameraShyRules.eliminatedAt(4));
         assertTrue(CameraShyRules.eliminatedAt(5));
