@@ -10,6 +10,7 @@ enabled-games:
   - micro-battles
   - paintball
   - plexball
+  - spleef
 lobby-selected-game: death-tag
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.

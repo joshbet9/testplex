@@ -17,6 +17,10 @@ class ArcadePortGameTest {
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.PAINTBALL));
         assertEquals(java.util.List.of("Speef", "Super Spleef"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.SPLEEF));
+        assertEquals(java.util.List.of("Death Tag"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.DEATH_TAG));
+        assertEquals(java.util.List.of("One in the Quiver"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.ONE_IN_THE_QUIVER));
+        assertEquals(java.util.List.of("Gladiators"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.GLADIATORS));
+        assertEquals(java.util.List.of("Micro Battle"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.MICRO_BATTLES));
         assertEquals(java.util.List.of("Turf Wars"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.TURF_WARS));
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.SNEAKY_ASSASSINS).isEmpty(),
                 "Sneaky Assassins has no archived map in Mineplex Reborn; do not invent one.");
@@ -154,9 +158,11 @@ class ArcadePortGameTest {
         assertEquals(ArcadePortGame.MONSTER_MAZE, ArcadePortGame.fromId("monster-maze"));
         assertEquals(ArcadePortGame.PLEXBALL, ArcadePortGame.fromId("plexball"));
         assertEquals("Plexball", ArcadePortGame.PLEXBALL.displayName());
-        assertTrue(ArcadePortRules.isArcadePortGameEnabled(
-                ArcadePortGame.PLEXBALL.id(), java.util.List.of("death-tag", "plexball")),
+        java.util.List<String> enabled = java.util.List.of("death-tag", "plexball", "spleef");
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.PLEXBALL.id(), enabled),
                 "Plexball is promoted into the controlled READY_FOR_TEST queue.");
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.SPLEEF.id(), enabled),
+                "Spleef is promoted into the controlled READY_FOR_TEST queue.");
         assertNull(ArcadePortGame.fromId("snake"));
         assertEquals(ArcadePortGame.DRAW_MY_THING, ArcadePortGame.fromId("Draw My Thing"));
         assertEquals(ArcadePortGame.MASTER_BUILDERS, ArcadePortGame.fromId("master_builders"));
