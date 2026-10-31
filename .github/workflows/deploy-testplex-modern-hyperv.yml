@@ -994,7 +994,7 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
-          timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" <<'REMOTE_STAGE_CLEANUP'
+          timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" <<'REMOTE_STAGE_CLEANUP'
           set -euo pipefail
           build_sha="$1"
           if [[ "$build_sha" =~ ^[0-9a-f]{40}$ ]]; then
