@@ -286,12 +286,12 @@ jobs:
             if [[ "$mtime" =~ ^[0-9]+$ ]] && (( now_epoch - mtime > 86400 )); then
               size="$(du -sh -- "$existing" 2>/dev/null | cut -f1 || true)"
               echo "Removing abandoned modern deployment cache (>24h old): $existing (${size:-size unavailable})"
-              rm -rf -- "$existing"
+              sudo -n rm -rf -- "$existing"
             else
               echo "Leaving recent/possibly active modern staging directory untouched: $existing"
             fi
           done
-          rm -rf -- "$upload_dir"
+          sudo -n rm -rf -- "$upload_dir"
           echo "Disk usage after staging-cache cleanup:"
           df -h /var/tmp
           df -i /var/tmp
@@ -404,6 +404,8 @@ jobs:
           # Gate before host prerequisites or service changes. This SSH session
           # already owns the shared flock and keeps it through deploy completion.
           if sudo -n test -x "$RECOVERY_HELPER"; then
+            echo "[deploy] resolving any interrupted modern transaction before preflight."
+            sudo -n "$RECOVERY_HELPER" --locked recover
             sudo -n "$RECOVERY_HELPER" --locked assert-deployable
           elif sudo -n test -e "$STATE_DIR/current.properties"; then
             echo "Recovery helper unavailable while a transaction journal exists; refusing all mutation." >&2
@@ -869,8 +871,8 @@ jobs:
           set -euo pipefail
           build_sha="$1"
           helper=/usr/local/sbin/testplex-modern-recovery
-          if [[ ! -x "$helper" ]]; then
-            echo "Independent recovery helper is missing; no rollback success is claimed." >&2
+          if ! sudo -n test -x "$helper"; then
+            echo "Independent recovery helper is missing or not executable by root; no rollback success is claimed." >&2
             exit 1
           fi
           recovery_output=""
@@ -948,7 +950,7 @@ jobs:
             upload_dir="/var/tmp/testplex-modern-artifacts-$build_sha"
             if [[ -d "$upload_dir" && ! -L "$upload_dir" ]]; then
               echo "Removing only this deployment's staging directory: $upload_dir"
-              rm -rf -- "$upload_dir"
+              sudo -n rm -rf -- "$upload_dir"
             fi
           else
             echo "No valid source SHA was available; leaving all modern staging directories untouched."
