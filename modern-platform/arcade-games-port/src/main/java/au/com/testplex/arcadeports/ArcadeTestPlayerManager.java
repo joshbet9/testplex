@@ -358,7 +358,6 @@ final class ArcadeTestPlayerManager {
                 if (rawPlayer instanceof Player player && player.isOnline()) {
                     player.getInventory().clear();
                     player.getInventory().setArmorContents(null);
-                    player.getInventory().setExtraContents(null);
                     player.setTotalExperience(0);
                     player.setLevel(0);
                     player.setExp(0.0F);
