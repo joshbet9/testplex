@@ -10291,6 +10291,8 @@ public final class ArcadePortManager implements Listener {
             case MICRO_BATTLES -> "team " + (session.teams.getOrDefault(id, 0) + 1) + "/4";
             case ONE_IN_THE_QUIVER -> "kills " + scoreFor(session, id) + "/20";
             case PAINTBALL -> "armour " + session.paintPiecesRemaining.getOrDefault(id, 4) + "/4";
+            case SUPER_SPLOOR -> "ink " + player.getLevel() + "% | Squid "
+                    + (player.getInventory().getHeldItemSlot() == 7 ? "ON" : "OFF");
             case RUNNER -> "unstable tiles " + session.runnerBlocks.size();
             case SHEEP_QUEST -> "pens R" + sheepQuestTeamCount(session, 0)
                     + " A" + sheepQuestTeamCount(session, 1) + " G" + sheepQuestTeamCount(session, 2)
