@@ -895,7 +895,7 @@ public final class PlexballGame implements Listener {
             return;
         }
         if (!PlexballRules.isFairYaw(aimFrame.yaw)) {
-            resolveAttempt(0.0D, false, false, "Foul direction — face inside the fair lines.");
+            resolveAttempt(0.0D, false, false, "Foul swing — the one batting attempt is used.");
             return;
         }
 
@@ -906,7 +906,8 @@ public final class PlexballGame implements Listener {
         Vector eyeOrigin = aimFrame.eyeLocation(arena, player.getEyeHeight()).toVector();
         Vector normal = contactNormal(eyeOrigin, eyeDirection, teeBallPosition, BALL_RADIUS);
         if (normal == null) {
-            player.sendActionBar(Component.text("MISS — put your crosshair on the ball."));
+            player.sendActionBar(Component.text("SWING AND A MISS!"));
+            resolveAttempt(0.0D, false, false, "Swing and a miss — the one batting attempt is used.");
             return;
         }
         double contactY = PlexballRules.clamp(normal.getY(), -1.0D, 1.0D);
