@@ -630,7 +630,7 @@ public final class SuperSploorRuntime implements Listener {
             Set<UUID> alreadyHit = stampedeHitPlayers.computeIfAbsent(id, ignored -> new HashSet<>());
             for (int step = 0; step <= 3; step++) {
                 Location point = origin.clone().add(direction.clone().multiply(step));
-                recordPaint(id, engine.paint(point, teams.getOrDefault(id, -1), 2));
+                recordRollerPaint(id, engine.paint(point, teams.getOrDefault(id, -1), 2));
             }
             for (Player target : players.values()) {
                 if (target == null || !target.isOnline() || target.getUniqueId().equals(id)
@@ -1088,7 +1088,7 @@ public final class SuperSploorRuntime implements Listener {
         for (int step = 0; step <= 5; step++) {
             Location point = origin.clone().add(direction.clone().multiply(step));
             point.setY(player.getLocation().getY() - 0.35D);
-            recordPaint(id, engine.paint(point, team, 1));
+            recordRollerPaint(id, engine.paint(point, team, 1));
         }
         // The Roller pressures close opponents but cannot repeatedly mark one target every tick.
         for (Player target : new ArrayList<>(players.values())) {
@@ -1114,8 +1114,15 @@ public final class SuperSploorRuntime implements Listener {
         double currentCharge = specialCharge.getOrDefault(ownerId, 0.0D);
         specialCharge.put(ownerId, SuperSploorRules.nextSpecialCharge(
                 currentCharge, result.changedUnits(), specialChargeSuppressed.contains(ownerId)));
-        if ("roller".equals(kits.get(ownerId))) stats.rollerTerritory += result.changedUnits();
         if ("lobber".equals(kits.get(ownerId))) stats.lobberEnemyReclaimed += result.enemyReclaimed();
+    }
+
+    private void recordRollerPaint(UUID ownerId, SuperSploorEngine.PaintResult result) {
+        recordPaint(ownerId, result);
+        MutableStats stats = playerStats.get(ownerId);
+        if (stats != null && result != null && "roller".equals(kits.get(ownerId))) {
+            stats.rollerTerritory += result.changedUnits();
+        }
     }
 
     private void updateChargerPaintLines() {
