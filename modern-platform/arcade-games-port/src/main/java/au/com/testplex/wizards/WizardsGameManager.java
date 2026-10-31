@@ -2892,8 +2892,8 @@ public final class WizardsGameManager implements Listener {
                     ? 20.0D : player.getAttribute(Attribute.MAX_HEALTH).getValue();
             player.setHealth(Math.max(1.0D, Math.min(health, maxHealth)));
             player.setAbsorptionAmount(Math.max(0.0D, absorption));
-            if (compassTarget != null && compassTarget.getWorld() != null) player.setCompassTarget(compassTarget);
             if (location != null && location.getWorld() != null) player.teleport(location);
+            if (compassTarget != null && compassTarget.getWorld() != null) player.setCompassTarget(compassTarget);
             if (scoreboard != null) player.setScoreboard(scoreboard);
         }
 
