@@ -149,6 +149,7 @@ public final class CameraShyGame implements Listener {
     private static final class Pursuit {
         final UUID pursuer;
         long lostSightSince = -1L;
+        boolean lostSightDueToSmoke;
         Pursuit(UUID pursuer) { this.pursuer = pursuer; }
     }
     private static final class PlayerSnapshot {
@@ -1392,14 +1393,21 @@ public final class CameraShyGame implements Listener {
                         && pursuer.getWorld() == victim.getWorld();
                 boolean smokeObscured = sameWorld
                         && isBlockedBySmoke(victim.getEyeLocation(), pursuer.getEyeLocation());
+                boolean withinPursuitRange = sameWorld
+                        && victim.getLocation().distanceSquared(pursuer.getLocation()) <= 24.0D * 24.0D;
                 boolean visible = sameWorld && alive.contains(pursuerId)
-                        && victim.getLocation().distanceSquared(pursuer.getLocation()) <= 24.0D * 24.0D
-                        && victim.hasLineOfSight(pursuer) && !smokeObscured;
+                        && withinPursuitRange && victim.hasLineOfSight(pursuer) && !smokeObscured;
                 if (visible) {
                     pursuit.lostSightSince = -1L;
+                    pursuit.lostSightDueToSmoke = false;
                     continue;
                 }
-                if (pursuit.lostSightSince < 0L) pursuit.lostSightSince = now;
+                if (pursuit.lostSightSince < 0L) {
+                    pursuit.lostSightSince = now;
+                    pursuit.lostSightDueToSmoke = alive.contains(pursuerId) && withinPursuitRange
+                            && CameraShyRules.shouldAwardSmokeEscape(smokeObscured, now,
+                                    smokeUsedUntil.getOrDefault(victimId, 0L));
+                }
                 boolean escaped = pursuer == null || !pursuer.isOnline() || !alive.contains(pursuerId)
                         || victim.getWorld() != pursuer.getWorld()
                         || victim.getLocation().distanceSquared(pursuer.getLocation()) >= PURSUIT_ESCAPE_DISTANCE * PURSUIT_ESCAPE_DISTANCE;
@@ -1409,8 +1417,7 @@ public final class CameraShyGame implements Listener {
                         int escapes = encounterEscapes.merge(victimId, 1, Integer::sum);
                         if (escapes >= 3) award(victimId, "now-you-see-me");
                         if (runnerUsedUntil.getOrDefault(victimId, 0L) > now) award(victimId, "catch-me-if-you-can");
-                        if (CameraShyRules.shouldAwardSmokeEscape(smokeObscured, now,
-                                smokeUsedUntil.getOrDefault(victimId, 0L))) {
+                        if (pursuit.lostSightDueToSmoke) {
                             int smoke = smokeEscapes.merge(victimId, 1, Integer::sum);
                             if (smoke >= 3) award(victimId, "smoke-and-mirrors");
                         }
