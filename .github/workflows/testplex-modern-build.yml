@@ -135,9 +135,9 @@ jobs:
             rm -f "$expected_file" "$actual_file"
           }
           # Resolve map folders from the actual enabled-game allow-list. Every enabled
-          # game with legacy maps must have an explicit mapping; Plexball and Camera Shy
-          # use modern arenas and have no 1.8 archive folder; Super Sploor uses its
-          # original Sploor archive folder.
+          # game with legacy maps must have an explicit mapping. Plexball and Camera Shy use
+          # modern arenas; Master Builders and Sneaky Assassins use generated worlds;
+          # these have explicit no-archive policies. Draw My Thing retains its source map.
           IFS=, read -r -a enabled_game_array <<< "$enabled_ids"
           for game_id in "${enabled_game_array[@]}"; do
             case "$game_id" in
@@ -180,7 +180,7 @@ jobs:
           grep -Fq 'retired-monster-maze-plugins' "$deploy_workflow"
           snake_config="$(unzip -p "$snake_jar" config.yml)"
           grep -Fxq "enabled: false" <<< "$snake_config"
-          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 27 shared Arcade catalogue games are packaged, and Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars and Camera Shy join the sixteen-game controlled acceptance queue; Camera Shy uses its procedural modern maze, and all 358 original enabled map archives are compared with the packaged JAR; Wizards is built as a separate module and Speed Builders Arcade remains planned."
+          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 27 shared Arcade catalogue games are packaged, and Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars, Camera Shy, Draw My Thing, Master Builders and Sneaky Assassins join the nineteen-game controlled acceptance queue; Camera Shy and Master Builders/Sneaky Assassins use generated arenas, Draw My Thing retains its source map, and all 358 original enabled map archives are compared with the packaged JAR; Wizards is built as a separate module and Speed Builders Arcade remains planned."
 
       - name: Validate independent deployment recovery and shell syntax
         shell: bash
