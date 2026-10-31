@@ -17,6 +17,7 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -160,8 +161,12 @@ final class ArcadeTestPlayerManager {
         List<Object> handles = new ArrayList<>(count);
         try {
             for (int i = 0; i < count; i++) {
-                String name = RESERVED_NAME_PREFIX
-                        + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+                // Reuse a small, reserved name pool so FakePlayerPlugin's
+                // optional inventory-on-despawn snapshots cannot grow without bound.
+                String name = RESERVED_NAME_PREFIX + String.format(Locale.ROOT, "%02d", i + 1);
+                if (Bukkit.getPlayerExact(name) != null) {
+                    throw new IllegalStateException("Reserved test-player name is already online: " + name);
+                }
                 Object optional = invoke(api, "spawnBot",
                         new Class<?>[] {Location.class, Player.class, String.class},
                         spawn.clone(), owner, name);
