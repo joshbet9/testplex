@@ -48,6 +48,26 @@ public final class HoopsRemasteredRules {
                 && hoopDistance <= DUNK_DISTANCE;
     }
 
+    public static final double RIM_SCORING_RADIUS = 1.15D;
+
+    /**
+     * Tests the actual segment/rim-plane intersection, not just the ball's
+     * end-of-tick location. This prevents fast shots from skipping over the
+     * scoring cylinder between server ticks.
+     */
+    public static boolean crossesHoopPlane(double fromX, double fromY, double fromZ,
+            double toX, double toY, double toZ, double hoopX, double hoopY, double radius) {
+        double[] values = {fromX, fromY, fromZ, toX, toY, toZ, hoopX, hoopY, radius};
+        for (double value : values) if (!Double.isFinite(value)) return false;
+        if (radius <= 0.0D || fromY <= hoopY || toY > hoopY || fromY <= toY) return false;
+        double fraction = (fromY - hoopY) / (fromY - toY);
+        if (fraction < 0.0D || fraction > 1.0D) return false;
+        double crossingX = fromX + (toX - fromX) * fraction;
+        double crossingZ = fromZ + (toZ - fromZ) * fraction;
+        double dx = crossingX - hoopX;
+        return dx * dx + crossingZ * crossingZ <= radius * radius;
+    }
+
     public static boolean hasReachedTargetScore(int red, int blue) {
         return red >= TARGET_SCORE || blue >= TARGET_SCORE;
     }
