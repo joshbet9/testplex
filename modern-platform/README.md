@@ -47,7 +47,7 @@ Modern server provisioning and deployment use a separate directory, unit (`testp
 2. Compare each of the other 14 rough game loops to the existing Reborn source and resolve mechanics/API/lifecycle issues game by game.
 3. Keep cosmetic lines, progression milestones and win scenes parked for all games during the mechanics pass. Exception: Monster Maze customisation remains a core pillar and is tested alongside its mechanics.
 
-## Complete 26-game programme register (31 October 2026)
+## Complete 27-game programme register (1 November 2026)
 
 The overall programme tracks 27 titles/variants: **25 shared Arcade catalogue games**, the separately packaged **Wizards** module, and the planned **Speed Builders Arcade** variant. Speed Builders currently has no implementation branch or runtime code; it is tracked as planned work rather than represented by a non-functional placeholder.
 
@@ -77,7 +77,7 @@ The overall programme tracks 27 titles/variants: **25 shared Arcade catalogue ga
 | 22 | SkyWars Mixed | Mechanics-first 16-player port integrated | Disabled |
 | 23 | Milk the Cow | Mechanics-first port integrated | Disabled |
 | 24 | Wither Assault | Mechanics-first port integrated; generated test arena | Disabled |
-| 25 | Plexball | Controlled acceptance; server-authoritative batting/fielding, kits, HUD, progression and shared Arcade lifecycle | Enabled |
+| 25 | Plexball | Controlled acceptance; server-authoritative batting/fielding, kits, HUD, progression and shared Arcade lifecycle; modern arena (no 1.8 map archive) | Enabled |
 | 26 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
 | 27 | Speed Builders Arcade | Planned; implementation not started | Not available |
 
