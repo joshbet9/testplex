@@ -1082,8 +1082,10 @@ public final class WizardsGameManager implements Listener {
         if (slot >= 0 && slot < state.wandCount && isWand(attacker.getInventory().getItem(slot))) {
             WizardsSpell spell = state.wands[slot];
             if (spell != null) castSpell(attacker, state, spell, event.getEntity(), null);
-            event.setDamage(Math.min(event.getDamage(), 0.5D));
         }
+        // The original Mineplex rules cap all direct melee hits, not only hits
+        // made while a bound wand is selected.
+        event.setDamage(WizardsRules.capMeleeDamage(event.getDamage()));
     }
 
     @EventHandler

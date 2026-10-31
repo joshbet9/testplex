@@ -57,7 +57,7 @@ Use the shared Arcade entry points:
 
 Wizards takes exclusive ownership of the Arcade test session: it stops an existing Arcade match before taking player snapshots, prevents another game from starting while its queue/match is active, and restores players to their pre-match shared-lobby state on elimination, leave, completion, disconnect/reconnect or server shutdown. It writes lifetime wins, kills and spell-binding counts to the common local stats configuration.
 
-This remains a mechanics-in-progress test port, not a READY_FOR_TEST game. The generated mechanics arena is retained because the original Wizards map archive is not present. Original-map parity, kit/armour/damage balance and live multi-client/reconnect acceptance remain outstanding. It is deliberately not added to the normal playable-game allow-list.
+This remains a mechanics-in-progress test port, not a READY_FOR_TEST game. The generated mechanics arena is retained because the original Wizards Arcade map archive is not present (the legacy tree contains only a separate Nano Wizards map folder). Mage's two source-weighted random starter spells and the original 0.5 melee-damage cap are now preserved. Original-map parity, armour rebalancing and live multi-client/reconnect acceptance remain outstanding. It is deliberately not added to the normal playable-game allow-list.
 
 ## Commands
 

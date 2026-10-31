@@ -26,6 +26,11 @@ public final class WizardsRules {
 
     public static float initialMana() { return 0.0F; }
 
+    public static double capMeleeDamage(double incomingDamage) {
+        if (!Double.isFinite(incomingDamage) || incomingDamage < 0.0D) return 0.0D;
+        return Math.min(incomingDamage, 0.5D);
+    }
+
     public static List<WizardsSpell> initialKnownSpells() {
         return List.of(WizardsSpell.MANA_BOLT, WizardsSpell.WIZARDS_COMPASS);
     }
