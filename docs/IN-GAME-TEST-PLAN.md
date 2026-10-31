@@ -48,6 +48,16 @@ This is the manual runtime checklist for the isolated Mineplex Reborn test serve
 - At the start of the round, confirm the indicator says the timed knockback boost is inactive; after the timed knockback escalation starts, confirm the indicator reports the active multiplier on each hit.
 - Hit a summoned Bacon Brawl test dummy and confirm the hit impact and action-bar feedback appear. Dummies are test targets, not real Players, so don't count them as proof of player-only stats/team mechanics.
 
+### Bacon Brawl combat acceptance
+- Spawn at least two test bots and walk directly through them from the front, back and sides. The real player bodies and pig/sheep bot disguises must not push, bounce or jitter against one another.
+- Hit each bot with ordinary melee attacks. The bot must play its hurt response and receive the normal Bacon Brawl knockback formula; it must not lose health because Bacon Brawl combat is knockback-based. The player's ability meter must increase and the XP bar must show the same percentage.
+- Repeat against a moving bot and confirm its chase logic does not overwrite the knockback immediately after a hit.
+- Use repeated hits with 500–900 ms between successful hits. Only those hits should show the large **FLASHY CRITICAL!** title/action-bar treatment and critical particles/sound. Fast, ordinary and late hits must not display a misleading hit/miss popup.
+- Confirm the action bar above the hotbar shows the survive timer, alive count, XP-backed ability-meter percentage, knockback multiplier and a live timing bar. Its green segment must align with the 500–900 ms critical window.
+- Select **Pig Cloak** and activate its ability. The pig/sheep avatar should become invisible without gaining Resistance or invincibility. Landing a hit or reaching the timer expiry must reveal the avatar; bots must stop targeting the cloaked player while it is active.
+- Select **Brutus Bacon** and activate its ability. Front and side attacks from players or bots should be absorbed with no knockback. A rear attack should break the guard, remove Resistance and allow normal knockback. Repeat with a bot attacking from the front and then from behind.
+- End the round and confirm the player's original collision setting, XP level/progress, potion effects and inventory are restored.
+
 ### Dragon Escape
 - Equip different trail colours on two runners.
 - Confirm the stained-glass dust follows the correct runner while they are moving and remains visible despite Dragon Escape's normal invisibility effect.

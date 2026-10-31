@@ -27,7 +27,7 @@ public class Tracker6Kill extends StatTracker<Game>
 		{
 			for (Player player : UtilServer.getPlayers())
 			{
-				if (((BombLobbers) getGame()).getKills(player) >= 6.0)
+				if (((BombLobbers) getGame()).getKills(player) >= 5.0)
 				{
 					addStat(player, "Killer", 1, true, false);
 				}

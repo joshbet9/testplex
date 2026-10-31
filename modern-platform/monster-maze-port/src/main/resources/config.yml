@@ -1,0 +1,12 @@
+# Test-only defaults for the modern Testplex port.
+# External backend writes and status heartbeats are blocked while test-mode is true.
+test-mode: true
+mode: Modern
+solo-mode: false
+debug: true
+record-runs: false
+map: eyeofender
+forced-pattern: -1
+mob-overrides:
+  volcano: witch
+  siberian: creeper

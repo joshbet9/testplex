@@ -57,3 +57,7 @@ The experimental branch also registers `MonsterMazeSpeed` and `MonsterMazeModern
 
 
 When GitHub Actions minutes are unavailable, run the local Java 8 build and source checks with `powershell -ExecutionPolicy Bypass -File .github/scripts/validate-monster-maze.ps1`. Use `-SkipBuild` only for a quick source-contract check; it does not replace compiling `Arcade.jar`.
+
+## Modern Arcade testbed (Paper 26.3)
+
+The independent Java 25/Paper 26.3 project lives in [modern-platform](modern-platform/README.md) and builds through [Testplex Modern Paper 26.3](.github/workflows/testplex-modern-build.yml). After a successful push build on `feat/testplex-modern-26.3-platform`, the build workflow automatically calls [Deploy Testplex Modern Paper 26.3 to isolated Hyper-V](.github/workflows/deploy-testplex-modern-hyperv.yml). Pull requests and manually dispatched build-only runs do not deploy. Deployment uses a separate directory, `testplex-modern.service`, and port `25568`; it refuses to proceed when the legacy Testplex or standalone Monster Maze services are active, so they must be stopped intentionally before deployment. The modern project remains isolated from the Java 8/1.8.8 Reborn server.

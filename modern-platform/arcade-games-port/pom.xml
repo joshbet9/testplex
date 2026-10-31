@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>au.com.testplex</groupId>
+    <artifactId>testplex-modern-arcade-mechanics</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <name>Testplex Modern Arcade Mechanics</name>
+    <description>Modern Arcade mechanics, integrated Monster Maze and source-mapped Mixed Arcade ports for Paper 26.3.</description>
+    <properties>
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+    <repositories>
+        <repository><id>papermc</id><url>https://repo.papermc.io/repository/maven-public/</url></repository>
+        <repository><id>codemc-releases</id><url>https://repo.codemc.io/repository/maven-releases/</url></repository>
+    </repositories>
+    <dependencies>
+        <dependency><groupId>io.papermc.paper</groupId><artifactId>paper-api</artifactId><version>[26.3.build,)</version><scope>provided</scope></dependency>
+        <!-- Optional at runtime; the bridge is reflectively loaded only when PacketEvents is installed. -->
+        <dependency><groupId>com.github.retrooper</groupId><artifactId>packetevents-spigot</artifactId><version>2.14.0</version><scope>provided</scope></dependency>
+        <dependency><groupId>net.dmulloy2</groupId><artifactId>ProtocolLib</artifactId><version>5.4.0</version><scope>provided</scope><optional>true</optional></dependency>
+        <dependency><groupId>org.junit.jupiter</groupId><artifactId>junit-jupiter</artifactId><version>5.12.2</version><scope>test</scope></dependency>
+    </dependencies>
+    <build>
+        <finalName>ArcadeMechanicsModern</finalName>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+            </resource>
+            <resource>
+                <directory>${project.basedir}/../../update/maps</directory>
+                <targetPath>source-maps</targetPath>
+                <filtering>false</filtering>
+                <includes>
+                    <include>Bacon Brawl/**/*.zip</include>
+                    <include>Castle Assault/**/*.zip</include>
+                    <include>Bomb Lobbers/**/*.zip</include>
+                    <include>Death Tag/**/*.zip</include>
+                    <include>Draw My Thing/**/*.zip</include>
+                    <include>Dragon Escape/**/*.zip</include>
+                    <include>Dragons/**/*.zip</include>
+                    <include>Gladiators/**/*.zip</include>
+                    <include>Heroes of GWEN/**/*.zip</include>
+                    <include>Micro Battle/**/*.zip</include>
+                    <include>One in the Quiver/**/*.zip</include>
+                    <include>Paintball/**/*.zip</include>
+                    <include>Super Paintball/**/*.zip</include>
+                    <include>Sploor/**/*.zip</include>
+                    <include>Runner/**/*.zip</include>
+                    <include>Sheep Quest/**/*.zip</include>
+                    <include>Speef/**/*.zip</include>
+                    <include>Super Spleef/**/*.zip</include>
+                    <include>Skywars/**/*.zip</include>
+                    <include>Turf Wars/**/*.zip</include>
+                    <include>Milk the Cow/**/*.zip</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>${project.basedir}/../monster-maze-port/src/main/resources</directory>
+                <targetPath>monster-maze</targetPath>
+                <filtering>false</filtering>
+                <includes>
+                    <include>config.yml</include>
+                    <include>maps.yml</include>
+                    <include>modes/**</include>
+                </includes>
+            </resource>
+        </resources>
+        <plugins>
+            <!-- Compile Monster Maze as an in-process Testplex game module, not a second Bukkit plugin. -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>add-monster-maze-game-source</id>
+                        <phase>generate-sources</phase>
+                        <goals><goal>add-source</goal></goals>
+                        <configuration>
+                            <sources>
+                                <source>${project.basedir}/../monster-maze-port/src/main/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-compiler-plugin</artifactId><version>3.14.1</version><configuration><release>25</release></configuration></plugin>
+            <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-resources-plugin</artifactId><version>3.3.1</version></plugin>
+            <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-jar-plugin</artifactId><version>3.4.2</version></plugin>
+            <plugin><groupId>org.apache.maven.plugins</groupId><artifactId>maven-surefire-plugin</artifactId><version>3.5.3</version></plugin>
+        </plugins>
+    </build>
+</project>
