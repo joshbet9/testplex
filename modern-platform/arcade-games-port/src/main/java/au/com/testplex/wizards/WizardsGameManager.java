@@ -2887,13 +2887,13 @@ public final class WizardsGameManager implements Listener {
             player.setAllowFlight(allowFlight);
             if (allowFlight) player.setFlying(flying);
             else player.setFlying(false);
-            player.setSprinting(sprinting);
             double maxHealth = player.getAttribute(Attribute.MAX_HEALTH) == null
                     ? 20.0D : player.getAttribute(Attribute.MAX_HEALTH).getValue();
             player.setHealth(Math.max(1.0D, Math.min(health, maxHealth)));
             player.setAbsorptionAmount(Math.max(0.0D, absorption));
             if (location != null && location.getWorld() != null) player.teleport(location);
             if (compassTarget != null && compassTarget.getWorld() != null) player.setCompassTarget(compassTarget);
+            player.setSprinting(sprinting);
             if (scoreboard != null) player.setScoreboard(scoreboard);
         }
 
