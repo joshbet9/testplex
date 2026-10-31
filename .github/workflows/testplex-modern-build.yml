@@ -93,6 +93,7 @@ jobs:
           ! jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/world/VoidWorldManager.class"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "name: ArcadeMechanicsModern"
           unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
+          unzip -p "$arcade_jar" plugin.yml | grep -Fxq "  - FakePlayerPlugin"
           ! unzip -p "$arcade_jar" plugin.yml | grep -Eq '^  games:'
           jar tf "$arcade_jar" | grep -Fxq "source-maps/Draw My Thing/Draw_Stadium.zip"
 
