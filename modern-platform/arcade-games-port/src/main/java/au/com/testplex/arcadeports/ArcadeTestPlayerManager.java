@@ -145,6 +145,10 @@ final class ArcadeTestPlayerManager {
             config.set("death.respawn-on-death", true);
             changed = true;
         }
+        if (!config.getBoolean("death.suppress-drops", false)) {
+            config.set("death.suppress-drops", true);
+            changed = true;
+        }
         if (config.getInt("death.respawn-delay", 1) != 1) {
             config.set("death.respawn-delay", 1);
             changed = true;
@@ -211,9 +215,11 @@ final class ArcadeTestPlayerManager {
                 if (Bukkit.getPlayerExact(name) != null) {
                     throw new IllegalStateException("Reserved test-player name is already online: " + name);
                 }
+                Location stagingLocation = spawn.clone().add(
+                        ((i % 5) - 2) * 1.25D, 0.0D, ((i / 5) - 1) * 1.25D);
                 Object optional = invoke(api, "spawnBot",
                         new Class<?>[] {Location.class, Player.class, String.class},
-                        spawn.clone(), owner, name);
+                        stagingLocation, owner, name);
                 if (!(optional instanceof Optional<?> result) || result.isEmpty()) {
                     throw new IllegalStateException("FakePlayerPlugin refused to create " + name
                             + " (check its active bot limit and server log).");
