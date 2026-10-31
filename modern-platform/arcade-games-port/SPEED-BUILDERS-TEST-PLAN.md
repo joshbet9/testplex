@@ -54,6 +54,11 @@ This is a mechanics-first vertical slice, not a claim of full Reborn parity:
 - [ ] A unique lowest score is eliminated; a full tie or all-perfect round does not eliminate a player.
 - [ ] Eliminated players remain spectators and cannot alter builds.
 - [ ] Disconnect, operator stop, plugin disable and a subsequent new match do not leave stale players, inventories or build blocks.
+- [ ] A match win increments only the winner's lifetime `wins` counter.
+- [ ] Each correctly completed model increments `perfect-builds` once, not twice when the build also finishes the timed phase.
+- [ ] Each accepted block placement increments `blocks-placed`; rejected placements do not count.
+- [ ] A player's earned counters are saved if they disconnect during a match; remaining players' counters are saved at match completion.
+- [ ] Operator stop and plugin shutdown save already-earned counters without awarding a match win.
 - [ ] Test with two to sixteen real clients, including latency variance and simultaneous placements.
 - [ ] Add source-map templates and full block-state/mob parity before readiness promotion.
 
