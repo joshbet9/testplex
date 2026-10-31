@@ -331,19 +331,16 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 manager.queue(requestedGame, player, sub.equals("play"), mixedArcadeVariant);
                 return true;
             case "leave":
-                if (!(sender instanceof Player player)) {
-                    sender.sendMessage("Players only.");
-                    return true;
-                }
-                if (cameraShy != null) cameraShy.leaveQueue(player);
-                return true;
-            case "leave":
                 if (!(sender instanceof Player leavingPlayer)) {
                     sender.sendMessage("Players only.");
                     return true;
                 }
                 if (args.length < 2) {
-                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport leave <game-id>");
+                    if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
+                    return true;
+                }
+                if ("camera-shy".equalsIgnoreCase(args[1])) {
+                    if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
                     return true;
                 }
                 ArcadePortGame leavingGame = ArcadePortGame.fromId(args[1]);
