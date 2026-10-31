@@ -945,7 +945,7 @@ jobs:
           sudo -n grep -F 'TESTPLEX_ARCADE_LOBBY_READY' "$SERVER_DIR/logs/latest.log" | tail -n 1 || true
 
           sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-phase DEPLOYMENT_VERIFIED
-          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and the thirteen-game controlled acceptance queue, including Super Sploor, Dragons (Solo), Runner and Camera Shy; Monster Maze registration is reported separately above; Snake, Wizards and all other unfinished game ports remain disabled; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
+          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and the nineteen-game controlled acceptance queue, including Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars, Camera Shy, Draw My Thing, Master Builders and Sneaky Assassins; Monster Maze registration is reported separately above; Snake, Wizards and all other unfinished game ports remain disabled; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "On successful deployment, testplex-reborn.service remains stopped if it was active during preflight; a failed deployment restores services that were active before preflight. Separate Monster Maze project services/data were not modified."
           REMOTE_DEPLOY
 
