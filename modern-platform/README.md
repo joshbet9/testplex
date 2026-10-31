@@ -68,7 +68,7 @@ The overall programme tracks 29 titles/variants: **27 shared Arcade catalogue ga
 | 13 | Sheep Quest | Controlled acceptance candidate; four-team capture, three source kits and original map implemented | Enabled |
 | 14 | Snake | Separate modern module; mechanics in progress | Disabled |
 | 15 | Spleef | Controlled acceptance candidate; all 37 original archives across Spleef and Super Spleef, three kits and source block mechanics | Enabled |
-| 16 | Turf Wars | Mechanics in progress | Disabled |
+| 16 | Turf Wars | Controlled acceptance candidate; 42 original maps, three source kits, standard and Mixed Arcade rules | Enabled |
 | 17 | Draw My Thing | Mechanics in progress; large-lobby turn scaling present | Disabled |
 | 18 | Master Builders | Mechanics in progress; plot/review work present | Disabled |
 | 19 | Castle Assault | Mechanics in progress | Disabled |
@@ -83,4 +83,4 @@ The overall programme tracks 29 titles/variants: **27 shared Arcade catalogue ga
 | 28 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
 | 29 | Speed Builders Arcade | Planned; implementation not started | Not available |
 
-**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest and Camera Shy form the shared controlled test queue. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable. The 315 archived map ZIPs for enabled games are tracked in [the legacy map parity register](arcade-games-port/LEGACY-MAP-PARITY.md); Plexball is explicitly documented as using a modern arena.
+**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars and Camera Shy form the shared controlled test queue. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable. The 357 archived map ZIPs for enabled games are tracked in [the legacy map parity register](arcade-games-port/LEGACY-MAP-PARITY.md); Plexball is explicitly documented as using a modern arena.
