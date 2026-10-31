@@ -171,7 +171,7 @@ final class ArcadeLobbyKitCatalogue {
         return new KitChoice(id, name, icon, unlock, npcType, heldItem, entityColor, new Material[0]);
     }
 
-    private enum Unlock {
+    enum Unlock {
         FREE(Material.YELLOW_WOOL, ChatColor.YELLOW),
         GEM(Material.LIME_WOOL, ChatColor.GREEN),
         ACHIEVEMENT(Material.MAGENTA_WOOL, ChatColor.LIGHT_PURPLE);
@@ -185,7 +185,7 @@ final class ArcadeLobbyKitCatalogue {
         }
     }
 
-    private static final class KitChoice {
+    static final class KitChoice {
         final String id;
         final String name;
         final Material icon;
