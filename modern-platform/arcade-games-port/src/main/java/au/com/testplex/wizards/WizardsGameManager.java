@@ -353,7 +353,7 @@ public final class WizardsGameManager implements Listener {
         player.setHealth(Math.min(maxHealth, 20.0D));
 
         double angle = (Math.PI * 2.0D * index) / Math.max(1, count);
-        double spawnRadius = Math.max(20.0D, Math.min(35.0D, plugin.getConfig().getInt("arena-radius", 48) - 12.0D));
+        double spawnRadius = Math.max(20.0D, Math.min(35.0D, plugin.getConfig().getInt("wizards.arena-radius", 48) - 12.0D));
         Location spawn = new Location(arena, Math.cos(angle) * spawnRadius + 0.5D,
                 ARENA_FLOOR_Y + 1.0D, Math.sin(angle) * spawnRadius + 0.5D);
         spawn.setDirection(new Vector(-Math.cos(angle), 0.0D, -Math.sin(angle)));
@@ -647,7 +647,7 @@ public final class WizardsGameManager implements Listener {
             double damage = baseDamage * (1.0D - distance / radius);
             if (damage > 0.0D) victim.damage(damage);
         }
-        if (plugin.getConfig().getBoolean("destructive-endgame-blocks", false)) {
+        if (plugin.getConfig().getBoolean("wizards.destructive-endgame-blocks", false)) {
             destroyEndgameBlocks(impact, 1.4D * size, 20);
         }
         ownedEntities.remove(meteor.getUniqueId());
@@ -2183,7 +2183,7 @@ public final class WizardsGameManager implements Listener {
             lightning.getPersistentDataContainer().set(projectileKey, PersistentDataType.STRING, "wizard-lightning");
             lightning.getPersistentDataContainer().set(projectileOwnerKey, PersistentDataType.STRING, ownerId.toString());
             lightning.getPersistentDataContainer().set(anvilLevelKey, PersistentDataType.INTEGER, level);
-            if (plugin.getConfig().getBoolean("destructive-spells", false)) {
+            if (plugin.getConfig().getBoolean("wizards.destructive-spells", false)) {
                 destroyEndgameBlocks(destination, 1.5D, 9);
             }
         }, 20L);
@@ -2330,7 +2330,7 @@ public final class WizardsGameManager implements Listener {
             arena.setThundering(false);
             WorldBorder border = arena.getWorldBorder();
             border.setCenter(0.0D, 0.0D);
-            border.setSize((Math.max(32, Math.min(96, plugin.getConfig().getInt("arena-radius", 48))) * 2.0D) + 4.0D);
+            border.setSize((Math.max(32, Math.min(96, plugin.getConfig().getInt("wizards.arena-radius", 48))) * 2.0D) + 4.0D);
         }
     }
 
