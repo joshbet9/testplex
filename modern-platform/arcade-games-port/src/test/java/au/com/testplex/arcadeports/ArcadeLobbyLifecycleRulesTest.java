@@ -12,6 +12,11 @@ class ArcadeLobbyLifecycleRulesTest {
         assertEquals(30, ArcadeLobbyLifecycleRules.recruitCountdownSeconds(15, 1, 16));
         assertEquals(10, ArcadeLobbyLifecycleRules.recruitCountdownSeconds(16, 1, 16));
     }
+    @Test void gameplayInputIsBlockedUntilLiveBegins() {
+        assertEquals(false, ArcadeLobbyLifecycleRules.gameplayInputAllowed(false));
+        assertEquals(true, ArcadeLobbyLifecycleRules.gameplayInputAllowed(true));
+    }
+
     @Test void phaseDurationsAreBounded() {
         assertEquals(3, ArcadeLobbyLifecycleRules.prepareSeconds(-1));
         assertEquals(10, ArcadeLobbyLifecycleRules.prepareSeconds(10));
