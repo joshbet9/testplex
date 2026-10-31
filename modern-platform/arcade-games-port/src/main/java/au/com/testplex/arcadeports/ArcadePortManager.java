@@ -19046,6 +19046,9 @@ public final class ArcadePortManager implements Listener {
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
+        // Test players have already been admitted to the pending match; never apply
+        // the ordinary human rejoin-to-lobby redirect to them.
+        if (testPlayers.isTestPlayer(player)) return;
         PlayerSnapshot snapshot = pendingRestore.remove(player.getUniqueId());
         Bukkit.getScheduler().runTask(plugin, () -> {
             if (!player.isOnline()) return;
