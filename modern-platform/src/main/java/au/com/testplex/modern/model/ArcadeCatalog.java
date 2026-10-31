@@ -16,7 +16,7 @@ public final class ArcadeCatalog {
 
     public ArcadeCatalog() {
         register(game("bacon-brawl", "Bacon Brawl", "PORKCHOP", "Torpedo into rivals and launch them from the arena.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("signature-impact", "Signature Impact", "Body-Slam/Torpedo presentation.", "FIREWORK_ROCKET",
                         single("pork-comet", "Pork Comet", "A bacon comet slams into the impact point."),
                         single("crispy-ring", "Crispy Ring", "A sizzling ring expands from the impact point."),

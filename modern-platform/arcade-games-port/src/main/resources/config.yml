@@ -1,9 +1,11 @@
 # The 24 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
-# This is the explicit controlled-acceptance queue; unfinished games stay disabled.
+# These games are available together for the shared controlled test session.
+# Other games remain disabled until their implementations are promoted.
 enabled-games:
   - death-tag
   - one-in-the-quiver
   - bomb-lobbers
+  - bacon-brawl
 lobby-selected-game: death-tag
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.

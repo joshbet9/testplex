@@ -52,7 +52,7 @@ The overall programme tracks 26 titles/variants: **24 shared Arcade catalogue ga
 
 | # | Game | Current implementation state | Test access |
 |---:|---|---|---|
-| 1 | Bacon Brawl | Mechanics in progress | Disabled |
+| 1 | Bacon Brawl | Controlled acceptance testing; source mechanics and map implemented | Enabled |
 | 2 | Bomb Lobbers | Controlled acceptance testing; original map and core mechanics implemented | Enabled |
 | 3 | Death Tag | Acceptance-ready | Enabled |
 | 4 | Dragon Escape | Mechanics in progress | Disabled |
@@ -79,4 +79,4 @@ The overall programme tracks 26 titles/variants: **24 shared Arcade catalogue ga
 | 25 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
 | 26 | Speed Builders Arcade | Planned; implementation not started | Not available |
 
-**Readiness rule:** Death Tag and One in the Quiver remain cleared, and Bomb Lobbers is the first controlled acceptance candidate. It is enabled so testers can exercise the implementation and report defects; it is not yet gameplay-accepted. Each subsequent game will be promoted individually, fixed against its acceptance checklist, and retained in the enabled queue after acceptance.
+**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers and Bacon Brawl form the current shared test queue and can be exercised together in the same test sessions. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable.
