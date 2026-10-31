@@ -99,7 +99,7 @@ class ArcadeCatalogTest {
     @Test
     void explicitlyClearedGamesAreAvailableTogetherForInGameAcceptance() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "camera-shy");
+        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "camera-shy");
 
         for (GameDefinition game : catalog.getGames()) {
             if (readyIds.contains(game.getId())) {
@@ -115,8 +115,17 @@ class ArcadeCatalogTest {
         long readyForTest = catalog.getGames().stream().filter(GameDefinition::isReadyForTest).count();
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
-        assertEquals(14, readyForTest);
-        assertEquals(13, inProgress);
+        assertEquals(15, readyForTest);
+        assertEquals(12, inProgress);
+    }
+
+    @Test
+    void sheepQuestIsPromotedForControlledSourceMapAcceptance() {
+        GameDefinition game = new ArcadeCatalog().getGame("sheep-quest");
+        assertNotNull(game);
+        assertEquals("Sheep Quest", game.getName());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
+        assertTrue(game.isReadyForTest());
     }
 
     @Test
