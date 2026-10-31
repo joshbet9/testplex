@@ -22,17 +22,17 @@ class HoopsRemasteredRulesTest {
         assertEquals(2, HoopsRemasteredRules.scoreValue(Double.POSITIVE_INFINITY));
     }
 
-    @Test void regulationRequiresTwentyOneAndARealTwoPointLead() {
-        assertFalse(HoopsRemasteredRules.isWinningScore(20, 19, false));
-        assertFalse(HoopsRemasteredRules.isWinningScore(21, 20, false));
-        assertTrue(HoopsRemasteredRules.isWinningScore(21, 19, false));
-        assertTrue(HoopsRemasteredRules.isWinningScore(23, 21, false));
-        assertFalse(HoopsRemasteredRules.isWinningScore(-1, 0, false));
+    @Test void firstTeamToReachTwentyOneWinsImmediatelyWithoutWinByTwo() {
+        assertFalse(HoopsRemasteredRules.hasReachedTargetScore(20, 19));
+        assertTrue(HoopsRemasteredRules.hasReachedTargetScore(21, 20));
+        assertTrue(HoopsRemasteredRules.hasReachedTargetScore(20, 21));
+        assertTrue(HoopsRemasteredRules.hasReachedTargetScore(23, 18));
     }
 
-    @Test void overtimeIsNextBasketWins() {
-        assertFalse(HoopsRemasteredRules.isWinningScore(21, 21, true));
-        assertTrue(HoopsRemasteredRules.isWinningScore(22, 21, true));
+    @Test void fiveMinuteLimitAwardsLeadOrRecordsADraw() {
+        assertEquals(0, HoopsRemasteredRules.winnerAtTimeLimit(12, 10));
+        assertEquals(1, HoopsRemasteredRules.winnerAtTimeLimit(9, 11));
+        assertEquals(-1, HoopsRemasteredRules.winnerAtTimeLimit(10, 10));
     }
 
     @Test void offensiveReboundsHaveAShorterShotClockThanDefensiveRebounds() {

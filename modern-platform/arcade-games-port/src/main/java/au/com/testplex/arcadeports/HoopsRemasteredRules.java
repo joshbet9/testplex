@@ -7,7 +7,6 @@ public final class HoopsRemasteredRules {
     public static final int MIN_PLAYERS = 2;
     public static final int MAX_PLAYERS = 16;
     public static final int TARGET_SCORE = 21;
-    public static final int WIN_BY = 2;
     public static final long REGULATION_MILLIS = 5 * 60_000L;
     public static final long SHOT_CLOCK_MILLIS = 24_000L;
     public static final long HOPS_COOLDOWN_MILLIS = 8_000L;
@@ -29,10 +28,14 @@ public final class HoopsRemasteredRules {
         return Double.isFinite(releaseDistance) && releaseDistance >= THREE_POINT_DISTANCE ? 3 : 2;
     }
 
-    public static boolean isWinningScore(int red, int blue, boolean overtime) {
-        if (red < 0 || blue < 0) return false;
-        if (overtime) return red != blue;
-        return Math.max(red, blue) >= TARGET_SCORE && Math.abs(red - blue) >= WIN_BY;
+    /** A team wins immediately when its score reaches or passes 21. */
+    public static boolean hasReachedTargetScore(int red, int blue) {
+        return red >= TARGET_SCORE || blue >= TARGET_SCORE;
+    }
+
+    /** Returns 0 for RED, 1 for BLUE, or -1 when the five-minute result is a draw. */
+    public static int winnerAtTimeLimit(int red, int blue) {
+        return leadingTeam(red, blue);
     }
 
     public static int leadingTeam(int red, int blue) {
