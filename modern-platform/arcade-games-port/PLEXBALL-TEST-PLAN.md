@@ -40,9 +40,9 @@ At least two and at most eight players are supported. Each player gets one initi
 
 ## Latency and fairness matrix
 
-Test with at least two clients and compare a low-latency client against one with controlled network delay. Record server-observed ping, swing timing grade, catch timing, actual path intersection, and result.
+Test with at least two clients and compare a low-latency client against one with controlled network delay. Record the Paper ping estimate, separately measured network RTT, swing timing grade, catch timing, actual path intersection, and result. Paper's `Player#getPing()` is a coarse estimate and is **not guaranteed to be network RTT**; it is used only as a bounded compensation hint and never as an anti-cheat signal.
 
-| Approx. RTT | Expected compensation |
+| Paper ping estimate | Expected compensation |
 | ---: | --- |
 | 0–50ms | 0 ticks |
 | 100ms | 1 tick |
@@ -51,9 +51,9 @@ Test with at least two clients and compare a low-latency client against one with
 | 400ms | 4 ticks |
 | 500ms or higher | Capped at 5 ticks (250ms one-way estimate) |
 
-The server uses its own observed ping to estimate a bounded effective input tick; client-provided timestamps and client-reported ball/catch results are never trusted. Player positions and ball positions are kept in short server-side histories, and catches use a swept-segment test to avoid missing fast balls between ticks.
+The server uses Paper's ping estimate only to choose a bounded rewind, then validates against server-recorded player and ball history; client-provided timestamps and client-reported ball/catch results are never trusted. Player positions and ball positions are kept in short server-side histories, and catches use a swept-segment test to avoid missing fast balls between ticks.
 
-A high-ping client must not receive a catch merely because its packet arrived later: the historical ball path and historical player position must still intersect the catch window. Conversely, ordinary RTT should not make valid input lose just because its packet arrived later. Compensation is intentionally bounded; latency above the cap can still affect play and must be measured during acceptance.
+A high-ping client must not receive a catch merely because its packet arrived later: the historical ball path and historical player position must still intersect the catch window. Conversely, ordinary network delay should not make a valid pre-deadline input lose just because its packet arrived later. Compensation is intentionally bounded; latency above the cap can still affect play. This is **latency tolerant, not ping independent**: the separate measured-RTT matrix must pass before the game is promoted.
 
 ## Anti-cheat checks
 
