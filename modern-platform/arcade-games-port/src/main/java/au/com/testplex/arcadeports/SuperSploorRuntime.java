@@ -172,6 +172,7 @@ public final class SuperSploorRuntime implements Listener {
     private final Map<UUID, Integer> kills = new HashMap<>();
     private final Map<UUID, MutableStats> playerStats = new HashMap<>();
     private final Map<UUID, Set<UUID>> contributors = new HashMap<>();
+    private final Map<UUID, Map<UUID, Long>> contributorTimes = new HashMap<>();
     private final Set<UUID> squidMode = new HashSet<>();
     private final Set<UUID> activeProjectiles = new HashSet<>();
     private final Map<UUID, UUID> projectileOwners = new HashMap<>();
@@ -258,6 +259,7 @@ public final class SuperSploorRuntime implements Listener {
             secondaryReadyAt.put(id, now);
             specialTargetsThisActivation.put(id, new HashSet<>());
             contributors.put(id, new HashSet<>());
+            contributorTimes.put(id, new HashMap<>());
             if ("dualies".equals(kit)) {
                 dodgeRollCharges.put(id, 2);
                 nextDodgeRollRechargeAt.put(id, Long.MAX_VALUE);
@@ -1018,14 +1020,14 @@ public final class SuperSploorRuntime implements Listener {
         int current = ink.getOrDefault(id, 0);
         long previous = lastShotAt.getOrDefault(id, 0L);
         int cost = switch (kit) {
-            case "roller" -> 10;
+            case "roller" -> 4;
             case "charger" -> 18;
             case "lobber" -> 14;
             case "dualies" -> 4;
             default -> SuperSploorRules.INK_PER_PRIMARY_SHOT;
         };
         long interval = switch (kit) {
-            case "roller" -> 500L;
+            case "roller" -> 550L;
             case "charger" -> 1_000L;
             case "lobber" -> 1_100L;
             case "dualies" -> 350L;
@@ -1227,10 +1229,13 @@ public final class SuperSploorRuntime implements Listener {
                 new Particle.DustOptions(Color.PURPLE, 1.2F));
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 1.0F);
         contributors.computeIfAbsent(targetId, ignored -> new HashSet<>()).add(attackerId);
+        contributorTimes.computeIfAbsent(targetId, ignored -> new HashMap<>()).put(attackerId, now);
         if (count >= SuperSploorRules.MAX_PAINT_MARKS) {
             kills.merge(attackerId, 1, Integer::sum);
-            specialCharge.put(attackerId,
-                    SuperSploorRules.specialChargeAfterSplat(specialCharge.getOrDefault(attackerId, 0.0D)));
+            if (!specialChargeSuppressed.contains(attackerId)) {
+                specialCharge.put(attackerId,
+                        SuperSploorRules.specialChargeAfterSplat(specialCharge.getOrDefault(attackerId, 0.0D)));
+            }
             MutableStats attackerStats = playerStats.get(attackerId);
             if (attackerStats != null) {
                 attackerStats.splats++;
@@ -1272,9 +1277,12 @@ public final class SuperSploorRuntime implements Listener {
         MutableStats victimStats = playerStats.get(targetId);
         if (victimStats != null) victimStats.deaths++;
         Set<UUID> helpers = contributors.remove(targetId);
-        if (helpers != null) {
+        Map<UUID, Long> hitTimes = contributorTimes.remove(targetId);
+        if (helpers != null && hitTimes != null) {
             for (UUID helperId : helpers) {
                 if (helperId.equals(killerId)) continue;
+                long lastHit = hitTimes.getOrDefault(helperId, 0L);
+                if (now - lastHit > 8_000L) continue;
                 MutableStats helperStats = playerStats.get(helperId);
                 if (helperStats != null) helperStats.assists++;
             }
@@ -1505,6 +1513,7 @@ public final class SuperSploorRuntime implements Listener {
         kills.clear();
         playerStats.clear();
         contributors.clear();
+        contributorTimes.clear();
         squidMode.clear();
         sidebarEntries.clear();
         engine = null;
@@ -1556,7 +1565,9 @@ public final class SuperSploorRuntime implements Listener {
         lastHitAt.remove(id);
         nextMarkRecoveryAt.remove(id);
         contributors.remove(id);
+        contributorTimes.remove(id);
         for (Set<UUID> values : contributors.values()) values.remove(id);
+        for (Map<UUID, Long> values : contributorTimes.values()) values.remove(id);
         if (players.isEmpty()) finish(-1);
     }
 }
