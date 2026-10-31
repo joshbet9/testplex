@@ -28,7 +28,6 @@ import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -214,9 +213,7 @@ public final class PlexballGame implements Listener {
     private final File progressionFile;
     private final YamlConfiguration progressionData;
     private final Map<UUID, Kit> selectedKits = new HashMap<>();
-    private final LinkedHashMap<UUID, Player> queue = new LinkedHashMap<>();
     private final List<UUID> matchPlayers = new ArrayList<>();
-    private final LinkedHashSet<UUID> spectators = new LinkedHashSet<>();
     private final Map<UUID, PlayerResult> results = new HashMap<>();
     private final Map<UUID, PlayerHud> playerHuds = new HashMap<>();
     private final Map<UUID, Deque<PlayerFrame>> playerHistory = new HashMap<>();
@@ -235,7 +232,6 @@ public final class PlexballGame implements Listener {
     private World arena;
     private Phase phase = Phase.IDLE;
     private long serverTick;
-    private long queueCountdownTick = -1L;
     private long matchEndTick;
     private long matchEndNanos;
     private long phaseEndTick;
@@ -277,12 +273,10 @@ public final class PlexballGame implements Listener {
     }
 
     public String status() {
-        if (phase == Phase.IDLE) {
-            return "queued " + queue.size() + "/" + PlexballRules.MAX_PLAYERS;
-        }
+        if (phase == Phase.IDLE) return "idle";
         return phase.name().toLowerCase(java.util.Locale.ROOT)
                 + ", players=" + matchPlayers.size()
-                + ", spectators=" + spectators.size()
+                + ", spectators=" + spectatorPlayers().size()
                 + ", time=" + Math.max(0L, (matchEndNanos - System.nanoTime()) / 1_000_000_000L) + "s";
     }
 
@@ -435,183 +429,21 @@ public final class PlexballGame implements Listener {
         return true;
     }
 
-    public void queue(Player player, boolean quickPlay) {
-        if (isActive()) {
-            player.sendMessage(ChatColor.RED + "A Plexball match is already underway.");
-            return;
-        }
-        if (queue.containsKey(player.getUniqueId())) {
-            player.sendMessage(ChatColor.YELLOW + "You are already queued for Plexball.");
-            return;
-        }
-        if (queue.size() >= PlexballRules.MAX_PLAYERS) {
-            player.sendMessage(ChatColor.RED + "The Plexball queue is full (8 players).");
-            return;
-        }
-        queue.put(player.getUniqueId(), player);
-        Kit kit = selectedKits.getOrDefault(player.getUniqueId(), Kit.TECHNICIAN);
-        player.sendMessage(ChatColor.GREEN + "Queued for Plexball. "
-                + ChatColor.GRAY + "Kit: " + kit.displayName() + ". "
-                + ChatColor.YELLOW + queue.size() + "/" + PlexballRules.MAX_PLAYERS + " players.");
-        if (queue.size() >= PlexballRules.MIN_PLAYERS && queueCountdownTick < 0L) {
-            queueCountdownTick = serverTick + (quickPlay ? QUICK_COUNTDOWN_TICKS : QUEUE_COUNTDOWN_TICKS);
-            broadcastQueue(ChatColor.GOLD + "Plexball starts in " + (quickPlay ? "2" : "5") + " seconds!");
-        }
-        if (queue.size() == PlexballRules.MAX_PLAYERS) {
-            queueCountdownTick = Math.min(queueCountdownTick < 0L ? serverTick + 20L : queueCountdownTick,
-                    serverTick + 20L);
-        }
+    /** Arena creation is invoked by ArcadePortManager before it creates the global Session. */
+    public World prepareArcadeArena() {
+        return ensureArena();
     }
 
-    public void spectate(Player player) {
-        if (player == null || !player.isOnline()) return;
-        UUID id = player.getUniqueId();
-        if (phase == Phase.IDLE) {
-            player.sendMessage(ChatColor.RED + "There is no Plexball match to spectate right now.");
-            return;
-        }
-        if (matchPlayers.contains(id)) {
-            player.sendMessage(ChatColor.RED + "You're already playing in this Plexball match.");
-            return;
-        }
-        if (queue.containsKey(id)) {
-            player.sendMessage(ChatColor.YELLOW + "Leave the Plexball queue before spectating.");
-            return;
-        }
-        if (spectators.contains(id)) {
-            player.sendMessage(ChatColor.YELLOW + "You're already spectating. Use /arcadeport leave plexball to return.");
-            return;
-        }
-        if (!PlexballRules.canJoinAsSpectator(isActive(), false, spectators.size())) {
-            player.sendMessage(ChatColor.RED + "The Plexball spectator slots are full.");
-            return;
-        }
-        spectators.add(id);
-        player.closeInventory();
-        player.getInventory().clear();
-        player.setGameMode(GameMode.SPECTATOR);
-        player.setAllowFlight(true);
-        player.setFlying(true);
-        player.teleport(new Location(arena, 0.5D, FLOOR_Y + 18.0D, -44.5D, 180.0F, 25.0F));
-        refreshSpectatorTarget(player);
-        applyPlayerScoreboard(player);
-        player.sendMessage(ChatColor.GREEN + "You are now spectating Plexball.");
-        player.sendMessage(ChatColor.GRAY + "Your view follows the current batter and ball. Use /arcadeport leave plexball to return to the lobby.");
-        broadcastMatch(ChatColor.AQUA + player.getName() + " joined as a spectator.");
-        refreshScoreboards();
-    }
-
-    public void leaveQueue(Player player) {
-        UUID id = player.getUniqueId();
-        if (spectators.remove(id)) {
-            playerHuds.remove(id);
-            if (player.getGameMode() == GameMode.SPECTATOR) player.setSpectatorTarget(null);
-            player.sendMessage(ChatColor.GREEN + "You stopped spectating Plexball.");
-            broadcastMatch(ChatColor.YELLOW + player.getName() + " left the spectators.");
-            plugin.returnPlayerToArcadeLobby(player);
-            return;
-        }
-        if (queue.remove(id) == null) {
-            player.sendMessage(ChatColor.YELLOW + "You are not queued or spectating Plexball.");
-            return;
-        }
-        player.sendMessage(ChatColor.GREEN + "You left the Plexball queue.");
-        if (queue.size() < PlexballRules.MIN_PLAYERS) queueCountdownTick = -1L;
-        broadcastQueue(ChatColor.YELLOW + player.getName() + " left Plexball (" + queue.size() + " queued).");
-    }
-
-    public void startQueued(org.bukkit.command.CommandSender sender) {
-        if (isActive()) {
-            sender.sendMessage(ChatColor.RED + "Plexball is already running.");
-            return;
-        }
-        if (queue.size() < PlexballRules.MIN_PLAYERS) {
-            sender.sendMessage(ChatColor.RED + "Plexball needs at least two queued players.");
-            return;
-        }
-        startMatch();
-    }
-
-    public void stop(String reason) {
-        if (phase == Phase.IDLE) {
-            queue.clear();
-            queueCountdownTick = -1L;
-            return;
-        }
-        String message = reason == null || reason.isBlank() ? "Plexball stopped." : reason;
-        finish(List.of(), message, false);
-    }
-
-    public void shutdown() {
-        if (ticker != null) ticker.cancel();
-        if (phase != Phase.IDLE) {
-            cleanupBall();
-            LinkedHashSet<UUID> returnIds = new LinkedHashSet<>(matchPlayers);
-            returnIds.addAll(spectators);
-            for (UUID id : returnIds) {
-                Player player = Bukkit.getPlayer(id);
-                if (player != null && player.isOnline()) {
-                    if (player.getGameMode() == GameMode.SPECTATOR) player.setSpectatorTarget(null);
-                    plugin.returnPlayerToArcadeLobby(player);
-                }
-            }
-        }
-        queue.clear();
-        spectators.clear();
-        playerHuds.clear();
-        phase = Phase.IDLE;
-    }
-
-    private void tick() {
-        serverTick++;
-        if (phase == Phase.IDLE) {
-            if (queueCountdownTick >= 0L && serverTick >= queueCountdownTick) {
-                if (queue.size() >= PlexballRules.MIN_PLAYERS) startMatch();
-                else queueCountdownTick = -1L;
-            }
-            return;
-        }
-
-        recordPlayerSnapshots();
-        if (serverTick % 10L == 0L) refreshScoreboards();
-        if (serverTick % 4L == 0L && !spectators.isEmpty()) updateSpectatorHud();
-        if (System.nanoTime() >= matchEndNanos) {
-            finishAtTimeLimit();
-            return;
-        }
-
-        switch (phase) {
-            case INTRO -> {
-                if (serverTick >= phaseEndTick) startNormalAtBat();
-            }
-            case BATTING -> {
-                updateBattingHud();
-                if (System.nanoTime() >= battingDeadlineNanos + INPUT_GRACE_NANOS) {
-                    plugin.getLogger().fine("Plexball batting timeout for " + batterId);
-                    resolveAttempt(0.0D, false, false, "Strike! No swing in time.");
-                }
-            }
-            case BALL_FLIGHT -> updateBallFlight();
-            case TURN_BREAK -> {
-                if (serverTick >= phaseEndTick) advanceAfterAttempt();
-            }
-            default -> { }
-        }
-    }
-
-    private void startMatch() {
-        List<Player> participants = new ArrayList<>(queue.values().stream()
-                .filter(Player::isOnline)
+    public boolean startFromArcadeLifecycle(List<Player> requestedParticipants, World world) {
+        if (phase != Phase.IDLE || world == null || requestedParticipants == null) return false;
+        List<Player> participants = new ArrayList<>(requestedParticipants.stream()
+                .filter(player -> player != null && player.isOnline())
                 .limit(PlexballRules.MAX_PLAYERS)
                 .toList());
+        if (!PlexballRules.hasValidPlayerCount(participants.size())) return false;
         Collections.shuffle(participants, random);
-        queue.clear();
-        queueCountdownTick = -1L;
-        if (participants.size() < PlexballRules.MIN_PLAYERS) return;
 
-        // Plexball owns the shared Arcade test lane for the duration of its round.
-        plugin.prepareForPlexball();
-        arena = ensureArena();
+        arena = world;
         matchPlayers.clear();
         results.clear();
         homeRunPlayers.clear();
@@ -624,6 +456,7 @@ public final class PlexballGame implements Listener {
         abilityUsedThisBall.clear();
         catchUsedThisBall.clear();
         sureHandsArmed.clear();
+        playerHuds.clear();
         initialTurnIndex = 0;
         suddenDeathTurnIndex = 0;
         suddenDeath = false;
@@ -632,7 +465,6 @@ public final class PlexballGame implements Listener {
         matchEndNanos = System.nanoTime() + 180_000_000_000L;
         phase = Phase.INTRO;
         phaseEndTick = serverTick + INTRO_TICKS;
-
         for (int i = 0; i < participants.size(); i++) {
             Player player = participants.get(i);
             UUID id = player.getUniqueId();
@@ -654,6 +486,114 @@ public final class PlexballGame implements Listener {
         refreshSpectatorTargets();
         broadcastMatch(ChatColor.GREEN + "Plexball is starting! " + ChatColor.YELLOW
                 + "The batter has 10 seconds; everyone else is in the outfield.");
+        return true;
+    }
+
+    public void spectate(Player player) {
+        if (player == null || !player.isOnline()) return;
+        UUID id = player.getUniqueId();
+        if (phase == Phase.IDLE || !plugin.getArcadePortManager().isActiveSession(ArcadePortGame.PLEXBALL)) {
+            player.sendMessage(ChatColor.RED + "There is no Plexball match to spectate right now.");
+            return;
+        }
+        if (matchPlayers.contains(id)) {
+            player.sendMessage(ChatColor.RED + "You're already playing in this Plexball match.");
+            return;
+        }
+        if (!PlexballRules.canJoinAsSpectator(isActive(), false,
+                plugin.getArcadePortManager().activeSpectatorCount(ArcadePortGame.PLEXBALL))) {
+            player.sendMessage(ChatColor.RED + "The Plexball spectator slots are full.");
+            return;
+        }
+        Location spawn = new Location(arena, 0.5D, FLOOR_Y + 18.0D, -44.5D, 180.0F, 25.0F);
+        if (!plugin.getArcadePortManager().joinSpectator(ArcadePortGame.PLEXBALL, player, spawn)) {
+            player.sendMessage(ChatColor.RED + "You cannot join this Plexball match as a spectator.");
+            return;
+        }
+        applyPlayerScoreboard(player);
+        refreshSpectatorTarget(player);
+        player.sendMessage(ChatColor.GREEN + "You are now spectating Plexball.");
+        player.sendMessage(ChatColor.GRAY + "Your view follows the current batter and ball. Use /arcadeport leave plexball to return to the lobby.");
+        broadcastMatch(ChatColor.AQUA + player.getName() + " joined as a spectator.");
+        refreshScoreboards();
+    }
+
+    public void onArcadeLifecycleSpectatorLeft(UUID playerId) {
+        if (playerId == null) return;
+        playerHuds.remove(playerId);
+        Player player = Bukkit.getPlayer(playerId);
+        if (player != null) broadcastMatch(ChatColor.YELLOW + player.getName() + " left the spectators.");
+    }
+
+    /** The Arcade manager is the only owner of the server's quit/disconnect event. */
+    public void onArcadeLifecycleQuit(Player quitter, boolean wasAlive) {
+        if (quitter == null) return;
+        UUID id = quitter.getUniqueId();
+        catchAttempts.remove(id);
+        playerHuds.remove(id);
+        if (!matchPlayers.contains(id) || !wasAlive) {
+            broadcastMatch(ChatColor.YELLOW + quitter.getName() + " stopped spectating or left the match.");
+            return;
+        }
+        if (id.equals(batterId)) resolveAttempt(0.0D, false, false, "Batter disconnected.");
+        else broadcastMatch(ChatColor.YELLOW + quitter.getName()
+                + " disconnected; their fielding position is now vacant.");
+    }
+
+    /** Called by ArcadePortManager before its shared Session/player snapshots are restored. */
+    public void stopForArcadeLifecycle(String reason) {
+        if (phase == Phase.IDLE) return;
+        if (reason != null && !reason.isBlank()) broadcastMatch(ChatColor.RED + "Plexball ended. " + reason);
+        cleanupBall();
+        phase = Phase.IDLE;
+        batterId = null;
+        matchPlayers.clear();
+        results.clear();
+        playerHistory.clear();
+        catchAttempts.clear();
+        abilityUsedThisBall.clear();
+        catchUsedThisBall.clear();
+        sureHandsArmed.clear();
+        homeRunPlayers.clear();
+        finalists.clear();
+        roundSurvivors.clear();
+        roundDistances.clear();
+        playerHuds.clear();
+    }
+
+    public void shutdown() {
+        if (ticker != null) ticker.cancel();
+        stopForArcadeLifecycle("Plexball module shutting down.");
+    }
+
+    private void tick() {
+        serverTick++;
+        if (phase == Phase.IDLE) return;
+        recordPlayerSnapshots();
+        if (serverTick % 10L == 0L) refreshScoreboards();
+        if (serverTick % 4L == 0L && plugin.getArcadePortManager()
+                .activeSpectatorCount(ArcadePortGame.PLEXBALL) > 0) updateSpectatorHud();
+        if (System.nanoTime() >= matchEndNanos) {
+            finishAtTimeLimit();
+            return;
+        }
+        switch (phase) {
+            case INTRO -> {
+                if (serverTick >= phaseEndTick) startNormalAtBat();
+            }
+            case BATTING -> {
+                updateBattingHud();
+                if (System.nanoTime() >= battingDeadlineNanos + INPUT_GRACE_NANOS) {
+                    plugin.getLogger().fine("Plexball batting timeout for " + batterId);
+                    resolveAttempt(0.0D, false, false, "Strike! No swing in time.");
+                }
+            }
+            case BALL_FLIGHT -> updateBallFlight();
+            case TURN_BREAK -> {
+                if (serverTick >= phaseEndTick) advanceAfterAttempt();
+            }
+            default -> { }
+        }
     }
 
     private void startNormalAtBat() {
@@ -983,7 +923,6 @@ public final class PlexballGame implements Listener {
 
     private void finish(List<UUID> winners, String reason, boolean announce) {
         List<UUID> participants = new ArrayList<>(matchPlayers);
-        List<UUID> watchers = new ArrayList<>(spectators);
         if (announce && !participants.isEmpty()) updateCareerProgress(participants, winners);
         cleanupBall();
         if (announce && !participants.isEmpty()) {
@@ -1009,7 +948,6 @@ public final class PlexballGame implements Listener {
             broadcastFinalMatchSummary(participants, winners);
         }
         phase = Phase.IDLE;
-        queueCountdownTick = -1L;
         batterId = null;
         matchPlayers.clear();
         playerHistory.clear();
@@ -1020,17 +958,9 @@ public final class PlexballGame implements Listener {
         finalists.clear();
         roundSurvivors.clear();
         roundDistances.clear();
-        spectators.clear();
-        LinkedHashSet<UUID> returnIds = new LinkedHashSet<>(participants);
-        returnIds.addAll(watchers);
-        for (UUID id : returnIds) {
-            playerHuds.remove(id);
-            Player player = Bukkit.getPlayer(id);
-            if (player != null && player.isOnline()) {
-                if (player.getGameMode() == GameMode.SPECTATOR) player.setSpectatorTarget(null);
-                plugin.returnPlayerToArcadeLobby(player);
-            }
-        }
+        for (UUID id : participants) playerHuds.remove(id);
+        for (UUID id : spectatorIds()) playerHuds.remove(id);
+        plugin.getArcadePortManager().finishExternalSession(ArcadePortGame.PLEXBALL);
     }
 
     private void broadcastFinalMatchSummary(List<UUID> participants, List<UUID> winners) {
@@ -1129,6 +1059,14 @@ public final class PlexballGame implements Listener {
         }
     }
 
+    private List<Player> spectatorPlayers() {
+        return plugin.getArcadePortManager().activeSpectators(ArcadePortGame.PLEXBALL);
+    }
+
+    private List<UUID> spectatorIds() {
+        return spectatorPlayers().stream().map(Player::getUniqueId).toList();
+    }
+
     private void updateSpectatorHud() {
         Player currentBatter = batterId == null ? null : Bukkit.getPlayer(batterId);
         String batterName = currentBatter == null ? "—" : currentBatter.getName();
@@ -1142,13 +1080,7 @@ public final class PlexballGame implements Listener {
         String distance = ballPosition == null || teeBallPosition == null ? ""
                 : "  |  " + String.format(java.util.Locale.ROOT, "%.1fm",
                         PlexballRules.horizontalDistance(teeBallPosition, ballPosition));
-        for (UUID id : new ArrayList<>(spectators)) {
-            Player spectator = Bukkit.getPlayer(id);
-            if (spectator == null || !spectator.isOnline()) {
-                spectators.remove(id);
-                playerHuds.remove(id);
-                continue;
-            }
+        for (Player spectator : spectatorPlayers()) {
             spectator.sendActionBar(Component.text("SPECTATING  |  " + status + distance
                     + "  |  /arcadeport leave plexball"));
         }
@@ -1156,10 +1088,7 @@ public final class PlexballGame implements Listener {
 
     private void refreshSpectatorTargets() {
         if (phase == Phase.IDLE) return;
-        for (UUID id : new ArrayList<>(spectators)) {
-            Player spectator = Bukkit.getPlayer(id);
-            if (spectator != null && spectator.isOnline()) refreshSpectatorTarget(spectator);
-        }
+        for (Player spectator : spectatorPlayers()) refreshSpectatorTarget(spectator);
     }
 
     private void refreshSpectatorTarget(Player spectator) {
@@ -1205,16 +1134,13 @@ public final class PlexballGame implements Listener {
             Player player = Bukkit.getPlayer(id);
             if (player != null && player.isOnline()) applyPlayerScoreboard(player);
         }
-        for (UUID id : spectators) {
-            Player player = Bukkit.getPlayer(id);
-            if (player != null && player.isOnline()) applyPlayerScoreboard(player);
-        }
+        for (Player spectator : spectatorPlayers()) applyPlayerScoreboard(spectator);
     }
 
     private void renderScoreboard(Player viewer, PlayerHud hud) {
         for (String entry : hud.entries) hud.scoreboard.resetScores(entry);
         List<String> lines = new ArrayList<>();
-        boolean observing = spectators.contains(viewer.getUniqueId());
+        boolean observing = plugin.getArcadePortManager().isActiveSpectator(ArcadePortGame.PLEXBALL, viewer.getUniqueId());
         Player currentBatter = batterId == null ? null : Bukkit.getPlayer(batterId);
         if (observing) {
             lines.add(ChatColor.AQUA.toString() + ChatColor.BOLD + "SPECTATING");
@@ -1222,7 +1148,7 @@ public final class PlexballGame implements Listener {
             lines.add(ChatColor.YELLOW + "At bat: "
                     + (currentBatter == null ? "—" : currentBatter.getName()));
             lines.add(ChatColor.GRAY + "Players: " + matchPlayers.size()
-                    + "  |  viewers: " + spectators.size());
+                    + "  |  viewers: " + spectatorPlayers().size());
             lines.add(ChatColor.GOLD.toString() + ChatColor.BOLD + "TOP DISTANCES");
             List<UUID> leaders = matchPlayers.stream()
                     .sorted((first, second) -> {
@@ -1325,7 +1251,7 @@ public final class PlexballGame implements Listener {
 
     private void showMatchResultTitle(String title, String subtitle) {
         LinkedHashSet<UUID> viewers = new LinkedHashSet<>(matchPlayers);
-        viewers.addAll(spectators);
+        viewers.addAll(spectatorIds());
         for (UUID id : viewers) {
             Player player = Bukkit.getPlayer(id);
             if (player != null && player.isOnline()) {
@@ -1692,33 +1618,6 @@ public final class PlexballGame implements Listener {
         }
     }
 
-    @EventHandler
-    public void onQuit(PlayerQuitEvent event) {
-        Player quitter = event.getPlayer();
-        UUID id = quitter.getUniqueId();
-        boolean wasQueued = queue.remove(id) != null;
-        if (wasQueued) {
-            if (queue.size() < PlexballRules.MIN_PLAYERS) queueCountdownTick = -1L;
-            broadcastQueue(ChatColor.YELLOW + quitter.getName()
-                    + " disconnected; " + queue.size() + " player(s) remain queued.");
-        }
-        catchAttempts.remove(id);
-        playerHuds.remove(id);
-        if (spectators.remove(id)) {
-            if (phase != Phase.IDLE) {
-                broadcastMatch(ChatColor.YELLOW + quitter.getName() + " stopped spectating.");
-            }
-            return;
-        }
-        if (phase == Phase.IDLE || !matchPlayers.contains(id)) return;
-        if (id.equals(batterId)) {
-            resolveAttempt(0.0D, false, false, "Batter disconnected.");
-        } else {
-            broadcastMatch(ChatColor.YELLOW + quitter.getName()
-                    + " disconnected; their fielding position is now vacant.");
-        }
-    }
-
     private void setupPlayer(Player player) {
         player.setGameMode(GameMode.ADVENTURE);
         player.getInventory().clear();
@@ -1896,13 +1795,9 @@ public final class PlexballGame implements Listener {
         if (serverTick % 2L == 0L) updateBattingHud();
     }
 
-    private void broadcastQueue(String message) {
-        for (Player player : queue.values()) if (player.isOnline()) player.sendMessage(message);
-    }
-
     private void broadcastMatch(String message) {
         LinkedHashSet<UUID> viewers = new LinkedHashSet<>(matchPlayers);
-        viewers.addAll(spectators);
+        viewers.addAll(spectatorIds());
         for (UUID id : viewers) {
             Player player = Bukkit.getPlayer(id);
             if (player != null && player.isOnline()) player.sendMessage(message);

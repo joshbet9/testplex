@@ -9,6 +9,15 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PlexballRulesTest {
     @Test
+    void sharedArcadeLifecycleAcceptsOnlySupportedPlexballPlayerCounts() {
+        assertFalse(PlexballRules.hasValidPlayerCount(0));
+        assertFalse(PlexballRules.hasValidPlayerCount(1));
+        assertTrue(PlexballRules.hasValidPlayerCount(2));
+        assertTrue(PlexballRules.hasValidPlayerCount(8));
+        assertFalse(PlexballRules.hasValidPlayerCount(9));
+    }
+
+    @Test
     void spectatorsCanOnlyJoinActiveMatchesOutsideThePlayerRoster() {
         assertTrue(PlexballRules.canJoinAsSpectator(true, false, 0));
         assertTrue(PlexballRules.canJoinAsSpectator(true, false, PlexballRules.MAX_SPECTATORS - 1));

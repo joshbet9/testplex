@@ -356,6 +356,119 @@ public final class ArcadePortManager implements Listener {
         gladiatorLobbyVotes.remove(player.getUniqueId());
     }
 
+    /** Online players in the active Arcade Session who are not alive participants. */
+    public List<Player> activeSpectators(ArcadePortGame type) {
+        Session session = active;
+        if (session == null || session.type != type) return List.of();
+        return session.players.entrySet().stream()
+                .filter(entry -> !session.alive.contains(entry.getKey()))
+                .map(Map.Entry::getValue)
+                .filter(player -> player != null && player.isOnline())
+                .toList();
+    }
+
+    public int activeSpectatorCount(ArcadePortGame type) {
+        return activeSpectators(type).size();
+    }
+
+    public boolean isActiveSpectator(ArcadePortGame type, UUID playerId) {
+        Session session = active;
+        return session != null && session.type == type && playerId != null
+                && session.players.containsKey(playerId) && !session.alive.contains(playerId);
+    }
+
+    public boolean isActiveSession(ArcadePortGame type) {
+        return active != null && active.type == type;
+    }
+
+    /** Add a viewer to the active global Arcade Session and capture their restore snapshot. */
+    public boolean joinSpectator(ArcadePortGame type, Player player, Location spectatorSpawn) {
+        Session session = active;
+        if (session == null || session.type != type || player == null || !player.isOnline()) return false;
+        UUID id = player.getUniqueId();
+        if (session.players.containsKey(id)) return false;
+        if (type == ArcadePortGame.PLEXBALL
+                && !PlexballRules.canJoinAsSpectator(true, false, activeSpectatorCount(type))) return false;
+
+        removeFromQueues(player);
+        PlayerSnapshot pending = pendingRestore.remove(id);
+        if (pending != null) pending.restore(player);
+        lobby.ensurePlayerInLobby(player);
+        PlayerSnapshot snapshot = new PlayerSnapshot(player);
+        session.players.put(id, player);
+        session.snapshots.put(id, snapshot);
+        player.closeInventory();
+        player.getInventory().clear();
+        player.setGameMode(GameMode.SPECTATOR);
+        player.setAllowFlight(true);
+        player.setFlying(true);
+        player.setSpectatorTarget(null);
+        if (spectatorSpawn != null && spectatorSpawn.getWorld() == session.world) player.teleport(spectatorSpawn);
+        return true;
+    }
+
+    /** Leave an eliminated/spectating role through the common Arcade restore path. */
+    public boolean leaveSpectator(ArcadePortGame type, Player player) {
+        Session session = active;
+        if (session == null || session.type != type || player == null || !player.isOnline()) return false;
+        UUID id = player.getUniqueId();
+        if (!session.players.containsKey(id) || session.alive.contains(id)) return false;
+        PlayerSnapshot snapshot = session.snapshots.remove(id);
+        session.players.remove(id);
+        session.scores.remove(id);
+        player.setSpectatorTarget(null);
+        if (snapshot != null) snapshot.restore(player);
+        lobby.sendToLobby(player);
+        if (type == ArcadePortGame.PLEXBALL && plugin.getPlexballGame() != null) {
+            plugin.getPlexballGame().onArcadeLifecycleSpectatorLeft(id);
+        }
+        checkRoundEnd(session);
+        return true;
+    }
+
+    /** Leave a global queue or an active eliminated/spectator role. */
+    public boolean leaveQueue(ArcadePortGame type, Player player) {
+        if (type == null || player == null) return false;
+        UUID id = player.getUniqueId();
+        boolean removed = false;
+        Map<UUID, Player> queue = queues.get(queueKey(type, false));
+        if (queue != null) removed = queue.remove(id) != null;
+        if (supportsMixedArcadeVariant(type)) {
+            Map<UUID, Player> mixed = queues.get(queueKey(type, true));
+            if (mixed != null) removed |= mixed.remove(id) != null;
+        }
+        if (removed) {
+            if (pendingStart != null && pendingType == type
+                    && onlineQueuedPlayers(type, pendingMixedArcadeVariant).isEmpty()) {
+                pendingStart.cancel();
+                pendingStart = null;
+                pendingType = null;
+                pendingMixedArcadeVariant = false;
+            }
+            if (manualStartCountdown != null && manualStartType == type
+                    && onlineQueuedPlayers(type).isEmpty()) {
+                cancelManualStartCountdown(type, ChatColor.YELLOW + "The queue is empty; the Arcade start countdown was cancelled.");
+            }
+            player.sendMessage(ChatColor.GREEN + "You left the " + type.displayName() + " queue.");
+            lobbyRuntime.refreshDisplays();
+            return true;
+        }
+        if (leaveSpectator(type, player)) {
+            player.sendMessage(ChatColor.GREEN + "You left the " + type.displayName() + " spectators.");
+            lobbyRuntime.refreshDisplays();
+            return true;
+        }
+        return false;
+    }
+
+    /** Finish a game-specific engine while preserving global Session cleanup and snapshots. */
+    public void finishExternalSession(ArcadePortGame type) {
+        Session session = active;
+        if (session != null && session.type == type) finish(session, null, false);
+    }
+
+
+
     public boolean isActiveGame(World world, ArcadePortGame type) {
         return active != null && active.type == type && active.world == world;
     }
@@ -640,8 +753,21 @@ public final class ArcadePortManager implements Listener {
                 case RUNNER -> { selectRunnerKit(player, value); return; }
                 case SNEAKY_ASSASSINS -> { sneakyAssassins.selectKit(player, value); return; }
                 case TURF_WARS -> { selectTurfWarsKit(player, value); return; }
+                case PLEXBALL -> {
+                    PlexballGame game = plugin.getPlexballGame();
+                    if (game != null) game.selectKit(player, value);
+                    return;
+                }
                 default -> { }
             }
+        }
+        if (ArcadePortGame.PLEXBALL.id().equalsIgnoreCase(
+                plugin.getConfig().getString("lobby-selected-game", ""))) {
+            PlexballGame game = plugin.getPlexballGame();
+            if (game != null && !game.selectKit(player, value)) {
+                player.sendMessage(ChatColor.RED + "Unknown Plexball kit. Choose Slugger, Technician, Curve Artist, Sprinter or Skyguard.");
+            }
+            return;
         }
         if (ArcadePortRules.normalizeCastleAssaultKit(value) != null) selectCastleAssaultKit(player, value);
         else if (ArcadePortRules.normalizeHeroesOfGwenHero(value) != null) selectHeroesOfGwenHero(player, value);
@@ -1260,6 +1386,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean isGameEnabled(ArcadePortGame type) {
+        // Explicitly selectable experiment; do not add it to READY_FOR_TEST rotation.
+        if (type == ArcadePortGame.PLEXBALL) return true;
         return type != null && ArcadePortRules.isArcadePortGameEnabled(
                 type.id(), plugin.getConfig().getStringList("enabled-games"));
     }
@@ -1313,6 +1441,10 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.SKY_WARS && mixedArcadeVariant
                 && !SkyWarsMixedArcadeRules.hasRoom(queuedPlayers)) {
             player.sendMessage(ChatColor.RED + "SkyWars Mixed Arcade is full (16/16 players).");
+            return;
+        }
+        if (type == ArcadePortGame.PLEXBALL && queuedPlayers >= PlexballRules.MAX_PLAYERS) {
+            player.sendMessage(ChatColor.RED + "Plexball's Arcade queue is full (8/8 players).");
             return;
         }
 
@@ -1540,6 +1672,70 @@ public final class ArcadePortManager implements Listener {
             String requestedId = mixedArcadeVariant ? type.id() + "-mixed" : type.id();
             sender.sendMessage(ChatColor.YELLOW + "No online players queued. Use /arcadeport join "
                     + requestedId + " or /arcadeport play " + requestedId + ".");
+            return;
+        }
+        if (type == ArcadePortGame.PLEXBALL) {
+            if (!PlexballRules.hasValidPlayerCount(participants.size())) {
+                sender.sendMessage(ChatColor.RED + "Plexball requires between "
+                        + PlexballRules.MIN_PLAYERS + " and " + PlexballRules.MAX_PLAYERS + " queued players.");
+                return;
+            }
+            PlexballGame game = plugin.getPlexballGame();
+            if (game == null) {
+                sender.sendMessage(ChatColor.RED + "Plexball is not available inside Testplex Arcade.");
+                return;
+            }
+            World plexballWorld;
+            try {
+                plexballWorld = game.prepareArcadeArena();
+            } catch (RuntimeException failure) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                        "Could not prepare the Plexball arena through ArcadePortManager.", failure);
+                sender.sendMessage(ChatColor.RED + "Plexball could not prepare its arena. Check the server log.");
+                return;
+            }
+            if (plexballWorld == null) {
+                sender.sendMessage(ChatColor.RED + "Plexball's arena could not be loaded.");
+                return;
+            }
+            if (queue != null) queues.remove(selectedQueueKey);
+            if (pendingStart != null && pendingType == type
+                    && pendingMixedArcadeVariant == mixedArcadeVariant) {
+                pendingStart.cancel();
+                pendingStart = null;
+                pendingType = null;
+                pendingMixedArcadeVariant = false;
+            }
+            Session session = new Session(type, plexballWorld, participants, false);
+            active = session;
+            try {
+                for (Player player : participants) {
+                    if (player == null || !player.isOnline()) continue;
+                    UUID id = player.getUniqueId();
+                    PlayerSnapshot pending = pendingRestore.remove(id);
+                    if (pending != null) pending.restore(player);
+                    lobby.ensurePlayerInLobby(player);
+                    PlayerSnapshot snapshot = new PlayerSnapshot(player);
+                    session.snapshots.put(id, snapshot);
+                    session.players.put(id, player);
+                    session.alive.add(id);
+                    session.scores.put(id, 0);
+                }
+                if (!game.startFromArcadeLifecycle(participants, plexballWorld)) {
+                    finish(session, null, false);
+                    sender.sendMessage(ChatColor.RED + "Plexball could not start with the current Arcade queue.");
+                    return;
+                }
+            } catch (RuntimeException failure) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                        "Plexball failed while starting inside the shared Arcade lifecycle.", failure);
+                game.stopForArcadeLifecycle("Plexball failed during startup.");
+                finish(session, null, false);
+                sender.sendMessage(ChatColor.RED + "Plexball failed to start. Player state was restored; see the server log.");
+                return;
+            }
+            sender.sendMessage(ChatColor.GREEN + "Started Plexball through the shared Testplex Arcade lifecycle with "
+                    + session.alive.size() + " players.");
             return;
         }
         if (type == ArcadePortGame.MONSTER_MAZE) {
@@ -10241,6 +10437,14 @@ public final class ArcadePortManager implements Listener {
 
     private void checkRoundEnd(Session session) {
         if (active != session) return;
+        if (session.type == ArcadePortGame.PLEXBALL) {
+            if (session.alive.isEmpty()) {
+                PlexballGame game = plugin.getPlexballGame();
+                if (game != null) game.stopForArcadeLifecycle("No Plexball players remain.");
+                finish(session, null, false);
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.DRAW_MY_THING || session.type == ArcadePortGame.MASTER_BUILDERS) return;
         // Castle Assault and Heroes of Gwen end through their objective controllers, not last-player rules.
         if (session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN) {
@@ -12084,7 +12288,7 @@ public final class ArcadePortManager implements Listener {
         if (announceWinner && session.type == ArcadePortGame.DEATH_TAG) {
             recordDeathTagRewards(session);
         }
-        recordLocalStats(session, winner, announceWinner);
+        if (session.type != ArcadePortGame.PLEXBALL) recordLocalStats(session, winner, announceWinner);
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             removeAllMicroBorderWarnings(session);
             for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
@@ -13539,6 +13743,10 @@ public final class ArcadePortManager implements Listener {
         Session stopping = active;
         List<Player> participantsToReturn = stopping == null
                 ? List.of() : new ArrayList<>(stopping.players.values());
+        if (stopping != null && stopping.type == ArcadePortGame.PLEXBALL
+                && plugin.getPlexballGame() != null) {
+            plugin.getPlexballGame().stopForArcadeLifecycle(reason);
+        }
         if (stopping != null) finish(stopping, null, false);
         if (monsterMazeRunning() && monsterMazeModule != null
                 && monsterMazeModule.getGameManager() != null) {
@@ -18863,8 +19071,19 @@ public final class ArcadePortManager implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         UUID id = event.getPlayer().getUniqueId();
-        for (Map<UUID, Player> queue : queues.values()) queue.remove(id);
+        boolean wasQueued = false;
+        for (Map<UUID, Player> queue : queues.values()) wasQueued |= queue.remove(id) != null;
         gladiatorLobbyVotes.remove(id);
+        if (wasQueued) {
+            if (pendingStart != null && pendingType != null
+                    && onlineQueuedPlayers(pendingType, pendingMixedArcadeVariant).isEmpty()) {
+                pendingStart.cancel();
+                pendingStart = null;
+                pendingType = null;
+                pendingMixedArcadeVariant = false;
+            }
+            lobbyRuntime.refreshDisplays();
+        }
         Session session = active;
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
@@ -18880,6 +19099,9 @@ public final class ArcadePortManager implements Listener {
             wasAlive = false;
         } else {
             wasAlive = session.alive.remove(id);
+        }
+        if (session.type == ArcadePortGame.PLEXBALL && plugin.getPlexballGame() != null) {
+            plugin.getPlexballGame().onArcadeLifecycleQuit(player, wasAlive);
         }
         if (session.type == ArcadePortGame.DRAGONS && wasAlive) {
             session.dragonEliminationOrder.add(id);

@@ -41,6 +41,10 @@ public final class PlexballRules {
                 && currentSpectators < MAX_SPECTATORS;
     }
 
+    public static boolean hasValidPlayerCount(int count) {
+        return count >= MIN_PLAYERS && count <= MAX_PLAYERS;
+    }
+
     public static int latencyRewindTicks(int pingEstimateMillis) {
         if (pingEstimateMillis <= 0) return 0;
         return Math.max(0, Math.min(MAX_REWIND_TICKS,

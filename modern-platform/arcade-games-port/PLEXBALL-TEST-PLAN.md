@@ -1,6 +1,6 @@
 # Plexball — Paper 26.3 test plan
 
-Plexball is an experimental in-process mode hosted by `ArcadeMechanicsModern`. It is deliberately **not** added to the READY_FOR_TEST allow-list or the normal rotating lobby queue. It uses a separate generated world named `testplex_plexball_arena_v1` and returns participants to the shared Testplex Arcade lobby when the match ends.
+Plexball is an experimental `ArcadePortGame` hosted by `ArcadeMechanicsModern` and started through the shared `ArcadePortManager` lifecycle. It remains outside the READY_FOR_TEST rotation allow-list, but is available through explicit Arcade lobby selection/queueing. The global manager owns the queue, countdown, active Session, participant/spectator membership, player snapshots, disconnect handling, stop and lobby restoration. Plexball owns only its game rules, batting turn order, ball simulation, scoreboard and progression. Its generated world is `testplex_plexball_arena_v1`.
 
 ## Start and kit selection
 
@@ -11,15 +11,15 @@ Plexball is an experimental in-process mode hosted by `ArcadeMechanicsModern`. I
 - `/arcadeport kit skyguard`
 - `/arcadeport kit plexball` — open the visual kit selector and choose a saved kit.
 - `/stats` or `/stats plexball` — open the Plexball career page with achievements, milestone progress and lifetime statistics.
-- `/arcadeport join plexball` — normal five-second queue countdown.
-- `/arcadeport play plexball` — quick two-second queue countdown.
-- `/arcadeport spectate plexball` — join an active match as a non-playing spectator.
-- `/arcadeport leave plexball` — leave the queue or stop spectating and return to the Arcade lobby.
-- `/arcadeport start plexball` — operator-only immediate start for two or more queued players.
+- `/arcadeport join plexball` — join the shared Testplex Arcade queue for Plexball.
+- `/arcadeport play plexball` — join the same Arcade queue and request the standard global quick-start window.
+- `/arcadeport spectate plexball` — join the active Arcade Session as a non-playing spectator.
+- `/arcadeport leave plexball` — use the global Arcade manager to leave the queue or active spectator role.
+- `/arcadeport start plexball` — operator-only start of the global Plexball queue (2–8 players).
 - `/arcadeport status` — shows the Plexball queue or current phase.
 - `/arcadeport stop` — operator stop and return to lobby.
 
-At least two and at most eight players are supported. Each player gets one initial batting turn. Everyone other than the current batter fields. The first round is capped at ten seconds per batter. Multiple home runs enter five-second sudden death, bounded by the same 180-second wall-clock match limit.
+At least two and at most eight players are supported. Queue admission, quick-start scheduling, explicit start and pre-game waiting are the same shared Arcade lifecycle used by other games; there is no Plexball-owned queue or countdown. On start, ArcadePortManager creates the active Session and captures player snapshots. Each player gets one initial batting turn. Everyone other than the current batter fields. The first round is capped at ten seconds per batter. Multiple home runs enter five-second sudden death, bounded by the same 180-second wall-clock match limit.
 
 ## Achievements
 
@@ -58,7 +58,7 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 | Test | Expected |
 | --- | --- |
 | Join with 2–8 players | Queue starts and every participant enters the separate Plexball arena. |
-| Spectate active match | `/arcadeport spectate plexball` joins an active game as a spectator, outside the player roster; spectators do not bat, field, score, unlock progression or change match results. |
+| Spectate active match | `/arcadeport spectate plexball` adds the viewer to the global Arcade Session's `players` and `snapshots` maps but not its `alive` set; spectators do not bat, field, score, unlock progression or change match results. |
 | Queue leave | A player can remove themselves while queued; countdown resets if the queue falls below two players. |
 | Queue disconnect | A queued player's disconnect immediately updates the queue and cancels the countdown if fewer than two players remain. |
 | Batter turn | Only the selected batter can hit; movement is locked but look direction remains available. |
@@ -85,8 +85,8 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 | Sudden death | Multiple home-run players take five-second turns; a finalist must hit another home run to survive the round. |
 | Sudden-death timeout | The hard cap only applies survivor elimination after every finalist has had a turn in that round; an interrupted round keeps all remaining finalists eligible and ranks them on completed match performance. |
 | Match cap | The game ends at 180 seconds of wall-clock time, even if server TPS falls below 20. |
-| Cleanup | Ball, tee Interaction and player inventories are cleaned; online participants return to the shared Arcade lobby. |
-| Spectator cleanup | Spectators are returned to the Arcade lobby when the match ends or is stopped, when they use `/arcadeport leave plexball`, or on server shutdown. |
+| Cleanup | Plexball removes its ball/tee/HUD state; ArcadePortManager restores participant and spectator snapshots and returns them to the shared Arcade lobby. |
+| Spectator cleanup | ArcadePortManager owns spectator membership and player snapshots; global finish, stop, leave, disconnect and shutdown paths restore the snapshot and return the viewer to the shared Arcade lobby. |
 | Match disconnect | A disconnected batter's turn resolves safely; a disconnected fielder is removed from active catch checks and the remaining players are notified. |
 | Repeated rounds | Field generation marker prevents rebuilding the entire field on every match. |
 
@@ -122,4 +122,4 @@ A high-ping client must not receive a catch merely because its packet arrived la
 - The current version uses right-click to swing at the tee Interaction entity and right-click the glove to attempt a catch. The match HUD uses a persistent scoreboard, role-specific action-bar prompts and phase/result titles. It does not provide a custom client-side crosshair overlay or a full swing animation.
 - Ball rendering is an ItemDisplay moved by the server-side simulation. Its visual smoothness may vary by client FPS/network, but the server path and score do not.
 - The current catch rewind is capped at five ticks (approximately 250ms one-way estimate). Do not advertise Plexball as completely ping independent; validate the RTT matrix and adjust only with measured evidence.
-- Achievements and career milestones are implemented in a local Testplex profile (`plexball-progression.yml`). They provide unlock notifications and a stats menu, but do not award production Mineplex currency, XP, titles or cosmetics. Ranked leaderboards and public matchmaking are still out of scope. Spectating is a read-only observer role for active test matches, limited to 16 concurrent viewers.
+- Achievements and career milestones are implemented in a local Testplex profile (`plexball-progression.yml`). They provide unlock notifications and a stats menu, but do not award production Mineplex currency, XP, titles or cosmetics. Ranked leaderboards and public matchmaking are still out of scope. Plexball supports a read-only observer role for active test matches, limited to 16 concurrent viewers; observer membership and lifecycle are represented in the shared Arcade Session, not a Plexball-specific spectator set.

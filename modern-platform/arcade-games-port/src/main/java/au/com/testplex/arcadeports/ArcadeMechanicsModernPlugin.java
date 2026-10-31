@@ -39,7 +39,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         getConfig().set("enabled-games", enabledGames);
 
         String selectedLobbyGame = getConfig().getString("lobby-selected-game", "death-tag");
-        if (!enabledGames.contains(selectedLobbyGame)) {
+        if (!enabledGames.contains(selectedLobbyGame)
+                && !ArcadePortGame.PLEXBALL.id().equalsIgnoreCase(selectedLobbyGame)) {
             getConfig().set("lobby-selected-game", enabledGames.isEmpty() ? "death-tag" : enabledGames.get(0));
         }
         saveConfig();
@@ -98,14 +99,12 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     }
 
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
+    public ArcadePortManager getArcadePortManager() { return manager; }
+    public PlexballGame getPlexballGame() { return plexball; }
     public void returnPlayerToArcadeLobby(Player player) {
         if (manager != null && player != null && player.isOnline()) manager.returnPlayerToLobby(player);
     }
 
-    /** Stop any active prototype before Plexball takes the shared test arena. */
-    public void prepareForPlexball() {
-        if (manager != null) manager.stop("Plexball is taking over the Arcade test arena.");
-    }
     public void stopMonsterMazeRound(String reason) {
         if (manager != null) manager.stop(reason == null ? "Monster Maze stopped" : reason);
     }
@@ -122,8 +121,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         } catch (java.io.IOException exception) {
             getLogger().warning("Could not remove an Arcade runtime readiness record: " + exception.getMessage());
         }
-        if (plexball != null) plexball.shutdown();
         if (manager != null) manager.shutdown();
+        if (plexball != null) plexball.shutdown();
         if (monsterMaze != null) monsterMaze.shutdown();
     }
 
@@ -267,14 +266,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport " + sub + " <game-id>");
                     return true;
                 }
-                if ("plexball".equalsIgnoreCase(args[1])) {
-                    plexball.queue(player, sub.equals("play"));
-                    return true;
-                }
-                if (plexball != null && plexball.isActive()) {
-                    sender.sendMessage(ChatColor.RED + "Plexball is currently using the Arcade test arena.");
-                    return true;
-                }
                 ArcadePortGame mixedJoinGame = mixedArcadeGameFromId(args[1]);
                 boolean mixedArcadeVariant = mixedJoinGame != null;
                 ArcadePortGame requestedGame = mixedArcadeVariant ? mixedJoinGame : ArcadePortGame.fromId(args[1]);
@@ -285,11 +276,14 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage("Players only.");
                     return true;
                 }
-                if (args.length < 2 || !"plexball".equalsIgnoreCase(args[1])) {
-                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport leave plexball");
+                if (args.length < 2) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport leave <game-id>");
                     return true;
                 }
-                if (plexball != null) plexball.leaveQueue(leavingPlayer);
+                ArcadePortGame leavingGame = ArcadePortGame.fromId(args[1]);
+                if (leavingGame == null || !manager.leaveQueue(leavingGame, leavingPlayer)) {
+                    sender.sendMessage(ChatColor.YELLOW + "You are not queued or spectating that Arcade game.");
+                }
                 return true;
             case "spectate":
                 if (!(sender instanceof Player spectator)) {
@@ -344,7 +338,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                         sender.sendMessage(ChatColor.RED + "Operator permission required to force-start Plexball.");
                         return true;
                     }
-                    plexball.startQueued(sender);
+                    manager.startQueued(ArcadePortGame.PLEXBALL, null, sender);
                     return true;
                 }
                 if (plexball != null && plexball.isActive()) {
@@ -411,7 +405,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.RED + "Operator permission required.");
                     return true;
                 }
-                if (plexball != null) plexball.stop("Stopped by an operator.");
                 manager.stop("Stopped by an operator.");
                 return true;
             default:
