@@ -673,10 +673,18 @@ public final class CameraShyGame implements Listener {
             photographedBy.put(id, new LinkedHashSet<>());
             spawnLocations.put(id, spawns.get(i % spawns.size()).clone());
         }
-        plugin.saveConfig();
-        for (UUID id : players.keySet()) {
-            Player player = players.get(id);
-            if (player != null && player.isOnline()) setupPlayer(player, spawnLocations.get(id));
+        try {
+            plugin.saveConfig();
+            for (UUID id : players.keySet()) {
+                Player player = players.get(id);
+                if (player != null && player.isOnline()) setupPlayer(player, spawnLocations.get(id));
+            }
+        } catch (RuntimeException startupFailure) {
+            plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                    "Camera Shy could not finish preparing every player; restoring the captured pre-match state.",
+                    startupFailure);
+            finish(null, "Camera Shy could not initialise. No round was played.", false);
+            return;
         }
 
         broadcastMatch(ChatColor.GOLD + "" + ChatColor.BOLD + "CAMERA SHY"
