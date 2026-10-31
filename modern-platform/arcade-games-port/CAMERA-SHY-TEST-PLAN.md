@@ -48,4 +48,5 @@
 - Starting Camera Shy while another Arcade game is running is rejected.
 - Starting another Arcade game while Camera Shy is live is rejected.
 - Operator stop and plugin shutdown restore player state and clean up the test-player roster.
+- Disconnect during a live round, reconnect both before and after match end, and confirm the pre-match inventory, location, effects and movement settings are restored; verify the pending restore is cleared after successful recovery.
 - `mvn -pl modern-platform/arcade-games-port -am test` and the modern platform tests pass.
