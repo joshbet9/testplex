@@ -57,10 +57,10 @@ Spawn coordinates above are the values stored in each archive's `level.dat`; the
 - The initial NBT inspection found 211 chest tile-entity records in the standard Alicudi archive; none were found in the other 19 snapshots.
 - Nano Wizards `WorldDownloader.txt` includes `ServerName=eu.mineplex.com` and the downloader setting `LOAD_TILE_ENTITY=false`. That means its exported files cannot be assumed to preserve chest tile-entity NBT or other tile entities.
 - The source-specific `WorldConfig.dat` data is absent throughout, so the original map bounds, `TEAM_SPAWNS` groups and custom chest marker list are not available from these ZIPs.
-- The validator is also inspecting legacy chunk section block arrays for chest block IDs. A chest block in terrain without its tile-entity data still needs in-server testing before it can be treated as a usable loot chest.
+- A follow-up diagnostic was added to scan legacy chunk section block arrays for chest block IDs, but that additional scan has not yet produced a CI report. A chest block in terrain without its tile-entity data still needs in-server testing before it can be treated as a usable loot chest.
 
 ### Engineering decision
 
 Keep these as recorded source assets, but do not mark any as ready for the existing Wizards importer. A proper adapter would need to accept a world export containing `level.dat` plus region files, derive bounded arena extents from populated chunks, verify safe spawn positions from the actual terrain, and recover or reconstruct usable chest locations. It must not silently treat the `level.dat` world spawn as an authoritative Mineplex `TEAM_SPAWNS` marker.
 
-The current implementation therefore keeps the generated test arena as the safe fallback until that adapter and a live Paper 26.3 acceptance pass are implemented. The metadata-only CI report for the initial full archive run is [available as an Actions artifact](https://github.com/joshbet9/testplex/actions/runs/41207742669/artifacts/13045575510). The map ZIPs themselves are not committed or rehosted.
+The current implementation therefore keeps the generated test arena as the safe fallback until that adapter and a live Paper 26.3 acceptance pass are implemented. The detailed NBT/chunk metadata report is [available as an Actions artifact](https://github.com/joshbet9/testplex/actions/runs/41207936209/artifacts/13044847925). The map ZIPs themselves are not committed or rehosted.
