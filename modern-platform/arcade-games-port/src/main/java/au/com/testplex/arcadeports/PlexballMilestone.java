@@ -40,8 +40,10 @@ public enum PlexballMilestone {
     }
 
     public String targetLabel() {
-        return metric == Metric.DISTANCE_TENTHS
-                ? String.format(java.util.Locale.ROOT, "%.1fm", target / 10.0D)
-                : Long.toString(target);
+        if (metric != Metric.DISTANCE_TENTHS) return Long.toString(target);
+        double metres = target / 10.0D;
+        return metres >= 1_000.0D
+                ? String.format(java.util.Locale.ROOT, "%.0fkm", metres / 1_000.0D)
+                : String.format(java.util.Locale.ROOT, "%.1fm", metres);
     }
 }
