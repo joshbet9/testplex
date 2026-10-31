@@ -53,6 +53,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     private UUID firstDisplayId;
     private UUID secondDisplayId;
     private UUID firstPasserId;
+    private UUID passReceiverId;
     private UUID firstShooterId;
     private UUID blockerId;
     private int firstScoringTeam = -1;
@@ -219,10 +220,16 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         Object ball = field(firstMatch, "ball");
         require(ball != null && "PASS".equals(String.valueOf(field(ball, "mode"))),
                 "left-click pass did not create a flying pass ball");
+        passPasserId = passer.getUniqueId();
+        passReceiverId = receiver.getUniqueId();
         Vector velocity = ((Vector) field(ball, "velocity")).clone();
-        velocity.setY(velocity.getY() - GRAVITY);
-        Location next = ((Location) field(ball, "location")).clone().add(velocity);
-        receiver.teleport(next.subtract(0.0D, 1.0D, 0.0D));
+        require(velocity.lengthSquared() > 0.25D, "pass did not launch with meaningful velocity");
+        require(velocity.getX() * (team == 0 ? 1.0D : -1.0D) > 0.0D,
+                "pass trajectory was not directed toward the selected teammate");
+        // The real ball tick runs every server tick, while this acceptance
+        // driver polls every five ticks. Let it travel first, then park the
+        // intended receiver at the live ball position for a deterministic catch.
+        
         stage = 2;
         ticks = 0L;
         getLogger().info("HOOPS_SMOKE|PASS_LAUNCHED|from=" + passer.getName()
@@ -233,16 +240,27 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         UUID holder = (UUID) field(firstMatch, "holderId");
         if (holder == null) {
             if (ticks >= 40L) throw new IllegalStateException("pass did not result in a recoverable catch");
+            Object liveBall = field(firstMatch, "ball");
+            Player intendedReceiver = player(passReceiverId);
+            require(liveBall != null && intendedReceiver != null,
+                    "launched pass or intended receiver disappeared before catch");
+            Location livePosition = ((Location) field(liveBall, "location")).clone();
+            field(liveBall, "velocity", new Vector(0.0D, 0.0D, 0.0D));
+            intendedReceiver.teleport(livePosition.subtract(0.0D, 1.0D, 0.0D));
+            intendedReceiver.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
             return;
         }
+        require(holder.equals(passReceiverId),
+                "pass was caught/intercepted by an unintended player: " + player(holder));
         Player shooter = player(holder);
         require(shooter != null, "pass catch holder is not in the match roster");
         @SuppressWarnings("unchecked")
         Map<UUID, Integer> teams = (Map<UUID, Integer>) field(firstMatch, "teams");
         int team = teams.get(shooter.getUniqueId());
         UUID passerId = (UUID) field(firstMatch, "lastPasserId");
-        require(passerId != null && !passerId.equals(shooter.getUniqueId()),
-                "completed pass did not retain its assist candidate");
+        require(passerId != null && passerId.equals(passPasserId)
+                        && !passerId.equals(shooter.getUniqueId()),
+                "completed teammate pass did not retain the correct assist candidate");
 
         // Put the carrier eight blocks from the hoop: a normal two-point shot.
         World world = (World) field(firstMatch, "world");
