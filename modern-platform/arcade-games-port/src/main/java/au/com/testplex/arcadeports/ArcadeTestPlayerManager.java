@@ -10,9 +10,6 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.Listener;
-import org.bukkit.event.player.PlayerRespawnEvent;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -37,7 +34,7 @@ import java.util.function.Consumer;
  * separately-installed server plugin with a proprietary distribution licence.
  * This project neither bundles nor copies any of its implementation.
  */
-final class ArcadeTestPlayerManager implements Listener {
+final class ArcadeTestPlayerManager {
     static final int TARGET_ROSTER_SIZE = 16;
     private static final String FPP_PLUGIN_NAME = "FakePlayerPlugin";
     private static final String RESERVED_NAME_PREFIX = "TPXTEST";
@@ -61,7 +58,6 @@ final class ArcadeTestPlayerManager implements Listener {
     ArcadeTestPlayerManager(JavaPlugin host) {
         this.host = host;
         this.markerKey = new NamespacedKey(host, "session-test-player");
-        Bukkit.getPluginManager().registerEvents(this, host);
     }
 
     enum CleanupAction {
@@ -320,8 +316,8 @@ final class ArcadeTestPlayerManager implements Listener {
         pendingSpawnTask = Bukkit.getScheduler().runTaskTimer(host, () -> {
             if (shuttingDown) {
                 cancelPendingSpawn();
-                despawnBatch(api, handles);
                 clearPendingHandles();
+                scheduleCleanup(api, handles, List.of(), null);
                 completion.accept(new SpawnResult(List.of(), "Testplex is shutting down."));
                 return;
             }
@@ -463,14 +459,6 @@ final class ArcadeTestPlayerManager implements Listener {
         }, 1L, 1L);
     }
 
-    @EventHandler
-    public void onTestPlayerRespawn(PlayerRespawnEvent event) {
-        UUID id = event.getPlayer().getUniqueId();
-        if (isTestPlayer(id)) {
-            whenRespawned(id, ignored -> { /* ArcadePortManager owns the session reference. */ });
-        }
-    }
-
     void despawnSessionPlayers() {
         cancelPendingSpawn();
         Object api = pendingApi != null ? pendingApi : retiringApi;
@@ -563,7 +551,7 @@ final class ArcadeTestPlayerManager implements Listener {
                 }
             }
             boolean bodyAvailable = rawPlayer instanceof Player body && body.isOnline() && body.isValid();
-            boolean handleRegistered = state.handle != null
+            boolean handleRegistered = state.handle != null && retiringApi != null
                     && (!registryReadable || registeredIds.contains(id));
             CleanupAction action = cleanupAction(handleRegistered, respawning, bodyAvailable,
                     playerOnline, state.despawnRequested, state.elapsedTicks >= CLEANUP_TIMEOUT_TICKS);
@@ -575,9 +563,8 @@ final class ArcadeTestPlayerManager implements Listener {
                 case DESPAWN -> {
                     clearDisposablePlayerState((Player) rawPlayer);
                     try {
-                        despawn(retiringApi, state.handle);
-                        state.despawnRequested = true;
-                        state.elapsedTicks = 0;
+                        state.despawnRequested = despawn(retiringApi, state.handle);
+                        if (state.despawnRequested) state.elapsedTicks = 0;
                     } catch (Exception exception) {
                         host.getLogger().warning("Could not despawn Testplex fake player " + id + ": "
                                 + rootMessage(exception));
@@ -590,8 +577,7 @@ final class ArcadeTestPlayerManager implements Listener {
                     }
                     if (handleRegistered && retiringApi != null && !state.despawnRequested) {
                         try {
-                            despawn(retiringApi, state.handle);
-                            state.despawnRequested = true;
+                            state.despawnRequested = despawn(retiringApi, state.handle);
                         } catch (Exception exception) {
                             host.getLogger().warning("Fallback FakePlayerPlugin despawn failed for " + id + ": "
                                     + rootMessage(exception));
