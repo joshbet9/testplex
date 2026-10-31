@@ -12360,7 +12360,7 @@ public final class ArcadePortManager implements Listener {
                     ChatColor teamColour = team == 0 ? ChatColor.RED : ChatColor.AQUA;
                     announce(session, teamColour + "" + ChatColor.BOLD + teamName + " team won Super Sploor!");
                 }
-                announce(session, winner == null ? ChatColor.YELLOW + "Round ended." : ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won " + session.type.displayName() + "!");
+
             }
         }
         for (Map.Entry<Block, BlockData> entry : session.deathTagOriginalLightBlocks.entrySet()) {
