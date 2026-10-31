@@ -19,8 +19,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
 
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
-    private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of("death-tag", "one-in-the-quiver", "bomb-lobbers");
-    private static final String PLAYABLE_GAMES_REVISION = "acceptance-bomb-lobbers-20261101-v1";
+    private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl");
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-bacon-brawl-20261101-v1";
 
     @Override
     public void onEnable() {
@@ -55,7 +55,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
         // Monster Maze remains embedded in this Arcade host, but is not currently
         // on the playable allow-list. Keep its startup failure isolated from the
-        // two games which have been cleared for acceptance testing.
+        // games which have been cleared for the shared acceptance test queue.
         try {
             monsterMazeReadiness.initializeAndAttach(
                     () -> {
