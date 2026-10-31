@@ -25,6 +25,7 @@ At least two and at most eight players are supported. Each player gets one initi
 | Join with 2–8 players | Queue starts and every participant enters the separate Plexball arena. |
 | Queue leave | A player can remove themselves while queued; countdown resets if the queue falls below two players. |
 | Batter turn | Only the selected batter can hit; movement is locked but look direction remains available. |
+| Single swing | The first click on the tee consumes the at-bat, including a miss or foul; repeated clicking cannot retry until timing improves. |
 | Fielder turn | Every non-batter can move throughout the fair triangle. |
 | Fielding hotbar | Fielder can switch between slot 0 (glove) and slot 1 (kit ability); other slots are blocked. |
 | Standings | Distance and successful catches are broadcast after each completed batting attempt. |
