@@ -176,9 +176,9 @@ public final class HoopsPaperSmoke extends JavaPlugin {
                 "four-player queue was not balanced 2v2: RED=" + teamCounts[0] + " BLUE=" + teamCounts[1]);
         require(world.getBlockAt(10, 63, 10).getType() == Material.BIRCH_PLANKS,
                 "generated hardwood court is missing");
-        require(world.getBlockAt(23, 67, 3).getType() == Material.RED_STAINED_GLASS
-                        || world.getBlockAt(-23, 67, 3).getType() == Material.LIGHT_BLUE_STAINED_GLASS,
-                "one of the stained-glass backboards is missing");
+        require(world.getBlockAt(-23, 67, -3).getType() == Material.RED_STAINED_GLASS
+                        && world.getBlockAt(23, 67, -3).getType() == Material.LIGHT_BLUE_STAINED_GLASS,
+                "both source-coloured stained-glass backboards must be present at x=-23/+23");
         require(((BossBar) field(firstMatch, "bossBar")).isVisible(), "live boss bar is not visible");
         TextDisplay display = (TextDisplay) field(firstMatch, "scoreboardDisplay");
         require(display != null && display.isValid(), "floating centre-court scoreboard was not spawned");
