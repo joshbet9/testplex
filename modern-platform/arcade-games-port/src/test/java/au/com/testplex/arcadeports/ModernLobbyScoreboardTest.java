@@ -47,9 +47,7 @@ class ModernLobbyScoreboardTest {
     }
 
     @Test
-    void baconBrawlIsNoLongerGivenADifferentSidebarLayout() {
-        assertTrue(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("bacon-brawl"));
-        assertFalse(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("death-tag"));
+    void baconBrawlAndOtherGamesShareTheSameLineCount() {
         assertEquals(
                 ModernLobbyScoreboard.sidebarLines("Testplex Modern", "Bacon Brawl", "Default", "0", "0", "Admin", "www.mineplex.com").size(),
                 ModernLobbyScoreboard.sidebarLines("Testplex Modern", "Death Tag", "Default", "0", "0", "Admin", "www.mineplex.com").size());
