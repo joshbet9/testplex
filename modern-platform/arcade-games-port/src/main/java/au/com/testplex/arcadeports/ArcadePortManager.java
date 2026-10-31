@@ -10409,6 +10409,7 @@ public final class ArcadePortManager implements Listener {
                     + (session.teams.getOrDefault(id, 0) == 1 ? " | COW" : " | FARMER");
             case WITHER_ASSAULT -> (session.teams.getOrDefault(id, 0) == 1 ? "WITHER" : "HUMAN")
                     + " | " + Math.max(0, (int) ((session.endsAt - System.currentTimeMillis()) / 1_000L)) + "s";
+            case CAMERA_SHY -> cameraShyModule == null ? "Camera Shy" : cameraShyModule.status();
             case TURF_WARS -> (session.turfCombat ? "COMBAT" : "BUILD") + " | R:"
                     + turfWarsRemainingLines(session, 0) + " B:" + turfWarsRemainingLines(session, 1);
             case DRAW_MY_THING -> session.drawCurrentDrawer == null ? "waiting for next drawing"
