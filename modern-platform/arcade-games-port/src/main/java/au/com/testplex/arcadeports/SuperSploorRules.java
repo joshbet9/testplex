@@ -106,6 +106,12 @@ public final class SuperSploorRules {
         return clampInk(current + Math.max(0, seconds) * rate);
     }
 
+    public static boolean canRegenerateInk(long nowMillis, long lastInkUseAtMillis,
+            boolean squidMode, boolean standingOnFriendlyPaint) {
+        if (squidMode && standingOnFriendlyPaint) return true;
+        return nowMillis >= lastInkUseAtMillis && nowMillis - lastInkUseAtMillis >= 1_000L;
+    }
+
     public static int overtimeLeadThreshold(int totalTerritoryUnits) {
         long total = Math.max(0L, (long) totalTerritoryUnits);
         return (int) Math.max(1L, (total + 99L) / 100L);
