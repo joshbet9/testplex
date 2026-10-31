@@ -97,9 +97,9 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             require(runtime != null, "HoopsRemasteredRuntime was not registered");
         }
 
-        List<Player> online = Bukkit.getOnlinePlayers().stream()
+        List<Player> online = new ArrayList<>(Bukkit.getOnlinePlayers().stream()
                 .filter(player -> CLIENT_NAMES.stream().anyMatch(name -> name.equalsIgnoreCase(player.getName())))
-                .toList();
+                .toList());
         if (online.size() < CLIENT_NAMES.size()) {
             if (ticks >= MAX_WAIT_TICKS) {
                 throw new IllegalStateException("timed out waiting for four clients; online="
