@@ -1772,6 +1772,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void cancelAutomaticRotationVote() {
+        // A manual action during the end presentation must also suppress a vote
+        // which has not started ticking yet.
+        automaticRotationOnReturn = false;
         if (automaticRotationTask == null) return;
         automaticRotationTask.cancel();
         automaticRotationTask = null;
