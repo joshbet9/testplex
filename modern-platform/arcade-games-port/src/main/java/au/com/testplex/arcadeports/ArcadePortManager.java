@@ -1595,9 +1595,9 @@ public final class ArcadePortManager implements Listener {
                 testPlayers.despawnSessionPlayers();
             } else {
                 for (Player bot : result.players()) {
-                    if (bot.isOnline()) {
-                        bot.sendMessage(ChatColor.GRAY + "AFK Test Player — controlled by Testplex game testing.");
-                    }
+                    if (!bot.isOnline()) continue;
+                    testPlayers.syncMatchRespawnLocation(bot);
+                    bot.sendMessage(ChatColor.GRAY + "AFK Test Player — controlled by Testplex game testing.");
                 }
             }
         });
