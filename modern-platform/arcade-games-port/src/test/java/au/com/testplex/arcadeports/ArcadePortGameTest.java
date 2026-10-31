@@ -150,6 +150,24 @@ class ArcadePortGameTest {
         assertEquals(ArcadePortGame.WITHER_ASSAULT, ArcadePortGame.fromId("wither-assault"));
     }
 
+    @Test void lobbyQueueTeamCountsAreDeclaredByTheSharedGameCatalogue() {
+        assertEquals(0, ArcadePortGame.BACON_BRAWL.lobbyTeamCount());
+        assertEquals(2, ArcadePortGame.BOMB_LOBBERS.lobbyTeamCount());
+        assertEquals(2, ArcadePortGame.PAINTBALL.lobbyTeamCount());
+        assertEquals(2, ArcadePortGame.TURF_WARS.lobbyTeamCount());
+        assertEquals(2, ArcadePortGame.CASTLE_ASSAULT.lobbyTeamCount());
+        assertEquals(2, ArcadePortGame.HEROES_OF_GWEN.lobbyTeamCount());
+        assertEquals(4, ArcadePortGame.MICRO_BATTLES.lobbyTeamCount());
+        assertEquals(4, ArcadePortGame.SHEEP_QUEST.lobbyTeamCount());
+        assertEquals(0, ArcadePortGame.ONE_IN_THE_QUIVER.lobbyTeamCount());
+        assertEquals(0, ArcadePortGame.MILK_THE_COW.lobbyTeamCount());
+        assertEquals(0, ArcadePortGame.WITHER_ASSAULT.lobbyTeamCount());
+        assertEquals(ArcadePortGame.MICRO_BATTLES.lobbyTeamCount(),
+                ArcadePortManager.teamCountForGame(ArcadePortGame.MICRO_BATTLES));
+        assertEquals(ArcadePortGame.BOMB_LOBBERS.lobbyTeamCount(),
+                ArcadePortManager.teamCountForGame(ArcadePortGame.BOMB_LOBBERS));
+    }
+
     @Test void normalizesSpacesAndUnderscoresInTestCommands() {
         assertEquals(ArcadePortGame.ONE_IN_THE_QUIVER, ArcadePortGame.fromId("one_in_the_quiver"));
         assertEquals(ArcadePortGame.BOMB_LOBBERS, ArcadePortGame.fromId("Bomb Lobbers"));
