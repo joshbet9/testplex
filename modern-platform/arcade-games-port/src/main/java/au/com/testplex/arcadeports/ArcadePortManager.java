@@ -202,6 +202,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> bombLobbersKitPreferences = new HashMap<>();
     private final Map<UUID, String> spleefKitPreferences = new HashMap<>();
     private final Map<UUID, String> microKitPreferences = new HashMap<>();
+    private final Map<UUID, String> evolutionKitPreferences = new HashMap<>();
     private final Map<UUID, String> quiverKitPreferences = new HashMap<>();
     private final Map<UUID, String> runnerKitPreferences = new HashMap<>();
     private final Map<UUID, String> sheepQuestKitPreferences = new HashMap<>();
@@ -632,6 +633,7 @@ public final class ArcadePortManager implements Listener {
                 case BOMB_LOBBERS -> { selectBombLobbersKit(player, value); return; }
                 case SPLEEF -> { selectSpleefKit(player, value); return; }
                 case MICRO_BATTLES -> { selectMicroBattlesKit(player, value); return; }
+                case EVOLUTION -> { selectEvolutionKit(player, value); return; }
                 case ONE_IN_THE_QUIVER -> { selectQuiverKit(player, value); return; }
                 case DRAGONS -> { selectDragonsKit(player, value); return; }
                 case DRAGON_ESCAPE -> { selectDragonEscapeKit(player, value); return; }
@@ -652,6 +654,10 @@ public final class ArcadePortManager implements Listener {
         else if (ArcadePortRules.normalizeBombLobbersKit(value) != null) selectBombLobbersKit(player, value);
         else if (ArcadePortRules.normalizeSpleefKit(value) != null) selectSpleefKit(player, value);
         else if (ArcadePortRules.normalizeMicroBattlesKit(value) != null) selectMicroBattlesKit(player, value);
+        else if (value.equals("quick-evolver") || value.equals("evolution-quick-evolver")
+                || value.equals("standard-evolution") || value.equals("evolution-standard")) {
+            selectEvolutionKit(player, value);
+        }
         else if (Set.of("rifle", "sniper", "shotgun", "machine-gun", "machinegun").contains(value)) selectPaintballKit(player, value);
         else if (ArcadePortRules.normalizeQuiverKit(value) != null) selectQuiverKit(player, value);
         else if (ArcadePortRules.normalizeDragonsKit(value) != null) selectDragonsKit(player, value);
@@ -748,6 +754,38 @@ public final class ArcadePortManager implements Listener {
         } else {
             player.sendMessage(ChatColor.GREEN + "Spleef kit set to " + kit + " for your next test.");
         }
+    }
+
+    public void selectEvolutionKit(Player player, String requestedKit) {
+        if (player == null || requestedKit == null) return;
+        String kit = requestedKit.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        if (kit.equals("evolution-quick-evolver")) kit = "quick-evolver";
+        if (kit.equals("evolution-standard")) kit = "standard-evolution";
+        if (!kit.equals("quick-evolver") && !kit.equals("standard-evolution")) {
+            player.sendMessage(ChatColor.YELLOW
+                    + "Evolution kits: standard-evolution, quick-evolver.");
+            return;
+        }
+        UUID playerId = player.getUniqueId();
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.EVOLUTION
+                && session.players.containsKey(playerId) && session.alive.contains(playerId)
+                && (session.evolving.contains(playerId) || session.evolutionCharge.containsKey(playerId))) {
+            player.sendMessage(ChatColor.YELLOW
+                    + "You cannot change Evolution kits while charging or transforming.");
+            return;
+        }
+        evolutionKitPreferences.put(playerId, kit);
+        plugin.getConfig().set("lobby-kit-preferences." + playerId + ".evolution", kit);
+        plugin.saveConfig();
+        if (session != null && session.type == ArcadePortGame.EVOLUTION
+                && session.players.containsKey(playerId) && session.alive.contains(playerId)) {
+            session.evolutionKits.put(playerId, kit);
+        }
+        player.sendMessage(ChatColor.GREEN + (kit.equals("quick-evolver")
+                ? "Quick Evolver selected — evolution is 25% faster."
+                : "Standard Evolution kit selected."));
     }
 
     public void selectMicroBattlesKit(Player player, String requestedKit) {
@@ -1872,6 +1910,11 @@ public final class ArcadePortManager implements Listener {
             }
             if (type == ArcadePortGame.EVOLUTION) {
                 UUID evolutionId = player.getUniqueId();
+                String savedEvolutionKit = plugin.getConfig().getString(
+                        "lobby-kit-preferences." + evolutionId + ".evolution", "standard-evolution");
+                String evolutionKit = evolutionKitPreferences.getOrDefault(evolutionId, savedEvolutionKit);
+                session.evolutionKits.put(evolutionId,
+                        "quick-evolver".equalsIgnoreCase(evolutionKit) ? "quick-evolver" : "standard-evolution");
                 session.evolutionLevels.put(evolutionId, 0);
                 session.evolutionLifeKills.put(evolutionId, 0);
                 session.evolutionKillsSinceEvolution.put(evolutionId, 0);
@@ -7434,6 +7477,19 @@ public final class ArcadePortManager implements Listener {
         }
         session.baconLastDamager.put(targetId, attackerId);
         session.baconLastDamagedAt.put(targetId, now);
+        if ("bacon-blast".equals(source)) {
+            session.baconBlastCombosByVictim.put(targetId, new BaconBlastCombo(attackerId, now));
+        } else {
+            BaconBlastCombo combo = session.baconBlastCombosByVictim.get(targetId);
+            if (combo != null) {
+                if (ArcadePortRules.shouldCountMamaCameraBlastKill(
+                        true, false, attackerId, combo.ownerId(), now, combo.lastHitAtMillis())) {
+                    session.baconBlastCombosByVictim.put(targetId, new BaconBlastCombo(attackerId, now));
+                } else {
+                    session.baconBlastCombosByVictim.remove(targetId);
+                }
+            }
+        }
         session.baconLastHitSource.put(targetId, source);
         session.baconLastHitBackstab.put(targetId, backstab);
         session.baconLastHitCloaked.put(targetId, attackerCloaked);
@@ -10643,6 +10699,7 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             String lastHitSource = session.baconLastHitSource.get(playerId);
+            BaconBlastCombo blastCombo = session.baconBlastCombosByVictim.remove(playerId);
             if (killer != null) {
                 String kit = session.baconKits.getOrDefault(killer.getUniqueId(), "el-muchacho-pigo");
                 boolean cloakedBackstab = "pig".equals(kit)
@@ -10650,7 +10707,14 @@ public final class ArcadePortManager implements Listener {
                         && session.baconLastHitBackstab.getOrDefault(playerId, false)
                         && session.baconLastHitCloaked.getOrDefault(playerId, false);
                 if (!cloakedBackstab) session.baconGoatStyEligible.remove(killer.getUniqueId());
-                if ("mama-piggles".equals(kit) && "bacon-blast".equals(lastHitSource)) {
+                boolean comboOwnerMatches = blastCombo != null
+                        && blastCombo.ownerId().equals(killer.getUniqueId());
+                boolean countsAsMamaCameraKill = ArcadePortRules.shouldCountMamaCameraBlastKill(
+                        "mama-piggles".equals(kit), "bacon-blast".equals(lastHitSource),
+                        killer.getUniqueId(), comboOwnerMatches ? blastCombo.ownerId() : null,
+                        System.currentTimeMillis(),
+                        blastCombo == null ? 0L : blastCombo.lastHitAtMillis());
+                if (countsAsMamaCameraKill) {
                     int blastKills = session.baconBlastKills.merge(killer.getUniqueId(), 1, Integer::sum);
                     if (blastKills >= 4) awardCatalogAchievement(killer, "bacon-brawl", "mama-camera");
                 }
@@ -10671,6 +10735,7 @@ public final class ArcadePortManager implements Listener {
             session.baconLastDamager.remove(playerId);
             session.baconLastDamagedAt.remove(playerId);
             session.baconLastHitSource.remove(playerId);
+            session.baconBlastCombosByVictim.remove(playerId);
             session.baconLastHitBackstab.remove(playerId);
             session.baconLastHitCloaked.remove(playerId);
             session.baconSlamRecoveryAttempts.remove(playerId);
@@ -10869,6 +10934,9 @@ public final class ArcadePortManager implements Listener {
             session.evolutionAvailable.remove(victimId);
             session.evolutionCharge.remove(victimId);
             session.evolving.remove(victimId);
+            session.evolutionStartedAtMillis.remove(victimId);
+            session.evolutionLevelAtAttempt.remove(victimId);
+            session.evolutionQuickEvolverAtAttempt.remove(victimId);
             session.evolutionLockedLocations.remove(victimId);
             session.evolutionWaterMessageAt.remove(victimId);
             session.evolutionKillsAtAttempt.remove(victimId);
@@ -11329,8 +11397,11 @@ public final class ArcadePortManager implements Listener {
                 continue;
             }
             float progress = session.evolutionCharge.getOrDefault(id, 0.0F);
+            boolean quickEvolver = "quick-evolver".equals(
+                    session.evolutionKits.getOrDefault(id, "standard-evolution"));
             progress = (float) Math.min(0.9999D, progress
-                    + ArcadePortRules.evolutionChargePerTick(session.evolutionLifeKills.getOrDefault(id, 0)));
+                    + ArcadePortRules.evolutionChargePerTick(
+                            session.evolutionLifeKills.getOrDefault(id, 0), quickEvolver));
             session.evolutionCharge.put(id, progress);
             player.setExp(progress);
             player.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, 4, 1, false, false, true));
@@ -11651,8 +11722,11 @@ public final class ArcadePortManager implements Listener {
     private void interruptEvolutionForHit(Session session, Player player) {
         UUID id = player.getUniqueId();
         if (!session.evolving.remove(id)) return;
-        // The form is committed at the form-change callback (44 ticks), before the
-        // cosmetic/lock animation finishes (140 ticks). Before that point, restore the
+        session.evolutionStartedAtMillis.remove(id);
+        session.evolutionLevelAtAttempt.remove(id);
+        session.evolutionQuickEvolverAtAttempt.remove(id);
+        // The form is committed at the form-change callback, before the
+        // cosmetic/lock animation finishes. Before that point, restore the
         // evolution unlock so the player can retry; after it, keep the new form.
         boolean transformationCommitted = !session.evolutionKillsAtAttempt.containsKey(id);
         session.evolutionKillsAtAttempt.remove(id);
@@ -11671,6 +11745,13 @@ public final class ArcadePortManager implements Listener {
         if (active != session || !session.alive.contains(id)
                 || !session.evolutionAvailable.remove(id) || !session.evolving.add(id)) return;
         session.evolutionManualEvolved.add(id);
+        session.evolutionStartedAtMillis.put(id, System.currentTimeMillis());
+        session.evolutionLevelAtAttempt.put(id, session.evolutionLevels.getOrDefault(id, 0));
+        boolean quickEvolver = "quick-evolver".equals(
+                session.evolutionKits.getOrDefault(id, "standard-evolution"));
+        session.evolutionQuickEvolverAtAttempt.put(id, quickEvolver);
+        long formChangeTicks = ArcadePortRules.evolutionFormChangeTicks(quickEvolver);
+        long totalAnimationTicks = ArcadePortRules.evolutionTotalAnimationTicks(quickEvolver);
         session.evolutionCharge.remove(id);
         // Overkill tracks kills since the last successful transformation, not just this life.
         session.evolutionKillsAtAttempt.put(id, session.evolutionKillsSinceEvolution.getOrDefault(id, 0));
@@ -11685,13 +11766,17 @@ public final class ArcadePortManager implements Listener {
         player.removePotionEffect(PotionEffectType.SLOWNESS);
         player.removePotionEffect(PotionEffectType.JUMP_BOOST);
         player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.8F, 1.0F);
-        player.sendTitle(ChatColor.GREEN + "EVOLVING", ChatColor.YELLOW + "Keep still...", 0, 44, 8);
+        player.sendTitle(ChatColor.GREEN + "EVOLVING", ChatColor.YELLOW + "Keep still...",
+                0, (int) formChangeTicks, 8);
         player.sendMessage(ChatColor.GREEN + "Evolution charge complete. Hold still while your form changes.");
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (active != session || !session.evolving.contains(id)) return;
             if (!player.isOnline() || !session.alive.contains(id)) {
                 session.evolving.remove(id);
+                session.evolutionStartedAtMillis.remove(id);
+                session.evolutionLevelAtAttempt.remove(id);
+                session.evolutionQuickEvolverAtAttempt.remove(id);
                 session.evolutionLockedLocations.remove(id);
                 session.evolutionKillsAtAttempt.remove(id);
                 cleanupEvolutionEggEffect(session, id);
@@ -11714,16 +11799,22 @@ public final class ArcadePortManager implements Listener {
             session.evolutionLevels.put(id, nextLevel);
             if (ArcadePortRules.isEvolutionWinnerLevel(nextLevel)) {
                 session.evolving.remove(id);
+                session.evolutionStartedAtMillis.remove(id);
+                session.evolutionLevelAtAttempt.remove(id);
+                session.evolutionQuickEvolverAtAttempt.remove(id);
                 session.evolutionLockedLocations.remove(id);
                 finish(session, player, true);
                 return;
             }
             giveEvolutionKit(session, player);
             player.sendMessage(ChatColor.GREEN + "You evolved into stage " + (nextLevel + 1) + "/5.");
-        }, ArcadePortRules.EVOLUTION_FORM_CHANGE_TICKS);
+        }, formChangeTicks);
 
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (active != session || !session.evolving.remove(id)) return;
+            session.evolutionStartedAtMillis.remove(id);
+            session.evolutionLevelAtAttempt.remove(id);
+            session.evolutionQuickEvolverAtAttempt.remove(id);
             session.evolutionLockedLocations.remove(id);
             cleanupEvolutionEggEffect(session, id);
             if (!player.isOnline() || !session.alive.contains(id)) return;
@@ -11736,7 +11827,7 @@ public final class ArcadePortManager implements Listener {
             player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 1.0F, 1.0F);
             player.getWorld().spawnParticle(Particle.EXPLOSION, player.getLocation().add(0.0D, 1.0D, 0.0D),
                     1, 0.1D, 0.1D, 0.1D, 0.0D);
-        }, ArcadePortRules.EVOLUTION_TOTAL_ANIMATION_TICKS);
+        }, totalAnimationTicks);
     }
 
     /** Keep respawning team players on their own archived team spawns. */
@@ -12617,6 +12708,7 @@ public final class ArcadePortManager implements Listener {
         session.baconLastDamager.clear();
         session.baconLastDamagedAt.clear();
         session.baconLastHitSource.clear();
+        session.baconBlastCombosByVictim.clear();
         session.baconMeters.clear();
         session.baconAbilitiesUsed.clear();
         session.baconBrutusUntil.clear();
@@ -12830,6 +12922,20 @@ public final class ArcadePortManager implements Listener {
 
     private void recordEvolutionAchievements(Session session, Player winner) {
         UUID id = winner.getUniqueId();
+        long now = System.currentTimeMillis();
+        for (Player candidate : alivePlayers(session)) {
+            UUID candidateId = candidate.getUniqueId();
+            if (candidateId.equals(id)
+                    || session.evolutionQuickEvolverAtAttempt.getOrDefault(candidateId, false)) continue;
+            long startedAt = session.evolutionStartedAtMillis.getOrDefault(candidateId, 0L);
+            if (startedAt <= 0L) continue;
+            long elapsedTicks = Math.max(0L, (now - startedAt) / 50L);
+            int attemptedLevel = session.evolutionLevelAtAttempt.getOrDefault(candidateId, -1);
+            if (ArcadePortRules.shouldAwardEvolutionWrongKitChamp(
+                    attemptedLevel, false, session.evolving.contains(candidateId), elapsedTicks)) {
+                awardCatalogAchievement(candidate, "evolution", "wrong-kit-champ");
+            }
+        }
         if (session.evolutionOverkillEligible.contains(id)
                 && ArcadePortRules.isEvolutionWinnerLevel(session.evolutionLevels.getOrDefault(id, 0))) {
             awardEvolutionAchievement(winner, EvolutionAchievement.OVERKILL.configKey(id),
@@ -19649,6 +19755,7 @@ public final class ArcadePortManager implements Listener {
     private record MicroPlacedBlockOwner(UUID ownerId, long placedAtMillis) { }
     private record MicroPlacedBlockKnock(UUID ownerId, long knockedAtMillis) { }
     private record MicroBattlesArrowHit(UUID shooterId, int targetTeam, long hitAtMillis, double hitY) { }
+    private record BaconBlastCombo(UUID ownerId, long lastHitAtMillis) { }
 
     private static final class Session {
         final Map<Block, Long> evolutionWebs = new HashMap<>();
@@ -19703,6 +19810,10 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> paintProjectileDamage = new HashMap<>();
         final Map<UUID, PaintballProjectileVisual> paintballProjectileCosmetics = new HashMap<>();
         final Map<UUID, Integer> evolutionLevels = new HashMap<>();
+        final Map<UUID, String> evolutionKits = new HashMap<>();
+        final Map<UUID, Long> evolutionStartedAtMillis = new HashMap<>();
+        final Map<UUID, Integer> evolutionLevelAtAttempt = new HashMap<>();
+        final Map<UUID, Boolean> evolutionQuickEvolverAtAttempt = new HashMap<>();
         final Map<UUID, Integer> evolutionLifeKills = new HashMap<>();
         /** Kills earned since the player's last successful Evolution transformation. */
         final Map<UUID, Integer> evolutionKillsSinceEvolution = new HashMap<>();
@@ -19864,6 +19975,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> baconLastSwingAt = new HashMap<>();
         final Map<UUID, Long> baconHitFeedbackUntil = new HashMap<>();
         final Map<UUID, String> baconLastHitSource = new HashMap<>();
+        final Map<UUID, BaconBlastCombo> baconBlastCombosByVictim = new HashMap<>();
         final Map<UUID, Boolean> baconLastHitBackstab = new HashMap<>();
         final Map<UUID, Boolean> baconLastHitCloaked = new HashMap<>();
         final Map<UUID, Integer> baconBlastKills = new HashMap<>();
