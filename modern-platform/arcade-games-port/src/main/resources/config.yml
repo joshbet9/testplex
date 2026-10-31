@@ -31,6 +31,12 @@ game-preferences:
 lobby-scoreboard:
   ranks: {}
 
+# Hide individual entries from the shared lobby kit stations without deleting
+# their gameplay implementations. Each entry uses "game-id:kit-id", matching
+# the legacy KitAvailability.Hide behavior. Empty by default.
+lobby-kits:
+  hidden: []
+
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
   - jn_playzmc
