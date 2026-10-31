@@ -4,6 +4,7 @@ import org.bukkit.entity.Display;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockGrowEvent;
+import org.bukkit.event.block.BlockIgniteEvent;
 
 import me.monstermaze.MonsterMazePlugin;
 
@@ -85,6 +86,7 @@ import org.bukkit.event.block.BlockGrowEvent;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.PlayerLeashEntityEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
@@ -109,6 +111,9 @@ import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerBucketFillEvent;
+import org.bukkit.event.player.PlayerBucketEmptyEvent;
+import org.bukkit.event.player.PlayerShearEntityEvent;
+import org.bukkit.event.player.PlayerUnleashEntityEvent;
 import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
@@ -119,6 +124,8 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
+import org.bukkit.event.player.PlayerToggleSneakEvent;
+import org.bukkit.event.player.PlayerToggleSprintEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
@@ -15036,7 +15043,7 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
-                if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
+        if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
         if ((session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN)
@@ -19721,6 +19728,47 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onPrepareBucketFill(PlayerBucketFillEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareBucketEmpty(PlayerBucketEmptyEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareShear(PlayerShearEntityEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareLeash(PlayerLeashEntityEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareUnleash(PlayerUnleashEntityEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareBlockIgnite(BlockIgniteEvent event) {
+        if (cancelPrepareAction(event.getPlayer(), event)) return;
+        cancelPrepareAction(playerShooter(event.getIgnitingEntity()), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareSneakToggle(PlayerToggleSneakEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareSprintToggle(PlayerToggleSprintEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareJump(PlayerJumpEvent event) {
         cancelPrepareAction(event.getPlayer(), event);
     }
 
