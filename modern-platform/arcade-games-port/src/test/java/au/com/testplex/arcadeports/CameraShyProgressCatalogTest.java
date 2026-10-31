@@ -13,6 +13,7 @@ class CameraShyProgressCatalogTest {
         assertEquals(20, achievements.size());
         assertEquals(20, new HashSet<>(achievements.stream().map(CameraShyProgressCatalog.Achievement::id).toList()).size());
         assertEquals(20, new HashSet<>(achievements.stream().map(CameraShyProgressCatalog.Achievement::name).toList()).size());
+        assertEquals(20, new HashSet<>(achievements.stream().map(CameraShyProgressCatalog.Achievement::requirement).toList()).size());
         assertEquals("Revenge Is Sweet", CameraShyProgressCatalog.achievement("revenge-is-sweet").name());
         assertEquals("Group Portrait", CameraShyProgressCatalog.achievement("group-portrait").name());
     }
