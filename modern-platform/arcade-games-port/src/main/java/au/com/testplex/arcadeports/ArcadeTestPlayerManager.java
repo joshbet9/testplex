@@ -61,7 +61,8 @@ final class ArcadeTestPlayerManager {
         if (id == null) return false;
         if (activeHandles.containsKey(id)) return true;
         Player player = Bukkit.getPlayer(id);
-        return player != null && player.getPersistentDataContainer().has(markerKey, PersistentDataType.BYTE);
+        return player != null && (player.getName().startsWith(RESERVED_NAME_PREFIX)
+                || player.getPersistentDataContainer().has(markerKey, PersistentDataType.BYTE));
     }
 
     boolean isTestPlayer(Player player) {
