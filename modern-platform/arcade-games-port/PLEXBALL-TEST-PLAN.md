@@ -1,0 +1,126 @@
+# Plexball — Paper 26.3 test plan
+
+Plexball is an experimental `ArcadePortGame` hosted by `ArcadeMechanicsModern` and started through the shared `ArcadePortManager` lifecycle. It remains outside the READY_FOR_TEST rotation allow-list, but is available through explicit Arcade lobby selection/queueing. The global manager owns the queue, countdown, active Session, participant/spectator membership, player snapshots, disconnect handling, stop and lobby restoration. Plexball owns only its game rules, batting turn order, ball simulation, scoreboard and progression. Its generated world is `testplex_plexball_arena_v1`.
+
+## Start and kit selection
+
+- `/arcadeport kit slugger`
+- `/arcadeport kit technician`
+- `/arcadeport kit curve-artist`
+- `/arcadeport kit sprinter`
+- `/arcadeport kit skyguard`
+- `/arcadeport kit plexball` — open the visual kit selector and choose a saved kit.
+- `/stats` or `/stats plexball` — open the Plexball career page with achievements, milestone progress and lifetime statistics.
+- `/arcadeport join plexball` — join the shared Testplex Arcade queue for Plexball.
+- `/arcadeport play plexball` — join the same Arcade queue and request the standard global quick-start window.
+- `/arcadeport spectate plexball` — join the active Arcade Session as a non-playing spectator.
+- `/arcadeport leave plexball` — use the global Arcade manager to leave the queue or active spectator role.
+- `/arcadeport start plexball` — operator-only start of the global Plexball queue (2–8 players).
+- `/arcadeport status` — shows the Plexball queue or current phase.
+- `/arcadeport stop` — operator stop and return to lobby.
+
+At least two and at most eight players are supported. Queue admission, quick-start scheduling, explicit start and pre-game waiting are the same shared Arcade lifecycle used by other games; there is no Plexball-owned queue or countdown. On start, ArcadePortManager creates the active Session and captures player snapshots. Each player gets one initial batting turn. Everyone other than the current batter fields. The first round is capped at ten seconds per batter. Multiple home runs enter five-second sudden death, bounded by the same 180-second wall-clock match limit.
+
+## Achievements
+
+Achievements are one-time challenges, unlocked from completed match results and saved per player UUID.
+
+| Achievement | Requirement |
+| --- | --- |
+| Sweet Spot | Land an uncaught hit of at least 75 metres. |
+| Warning Track | Land an uncaught hit of at least 95 metres. |
+| Out of the Park | Hit a fair 100-metre home run. |
+| Perfect Contact | Record three top-grade contacts across your Plexball career. |
+| Sticky Gloves | Make at least three successful catches in one match. |
+| Golden Glove | Make at least five successful catches in one match. |
+| All-Rounder | Make a catch and land an uncaught hit of at least 75 metres in one match. |
+| Clutch Performer | Win a match after hitting at least two home runs in sudden death. |
+| Champion | Win five Plexball matches in a row. |
+
+Unlocks send a player notification and challenge-complete sound. They are local Testplex progression only; no production Mineplex currency, XP, title or cosmetic reward is granted.
+Raised achievement requirements use versioned internal unlock keys, so an unlock earned under an earlier, easier requirement does not automatically satisfy the harder challenge. The 300-catch Wall of Leather milestone likewise has its own versioned key.
+
+## Career milestones
+
+Milestones are cumulative and persist between matches and server restarts. The /stats page shows individual progress bars and completion states.
+
+| Milestone | Lifetime target |
+| --- | ---: |
+| Winning Legend | 250 wins |
+| Wall of Leather | 300 successful catches |
+| Home Run Hero | 100 home runs |
+| 10 Kilometre Club | 10km total uncaught hit distance |
+
+The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. It is separate from kit preferences and production account/stat storage.
+
+## Gameplay acceptance
+
+| Test | Expected |
+| --- | --- |
+| Join with 2–8 players | Queue starts and every participant enters the separate Plexball arena. |
+| Spectate active match | `/arcadeport spectate plexball` adds the viewer to the global Arcade Session's `players` and `snapshots` maps but not its `alive` set; spectators do not bat, field, score, unlock progression or change match results. |
+| Queue leave | A player can remove themselves while queued; countdown resets if the queue falls below two players. |
+| Queue disconnect | A queued player's disconnect immediately updates the queue and cancels the countdown if fewer than two players remain. |
+| Batter turn | Only the selected batter can hit; movement is locked but look direction remains available. |
+| Single swing | The first click on the tee consumes the at-bat, including a miss or foul; repeated clicking cannot retry until timing improves. |
+| Fielder turn | Every non-batter can move throughout the fair triangle. |
+| Fielding hotbar | Fielder can switch between slot 0 (glove) and slot 1 (kit ability); other slots are blocked. |
+| Standings | Distance and successful catches are broadcast after each completed batting attempt. |
+| Final results | Players receive a final hitting/fielding leaderboard and a personal recap with best hit, total uncaught distance, catches, home runs and at-bats. |
+| Player HUD | Every participant sees a live sidebar with phase, match clock, current batter, personal best, catches, kit/ability and the top three distances. |
+| Spectator camera and HUD | Spectators follow the next online batter during turn breaks and the ItemDisplay ball during flight; the spectator action bar and scoreboard name the next batter when one is queued, or show the round result when the round is complete. |
+| Progression menu | `/stats plexball` opens a read-only inventory page listing all nine achievements, four long-term career goals and the player's saved totals. |
+| Achievement unlocks | Each achievement unlocks once, is saved per UUID, and notifies the player with a message and challenge-complete sound. |
+| Milestone unlocks | Wins (250), successful catches (300), home runs (100) and uncaught hit distance (10km) progress cumulatively and persist between restarts. |
+| Crosshair | Clicking the tee Interaction entity only counts if the server-side eye ray intersects the smaller ball sphere. |
+| Timing | Each at-bat gets a newly phased beat; near-perfect timing grades progressively rather than binary hit/miss. |
+| Direction | Swing yaw must be inside the fair cone; off-cone direction is a foul. |
+| Ball physics | Server simulates position, gravity, spin and distance; no client projectile velocity or reported distance is accepted. |
+| Catch | A fielder gets one catch attempt per ball; catch is based on the server's swept ball segment and buffered fielder position. |
+| Catch tiebreak | A valid catch voids the batter's hit and increments the catcher's count. |
+| Kits | Slugger, Technician, Curve Artist, Sprinter and Skyguard have distinct batting/fielding identities. |
+| Kit selector | `/arcadeport kit plexball` shows all five kits, their abilities and current selection; clicking a kit persists it for the next match, while click, hotbar-swap and drag interactions cannot move menu items. |
+| Rotation | After batting, the previous batter joins the fielders for the next player. |
+| Home run | A fair 100m hit is recorded as a home run. |
+| Sudden death | Multiple home-run players take five-second turns; a finalist must hit another home run to survive the round. |
+| Sudden-death timeout | The hard cap only applies survivor elimination after every finalist has had a turn in that round; an interrupted round keeps all remaining finalists eligible and ranks them on completed match performance. |
+| Match cap | The game ends at 180 seconds of wall-clock time, even if server TPS falls below 20. |
+| Catch at match cap | Before final standings, pending catch windows are checked against the last ball positions already recorded by the server; no extra ball tick or match time is simulated. |
+| Cleanup | Plexball removes its ball/tee/HUD state; ArcadePortManager restores participant and spectator snapshots and returns them to the shared Arcade lobby. |
+| Spectator cleanup | ArcadePortManager owns spectator membership and player snapshots; global finish, stop, leave, disconnect and shutdown paths restore the snapshot and return the viewer to the shared Arcade lobby. |
+| Match disconnect | A disconnected batter's turn resolves safely; a disconnected fielder is removed from active catch checks and the remaining players are notified. |
+| Repeated rounds | Field generation marker prevents rebuilding the entire field on every match. |
+
+## Latency and fairness matrix
+
+Test with at least two clients and compare a low-latency client against one with controlled network delay. Record the Paper ping estimate, separately measured network RTT, swing timing grade, catch timing, actual path intersection, and result. Paper's `Player#getPing()` is a coarse estimate and is **not guaranteed to be network RTT**; it is used only as a bounded compensation hint and never as an anti-cheat signal.
+
+| Paper ping estimate | Expected compensation |
+| ---: | --- |
+| 0–49ms | 0 ticks |
+| 50–149ms | 1 tick |
+| 150–249ms | 2 ticks |
+| 250–349ms | 3 ticks |
+| 350–449ms | 4 ticks |
+| 450ms or higher | Capped at 5 ticks (250ms maximum rewind) |
+
+The server uses Paper's ping estimate only to choose a bounded rewind, then validates against server-recorded player and ball history; client-provided timestamps and client-reported ball/catch results are never trusted. Player positions and ball positions are kept in short server-side histories, and catches use a swept-segment test to avoid missing fast balls between ticks.
+
+A high-ping client must not receive a catch merely because its packet arrived later: the historical ball path and historical player position must still intersect the catch window. Conversely, ordinary network delay should not make a valid pre-deadline input lose just because its packet arrived later. Compensation is intentionally bounded; latency above the cap can still affect play. This is **latency tolerant, not ping independent**: the separate measured-RTT matrix must pass before the game is promoted.
+
+## Anti-cheat checks
+
+- Repeated fixed-delay swing macros must not consistently obtain perfect timing because each at-bat receives a server-generated random phase and cycle.
+- Repeated clicks cannot produce more than one swing; the first click on the tee Interaction consumes the at-bat even when it misses or is foul.
+- The larger tee Interaction entity is only an interaction target; the server ray must hit the actual ball sphere.
+- Catch spamming cannot create repeated windows; each fielder has one catch action per ball.
+- Client timestamps, reported trajectory, reported hit power and reported distance are not inputs to the result.
+- Movement outside the triangle or above the permitted field height is rejected; normal movement is otherwise left to Paper.
+- Ability use is one per fielder per ball and is checked by the game module.
+
+## Known experimental limits
+
+- The current version uses right-click to swing at the tee Interaction entity and right-click the glove to attempt a catch. The match HUD uses a persistent scoreboard, role-specific action-bar prompts and phase/result titles. It does not provide a custom client-side crosshair overlay or a full swing animation.
+- Ball rendering is an ItemDisplay moved by the server-side simulation. Its visual smoothness may vary by client FPS/network, but the server path and score do not.
+- The current catch rewind is capped at five ticks (approximately 250ms one-way estimate). Do not advertise Plexball as completely ping independent; validate the RTT matrix and adjust only with measured evidence.
+- Achievements and career milestones are implemented in a local Testplex profile (`plexball-progression.yml`). They provide unlock notifications and a stats menu, but do not award production Mineplex currency, XP, titles or cosmetics. Ranked leaderboards and public matchmaking are still out of scope. Plexball supports a read-only observer role for active test matches, limited to 16 concurrent viewers; observer membership and lifecycle are represented in the shared Arcade Session, not a Plexball-specific spectator set.
