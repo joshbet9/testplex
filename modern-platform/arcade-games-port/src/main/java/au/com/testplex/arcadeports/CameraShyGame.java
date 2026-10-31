@@ -240,7 +240,7 @@ public final class CameraShyGame implements Listener {
             }
             return result;
         }
-        void persist(JavaPlugin plugin, UUID playerId) {
+        void writeToConfig(JavaPlugin plugin, UUID playerId) {
             String path = "camera-shy-pending-restores." + playerId;
             plugin.getConfig().set(path, null);
             ConfigurationSection section = plugin.getConfig().createSection(path);
@@ -262,6 +262,9 @@ public final class CameraShyGame implements Listener {
             section.set("invulnerable", invulnerable);
             section.set("collidable", collidable);
             section.set("glowing", glowing);
+        }
+        void persist(JavaPlugin plugin, UUID playerId) {
+            writeToConfig(plugin, playerId);
             plugin.saveConfig();
         }
         void restore(Player player) {
@@ -656,7 +659,11 @@ public final class CameraShyGame implements Listener {
             if (testPlayers.isTestPlayer(player)) bots.add(id);
             else {
                 humans.add(id);
-                snapshots.put(id, new PlayerSnapshot(player));
+                PlayerSnapshot snapshot = new PlayerSnapshot(player);
+                snapshots.put(id, snapshot);
+                // Persist before changing any inventory, game mode or location so an
+                // unclean server stop can still restore the exact pre-match player.
+                snapshot.writeToConfig(plugin, id);
             }
             alive.add(id);
             exposures.put(id, 0);
@@ -665,7 +672,11 @@ public final class CameraShyGame implements Listener {
             uniquePhotos.put(id, new LinkedHashSet<>());
             photographedBy.put(id, new LinkedHashSet<>());
             spawnLocations.put(id, spawns.get(i % spawns.size()).clone());
-            setupPlayer(player, spawnLocations.get(id));
+        }
+        plugin.saveConfig();
+        for (UUID id : players.keySet()) {
+            Player player = players.get(id);
+            if (player != null && player.isOnline()) setupPlayer(player, spawnLocations.get(id));
         }
 
         broadcastMatch(ChatColor.GOLD + "" + ChatColor.BOLD + "CAMERA SHY"
@@ -941,6 +952,8 @@ public final class CameraShyGame implements Listener {
             if (player.isOnline()) {
                 manager.returnPlayerToLobby(player);
                 snapshot.restore(player);
+                plugin.getConfig().set("camera-shy-pending-restores." + id, null);
+                plugin.saveConfig();
             } else {
                 snapshot.persist(plugin, id);
             }
@@ -1539,6 +1552,7 @@ public final class CameraShyGame implements Listener {
         for (ArmorStand stand : understudyStands.values()) if (stand != null && stand.isValid()) stand.remove();
         understudyStands.clear();
         for (UUID id : new ArrayList<>(bossBars.keySet())) removePlayerPresentation(id);
+        boolean pendingRestoreChanged = false;
         for (UUID id : players.keySet()) {
             Player player = players.get(id);
             PlayerSnapshot snapshot = snapshots.get(id);
@@ -1549,7 +1563,11 @@ public final class CameraShyGame implements Listener {
             if (player.isGlowing()) player.setGlowing(false);
             if (humans.contains(id)) {
                 manager.returnPlayerToLobby(player);
-                if (snapshot != null) snapshot.restore(player);
+                if (snapshot != null) {
+                    snapshot.restore(player);
+                    plugin.getConfig().set("camera-shy-pending-restores." + id, null);
+                    pendingRestoreChanged = true;
+                }
                 player.sendMessage(ChatColor.GOLD + "Camera Shy ended: " + ChatColor.YELLOW + reason);
                 if (winnerId != null && winnerId.equals(id)) {
                     player.sendTitle(ChatColor.GOLD + "" + ChatColor.BOLD + "VICTORY!",
@@ -1558,6 +1576,7 @@ public final class CameraShyGame implements Listener {
                 }
             }
         }
+        if (pendingRestoreChanged) plugin.saveConfig();
         testPlayers.despawnSessionPlayers();
         phase = Phase.IDLE;
         players.clear(); humans.clear(); bots.clear(); alive.clear(); snapshots.clear();
