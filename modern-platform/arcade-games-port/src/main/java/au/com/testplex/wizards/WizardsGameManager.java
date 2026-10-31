@@ -1335,13 +1335,11 @@ public final class WizardsGameManager implements Listener {
                 + "|health=" + before + "|damage=" + damage
                 + "|world=" + victim.getWorld().getName());
         if (caster == null || !caster.isOnline()) {
-            victim.setNoDamageTicks(0);
             victim.damage(damage);
         } else {
             UUID casterId = caster.getUniqueId();
             spellDamageSources.add(casterId);
             try {
-                victim.setNoDamageTicks(0);
                 victim.damage(damage, caster);
             } finally {
                 spellDamageSources.remove(casterId);
