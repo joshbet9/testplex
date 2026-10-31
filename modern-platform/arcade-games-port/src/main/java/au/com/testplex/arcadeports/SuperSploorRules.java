@@ -107,7 +107,8 @@ public final class SuperSploorRules {
     }
 
     public static int overtimeLeadThreshold(int totalTerritoryUnits) {
-        return Math.max(1, Math.max(0, totalTerritoryUnits) / 100);
+        long total = Math.max(0L, (long) totalTerritoryUnits);
+        return (int) Math.max(1L, (total + 99L) / 100L);
     }
 
     /** Returns 0 for Red, 1 for Blue, and -1 for a tied territory score. */
