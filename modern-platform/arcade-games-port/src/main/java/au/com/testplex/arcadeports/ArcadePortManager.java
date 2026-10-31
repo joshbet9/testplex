@@ -10837,6 +10837,7 @@ public final class ArcadePortManager implements Listener {
         if (killer != null && session.scores.containsKey(killer.getUniqueId())) {
             int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
             if (session.type == ArcadePortGame.MICRO_BATTLES
+                    && !testPlayers.isTestPlayer(killer)
                     && ArcadePortRules.shouldAwardMicroBattlesAnnihilation(kills)) {
                 UUID killerId = killer.getUniqueId();
                 String statsPath = localStatsPath(killerId, ArcadePortGame.MICRO_BATTLES.id());
@@ -12646,7 +12647,7 @@ public final class ArcadePortManager implements Listener {
     public void recordSnakeStats(UUID playerId, boolean won, int kills, boolean knockedOut,
                                  int lifetimeKills, int lifetimeSlimes, int bestTailLength,
                                  Set<String> achievements) {
-        if (playerId == null) return;
+        if (playerId == null || testPlayers.isTestPlayer(playerId)) return;
         String path = localStatsPath(playerId, "snake");
         plugin.getConfig().set(path + "games-played",
                 plugin.getConfig().getInt(path + "games-played", 0) + 1);
