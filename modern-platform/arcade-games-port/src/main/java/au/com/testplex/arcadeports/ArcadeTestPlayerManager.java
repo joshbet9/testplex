@@ -248,7 +248,14 @@ final class ArcadeTestPlayerManager {
         player.setCanPickupItems(true);
         player.setOp(false);
         player.setGameMode(org.bukkit.GameMode.SURVIVAL);
-        player.setListed(true);
+        // Listed visibility is exposed by some Paper builds and hidden behind the
+        // server implementation in others; keep this optional so Player setup still
+        // compiles against the exact server API without depending on CraftPlayer.
+        try {
+            player.getClass().getMethod("setListed", boolean.class).invoke(player, true);
+        } catch (ReflectiveOperationException ignored) {
+            // The entity remains in Bukkit's online player set even if the TAB flag is unavailable.
+        }
         player.playerListName(Component.text(ChatColor.GRAY + player.getName()));
         player.getPersistentDataContainer().set(markerKey, PersistentDataType.BYTE, (byte) 1);
     }
