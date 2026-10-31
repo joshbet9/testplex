@@ -1,9 +1,11 @@
 name: Testplex Modern Paper 26.3
 
 on:
+  # Feature branches are validated by pull_request. Only the integration branch
+  # needs a separate push build, which is also the only branch that auto-deploys.
   push:
     branches:
-      - "**"
+      - "feat/testplex-modern-26.3-platform"
     paths:
       - "modern-platform/**"
       - ".github/workflows/testplex-modern-build.yml"
