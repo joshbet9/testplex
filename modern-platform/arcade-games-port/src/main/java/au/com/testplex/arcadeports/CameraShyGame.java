@@ -14,6 +14,7 @@ import org.bukkit.World;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.boss.BarColor;
 import org.bukkit.boss.BarStyle;
 import org.bukkit.boss.BossBar;
@@ -53,6 +54,7 @@ import org.bukkit.util.Vector;
 import java.io.File;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Deque;
@@ -180,10 +182,87 @@ public final class CameraShyGame implements Listener {
             allowFlight = player.getAllowFlight(); flying = player.isFlying();
             invulnerable = player.isInvulnerable(); collidable = player.isCollidable();
         }
+        PlayerSnapshot(ConfigurationSection section) {
+            Object savedLocation = section.get("location");
+            location = savedLocation instanceof Location saved ? saved.clone() : null;
+            contents = readItems(section.getList("contents"));
+            armor = readItems(section.getList("armor"));
+            Object savedOffhand = section.get("offhand");
+            offhand = savedOffhand instanceof ItemStack item ? item.clone() : null;
+            GameMode savedMode;
+            try {
+                savedMode = GameMode.valueOf(section.getString("mode", GameMode.SURVIVAL.name()));
+            } catch (IllegalArgumentException invalidMode) {
+                savedMode = GameMode.SURVIVAL;
+            }
+            mode = savedMode;
+            List<PotionEffect> restoredEffects = new ArrayList<>();
+            List<?> savedEffects = section.getList("effects");
+            if (savedEffects != null) {
+                for (Object value : savedEffects) {
+                    if (value instanceof PotionEffect effect) restoredEffects.add(effect);
+                }
+            }
+            effects = restoredEffects;
+            exp = (float) section.getDouble("exp");
+            level = section.getInt("level");
+            food = section.getInt("food", 20);
+            saturation = (float) section.getDouble("saturation", 20.0D);
+            health = section.getDouble("health", 20.0D);
+            walkSpeed = (float) section.getDouble("walk-speed", 0.2D);
+            flySpeed = (float) section.getDouble("fly-speed", 0.1D);
+            allowFlight = section.getBoolean("allow-flight");
+            flying = section.getBoolean("flying");
+            invulnerable = section.getBoolean("invulnerable");
+            collidable = section.getBoolean("collidable", true);
+        }
+        private static ItemStack[] readItems(List<?> values) {
+            if (values == null) return new ItemStack[0];
+            ItemStack[] result = new ItemStack[values.size()];
+            for (int i = 0; i < values.size(); i++) {
+                Object value = values.get(i);
+                if (value instanceof ItemStack item) result[i] = item.clone();
+                else if (value instanceof Map<?, ?> serialized) {
+                    Map<String, Object> itemData = new HashMap<>();
+                    for (Map.Entry<?, ?> entry : serialized.entrySet()) {
+                        if (entry.getKey() instanceof String key) itemData.put(key, entry.getValue());
+                    }
+                    try {
+                        result[i] = ItemStack.deserialize(itemData);
+                    } catch (RuntimeException ignored) {
+                        result[i] = null;
+                    }
+                }
+            }
+            return result;
+        }
+        void persist(JavaPlugin plugin, UUID playerId) {
+            String path = "camera-shy-pending-restores." + playerId;
+            plugin.getConfig().set(path, null);
+            ConfigurationSection section = plugin.getConfig().createSection(path);
+            section.set("location", location);
+            section.set("contents", Arrays.asList(cloneItems(contents)));
+            section.set("armor", Arrays.asList(cloneItems(armor)));
+            section.set("offhand", offhand == null ? null : offhand.clone());
+            section.set("mode", mode.name());
+            section.set("effects", new ArrayList<>(effects));
+            section.set("exp", exp);
+            section.set("level", level);
+            section.set("food", food);
+            section.set("saturation", saturation);
+            section.set("health", health);
+            section.set("walk-speed", walkSpeed);
+            section.set("fly-speed", flySpeed);
+            section.set("allow-flight", allowFlight);
+            section.set("flying", flying);
+            section.set("invulnerable", invulnerable);
+            section.set("collidable", collidable);
+            plugin.saveConfig();
+        }
         void restore(Player player) {
             if (player == null || !player.isOnline()) return;
             player.leaveVehicle();
-            if (location.getWorld() != null) player.teleport(location);
+            if (location != null && location.getWorld() != null) player.teleport(location);
             player.getInventory().clear();
             player.getInventory().setContents(cloneItems(contents));
             player.getInventory().setArmorContents(cloneItems(armor));
@@ -284,6 +363,22 @@ public final class CameraShyGame implements Listener {
         this.decoyOwnerKey = new NamespacedKey(plugin, "camera-shy-decoy-owner");
         this.groupPickupKey = new NamespacedKey(plugin, "camera-shy-group-photo");
         this.ticker = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
+    }
+
+    /** Restore a saved pre-match snapshot after a player reconnects. */
+    public boolean restorePendingSnapshot(Player player) {
+        if (player == null || !player.isOnline()) return false;
+        String path = "camera-shy-pending-restores." + player.getUniqueId();
+        ConfigurationSection section = plugin.getConfig().getConfigurationSection(path);
+        if (section == null) return false;
+        PlayerSnapshot snapshot = new PlayerSnapshot(section);
+        // Establish the shared lobby as a safe fallback before restoring the exact saved state.
+        manager.returnPlayerToLobby(player);
+        snapshot.restore(player);
+        plugin.getConfig().set(path, null);
+        plugin.saveConfig();
+        player.sendMessage(ChatColor.YELLOW + "Your Camera Shy session ended while you were offline. Your pre-match state has been restored.");
+        return true;
     }
 
     public boolean isActive() { return phase == Phase.STARTING || phase == Phase.LIVE || phase == Phase.ENDING; }
@@ -684,7 +779,10 @@ public final class CameraShyGame implements Listener {
             Player player = players.get(id);
             if (player == null || !player.isOnline()) {
                 alive.remove(id);
-                if (player != null && humans.contains(id)) snapshots.remove(id);
+                if (humans.contains(id)) {
+                    PlayerSnapshot snapshot = snapshots.remove(id);
+                    if (snapshot != null) snapshot.persist(plugin, id);
+                }
             }
         }
     }
@@ -830,9 +928,13 @@ public final class CameraShyGame implements Listener {
         queue.remove(id);
         if (phase != Phase.LIVE || !humans.contains(id) || !alive.remove(id)) return;
         PlayerSnapshot snapshot = snapshots.remove(id);
-        if (snapshot != null && player.isOnline()) {
-            snapshot.restore(player);
-            manager.returnPlayerToLobby(player);
+        if (snapshot != null) {
+            if (player.isOnline()) {
+                snapshot.restore(player);
+                manager.returnPlayerToLobby(player);
+            } else {
+                snapshot.persist(plugin, id);
+            }
         }
         removePlayerPresentation(id);
         long remainingHumans = alive.stream().filter(humans::contains).count();
@@ -1371,9 +1473,13 @@ public final class CameraShyGame implements Listener {
         for (UUID id : new ArrayList<>(bossBars.keySet())) removePlayerPresentation(id);
         for (UUID id : players.keySet()) {
             Player player = players.get(id);
-            if (player != null && player.isOnline() && player.isGlowing()) player.setGlowing(false);
-            if (player != null && player.isOnline() && humans.contains(id)) {
-                PlayerSnapshot snapshot = snapshots.get(id);
+            PlayerSnapshot snapshot = snapshots.get(id);
+            if (player == null || !player.isOnline()) {
+                if (humans.contains(id) && snapshot != null) snapshot.persist(plugin, id);
+                continue;
+            }
+            if (player.isGlowing()) player.setGlowing(false);
+            if (humans.contains(id)) {
                 if (snapshot != null) snapshot.restore(player);
                 manager.returnPlayerToLobby(player);
                 player.sendMessage(ChatColor.GOLD + "Camera Shy ended: " + ChatColor.YELLOW + reason);
