@@ -16,6 +16,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private ArcadePortManager manager;
     private MonsterMazePlugin monsterMaze;
     private ArcadeMapSelectionMenu mapMenu;
+    private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
 
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
     private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of("death-tag", "one-in-the-quiver");
@@ -42,10 +43,17 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         }
         saveConfig();
 
-        monsterMaze = new MonsterMazePlugin(this);
-        monsterMaze.enable();
-        manager = new ArcadePortManager(this);
-        manager.setMonsterMazeModule(monsterMaze);
+        monsterMazeReadiness.initializeAndAttach(
+                () -> {
+                    monsterMaze = new MonsterMazePlugin(this);
+                    monsterMaze.enable();
+                },
+                () -> monsterMaze != null && monsterMaze.getGameManager() != null,
+                () -> {
+                    manager = new ArcadePortManager(this);
+                    manager.setMonsterMazeModule(monsterMaze);
+                },
+                () -> manager != null && manager.isMonsterMazeModuleRegistered(monsterMaze));
         mapMenu = new ArcadeMapSelectionMenu(this);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
@@ -61,6 +69,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         getCommand("stats").setExecutor(this);
         getCommand("arcadeport").setExecutor(this);
         getServer().getPluginManager().registerEvents(this, this);
+        publishMonsterMazeReadiness();
     }
 
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
@@ -77,8 +86,30 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     @Override
     public void onDisable() {
+        try {
+            MonsterMazeRegistrationSignal.remove(getDataFolder().toPath());
+        } catch (java.io.IOException exception) {
+            getLogger().warning("Could not remove the Monster Maze readiness record: " + exception.getMessage());
+        }
         if (manager != null) manager.shutdown();
         if (monsterMaze != null) monsterMaze.shutdown();
+    }
+
+    private void publishMonsterMazeReadiness() {
+        monsterMazeReadiness.requireReady();
+        if (manager == null || !manager.isMonsterMazeModuleRegistered(monsterMaze)) {
+            monsterMazeReadiness.markFailed();
+            throw new IllegalStateException("Monster Maze readiness cannot be published before Arcade manager attachment.");
+        }
+        try {
+            boolean deploymentSignal = MonsterMazeRegistrationSignal.publish(getDataFolder().toPath(),
+                    monsterMazeReadiness, System.getenv("INVOCATION_ID"), ProcessHandle.current().pid());
+            getLogger().info("TESTPLEX_ARCADE_MODULE_READY module=monster-maze manager=testplex-arcade "
+                    + "game-manager=initialized deployment-signal=" + deploymentSignal);
+        } catch (java.io.IOException exception) {
+            monsterMazeReadiness.markFailed();
+            throw new IllegalStateException("Could not publish Monster Maze post-attachment readiness.", exception);
+        }
     }
 
     /** Public bridge for standalone games whose mechanics live in a separate plugin JAR. */

@@ -262,7 +262,22 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void setMonsterMazeModule(MonsterMazePlugin module) {
+        if (module == null) throw new IllegalArgumentException("Monster Maze module is required.");
+        if (module.getHostPlugin() != plugin) {
+            throw new IllegalArgumentException("Monster Maze module belongs to a different Bukkit host.");
+        }
+        if (module.getGameManager() == null) {
+            throw new IllegalStateException("Monster Maze must finish initialization before Arcade attachment.");
+        }
         this.monsterMazeModule = module;
+    }
+
+    /** True only after this manager has accepted the initialized embedded module instance. */
+    public boolean isMonsterMazeModuleRegistered(MonsterMazePlugin module) {
+        return module != null
+                && monsterMazeModule == module
+                && module.getHostPlugin() == plugin
+                && module.getGameManager() != null;
     }
 
     public void returnPlayerToLobby(Player player) {
