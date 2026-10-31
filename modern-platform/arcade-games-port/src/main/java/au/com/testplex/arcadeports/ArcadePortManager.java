@@ -1441,6 +1441,12 @@ public final class ArcadePortManager implements Listener {
                     .filter(player -> player.isOnline() && !testPlayers.isTestPlayer(player)
                             && lobby.isLobbyWorld(player.getWorld()))
                     .toList());
+            for (Player player : lobbyPlayers) {
+                for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
+                    existingQueue.remove(player.getUniqueId());
+                }
+                gladiatorLobbyVotes.remove(player.getUniqueId());
+            }
             cameraShyModule.startFromLobby(sender, lobbyPlayers);
             return;
         }
