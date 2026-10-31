@@ -106,11 +106,45 @@ def inspect_zip(path):
             if expanded > MAX_EXPANDED:
                 raise ValueError("archive expands beyond 8 GB limit")
             entries.append((name, info))
+
         bad = zf.testzip()
         if bad:
             raise ValueError("ZIP CRC failed: " + bad)
 
-        files = {name for name, info in entries if not info.is_dir()}
+        files = {name: info for name, info in entries if not info.is_dir()}
+        suffix_counts = {}
+        top_level = set()
+        for name in files:
+            suffix = PurePosixPath(name).suffix.lower() or "[no extension]"
+            suffix_counts[suffix] = suffix_counts.get(suffix, 0) + 1
+            parts = PurePosixPath(name).parts
+            if parts:
+                top_level.add(parts[0])
+        relevant_names = [
+            name for name in sorted(files)
+            if (PurePosixPath(name).suffix.lower() in {".schematic", ".schem", ".mca", ".nbt"}
+                or PurePosixPath(name).name.lower() in {"level.dat", "worldconfig.dat"}
+                or "config" in PurePosixPath(name).name.lower())
+        ]
+        level_entries = [name for name in files if PurePosixPath(name).name.lower() == "level.dat"]
+        config_entries = [name for name in files if PurePosixPath(name).name.lower() == "worldconfig.dat"]
+        region_entries = [
+            name for name in files
+            if "region" in PurePosixPath(name).parts and name.lower().endswith(".mca")
+        ]
+        schematics = [
+            name for name in files
+            if PurePosixPath(name).suffix.lower() in {".schematic", ".schem"}
+        ]
+        inventory = {
+            "top_level_entries": sorted(top_level)[:40],
+            "extension_counts": dict(sorted(suffix_counts.items())),
+            "level_dat_entries": sorted(level_entries)[:10],
+            "world_config_entries": sorted(config_entries)[:10],
+            "region_mca_entries": sorted(region_entries)[:10],
+            "schematic_entries": sorted(schematics)[:20],
+            "sample_files": sorted(files)[:30],
+        }
         roots = set()
         for name in files:
             if PurePosixPath(name).name != "WorldConfig.dat":
@@ -121,37 +155,73 @@ def inspect_zip(path):
             level = f"{parent}/level.dat" if parent else "level.dat"
             if level in files:
                 roots.add(parent)
+
+        format_guess = (
+            "schematic archive" if schematics else
+            "Minecraft region/world export without Reborn metadata" if region_entries else
+            "non-world map asset archive"
+        )
+        base = {
+            "zip_entries": len(infos),
+            "uncompressed_bytes": expanded,
+            "inventory": inventory,
+            "format_guess": format_guess,
+        }
         if not roots:
-            raise ValueError("no folder contains both level.dat and WorldConfig.dat")
+            return {
+                **base,
+                "importer_structure": "FAIL",
+                "error": (
+                    "No directory contains both level.dat and WorldConfig.dat. "
+                    "This ZIP is not directly installable by SourceMapCatalog."
+                ),
+            }
+
         depth = {root: len(PurePosixPath(root).parts) if root else 0 for root in roots}
         shallowest = min(depth.values())
         candidates = sorted(root for root in roots if depth[root] == shallowest)
         if len(candidates) != 1:
-            raise ValueError("ambiguous shallowest world roots: " + ", ".join(candidates))
+            return {
+                **base,
+                "importer_structure": "FAIL",
+                "error": "Ambiguous shallowest world roots: " + ", ".join(candidates),
+            }
         root = candidates[0]
         prefix = f"{root}/region/" if root else "region/"
-        regions = [name for name in files if name.startswith(prefix) and name.lower().endswith(".mca")]
+        regions = [
+            name for name in files
+            if name.startswith(prefix) and name.lower().endswith(".mca")
+        ]
         if not regions:
-            raise ValueError("world root has no region/*.mca terrain files")
+            return {
+                **base,
+                "world_root": root or ".",
+                "importer_structure": "FAIL",
+                "error": "The world root has no region/*.mca terrain files.",
+            }
         config_path = f"{root}/WorldConfig.dat" if root else "WorldConfig.dat"
-        config_info = next(info for name, info in entries if name == config_path and not info.is_dir())
+        config_info = files[config_path]
         if config_info.file_size > 2_000_000:
-            raise ValueError("WorldConfig.dat exceeds 2 MB")
+            return {**base, "world_root": root or ".", "importer_structure": "FAIL",
+                    "error": "WorldConfig.dat exceeds 2 MB."}
         meta = parse_config(zf.read(config_info))
         if not meta["map_name"]:
-            raise ValueError("WorldConfig.dat has no MAP_NAME")
+            return {**base, "world_root": root or ".", "importer_structure": "FAIL",
+                    "error": "WorldConfig.dat has no MAP_NAME."}
         notes = []
         if not meta["spawn_count"]:
             notes.append("No valid TEAM_SPAWNS coordinates; review player spawn setup.")
         if not meta["has_horizontal_bounds"]:
             notes.append("Horizontal bounds incomplete; review arena bounds.")
         return {
-            "zip_entries": len(infos), "uncompressed_bytes": expanded,
-            "world_root": root or ".", "region_files": len(regions),
-            "world_config": config_path, "metadata": meta,
-            "importer_structure": "PASS", "notes": notes,
+            **base,
+            "world_root": root or ".",
+            "region_files": len(regions),
+            "world_config": config_path,
+            "metadata": meta,
+            "importer_structure": "PASS",
+            "notes": notes,
         }
-
 
 def inspect_one(pool, item):
     slug, name, builder = item
@@ -179,8 +249,9 @@ def inspect_one(pool, item):
                         digest.update(chunk)
                         out.write(chunk)
             result.update({"download_bytes": size, "sha256": digest.hexdigest()})
-            result.update(inspect_zip(tmp))
-            result["status"] = "PASS"
+            inspection = inspect_zip(tmp)
+            result.update(inspection)
+            result["status"] = "PASS" if inspection.get("importer_structure") == "PASS" else "UNSUPPORTED_LAYOUT"
             return result
         except Exception as exc:
             error = str(exc)
@@ -237,7 +308,14 @@ def main():
             root=r.get("world_root", "—"), spawns=m.get("spawn_count", "—"),
             data=m.get("data_location_count", "—"), sha=r.get("sha256", "—")))
         if r.get("error"):
-            lines.append(f"  - Failure: {r['error']}")
+            lines.append(f"  - Finding: {r['error']}")
+        inventory = r.get("inventory", {})
+        if inventory:
+            lines.append(f"  - Format guess: {r.get('format_guess', 'unknown')}")
+            lines.append(f"  - Top-level entries: {', '.join(inventory.get('top_level_entries', []))}")
+            lines.append(f"  - Extensions: {inventory.get('extension_counts', {})}")
+            lines.append(f"  - Relevant files: {', '.join(inventory.get('relevant_names', inventory.get('schematic_entries', []) + inventory.get('region_mca_entries', []) + inventory.get('world_config_entries', []) + inventory.get('level_dat_entries', []))) or 'none'}")
+            lines.append(f"  - Sample files: {', '.join(inventory.get('sample_files', []))}")
         for note in r.get("notes", []):
             lines.append(f"  - Review: {note}")
     lines += ["", "Structural PASS requires ZIP CRC success, one unambiguous shallowest world root with level.dat and WorldConfig.dat, and at least one region/*.mca terrain file. WorldConfig.dat is parsed for MAP_NAME, bounds, TEAM_SPAWNS, DATA_LOCS and CUSTOM_LOCS.",
