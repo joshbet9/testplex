@@ -13,6 +13,7 @@ public enum ArcadePortGame {
     EVOLUTION("evolution", "Evolution", Material.GRASS_BLOCK),
     GLADIATORS("gladiators", "Gladiators", Material.RED_SANDSTONE),
     HEROES_OF_GWEN("heroes-of-gwen", "Heroes of Gwen", Material.PRISMARINE_BRICKS),
+    HOOPS_REMASTERED("hoops-remastered", "Hoops Remastered", Material.BIRCH_PLANKS),
     MICRO_BATTLES("micro-battles", "Micro Battles", Material.LIGHT_BLUE_STAINED_GLASS),
     ONE_IN_THE_QUIVER("one-in-the-quiver", "One in the Quiver", Material.STONE_BRICKS),
     PAINTBALL("paintball", "Paintball", Material.LIME_TERRACOTTA),

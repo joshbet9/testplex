@@ -2625,4 +2625,14 @@ class ArcadePortGameTest {
         assertEquals(1, ArcadePortRules.turfWarsTimeoutLeader(-1, 4, 5));
         assertEquals(-1, ArcadePortRules.turfWarsTimeoutLeader(-1, 5, 5));
     }
+
+    @Test void hoopsRemasteredHasItsOwnArcadeIdAndUsesItsGeneratedCourt() {
+        assertEquals(ArcadePortGame.HOOPS_REMASTERED,
+                ArcadePortGame.fromId("hoops-remastered"));
+        assertEquals(ArcadePortGame.HOOPS_REMASTERED,
+                ArcadePortGame.fromId("Hoops Remastered"));
+        assertEquals("Hoops Remastered", ArcadePortGame.HOOPS_REMASTERED.displayName());
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.HOOPS_REMASTERED).isEmpty(),
+                "Hoops Remastered builds its controlled court rather than inventing a source archive.");
+    }
 }

@@ -133,3 +133,12 @@ The catalogue and renderer contract are covered by unit tests. A passing build d
 ## Wither Assault: smoother movement
 
 Wither flight speed follows a continuous altitude curve. Near the spawn height, an eased transition blends the source hover speed into the altitude-based curve, while a per-tick rate limit prevents sudden changes during climbs and descents.
+
+
+## Hoops Remastered — first modern gameplay slice
+
+Hoops Remastered is being rebuilt as a two-team basketball match inside the shared Arcade session lifecycle. The first implementation adds a generated indoor hardwood court, RED / BLUE team assignment, five-minute regulation, first-to-21 win-by-two scoring, next-basket-wins overtime, a 24-second shot clock, two- and three-point shots, server-simulated ball flight, possession passing, close-range steals, shot blocks and recoverable rebounds. The live action bar shows the player's points, assists, rebounds, blocks and steals; the sidebar shows team scores and clocks. Career data is stored under the existing local Hoops progress namespace, including PPG / APG / RPG, and the existing achievements / milestones are wired to match results.
+
+Controls: left-click to pass while holding the ball; right-click to shoot while holding the ball; left-click an opposing carrier to attempt a steal; right-click near an opposing airborne shot to contest / block it.
+
+Hoops is intentionally **not** added to the deployed READY_FOR_TEST allow-list yet. It remains disabled from normal test selection until Paper 26.3 build validation and the live acceptance plan in `HOOPS-REMASTERED-ACCEPTANCE-PLAN.md` are complete. Automated rule tests cover scoring, clocks, regulation / overtime, assists, box-score achievements and player limits; they do not prove live ball feel or rim geometry.
