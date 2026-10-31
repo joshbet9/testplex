@@ -327,10 +327,11 @@ public final class PlexballGame implements Listener {
             int percent = PlexballProgressionRules.milestoneProgressPercent(current, milestone.target());
             List<String> lore = new ArrayList<>();
             lore.add(ChatColor.GRAY + milestone.metric().displayName());
-            lore.add(ChatColor.WHITE + formatMilestoneValue(milestone.metric(), current)
+            lore.add(ChatColor.WHITE.toString() + formatMilestoneValue(milestone.metric(), current)
                     + ChatColor.GRAY + " / " + ChatColor.WHITE + milestone.targetLabel());
             lore.add(progressBar(percent));
-            lore.add(unlocked ? ChatColor.GREEN + "COMPLETED" : ChatColor.YELLOW + percent + "% complete");
+            lore.add(unlocked ? ChatColor.GREEN + "COMPLETED"
+                    : ChatColor.YELLOW.toString() + percent + "% complete");
             inventory.setItem(28 + index, progressItem(
                     unlocked ? Material.EMERALD : milestoneIcon(milestone.metric()),
                     (unlocked ? ChatColor.GREEN : ChatColor.WHITE) + milestone.displayName(), lore));
