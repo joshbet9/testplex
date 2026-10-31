@@ -27,7 +27,7 @@ jobs:
   build-modern-arcade:
     name: Build and test Paper 26.3 plugin
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -43,6 +43,15 @@ jobs:
             modern-platform/snake-port/pom.xml
             modern-platform/arcade-games-port/pom.xml
 
+      - name: Set up Node.js 24 for Minecraft 26.3 protocol clients
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install pinned offline Minecraft 26.3 protocol client
+        run: |
+          npm install --prefix "$RUNNER_TEMP/hoops-protocol-client" --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "@wp2508/minecraft-protocol@1.69.5"
+
       - name: Build and run catalogue tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/pom.xml clean verify
 
@@ -51,6 +60,35 @@ jobs:
 
       - name: Build Arcade mechanics and the integrated Monster Maze module
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
+
+      - name: Build disposable Hoops Paper 26.3 acceptance harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_dir="modern-platform/arcade-games-port/src/test-runtime/hoops-paper-smoke"
+          mvn --batch-mode --no-transfer-progress -f "$smoke_dir/pom.xml" clean package
+
+      - name: Run four-client Hoops Paper 26.3 gameplay acceptance
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash modern-platform/arcade-games-port/scripts/run-hoops-paper-smoke.sh \
+            modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar \
+            modern-platform/arcade-games-port/src/test-runtime/hoops-paper-smoke/target/HoopsPaperSmoke.jar \
+            "$RUNNER_TEMP/hoops-paper-smoke" \
+            "$RUNNER_TEMP/hoops-protocol-client/node_modules"
+
+      - name: Upload Hoops Paper acceptance results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hoops-paper-26.3-acceptance-results
+          path: |
+            ${{ runner.temp }}/hoops-paper-smoke/plugins/HoopsPaperSmoke/results.tsv
+            ${{ runner.temp }}/hoops-paper-smoke/server.log
+            ${{ runner.temp }}/hoops-paper-smoke/client-bots.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Build the disabled Wizards 26.3 port and run spell-rule tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/wizards-port/pom.xml clean verify
