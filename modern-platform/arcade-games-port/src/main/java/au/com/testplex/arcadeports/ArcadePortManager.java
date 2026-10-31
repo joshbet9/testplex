@@ -10208,8 +10208,12 @@ public final class ArcadePortManager implements Listener {
         Player carrier = session.players.get(playerId);
         if (carrier != null && carrier.isOnline()
                 && "beserker".equals(session.sheepQuestKits.getOrDefault(playerId, "beserker"))
-                && !carrier.isOnGround()) {
+                && !carrier.isOnGround()
+                && now <= session.sheepBerserkerLeapUntil.getOrDefault(playerId, 0L)) {
             session.sheepQuestAirborneCaptures.add(playerId);
+            session.sheepQuestLeapCaptures.merge(playerId, 1, Integer::sum);
+        } else {
+            session.sheepQuestNonLeapCaptures.merge(playerId, 1, Integer::sum);
         }
     }
 
@@ -10249,7 +10253,8 @@ public final class ArcadePortManager implements Listener {
                     awardCatalogAchievement(player, "sheep-quest", "unconventional-but-effective");
                 }
                 if ("beserker".equals(session.sheepQuestKits.getOrDefault(id, "beserker"))
-                        && session.sheepQuestAirborneCaptures.contains(id)) {
+                        && session.sheepQuestLeapCaptures.getOrDefault(id, 0) > 0
+                        && session.sheepQuestNonLeapCaptures.getOrDefault(id, 0) == 0) {
                     awardCatalogAchievement(player, "sheep-quest", "yeet");
                 }
                 if (session.sheepQuestSoloCarryCaptures.getOrDefault(id, 0) >= 2
@@ -12886,6 +12891,10 @@ public final class ArcadePortManager implements Listener {
                         && !session.spleefSnowballsThrown.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "wrong-kit-lil-bro");
                 if ("brawler".equals(session.spleefKits.getOrDefault(winnerId, "snowballer"))
                         && !session.spleefBrawlerHitPlayers.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "spleeftastic");
+                if (session.spleefBrawlerSelfSpleefCandidates.contains(winnerId)
+                        && session.spleefBrawlerLeapAfterSelfSpleef.contains(winnerId)) {
+                    awardCatalogAchievement(winner, "spleef", "clutchest-of-them-all");
+                }
                 if (session.spleefStarvationPlayers.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "block-drought");
                 if (session.spleefVoidFallPlayers.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "praying-to-the-gods");
                 if (session.spleefArrowAssists.getOrDefault(winnerId, 0) >= 5) awardCatalogAchievement(winner, "spleef", "ranger");
@@ -14806,12 +14815,23 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.TURF_WARS && session.alive.contains(playerId)
                 && !(event instanceof PlayerTeleportEvent)) {
+            if (player.isOnGround()) {
+                session.turfAirYawTravel.remove(playerId);
+                session.turfAir360Ready.remove(playerId);
+            } else {
+                double deltaYaw = ((event.getTo().getYaw() - event.getFrom().getYaw() + 540.0D) % 360.0D) - 180.0D;
+                double travelled = session.turfAirYawTravel.merge(playerId, Math.abs(deltaYaw), Double::sum);
+                if (travelled >= 330.0D) session.turfAir360Ready.add(playerId);
+            }
             int team = session.teams.getOrDefault(playerId, -1);
             Location base = session.turfTeamSpawnCentres.get(team);
             if (base != null) {
                 double distance = horizontalDistanceSquared(event.getTo(), base);
                 if (distance > 100.0D) session.turfLeftBase.add(playerId);
-                else if (session.turfLeftBase.contains(playerId)
+                boolean returnedToOwnSide = team == 0
+                        ? event.getTo().getX() <= session.turfFrontlineX
+                        : team == 1 && event.getTo().getX() >= session.turfFrontlineX;
+                if (returnedToOwnSide && session.turfLeftBase.contains(playerId)
                         && "infiltrator".equals(session.turfWarsKits.getOrDefault(playerId, "marksman"))) {
                     session.turfInfiltratorReturned.add(playerId);
                     session.turfInfiltratorKillStreak.remove(playerId);
@@ -14893,7 +14913,10 @@ public final class ArcadePortManager implements Listener {
                 session.runnerLastBlockStepOwner.put(playerId, owner);
                 session.runnerLastBlockStepAt.put(playerId, System.currentTimeMillis());
             }
-            if (current.getBlock().isLiquid() || below.isLiquid()) session.runnerIceCandidates.add(playerId);
+            if (current.getBlock().isLiquid() || below.isLiquid()
+                    || current.getY() <= session.world.getMinHeight() + 2.0D) {
+                session.runnerIceCandidates.add(playerId);
+            }
             if (System.currentTimeMillis() - session.startedAt <= 3_000L
                     && current.getY() < session.runnerStartY.getOrDefault(playerId, event.getFrom().getY()) - 2.0D) {
                 session.runnerDiveCandidates.add(playerId);
@@ -15335,6 +15358,9 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         session.spleefLeapReadyAt.put(id, now + ArcadePortRules.SPLEEF_BRAWLER_LEAP_COOLDOWN_MILLIS);
+        if (session.spleefBrawlerSelfSpleefCandidates.contains(id)) {
+            session.spleefBrawlerLeapAfterSelfSpleef.add(id);
+        }
         Vector launch = ArcadePortRules.spleefLeapVelocity(
                 player.getLocation().getDirection(), player.isOnGround());
         player.setVelocity(launch);
@@ -15407,7 +15433,15 @@ public final class ArcadePortManager implements Listener {
      */
     private void breakSpleefBlock(Session session, Player breaker, Block block) {
         if (isSpleefProtectedBlock(block.getType())) return;
-        if (breaker != null) session.spleefBlocksBroken.merge(breaker.getUniqueId(), 1, Integer::sum);
+        if (breaker != null) {
+            UUID breakerId = breaker.getUniqueId();
+            session.spleefBlocksBroken.merge(breakerId, 1, Integer::sum);
+            if (session.alive.size() == 2
+                    && "brawler".equals(session.spleefKits.getOrDefault(breakerId, "snowballer"))
+                    && breaker.getLocation().getBlock().getRelative(BlockFace.DOWN).equals(block)) {
+                session.spleefBrawlerSelfSpleefCandidates.add(breakerId);
+            }
+        }
         BlockData brokenData = block.getBlockData();
         Location center = block.getLocation().add(0.5D, 0.5D, 0.5D);
         block.setType(Material.AIR, false);
@@ -16337,6 +16371,14 @@ public final class ArcadePortManager implements Listener {
         session.entities.add(arrow);
         session.turfTrackedArrows.add(arrow.getUniqueId());
         UUID id = player.getUniqueId();
+        int team = session.teams.getOrDefault(id, -1);
+        boolean inOpponentTerritory = team == 0
+                ? player.getLocation().getX() > session.turfFrontlineX
+                : team == 1 && player.getLocation().getX() < session.turfFrontlineX;
+        if (inOpponentTerritory && !player.isOnGround()) {
+            session.turfBounceArrowOwners.put(arrow.getUniqueId(), id);
+            if (session.turfAir360Ready.remove(id)) session.turf360BounceArrows.add(arrow.getUniqueId());
+        }
         if ("shredder".equals(session.turfWarsKits.getOrDefault(id, "marksman"))
                 && session.turfBarrageCharges.containsKey(id)) {
             int charge = session.turfBarrageCharges.getOrDefault(id, 0);
@@ -16424,6 +16466,18 @@ public final class ArcadePortManager implements Listener {
             UUID barrageOwner = session.turfBarrageArrowOwners.remove(turfArrow.getUniqueId());
             if (event.getHitEntity() instanceof Player target
                     && turfArrow.getShooter() instanceof Player shooter) {
+                UUID bounceOwner = session.turfBounceArrowOwners.remove(turfArrow.getUniqueId());
+                boolean bounceShot = bounceOwner != null && bounceOwner.equals(shooter.getUniqueId());
+                if (bounceShot) {
+                    int streak = session.turfBounceShotStreak.merge(shooter.getUniqueId(), 1, Integer::sum);
+                    if (streak >= 3) awardCatalogAchievement(shooter, "turf-wars", "triple-combo");
+                    if (session.turf360BounceArrows.remove(turfArrow.getUniqueId())) {
+                        awardCatalogAchievement(shooter, "turf-wars", "360-no-scope");
+                    }
+                } else {
+                    session.turfBounceShotStreak.remove(shooter.getUniqueId());
+                    session.turf360BounceArrows.remove(turfArrow.getUniqueId());
+                }
                 if (barrageOwner != null) {
                     Set<UUID> targets = session.turfBarrageTargetsByOwner.computeIfAbsent(
                             barrageOwner, ignored -> new HashSet<>());
@@ -16447,6 +16501,11 @@ public final class ArcadePortManager implements Listener {
                         awardCatalogAchievement(shooter, "turf-wars", "watch-your-step");
                     }
                 }
+            }
+            if (event.getHitEntity() == null) {
+                UUID missedBounceOwner = session.turfBounceArrowOwners.remove(turfArrow.getUniqueId());
+                if (missedBounceOwner != null) session.turfBounceShotStreak.remove(missedBounceOwner);
+                session.turf360BounceArrows.remove(turfArrow.getUniqueId());
             }
             if (event.getHitBlock() != null && isTurfWarsWool(event.getHitBlock().getType())) {
                 Block wool = event.getHitBlock();
@@ -19799,6 +19858,32 @@ public final class ArcadePortManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSheepQuestBerserkerJump(PlayerToggleFlightEvent event) {
+        Player player = event.getPlayer();
+        Session session = active;
+        UUID id = player.getUniqueId();
+        if (session == null || session.type != ArcadePortGame.SHEEP_QUEST
+                || !session.alive.contains(id)
+                || !"beserker".equals(session.sheepQuestKits.getOrDefault(id, "beserker"))) return;
+        event.setCancelled(true);
+        long now = System.currentTimeMillis();
+        long readyAt = session.sheepBerserkerReadyAt.getOrDefault(id, 0L);
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        if (now < readyAt) {
+            player.sendActionBar(ChatColor.YELLOW + "Berserker Jump is recharging.");
+            return;
+        }
+        session.sheepBerserkerReadyAt.put(id, now + 8_000L);
+        session.sheepBerserkerLeapUntil.put(id, now + 3_000L);
+        Vector launch = player.getLocation().getDirection().normalize().multiply(0.9D);
+        launch.setY(Math.max(0.65D, Math.min(1.0D, launch.getY() + 0.4D)));
+        player.setVelocity(launch);
+        player.setFallDistance(0.0F);
+        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.8F, 1.15F);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onWitherHumanDoubleJump(org.bukkit.event.player.PlayerToggleFlightEvent event) {
         Player player = event.getPlayer();
         Session session = active;
@@ -20515,6 +20600,9 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> sheepQuestKits = new HashMap<>();
         final Map<UUID, Long> sheepNextPickupAt = new HashMap<>();
         final Map<UUID, Long> sheepBerserkerReadyAt = new HashMap<>();
+        final Map<UUID, Long> sheepBerserkerLeapUntil = new HashMap<>();
+        final Map<UUID, Integer> sheepQuestLeapCaptures = new HashMap<>();
+        final Map<UUID, Integer> sheepQuestNonLeapCaptures = new HashMap<>();
         final Map<UUID, Integer> sheepQuestCaptures = new HashMap<>();
         final Map<UUID, Integer> sheepQuestSoloCarryCaptures = new HashMap<>();
         final Map<UUID, List<Long>> sheepQuestCaptureTimes = new HashMap<>();
@@ -20605,6 +20693,8 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> runnerLastBlockStepAt = new HashMap<>();
         final Map<UUID, Double> runnerFailedUpwardsHealth = new HashMap<>();
         final Set<UUID> spleefBrawlerHitPlayers = new HashSet<>();
+        final Set<UUID> spleefBrawlerSelfSpleefCandidates = new HashSet<>();
+        final Set<UUID> spleefBrawlerLeapAfterSelfSpleef = new HashSet<>();
         final Set<UUID> spleefStarvationPlayers = new HashSet<>();
         final Set<UUID> spleefVoidFallPlayers = new HashSet<>();
         final Set<UUID> spleefSnowballsThrown = new HashSet<>();
@@ -20635,6 +20725,11 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> turfTrackedArrows = new HashSet<>();
         final Map<UUID, UUID> turfBarrageArrowOwners = new HashMap<>();
         final Map<UUID, Set<UUID>> turfBarrageTargetsByOwner = new HashMap<>();
+        final Map<UUID, UUID> turfBounceArrowOwners = new HashMap<>();
+        final Set<UUID> turf360BounceArrows = new HashSet<>();
+        final Map<UUID, Integer> turfBounceShotStreak = new HashMap<>();
+        final Map<UUID, Double> turfAirYawTravel = new HashMap<>();
+        final Set<UUID> turfAir360Ready = new HashSet<>();
         final Map<UUID, Integer> turfDeaths = new HashMap<>();
         final Set<UUID> turfLeftBase = new HashSet<>();
         final Map<UUID, UUID> turfLastShredderShotByVictim = new HashMap<>();
