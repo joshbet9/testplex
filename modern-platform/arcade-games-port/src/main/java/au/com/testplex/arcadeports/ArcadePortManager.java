@@ -2916,6 +2916,18 @@ public final class ArcadePortManager implements Listener {
                 session.gladiatorUsedBow.contains(id), session.gladiatorUsedRod.contains(id))) {
             awardGladiatorsAchievement(winner, "are-you-not-entertained", "Are you not entertained?");
         }
+        if (mode != null && mode.rodAvailable() && !session.gladiatorUsedRod.contains(id)) {
+            awardCustomArcadeAchievement(winner, "gladiators", "man-of-integrity",
+                    "Man of Integrity — won without using a fishing rod.");
+        }
+        if (session.gladiatorSilkySeconds.contains(id)) {
+            awardCustomArcadeAchievement(winner, "gladiators", "silky-seconds",
+                    "Silky Seconds — won from the loser's bracket after a sub-half-heart first-round loss.");
+        }
+        if (session.gladiatorComebackKid.contains(id)) {
+            awardCustomArcadeAchievement(winner, "gladiators", "comeback-kid",
+                    "Comeback Kid — won from the loser's bracket after taking at least 10 damage in round one.");
+        }
     }
 
     private static final int GLADIATOR_BRACKET_WINNERS = 0;
@@ -12110,6 +12122,14 @@ public final class ArcadePortManager implements Listener {
         if (announceWinner && session.type == ArcadePortGame.SHEEP_QUEST) {
             recordSheepQuestRewards(session, winner);
         }
+        if (announceWinner && winner != null) {
+            if (session.type == ArcadePortGame.DEATH_TAG) recordDeathTagAchievements(session, winner);
+            if (session.type == ArcadePortGame.DRAGON_ESCAPE) recordDragonEscapeAchievements(session, winner);
+            if (session.type == ArcadePortGame.DRAGONS) recordDragonsAchievements(session, winner);
+            if (session.type == ArcadePortGame.EVOLUTION) recordEvolutionAchievements(session, winner);
+            if (session.type == ArcadePortGame.MICRO_BATTLES) recordMicroBattlesAchievements(session, winner);
+            if (session.type == ArcadePortGame.BOMB_LOBBERS) recordBombLobbersCustomAchievements(session, winner);
+        }
         active = null;
         if (session.tickTask != null) session.tickTask.cancel();
         if (announceWinner && session.type == ArcadePortGame.BACON_BRAWL && winner != null) {
@@ -12340,6 +12360,24 @@ public final class ArcadePortManager implements Listener {
         plugin.saveConfig();
     }
 
+    /** Persist a Testplex-only achievement under the key consumed by /stats. */
+    private void awardCustomArcadeAchievement(Player player, String gameId, String slug, String description) {
+        if (player == null || gameId == null || slug == null || !slug.matches("[a-z0-9-]+")) return;
+        UUID id = player.getUniqueId();
+        String key = switch (gameId) {
+            case "bacon-brawl" -> ArcadePortRules.baconBrawlAchievementConfigKey(id, slug);
+            case "bomb-lobbers" -> ArcadePortRules.bombLobbersAchievementConfigKey(id, slug);
+            case "micro-battles" -> ArcadePortRules.microBattlesAchievementConfigKey(id, slug);
+            case "gladiators" -> ArcadePortRules.gladiatorsAchievementConfigKey(id, slug);
+            case "evolution" -> "local-achievements." + id + ".evolution." + slug;
+            default -> "test-achievements." + gameId + "." + id + "." + slug;
+        };
+        if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        plugin.saveConfig();
+        if (player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + description);
+    }
+
     /** Record local Bacon Brawl achievements in isolated test config, never production milestones. */
     private void recordBaconBrawlAchievements(Session session, Player winner) {
         UUID id = winner.getUniqueId();
@@ -12358,6 +12396,22 @@ public final class ArcadePortManager implements Listener {
             awardBaconAchievement(winner,
                     ArcadePortRules.baconBrawlAchievementConfigKey(id, "raw-pork"),
                     "Raw Pork — won Bacon Brawl without using an ability.");
+        }
+        if (session.baconPigBackstabSeen.contains(id) && !session.baconPigBackstabInvalid.contains(id)) {
+            awardCustomArcadeAchievement(winner, "bacon-brawl", "goat-sty",
+                    "GOAT Sty — won as Pig while every backstab was made from cloak.");
+        }
+        if (session.scores.getOrDefault(id, 0) == 0) {
+            awardCustomArcadeAchievement(winner, "bacon-brawl", "get-some-pork-on-your-fork",
+                    "Get Some Pork on Your Fork — won without a kill.");
+        }
+        if (session.baconMamaBlastKills.getOrDefault(id, 0) >= 4) {
+            awardCustomArcadeAchievement(winner, "bacon-brawl", "mama-get-the-camera",
+                    "Mama Get the Camera — got four Mama Piggles Bacon Blast kills.");
+        }
+        if (session.baconHamished.contains(id)) {
+            awardCustomArcadeAchievement(winner, "bacon-brawl", "hamished",
+                    "Hamished — won while taking starvation damage.");
         }
     }
 
@@ -12469,6 +12523,21 @@ public final class ArcadePortManager implements Listener {
             awardEvolutionAchievement(winner, EvolutionAchievement.OVERKILL.configKey(id),
                     "Overkill — got 2 kills before each evolution.");
         }
+        if (session.evolutionOnlySameMobEligible.contains(id) && session.scores.getOrDefault(id, 0) > 0) {
+            awardCustomArcadeAchievement(winner, "evolution", "objection",
+                    "Objection! — won only killing players who were the same mob as you.");
+        }
+        if (session.evolutionChickenGolemKillers.contains(id)
+                && session.evolutionLevels.getOrDefault(id, 0) == 4) {
+            awardCustomArcadeAchievement(winner, "evolution", "how-the-turns-have-tabled",
+                    "How the Turns have Tabled — won as Chicken after killing an Iron Golem.");
+        }
+        if (session.evolutionAssistEvolves.getOrDefault(id, 0) >= 3) {
+            awardCustomArcadeAchievement(winner, "evolution", "try-try-again",
+                    "Try Try Again — completed three evolutions after earning assists.");
+        }
+        // The current port has no automatic Quick Evolver path. Mercy Rule and Wrong Kit Champ
+        // remain locked until that kit/mechanic is implemented; do not award them falsely.
     }
 
     private void awardEvolutionAchievement(Player player, String key, String description) {
@@ -12631,6 +12700,99 @@ public final class ArcadePortManager implements Listener {
             if (participant != null && participant.isOnline()) {
                 awardDragonTestGems(entry.getKey(), ArcadePortRules.DRAGONS_PARTICIPATION_GEMS);
             }
+        }
+    }
+
+    private void recordDeathTagAchievements(Session session, Player winner) {
+        UUID id = winner.getUniqueId();
+        long since = session.deathTagStationarySince.getOrDefault(id, 0L);
+        if (since > 0L && System.currentTimeMillis() - since >= 180_000L) {
+            awardCustomArcadeAchievement(winner, "death-tag", "statue",
+                    "Statue — won after standing in one 5×5 area for at least three minutes.");
+        }
+    }
+
+    private void recordDragonEscapeAchievements(Session session, Player winner) {
+        UUID id = winner.getUniqueId();
+        if (session.dragonEscapeStrats.contains(id)) {
+            awardCustomArcadeAchievement(winner, "dragon-escape", "strats",
+                    "Strats — warped to the first-place racer while they were at least 40 blocks ahead.");
+        }
+        if ("digger".equals(session.dragonEscapeKits.getOrDefault(id, "jumper"))
+                && session.dragonEscapeDiggerUsesRemaining.getOrDefault(id,
+                        ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES) == 0
+                && !session.dragonEscapeDiggerTunnelEntered.contains(id)) {
+            awardCustomArcadeAchievement(winner, "dragon-escape", "learn-to-code",
+                    "Learn to Code — used every Digger break without entering a block you broke.");
+        }
+    }
+
+    private void recordDragonsAchievements(Session session, Player winner) {
+        UUID id = winner.getUniqueId();
+        long flareAt = session.dragonsFlareUsedAt.getOrDefault(id, 0L);
+        long sparklerAt = session.dragonsSparklerUsedAt.getOrDefault(id, 0L);
+        if (flareAt > 0L && sparklerAt > 0L && Math.abs(flareAt - sparklerAt) <= 20_000L) {
+            awardCustomArcadeAchievement(winner, "dragons", "ultra",
+                    "Ultra — used Dragon Flare and Throwing Sparkler in one combo to win.");
+        }
+        if (session.dragonsHalfHeartSurvived.contains(id)) {
+            awardCustomArcadeAchievement(winner, "dragons", "survivors-guilt",
+                    "Survivor’s Guilt — won after surviving a hit that left you on half a heart.");
+        }
+        if (winner.getLocation().getY() <= session.world.getMinHeight() + 5.0D
+                && winner.getVelocity().getY() < 0.0D) {
+            awardCustomArcadeAchievement(winner, "dragons", "freefallin",
+                    "Freefallin’ — won while falling in the void.");
+        }
+        if (System.currentTimeMillis() - session.startedAt >= 60_000L
+                && !session.dragonsLastHitAt.containsKey(id)) {
+            awardCustomArcadeAchievement(winner, "dragons", "dodgems",
+                    "Dodgems — survived a minute without being hit by a dragon.");
+        }
+        if (session.dragonsHighFallSurvived.contains(id)) {
+            awardCustomArcadeAchievement(winner, "dragons", "sticks-and-stones",
+                    "Sticks and stones — survived at least 7.5 hearts of fall damage.");
+        }
+        if (session.dragonsLeapUsedWhileFalling.contains(id) && !session.dragonsFallDamageTaken.contains(id)) {
+            awardCustomArcadeAchievement(winner, "dragons", "mlg-pro",
+                    "MLG Pro — won using Leap as your only fall-damage cancel.");
+        }
+    }
+
+    private void recordMicroBattlesAchievements(Session session, Player winner) {
+        UUID id = winner.getUniqueId();
+        if (session.microAssists.getOrDefault(id, 0) >= 8) {
+            awardCustomArcadeAchievement(winner, "micro-battles", "mosh-pit-playroom",
+                    "Mosh-Pit Playroom — earned eight assists in one game.");
+        }
+        if ("fighter".equals(session.microKits.getOrDefault(id, "archer")) && session.microFighterSaved.contains(id)) {
+            awardCustomArcadeAchievement(winner, "micro-battles", "built-for-this",
+                    "Built for This — won as Fighter after its damage reduction saved you in a duel.");
+        }
+        if (session.microReachedBorder.contains(id)) {
+            awardCustomArcadeAchievement(winner, "micro-battles", "phew",
+                    "PHEW! — built up to the border and survived it.");
+        }
+        Set<Integer> expectedEnemyTeams = new HashSet<>(session.teams.values());
+        expectedEnemyTeams.remove(session.teams.getOrDefault(id, -1));
+        Set<Integer> shotTeams = session.microSkybaseTeams.getOrDefault(id, Set.of());
+        if ("archer".equals(session.microKits.getOrDefault(id, "fighter"))
+                && !expectedEnemyTeams.isEmpty() && shotTeams.containsAll(expectedEnemyTeams)) {
+            awardCustomArcadeAchievement(winner, "micro-battles", "sniper-dawg",
+                    "Sniper Dawg — knocked a player from every enemy team off a skybase.");
+        }
+    }
+
+    private void recordBombLobbersCustomAchievements(Session session, Player winner) {
+        UUID id = winner.getUniqueId();
+        if (session.scores.getOrDefault(id, 0) >= 3 && !session.bombImmediateImpactThrowers.contains(id)) {
+            awardCustomArcadeAchievement(winner, "bomb-lobbers", "wonderkid",
+                    "Wonderkid — got three kills without throwing TNT that detonated on immediate impact.");
+        }
+        if (session.bombMvpPressurePlayers.contains(id) && session.bombPowerupKillers.contains(id)
+                && !session.bombNormalTntKillers.contains(id)) {
+            awardCustomArcadeAchievement(winner, "bomb-lobbers", "over-9000",
+                    "Over 9000 — won a 1v3 clutch using only TNT powerups.");
         }
     }
 
@@ -19038,6 +19200,11 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Map<UUID, Long>> evolutionDamageContributors = new HashMap<>();
         final Map<UUID, Integer> evolutionKillsAtAttempt = new HashMap<>();
         final Set<UUID> evolutionOverkillEligible = new HashSet<>();
+        final Set<UUID> evolutionOnlySameMobEligible = new HashSet<>();
+        final Set<UUID> evolutionChickenGolemKillers = new HashSet<>();
+        final Set<UUID> evolutionAssistedSinceLastEvolution = new HashSet<>();
+        final Map<UUID, Integer> evolutionAssistEvolves = new HashMap<>();
+        final Map<UUID, Integer> evolutionManualEvolves = new HashMap<>();
         final Map<UUID, BlockDisplay> evolutionEggDisplays = new HashMap<>();
         final Map<UUID, String> evolutionEggVariants = new HashMap<>();
         final Map<UUID, Long> evolutionEggNextParticleAt = new HashMap<>();
@@ -19065,6 +19232,15 @@ public final class ArcadePortManager implements Listener {
         final List<UUID> gladiatorWinnerQueue = new ArrayList<>();
         final List<UUID> gladiatorLoserQueue = new ArrayList<>();
         final Set<UUID> gladiatorUsedBow = new HashSet<>();
+        final Set<UUID> gladiatorFirstRoundPlayers = new HashSet<>();
+        final Set<UUID> gladiatorSilkySeconds = new HashSet<>();
+        final Set<UUID> gladiatorComebackKid = new HashSet<>();
+        final Map<UUID, Double> gladiatorDamageTaken = new HashMap<>();
+        final Map<UUID, Double> gladiatorLastHitHealthRemaining = new HashMap<>();
+        final Map<UUID, Integer> gladiatorArrowsGiven = new HashMap<>();
+        final Map<UUID, Integer> gladiatorArrowsFired = new HashMap<>();
+        final Map<UUID, Integer> gladiatorPotionsGiven = new HashMap<>();
+        final Map<UUID, Integer> gladiatorPotionsUsed = new HashMap<>();
         final Set<UUID> gladiatorUsedRod = new HashSet<>();
         final Map<UUID, String> gladiatorVotes = new HashMap<>();
         int gladiatorRound = -1;
@@ -19135,9 +19311,17 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> deathTagFletchedArrows = new HashSet<>();
         final Map<UUID, Double> deathTagProjectileDamage = new HashMap<>();
         final Map<String, Long> deathTagTraitorKnockbackAt = new HashMap<>();
+        final Map<UUID, String> deathTagStationaryArea = new HashMap<>();
+        final Map<UUID, Long> deathTagStationarySince = new HashMap<>();
+        final Map<UUID, UUID> deathTagTraitorChaserHitOwner = new HashMap<>();
+        final Map<UUID, Integer> deathTagTraitorAssists = new HashMap<>();
         final Map<Block, BlockData> deathTagOriginalLightBlocks = new LinkedHashMap<>();
         long deathTagNextLightAt;
         final Map<UUID, String> baconKits = new HashMap<>();
+        final Set<UUID> baconPigBackstabSeen = new HashSet<>();
+        final Set<UUID> baconPigBackstabInvalid = new HashSet<>();
+        final Map<UUID, Integer> baconMamaBlastKills = new HashMap<>();
+        final Set<UUID> baconHamished = new HashSet<>();
         final Map<UUID, Integer> baconMeters = new HashMap<>();
         final Set<UUID> baconAbilitiesUsed = new HashSet<>();
         final Map<UUID, Integer> baconSlamPowerPercent = new HashMap<>();
@@ -19194,6 +19378,11 @@ public final class ArcadePortManager implements Listener {
         boolean sheepQuestOvertime;
         final Set<Entity> entities = new HashSet<>();
         final Map<UUID, UUID> bombOwners = new HashMap<>();
+        final Map<UUID, Location> bombThrowOrigins = new HashMap<>();
+        final Map<UUID, Integer> bombJumpCounts = new HashMap<>();
+        final Set<UUID> bombImmediateImpactThrowers = new HashSet<>();
+        final Set<UUID> bombPowerupKillers = new HashSet<>();
+        final Set<UUID> bombNormalTntKillers = new HashSet<>();
         final Map<UUID, Item> bombPowerupDrops = new HashMap<>();
         final Map<UUID, String> bombPowerTypes = new HashMap<>();
         final Map<UUID, Long> bombLastThrowAt = new HashMap<>();
@@ -19250,6 +19439,13 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> microBorderColours = new HashMap<>();
         final Map<UUID, Set<Block>> microPersonalGlassBlocks = new HashMap<>();
         final Map<UUID, TextDisplay> microBorderWarnings = new HashMap<>();
+        final Set<UUID> microReachedBorder = new HashSet<>();
+        final Set<UUID> microFighterSaved = new HashSet<>();
+        final Map<UUID, UUID> microSkybaseArrowOwners = new HashMap<>();
+        final Map<UUID, Set<Integer>> microSkybaseTeams = new HashMap<>();
+        final Map<UUID, UUID> microRecentTrapOwner = new HashMap<>();
+        final Map<UUID, Long> microRecentTrapAt = new HashMap<>();
+        final Map<UUID, Integer> microTrapKills = new HashMap<>();
         boolean microLastTwoAwarded;
         final Map<UUID, Map<Integer, UUID>> microCompassMenuTargets = new HashMap<>();
         final Map<UUID, Long> microSpectateNextTeleportAt = new HashMap<>();
@@ -19336,6 +19532,17 @@ public final class ArcadePortManager implements Listener {
         final Map<String, Long> dragonEscapeBlockRestoreTokens = new HashMap<>();
         long dragonEscapeBlockRestoreSequence;
         final Map<UUID, UUID> dragonEscapeMineOwners = new HashMap<>();
+        final Set<UUID> dragonEscapeStrats = new HashSet<>();
+        final Set<UUID> dragonEscapeDiggerTunnelEntered = new HashSet<>();
+        final Map<UUID, UUID> dragonEscapeDisruptorHitOwner = new HashMap<>();
+        final Map<UUID, Integer> dragonEscapeDisruptorKills = new HashMap<>();
+        final Map<UUID, Long> dragonsFlareUsedAt = new HashMap<>();
+        final Map<UUID, Long> dragonsSparklerUsedAt = new HashMap<>();
+        final Set<UUID> dragonsHalfHeartSurvived = new HashSet<>();
+        final Set<UUID> dragonsFallDamageTaken = new HashSet<>();
+        final Set<UUID> dragonsHighFallSurvived = new HashSet<>();
+        final Set<UUID> dragonsLeapUsedWhileFalling = new HashSet<>();
+        final Map<UUID, Long> dragonsLastHitAt = new HashMap<>();
         String dragonEscapeMapName = "";
         String dragonEscapeMapResource;
         Location dragonEscapeStartLocation;
