@@ -10,7 +10,7 @@ const minecraft = require('@wp2508/minecraft-protocol');
 
 const host = process.env.WIZARDS_SMOKE_HOST || '127.0.0.1';
 const port = Number(process.env.WIZARDS_SMOKE_PORT || 25578);
-const usernames = ['jn_playzmc', 'WizardSmoke2'];
+const usernames = ['jn_playzmc', 'WizardSmoke2', 'WizardSmoke3'];
 const clients = [];
 const finished = new Set();
 let shuttingDown = false;
@@ -47,6 +47,26 @@ function connect(username) {
       clearTimeout(timeout);
       log('BOT_LOGIN|PASS|' + username + '|protocol=' + client.protocolVersion);
       resolve(client);
+    });
+
+    let respawnPending = false;
+    client.on('update_health', (packet) => {
+      const health = Number(packet && packet.health);
+      if (Number.isFinite(health) && health <= 0 && !respawnPending) {
+        respawnPending = true;
+        log('BOT_RESPAWN|REQUEST|' + username);
+        setTimeout(() => {
+          try {
+            // Serverbound play/client_command actionId 0 is the vanilla respawn action.
+            client.write('client_command', { actionId: 0 });
+            log('BOT_RESPAWN|SENT|' + username);
+          } catch (error) {
+            log('BOT_RESPAWN|ERROR|' + username + '|' + String(error));
+          }
+        }, 1000);
+      } else if (Number.isFinite(health) && health > 0) {
+        respawnPending = false;
+      }
     });
 
     client.on('error', (error) => {
