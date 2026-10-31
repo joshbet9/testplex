@@ -26,7 +26,11 @@ class ArcadePortGameTest {
         assertEquals(java.util.List.of("Micro Battle"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.MICRO_BATTLES));
         assertEquals(java.util.List.of("Turf Wars"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.TURF_WARS));
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.SNEAKY_ASSASSINS).isEmpty(),
-                "Sneaky Assassins has no archived map in Mineplex Reborn; do not invent one.");
+                "Sneaky Assassins uses its generated modern town; no legacy map archive exists.");
+        assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.MASTER_BUILDERS));
+        assertNull(SourceMapCatalog.resourceFor(ArcadePortGame.SNEAKY_ASSASSINS));
+        assertEquals("source-maps/Draw My Thing/Draw_Stadium.zip",
+                SourceMapCatalog.resourceFor(ArcadePortGame.DRAW_MY_THING));
         assertEquals(java.util.List.of("Castle Assault"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.CASTLE_ASSAULT));
         assertEquals(java.util.List.of("Heroes of GWEN"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.HEROES_OF_GWEN));
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.EVOLUTION).isEmpty(),
