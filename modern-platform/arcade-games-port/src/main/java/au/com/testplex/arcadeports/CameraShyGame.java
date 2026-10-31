@@ -1035,7 +1035,7 @@ public final class CameraShyGame implements Listener {
         if (ownerRaw != null) {
             try {
                 UUID owner = UUID.fromString(ownerRaw);
-                if (humans.contains(owner)) award(owner, "method-actor");
+                if (!owner.equals(photographer.getUniqueId()) && humans.contains(owner)) award(owner, "method-actor");
                 Player creator = Bukkit.getPlayer(owner);
                 if (creator != null && creator.isOnline()) creator.sendMessage(ChatColor.LIGHT_PURPLE + "Your Understudy fooled " + photographer.getName() + "!");
             } catch (IllegalArgumentException ignored) { }

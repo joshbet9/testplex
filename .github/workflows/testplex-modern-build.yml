@@ -160,7 +160,7 @@ jobs:
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
             echo "- Gameplay ports: 25 shared Arcade catalogue entries are packaged; Wizards is a separate disabled module, and Speed Builders Arcade is planned but not implemented; unfinished ports remain unavailable for starting live games"
-            echo "- Playable allow-list: Death Tag and One in the Quiver only; all other catalogue entries, Snake and Wizards remain gated pending readiness promotion"
+            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers and Bacon Brawl; all other catalogue entries, Snake and Wizards remain gated pending readiness promotion"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
 
