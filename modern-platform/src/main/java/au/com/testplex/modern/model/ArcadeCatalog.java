@@ -63,7 +63,7 @@ public final class ArcadeCatalog {
                 win("cloud-throne", "Cloud Throne", "A cloud-built throne rises under the winner")));
 
         register(game("dragons", "Dragons", "BLAZE_POWDER", "Use Pyro platforms to survive dragon attacks.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("pyro-signature", "Pyro Signature", "Unique shape language for the Pyro ability.", "BLAZE_POWDER",
                         single("ember-wing", "Ember Wing", "A fan of flame-shaped particles."),
                         single("phoenix-arc", "Phoenix Arc", "A phoenix outline arcs through the air."),
@@ -196,7 +196,7 @@ public final class ArcadeCatalog {
                 win("splatter-crown", "Splatter Crown", "A crown of layered paint splashes")));
 
         register(game("runner", "Runner", "LEATHER_BOOTS", "Survive by running the course without falling into gaps.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("running-trail-colour", "Running Trail Colour",
                         "Choose a non-red trail colour. The selected map palette is checked to avoid clashes.",
                         "GLOW_INK_SAC",
