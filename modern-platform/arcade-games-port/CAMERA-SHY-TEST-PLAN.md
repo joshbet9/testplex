@@ -22,8 +22,9 @@
 ## Kit acceptance
 - Smoke Artist: smoke sphere blocks camera rays; encounter escape achievement counts three distinct escapes.
 - Decoy: fake shutter/flash fools three distinct human opponents. Looking at a fake flash through a solid wall does not count; a genuine approach to its location still does.
+- Understudy: its owner is credited only when a different human photographs the stand-in; photographing your own stand-in cannot unlock Method Actor.
 - Runner: Speed II for three seconds; shutter is disabled during the burst; a successful escape within the follow-up window unlocks Catch Me If You Can.
-- Spotter: only reveals opponents within 18 blocks and clear line of sight; marks last 15 seconds and must lead to three distinct photographs.
+- Spotter: only reveals opponents within 18 blocks and clear line of sight; a private marker repeatedly tracks each detected opponent for the full 15 seconds and must lead to three distinct photographs.
 - Understudy: deploys a player-skin stand-in; photographing the stand-in awards Method Actor and does not add exposure.
 
 ## Match mechanics
@@ -48,5 +49,6 @@
 - Starting Camera Shy while another Arcade game is running is rejected.
 - Starting another Arcade game while Camera Shy is live is rejected.
 - Operator stop and plugin shutdown restore player state and clean up the test-player roster.
-- Disconnect during a live round, reconnect both before and after match end, and confirm the pre-match inventory, location, effects and movement settings are restored; verify the pending restore is cleared after successful recovery.
+- Disconnect during a live round, reconnect both before and after match end, and confirm the exact pre-match location, inventory, armour, offhand, mode, effects, experience, health, food, movement, flight, invulnerability, collision and glowing state are restored; verify the pending restore is cleared after successful recovery.
+- Stop/restart the server after deleting the dedicated Camera Shy world folder while retaining plugin config; the maze must be regenerated rather than leaving an empty flat world.
 - `mvn -pl modern-platform/arcade-games-port -am test` and the modern platform tests pass.
