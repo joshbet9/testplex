@@ -272,6 +272,13 @@ output="$(run_helper verify-deployment "$target_sha")"
 grep -q "runtime SHA=$target_sha; process identity=VERIFIED" <<< "$output"
 echo 'PASS a deployment journal is not treated as live health when its service is down'
 
+# Reset the simulated server to its prior deployed baseline for the remaining recovery cases.
+printf '%s\\n' "$old_sha" > "$SERVER/.testplex-modern-deployed-build"
+printf 'old paper\\n' > "$SERVER/paper.jar"
+printf 'old plugin payload\\n' > "$SERVER/plugins/ArcadeMechanicsModern/plugin.dat"
+printf 'source_sha=%s\\nnonce=%s\\n' "$old_sha" "$nonce" > "$SERVER/plugins/ArcadeMechanicsModern/.testplex-modern-deploy-identity.properties"
+printf 'status=READY\\nmodule=arcade-lobby\\nmanager=testplex-arcade\\nworld=testplex_arcade_lobby_v1\\nplane=100x100\\nfloor_y=100\\nsource_sha=%s\\nnonce=%s\\ninvocation_id=0123456789abcdef0123456789abcdef\\nprocess_id=4242\\n' "$old_sha" "$nonce" > "$SERVER/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties"
+
 # A PREPARING transaction can recover a Modern service stopped by locked preflight.
 write_txn PREPARING true false
 sed -i 's/^previous_active=.*/previous_active=true/' "$STATE/current.properties"
