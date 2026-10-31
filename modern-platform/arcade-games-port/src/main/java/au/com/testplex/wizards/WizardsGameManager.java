@@ -1278,8 +1278,8 @@ public final class WizardsGameManager implements Listener {
      * Keep spell damage attributed to its caster without letting the generic
      * player-melee cap or wand attack handler rewrite/re-enter the spell.
      */
-    private void damageFromSpell(Player caster, Player victim, double damage) {
-        if (victim == null || !victim.isOnline() || damage <= 0.0D) return;
+    private void damageFromSpell(Player caster, LivingEntity victim, double damage) {
+        if (victim == null || victim.isDead() || !victim.isValid() || damage <= 0.0D) return;
         if (caster == null || !caster.isOnline()) {
             victim.damage(damage);
             return;
@@ -1287,7 +1287,7 @@ public final class WizardsGameManager implements Listener {
         UUID casterId = caster.getUniqueId();
         spellDamageSources.add(casterId);
         try {
-            damageFromSpell(caster, victim, damage);
+            victim.damage(damage, caster);
         } finally {
             spellDamageSources.remove(casterId);
         }
