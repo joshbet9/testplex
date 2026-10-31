@@ -68,7 +68,7 @@ The overall programme tracks 26 titles/variants: **24 shared Arcade catalogue ga
 | 22 | SkyWars Mixed | Mechanics-first 16-player port integrated | Disabled |
 | 23 | Milk the Cow | Mechanics-first port integrated | Disabled |
 | 24 | Wither Assault | Mechanics-first port integrated; generated test arena | Disabled |
-| 25 | Wizards | Shared Arcade lifecycle prototype; 21 spell effects implemented; generated test arena pending original-map parity | Disabled |
+| 25 | Wizards | Shared Arcade lifecycle prototype; 21 spell effects implemented; bundled/server-local source-map discovery; generated fallback only when no archive is found | Disabled |
 | 26 | Speed Builders Arcade | Planned; implementation not started | Not available |
 
 **Readiness rule:** only Death Tag and One in the Quiver are in the READY_FOR_TEST allow-list and enabled-games config. Catalogue presence and successful compilation do not automatically make a game available. Every other title remains disabled until source parity and isolated multi-client acceptance are completed.
