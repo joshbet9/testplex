@@ -49,7 +49,7 @@ public final class ArcadeCatalog {
                 win("untouched-run", "Untouched Run", "A route map draws itself around the winner")));
 
         register(game("dragon-escape", "Dragon Escape", "DRAGON_HEAD", "Race the dragon through a collapsing parkour route.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("leader-marker", "Course Leader Marker", "A course-specific marker for the current leader.", "BEACON",
                         single("dragon-eye", "Dragon Eye", "An iris-like marker pulses above the leader."),
                         single("sky-compass", "Sky Compass", "A rotating compass motif follows the leader."),
