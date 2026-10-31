@@ -2052,10 +2052,6 @@ public final class ArcadePortManager implements Listener {
                         microCosmeticPreferences, microId, "middle-glass-colour"));
                 session.microBorderColours.put(microId, microBattlesColourSelection(
                         microCosmeticPreferences, microId, "border-particle-colour"));
-                session.microGlassColours.put(microId, microBattlesColourSelection(
-                        microCosmeticPreferences, microId, "middle-glass-colour"));
-                session.microBorderColours.put(microId, microBattlesColourSelection(
-                        microCosmeticPreferences, microId, "border-particle-colour"));
             }
             if (type == ArcadePortGame.ONE_IN_THE_QUIVER) {
                 session.quiverKits.put(player.getUniqueId(), quiverKitPreferences.getOrDefault(player.getUniqueId(), "leaper"));
@@ -2128,13 +2124,6 @@ public final class ArcadePortManager implements Listener {
                 player.setWalkSpeed(0.0F);
             }
             session.lastLocations.put(player.getUniqueId(), spawn.clone());
-            if (type == ArcadePortGame.MICRO_BATTLES) {
-                UUID microId = player.getUniqueId();
-                Bukkit.getScheduler().runTaskLater(plugin, () -> {
-                    if (active == session && player.isOnline() && session.alive.contains(microId)
-                            && session.microBarrierActive) applyMicroMiddleGlassCosmetic(session, player);
-                }, 2L);
-            }
             if (type == ArcadePortGame.MICRO_BATTLES) {
                 UUID microId = player.getUniqueId();
                 Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -2242,26 +2231,6 @@ public final class ArcadePortManager implements Listener {
                 }
             }
         }
-        if (type == ArcadePortGame.MICRO_BATTLES && session.microBarrierBlocks.isEmpty()) {
-            // Source-map fallback: retain the same two-block team-island glass rings as the generated arena.
-            for (int team = 0; team < 4; team++) {
-                Location island = microSourceMap == null ? islandSpawn(team * 2) : microTeamCenter(session, team);
-                int cx = island.getBlockX(), cy = island.getBlockY(), cz = island.getBlockZ();
-                for (int offset = -4; offset <= 4; offset++) {
-                    for (int y = cy; y <= ArcadePortRules.microBattlesBarrierTopY(cy); y++) {
-                        Block[] ring = {
-                                session.world.getBlockAt(cx + offset, y, cz - 4),
-                                session.world.getBlockAt(cx + offset, y, cz + 4),
-                                session.world.getBlockAt(cx - 4, y, cz + offset),
-                                session.world.getBlockAt(cx + 4, y, cz + offset)
-                        };
-                        for (Block barrier : ring) {
-                            if (barrier.getType() == Material.GLASS) session.microBarrierBlocks.add(barrier);
-                        }
-                    }
-                }
-            }
-        }
         if (type == ArcadePortGame.DEATH_TAG) {
             for (Player player : participants) {
                 giveDeathTagKit(session, player, session.tagged.contains(player.getUniqueId()),
@@ -2288,7 +2257,7 @@ public final class ArcadePortManager implements Listener {
         } else if (type == ArcadePortGame.GLADIATORS && participants.size() == 1) {
             String savedVote = gladiatorLobbyVotes.remove(participants.get(0).getUniqueId());
             GladiatorsMode soloMode = GladiatorsMode.fromId(savedVote);
-            session.gladiatorMode = soloMode == null ? GladiatorsMode.RODLESS.id() : soloMode.id();
+            session.gladiatorMode = soloMode == null ? GladiatorsMode.defaultMode().id() : soloMode.id();
             giveGladiatorKit(session, participants.get(0));
             participants.get(0).sendMessage(ChatColor.YELLOW
                     + "Solo practice only: the double-elimination tournament begins when at least two players join.");
@@ -2792,13 +2761,14 @@ public final class ArcadePortManager implements Listener {
                 GladiatorMenuType.VOTE, votes == gladiatorLobbyVotes);
         Inventory inventory = Bukkit.createInventory(holder, 27, title);
         holder.inventory = inventory;
-        Material[] icons = {Material.BOW, Material.FISHING_ROD, Material.SHIELD, Material.SPLASH_POTION};
+        Material[] icons = {Material.IRON_SWORD, Material.BOW, Material.FISHING_ROD, Material.SHIELD, Material.SPLASH_POTION};
         GladiatorsMode[] modes = GladiatorsMode.values();
-        int[] slots = {10, 12, 14, 16};
+        int[] slots = {9, 11, 13, 15, 17};
         for (int i = 0; i < modes.length; i++) {
             GladiatorsMode mode = modes[i];
             int count = (int) votes.values().stream().filter(mode.id()::equals).count();
             String details = switch (mode) {
+                case NORMAL -> "Classic loadout: sword, bow, arrows and fishing rod.";
                 case RODLESS -> "Bow available; fishing rod disabled.";
                 case BOWLESS -> "Fishing rod available; bow disabled.";
                 case MODERN -> "Sword, axe and shield. No bow or rod.";
@@ -3055,7 +3025,7 @@ public final class ArcadePortManager implements Listener {
             String vote = gladiatorLobbyVotes.remove(id);
             if (GladiatorsMode.fromId(vote) != null) session.gladiatorVotes.put(id, vote);
         }
-        session.gladiatorMode = GladiatorsMode.RODLESS.id();
+        session.gladiatorMode = GladiatorsMode.defaultMode().id();
         session.gladiatorVotingEndsAt = System.currentTimeMillis() + 15_000L;
         announce(session, ChatColor.GOLD + "Gladiators vote: choose the PvP rules for this tournament.");
         for (Player player : session.players.values()) {
@@ -3141,7 +3111,7 @@ public final class ArcadePortManager implements Listener {
             GladiatorsMode mode = GladiatorsMode.fromId(vote);
             if (mode != null) counts.merge(mode, 1, Integer::sum);
         }
-        GladiatorsMode selected = GladiatorsMode.RODLESS;
+        GladiatorsMode selected = GladiatorsMode.defaultMode();
         int highest = -1;
         for (GladiatorsMode mode : GladiatorsMode.values()) {
             int count = counts.getOrDefault(mode, 0);
@@ -3421,8 +3391,13 @@ public final class ArcadePortManager implements Listener {
         player.getInventory().setItemInOffHand(null);
         player.getInventory().addItem(new ItemStack(sword));
         GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
-        if (mode == null) mode = GladiatorsMode.RODLESS;
+        if (mode == null) mode = GladiatorsMode.defaultMode();
         switch (mode) {
+            case NORMAL -> {
+                player.getInventory().addItem(new ItemStack(Material.FISHING_ROD));
+                player.getInventory().addItem(new ItemStack(Material.BOW),
+                        new ItemStack(Material.ARROW, new int[]{3, 5, 7, 10}[tier]));
+            }
             case RODLESS -> {
                 player.getInventory().addItem(new ItemStack(Material.BOW),
                         new ItemStack(Material.ARROW, new int[]{3, 5, 7, 10}[tier]));
@@ -6389,10 +6364,6 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.MILK_THE_COW) updateMilkCow(session, now);
         if (session.type == ArcadePortGame.WITHER_ASSAULT) updateWitherAssault(session, now);
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
-            updateMicroBorderWarnings(session);
-            updateMicroBattlesBorderParticles(session);
-            updateMicroSpectatorCompass(session);
-            if (session.ticks % 20 == 0) updateMicroLastTwoMission(session);
             updateMicroBorderWarnings(session);
             updateMicroBattlesBorderParticles(session);
             updateMicroSpectatorCompass(session);
@@ -12215,10 +12186,6 @@ public final class ArcadePortManager implements Listener {
             recordDeathTagRewards(session);
         }
         recordLocalStats(session, winner, announceWinner);
-        if (session.type == ArcadePortGame.MICRO_BATTLES) {
-            removeAllMicroBorderWarnings(session);
-            for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
-        }
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             removeAllMicroBorderWarnings(session);
             for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
