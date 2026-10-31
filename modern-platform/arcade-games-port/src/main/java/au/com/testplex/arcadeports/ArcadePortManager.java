@@ -13049,8 +13049,8 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
-    private void awardSuperSploorAchievement(UUID playerId, Player player, String achievementId) {
-        if (playerId == null || testPlayers.isTestPlayer(playerId)) return;
+    private void awardSuperSploorAchievement(UUID playerId, Player player, String gameId, String achievementId) {
+        if (playerId == null || !"super-sploor".equals(gameId) || testPlayers.isTestPlayer(playerId)) return;
         SuperSploorProgressCatalog.Achievement achievement = SuperSploorProgressCatalog.achievement(achievementId);
         if (achievement == null) return;
         String key = SuperSploorProgressCatalog.achievementConfigKey(playerId, achievementId);
