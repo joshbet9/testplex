@@ -725,9 +725,23 @@ public final class SuperSploorRuntime implements Listener {
         }
     }
 
+    private boolean isEnemyPaintedSupport(Location location, int team) {
+        if (location == null || location.getWorld() != world || engine == null) return false;
+        Block block = location.getBlock();
+        int owner = engine.owner(block);
+        if (owner >= 0 && owner != team) return true;
+        int supportOwner = engine.owner(block.getRelative(0, -1, 0));
+        return supportOwner >= 0 && supportOwner != team;
+    }
+
     private void updateTemporaryDevices(long now) {
         mines.removeIf(mine -> now >= mine.expiresAt);
         for (InkMine mine : new ArrayList<>(mines)) {
+            if (isEnemyPaintedSupport(mine.location, mine.team)) {
+                mines.remove(mine);
+                world.spawnParticle(Particle.SMOKE, mine.location, 8, 0.2D, 0.1D, 0.2D, 0.01D);
+                continue;
+            }
             if (now < mine.armedAt) continue;
             Player target = players.values().stream()
                     .filter(p -> p != null && p.isOnline() && !p.getUniqueId().equals(mine.ownerId)
@@ -744,6 +758,11 @@ public final class SuperSploorRuntime implements Listener {
 
         for (Sprinkler sprinkler : new ArrayList<>(sprinklers)) {
             if (now >= sprinkler.expiresAt) { sprinklers.remove(sprinkler); continue; }
+            if (isEnemyPaintedSupport(sprinkler.location, sprinkler.team)) {
+                sprinklers.remove(sprinkler);
+                world.spawnParticle(Particle.SMOKE, sprinkler.location, 12, 0.3D, 0.15D, 0.3D, 0.01D);
+                continue;
+            }
             if (now < sprinkler.nextPulseAt) continue;
             sprinkler.nextPulseAt = now + 650L;
             recordPaint(sprinkler.ownerId, engine.paint(sprinkler.location, sprinkler.team, 2));
