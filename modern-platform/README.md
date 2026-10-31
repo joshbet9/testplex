@@ -62,7 +62,7 @@ The overall programme tracks 26 titles/variants: **24 shared Arcade catalogue ga
 | 8 | Micro Battles | Controlled acceptance; original map, four-team combat, kits and achievements implemented | Enabled |
 | 9 | Monster Maze | Embedded in Testplex Arcade lifecycle; mechanics in progress | Disabled |
 | 10 | One in the Quiver | Acceptance-ready | Enabled |
-| 11 | Paintball | Mechanics in progress | Disabled |
+| 11 | Paintball | Controlled acceptance; original maps, four kits, team combat and SAVE ME revival implemented | Enabled |
 | 12 | Runner | Mechanics in progress | Disabled |
 | 13 | Sheep Quest | Mechanics in progress | Disabled |
 | 14 | Snake | Separate modern module; mechanics in progress | Disabled |
@@ -79,4 +79,4 @@ The overall programme tracks 26 titles/variants: **24 shared Arcade catalogue ga
 | 25 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
 | 26 | Speed Builders Arcade | Planned; implementation not started | Not available |
 
-**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators and Micro Battles form the current shared test queue and can be exercised together in the same test sessions. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable.
+**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles and Paintball form the current shared test queue and can be exercised together in the same test sessions. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable.
