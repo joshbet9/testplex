@@ -1,9 +1,9 @@
 # The 24 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
-# Only games formally marked READY_FOR_TEST may be started in the isolated server.
-# The other 22 catalogue entries remain disabled until their parity/acceptance gate is cleared.
+# This is the explicit controlled-acceptance queue; unfinished games stay disabled.
 enabled-games:
   - death-tag
   - one-in-the-quiver
+  - bomb-lobbers
 lobby-selected-game: death-tag
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
