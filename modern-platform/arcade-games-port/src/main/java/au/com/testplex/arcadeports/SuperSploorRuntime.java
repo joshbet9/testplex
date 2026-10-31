@@ -55,9 +55,11 @@ import org.bukkit.util.Vector;
  * shared Testplex Arcade manager and never creates its own Bukkit lifecycle.
  */
 public final class SuperSploorRuntime implements Listener {
-    public record PlayerMatchStats(long territoryPainted, long enemyTerritoryReclaimed,
+    public record PlayerMatchStats(String kit, long territoryPainted, long enemyTerritoryReclaimed,
             int splats, int deaths, int assists, double squidTravelBlocks,
-            double wallClimbBlocks, int specialsUsed) { }
+            double wallClimbBlocks, int specialsUsed, long rollerTerritory,
+            int chargerFullHits, long lobberEnemyReclaimed, int dualiesPostRollSplats,
+            int bestSpecialTargets) { }
     public record TerritorySummary(int redUnits, int blueUnits, int totalUnits) { }
 
     private static final class MutableStats {
@@ -69,10 +71,18 @@ public final class SuperSploorRuntime implements Listener {
         double squidTravelBlocks;
         double wallClimbBlocks;
         int specialsUsed;
+        String kit = "sprayer";
+        long rollerTerritory;
+        int chargerFullHits;
+        long lobberEnemyReclaimed;
+        int dualiesPostRollSplats;
+        int bestSpecialTargets;
 
         PlayerMatchStats snapshot() {
-            return new PlayerMatchStats(territoryPainted, enemyTerritoryReclaimed, splats, deaths,
-                    assists, squidTravelBlocks, wallClimbBlocks, specialsUsed);
+            return new PlayerMatchStats(kit, territoryPainted, enemyTerritoryReclaimed, splats, deaths,
+                    assists, squidTravelBlocks, wallClimbBlocks, specialsUsed,
+                    rollerTerritory, chargerFullHits, lobberEnemyReclaimed,
+                    dualiesPostRollSplats, bestSpecialTargets);
         }
     }
 
@@ -91,6 +101,11 @@ public final class SuperSploorRuntime implements Listener {
     private final Map<UUID, Integer> marks = new HashMap<>();
     private final Map<UUID, Long> lastShotAt = new HashMap<>();
     private final Map<UUID, Long> lastInkRegenAt = new HashMap<>();
+    private final Map<UUID, Long> chargerChargeStartedAt = new HashMap<>();
+    private final Map<UUID, Integer> dodgeRollCharges = new HashMap<>();
+    private final Map<UUID, Long> nextDodgeRollRechargeAt = new HashMap<>();
+    private final Map<UUID, Long> dualiesRollExpiresAt = new HashMap<>();
+    private final Map<UUID, Set<UUID>> dualiesRollTargets = new HashMap<>();
     private final Map<UUID, Long> lastHitAt = new HashMap<>();
     private final Map<UUID, Long> nextMarkRecoveryAt = new HashMap<>();
     private final Map<UUID, Long> spawnProtectedUntil = new HashMap<>();
@@ -104,6 +119,7 @@ public final class SuperSploorRuntime implements Listener {
     private final Map<UUID, Snowball> projectileEntities = new HashMap<>();
     private final Map<UUID, Integer> projectilePaintRadii = new HashMap<>();
     private final Set<UUID> projectilePaintLines = new HashSet<>();
+    private final Set<UUID> fullyChargedProjectiles = new HashSet<>();
     private final Map<UUID, Location> projectileLastLocations = new HashMap<>();
 
     private SuperSploorEngine engine;
@@ -172,12 +188,19 @@ public final class SuperSploorRuntime implements Listener {
             kits.put(id, kit);
             ink.put(id, SuperSploorRules.MAX_INK);
             marks.put(id, 0);
-            lastShotAt.put(id, now - SuperSploorRules.PRIMARY_SHOT_INTERVAL_MILLIS);
+            lastShotAt.put(id, now - 2_000L);
             lastInkRegenAt.put(id, now);
             spawnProtectedUntil.put(id, now + SuperSploorRules.SPAWN_PROTECTION_MILLIS);
             kills.put(id, 0);
-            playerStats.put(id, new MutableStats());
+            MutableStats stats = new MutableStats();
+            stats.kit = kit;
+            playerStats.put(id, stats);
             contributors.put(id, new HashSet<>());
+            if ("dualies".equals(kit)) {
+                dodgeRollCharges.put(id, 2);
+                nextDodgeRollRechargeAt.put(id, Long.MAX_VALUE);
+                dualiesRollTargets.put(id, new HashSet<>());
+            }
             giveStarterLoadout(player, team, kit);
             player.setGameMode(GameMode.ADVENTURE);
             player.setInvulnerable(true);
@@ -202,6 +225,14 @@ public final class SuperSploorRuntime implements Listener {
     public void tick(long now) {
         if (!running || engine == null) return;
         updateChargerPaintLines();
+        rechargeDodgeRolls(now);
+        for (Map.Entry<UUID, Long> charge : new ArrayList<>(chargerChargeStartedAt.entrySet())) {
+            Player chargingPlayer = players.get(charge.getKey());
+            if (chargingPlayer != null && chargingPlayer.isOnline()) {
+                long percent = Math.min(100L, Math.max(0L, (now - charge.getValue()) * 100L / 900L));
+                chargingPlayer.sendActionBar(ChatColor.AQUA + "CHARGER " + percent + "%");
+            }
+        }
         lastTickAt = now;
         for (UUID id : new ArrayList<>(players.keySet())) {
             Player player = players.get(id);
@@ -307,6 +338,10 @@ public final class SuperSploorRuntime implements Listener {
         };
         player.getInventory().setItem(0, namedItem(weapon, ChatColor.GOLD + name,
                 "Right-click to use your primary • ink cost depends on kit"));
+        if ("dualies".equals(kit)) {
+            player.getInventory().setItem(1, namedItem(Material.ENDER_PEARL,
+                    ChatColor.AQUA + "Dodge Roll", "Right-click to dodge. Two charges; one recharges every 5 seconds."));
+        }
         player.getInventory().setItem(7, namedItem(Material.INK_SAC, ChatColor.AQUA + "Squid Mode",
                 "Select this slot on your team's paint to swim, climb and refill ink"));
         player.getInventory().setHeldItemSlot(PRIMARY_SLOT);
@@ -368,12 +403,19 @@ public final class SuperSploorRuntime implements Listener {
         Player player = event.getPlayer();
         UUID id = player.getUniqueId();
         if (!players.containsKey(id) || !player.isOnline() || respawnAt.containsKey(id)) return;
-        // Map interaction is disabled during the match; only the current primary weapon fires.
         event.setCancelled(true);
-        if (!event.getAction().isRightClick()) return;
         ItemStack held = event.getItem();
-        if (held == null || !held.hasItemMeta() || held.getItemMeta() == null) return;
+        if (held == null || !held.hasItemMeta() || held.getItemMeta() == null
+                || !held.getItemMeta().hasDisplayName()) return;
+        String heldName = ChatColor.stripColor(held.getItemMeta().getDisplayName());
         String kit = kits.getOrDefault(id, "sprayer");
+
+        if ("dualies".equals(kit) && "Dodge Roll".equals(heldName)
+                && event.getAction().isRightClick()) {
+            useDodgeRoll(player, id);
+            return;
+        }
+
         String expected = switch (kit) {
             case "roller" -> "Paint Roller";
             case "charger" -> "Ink Charger";
@@ -381,9 +423,101 @@ public final class SuperSploorRuntime implements Listener {
             case "dualies" -> "Twin Blasters";
             default -> "Splattershot";
         };
-        if (!ChatColor.stripColor(held.getItemMeta().getDisplayName()).equals(expected)) return;
-        event.setCancelled(true);
-        firePrimary(player, id);
+        if (!expected.equals(heldName)) return;
+        if ("charger".equals(kit)) {
+            if (event.getAction().isRightClick()) beginChargerCharge(player, id);
+            else if (event.getAction().isLeftClick()) releaseChargerCharge(player, id);
+            return;
+        }
+        if (event.getAction().isRightClick()) firePrimary(player, id);
+    }
+
+    private void beginChargerCharge(Player player, UUID id) {
+        if (chargerChargeStartedAt.containsKey(id)) return;
+        long now = System.currentTimeMillis();
+        if (ink.getOrDefault(id, 0) < 8) {
+            player.sendActionBar(ChatColor.RED + "Not enough ink to charge.");
+            return;
+        }
+        long lastShot = lastShotAt.getOrDefault(id, 0L);
+        if (now - lastShot < 1_000L) {
+            player.sendActionBar(ChatColor.YELLOW + "Charger recharging.");
+            return;
+        }
+        chargerChargeStartedAt.put(id, now);
+        player.playSound(player.getLocation(), Sound.BLOCK_BEACON_AMBIENT, 0.35F, 1.7F);
+        player.sendActionBar(ChatColor.AQUA + "CHARGER 0%");
+    }
+
+    private void releaseChargerCharge(Player player, UUID id) {
+        Long started = chargerChargeStartedAt.remove(id);
+        if (started == null) return;
+        long elapsed = Math.max(0L, System.currentTimeMillis() - started);
+        double charge = Math.max(0.2D, Math.min(1.0D, elapsed / 900.0D));
+        fireChargedCharger(player, id, charge);
+    }
+
+    private void fireChargedCharger(Player player, UUID id, double charge) {
+        long now = System.currentTimeMillis();
+        if (now - lastShotAt.getOrDefault(id, 0L) < 1_000L) return;
+        int cost = 8 + (int) Math.ceil(10.0D * charge);
+        int current = ink.getOrDefault(id, 0);
+        if (current < cost) {
+            player.sendActionBar(ChatColor.RED + "Not enough ink for that charge.");
+            return;
+        }
+        ink.put(id, SuperSploorRules.spendInk(current, cost));
+        lastShotAt.put(id, now);
+        Snowball projectile = player.launchProjectile(Snowball.class);
+        projectile.setItem(new ItemStack(teams.get(id) == RED ? Material.RED_DYE : Material.LIGHT_BLUE_DYE));
+        projectile.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.8D + charge * 1.2D));
+        UUID projectileId = projectile.getUniqueId();
+        projectile.getPersistentDataContainer().set(projectileKey, PersistentDataType.BYTE, (byte) 1);
+        projectileOwners.put(projectileId, id);
+        projectileEntities.put(projectileId, projectile);
+        activeProjectiles.add(projectileId);
+        projectilePaintRadii.put(projectileId, 0);
+        projectilePaintLines.add(projectileId);
+        projectileLastLocations.put(projectileId, projectile.getLocation().clone());
+        if (charge >= 0.99D) fullyChargedProjectiles.add(projectileId);
+        player.playSound(player.getLocation(), Sound.ENTITY_SNOWBALL_THROW, 0.9F, 1.9F);
+        player.sendActionBar(ChatColor.AQUA + "CHARGER " + Math.round(charge * 100.0D) + "%");
+        updateInkBar(player, id);
+    }
+
+    private void useDodgeRoll(Player player, UUID id) {
+        long now = System.currentTimeMillis();
+        int charges = dodgeRollCharges.getOrDefault(id, 0);
+        if (charges <= 0) {
+            long readyAt = nextDodgeRollRechargeAt.getOrDefault(id, now + 5_000L);
+            player.sendActionBar(ChatColor.YELLOW + "Dodge Roll recharging: "
+                    + Math.max(0L, (readyAt - now + 999L) / 1_000L) + "s");
+            return;
+        }
+        dodgeRollCharges.put(id, charges - 1);
+        if (charges == 2) nextDodgeRollRechargeAt.put(id, now + 5_000L);
+        dualiesRollExpiresAt.put(id, now + 5_000L);
+        dualiesRollTargets.computeIfAbsent(id, ignored -> new HashSet<>()).clear();
+        Vector direction = player.getLocation().getDirection().setY(0.0D);
+        if (direction.lengthSquared() < 1.0E-5D) direction = new Vector(0.0D, 0.0D, 1.0D);
+        direction.normalize().multiply(1.15D).setY(0.18D);
+        player.setVelocity(direction);
+        player.setFallDistance(0.0F);
+        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.7F, 1.5F);
+        player.getWorld().spawnParticle(Particle.CLOUD, player.getLocation(), 12,
+                0.25D, 0.2D, 0.25D, 0.04D);
+        player.sendActionBar(ChatColor.AQUA + "DODGE ROLL  •  " + (charges - 1) + "/2 charges");
+    }
+
+    private void rechargeDodgeRolls(long now) {
+        for (UUID id : new ArrayList<>(players.keySet())) {
+            if (!"dualies".equals(kits.get(id)) || dodgeRollCharges.getOrDefault(id, 0) >= 2) continue;
+            long readyAt = nextDodgeRollRechargeAt.getOrDefault(id, Long.MAX_VALUE);
+            if (now < readyAt) continue;
+            dodgeRollCharges.merge(id, 1, (oldValue, one) -> Math.min(2, oldValue + 1));
+            nextDodgeRollRechargeAt.put(id, dodgeRollCharges.getOrDefault(id, 0) < 2
+                    ? now + 5_000L : Long.MAX_VALUE);
+        }
     }
 
     private void firePrimary(Player player, UUID id) {
@@ -482,6 +616,8 @@ public final class SuperSploorRuntime implements Listener {
         if (stats == null || result == null) return;
         stats.territoryPainted += result.changedUnits();
         stats.enemyTerritoryReclaimed += result.enemyReclaimed();
+        if ("roller".equals(kits.get(ownerId))) stats.rollerTerritory += result.changedUnits();
+        if ("lobber".equals(kits.get(ownerId))) stats.lobberEnemyReclaimed += result.enemyReclaimed();
     }
 
     private void updateChargerPaintLines() {
@@ -521,7 +657,13 @@ public final class SuperSploorRuntime implements Listener {
         Player owner = ownerId == null ? null : players.get(ownerId);
         Location impact = projectile.getLocation().clone();
         if (event.getHitEntity() instanceof Player target && owner != null) {
+            if (fullyChargedProjectiles.remove(projectileId)) {
+                MutableStats ownerStats = playerStats.get(ownerId);
+                if (ownerStats != null) ownerStats.chargerFullHits++;
+            }
             applyMark(ownerId, target.getUniqueId(), target);
+        } else {
+            fullyChargedProjectiles.remove(projectileId);
         }
         if (owner != null && owner.isOnline()) {
             int team = teams.getOrDefault(ownerId, -1);
@@ -592,7 +734,14 @@ public final class SuperSploorRuntime implements Listener {
         if (count >= SuperSploorRules.MAX_PAINT_MARKS) {
             kills.merge(attackerId, 1, Integer::sum);
             MutableStats attackerStats = playerStats.get(attackerId);
-            if (attackerStats != null) attackerStats.splats++;
+            if (attackerStats != null) {
+                attackerStats.splats++;
+                if ("dualies".equals(kits.get(attackerId))
+                        && dualiesRollExpiresAt.getOrDefault(attackerId, 0L) >= now
+                        && dualiesRollTargets.computeIfAbsent(attackerId, ignored -> new HashSet<>()).add(targetId)) {
+                    attackerStats.dualiesPostRollSplats++;
+                }
+            }
             splat(targetId, target, attackerId);
         } else {
             target.sendActionBar(ChatColor.RED + "SPLAT MARK " + count + "/4");
@@ -782,6 +931,7 @@ public final class SuperSploorRuntime implements Listener {
         activeProjectiles.clear();
         projectileOwners.clear();
         projectileEntities.clear();
+        fullyChargedProjectiles.clear();
         projectilePaintRadii.clear();
         projectilePaintLines.clear();
         projectileLastLocations.clear();
@@ -807,6 +957,11 @@ public final class SuperSploorRuntime implements Listener {
         marks.clear();
         lastShotAt.clear();
         lastInkRegenAt.clear();
+        chargerChargeStartedAt.clear();
+        dodgeRollCharges.clear();
+        nextDodgeRollRechargeAt.clear();
+        dualiesRollExpiresAt.clear();
+        dualiesRollTargets.clear();
         lastHitAt.clear();
         nextMarkRecoveryAt.clear();
         spawnProtectedUntil.clear();
@@ -836,6 +991,11 @@ public final class SuperSploorRuntime implements Listener {
         teams.remove(id);
         spawns.remove(id);
         kits.remove(id);
+        chargerChargeStartedAt.remove(id);
+        dodgeRollCharges.remove(id);
+        nextDodgeRollRechargeAt.remove(id);
+        dualiesRollExpiresAt.remove(id);
+        dualiesRollTargets.remove(id);
         ink.remove(id);
         marks.remove(id);
         respawnAt.remove(id);
