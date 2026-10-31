@@ -520,6 +520,7 @@ public final class PlexballGame implements Listener {
             player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "PLEXBALL"
                     + ChatColor.GRAY + " — " + selectedKits.getOrDefault(id, Kit.TECHNICIAN).displayName());
             player.sendMessage(ChatColor.YELLOW + "You get one 10-second batting turn. Everyone else fields.");
+            player.sendMessage(ChatColor.GRAY + "View achievements and career milestones any time with /stats.");
             applyPlayerScoreboard(player);
             player.sendTitle(ChatColor.GOLD + "PLEXBALL",
                     ChatColor.YELLOW + "One swing each  |  100m home run  |  Longest uncaught hit wins",
