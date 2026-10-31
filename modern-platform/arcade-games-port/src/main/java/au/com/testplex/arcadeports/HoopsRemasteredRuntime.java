@@ -220,8 +220,17 @@ public final class HoopsRemasteredRuntime implements Listener {
         world.getBlockAt(rimX + 1, 66, 0).setType(Material.IRON_BARS, false);
         world.getBlockAt(rimX, 66, -1).setType(Material.IRON_BARS, false);
         world.getBlockAt(rimX, 66, 1).setType(Material.IRON_BARS, false);
+        // Four short chain drops form a visible net while keeping the centre open.
         world.getBlockAt(rimX - 1, 65, 0).setType(Material.IRON_CHAIN, false);
         world.getBlockAt(rimX + 1, 65, 0).setType(Material.IRON_CHAIN, false);
+        world.getBlockAt(rimX, 65, -1).setType(Material.IRON_CHAIN, false);
+        world.getBlockAt(rimX, 65, 1).setType(Material.IRON_CHAIN, false);
+        // A white target square is built into the coloured glass backboard.
+        for (int y = 68; y <= 69; y++) {
+            for (int z = -1; z <= 1; z++) {
+                world.getBlockAt(backboardX, y, z).setType(Material.WHITE_CONCRETE, false);
+            }
+        }
     }
 
     public boolean isActive(World world) {
@@ -912,8 +921,11 @@ public final class HoopsRemasteredRuntime implements Listener {
     }
 
     private void showFinalResultsDialogs(Match current, int winningTeam) {
-        Player mvp = alivePlayers(current).stream()
-                .filter(player -> current.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
+        // The manager has already returned players to the lobby when this dialog is shown,
+        // so calculate MVP from the saved match roster rather than filtering by the old world.
+        Player mvp = current.players.values().stream()
+                .filter(player -> player != null && player.isOnline()
+                        && current.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
                 .max(Comparator.comparingDouble(player ->
                         performanceRating(current.playerStats.getOrDefault(player.getUniqueId(), new PlayerStats()))))
                 .orElse(null);
