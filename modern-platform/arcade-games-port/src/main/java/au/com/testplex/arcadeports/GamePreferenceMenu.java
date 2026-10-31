@@ -79,11 +79,13 @@ public final class GamePreferenceMenu implements Listener {
 
         inventory.setItem(4, createItem(Material.WRITABLE_BOOK,
                 ChatColor.GREEN + "Rate the games",
-                ChatColor.GRAY + "Your preferences influence the regular game rotation.",
+                ChatColor.GRAY + "Your preferences adjust each game\u0027s weighted selection likelihood.",
                 ChatColor.GREEN + "Left-click: Like",
                 ChatColor.RED + "Right-click: Dislike",
                 ChatColor.YELLOW + "Shift-click: Neutral",
                 ChatColor.DARK_GRAY + "Neutral is the default for unrated games.",
+                ChatColor.DARK_GRAY + "Preferences adjust odds; they never ban a game.",
+                ChatColor.DARK_GRAY + "Each game stays between 0.05x and 1.95x its base weight.",
                 ChatColor.GRAY + "Eligible lobby players: " + ChatColor.WHITE + eligibleCount,
                 ChatColor.GRAY + "Selection likelihoods update after every rating."));
 
