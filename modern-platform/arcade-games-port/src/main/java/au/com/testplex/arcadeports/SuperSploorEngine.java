@@ -151,7 +151,7 @@ public final class SuperSploorEngine {
 
     private Material teamMaterial(Material current, int team) {
         String source = current.name();
-        String suffix = null;
+        String suffix = source.equals("TERRACOTTA") ? "TERRACOTTA" : null;
         for (String candidate : PAINTABLE_SUFFIXES) {
             if (source.endsWith(candidate)) {
                 suffix = candidate.substring(1);
