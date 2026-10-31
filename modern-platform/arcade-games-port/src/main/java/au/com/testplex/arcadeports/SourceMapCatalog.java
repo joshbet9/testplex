@@ -1057,7 +1057,7 @@ public final class SourceMapCatalog {
         }
         inferred.teamSpawns.put("INFERRED_TEST_STARTS", spawns);
 
-        List<Location> chests = findWizardsChestBlocks(world, inferred);
+        List<Location> chests = findWizardsChestBlocks(world, inferred, bounds.populatedChunks());
         if (chests.isEmpty()) {
             chests = findSafeSurfaceLocations(world, inferred, 32, 0.16D);
             plugin.getLogger().warning("Wizards archive " + resource
@@ -1077,12 +1077,22 @@ public final class SourceMapCatalog {
         return inferred;
     }
 
-    /** Bounds of populated legacy chunk slots in a source archive. */
-    static record ChunkBounds(int minChunkX, int maxChunkX, int minChunkZ, int maxChunkZ, int activeChunks) {}
+    /** Coordinates of a populated legacy Anvil chunk. */
+    static record ChunkCoordinate(int x, int z) {}
+
+    /** Bounds and exact populated legacy chunk slots from a source archive. */
+    static record ChunkBounds(
+            int minChunkX, int maxChunkX, int minChunkZ, int maxChunkZ,
+            int activeChunks, List<ChunkCoordinate> populatedChunks) {
+        ChunkBounds {
+            populatedChunks = populatedChunks == null ? List.of() : List.copyOf(populatedChunks);
+        }
+    }
 
     private static ChunkBounds readRegionChunkBounds(JavaPlugin plugin, String resource) {
         int minX = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
         int maxX = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE, count = 0;
+        List<ChunkCoordinate> populatedChunks = new ArrayList<>();
         try (InputStream input = openMapArchive(plugin, resource);
              ZipInputStream zip = input == null ? null : new ZipInputStream(input)) {
             if (zip == null) return null;
@@ -1117,6 +1127,7 @@ public final class SourceMapCatalog {
                 minZ = Math.min(minZ, region.minChunkZ());
                 maxZ = Math.max(maxZ, region.maxChunkZ());
                 count += region.activeChunks();
+                populatedChunks.addAll(region.populatedChunks());
                 if (count > 8192 || maxX - minX > 128 || maxZ - minZ > 128) {
                     plugin.getLogger().warning("Refusing oversized Wizards source-map chunk bounds for " + resource);
                     return null;
@@ -1128,7 +1139,7 @@ public final class SourceMapCatalog {
             return null;
         }
         if (count == 0 || minX == Integer.MAX_VALUE) return null;
-        return new ChunkBounds(minX, maxX, minZ, maxZ, count);
+        return new ChunkBounds(minX, maxX, minZ, maxZ, count, populatedChunks);
     }
 
     /** Pure Anvil location-table parser, also used by unit tests. */
@@ -1136,6 +1147,7 @@ public final class SourceMapCatalog {
         if (header == null || header.length < 8192) return null;
         int minX = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
         int maxX = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE, count = 0;
+        List<ChunkCoordinate> populatedChunks = new ArrayList<>();
         for (int slot = 0; slot < 1024; slot++) {
             int offset = ((header[slot * 4] & 0xff) << 16)
                     | ((header[slot * 4 + 1] & 0xff) << 8)
@@ -1148,9 +1160,10 @@ public final class SourceMapCatalog {
             maxX = Math.max(maxX, chunkX);
             minZ = Math.min(minZ, chunkZ);
             maxZ = Math.max(maxZ, chunkZ);
+            populatedChunks.add(new ChunkCoordinate(chunkX, chunkZ));
             count++;
         }
-        return count == 0 ? null : new ChunkBounds(minX, maxX, minZ, maxZ, count);
+        return count == 0 ? null : new ChunkBounds(minX, maxX, minZ, maxZ, count, populatedChunks);
     }
 
     private static List<Location> findSafeSurfaceLocations(World world, MapData data, int wanted, double radiusFactor) {
@@ -1207,20 +1220,55 @@ public final class SourceMapCatalog {
     }
 
     private static List<Location> findWizardsChestBlocks(World world, MapData data) {
+        return findWizardsChestBlocks(world, data, null);
+    }
+
+    /**
+     * Scan only populated chunks from the source region headers. ChunkSnapshot avoids
+     * allocating Bukkit Block wrappers for every block in a map and prevents gaps in
+     * the source region rectangle from being generated merely to look for chests.
+     */
+    private static List<Location> findWizardsChestBlocks(
+            World world, MapData data, List<ChunkCoordinate> populatedChunks) {
         List<Location> found = new ArrayList<>();
-        java.util.Set<String> seen = new java.util.HashSet<>();
         int minY = world.getMinHeight();
         int baseMaxY = Math.min(world.getMaxHeight() - 1, minY + 96);
         int maxY = world.getMaxHeight() - 1;
-        for (int x = data.minX; x <= data.maxX; x++) {
-            for (int z = data.minZ; z <= data.maxZ; z++) {
-                int surfaceY = Math.min(maxY, world.getHighestBlockYAt(x, z));
-                int upperStart = Math.max(baseMaxY + 1, surfaceY - 128);
-                for (int y = minY; y <= Math.min(baseMaxY, surfaceY); y++) {
-                    addChestIfPresent(world, x, y, z, found, seen);
+
+        List<ChunkCoordinate> chunks = populatedChunks;
+        if (chunks == null || chunks.isEmpty()) {
+            chunks = new ArrayList<>();
+            for (int chunkX = Math.floorDiv(data.minX, 16); chunkX <= Math.floorDiv(data.maxX, 16); chunkX++) {
+                for (int chunkZ = Math.floorDiv(data.minZ, 16); chunkZ <= Math.floorDiv(data.maxZ, 16); chunkZ++) {
+                    chunks.add(new ChunkCoordinate(chunkX, chunkZ));
                 }
-                for (int y = upperStart; y <= surfaceY; y++) {
-                    addChestIfPresent(world, x, y, z, found, seen);
+            }
+        }
+
+        for (ChunkCoordinate coordinate : chunks) {
+            int chunkMinX = coordinate.x() * 16;
+            int chunkMinZ = coordinate.z() * 16;
+            if (chunkMinX > data.maxX || chunkMinX + 15 < data.minX
+                    || chunkMinZ > data.maxZ || chunkMinZ + 15 < data.minZ) continue;
+
+            org.bukkit.ChunkSnapshot snapshot = world.getChunkAt(coordinate.x(), coordinate.z()).getChunkSnapshot();
+            for (int localX = 0; localX < 16; localX++) {
+                int x = chunkMinX + localX;
+                if (x < data.minX || x > data.maxX) continue;
+                for (int localZ = 0; localZ < 16; localZ++) {
+                    int z = chunkMinZ + localZ;
+                    if (z < data.minZ || z > data.maxZ) continue;
+
+                    int surfaceY = Math.min(maxY, snapshot.getHighestBlockYAt(localX, localZ));
+                    if (surfaceY < minY) continue;
+                    int lowerEnd = Math.min(baseMaxY, surfaceY);
+                    for (int y = minY; y <= lowerEnd; y++) {
+                        addChestIfPresent(world, snapshot, localX, y, localZ, x, z, found);
+                    }
+                    int upperStart = Math.max(baseMaxY + 1, surfaceY - 128);
+                    for (int y = upperStart; y <= surfaceY; y++) {
+                        addChestIfPresent(world, snapshot, localX, y, localZ, x, z, found);
+                    }
                 }
             }
         }
@@ -1228,11 +1276,12 @@ public final class SourceMapCatalog {
     }
 
     private static void addChestIfPresent(
-            World world, int x, int y, int z, List<Location> found, java.util.Set<String> seen) {
-        org.bukkit.Material type = world.getBlockAt(x, y, z).getType();
-        if (type != org.bukkit.Material.CHEST && type != org.bukkit.Material.TRAPPED_CHEST) return;
-        String key = x + ":" + y + ":" + z;
-        if (seen.add(key)) found.add(new Location(world, x, y, z));
+            World world, org.bukkit.ChunkSnapshot snapshot,
+            int localX, int y, int localZ, int x, int z, List<Location> found) {
+        org.bukkit.Material type = snapshot.getBlockType(localX, y, localZ);
+        if (type == org.bukkit.Material.CHEST || type == org.bukkit.Material.TRAPPED_CHEST) {
+            found.add(new Location(world, x, y, z));
+        }
     }
 
     /** Read an already-extracted WorldConfig.dat or its UTF-8 contents into source map data. */
