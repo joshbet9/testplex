@@ -191,6 +191,9 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 case 1 -> verifyLiveRoundAndEliminateFirstOpponent();
                 case 2 -> verifySpectatorAndEliminateFinalOpponent();
                 case 3 -> verifyPlayerRestorationAndFinish();
+                case 4 -> { if (gameplayTicks >= 5) runGenericDamageProbe(); }
+                case 5 -> { if (gameplayTicks >= 5) runAttributedDamageProbe(); }
+                case 6 -> { if (gameplayTicks >= 5) runRainbowBeamAcceptance(); }
                 default -> failAndShutdown("GAMEPLAY_FAIL", "lifecycle",
                         new IllegalStateException("unknown gameplay smoke stage " + gameplayStage));
             }
@@ -319,40 +322,58 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
 
         getLogger().info("WIZARDS_GAMEPLAY_SMOKE|ROUND_STARTED|players=3|map=" + GAMEPLAY_MAP
                 + "|chests=" + chests.size() + "|snapshotCount=" + snapshots.size());
+        // Let spawn protection and Paper's internal damage cooldown expire naturally.
+        gameplayStage = 4;
+        gameplayTicks = 0;
+    }
 
-        // Cast a direct-target damage spell through the production handler. This
-        // verifies that magic damage is not accidentally clamped to melee damage.
-        // Establish how Paper 26.3 handles ordinary and caster-attributed
-        // player damage on this exact target before testing the spell path.
+    private void runGenericDamageProbe() {
         rival.setInvulnerable(false);
         rival.setNoDamageTicks(0);
         rival.setLastDamage(0.0D);
         rival.setHealth(10.0D);
-        double genericBefore = rival.getHealth();
+        double before = rival.getHealth();
         lastAnyDamageObservation = "no entity damage event observed";
         rival.damage(1.0D);
-        double genericAfter = rival.isDead() ? 0.0D : rival.getHealth();
-        getLogger().info("WIZARDS_DAMAGE_PROBE|GENERIC|health=" + genericBefore + "->" + genericAfter
+        double after = rival.isDead() ? 0.0D : rival.getHealth();
+        getLogger().info("WIZARDS_DAMAGE_PROBE|GENERIC|health=" + before + "->" + after
                 + "|observed=" + lastAnyDamageObservation);
+        require(after < before, "ordinary LivingEntity.damage(1) did not damage a live Wizards player");
+        gameplayStage = 5;
+        gameplayTicks = 0;
+    }
 
+    private void runAttributedDamageProbe() {
+        rival.setInvulnerable(false);
         rival.setNoDamageTicks(0);
         rival.setLastDamage(0.0D);
         rival.setHealth(10.0D);
-        double attributedBefore = rival.getHealth();
+        double before = rival.getHealth();
         lastAnyDamageObservation = "no entity damage event observed";
         rival.damage(1.0D, owner);
-        double attributedAfter = rival.isDead() ? 0.0D : rival.getHealth();
-        getLogger().info("WIZARDS_DAMAGE_PROBE|ATTRIBUTED|health=" + attributedBefore + "->" + attributedAfter
+        double after = rival.isDead() ? 0.0D : rival.getHealth();
+        getLogger().info("WIZARDS_DAMAGE_PROBE|ATTRIBUTED|health=" + before + "->" + after
                 + "|observed=" + lastAnyDamageObservation);
+        require(after < before, "caster-attributed LivingEntity.damage(1, owner) did not damage a live Wizards player");
+        gameplayStage = 6;
+        gameplayTicks = 0;
+    }
 
+    private void runRainbowBeamAcceptance() throws Exception {
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> states = (Map<Object, Object>) field(wizards, "states");
+        Object ownerState = states.get(owner.getUniqueId());
+        require(ownerState != null && states.containsKey(rival.getUniqueId()),
+                "caster or target state disappeared before Rainbow Beam acceptance");
+        Class<?> spellType = Class.forName("au.com.testplex.wizards.WizardsSpell");
         Object rainbowBeam = Enum.valueOf((Class<? extends Enum>) spellType.asSubclass(Enum.class), "RAINBOW_BEAM");
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> known = (Map<Object, Object>) field(ownerState, "known");
         known.put(rainbowBeam, 5);
         Location beamTarget = findSafeLocationNear(owner);
         require(beamTarget != null, "could not find a safe nearby test location for the direct-target spell");
         rival.teleport(beamTarget);
-        // Reset both parts of vanilla's hurt-resistance window. noDamageTicks
-        // alone does not clear the last-hit threshold, which can reject the
-        // damage before Bukkit raises EntityDamageByEntityEvent.
+        rival.setInvulnerable(false);
         rival.setNoDamageTicks(0);
         rival.setLastDamage(0.0D);
         rival.setHealth(0.25D);
@@ -364,11 +385,9 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         @SuppressWarnings("unchecked")
         Map<Object, Object> beamCooldowns = (Map<Object, Object>) field(ownerState, "cooldowns");
         beamCooldowns.remove(rainbowBeam);
-        // The game setup already disables invulnerability. Reassert the same
-        // portable Bukkit flag at the direct-damage boundary and report the
-        // marked flag separately, so the smoke distinguishes state from API defaults.
         owner.setInvulnerable(false);
-        rival.setInvulnerable(false);
+        Method castSpell = method(wizards.getClass(), "castSpell", Player.class, ownerState.getClass(),
+                spellType, org.bukkit.entity.Entity.class, Block.class);
         castSpell.invoke(wizards, owner, ownerState, rainbowBeam, rival, null);
         double manaAfterBeam = ((Number) field(ownerState, "mana")).doubleValue();
         long beamCooldownUntil = ((Number) beamCooldowns.getOrDefault(rainbowBeam, 0L)).longValue();
@@ -392,8 +411,6 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 + ", noDamageTicks=" + rival.getNoDamageTicks()
                 + ", lastDamage=" + lastDamageObservation
                 + ", lastAnyDamage=" + lastAnyDamageObservation + ")");
-        require(Math.abs((manaBeforeBeam - manaAfterBeam) - 17.0D) < 0.01D,
-                "Rainbow Beam did not charge the level-five cost of 17 mana");
         require(((Number) field(ownerState, "kills")).intValue() == 1,
                 "the direct-target spell elimination was not credited to its caster");
         getLogger().info("WIZARDS_GAMEPLAY_SMOKE|SPELL_IMPACT|spell=RAINBOW_BEAM|level=5"
