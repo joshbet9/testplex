@@ -824,13 +824,12 @@ public final class CameraShyGame implements Listener {
 
     private UUID selectTimeoutWinner() {
         return alive.stream().filter(humans::contains)
-                .max((first, second) -> {
-                    int exposureCompare = Integer.compare(exposures.getOrDefault(second, 0), exposures.getOrDefault(first, 0));
-                    if (exposureCompare != 0) return exposureCompare;
-                    int photoCompare = Integer.compare(photos.getOrDefault(first, 0), photos.getOrDefault(second, 0));
-                    if (photoCompare != 0) return photoCompare;
-                    return Integer.compare(eliminations.getOrDefault(first, 0), eliminations.getOrDefault(second, 0));
-                }).orElse(null);
+                .max((first, second) -> CameraShyRules.compareTimeoutRank(
+                        exposures.getOrDefault(first, 0), exposures.getOrDefault(second, 0),
+                        photos.getOrDefault(first, 0), photos.getOrDefault(second, 0),
+                        eliminations.getOrDefault(first, 0), eliminations.getOrDefault(second, 0),
+                        first, second))
+                .orElse(null);
     }
 
     private void refreshHud(long now) {
