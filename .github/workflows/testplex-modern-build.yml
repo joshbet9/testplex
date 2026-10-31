@@ -109,7 +109,7 @@ jobs:
 
           arcade_config="$(unzip -p "$arcade_jar" config.yml)"
           enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config" | paste -sd, -)"
-          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,gladiators,micro-battles,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy" ]] || {
+          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,gladiators,micro-battles,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy,draw-my-thing,master-builders,sneaky-assassins" ]] || {
             echo "Only the explicitly reviewed acceptance queue may be enabled. Found: [$enabled_ids]" >&2
             exit 1
           }
@@ -151,6 +151,9 @@ jobs:
               plexball) map_folders=(); echo "Plexball uses its modern arena; no legacy 1.8 map archive folder exists." ;;
               super-sploor) map_folders=("Sploor") ;;
               dragon-escape) map_folders=("Dragon Escape") ;;
+              draw-my-thing) map_folders=("Draw My Thing") ;;
+              master-builders) map_folders=(); echo "Master Builders uses a generated 4x4 plot arena; no legacy 1.8 archive folder exists." ;;
+              sneaky-assassins) map_folders=(); echo "Sneaky Assassins uses a generated town; no legacy 1.8 archive folder exists." ;;
               dragons) map_folders=("Dragons") ;;
               runner) map_folders=("Runner") ;;
               sheep-quest) map_folders=("Sheep Quest") ;;
@@ -177,7 +180,7 @@ jobs:
           grep -Fq 'retired-monster-maze-plugins' "$deploy_workflow"
           snake_config="$(unzip -p "$snake_jar" config.yml)"
           grep -Fxq "enabled: false" <<< "$snake_config"
-          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 27 shared Arcade catalogue games are packaged, and Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars and Camera Shy join the sixteen-game controlled acceptance queue; Camera Shy uses its procedural modern maze, and all 357 original enabled map archives are compared with the packaged JAR; Wizards is built as a separate module and Speed Builders Arcade remains planned."
+          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 27 shared Arcade catalogue games are packaged, and Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars and Camera Shy join the sixteen-game controlled acceptance queue; Camera Shy uses its procedural modern maze, and all 358 original enabled map archives are compared with the packaged JAR; Wizards is built as a separate module and Speed Builders Arcade remains planned."
 
       - name: Validate independent deployment recovery and shell syntax
         shell: bash
@@ -219,12 +222,12 @@ jobs:
             echo
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
-            echo "- Catalogue: 27 shared Arcade games (16 READY_FOR_TEST, 11 MECHANICS_IN_PROGRESS)"
+            echo "- Catalogue: 27 shared Arcade games (19 READY_FOR_TEST, 8 MECHANICS_IN_PROGRESS)"
             echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar, ArcadeMechanicsModern.jar and WizardsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: 27 shared Arcade catalogue entries are packaged; Plexball, Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars and Camera Shy are in the controlled READY_FOR_TEST queue, Wizards remains a separate disabled module, and Speed Builders Arcade is planned but not implemented"
-            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars and Camera Shy; remaining catalogue entries, Snake and Wizards remain gated pending readiness promotion"
+            echo "- Gameplay ports: 27 shared Arcade catalogue entries are packaged; Plexball, Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars, Camera Shy, Draw My Thing, Master Builders and Sneaky Assassins are in the controlled READY_FOR_TEST queue, Wizards remains a separate disabled module, and Speed Builders Arcade is planned but not implemented"
+            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars, Camera Shy, Draw My Thing, Master Builders and Sneaky Assassins; remaining catalogue entries, Snake and Wizards remain gated pending readiness promotion"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
 
