@@ -35,7 +35,7 @@ All five kits are available to every player from the beginning. There are no dam
 | Respawning | Enabled |
 | Splat recovery | 2.5-second respawn |
 | Spawn protection | 2 seconds; firing disabled during protection |
-| Winner | Team controlling the greater weighted paintable territory at time |
+| Winner | Team controlling the greater share of paintable territory at time |
 | Exact tie | 30-second overtime; first team to lead by 1 percentage point wins; otherwise draw |
 | Map | Dedicated Super Sploor arena; original Excavation map is first import candidate |
 
@@ -47,7 +47,7 @@ The match uses the normal Testplex Arcade lifecycle: queue, kit selection, prepa
 - **Prepare:** 5 seconds, with controls and weapons shown. Players cannot paint or damage opponents.
 - **Live:** 180 seconds. Players paint, contest territory, splat opponents and use abilities.
 - **Final 30 seconds:** a clear countdown and urgent match announcement; HUD score updates remain live.
-- **Overtime:** only when the two weighted team scores are exactly equal at 180 seconds. The first territory update that creates a lead of at least 1 percentage point wins. Overtime is capped at 30 seconds; an exact tie at the cap is a draw.
+- **Overtime:** only when the two team territory scores are exactly equal at 180 seconds. The first territory update that creates a lead of at least 1 percentage point wins. Overtime is capped at 30 seconds; an exact tie at the cap is a draw.
 - **End / cleanup:** announce score and winner, show personal results, restore all modified arena blocks, clear projectiles and temporary objects, then return players through the shared Arcade lifecycle.
 
 A player who disconnects must be removed from the active roster and their team score must remain valid. Rejoining should follow the shared Arcade reconnect policy; do not create duplicate team members or retain stale projectiles, ink effects or player state.
