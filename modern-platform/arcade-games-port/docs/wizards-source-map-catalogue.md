@@ -69,13 +69,13 @@ The follow-up Anvil-section scan found these legacy chest block IDs (54) in the 
 | Magically Possible | 207 | 0 |
 | Kalamit | 227 | 0 |
 
-These are chest **block records**, not proof that usable chest block entities or original inventories survived. The initial NBT inspection found 211 chest tile-entity records in the standard Alicudi archive; the Nano downloader metadata includes `LOAD_TILE_ENTITY=false`, so Nano snapshots in particular cannot be assumed to preserve chest block-entity NBT. The runtime adapter recreates the chest block entity before Wizards populates it with test loot. Nano maps with no remaining chest blocks receive replacement test chests on terrain-checked locations.
+These are chest **block records**, not proof that usable chest block entities or original inventories survived. The initial NBT inspection found 211 chest tile-entity records in the standard Alicudi archive; the Nano downloader metadata includes `LOAD_TILE_ENTITY=false`, so Nano snapshots in particular cannot be assumed to preserve chest block-entity NBT. The runtime adapter scans only chunks marked populated in the original Anvil region headers, using Paper chunk snapshots rather than generating every chunk in the rectangular bounds just to inspect blocks. It recreates chest block entities before Wizards populates them with test loot. Any map yielding fewer than eight recoverable chests is topped up with terrain-checked replacement positions; the archive is rejected if it still cannot provide eight usable loot chests.
 
 The source-specific `WorldConfig.dat` data is absent throughout. Original map bounds, `TEAM_SPAWNS` groups, and custom chest marker metadata are therefore unavailable. The adapter uses the Anvil location tables to derive a conservative rectangle around populated chunks, then checks the loaded terrain for safe start and replacement-chest positions. `level.dat` spawn coordinates are never silently promoted to original Mineplex starts.
 
 ### Engineering decision and acceptance status
 
-A dedicated Wizards-only import path is now implemented in `SourceMapCatalog` and wired into `WizardsGameManager`. It does not weaken the generic importer used by other games. The adapter:
+A dedicated Wizards-only import path is now implemented in `SourceMapCatalog` and wired into `WizardsGameManager`. It does not weaken the generic importer used by other games. Chest recovery scans only populated chunks from the source region index and requires at least eight usable loot-chest positions. The adapter:
 
 1. accepts only the two approved Wizards source folders and a unique root with `level.dat` plus legacy Anvil region files;
 2. converts the legacy region layout to Paper 26.3's custom-world layout;
