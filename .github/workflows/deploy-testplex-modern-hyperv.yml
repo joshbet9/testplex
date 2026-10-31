@@ -465,9 +465,14 @@ jobs:
             "$FPP_URL" -o "$FPP_TMP"
           unzip -tq "$FPP_TMP" >/dev/null
           fpp_descriptor="$(unzip -p "$FPP_TMP" plugin.yml)"
-          fpp_name="$(printf '%s\\n' "$fpp_descriptor" | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\\\"\\r")"
-          fpp_version="$(printf '%s\\n' "$fpp_descriptor" | sed -n 's/^version:[[:space:]]*//p' | head -n 1 | tr -d "'\\\"\\r")"
-          fpp_main="$(printf '%s\\n' "$fpp_descriptor" | sed -n 's/^main:[[:space:]]*//p' | head -n 1 | tr -d "'\\\"\\r")"
+          yaml_descriptor_value() {
+            local key="$1" descriptor="$2"
+            printf '%s\n' "$descriptor" | awk -F': *' -v key="$key" \
+              '$1 == key { gsub(/["\047\r]/, "", $2); sub(/[[:space:]]+$/, "", $2); print $2; exit }'
+          }
+          fpp_name="$(yaml_descriptor_value name "$fpp_descriptor")"
+          fpp_version="$(yaml_descriptor_value version "$fpp_descriptor")"
+          fpp_main="$(yaml_descriptor_value main "$fpp_descriptor")"
           [[ "$fpp_name" == "FakePlayerPlugin" && "$fpp_version" == "$FPP_VERSION" \
              && "$fpp_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]] || {
             echo "Downloaded FakePlayerPlugin descriptor did not match pinned release $FPP_VERSION." >&2
@@ -597,8 +602,8 @@ jobs:
             [[ -f "$plugin_jar" ]] || continue
             descriptor="$(sudo -n unzip -p "$plugin_jar" plugin.yml 2>/dev/null || true)"
             [[ -n "$descriptor" ]] || continue
-            plugin_name="$(printf '%s\\n' "$descriptor" | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "'\\\"\\r")"
-            plugin_main="$(printf '%s\\n' "$descriptor" | sed -n 's/^main:[[:space:]]*//p' | head -n 1 | tr -d "'\\\"\\r")"
+            plugin_name="$(yaml_descriptor_value name "$descriptor")"
+            plugin_main="$(yaml_descriptor_value main "$descriptor")"
             if [[ "$plugin_name" == "FakePlayerPlugin" || "$plugin_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]]; then
               sudo -n rm -f -- "$plugin_jar"
               echo "Replaced previous FakePlayerPlugin jar $plugin_jar with the pinned Paper 26.3 release."
