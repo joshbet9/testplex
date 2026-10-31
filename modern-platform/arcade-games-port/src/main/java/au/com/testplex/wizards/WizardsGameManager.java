@@ -2672,7 +2672,9 @@ public final class WizardsGameManager implements Listener {
                 if (inventory.getItem(slot) != null) continue;
                 inventory.setItem(slot, randomLootItem());
             }
-            chest.update(true, false);
+            // getBlockInventory() mutates the live world inventory immediately.
+            // Do not update this pre-mutation BlockState snapshot afterwards: its
+            // captured empty inventory can overwrite the live loot on Paper.
         }
     }
 
