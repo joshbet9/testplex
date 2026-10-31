@@ -114,6 +114,14 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         owner = players.get(0);
         owner.setOp(true);
 
+        // The host sanitises enabled-games against its production READY_FOR_TEST
+        // list during onEnable. Add Hoops only to this disposable server's
+        // in-memory config after that guard has run; never persist this override.
+        List<String> acceptanceGames = new ArrayList<>(
+                ((JavaPlugin) arcade).getConfig().getStringList("enabled-games"));
+        if (!acceptanceGames.contains("hoops-remastered")) acceptanceGames.add("hoops-remastered");
+        ((JavaPlugin) arcade).getConfig().set("enabled-games", acceptanceGames);
+
         invoke(arcade, "prepareForHoops", new Class<?>[0]);
         for (int i = 0; i < players.size(); i++) {
             Player player = players.get(i);
