@@ -1,6 +1,6 @@
 # Runner — Paper 26.3 source-parity acceptance plan
 
-**Readiness:** `MECHANICS_IN_PROGRESS` — disabled in the shared `enabled-games` allow-list.  
+**Readiness:** `READY_FOR_TEST` — enabled in the shared controlled queue. Live multiplayer acceptance is still outstanding.  
 **Legacy reference:** Mineplex Reborn `Plugins/Nautilus.Game.Arcade/src/nautilus/game/arcade/game/games/runner/Runner.java` and the three `kits/Kit*.java` files.  
 **Map source:** `update/maps/Runner/` — 22 original ZIP archives.
 
@@ -82,12 +82,8 @@ The two Clay Plaza filenames are distinct source archives and must not be collap
 - [ ] Verify all temporarily marked course blocks and cosmetic trail blocks are restored to their pre-round block data; no falling-block entities, scheduled callbacks, scoreboards, compass targets or temporary state survive the session.
 - [ ] Verify every participant returns to the shared lobby with their inventory, armour, offhand, mode, effects, food, health, experience and movement settings restored.
 
-## Promotion gate
+## Controlled-queue acceptance gate
 
-Runner stays disabled until:
-1. The Paper 26.3 build and Runner regression tests pass.
-2. CI confirms all 22 original archive filenames match the packaged JAR exactly.
-3. The full map loading and multi-client checks above pass on the isolated live server.
-4. Any defect found is fixed and retested without weakening source parity or the shared Arcade lifecycle.
+Runner is enabled for combined controlled testing because its source implementation, regression coverage and exact 22-map packaging comparison are present in the Paper 26.3 build. This is **not** a claim that live gameplay has already been accepted.
 
-After that, add Runner to the enabled-game map policy and config migration in one focused readiness change. This plan does not claim that live acceptance has already occurred.
+Before calling Runner gameplay-accepted, complete the map-by-map load checks, two-client rounds, selected 8–16 player stress checks, and lifecycle/cleanup checks above on the isolated live server. Fix each observed defect and rerun affected tests without weakening source parity or the shared Arcade lifecycle.
