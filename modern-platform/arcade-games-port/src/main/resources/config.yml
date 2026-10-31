@@ -6,6 +6,11 @@ enabled-games:
   - one-in-the-quiver
 lobby-selected-game: death-tag
 
+# Optional source map archives on the server filesystem. Relative paths use the
+# server process working directory; set an absolute path if maps live elsewhere.
+source-maps:
+  directory: update/maps
+
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
   - jn_playzmc
