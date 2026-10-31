@@ -1346,7 +1346,11 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (active != null && active.type == type) {
-            player.sendMessage(ChatColor.RED + "That game is already in progress. Use /arcadeport status or queue the next game.");
+            if (type == ArcadePortGame.TURF_WARS) {
+                joinActiveTurfWars(active, player);
+            } else {
+                player.sendMessage(ChatColor.RED + "That game is already in progress. Use /arcadeport status or queue the next game.");
+            }
             return;
         }
         if (manualStartCountdown != null && manualStartType != type) {
@@ -1379,6 +1383,79 @@ public final class ArcadePortManager implements Listener {
         player.sendMessage(ChatColor.GREEN + "Queued for " + type.displayName() + variantName + ". " + nextAction);
         if (quickStart) scheduleQuickStart(type, mixedArcadeVariant);
         if (type == ArcadePortGame.GLADIATORS) openGladiatorLobbyVoteMenu(player);
+    }
+
+
+    private void joinActiveTurfWars(Session session, Player player) {
+        if (session == null || active != session || session.type != ArcadePortGame.TURF_WARS
+                || player == null || !player.isOnline()) return;
+        UUID id = player.getUniqueId();
+        if (session.players.containsKey(id)) {
+            player.sendMessage(ChatColor.YELLOW + (session.alive.contains(id)
+                    ? "You are already playing this Turf Wars round."
+                    : "You have already been eliminated and cannot rejoin this round."));
+            return;
+        }
+
+        int teamZero = (int) session.teams.values().stream().filter(team -> team == 0).count();
+        int teamOne = (int) session.teams.values().stream().filter(team -> team == 1).count();
+        int team;
+        if (teamZero < teamOne) {
+            team = 0;
+        } else if (teamOne < teamZero) {
+            team = 1;
+        } else {
+            int leader = ArcadePortRules.teamWithBestTimeoutStanding(
+                    teamZero, teamOne, timeoutTeamKills(session, 0), timeoutTeamKills(session, 1));
+            // Equal team sizes go to the side currently behind. In a true tie,
+            // alternate to blue/red by the current frontline direction for balance.
+            if (leader == 0) team = 1;
+            else if (leader == 1) team = 0;
+            else team = session.turfFrontlineX >= session.turfInitialFrontlineX ? 1 : 0;
+        }
+
+        PlayerSnapshot pending = pendingRestore.remove(id);
+        if (pending != null) pending.restore(player);
+        lobby.ensurePlayerInLobby(player);
+        PlayerSnapshot snapshot = new PlayerSnapshot(player);
+        session.snapshots.put(id, snapshot);
+        session.players.put(id, player);
+        session.alive.add(id);
+        session.scores.put(id, 0);
+        session.teams.put(id, team);
+
+        long now = System.currentTimeMillis();
+        String kit = turfWarsKitPreferences.getOrDefault(id, "marksman");
+        session.turfWarsKits.put(id, kit);
+        session.turfConstructorNextAt.put(id, now);
+        session.turfArrowNextAt.put(id, now);
+        session.turfKnockbackNextAt.put(id, now);
+        session.turfSpawnDamageNextAt.put(id, now);
+        session.turfInfiltration.put(id, new TurfWarsInfiltration(now));
+
+        int teamSize = team == 0 ? teamZero : teamOne;
+        Location spawn = turfWarsSpawn(session, team, teamSize, teamSize + 1);
+        player.closeInventory();
+        player.leaveVehicle();
+        player.teleport(spawn);
+        player.setGameMode(GameMode.SURVIVAL);
+        player.setHealth(player.getMaxHealth());
+        player.setFoodLevel(20);
+        player.setSaturation(20.0F);
+        player.setFireTicks(0);
+        player.setExp(0.0F);
+        player.setLevel(0);
+        player.getInventory().clear();
+        giveKit(session, player);
+        session.lastLocations.put(id, spawn.clone());
+
+        for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) existingQueue.remove(id);
+        player.sendMessage(ChatColor.GREEN + "You joined the live Turf Wars round on "
+                + (team == 0 ? ChatColor.RED + "Red" : ChatColor.AQUA + "Blue")
+                + ChatColor.GREEN + " team.");
+        announce(session, (team == 0 ? ChatColor.RED : ChatColor.AQUA)
+                + player.getName() + ChatColor.YELLOW + " joined the " + (team == 0 ? "Red" : "Blue")
+                + " team mid-round.");
     }
 
     private void scheduleQuickStart(ArcadePortGame type) {
