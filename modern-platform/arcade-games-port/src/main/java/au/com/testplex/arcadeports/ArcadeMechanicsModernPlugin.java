@@ -43,20 +43,46 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         }
         saveConfig();
 
-        monsterMazeReadiness.initializeAndAttach(
-                () -> {
-                    monsterMaze = new MonsterMazePlugin(this);
-                    monsterMaze.enable();
-                },
-                () -> monsterMaze != null && monsterMaze.getGameManager() != null,
-                () -> {
-                    manager = new ArcadePortManager(this);
-                    manager.setMonsterMazeModule(monsterMaze);
-                },
-                () -> manager != null && manager.isMonsterMazeModuleRegistered(monsterMaze));
+        // Bring up Testplex's shared lobby before any optional game module. A failure
+        // in Monster Maze must not leave players in the unrelated survival world.
+        manager = new ArcadePortManager(this);
         mapMenu = new ArcadeMapSelectionMenu(this);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
+        getCommand("stats").setExecutor(this);
+        getCommand("arcadeport").setExecutor(this);
+        publishArcadeRuntimeReadiness();
+
+        // Monster Maze remains embedded in this Arcade host, but is not currently
+        // on the playable allow-list. Keep its startup failure isolated from the
+        // two games which have been cleared for acceptance testing.
+        try {
+            monsterMazeReadiness.initializeAndAttach(
+                    () -> {
+                        monsterMaze = new MonsterMazePlugin(this);
+                        monsterMaze.enable();
+                    },
+                    () -> monsterMaze != null && monsterMaze.getGameManager() != null,
+                    () -> manager.setMonsterMazeModule(monsterMaze),
+                    () -> manager.isMonsterMazeModuleRegistered(monsterMaze));
+            publishMonsterMazeReadiness();
+        } catch (RuntimeException | Error startupFailure) {
+            monsterMazeReadiness.markFailed();
+            getLogger().log(java.util.logging.Level.SEVERE,
+                    "Monster Maze did not initialise inside Testplex Arcade. The shared lobby and cleared Arcade games "
+                            + "remain available; Monster Maze stays unavailable until this module fault is fixed.",
+                    startupFailure);
+            if (monsterMaze != null) {
+                try {
+                    monsterMaze.shutdown();
+                } catch (Throwable shutdownFailure) {
+                    getLogger().log(java.util.logging.Level.WARNING,
+                            "Monster Maze cleanup after failed startup was incomplete.", shutdownFailure);
+                }
+                monsterMaze = null;
+            }
+        }
+
         for (Player online : Bukkit.getOnlinePlayers()) {
             Bukkit.getScheduler().runTask(this, () -> {
                 if (online.isOnline() && manager != null) {
@@ -66,10 +92,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
             });
         }
-        getCommand("stats").setExecutor(this);
-        getCommand("arcadeport").setExecutor(this);
-        getServer().getPluginManager().registerEvents(this, this);
-        publishMonsterMazeReadiness();
     }
 
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
@@ -87,12 +109,25 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     @Override
     public void onDisable() {
         try {
+            ArcadeRuntimeReadinessSignal.remove(getDataFolder().toPath());
             MonsterMazeRegistrationSignal.remove(getDataFolder().toPath());
         } catch (java.io.IOException exception) {
-            getLogger().warning("Could not remove the Monster Maze readiness record: " + exception.getMessage());
+            getLogger().warning("Could not remove an Arcade runtime readiness record: " + exception.getMessage());
         }
         if (manager != null) manager.shutdown();
         if (monsterMaze != null) monsterMaze.shutdown();
+    }
+
+    private void publishArcadeRuntimeReadiness() {
+        try {
+            boolean deploymentSignal = ArcadeRuntimeReadinessSignal.publish(
+                    getDataFolder().toPath(), System.getenv("INVOCATION_ID"), ProcessHandle.current().pid());
+            getLogger().info("TESTPLEX_ARCADE_LOBBY_READY world=" + ModernArcadeLobby.WORLD_NAME
+                    + " plane=100x100 floor-y=" + ModernArcadeLobby.FLOOR_Y
+                    + " deployment-signal=" + deploymentSignal);
+        } catch (java.io.IOException exception) {
+            throw new IllegalStateException("Could not publish Testplex Arcade lobby readiness.", exception);
+        }
     }
 
     private void publishMonsterMazeReadiness() {
