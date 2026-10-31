@@ -12801,15 +12801,23 @@ public final class ArcadePortManager implements Listener {
         }
         if (announceWinner && session.type == ArcadePortGame.PAINTBALL && winner != null) recordPaintballAchievements(session, winner);
         if (announceWinner && session.type == ArcadePortGame.ONE_IN_THE_QUIVER && winner != null) recordQuiverAchievements(session, winner);
-        if (announceWinner && session.type == ArcadePortGame.SPLEEF && winner != null) {
-            UUID winnerId = winner.getUniqueId();
-            if ("snowballer".equals(session.spleefKits.getOrDefault(winnerId, "snowballer"))
-                    && !session.spleefSnowballsThrown.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "wrong-kit-lil-bro");
-            if ("brawler".equals(session.spleefKits.getOrDefault(winnerId, "snowballer"))
-                    && !session.spleefBrawlerHitPlayers.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "spleeftastic");
-            if (session.spleefStarvationPlayers.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "block-drought");
-            if (session.spleefVoidFallPlayers.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "praying-to-the-gods");
-            if (session.spleefArrowAssists.getOrDefault(winnerId, 0) >= 5) awardCatalogAchievement(winner, "spleef", "ranger");
+        if (announceWinner && session.type == ArcadePortGame.SPLEEF) {
+            if (winner != null) {
+                UUID winnerId = winner.getUniqueId();
+                if ("snowballer".equals(session.spleefKits.getOrDefault(winnerId, "snowballer"))
+                        && !session.spleefSnowballsThrown.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "wrong-kit-lil-bro");
+                if ("brawler".equals(session.spleefKits.getOrDefault(winnerId, "snowballer"))
+                        && !session.spleefBrawlerHitPlayers.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "spleeftastic");
+                if (session.spleefStarvationPlayers.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "block-drought");
+                if (session.spleefVoidFallPlayers.contains(winnerId)) awardCatalogAchievement(winner, "spleef", "praying-to-the-gods");
+                if (session.spleefArrowAssists.getOrDefault(winnerId, 0) >= 5) awardCatalogAchievement(winner, "spleef", "ranger");
+            } else if (session.alive.size() >= 2) {
+                Set<Integer> tiedScores = new HashSet<>();
+                for (UUID id : session.alive) tiedScores.add(session.scores.getOrDefault(id, 0));
+                if (tiedScores.size() == 1) {
+                    for (UUID id : session.alive) awardCatalogAchievement(id, "spleef", "no-mods-in-here");
+                }
+            }
         }
         if (announceWinner && session.type == ArcadePortGame.GLADIATORS && winner != null) {
             recordGladiatorsWinnerAchievements(session, winner);
@@ -13547,10 +13555,12 @@ public final class ArcadePortManager implements Listener {
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean paintballWinner = session.type == ArcadePortGame.PAINTBALL
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean sheepQuestWinner = session.type == ArcadePortGame.SHEEP_QUEST
+                    && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean deathTagWinner = session.type == ArcadePortGame.DEATH_TAG && winnerId != null
                     && session.tagged.contains(id) == session.tagged.contains(winnerId);
             boolean won = winnerId != null && (winnerId.equals(id) || turfWarsWinner || paintballWinner
-                    || deathTagWinner
+                    || sheepQuestWinner || deathTagWinner
                     || ((session.type == ArcadePortGame.BOMB_LOBBERS
                             || session.type == ArcadePortGame.MICRO_BATTLES)
                         && session.alive.contains(id)
@@ -16331,6 +16341,33 @@ public final class ArcadePortManager implements Listener {
         if (session.type == ArcadePortGame.TURF_WARS
                 && event.getEntity() instanceof Arrow turfArrow
                 && session.turfTrackedArrows.remove(turfArrow.getUniqueId())) {
+            UUID barrageOwner = session.turfBarrageArrowOwners.remove(turfArrow.getUniqueId());
+            if (event.getHitEntity() instanceof Player target
+                    && turfArrow.getShooter() instanceof Player shooter) {
+                if (barrageOwner != null) {
+                    Set<UUID> targets = session.turfBarrageTargetsByOwner.computeIfAbsent(
+                            barrageOwner, ignored -> new HashSet<>());
+                    targets.add(target.getUniqueId());
+                    if (targets.size() >= 3) awardCatalogAchievement(barrageOwner, "turf-wars", "barragist");
+                }
+                if ("shredder".equals(session.turfWarsKits.getOrDefault(shooter.getUniqueId(), "marksman"))) {
+                    session.turfLastShredderShotByVictim.put(target.getUniqueId(), shooter.getUniqueId());
+                }
+                double distance = shooter.getEyeLocation().distance(target.getLocation());
+                if (distance > 0.1D) {
+                    Vector feetDirection = target.getLocation().clone().add(0.0D, 0.15D, 0.0D)
+                            .toVector().subtract(shooter.getEyeLocation().toVector()).normalize();
+                    Vector eyeDirection = target.getEyeLocation().toVector()
+                            .subtract(shooter.getEyeLocation().toVector()).normalize();
+                    var feetRay = shooter.getWorld().rayTraceBlocks(shooter.getEyeLocation(), feetDirection,
+                            distance, org.bukkit.FluidCollisionMode.NEVER, true);
+                    var eyeRay = shooter.getWorld().rayTraceBlocks(shooter.getEyeLocation(), eyeDirection,
+                            distance, org.bukkit.FluidCollisionMode.NEVER, true);
+                    if (feetRay == null && eyeRay != null) {
+                        awardCatalogAchievement(shooter, "turf-wars", "watch-your-step");
+                    }
+                }
+            }
             if (event.getHitBlock() != null && isTurfWarsWool(event.getHitBlock().getType())) {
                 Block wool = event.getHitBlock();
                 Material woolType = wool.getType();
