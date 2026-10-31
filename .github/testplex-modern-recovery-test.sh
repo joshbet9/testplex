@@ -155,6 +155,31 @@ grep -Fxq 'status=RECOVERY_VERIFIED' "$STATE/current.properties"
 [[ -f "$BACKUP/failed-artifacts/attempt-001/maps/mm_void-failed-deployment/region.dat" ]]
 echo 'PASS fresh-session interrupted-deployment recovery and separate artifact/runtime SHA'
 
+# Regression: an early grep -q match closes tar's output pipe. With pipefail,
+# tar's resulting SIGPIPE makes a valid archive look incomplete. Make its member
+# listing larger than the pipe buffer so the broken-pipe behaviour is deterministic.
+LARGE_OLD="$TMP/large-old"
+mkdir -p "$LARGE_OLD"
+cp -a "$TMP/old/." "$LARGE_OLD/"
+mkdir -p "$LARGE_OLD/plugins/filler"
+for i in $(seq -w 1 12000); do
+  : > "$LARGE_OLD/plugins/filler/file-$i"
+done
+tar -cpf "$BACKUP/server-artifacts.tar" -C "$LARGE_OLD" plugins paper.jar .testplex-modern-deployed-build server.properties mm_void
+sha256sum "$BACKUP/server-artifacts.tar" > "$BACKUP/server-artifacts.sha256"
+run_helper --locked set-field backup_sha "$(awk '{print $1}' "$BACKUP/server-artifacts.sha256")"
+if tar -tf "$BACKUP/server-artifacts.tar" 2>/dev/null | grep -Eq '^\\.?/?plugins/?$'; then
+  echo 'FAIL regression fixture did not trigger tar SIGPIPE under pipefail' >&2
+  exit 1
+fi
+run_helper verify-snapshot >/dev/null
+echo 'PASS valid large snapshot is accepted without tar/grep pipefail false-negative'
+
+# Restore the small fixture for the remaining lifecycle assertions.
+tar -cpf "$BACKUP/server-artifacts.tar" -C "$TMP/old" plugins paper.jar .testplex-modern-deployed-build server.properties mm_void
+sha256sum "$BACKUP/server-artifacts.tar" > "$BACKUP/server-artifacts.sha256"
+run_helper --locked set-field backup_sha "$(awk '{print $1}' "$BACKUP/server-artifacts.sha256")"
+
 # Repeated recovery verifies existing state without moving restored data again.
 attempts_before="$(cat "$BACKUP/recovery-attempts")"
 run_helper recover "$target_sha"

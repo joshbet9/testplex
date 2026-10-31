@@ -8,11 +8,15 @@ on:
       - "modern-platform/**"
       - ".github/workflows/testplex-modern-build.yml"
       - ".github/workflows/deploy-testplex-modern-hyperv.yml"
+      - ".github/testplex-modern-recovery.sh"
+      - ".github/testplex-modern-recovery-test.sh"
   pull_request:
     paths:
       - "modern-platform/**"
       - ".github/workflows/testplex-modern-build.yml"
       - ".github/workflows/deploy-testplex-modern-hyperv.yml"
+      - ".github/testplex-modern-recovery.sh"
+      - ".github/testplex-modern-recovery-test.sh"
   workflow_dispatch:
 
 permissions:

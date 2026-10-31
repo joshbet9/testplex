@@ -62,20 +62,30 @@ validate_transaction() {
   [[ "$replacement_started" == true || "$replacement_started" == false ]] || fail "invalid replacement_started state"
 }
 assert_backup_complete() {
-  local backup_dir backup_sha world declared_worlds previous_marker file prior_files
+  local backup_dir backup_sha world declared_worlds previous_marker file prior_files archive_listing
   backup_dir="$(value backup_dir)"; backup_sha="$(value backup_sha || true)"
   [[ "$(value backup_complete || true)" == true ]] || fail "backup is incomplete; refusing to restore or restart"
   [[ "$backup_sha" =~ ^[0-9a-f]{64}$ && -s "$backup_dir/server-artifacts.tar" && -s "$backup_dir/server-artifacts.sha256" ]] ||
     fail "server artifact snapshot identity is incomplete"
   [[ "$(awk '{print $1}' "$backup_dir/server-artifacts.sha256")" == "$backup_sha" ]] || fail "backup manifest SHA differs from transaction identity"
   (cd "$backup_dir" && sha256sum -c server-artifacts.sha256 >/dev/null) || fail "server artifact snapshot checksum failed"
-  tar -tf "$backup_dir/server-artifacts.tar" >/dev/null || fail "server artifact snapshot cannot be read"
+
+  # Build one complete member index and test that regular file below. Never pipe
+  # tar -tf into grep -q: with pipefail, grep closes the pipe on its first match,
+  # tar receives SIGPIPE, and a valid archive is falsely reported as incomplete.
+  # Reusing this index also avoids rescanning a large world/plugin archive for
+  # each individual file and directory assertion.
+  archive_listing="$backup_dir/server-artifacts.members"
+  tar -tf "$backup_dir/server-artifacts.tar" > "$archive_listing" ||
+    fail "server artifact snapshot cannot be read"
+  chmod 0600 "$archive_listing"
+
   prior_files="$(value prior_files || true)"
   if [[ "$(value previous_state)" == deployed ]]; then
     if [[ "$(value had_old_plugins)" == true ]]; then
-      tar -tf "$backup_dir/server-artifacts.tar" | grep -Eq '^\.?/?plugins/?$' || fail "snapshot omits the previous plugins directory"
+      grep -Eq '^\.?/?plugins/?$' "$archive_listing" || fail "snapshot omits the previous plugins directory"
     fi
-    tar -tf "$backup_dir/server-artifacts.tar" | grep -Eq '^(\./)?\.testplex-modern-deployed-build$' ||
+    grep -Eq '^(\./)?\.testplex-modern-deployed-build$' "$archive_listing" ||
       fail "snapshot omits the previous deployed-build identity"
     previous_marker="$(tar -xOf "$backup_dir/server-artifacts.tar" .testplex-modern-deployed-build 2>/dev/null ||
       tar -xOf "$backup_dir/server-artifacts.tar" ./.testplex-modern-deployed-build 2>/dev/null || true)"
@@ -85,13 +95,13 @@ assert_backup_complete() {
     [[ -z "$prior_files" && "$(value had_old_plugins)" == false && "$(value had_old_paper)" == false &&
        -z "$(value worlds || true)" && "$(value server_dir_existed)" == false ]] ||
       fail "no-prior-deployment journal describes existing deployment artifacts"
-    [[ -z "$(tar -tf "$backup_dir/server-artifacts.tar")" ]] || fail "no-prior-deployment snapshot is not empty"
+    [[ ! -s "$archive_listing" ]] || fail "no-prior-deployment snapshot is not empty"
   fi
   IFS=',' read -r -a files_to_verify <<< "$prior_files"
   for file in "${files_to_verify[@]}"; do
     [[ "$file" =~ ^(paper\.jar|server\.properties|eula\.txt|\.testplex-modern-deployed-build|\.testplex-paper-build|\.testplex-mm-source-maps|\.testplex-plugin-sha256sums|\.testplex-modern-sandbox)$ ]] ||
       fail "transaction names an unsupported server artifact"
-    tar -tf "$backup_dir/server-artifacts.tar" | grep -Fxq "$file" || tar -tf "$backup_dir/server-artifacts.tar" | grep -Fxq "./$file" ||
+    grep -Fxq "$file" "$archive_listing" || grep -Fxq "./$file" "$archive_listing" ||
       fail "snapshot omits previously installed artifact $file"
   done
   declared_worlds="$(value worlds || true)"
@@ -100,12 +110,12 @@ assert_backup_complete() {
     for world in "${worlds_to_verify[@]}"; do
       [[ "$world" =~ ^(mm_void|mm_volcano|mm_colombia|mm_sandycoast|mm_siberian|mm_swampland|mm_tesorohundido)$ ]] ||
         fail "transaction names an unsupported map world"
-      tar -tf "$backup_dir/server-artifacts.tar" | grep -Eq "^\\.?/?${world}/?$" ||
+      grep -Eq "^\\.?/?${world}/?$" "$archive_listing" ||
         fail "snapshot omits previously installed map world $world"
     done
   fi
   if [[ "$(value had_old_paper || true)" == true ]]; then
-    tar -tf "$backup_dir/server-artifacts.tar" | grep -Eq '^\.?/?paper\.jar$' || fail "snapshot omits the previous Paper artifact"
+    grep -Eq '^\.?/?paper\.jar$' "$archive_listing" || fail "snapshot omits the previous Paper artifact"
   fi
   if [[ "$(value had_old_unit || true)" == true ]]; then
     [[ -s "$backup_dir/unit.tar" && -s "$backup_dir/unit.sha256" ]] || fail "previous service unit backup is incomplete"
@@ -409,6 +419,11 @@ EOF
       case "$2" in PREPARED|REPLACING|DEPLOYMENT_VERIFIED|RESTORE_FAILED) ;; *) fail "unsupported transaction phase $2" ;; esac
       if [[ "$2" == REPLACING ]]; then write_manifest replacement_started true; fi
       set_status "$2"
+      ;;
+    verify-snapshot)
+      validate_transaction
+      assert_backup_complete
+      echo "Snapshot verified: artifact SHA=$(value backup_sha); transaction=$(value deployment_id)."
       ;;
     recover)
       local expected_target="${2:-}"
