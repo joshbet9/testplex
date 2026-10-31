@@ -26,7 +26,7 @@ wizards:
   source-map-world: arcadeport_source_wizards
   arena-radius: 48
   chest-count: 32
-  allow-solo-start: true
+  allow-solo-start: false
   minimum-players: 2
   kits:
     default: MAGE
