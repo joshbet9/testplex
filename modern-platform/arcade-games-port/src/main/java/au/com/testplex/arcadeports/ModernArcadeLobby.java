@@ -94,8 +94,8 @@ public final class ModernArcadeLobby implements Listener {
             world = creator.createWorld();
         }
         if (world == null) {
-            plugin.getLogger().severe("Could not create the isolated modern Arcade lobby world.");
-            return null;
+            throw new IllegalStateException("Could not create the isolated modern Arcade lobby world '"
+                    + WORLD_NAME + "'. Refusing to start an Arcade server in the survival world.");
         }
 
         lobbyWorld = world;
@@ -113,6 +113,8 @@ public final class ModernArcadeLobby implements Listener {
 
         ensurePlane(world);
         ensureDatapoints(world);
+        plugin.getLogger().info("TESTPLEX_ARCADE_LOBBY_READY world=" + WORLD_NAME
+                + " plane=100x100 floor-y=" + FLOOR_Y + " spawn=" + SPAWN_X + "," + SPAWN_Y + "," + SPAWN_Z);
         return world;
     }
 
