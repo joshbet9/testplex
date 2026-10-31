@@ -240,6 +240,7 @@ public final class ArcadePortManager implements Listener {
     private final ModernArcadeLobby lobby;
     private final ModernArcadeLobbyRuntime lobbyRuntime;
     private MonsterMazePlugin monsterMazeModule;
+    private CameraShyGame cameraShyModule;
 
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
@@ -304,6 +305,14 @@ public final class ArcadePortManager implements Listener {
         if (player != null && player.isOnline()) lobby.sendToLobby(player);
     }
 
+    ArcadeTestPlayerManager testPlayerManager() { return testPlayers; }
+
+    void setCameraShyModule(CameraShyGame game) { this.cameraShyModule = game; }
+
+    CameraShyGame cameraShyModule() { return cameraShyModule; }
+
+    boolean canStartCameraShy() { return active == null && !monsterMazeRunning(); }
+
     /** Start an explicit participant set through the same Testplex Arcade queue/manager path. */
     public boolean startMonsterMazeTournamentRound(List<Player> requestedParticipants) {
         if (requestedParticipants == null || requestedParticipants.isEmpty()
@@ -345,6 +354,9 @@ public final class ArcadePortManager implements Listener {
 
     public int queuedCount(ArcadePortGame type) {
         if (type == null) return 0;
+        if (type == ArcadePortGame.CAMERA_SHY) {
+            return cameraShyModule == null ? 0 : cameraShyModule.queuedCount();
+        }
         Map<UUID, Player> queued = queues.get(type.id());
         int count = queued == null ? 0
                 : (int) queued.values().stream().filter(p -> p != null && p.isOnline()).count();
@@ -369,6 +381,7 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         for (Map<UUID, Player> queued : queues.values()) queued.remove(player.getUniqueId());
         gladiatorLobbyVotes.remove(player.getUniqueId());
+        if (cameraShyModule != null) cameraShyModule.removeFromQueue(player.getUniqueId());
     }
 
     /** Online players in the active Arcade Session who are not alive participants. */
@@ -728,6 +741,16 @@ public final class ArcadePortManager implements Listener {
     public void selectKit(Player player, String requestedKit) {
         if (player == null || requestedKit == null) return;
         String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        boolean explicitCameraShyKit = value.startsWith("camera-shy-");
+        boolean cameraShyLobby = "camera-shy".equals(
+                plugin.getConfig().getString("lobby-selected-game", "bacon-brawl"));
+        if (explicitCameraShyKit || cameraShyLobby) {
+            if (cameraShyModule != null) {
+                cameraShyModule.selectKit(player, explicitCameraShyKit
+                        ? value.substring("camera-shy-".length()) : value);
+                return;
+            }
+        }
         boolean explicitMonsterMazeKit = value.startsWith("monster-maze-");
         if (explicitMonsterMazeKit) value = value.substring("monster-maze-".length());
         boolean monsterMazeLobby = "monster-maze".equals(
@@ -1415,6 +1438,26 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void queue(ArcadePortGame type, Player player, boolean quickStart, boolean mixedArcadeVariant) {
+        if (player == null || !player.isOnline()) return;
+        if (type == ArcadePortGame.CAMERA_SHY) {
+            if (active != null || monsterMazeRunning()) {
+                player.sendMessage(ChatColor.RED + "Another Arcade game is already running.");
+            } else if (cameraShyModule == null) {
+                player.sendMessage(ChatColor.RED + "Camera Shy is not loaded.");
+            } else {
+                for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
+                    existingQueue.remove(player.getUniqueId());
+                }
+                gladiatorLobbyVotes.remove(player.getUniqueId());
+                cameraShyModule.queue(player, quickStart);
+            }
+            return;
+        }
+        if (cameraShyModule != null && cameraShyModule.isActive()) {
+            player.sendMessage(ChatColor.RED + "Camera Shy is already underway. Wait for the current round to finish.");
+            return;
+        }
+        if (cameraShyModule != null) cameraShyModule.removeFromQueue(player.getUniqueId());
         if (monsterMazeRunning()) {
             player.sendMessage(ChatColor.RED + "Monster Maze is already running. Wait for the current Testplex game to finish.");
             return;
@@ -1514,6 +1557,33 @@ public final class ArcadePortManager implements Listener {
 
     public void startFromLobby(ArcadePortGame type, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
+        if (type == ArcadePortGame.CAMERA_SHY) {
+            if (!canStartCameraShy()) {
+                sender.sendMessage(ChatColor.RED + "Another Arcade game is already running.");
+                return;
+            }
+            if (cameraShyModule == null) {
+                sender.sendMessage(ChatColor.RED + "Camera Shy is not loaded.");
+                return;
+            }
+            if (sender instanceof Player requesting && requesting.isOnline()) lobby.ensurePlayerInLobby(requesting);
+            List<Player> lobbyPlayers = new ArrayList<>(Bukkit.getOnlinePlayers().stream()
+                    .filter(player -> player.isOnline() && !testPlayers.isTestPlayer(player)
+                            && lobby.isLobbyWorld(player.getWorld()))
+                    .toList());
+            for (Player player : lobbyPlayers) {
+                for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
+                    existingQueue.remove(player.getUniqueId());
+                }
+                gladiatorLobbyVotes.remove(player.getUniqueId());
+            }
+            cameraShyModule.startFromLobby(sender, lobbyPlayers);
+            return;
+        }
+        if (cameraShyModule != null && cameraShyModule.isActive()) {
+            sender.sendMessage(ChatColor.RED + "Camera Shy is already underway.");
+            return;
+        }
         if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
             sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
             return;
@@ -1556,6 +1626,7 @@ public final class ArcadePortManager implements Listener {
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (player.isOnline() && lobby.isLobbyWorld(player.getWorld())
                     && !testPlayers.isTestPlayer(player)) {
+                if (cameraShyModule != null) cameraShyModule.removeFromQueue(player.getUniqueId());
                 for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
                     existingQueue.remove(player.getUniqueId());
                 }
@@ -1646,6 +1717,16 @@ public final class ArcadePortManager implements Listener {
 
     public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
+        if (type == ArcadePortGame.CAMERA_SHY) {
+            if (!canStartCameraShy()) sender.sendMessage(ChatColor.RED + "Another Arcade game is already running.");
+            else if (cameraShyModule == null) sender.sendMessage(ChatColor.RED + "Camera Shy is not loaded.");
+            else cameraShyModule.startQueued(sender);
+            return;
+        }
+        if (cameraShyModule != null && cameraShyModule.isActive()) {
+            sender.sendMessage(ChatColor.RED + "Camera Shy is already underway.");
+            return;
+        }
         if (type == null || !isGameEnabled(type) || active != null || monsterMazeRunning()) {
             startQueuedInternal(type, requester, sender, mixedArcadeVariant);
             return;
@@ -10530,6 +10611,7 @@ public final class ArcadePortManager implements Listener {
                     : "guesses " + Math.max(0, DRAW_MY_THING_MAX_GUESSES - session.drawGuessAttempts.getOrDefault(id, 0)) + "/10";
             case MASTER_BUILDERS -> session.masterBuilderPhase == MasterBuildersPhase.BUILDING
                     ? "building | " + session.masterBuilderTheme : "review | " + session.masterBuilderTheme;
+            case CAMERA_SHY -> "Camera Shy runs in its dedicated match controller";
             case PLEXBALL -> "Plexball | " + session.alive.size() + " active";
             // Monster Maze owns its own in-process GameManager session and does not
             // create an ArcadePortManager Session object.
@@ -13169,7 +13251,8 @@ public final class ArcadePortManager implements Listener {
             {"evolution", "Evolution", "SLIME_SPAWN_EGG"},
             {"monster-maze", "Monster Maze", "ROTTEN_FLESH"},
             {"gladiators", "Gladiators", "IRON_SWORD"},
-            {"sneaky-assassins", "Sneaky Assassins", "VILLAGER_SPAWN_EGG"}
+            {"sneaky-assassins", "Sneaky Assassins", "VILLAGER_SPAWN_EGG"},
+            {"camera-shy", "Camera Shy", "SPYGLASS"}
     };
 
     private static final List<String> DRAGON_ESCAPE_BEACON_COLOR_NAMES =
@@ -13389,7 +13472,35 @@ public final class ArcadePortManager implements Listener {
         int score = plugin.getConfig().getInt(path + "score", 0);
         int knockouts = plugin.getConfig().getInt(path + "knockouts", 0);
         Inventory inventory = createStatsInventory(StatsPage.GAME, targetId, targetName, displayName, gameId);
-        if ("bacon-brawl".equals(gameId)) {
+        if ("camera-shy".equals(gameId)) {
+            int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21,
+                    23, 24, 25, 28, 29, 30, 31, 32, 33, 34};
+            List<CameraShyProgressCatalog.Achievement> achievements = CameraShyProgressCatalog.achievements();
+            for (int i = 0; i < achievements.size(); i++) {
+                CameraShyProgressCatalog.Achievement achievement = achievements.get(i);
+                boolean unlocked = plugin.getConfig().getBoolean(
+                        "local-achievements." + targetId + ".camera-shy." + achievement.id(), false);
+                inventory.setItem(achievementSlots[i], statsItem(
+                        unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
+                        List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
+                                unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
+                        "noop", null, null));
+            }
+            int[] milestoneSlots = {37, 40, 43};
+            for (int i = 0; i < CameraShyProgressCatalog.milestones().size(); i++) {
+                CameraShyProgressCatalog.Milestone milestone = CameraShyProgressCatalog.milestones().get(i);
+                int value = plugin.getConfig().getInt(path + milestone.statKey(), 0);
+                boolean complete = value >= milestone.target();
+                inventory.setItem(milestoneSlots[i], statsItem(
+                        complete ? Material.NETHER_STAR : Material.CLOCK,
+                        (complete ? ChatColor.GREEN + "✓ " : ChatColor.GOLD) + milestone.name(),
+                        List.of(" ", ChatColor.GRAY + "Progress: " + ChatColor.WHITE + value + "/" + milestone.target(),
+                                ChatColor.GRAY + "Lifetime " + milestone.unit() + ".",
+                                complete ? ChatColor.GREEN + "Milestone complete" : ChatColor.YELLOW + "In progress"),
+                        "noop", null, null));
+            }
+        } else if ("bacon-brawl".equals(gameId)) {
             // Match the 1.8 achievement-bottle pattern: unlocked achievements use
             // experience bottles, and unearned achievements use glass bottles.
             int[] achievementSlots = {10, 11, 12, 13, 14};
@@ -13724,6 +13835,17 @@ public final class ArcadePortManager implements Listener {
         lore.add(ChatColor.GRAY + "Wins: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "wins", 0));
         lore.add(ChatColor.GRAY + "Score / Kills: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "score", 0));
         lore.add(ChatColor.GRAY + "Knockouts: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "knockouts", 0));
+        if ("camera-shy".equals(gameId)) {
+            lore.add(ChatColor.GRAY + "Photographs: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "photos", 0));
+            lore.add(ChatColor.GRAY + "Eliminations: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "eliminations", 0));
+            lore.add(ChatColor.GRAY + "Exposures Received: " + ChatColor.WHITE + plugin.getConfig().getInt(path + "exposures-received", 0));
+            long unlocked = CameraShyProgressCatalog.achievements().stream()
+                    .filter(achievement -> plugin.getConfig().getBoolean(
+                            "local-achievements." + targetId + ".camera-shy." + achievement.id(), false))
+                    .count();
+            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/"
+                    + CameraShyProgressCatalog.achievements().size());
+        }
         if ("spleef".equals(gameId)) {
             lore.add(ChatColor.GRAY + "Blocks Broken: " + ChatColor.WHITE
                     + plugin.getConfig().getInt(path + "blocks-broken", 0));
@@ -13854,6 +13976,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void stop(String reason) {
+        boolean cameraShyWasActive = cameraShyModule != null && cameraShyModule.isActive();
+        if (cameraShyModule != null) cameraShyModule.stop(reason);
         // A stop during asynchronous fake-player login must release the start gate too.
         testPlayerStartPending = false;
         if (pendingStart != null) {
@@ -13874,7 +13998,8 @@ public final class ArcadePortManager implements Listener {
                 && monsterMazeModule.getGameManager() != null) {
             monsterMazeModule.getGameManager().forceStop();
         }
-        testPlayers.despawnSessionPlayers();
+        if (!cameraShyWasActive) testPlayers.despawnSessionPlayers();
+        // Camera Shy owns and has already released its own AFK roster when it was active.
         // Make the explicit Stop Game action authoritative: every participant from
         // the stopped session is put at the lobby spawn after round state is cleaned.
         for (Player player : participantsToReturn) {
@@ -13886,6 +14011,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     public String status() {
+        if (cameraShyModule != null
+                && (cameraShyModule.isActive() || cameraShyModule.queuedCount() > 0)) {
+            return "Camera Shy (" + cameraShyModule.status() + "); queued=" + cameraShyModule.queuedCount()
+                    + "; cleared-games=" + enabledGamesLabel();
+        }
         String variant = active != null && active.mixedArcadeVariant ? " (Mixed Arcade)" : "";
         String game = active == null
                 ? (monsterMazeRunning() ? "Monster Maze (" + monsterMazeModule.getGameManager().getStage() + " stages reached)" : "idle")
@@ -13901,6 +14031,7 @@ public final class ArcadePortManager implements Listener {
         manualStartType = null;
         clearLobbyCountdownStatus();
         stop("plugin shutdown");
+        if (cameraShyModule != null) cameraShyModule.shutdown();
         testPlayers.shutdown();
         lobbyRuntime.shutdown();
         unregisterOptionalBaconPacketBridge();

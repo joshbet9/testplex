@@ -1,4 +1,4 @@
-# The 25 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
+# The 26 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
 # READY_FOR_TEST games are available together for the shared controlled test session.
 # Other games remain disabled until their implementations are promoted.
 enabled-games:

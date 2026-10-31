@@ -147,8 +147,8 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheMechanicsGamesAndIntegratedMonsterMazeModuleWithPlexball() {
-        assertEquals(24, ArcadePortGame.values().length);
+    @Test void exposesTheMechanicsGamesAndIntegratedModules() {
+        assertEquals(25, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -157,6 +157,7 @@ class ArcadePortGameTest {
         }
         assertEquals(ArcadePortGame.MONSTER_MAZE, ArcadePortGame.fromId("monster-maze"));
         assertEquals(ArcadePortGame.PLEXBALL, ArcadePortGame.fromId("plexball"));
+        assertEquals(ArcadePortGame.CAMERA_SHY, ArcadePortGame.fromId("camera-shy"));
         assertEquals("Plexball", ArcadePortGame.PLEXBALL.displayName());
         java.util.List<String> enabled = java.util.List.of("death-tag", "plexball", "spleef");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.PLEXBALL.id(), enabled),
