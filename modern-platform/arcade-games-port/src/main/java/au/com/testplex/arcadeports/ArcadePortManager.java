@@ -13060,6 +13060,9 @@ public final class ArcadePortManager implements Listener {
         plugin.getConfig().set(statsPath + "enemy-blocks-reclaimed",
                 plugin.getConfig().getLong(statsPath + "enemy-blocks-reclaimed", 0L)
                         + stats.enemyTerritoryReclaimed());
+        plugin.getConfig().set(statsPath + "neutral-territory-claimed",
+                plugin.getConfig().getLong(statsPath + "neutral-territory-claimed", 0L)
+                        + stats.neutralTerritoryClaimed());
         plugin.getConfig().set(statsPath + "splats",
                 plugin.getConfig().getInt(statsPath + "splats", 0) + stats.splats());
         plugin.getConfig().set(statsPath + "deaths",
@@ -13086,7 +13089,7 @@ public final class ArcadePortManager implements Listener {
                 Math.max(plugin.getConfig().getInt(statsPath + "best-special-targets", 0), stats.bestSpecialTargets()));
 
         awardCatalogAchievement(playerId, player, "super-sploor", "first-splash");
-        if (stats.territoryPainted() >= 500L) {
+        if (stats.neutralTerritoryClaimed() >= 500L) {
             awardCatalogAchievement(playerId, player, "super-sploor", "fresh-canvas");
         }
         if (stats.enemyTerritoryReclaimed() >= 200L) {
@@ -13104,7 +13107,7 @@ public final class ArcadePortManager implements Listener {
         if (won && stats.deaths() == 0) {
             awardCatalogAchievement(playerId, player, "super-sploor", "clean-sweep");
         }
-        if ("sprayer".equals(stats.kit()) && stats.territoryPainted() >= 350L) {
+        if ("sprayer".equals(stats.kit()) && stats.neutralTerritoryClaimed() >= 350L) {
             awardCatalogAchievement(playerId, player, "super-sploor", "colour-outside-the-lines");
         }
         if (stats.rollerTerritory() >= 500L) {
