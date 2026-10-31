@@ -31,6 +31,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.generator.BlockPopulator;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.generator.ChunkGenerator.ChunkData;
@@ -406,6 +407,14 @@ public final class PlexballGame implements Listener {
         event.setCancelled(true);
         if (event.getWhoClicked() instanceof Player player && event.getRawSlot() == 53) {
             player.closeInventory();
+        }
+    }
+
+    @EventHandler
+    public void onProgressMenuDrag(InventoryDragEvent event) {
+        String title = event.getView().getTitle();
+        if (KIT_MENU_TITLE.equals(title) || STATS_MENU_TITLE.equals(title)) {
+            event.setCancelled(true);
         }
     }
 
