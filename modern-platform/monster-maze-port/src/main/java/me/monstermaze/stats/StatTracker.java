@@ -28,6 +28,8 @@ public class StatTracker implements Listener {
     private final Set<UUID> hitByMonster = new HashSet<UUID>();   // Ninja = never hit
     private final Set<UUID> usedAbility = new HashSet<UUID>();    // Hard Mode = never used ability
     private final Map<UUID, Integer> firstPads = new HashMap<UUID, Integer>(); // Speed
+    private final Set<UUID> firstPadOnStageOne = new HashSet<UUID>();
+    private final Set<UUID> spentJumpsOnStageOne = new HashSet<UUID>();
     private final Set<UUID> pilot = new HashSet<UUID>();          // land on pad within bump knock window
     private final Map<UUID, Long> bumpedAt = new HashMap<UUID, Long>(); // UUID -> bump time (ms)
     private boolean toughGiven = false;
@@ -41,6 +43,8 @@ public class StatTracker implements Listener {
         hitByMonster.clear();
         usedAbility.clear();
         firstPads.clear();
+        firstPadOnStageOne.clear();
+        spentJumpsOnStageOne.clear();
         pilot.clear();
         bumpedAt.clear();
         toughGiven = false;
@@ -62,14 +66,31 @@ public class StatTracker implements Listener {
 
     @EventHandler
     public void onAbility(AbilityUseEvent e) {
-        usedAbility.add(e.getPlayer().getUniqueId());
+        Player player = e.getPlayer();
+        usedAbility.add(player.getUniqueId());
+        if (game.getStage() == 1 && game.getKitManager().getKit(player)
+                == me.monstermaze.kit.KitType.JUMPER) {
+            org.bukkit.inventory.ItemStack jumps = player.getInventory().getItem(8);
+            if (jumps == null || jumps.getType() != org.bukkit.Material.FEATHER || jumps.getAmount() <= 0) {
+                spentJumpsOnStageOne.add(player.getUniqueId());
+            }
+        }
     }
 
     @EventHandler
     public void onFirst(FirstToSafepadEvent e) {
         UUID id = e.getPlayer().getUniqueId();
+        game.noteFirstPad(e.getPlayer());
         Integer n = firstPads.get(id);
         firstPads.put(id, n == null ? 1 : n + 1);
+        game.recordFirstSafePad(id);
+        if (game.getStage() == 1) firstPadOnStageOne.add(id);
+        double closestRival = Double.POSITIVE_INFINITY;
+        for (Player other : game.getAlivePlayers()) {
+            if (other.equals(e.getPlayer())) continue;
+            closestRival = Math.min(closestRival, other.getLocation().distance(e.getPlayer().getLocation()));
+        }
+        if (Double.isFinite(closestRival) && closestRival > 30.0D) game.recordAchievement(id, "breakaway");
     }
 
     @EventHandler
@@ -109,6 +130,12 @@ public class StatTracker implements Listener {
     public void announceWinners(Player winner) {
         if (winner == null) return;
         UUID id = winner.getUniqueId();
+        if (game.getKitManager().getKit(winner) == me.monstermaze.kit.KitType.BODY_BUILDER
+                && !firstPads.containsKey(id)) game.recordAchievement(id, "blackout");
+        if (firstPads.getOrDefault(id, 0) >= game.getStage()) game.recordAchievement(id, "perfect-run");
+        if (firstPadOnStageOne.contains(id) && spentJumpsOnStageOne.contains(id)) {
+            game.recordAchievement(id, "jumpman");
+        }
         if (!hitByMonster.contains(id))
             winner.sendMessage(ChatColor.GREEN + "Stat: Ninja (never hit by a monster)");
         if (!usedAbility.contains(id))

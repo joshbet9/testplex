@@ -85,6 +85,9 @@ public class GameManager implements Listener {
     private final LinkedList<SafePad> oldSafePads = new LinkedList<SafePad>();
 
     private int curSafe = 1;
+    private final Set<UUID> firstPadPlayers = new HashSet<UUID>();
+    private final Map<UUID, Set<UUID>> outOfCupTargets = new HashMap<UUID, Set<UUID>>();
+    private final Set<UUID> photoFinishCandidates = new HashSet<UUID>();
     private int phaseTimer = 60;
     private int phaseTimerStart = 60;
     private int centerSafeZoneDecay = 11;
@@ -120,6 +123,21 @@ public class GameManager implements Listener {
     public boolean isRunning() { return state != GameState.IDLE && state != GameState.ENDING; }
     public boolean isLive() { return state == GameState.LIVE; }
     public int getStage() { return curSafe; }
+    public void recordFirstSafePad(UUID playerId) { plugin.recordFirstSafePad(playerId); }
+    public void recordAchievement(UUID playerId, String achievementId) {
+        plugin.recordAchievement(playerId, achievementId);
+    }
+    public void noteFirstPad(Player player) {
+        if (player != null) firstPadPlayers.add(player.getUniqueId());
+    }
+    public void noteOutOfCupSlowball(Player shooter, Player target) {
+        if (shooter == null || target == null || !firstPadPlayers.contains(shooter.getUniqueId())) return;
+        outOfCupTargets.computeIfAbsent(shooter.getUniqueId(), ignored -> new HashSet<UUID>())
+                .add(target.getUniqueId());
+    }
+    public void notePhotoFinish(Player player) {
+        if (player != null) photoFinishCandidates.add(player.getUniqueId());
+    }
     public void setCenter(Location loc) {
         // A live round's arena world is part of its player/entity isolation boundary.
         if (loc == null || loc.getWorld() == null || isRunning()) return;
@@ -236,6 +254,9 @@ public void startGame(Location preferCenter, int requestedPattern) {
         firstClaimedThisPhase = false;
         soloMode = false;
         stats.reset();
+        firstPadPlayers.clear();
+        outOfCupTargets.clear();
+        photoFinishCandidates.clear();
 
         // Freeze the participant list before generation so late entrants are not reset or counted.
         final List<Player> startingPlayers = testplexManagedRound && pendingTestplexParticipants != null
@@ -589,6 +610,16 @@ public void startGame(Location preferCenter, int requestedPattern) {
             boolean grounded = p.isOnGround();
 
             if (onPad && grounded) padLockIns.add(id);
+            if (onPad && grounded && phaseTimer <= 1) {
+                boolean rivalNearby = false;
+                for (Player rival : getAlivePlayers()) {
+                    if (!rival.equals(p) && rival.getLocation().distance(p.getLocation()) <= 3.0D) {
+                        rivalNearby = true;
+                        break;
+                    }
+                }
+                if (rivalNearby) notePhotoFinish(p);
+            }
             if (!onPad || !grounded) {
                 allOn = false;
                 if (!onPad && padLockIns.contains(id) && grounded) {
@@ -733,12 +764,14 @@ public void startGame(Location preferCenter, int requestedPattern) {
 
     /** Record this player's highest stage reached for the active mode+pattern (persisted). */
     private void recordPB(Player player) {
+        if (player == null || plugin.getHostPlugin().isTestPlayer(player)) return;
         int pattern = getPatternIndex();
         if (pattern < 0) return;
         String kit = null;
         me.monstermaze.kit.KitType k = kitManager.getKit(player);
         if (k != null) kit = k.id;
         plugin.getLeaderboards().recordRun(plugin.getMode(), pattern, player.getUniqueId(), curSafe, kit);
+        plugin.recordHighestStage(player.getUniqueId(), curSafe);
     }
 
     private void eliminate(Player player, String message) {
@@ -799,6 +832,15 @@ public void startGame(Location preferCenter, int requestedPattern) {
                 
                 // Record winner's PB BEFORE setting state to ENDING
                 recordPB(winner);
+                plugin.recordWin(winner.getUniqueId(), curSafe);
+                if (photoFinishCandidates.contains(winner.getUniqueId())) {
+                    recordAchievement(winner.getUniqueId(), "photo-finish");
+                }
+                Set<UUID> slowballTargets = outOfCupTargets.getOrDefault(winner.getUniqueId(), Set.of());
+                if (slowballTargets.stream().anyMatch(targetId -> roundParticipants.contains(targetId)
+                        && !alive.contains(targetId))) {
+                    recordAchievement(winner.getUniqueId(), "out-of-the-cup");
+                }
                 
                 broadcast(ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName()
                         + " wins Monster Maze! (Stage " + curSafe + ")");
