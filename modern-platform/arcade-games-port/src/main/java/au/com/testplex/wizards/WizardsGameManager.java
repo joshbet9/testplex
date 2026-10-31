@@ -474,6 +474,9 @@ public final class WizardsGameManager implements Listener {
             return;
         }
         if (entrants.size() > maximum) entrants = new ArrayList<>(entrants.subList(0, maximum));
+        // Source archives may carry stale world flags. Wizards is a PvP free-for-all;
+        // always enforce combat on the disposable match world itself.
+        arena.setPVP(true);
 
         // The shared Arcade manager must return any previous game to the lobby
         // before Wizards snapshots player inventory, location and movement state.

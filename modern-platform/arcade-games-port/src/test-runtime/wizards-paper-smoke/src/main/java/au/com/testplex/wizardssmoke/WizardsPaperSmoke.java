@@ -238,6 +238,7 @@ public final class WizardsPaperSmoke extends JavaPlugin {
                 "actual match fell back from selected map (active=" + activeResource + ")");
         require(gameplayArena != null && "arcadeport_source_wizards".equals(gameplayArena.getName()),
                 "actual Wizards round is not using the selected source world");
+        require(gameplayArena.getPVP(), "the live Wizards arena did not enable PvP");
         require(states.size() == 3, "expected three active wizard states, found " + states.size());
         require(snapshots.size() == 3, "player snapshots were not captured for all three clients");
         require(chests.size() >= 8, "live round has fewer than eight loot chests");
@@ -295,20 +296,26 @@ public final class WizardsPaperSmoke extends JavaPlugin {
         require(beamTarget != null, "could not find a safe nearby test location for the direct-target spell");
         rival.teleport(beamTarget);
         rival.setNoDamageTicks(0);
-        rival.setHealth(1.0D);
+        rival.setHealth(0.25D);
+        double beamDistance = owner.getEyeLocation().distance(rival.getEyeLocation());
+        Class<?> rulesType = Class.forName("au.com.testplex.wizards.WizardsRules");
+        double expectedBeamDamage = ((Number) method(rulesType, "rainbowBeamDamage", int.class, double.class)
+                .invoke(null, 5, beamDistance)).doubleValue();
         double manaBeforeBeam = ((Number) field(ownerState, "mana")).doubleValue();
         @SuppressWarnings("unchecked")
         Map<Object, Object> beamCooldowns = (Map<Object, Object>) field(ownerState, "cooldowns");
         beamCooldowns.remove(rainbowBeam);
         castSpell.invoke(wizards, owner, ownerState, rainbowBeam, rival, null);
-        require(rival.isDead(), "Rainbow Beam damage was clamped or failed to eliminate the one-health target");
+        require(rival.isDead(), "Rainbow Beam damage failed (health="
+                + (rival.isDead() ? 0.0D : rival.getHealth()) + ", expectedDamage=" + expectedBeamDamage
+                + ", distance=" + beamDistance + ", pvp=" + gameplayArena.getPVP() + ")");
         double manaAfterBeam = ((Number) field(ownerState, "mana")).doubleValue();
         require(Math.abs((manaBeforeBeam - manaAfterBeam) - 17.0D) < 0.01D,
                 "Rainbow Beam did not charge the level-five cost of 17 mana");
         require(((Number) field(ownerState, "kills")).intValue() == 1,
                 "the direct-target spell elimination was not credited to its caster");
         getLogger().info("WIZARDS_GAMEPLAY_SMOKE|SPELL_IMPACT|spell=RAINBOW_BEAM|level=5"
-                + "|damageApplied=true|killCredited=true|manaCost=17");
+                + "|damageApplied=true|killCredited=true|manaCost=17|distance=" + beamDistance);
         getLogger().info("WIZARDS_GAMEPLAY_SMOKE|ELIMINATION|victim=" + rival.getName()
                 + "|attacker=" + owner.getName() + "|stage=1");
         gameplayStage = 2;
