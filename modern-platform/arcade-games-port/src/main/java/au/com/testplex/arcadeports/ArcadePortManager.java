@@ -12857,7 +12857,8 @@ public final class ArcadePortManager implements Listener {
             long survivingWinners = session.alive.stream()
                     .filter(id -> session.teams.getOrDefault(id, -2) == winningTeam).count();
             for (UUID id : session.alive) {
-                if (session.teams.getOrDefault(id, -2) != winningTeam) continue;
+                if (testPlayers.isTestPlayer(id)
+                        || session.teams.getOrDefault(id, -2) != winningTeam) continue;
                 String path = localStatsPath(id, ArcadePortGame.PAINTBALL.id());
                 if (ArcadePortRules.shouldAwardPaintballSpeedrunner(elapsed, true)) {
                     plugin.getConfig().set(path + "speedrunner",
