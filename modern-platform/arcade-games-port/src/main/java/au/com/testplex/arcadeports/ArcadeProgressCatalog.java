@@ -146,14 +146,6 @@ public final class ArcadeProgressCatalog {
                     a("barragist", "Barragist", "As Shredder, hit 3 players in one barrage."),
                     a("invincible", "Invincible", "As Infiltrator, get 5 kills without returning to your team's side."),
                     a("fair-game", "Fair Game", "As Marksman, get killed by a Shredder bowshot."))),
-
-            Map.entry("one-in-the-quiver", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 5000, "kills"))),
-            Map.entry("paintball", List.of(m("wins", "Wins", "wins", 5000, "wins"), m("kills", "Kills", "kills", 5000, "kills"), m("revives", "Revives", "medic", 2500, "revives"))),
-            Map.entry("runner", List.of(m("wins", "Wins", "wins", 250, "wins"), m("blocks-run", "Blocks Run", "marathon-runner", 100000, "blocks"))),
-            Map.entry("sheep-quest", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 2000, "kills"), m("sheep-captures", "Sheep Captures", "sheep-captures", 1000, "captures"))),
-            Map.entry("snake", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "lifetime-kills", 750, "kills"))),
-            Map.entry("spleef", List.of(m("wins", "Wins", "wins", 250, "wins"), m("blocks-broken", "Blocks Broken", "blocks-broken", 250000, "blocks"))),
-            Map.entry("turf-wars", List.of(m("wins", "Wins", "wins", 1000, "wins"), m("kills", "Kills", "kills", 10000, "kills"), m("blocks-broken", "Blocks Broken", "blocks-broken", 10000, "blocks"))),
             Map.entry("monster-maze", List.of(
                     a("jumpman", "Jumpman", "Spend all jumps on stage 1, reach the first safe pad, and win."),
                     a("just-to-suffer", "Just to Suffer", "Use a jump on a one-block gap."),
@@ -174,6 +166,14 @@ public final class ArcadeProgressCatalog {
             Map.entry("evolution", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 2000, "kills"))),
             Map.entry("gladiators", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 1000, "kills"), m("loser-bracket-wins", "Loser Bracket Wins", "loser-bracket-wins", 100, "wins"))),
             Map.entry("micro-battles", List.of(m("wins", "Wins", "wins", 1500, "wins"), m("kills", "Kills", "kills", 5000, "kills"))),
+
+            Map.entry("one-in-the-quiver", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 5000, "kills"))),
+            Map.entry("paintball", List.of(m("wins", "Wins", "wins", 5000, "wins"), m("kills", "Kills", "kills", 5000, "kills"), m("revives", "Revives", "medic", 2500, "revives"))),
+            Map.entry("runner", List.of(m("wins", "Wins", "wins", 250, "wins"), m("blocks-run", "Blocks Run", "marathon-runner", 100000, "blocks"))),
+            Map.entry("sheep-quest", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "kills", 2000, "kills"), m("sheep-captures", "Sheep Captures", "sheep-captures", 1000, "captures"))),
+            Map.entry("snake", List.of(m("wins", "Wins", "wins", 250, "wins"), m("kills", "Kills", "lifetime-kills", 750, "kills"))),
+            Map.entry("spleef", List.of(m("wins", "Wins", "wins", 250, "wins"), m("blocks-broken", "Blocks Broken", "blocks-broken", 250000, "blocks"))),
+            Map.entry("turf-wars", List.of(m("wins", "Wins", "wins", 1000, "wins"), m("kills", "Kills", "kills", 10000, "kills"), m("blocks-broken", "Blocks Broken", "blocks-broken", 10000, "blocks"))),
             Map.entry("monster-maze", List.of(
                     ms("wins", "Wins", "wins", 250, "wins", 25, 50, 100, 250),
                     ms("first-safe-pads", "First Safe Pads", "first-safe-pads", 1000, "pads", 100, 250, 500, 1000),
