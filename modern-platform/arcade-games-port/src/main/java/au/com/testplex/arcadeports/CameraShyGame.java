@@ -661,7 +661,7 @@ public final class CameraShyGame implements Listener {
         finalSnapshot = false;
 
         try {
-                for (int i = 0; i < all.size(); i++) {
+            for (int i = 0; i < all.size(); i++) {
                 Player player = all.get(i);
                 UUID id = player.getUniqueId();
                 players.put(id, player);
@@ -681,12 +681,13 @@ public final class CameraShyGame implements Listener {
                 uniquePhotos.put(id, new LinkedHashSet<>());
                 photographedBy.put(id, new LinkedHashSet<>());
                 spawnLocations.put(id, spawns.get(i % spawns.size()).clone());
-                }
-                plugin.saveConfig();
+            }
+            plugin.saveConfig();
             for (UUID id : players.keySet()) {
                 Player player = players.get(id);
                 if (player != null && player.isOnline()) setupPlayer(player, spawnLocations.get(id));
             }
+            phase = Phase.LIVE;
             phase = Phase.LIVE;
         } catch (RuntimeException startupFailure) {
             plugin.getLogger().log(java.util.logging.Level.SEVERE,
