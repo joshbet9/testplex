@@ -14,6 +14,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements CommandExecutor, Listener {
     private ArcadePortManager manager;
+    private SpeedBuildersGame speedBuilders;
     private MonsterMazePlugin monsterMaze;
     private ArcadeMapSelectionMenu mapMenu;
     private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
@@ -46,6 +47,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         // Bring up Testplex's shared lobby before any optional game module. A failure
         // in Monster Maze must not leave players in the unrelated survival world.
         manager = new ArcadePortManager(this);
+        speedBuilders = new SpeedBuildersGame(this);
+        getServer().getPluginManager().registerEvents(speedBuilders, this);
         mapMenu = new ArcadeMapSelectionMenu(this);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
@@ -98,6 +101,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public void returnPlayerToArcadeLobby(Player player) {
         if (manager != null && player != null && player.isOnline()) manager.returnPlayerToLobby(player);
     }
+
+    /** Keep the generated Speed Builders arena mutually exclusive with other test matches. */
+    public void prepareForSpeedBuilders() {
+        if (manager != null) manager.stop("Speed Builders is taking over the shared Arcade test session.");
+    }
     public void stopMonsterMazeRound(String reason) {
         if (manager != null) manager.stop(reason == null ? "Monster Maze stopped" : reason);
     }
@@ -114,6 +122,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         } catch (java.io.IOException exception) {
             getLogger().warning("Could not remove an Arcade runtime readiness record: " + exception.getMessage());
         }
+        if (speedBuilders != null) speedBuilders.shutdown();
         if (manager != null) manager.shutdown();
         if (monsterMaze != null) monsterMaze.shutdown();
     }
@@ -209,6 +218,14 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         }
     }
 
+    private boolean isSpeedBuildersId(String requestedId) {
+        if (requestedId == null) return false;
+        String normalized = requestedId.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return normalized.equals("speed-builders") || normalized.equals("speedbuilders")
+                || normalized.equals("speed-builder");
+    }
+
     /** Resolve supported Mixed Arcade aliases without changing the base game ID. */
     private ArcadePortGame mixedArcadeGameFromId(String requestedId) {
         if (requestedId == null) return null;
@@ -246,10 +263,29 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport " + sub + " <game-id>");
                     return true;
                 }
+                if (isSpeedBuildersId(args[1])) {
+                    speedBuilders.queue(player, sub.equals("play"));
+                    return true;
+                }
+                if (speedBuilders != null && speedBuilders.isActive()) {
+                    sender.sendMessage(ChatColor.RED + "Speed Builders is currently using the Arcade test session.");
+                    return true;
+                }
                 ArcadePortGame mixedJoinGame = mixedArcadeGameFromId(args[1]);
                 boolean mixedArcadeVariant = mixedJoinGame != null;
                 ArcadePortGame requestedGame = mixedArcadeVariant ? mixedJoinGame : ArcadePortGame.fromId(args[1]);
                 manager.queue(requestedGame, player, sub.equals("play"), mixedArcadeVariant);
+                return true;
+            case "leave":
+                if (!(sender instanceof Player leavingPlayer)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                if (args.length < 2 || !isSpeedBuildersId(args[1])) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport leave speed-builders");
+                    return true;
+                }
+                speedBuilders.leaveQueue(leavingPlayer);
                 return true;
             case "lobby":
             case "selectgame":
@@ -287,6 +323,18 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport start <game-id>");
                     return true;
                 }
+                if (isSpeedBuildersId(args[1])) {
+                    if (!hasAdminAccess(sender)) {
+                        sender.sendMessage(ChatColor.RED + "Operator permission required to force-start Speed Builders.");
+                        return true;
+                    }
+                    speedBuilders.startQueued();
+                    return true;
+                }
+                if (speedBuilders != null && speedBuilders.isActive()) {
+                    sender.sendMessage(ChatColor.RED + "Speed Builders is currently using the Arcade test session.");
+                    return true;
+                }
                 ArcadePortGame mixedStartGame = mixedArcadeGameFromId(args[1]);
                 boolean mixedArcadeStart = mixedStartGame != null;
                 ArcadePortGame requestedStartGame = mixedArcadeStart ? mixedStartGame : ArcadePortGame.fromId(args[1]);
@@ -299,6 +347,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
                 if (args.length < 2) {
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit <el-muchacho-pigo|mama-piggles|pig|mama-pig|sheep-pig|jumper|armorer|pitcher|waller|coward|marksman|pyrotechnic|snowballer|spleef-brawler|micro-archer|worker|fighter|quiver-leaper|quiver-brawler|enchanter|slam-shot|ninja|runnerkit-leaper|runnerkit-archer|runnerkit-frosty|rifle|sniper|shotgun|machine-gun|runner-basher|runner-archer|runner-traitor|runner-null|turf-wars-marksman|turf-wars-infiltrator|turf-wars-shredder|escape-artist|assassin|briber|revealer>");
+                    return true;
+                }
+                if (speedBuilders != null && speedBuilders.isActive()) {
+                    player.sendMessage(ChatColor.GRAY + "Speed Builders uses the shared default builder kit.");
                     return true;
                 }
                 manager.selectKit(player, args[1]);
@@ -323,18 +375,25 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 return true;
             case "status":
                 sender.sendMessage(ChatColor.GOLD + "Modern Arcade ports: " + ChatColor.WHITE + manager.status());
+                if (speedBuilders != null) sender.sendMessage(ChatColor.GOLD + "Speed Builders: "
+                        + ChatColor.WHITE + speedBuilders.status());
                 return true;
             case "stop":
                 if (!hasAdminAccess(sender)) {
                     sender.sendMessage(ChatColor.RED + "Operator permission required.");
                     return true;
                 }
+                if (speedBuilders != null) speedBuilders.stop("Stopped by an operator.");
                 manager.stop("Stopped by an operator.");
                 return true;
             default:
                 sender.sendMessage(ChatColor.GOLD + "=== Modern Arcade Mechanics Prototypes ===");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>" + ChatColor.GRAY + " — quick solo test; starts after a short join window");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join <game-id>" + ChatColor.GRAY + " — queue to join a multiplayer test");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport play speed-builders" + ChatColor.GRAY + " — quick-start the Speed Builders test queue");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport join speed-builders" + ChatColor.GRAY + " — join the Speed Builders queue");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport leave speed-builders" + ChatColor.GRAY + " — leave the queue before the match starts");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport start speed-builders" + ChatColor.GRAY + " — operator-only force start");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>-mixed" + ChatColor.GRAY
                         + " — Mixed Arcade variants: Turf Wars, Castle Assault and Heroes of Gwen");
