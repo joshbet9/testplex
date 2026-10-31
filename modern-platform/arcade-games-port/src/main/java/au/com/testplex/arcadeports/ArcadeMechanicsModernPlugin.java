@@ -349,7 +349,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage("Players only.");
                     return true;
                 }
-                if (args.length >= 3 && isWizardsId(args[1])) {
+                if (args.length >= 2 && isWizardsId(args[1])) {
+                    if (args.length < 3) {
+                        player.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit wizards <mage|sorcerer|mystic|witchdoctor>");
+                        return true;
+                    }
                     WizardsKit kit = WizardsKit.parse(args[2]);
                     if (kit == null) {
                         player.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit wizards <mage|sorcerer|mystic|witchdoctor>");

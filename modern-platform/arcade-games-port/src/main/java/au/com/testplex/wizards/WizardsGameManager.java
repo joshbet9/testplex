@@ -260,7 +260,7 @@ public final class WizardsGameManager implements Listener {
             return;
         }
         if (!queue.containsKey(player.getUniqueId())) {
-            player.sendMessage(ChatColor.YELLOW + "Join the Wizards queue first with /wizards join.");
+            player.sendMessage(ChatColor.YELLOW + "Join the Wizards queue first with /arcadeport join wizards.");
             return;
         }
         selectedKits.put(player.getUniqueId(), kit);
@@ -383,6 +383,9 @@ public final class WizardsGameManager implements Listener {
         WizardState state = states.get(id);
         if (running && state != null && state.alive) {
             state.alive = false;
+            WizardsProgressStore.increment(plugin.getConfig(), id, "kills", state.kills);
+            WizardsProgressStore.increment(plugin.getConfig(), id, "spells-bound", state.spellsBound);
+            plugin.saveConfig();
             removeManaBar(id);
             restoreTemporaryPlayer(player, id);
             player.sendMessage(ChatColor.YELLOW + "You left the Wizards round.");
@@ -412,7 +415,10 @@ public final class WizardsGameManager implements Listener {
 
     public void shutdown() {
         if (tickTask != null) tickTask.cancel();
-        if (running || !snapshots.isEmpty()) finish(null, "Wizards plugin disabled; player state restored.");
+        if (running || !snapshots.isEmpty()) finish(null, "Wizards test session stopped; player state restored.");
+        queue.clear();
+        selectedKits.clear();
+        queueDeadlineTick = -1L;
         for (Map.Entry<UUID, PlayerSnapshot> entry : pendingRestore.entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player != null && player.isOnline() && !player.isDead()) entry.getValue().restore(player);
@@ -1359,6 +1365,7 @@ public final class WizardsGameManager implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         UUID id = event.getPlayer().getUniqueId();
         queue.remove(id);
+        selectedKits.remove(id);
         if (queue.isEmpty()) queueDeadlineTick = -1L;
         WizardState state = states.get(id);
         if (running && state != null && state.alive) {
@@ -1371,15 +1378,32 @@ public final class WizardsGameManager implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
-        PlayerSnapshot snapshot = pendingRestore.get(event.getPlayer().getUniqueId());
-        if (snapshot == null) return;
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            Player player = event.getPlayer();
-            if (player.isOnline() && !player.isDead()) {
-                pendingRestore.remove(player.getUniqueId());
-                snapshot.restore(player);
-            }
-        }, 1L);
+        UUID id = event.getPlayer().getUniqueId();
+        PlayerSnapshot snapshot = pendingRestore.get(id);
+        if (snapshot != null) {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                Player player = event.getPlayer();
+                if (player.isOnline() && !player.isDead()) {
+                    pendingRestore.remove(player.getUniqueId());
+                    snapshot.restore(player);
+                }
+            }, 1L);
+            return;
+        }
+
+        WizardState state = states.get(id);
+        if (running && state != null && !state.alive && arena != null) {
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                Player player = event.getPlayer();
+                if (!player.isOnline() || !running || state.alive || arena == null) return;
+                player.closeInventory();
+                player.getInventory().clear();
+                player.setGameMode(GameMode.SPECTATOR);
+                player.teleport(new Location(arena, 0.5D, ARENA_FLOOR_Y + 2.0D, 0.5D));
+                player.setFlying(true);
+                player.sendMessage(ChatColor.GRAY + "You rejoined as a spectator. Your lobby state will be restored when the round ends.");
+            }, 1L);
+        }
     }
 
     @EventHandler(ignoreCancelled = true)

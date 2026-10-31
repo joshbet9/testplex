@@ -40,7 +40,7 @@ Modern server provisioning and deployment use a separate directory, unit (`testp
 
 ## Complete 26-game programme register (31 October 2026)
 
-The overall programme tracks 26 titles/variants: **24 shared Arcade catalogue games**, the separately packaged **Wizards** module, and the planned **Speed Builders Arcade** variant. Speed Builders currently has no implementation branch or runtime code; it is tracked as planned work rather than represented by a non-functional placeholder.
+The overall programme tracks 26 titles/variants: **24 shared Arcade catalogue games**, the **Wizards** prototype hosted inside ArcadeMechanicsModern, and the separately developed **Speed Builders Arcade** prototype. Wizards' old standalone JAR remains a disabled reference build; active Wizards test matches use the shared Arcade host. Speed Builders is tracked separately in draft [PR #62](https://github.com/joshbet9/testplex/pull/62) and branch `feat/speed-builders-modern-26.3`; it is not yet part of this platform base branch.
 
 | # | Game | Current implementation state | Test access |
 |---:|---|---|---|
