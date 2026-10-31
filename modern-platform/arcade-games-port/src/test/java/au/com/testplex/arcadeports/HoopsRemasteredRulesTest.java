@@ -45,6 +45,26 @@ class HoopsRemasteredRulesTest {
         assertTrue(HoopsRemasteredRules.BLOCK_RADIUS > 2.0D);
     }
 
+    @Test void rimIntersectionUsesInterpolatedCrossingPoint() {
+        // The ball crosses at x=0 halfway through this tick; the end position
+        // is outside the rim radius, so endpoint-only checks would miss it.
+        assertTrue(HoopsRemasteredRules.crossesHoopPlane(
+                -1.5D, 67.0D, 0.0D, 1.5D, 65.0D, 0.0D,
+                0.0D, 66.0D, HoopsRemasteredRules.RIM_SCORING_RADIUS));
+        assertFalse(HoopsRemasteredRules.crossesHoopPlane(
+                1.5D, 67.0D, 0.0D, 2.5D, 65.0D, 0.0D,
+                0.0D, 66.0D, HoopsRemasteredRules.RIM_SCORING_RADIUS));
+        assertFalse(HoopsRemasteredRules.crossesHoopPlane(
+                0.0D, 65.0D, 0.0D, 0.0D, 67.0D, 0.0D,
+                0.0D, 66.0D, HoopsRemasteredRules.RIM_SCORING_RADIUS));
+        assertFalse(HoopsRemasteredRules.crossesHoopPlane(
+                0.0D, 67.0D, 0.0D, 0.0D, 66.5D, 0.0D,
+                0.0D, 66.0D, HoopsRemasteredRules.RIM_SCORING_RADIUS));
+        assertFalse(HoopsRemasteredRules.crossesHoopPlane(
+                Double.NaN, 67.0D, 0.0D, 0.0D, 65.0D, 0.0D,
+                0.0D, 66.0D, HoopsRemasteredRules.RIM_SCORING_RADIUS));
+    }
+
     @Test void firstTeamToReachTwentyOneWinsImmediatelyWithoutWinByTwo() {
         assertFalse(HoopsRemasteredRules.hasReachedTargetScore(20, 19));
         assertTrue(HoopsRemasteredRules.hasReachedTargetScore(21, 20));
