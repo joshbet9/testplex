@@ -72,6 +72,10 @@ public final class GamePreferenceMenu implements Listener {
 
         Map<String, Double> probabilities = GamePreferenceWeights.selectionProbabilities(
                 baseWeights, counts, eligibleCount);
+        boolean avoidConsecutive = plugin.getConfig().getBoolean(
+                "game-preferences.automatic-rotation.avoid-consecutive-games", true);
+        probabilities = GamePreferenceRotation.effectiveProbabilities(
+                probabilities, manager.previousRotationGameId(), avoidConsecutive);
 
         int pageCount = Math.max(1, (games.size() + PAGE_SIZE - 1) / PAGE_SIZE);
         int page = Math.max(0, Math.min(requestedPage, pageCount - 1));
@@ -85,7 +89,7 @@ public final class GamePreferenceMenu implements Listener {
                 ChatColor.YELLOW + "Shift-click: Neutral",
                 ChatColor.DARK_GRAY + "Neutral is the default for unrated games.",
                 ChatColor.DARK_GRAY + "Preferences adjust odds; they never ban a game.",
-                ChatColor.DARK_GRAY + "Each game stays between 0.05x and 1.95x its base weight.",
+                ChatColor.DARK_GRAY + "The immediately previous game is skipped when alternatives exist.",
                 ChatColor.GRAY + "Eligible lobby players: " + ChatColor.WHITE + eligibleCount,
                 ChatColor.GRAY + "Selection likelihoods update after every rating."));
 
