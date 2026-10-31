@@ -311,6 +311,23 @@ final class ArcadeTestPlayerManager {
         player.getPersistentDataContainer().set(markerKey, PersistentDataType.BYTE, (byte) 1);
     }
 
+    /**
+     * FakePlayerPlugin uses each bot's last requested teleport as its respawn
+     * location. Arcade's normal setup teleports the Bukkit Player directly, so
+     * sync that final game spawn through the FPP API after the session is built.
+     */
+    void syncMatchRespawnLocation(Player player) {
+        if (player == null) return;
+        Object handle = activeHandles.get(player.getUniqueId());
+        if (handle == null || !player.isOnline()) return;
+        try {
+            invoke(handle, "teleport", new Class<?>[] {Location.class}, player.getLocation().clone());
+        } catch (Exception exception) {
+            host.getLogger().warning("Could not sync the match respawn location for "
+                    + player.getName() + ": " + rootMessage(exception));
+        }
+    }
+
     void despawnSessionPlayers() {
         cancelPendingSpawn();
         Object api = pendingApi;
