@@ -121,6 +121,15 @@ jobs:
           bash -n .github/testplex-modern-recovery.sh
           bash -n .github/testplex-modern-recovery-test.sh
           bash .github/testplex-modern-recovery-test.sh
+
+          # Parse the actual remote deployment transaction shell without running it.
+          deploy_workflow=".github/workflows/deploy-testplex-modern-hyperv.yml"
+          awk "/<<'REMOTE_DEPLOY'/ { active=1; next } active && /^REMOTE_DEPLOY$/ { exit } active { print }" \
+            "$deploy_workflow" > "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
+          test -s "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
+          bash -n "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
+          grep -Fq 'FPP_VERSION="2.1.7"' "$deploy_workflow"
+          grep -Fq 'versions/$FPP_VERSION/PAPER/fake-player-plugin-$FPP_VERSION.jar' "$deploy_workflow"
           git diff --check
 
       - name: Upload modern plugin artifact
