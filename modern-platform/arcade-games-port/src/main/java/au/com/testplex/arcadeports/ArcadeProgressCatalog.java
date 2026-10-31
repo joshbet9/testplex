@@ -132,7 +132,7 @@ public final class ArcadeProgressCatalog {
                     a("praying-to-the-gods", "Praying to the Gods", "Win while falling into the void."),
                     a("clutchest-of-them-all", "Clutchest of them all", "As Brawler, spleef yourself and your final opponent, then leap back to the ground and win."),
                     a("ranger", "Ranger", "Win after assisting 5 player deaths with arrows."),
-                    a("wrong-kit-lil-bro", "Wrong Kit Lil' Bro", "Win as Snowballer without throwing a snowball."),
+                    a("wrong-kit-lil-bro", "Wrong Kit Lil’ Bro", "Win as Snowballer without throwing a snowball."),
                     a("spleeftastic", "Spleeftastic!", "Win as Brawler without hitting another player."),
                     a("block-drought", "Block Drought", "Win while taking starvation damage."),
                     a("no-mods-in-here", "No Mods in Here", "Tie a game of Spleef."))),

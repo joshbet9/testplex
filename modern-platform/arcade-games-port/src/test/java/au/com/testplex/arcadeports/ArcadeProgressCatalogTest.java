@@ -75,6 +75,43 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("turf-wars", "fair-game", "Fair Game"));
     }
 
+
+    @Test
+    void allSevenGamesExposeEveryRequestedMilestoneKeyAndThreshold() {
+        assertMilestone("one-in-the-quiver", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("one-in-the-quiver", "kills", "kills", 5000, new long[] {500, 1250, 2500, 5000});
+
+        assertMilestone("paintball", "wins", "wins", 5000, new long[] {500, 1250, 2500, 5000});
+        assertMilestone("paintball", "kills", "kills", 5000, new long[] {500, 1250, 2500, 5000});
+        assertMilestone("paintball", "revives", "medic", 2500, new long[] {250, 625, 1250, 2500});
+
+        assertMilestone("runner", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("runner", "blocks-run", "marathon-runner", 100000, new long[] {10000, 25000, 50000, 100000});
+
+        assertMilestone("sheep-quest", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("sheep-quest", "kills", "kills", 2000, new long[] {200, 500, 1000, 2000});
+        assertMilestone("sheep-quest", "sheep-captures", "sheep-captures", 1000, new long[] {100, 250, 500, 1000});
+
+        assertMilestone("snake", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("snake", "kills", "lifetime-kills", 750, new long[] {75, 188, 375, 750});
+
+        assertMilestone("spleef", "wins", "wins", 250, new long[] {25, 63, 125, 250});
+        assertMilestone("spleef", "blocks-broken", "blocks-broken", 250000, new long[] {25000, 62500, 125000, 250000});
+
+        assertMilestone("turf-wars", "wins", "wins", 1000, new long[] {100, 250, 500, 1000});
+        assertMilestone("turf-wars", "kills", "kills", 10000, new long[] {1000, 2500, 5000, 10000});
+        assertMilestone("turf-wars", "blocks-broken", "blocks-broken", 10000, new long[] {1000, 2500, 5000, 10000});
+    }
+
+    private void assertMilestone(String game, String id, String statKey, long maximum, long[] stages) {
+        var milestone = ArcadeProgressCatalog.milestones(game).stream()
+                .filter(entry -> entry.id().equals(id))
+                .findFirst().orElseThrow(() -> new AssertionError("Missing milestone " + game + "/" + id));
+        assertEquals(statKey, milestone.statKey(), game + "/" + id + " stat key");
+        assertEquals(maximum, milestone.maximum(), game + "/" + id + " maximum");
+        assertArrayEquals(stages, milestone.stages(), game + "/" + id + " stages");
+    }
+
     private boolean hasAchievement(String game, String id, String name) {
         return ArcadeProgressCatalog.achievements(game).stream()
                 .anyMatch(entry -> entry.id().equals(id) && entry.name().equals(name));

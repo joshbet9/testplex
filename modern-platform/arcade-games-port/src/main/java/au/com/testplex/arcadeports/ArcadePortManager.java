@@ -1399,8 +1399,11 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
-        int teamZero = (int) session.teams.values().stream().filter(team -> team == 0).count();
-        int teamOne = (int) session.teams.values().stream().filter(team -> team == 1).count();
+        // Count current round participants, not stale team entries left by players who disconnected.
+        int teamZero = (int) session.players.keySet().stream()
+                .filter(playerId -> session.teams.getOrDefault(playerId, -1) == 0).count();
+        int teamOne = (int) session.players.keySet().stream()
+                .filter(playerId -> session.teams.getOrDefault(playerId, -1) == 1).count();
         int team;
         if (teamZero < teamOne) {
             team = 0;
@@ -10065,7 +10068,8 @@ public final class ArcadePortManager implements Listener {
                             && "brute".equals(session.sheepQuestKits.getOrDefault(entry.getValue(), "beserker"))
                             && session.teams.getOrDefault(thrownPlayer.getUniqueId(), -2)
                                     == session.teams.getOrDefault(entry.getValue(), -1)) {
-                        int kills = session.sheepBruteThrownKills.merge(entry.getValue(), 1, Integer::sum);
+                        // Both kills must come from the same thrown teammate, in this throw.
+                        int kills = session.sheepBruteThrownKills.merge(thrownPlayer.getUniqueId(), 1, Integer::sum);
                         if (kills >= 2 && thrower != null) {
                             awardCatalogAchievement(thrower, "sheep-quest", "gladiator");
                         }
@@ -10106,6 +10110,12 @@ public final class ArcadePortManager implements Listener {
         thrown.setVelocity(velocity);
         session.sheepThrownBy.put(thrown.getUniqueId(), throwerId);
         session.sheepThrownAt.put(thrown.getUniqueId(), System.currentTimeMillis());
+        if (thrown instanceof Player thrownPlayer
+                && "brute".equals(session.sheepQuestKits.getOrDefault(throwerId, "beserker"))
+                && session.teams.getOrDefault(thrownPlayer.getUniqueId(), -2)
+                        == session.teams.getOrDefault(throwerId, -1)) {
+            session.sheepBruteThrownKills.put(thrownPlayer.getUniqueId(), 0);
+        }
         if (thrown instanceof Sheep sheep) session.entities.add(sheep);
         thrower.playSound(thrower.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 3.0F);
     }
