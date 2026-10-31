@@ -13799,10 +13799,14 @@ public final class ArcadePortManager implements Listener {
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean milkCowWinner = session.type == ArcadePortGame.MILK_THE_COW
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean castleAssaultWinner = session.type == ArcadePortGame.CASTLE_ASSAULT
+                    && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean heroesOfGwenWinner = session.type == ArcadePortGame.HEROES_OF_GWEN
+                    && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean deathTagWinner = session.type == ArcadePortGame.DEATH_TAG && winnerId != null
                     && session.tagged.contains(id) == session.tagged.contains(winnerId);
             boolean won = winnerId != null && (winnerId.equals(id) || turfWarsWinner || paintballWinner
-                    || sheepQuestWinner || milkCowWinner || deathTagWinner
+                    || sheepQuestWinner || milkCowWinner || castleAssaultWinner || heroesOfGwenWinner || deathTagWinner
                     || ((session.type == ArcadePortGame.BOMB_LOBBERS
                             || session.type == ArcadePortGame.MICRO_BATTLES)
                         && session.alive.contains(id)

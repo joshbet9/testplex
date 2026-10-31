@@ -130,6 +130,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, String> castleAssaultPlayerKits = new HashMap<>();
     private final Map<UUID, Long> castleArcherNextArrowAt = new HashMap<>();
     private final Map<UUID, Long> castleDemolitionistNextTntAt = new HashMap<>();
+    private final Map<UUID, Integer> castleKillsByPlayer = new HashMap<>();
+    private final Map<UUID, Integer> castleTntHolderKillsByPlayer = new HashMap<>();
+    private final Map<UUID, Integer> castleCrystalsDestroyedByPlayer = new HashMap<>();
+    private final Set<UUID> castleRodUsed = new HashSet<>();
+    private final Set<UUID> castleFinalKingHitByPlayer = new HashSet<>();
+    private final Set<UUID> castleCreditedVictims = new HashSet<>();
+    private boolean castleResultRecorded;
     private final Map<UUID, String> selectedHeroesOfGwen = new HashMap<>();
     private final Map<UUID, Map<String, Long>> heroSkillReadyAt = new HashMap<>();
     private final Map<UUID, Integer> heroTntArrowCharges = new HashMap<>();
@@ -205,6 +212,66 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     boolean isReady() {
         return ready && !stopped;
+    }
+
+    private void awardCastleAchievement(Player player, String achievementId) {
+        if (player == null || achievementId == null) return;
+        String path = "local-achievements." + player.getUniqueId() + ".castle-assault." + achievementId;
+        if (plugin.getConfig().getBoolean(path, false)) return;
+        plugin.getConfig().set(path, true);
+        plugin.saveConfig();
+        player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + ChatColor.YELLOW
+                + achievementId.replace('-', ' '));
+        player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 0.8F, 1.15F);
+    }
+
+    private void recordCastleKill(Player killer, Player victim, boolean objectiveTnt) {
+        if (killer == null || victim == null || killer.equals(victim)
+                || teams.getOrDefault(killer.getUniqueId(), -1) == teams.getOrDefault(victim.getUniqueId(), -2)
+                || !castleCreditedVictims.add(victim.getUniqueId())) return;
+        UUID killerId = killer.getUniqueId();
+        castleKillsByPlayer.merge(killerId, 1, Integer::sum);
+        if (objectiveTnt) {
+            int tntKills = castleTntHolderKillsByPlayer.merge(killerId, 1, Integer::sum);
+            if (tntKills >= 5) awardCastleAchievement(killer, "moral-exercise");
+        }
+    }
+
+    private void recordCastleAssaultResult(int winningTeam) {
+        if (game != ArcadePortGame.CASTLE_ASSAULT || castleResultRecorded || winningTeam < 0) return;
+        castleResultRecorded = true;
+        KingState winningKing = kings.get(winningTeam);
+        int winningKingHealth = winningKing == null ? Integer.MAX_VALUE : winningKing.health;
+        for (Player player : players.values()) {
+            if (player == null) continue;
+            UUID id = player.getUniqueId();
+            boolean won = teams.getOrDefault(id, -1) == winningTeam;
+            String path = "local-stats." + id + ".castle-assault.";
+            int kills = castleKillsByPlayer.getOrDefault(id, 0);
+            int crystals = castleCrystalsDestroyedByPlayer.getOrDefault(id, 0);
+            plugin.getConfig().set(path + "kills", plugin.getConfig().getInt(path + "kills", 0) + kills);
+            plugin.getConfig().set(path + "crystals-destroyed",
+                    plugin.getConfig().getInt(path + "crystals-destroyed", 0) + crystals);
+            int streak = won ? plugin.getConfig().getInt(path + "win-streak", 0) + 1 : 0;
+            plugin.getConfig().set(path + "win-streak", streak);
+            if (won && streak >= 3) awardCastleAchievement(player, "remember-the-days");
+            if (won && winningKingHealth < 50) awardCastleAchievement(player, "clutchness");
+            if (won && crystals >= 2 && castleFinalKingHitByPlayer.contains(id)) {
+                awardCastleAchievement(player, "one-man-army");
+            }
+            if (!castleRodUsed.contains(id) && kills >= 8) {
+                awardCastleAchievement(player, "blasphemous");
+            }
+            int bestTeammateKills = players.values().stream()
+                    .filter(other -> other != null && !other.getUniqueId().equals(id)
+                            && teams.getOrDefault(other.getUniqueId(), -2) == teams.getOrDefault(id, -1))
+                    .mapToInt(other -> castleKillsByPlayer.getOrDefault(other.getUniqueId(), 0))
+                    .max().orElse(0);
+            if (kills > 0 && bestTeammateKills > 0 && kills >= bestTeammateKills * 2) {
+                awardCastleAchievement(player, "multiplicative");
+            }
+        }
+        plugin.saveConfig();
     }
 
     private boolean prepareCastleAssault() {
@@ -1011,10 +1078,19 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return meta != null && meta.hasDisplayName() && meta.getDisplayName().contains("Fletched Arrow");
     }
 
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onCastlePlayerRespawn(org.bukkit.event.player.PlayerRespawnEvent event) {
+        if (game == ArcadePortGame.CASTLE_ASSAULT) {
+            castleCreditedVictims.remove(event.getPlayer().getUniqueId());
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onCastleKitDeath(PlayerDeathEvent event) {
         if (stopped || game != ArcadePortGame.CASTLE_ASSAULT) return;
         Player player = event.getEntity();
+        Player killer = player.getKiller();
+        if (killer != null) recordCastleKill(killer, player, false);
         String kit = castleAssaultPlayerKits.get(player.getUniqueId());
         if ("demolitionist".equals(kit)) {
             event.getDrops().removeIf(item -> item != null && item.getType() == Material.TNT);
@@ -1029,6 +1105,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Player player = event.getPlayer();
         if (!players.containsKey(player.getUniqueId())) return;
         if (game == ArcadePortGame.CASTLE_ASSAULT) {
+            if (event.getItem() != null && event.getItem().getType() == Material.FISHING_ROD) {
+                castleRodUsed.add(player.getUniqueId());
+            }
             if (event.getAction().isRightClick() && player.getUniqueId().equals(objectiveCarrier)) {
                 event.setCancelled(true);
                 detonateObjectiveTnt(player);
@@ -1280,8 +1359,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             double damage = 10.0D * Math.max(0.0D, 1.0D - distance / radius);
             damage *= ArcadePortRules.castleAssaultBlastDamageMultiplier(castleBlastProtectionEpf(target));
             if (damage <= 0.0D) continue;
-            if (target.getHealth() <= damage) hooks.eliminate(target, owner, "was caught in a Castle Assault TNT blast");
-            else target.setHealth(target.getHealth() - damage);
+            if (target.getHealth() <= damage) {
+                recordCastleKill(owner, target, objective);
+                hooks.eliminate(target, owner, "was caught in a Castle Assault TNT blast");
+            } else target.setHealth(target.getHealth() - damage);
             Vector direction = target.getLocation().toVector().subtract(center.toVector());
             if (direction.lengthSquared() > 0.001D) {
                 double knockback = ArcadePortRules.castleAssaultBlastKnockbackMultiplier(
@@ -1305,6 +1386,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (!king.crystals.remove(crystal)) return;
         entities.remove(crystal);
         crystal.remove();
+        castleCrystalsDestroyedByPlayer.merge(attacker.getUniqueId(), 1, Integer::sum);
         attacker.sendMessage(ChatColor.GREEN + "Sentry crystal destroyed!");
         Block beaconBase = crystal.getLocation().getBlock().getRelative(0, -2, 0);
         rememberBlock(beaconBase);
@@ -1322,8 +1404,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             king.entity.playEffect(org.bukkit.EntityEffect.HURT);
         }
         if (king.health <= 0) {
-            announce(ChatColor.GOLD + king.name + " has fallen. " + teamName(1 - king.team) + " wins Castle Assault!");
-            hooks.finish(firstPlayerOnTeam(1 - king.team), 1 - king.team, "enemy king defeated");
+            if (attacker != null && castleCrystalsDestroyedByPlayer.getOrDefault(attacker.getUniqueId(), 0) >= 2) {
+                castleFinalKingHitByPlayer.add(attacker.getUniqueId());
+            }
+            int winningTeam = 1 - king.team;
+            recordCastleAssaultResult(winningTeam);
+            announce(ChatColor.GOLD + king.name + " has fallen. " + teamName(winningTeam) + " wins Castle Assault!");
+            hooks.finish(firstPlayerOnTeam(winningTeam), winningTeam, "enemy king defeated");
         }
     }
 
@@ -1694,6 +1781,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     && teams.getOrDefault(player.getUniqueId(), -1) == currentTeam);
             if (!hasOnlinePlayer) {
                 int winner = 1 - team;
+                if (game == ArcadePortGame.CASTLE_ASSAULT) recordCastleAssaultResult(winner);
                 hooks.finish(firstPlayerOnTeam(winner), winner, "opposing team left the match");
                 return;
             }
