@@ -11,7 +11,7 @@ softdepend:
 commands:
   stats:
     description: Open local Testplex Arcade statistics (optionally for an online player).
-    usage: /stats [player]
+    usage: /stats [player] [camera-shy] [page]
     aliases: [arcadestats]
   arcadeport:
     description: Start and test a modern Arcade game
