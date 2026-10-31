@@ -83,6 +83,24 @@ class SuperSploorRulesTest {
     }
 
     @Test
+    void spawnRoomFootprintIsExcludedFromTerritory() {
+        assertTrue(SuperSploorRules.isSpawnSafeTerritoryBlock(10, 64, 10, 10, 64, 10));
+        assertTrue(SuperSploorRules.isSpawnSafeTerritoryBlock(13, 67, 10, 10, 64, 10));
+        assertFalse(SuperSploorRules.isSpawnSafeTerritoryBlock(14, 64, 10, 10, 64, 10));
+        assertFalse(SuperSploorRules.isSpawnSafeTerritoryBlock(10, 68, 10, 10, 64, 10));
+        assertFalse(SuperSploorRules.isSpawnSafeTerritoryBlock(10, 61, 10, 10, 64, 10));
+    }
+
+    @Test
+    void specialMarksRequireAnAliveUnprotectedOpponent() {
+        assertTrue(SuperSploorRules.canMarkTarget(0, 1, false, 10_000L, 8_000L));
+        assertFalse(SuperSploorRules.canMarkTarget(0, 0, false, 10_000L, 8_000L));
+        assertFalse(SuperSploorRules.canMarkTarget(0, 1, true, 10_000L, 8_000L));
+        assertFalse(SuperSploorRules.canMarkTarget(0, 1, false, 7_999L, 8_000L));
+        assertFalse(SuperSploorRules.canMarkTarget(-1, 1, false, 10_000L, 8_000L));
+    }
+
+    @Test
     void inkRegenerationWaitsAfterPrimaryOrSecondaryUseUnlessSwimmingOnFriendlyPaint() {
         assertFalse(SuperSploorRules.canRegenerateInk(10_999L, 10_000L, false, false));
         assertTrue(SuperSploorRules.canRegenerateInk(11_000L, 10_000L, false, false));
