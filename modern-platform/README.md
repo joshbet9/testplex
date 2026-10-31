@@ -57,14 +57,14 @@ The overall programme tracks 27 titles/variants: **25 shared Arcade catalogue ga
 | 2 | Bomb Lobbers | Controlled acceptance testing; original map and core mechanics implemented | Enabled |
 | 3 | Death Tag | Acceptance-ready | Enabled |
 | 4 | Dragon Escape | Mechanics in progress | Disabled |
-| 5 | Dragons (Solo) | Mechanics in progress | Disabled |
+| 5 | Dragons (Solo) | Source implementation prepared; controlled gameplay acceptance required | Enabled |
 | 6 | Evolution | Mechanics in progress | Disabled |
 | 7 | Gladiators | Controlled acceptance; Normal default plus four voteable rulesets and tournament lifecycle implemented | Enabled |
 | 8 | Micro Battles | Controlled acceptance; original map, four-team combat, kits and achievements implemented | Enabled |
 | 9 | Monster Maze | Embedded in Testplex Arcade lifecycle; mechanics in progress | Disabled |
 | 10 | One in the Quiver | Acceptance-ready | Enabled |
 | 11 | Paintball | Controlled acceptance; original maps, four kits, team combat and SAVE ME revival implemented | Enabled |
-| 12 | Runner | Mechanics in progress | Disabled |
+| 12 | Runner | Source implementation prepared; controlled gameplay acceptance required | Enabled |
 | 13 | Sheep Quest | Mechanics in progress | Disabled |
 | 14 | Snake | Separate modern module; mechanics in progress | Disabled |
 | 15 | Spleef | Controlled acceptance candidate; all 37 original archives across Spleef and Super Spleef, three kits and source block mechanics | Enabled |
@@ -81,4 +81,4 @@ The overall programme tracks 27 titles/variants: **25 shared Arcade catalogue ga
 | 26 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
 | 27 | Speed Builders Arcade | Planned; implementation not started | Not available |
 
-**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball and Spleef form the current shared controlled test queue and can be exercised together in the same test sessions. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable. The 221 archived 1.8 map ZIPs for enabled games are tracked in [the legacy map parity register](arcade-games-port/LEGACY-MAP-PARITY.md); Plexball is explicitly documented as using a modern arena.
+**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Dragons (Solo) and Runner form the current shared controlled test queue and can be exercised together in the same test sessions. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable. The 283 archived 1.8 map ZIPs for enabled games are tracked in [the legacy map parity register](arcade-games-port/LEGACY-MAP-PARITY.md); Plexball is explicitly documented as using a modern arena.
