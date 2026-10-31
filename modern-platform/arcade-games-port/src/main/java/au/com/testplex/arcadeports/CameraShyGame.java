@@ -53,7 +53,6 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.RayTraceResult;
 import org.bukkit.util.Vector;
 
-import java.io.File;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -170,6 +169,7 @@ public final class CameraShyGame implements Listener {
         final boolean flying;
         final boolean invulnerable;
         final boolean collidable;
+        final boolean glowing;
         PlayerSnapshot(Player player) {
             location = player.getLocation().clone();
             contents = cloneItems(player.getInventory().getContents());
@@ -183,6 +183,7 @@ public final class CameraShyGame implements Listener {
             health = player.getHealth(); walkSpeed = player.getWalkSpeed(); flySpeed = player.getFlySpeed();
             allowFlight = player.getAllowFlight(); flying = player.isFlying();
             invulnerable = player.isInvulnerable(); collidable = player.isCollidable();
+            glowing = player.isGlowing();
         }
         PlayerSnapshot(ConfigurationSection section) {
             Object savedLocation = section.get("location");
@@ -217,6 +218,7 @@ public final class CameraShyGame implements Listener {
             flying = section.getBoolean("flying");
             invulnerable = section.getBoolean("invulnerable");
             collidable = section.getBoolean("collidable", true);
+            glowing = section.getBoolean("glowing", false);
         }
         private static ItemStack[] readItems(List<?> values) {
             if (values == null) return new ItemStack[0];
@@ -259,6 +261,7 @@ public final class CameraShyGame implements Listener {
             section.set("flying", flying);
             section.set("invulnerable", invulnerable);
             section.set("collidable", collidable);
+            section.set("glowing", glowing);
             plugin.saveConfig();
         }
         void restore(Player player) {
@@ -278,6 +281,7 @@ public final class CameraShyGame implements Listener {
             player.setFoodLevel(food); player.setSaturation(saturation);
             player.setWalkSpeed(walkSpeed); player.setFlySpeed(flySpeed);
             player.setInvulnerable(invulnerable); player.setCollidable(collidable);
+            player.setGlowing(glowing);
             player.setAllowFlight(allowFlight);
             if (allowFlight) player.setFlying(flying);
             player.setHealth(Math.max(1.0D, Math.min(health, player.getMaxHealth())));
@@ -759,6 +763,7 @@ public final class CameraShyGame implements Listener {
         removeOfflinePlayers();
         if (phase != Phase.LIVE) return;
         updateFocusTracking(now);
+        if (serverTick % 10L == 0L) updateSpotterMarkers(now);
         updatePursuits(now);
         updateFakeFlashes(now);
         updateSpotlight(now);
@@ -932,8 +937,8 @@ public final class CameraShyGame implements Listener {
         PlayerSnapshot snapshot = snapshots.remove(id);
         if (snapshot != null) {
             if (player.isOnline()) {
-                snapshot.restore(player);
                 manager.returnPlayerToLobby(player);
+                snapshot.restore(player);
             } else {
                 snapshot.persist(plugin, id);
             }
@@ -1139,9 +1144,15 @@ public final class CameraShyGame implements Listener {
         if (ownerRaw != null) {
             try {
                 UUID owner = UUID.fromString(ownerRaw);
-                if (humans.contains(owner)) award(owner, "method-actor");
+                boolean fooledOpponent = CameraShyRules.shouldAwardUnderstudy(owner, photographer.getUniqueId(),
+                        humans.contains(owner), humans.contains(photographer.getUniqueId()));
+                if (fooledOpponent) award(owner, "method-actor");
                 Player creator = Bukkit.getPlayer(owner);
-                if (creator != null && creator.isOnline()) creator.sendMessage(ChatColor.LIGHT_PURPLE + "Your Understudy fooled " + photographer.getName() + "!");
+                if (creator != null && creator.isOnline() && fooledOpponent) {
+                    creator.sendMessage(ChatColor.LIGHT_PURPLE + "Your Understudy fooled " + photographer.getName() + "!");
+                } else if (creator != null && creator.isOnline() && owner.equals(photographer.getUniqueId())) {
+                    creator.sendMessage(ChatColor.GRAY + "Photographing your own Understudy does not fool an opponent.");
+                }
             } catch (IllegalArgumentException ignored) { }
         }
         photographer.sendTitle(ChatColor.LIGHT_PURPLE + "FAKE OUT!", ChatColor.GRAY + "That was an Understudy decoy.", 0, 25, 5);
@@ -1260,6 +1271,35 @@ public final class CameraShyGame implements Listener {
         }
     }
 
+    /** Repeats each marked opponent's location only to the Spotter for the full mark duration. */
+    private void updateSpotterMarkers(long now) {
+        for (Map.Entry<UUID, Map<UUID, Long>> spotterEntry : new ArrayList<>(spotterMarks.entrySet())) {
+            UUID spotterId = spotterEntry.getKey();
+            Player spotter = players.get(spotterId);
+            Map<UUID, Long> marks = spotterEntry.getValue();
+            if (spotter == null || !spotter.isOnline() || !alive.contains(spotterId)) {
+                spotterMarks.remove(spotterId);
+                continue;
+            }
+            for (Map.Entry<UUID, Long> mark : new ArrayList<>(marks.entrySet())) {
+                UUID targetId = mark.getKey();
+                if (mark.getValue() <= now) {
+                    marks.remove(targetId);
+                    continue;
+                }
+                Player target = players.get(targetId);
+                if (target == null || !target.isOnline() || !alive.contains(targetId)
+                        || target.getWorld() != arena) {
+                    marks.remove(targetId);
+                    continue;
+                }
+                Location marker = target.getLocation().clone().add(0.0D, 1.25D, 0.0D);
+                spotter.spawnParticle(Particle.HAPPY_VILLAGER, marker, 4, 0.22D, 0.4D, 0.22D, 0.005D);
+            }
+            if (marks.isEmpty()) spotterMarks.remove(spotterId);
+        }
+    }
+
     private boolean isBlockedBySmoke(Location from, Location to) {
         Vector start = from.toVector();
         Vector end = to.toVector();
@@ -1282,6 +1322,8 @@ public final class CameraShyGame implements Listener {
                     entity -> entity instanceof Player target && !target.getUniqueId().equals(id)
                             && players.containsKey(target.getUniqueId()) && alive.contains(target.getUniqueId()));
             if (trace == null || !(trace.getHitEntity() instanceof Player target)) continue;
+            Location focusedLocation = target.getLocation().clone().add(0.0D, 0.9D, 0.0D);
+            if (!shooter.hasLineOfSight(target) || isBlockedBySmoke(shooter.getEyeLocation(), focusedLocation)) continue;
             FocusKey key = new FocusKey(id, target.getUniqueId());
             focusSeenThisTick.add(key);
             focusAttempts.computeIfAbsent(key, ignored -> new FocusAttempt(serverTick, target.getLocation()));
@@ -1322,7 +1364,8 @@ public final class CameraShyGame implements Listener {
                 boolean visible = pursuer != null && pursuer.isOnline() && alive.contains(pursuerId)
                         && pursuer.getWorld() == victim.getWorld()
                         && victim.getLocation().distanceSquared(pursuer.getLocation()) <= 24.0D * 24.0D
-                        && victim.hasLineOfSight(pursuer);
+                        && victim.hasLineOfSight(pursuer)
+                        && !isBlockedBySmoke(victim.getEyeLocation(), pursuer.getEyeLocation());
                 if (visible) {
                     pursuit.lostSightSince = -1L;
                     continue;
@@ -1497,8 +1540,8 @@ public final class CameraShyGame implements Listener {
             }
             if (player.isGlowing()) player.setGlowing(false);
             if (humans.contains(id)) {
-                if (snapshot != null) snapshot.restore(player);
                 manager.returnPlayerToLobby(player);
+                if (snapshot != null) snapshot.restore(player);
                 player.sendMessage(ChatColor.GOLD + "Camera Shy ended: " + ChatColor.YELLOW + reason);
                 if (winnerId != null && winnerId.equals(id)) {
                     player.sendTitle(ChatColor.GOLD + "" + ChatColor.BOLD + "VICTORY!",
@@ -1654,16 +1697,17 @@ public final class CameraShyGame implements Listener {
     }
 
     private void ensureArena() {
-        if (arena != null && arena.getWorldBorder().getSize() > 0.0D) return;
-        World loaded = Bukkit.getWorld(WORLD_NAME);
-        if (loaded != null) {
-            arena = loaded;
-        } else {
-            WorldCreator creator = new WorldCreator(WORLD_NAME);
-            creator.type(WorldType.FLAT);
-            creator.generateStructures(false);
-            creator.environment(World.Environment.NORMAL);
-            arena = creator.createWorld();
+        if (arena == null) {
+            World loaded = Bukkit.getWorld(WORLD_NAME);
+            if (loaded != null) {
+                arena = loaded;
+            } else {
+                WorldCreator creator = new WorldCreator(WORLD_NAME);
+                creator.type(WorldType.FLAT);
+                creator.generateStructures(false);
+                creator.environment(World.Environment.NORMAL);
+                arena = creator.createWorld();
+            }
         }
         if (arena == null) return;
         arena.setDifficulty(Difficulty.PEACEFUL);
@@ -1677,8 +1721,10 @@ public final class CameraShyGame implements Listener {
         arena.setGameRule(org.bukkit.GameRule.FALL_DAMAGE, false);
         arena.getWorldBorder().setCenter(0.0D, 0.0D);
         arena.getWorldBorder().setSize(120.0D);
-        if (!plugin.getConfig().getBoolean("camera-shy.arena-built", false)
-                || !new File(Bukkit.getWorldContainer(), WORLD_NAME).exists()) {
+        boolean buildFlag = plugin.getConfig().getBoolean("camera-shy.arena-built", false);
+        Material foundationMarker = arena.getBlockAt(0, FLOOR_Y - 1, 0).getType();
+        Material floorMarker = arena.getBlockAt(0, FLOOR_Y, 0).getType();
+        if (CameraShyRules.arenaBuildRequired(buildFlag, foundationMarker, floorMarker)) {
             buildMaze(arena);
             plugin.getConfig().set("camera-shy.arena-built", true);
             plugin.saveConfig();
