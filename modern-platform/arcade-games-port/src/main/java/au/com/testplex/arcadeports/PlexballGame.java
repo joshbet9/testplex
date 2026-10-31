@@ -37,6 +37,12 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.scoreboard.Criteria;
+import org.bukkit.scoreboard.DisplaySlot;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Scoreboard;
+import org.bukkit.scoreboard.ScoreboardManager;
+import org.bukkit.scoreboard.Team;
 import org.bukkit.util.Vector;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -123,6 +129,18 @@ public final class PlexballGame implements Listener {
         private int atBats;
     }
 
+    private static final class PlayerHud {
+        private final Scoreboard scoreboard;
+        private final Objective sidebar;
+        private final List<Team> lineTeams = new ArrayList<>();
+        private final List<String> entries = new ArrayList<>();
+
+        private PlayerHud(Scoreboard scoreboard, Objective sidebar) {
+            this.scoreboard = scoreboard;
+            this.sidebar = sidebar;
+        }
+    }
+
     private static final class PlayerFrame {
         private final long tick;
         private final double x;
@@ -165,6 +183,7 @@ public final class PlexballGame implements Listener {
     private final LinkedHashMap<UUID, Player> queue = new LinkedHashMap<>();
     private final List<UUID> matchPlayers = new ArrayList<>();
     private final Map<UUID, PlayerResult> results = new HashMap<>();
+    private final Map<UUID, PlayerHud> playerHuds = new HashMap<>();
     private final Map<UUID, Deque<PlayerFrame>> playerHistory = new HashMap<>();
     private final Map<UUID, CatchAttempt> catchAttempts = new HashMap<>();
     private final Set<UUID> abilityUsedThisBall = new HashSet<>();
@@ -314,6 +333,7 @@ public final class PlexballGame implements Listener {
             }
         }
         queue.clear();
+        playerHuds.clear();
         phase = Phase.IDLE;
     }
 
@@ -328,6 +348,7 @@ public final class PlexballGame implements Listener {
         }
 
         recordPlayerSnapshots();
+        if (serverTick % 10L == 0L) refreshScoreboards();
         if (System.nanoTime() >= matchEndNanos) {
             finishAtTimeLimit();
             return;
@@ -380,7 +401,7 @@ public final class PlexballGame implements Listener {
         initialTurnIndex = 0;
         suddenDeathTurnIndex = 0;
         suddenDeath = false;
-        batterId = null;
+        batterId = participants.get(0).getUniqueId();
         matchEndTick = serverTick + PlexballRules.MATCH_LIMIT_TICKS;
         matchEndNanos = System.nanoTime() + 180_000_000_000L;
         phase = Phase.INTRO;
@@ -397,7 +418,12 @@ public final class PlexballGame implements Listener {
             player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "PLEXBALL"
                     + ChatColor.GRAY + " — " + selectedKits.getOrDefault(id, Kit.TECHNICIAN).displayName());
             player.sendMessage(ChatColor.YELLOW + "You get one 10-second batting turn. Everyone else fields.");
+            applyPlayerScoreboard(player);
+            player.sendTitle(ChatColor.GOLD + "PLEXBALL",
+                    ChatColor.YELLOW + "One swing each  |  100m home run  |  Longest uncaught hit wins",
+                    5, 35, 10);
         }
+        refreshScoreboards();
         broadcastMatch(ChatColor.GREEN + "Plexball is starting! " + ChatColor.YELLOW
                 + "The batter has 10 seconds; everyone else is in the outfield.");
     }
@@ -455,8 +481,22 @@ public final class PlexballGame implements Listener {
         battingDeadlineTick = serverTick + battingTicks;
         battingDeadlineNanos = System.nanoTime() + battingTicks * 50_000_000L;
         phase = Phase.BATTING;
+        for (UUID id : matchPlayers) {
+            Player participant = Bukkit.getPlayer(id);
+            if (participant == null || !participant.isOnline()) continue;
+            if (id.equals(playerId)) {
+                participant.sendTitle(ChatColor.GOLD + "YOUR AT-BAT",
+                        ChatColor.YELLOW + "Aim at the ball  |  Right-click once when the marker reaches the centre",
+                        2, 28, 6);
+            } else {
+                participant.sendTitle(ChatColor.AQUA + "FIELDING",
+                        ChatColor.YELLOW + "Move under the ball  |  Right-click your glove to attempt a catch",
+                        2, 28, 6);
+            }
+        }
         broadcastMatch(ChatColor.GOLD + batter.getName() + ChatColor.YELLOW
                 + (playoff ? " — sudden death! Hit another 100m home run." : " is batting!"));
+        refreshScoreboards();
         updateBattingHud();
     }
 
@@ -567,9 +607,11 @@ public final class PlexballGame implements Listener {
         if (message != null && !message.isBlank()) broadcastMatch(message);
         if (caught) {
             broadcastMatch(ChatColor.RED + "CAUGHT! " + ChatColor.YELLOW + "The batting attempt is void.");
+            showMatchResultTitle("CAUGHT!", "The hit is void  |  A fielder earns a catch");
         } else if (homeRun) {
             broadcastMatch(ChatColor.GOLD + "" + ChatColor.BOLD + "HOME RUN! "
                     + ChatColor.YELLOW + "100.0m");
+            showMatchResultTitle("HOME RUN!", "100 metres  |  Playoff may follow");
         } else if (distance > 0.0D) {
             broadcastMatch(ChatColor.GREEN + "Uncaught hit: " + ChatColor.WHITE
                     + String.format(java.util.Locale.ROOT, "%.1fm", distance));
@@ -577,6 +619,7 @@ public final class PlexballGame implements Listener {
         cleanupBall();
         broadcastLeaderboard();
         phase = Phase.TURN_BREAK;
+        refreshScoreboards();
         phaseEndTick = serverTick + TURN_BREAK_TICKS;
     }
 
@@ -704,6 +747,7 @@ public final class PlexballGame implements Listener {
         roundSurvivors.clear();
         roundDistances.clear();
         for (UUID id : participants) {
+            playerHuds.remove(id);
             Player player = Bukkit.getPlayer(id);
             if (player != null && player.isOnline()) plugin.returnPlayerToArcadeLobby(player);
         }
@@ -742,23 +786,130 @@ public final class PlexballGame implements Listener {
     private void updateBattingHud() {
         Player batter = batterId == null ? null : Bukkit.getPlayer(batterId);
         if (batter == null || !batter.isOnline()) return;
-        long effectiveTick = serverTick;
-        int phase = PlexballRules.timingDistanceTicks(effectiveTick, battingStartTick,
-                timingCycleTicks, timingPhaseOffset);
-        int remaining = (int) Math.max(0L, (battingDeadlineNanos - System.nanoTime() + 999_999_999L) / 1_000_000_000L);
+        int remaining = (int) Math.max(0L,
+                (battingDeadlineNanos - System.nanoTime() + 999_999_999L) / 1_000_000_000L);
         int beatPhase = Math.floorMod((int) (serverTick - battingStartTick - timingPhaseOffset), timingCycleTicks);
         int markerPosition = Math.min(20, beatPhase * 21 / timingCycleTicks);
-        StringBuilder beatBar = new StringBuilder(".....................");
-        beatBar.setCharAt(10, '|');
-        beatBar.setCharAt(markerPosition, '●');
-        String timerLabel = remaining == 0 ? "INPUT BUFFER" : remaining + "s";
-        batter.sendActionBar(Component.text("BAT  " + timerLabel + "  " + beatBar
-                + "  AIM AT BALL + SWING ON THE CENTRE"));
+        StringBuilder beatBar = new StringBuilder("..........|..........");
+        beatBar.setCharAt(markerPosition, markerPosition == 10 ? '*' : 'o');
+        String timerLabel = remaining == 0 ? "BUFFER" : remaining + "s";
+        batter.sendActionBar(Component.text("YOUR TURN  |  " + timerLabel + "  |  " + beatBar
+                + "  |  Aim at ball; right-click once when o meets |"));
         for (UUID id : matchPlayers) {
             if (id.equals(batterId)) continue;
             Player fielder = Bukkit.getPlayer(id);
-            if (fielder != null && fielder.isOnline()) {
-                fielder.sendActionBar(Component.text("FIELD  |  Move to the ball  |  Right-click glove to catch"));
+            if (fielder == null || !fielder.isOnline()) continue;
+            Kit kit = selectedKits.getOrDefault(id, Kit.TECHNICIAN);
+            fielder.sendActionBar(Component.text("FIELDING  |  Watch the ball  |  [1] Glove  [2] " + kit.abilityName()));
+        }
+    }
+
+    private void applyPlayerScoreboard(Player player) {
+        if (player == null || !player.isOnline()) return;
+        ScoreboardManager manager = Bukkit.getScoreboardManager();
+        if (manager == null) return;
+        UUID id = player.getUniqueId();
+        PlayerHud hud = playerHuds.get(id);
+        if (hud == null) {
+            Scoreboard scoreboard = manager.getNewScoreboard();
+            Objective sidebar = scoreboard.registerNewObjective(
+                    "plexball", Criteria.DUMMY, ChatColor.GOLD.toString() + ChatColor.BOLD + "PLEXBALL");
+            sidebar.setDisplaySlot(DisplaySlot.SIDEBAR);
+            hud = new PlayerHud(scoreboard, sidebar);
+            ChatColor[] colors = ChatColor.values();
+            for (int index = 0; index < 15; index++) {
+                Team team = scoreboard.registerNewTeam(String.format(java.util.Locale.ROOT, "pb_line_%02d", index));
+                String entry = colors[index].toString();
+                team.addEntry(entry);
+                hud.lineTeams.add(team);
+                hud.entries.add(entry);
+            }
+            playerHuds.put(id, hud);
+        }
+        if (player.getScoreboard() != hud.scoreboard) player.setScoreboard(hud.scoreboard);
+        renderScoreboard(player, hud);
+    }
+
+    private void refreshScoreboards() {
+        if (phase == Phase.IDLE) return;
+        for (UUID id : matchPlayers) {
+            Player player = Bukkit.getPlayer(id);
+            if (player != null && player.isOnline()) applyPlayerScoreboard(player);
+        }
+    }
+
+    private void renderScoreboard(Player viewer, PlayerHud hud) {
+        for (String entry : hud.entries) hud.scoreboard.resetScores(entry);
+        List<String> lines = new ArrayList<>();
+        String phaseLabel = switch (phase) {
+            case INTRO -> "GET READY";
+            case BATTING -> viewer.getUniqueId().equals(batterId) ? "YOUR AT-BAT" : "WATCH THE BATTER";
+            case BALL_FLIGHT -> "BALL IN PLAY";
+            case TURN_BREAK -> "NEXT BATTER";
+            default -> "WAITING";
+        };
+        lines.add(ChatColor.GOLD.toString() + ChatColor.BOLD + phaseLabel);
+        lines.add(ChatColor.WHITE + "Time left: " + formatMatchTime());
+        Player currentBatter = batterId == null ? null : Bukkit.getPlayer(batterId);
+        lines.add(ChatColor.YELLOW + "At bat: " + (currentBatter == null ? "—" : currentBatter.getName()));
+        lines.add(viewer.getUniqueId().equals(batterId)
+                ? ChatColor.GREEN + "Right-click bat once"
+                : ChatColor.AQUA + "Run to ball; use glove");
+        PlayerResult ownResult = results.getOrDefault(viewer.getUniqueId(), new PlayerResult());
+        lines.add(ChatColor.GREEN + "Best hit: " + formatDistance(ownResult.bestDistance));
+        lines.add(ChatColor.AQUA + "Catches: " + ownResult.catches);
+        Kit kit = selectedKits.getOrDefault(viewer.getUniqueId(), Kit.TECHNICIAN);
+        lines.add(ChatColor.LIGHT_PURPLE + "Kit: " + kit.displayName());
+        lines.add(ChatColor.LIGHT_PURPLE + "Ability: " + kit.abilityName());
+        lines.add(ChatColor.DARK_GRAY + "----------------");
+        lines.add(ChatColor.GOLD.toString() + ChatColor.BOLD + "TOP DISTANCES");
+        List<UUID> leaders = matchPlayers.stream()
+                .filter(id -> Bukkit.getPlayer(id) != null && Bukkit.getPlayer(id).isOnline())
+                .sorted((first, second) -> {
+                    PlayerResult a = results.getOrDefault(first, new PlayerResult());
+                    PlayerResult b = results.getOrDefault(second, new PlayerResult());
+                    int distance = Double.compare(b.bestDistance, a.bestDistance);
+                    return distance != 0 ? distance : Integer.compare(b.catches, a.catches);
+                }).limit(3).toList();
+        int rank = 1;
+        for (UUID id : leaders) {
+            Player leader = Bukkit.getPlayer(id);
+            PlayerResult result = results.getOrDefault(id, new PlayerResult());
+            lines.add(ChatColor.YELLOW + Integer.toString(rank++) + ". "
+                    + (leader == null ? "Offline" : leader.getName()) + " "
+                    + formatDistance(result.bestDistance));
+        }
+        lines.add(ChatColor.GREEN + "100m = HOME RUN");
+        lines.add(ChatColor.GRAY + "A caught hit scores 0m");
+        for (int index = 0; index < hud.lineTeams.size(); index++) {
+            Team team = hud.lineTeams.get(index);
+            if (index >= lines.size()) {
+                team.setPrefix(" ");
+                continue;
+            }
+            String line = lines.get(index);
+            if (line.length() > 64) line = line.substring(0, 64);
+            team.setPrefix(line);
+            hud.sidebar.getScore(hud.entries.get(index)).setScore(lines.size() - index);
+        }
+    }
+
+    private String formatMatchTime() {
+        long seconds = Math.max(0L,
+                (matchEndNanos - System.nanoTime() + 999_999_999L) / 1_000_000_000L);
+        return String.format(java.util.Locale.ROOT, "%d:%02d", seconds / 60L, seconds % 60L);
+    }
+
+    private static String formatDistance(double distance) {
+        return distance < 0.05D ? "—"
+                : String.format(java.util.Locale.ROOT, "%.1fm", Math.min(distance, PlexballRules.HOME_RUN_METRES));
+    }
+
+    private void showMatchResultTitle(String title, String subtitle) {
+        for (UUID id : matchPlayers) {
+            Player player = Bukkit.getPlayer(id);
+            if (player != null && player.isOnline()) {
+                player.sendTitle(ChatColor.GOLD + title, ChatColor.YELLOW + subtitle, 0, 24, 6);
             }
         }
     }
@@ -812,9 +963,14 @@ public final class PlexballGame implements Listener {
                 if (id.equals(batterId)) continue;
                 Player fielder = Bukkit.getPlayer(id);
                 if (fielder != null && fielder.isOnline()) {
-                    fielder.sendActionBar(Component.text("BALL  |  "
+                    Kit kit = selectedKits.getOrDefault(id, Kit.TECHNICIAN);
+                    String catchHint = catchUsedThisBall.contains(id) ? "Catch used"
+                            : (catchAttempts.containsKey(id) ? "Catch window active" : "[1] Right-click glove");
+                    String abilityHint = abilityUsedThisBall.contains(id) ? "Ability used"
+                            : "[2] " + kit.abilityName();
+                    fielder.sendActionBar(Component.text("BALL "
                             + String.format(java.util.Locale.ROOT, "%.1fm", distance)
-                            + "  |  Catch window closes when the ball lands"));
+                            + "  |  " + catchHint + "  |  " + abilityHint));
                 }
             }
         }
@@ -1110,6 +1266,7 @@ public final class PlexballGame implements Listener {
         UUID id = event.getPlayer().getUniqueId();
         queue.remove(id);
         catchAttempts.remove(id);
+        playerHuds.remove(id);
         if (phase == Phase.IDLE || !matchPlayers.contains(id)) return;
         if (id.equals(batterId)) resolveAttempt(0.0D, false, false, "Batter disconnected.");
     }
