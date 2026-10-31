@@ -2295,7 +2295,11 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.MILK_THE_COW) spawnMilkCowMapAnimals(session);
         if (type == ArcadePortGame.WITHER_ASSAULT) {
+            long activityStart = System.currentTimeMillis();
             for (Player player : alivePlayers(session)) {
+                if (session.teams.getOrDefault(player.getUniqueId(), 0) == 0) {
+                    session.witherLastHumanActivityAt.put(player.getUniqueId(), activityStart);
+                }
                 if (session.teams.getOrDefault(player.getUniqueId(), 0) == 1) {
                     player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, 300, 0, false, false, false));
                 }
@@ -12845,6 +12849,11 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        if (announceWinner && session.type == ArcadePortGame.WITHER_ASSAULT && winner != null
+                && session.teams.getOrDefault(winner.getUniqueId(), -1) == 0
+                && !session.witherHumanDamaged.contains(winner.getUniqueId())) {
+            awardCatalogAchievement(winner, "wither-assault", "lucid-dreams");
+        }
         if (announceWinner && session.type == ArcadePortGame.DEATH_TAG) {
             recordDeathTagRewards(session);
         }
@@ -15929,8 +15938,9 @@ public final class ArcadePortManager implements Listener {
             }
             double damage = event.getFinalDamage();
             if (damage > 0.0D) {
+                session.witherHumanDamaged.add(witherTarget.getUniqueId());
                 if (witherTarget.getHealth() <= damage) {
-                    playerOutWitherAssault(session, witherTarget);
+                    playerOutWitherAssault(session, witherTarget, witherAttacker);
                     if (active != session) return;
                     if (witherAttacker != null) witherAttacker.sendMessage(ChatColor.GREEN + "Human stunned: " + witherTarget.getName());
                 } else witherTarget.setHealth(witherTarget.getHealth() - damage);
@@ -17711,6 +17721,34 @@ public final class ArcadePortManager implements Listener {
         disguise.teleport(player.getLocation());
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onWitherHumanMove(org.bukkit.event.player.PlayerMoveEvent event) {
+        Session session = active;
+        Player player = event.getPlayer();
+        if (session == null || session.type != ArcadePortGame.WITHER_ASSAULT
+                || !session.alive.contains(player.getUniqueId())
+                || session.teams.getOrDefault(player.getUniqueId(), 1) != 0
+                || event.getTo() == null) return;
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (Math.abs(from.getX() - to.getX()) > 0.01D
+                || Math.abs(from.getY() - to.getY()) > 0.01D
+                || Math.abs(from.getZ() - to.getZ()) > 0.01D) {
+            session.witherLastHumanActivityAt.put(player.getUniqueId(), System.currentTimeMillis());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onWitherHumanInteract(org.bukkit.event.player.PlayerInteractEvent event) {
+        Session session = active;
+        Player player = event.getPlayer();
+        if (session != null && session.type == ArcadePortGame.WITHER_ASSAULT
+                && session.alive.contains(player.getUniqueId())
+                && session.teams.getOrDefault(player.getUniqueId(), 1) == 0) {
+            session.witherLastHumanActivityAt.put(player.getUniqueId(), System.currentTimeMillis());
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onWitherCopyCombust(org.bukkit.event.entity.EntityCombustEvent event) {
         Session session = active;
@@ -17733,7 +17771,17 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void playerOutWitherAssault(Session session, Player player) {
-        if (active != session || player == null || !session.alive.remove(player.getUniqueId())) return;
+        playerOutWitherAssault(session, player, null);
+    }
+
+    private void playerOutWitherAssault(Session session, Player player, Player attacker) {
+        if (active != session || player == null || !session.alive.contains(player.getUniqueId())) return;
+        if (attacker != null
+                && session.teams.getOrDefault(attacker.getUniqueId(), -1) == 1
+                && session.teams.getOrDefault(player.getUniqueId(), -1) == 0) {
+            recordWitherAssaultElimination(session, attacker, player);
+        }
+        if (!session.alive.remove(player.getUniqueId())) return;
         UUID id = player.getUniqueId();
         player.playEffect(EntityEffect.HURT);
         player.setHealth(player.getMaxHealth());
@@ -17766,6 +17814,17 @@ public final class ArcadePortManager implements Listener {
         checkRoundEnd(session);
     }
 
+    private void recordWitherAssaultElimination(Session session, Player wither, Player human) {
+        if (session == null || wither == null || human == null) return;
+        long lastActive = session.witherLastHumanActivityAt.getOrDefault(
+                human.getUniqueId(), session.startedAt);
+        if (System.currentTimeMillis() - lastActive > 60_000L) return;
+        Map<UUID, Integer> killsByVictim = session.witherKillsByAttackerTarget.computeIfAbsent(
+                wither.getUniqueId(), ignored -> new HashMap<>());
+        int kills = killsByVictim.merge(human.getUniqueId(), 1, Integer::sum);
+        if (kills >= 5) awardCatalogAchievement(wither, "wither-assault", "worst-wither-ever");
+    }
+
     private void reviveWitherHuman(Session session, Player thrower, UUID revivedId) {
         if (active != session || thrower == null || !session.alive.contains(thrower.getUniqueId())
                 || session.teams.getOrDefault(thrower.getUniqueId(), 1) != 0) return;
@@ -17791,6 +17850,11 @@ public final class ArcadePortManager implements Listener {
         }, 4L);
         session.alive.add(revivedId);
         session.lastLocations.put(revivedId, at.clone());
+        Set<UUID> revivedHumans = session.witherRevivedByPlayer.computeIfAbsent(
+                thrower.getUniqueId(), ignored -> new HashSet<>());
+        if (revivedHumans.add(revivedId) && revivedHumans.size() >= 5) {
+            awardCatalogAchievement(thrower, "wither-assault", "savior");
+        }
         revived.sendMessage(ChatColor.GREEN + "You have been revived by " + thrower.getName() + "!");
         thrower.sendMessage(ChatColor.GREEN + "Revived " + revived.getName() + ".");
         thrower.playSound(thrower.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.0F, 1.4F);
@@ -20182,6 +20246,7 @@ public final class ArcadePortManager implements Listener {
             double ageScale = 0.4D + 0.6D * Math.min(1.0D, skull.getTicksLived() / 20.0D);
             session.world.spawnParticle(Particle.EXPLOSION_EMITTER, blast, 1);
             session.world.playSound(blast, Sound.ENTITY_GENERIC_EXPLODE, 1.4F, 0.9F);
+            int humanKillsFromSkull = 0;
             for (Player target : alivePlayers(session)) {
                 if (session.teams.getOrDefault(target.getUniqueId(), 1) != 0) continue;
                 double distance = target.getLocation().distance(blast);
@@ -20194,8 +20259,14 @@ public final class ArcadePortManager implements Listener {
                         .setY(Math.max(0.3D, 0.65D * scale))));
                 target.getWorld().spawnParticle(Particle.CLOUD, target.getLocation().add(0.0D, 1.0D, 0.0D),
                         10, 0.35D, 0.4D, 0.35D, 0.04D);
-                if (target.getHealth() <= damage) playerOutWitherAssault(session, target);
-                else target.setHealth(target.getHealth() - damage);
+                if (damage > 0.0D) session.witherHumanDamaged.add(target.getUniqueId());
+                if (target.getHealth() <= damage) {
+                    humanKillsFromSkull++;
+                    if (owner != null && humanKillsFromSkull >= 3) {
+                        awardCatalogAchievement(owner, "wither-assault", "tormentor");
+                    }
+                    playerOutWitherAssault(session, target, owner);
+                } else target.setHealth(target.getHealth() - damage);
                 if (active != session) return;
                 if (owner != null) owner.sendActionBar(ChatColor.RED + "Wither Skull hit " + target.getName());
             }
@@ -20636,6 +20707,10 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Cow> milkCowDisguises = new HashMap<>();
         final Map<UUID, Long> milkChargeHungerAt = new HashMap<>();
         final Map<UUID, String> witherAssaultKits = new HashMap<>();
+        final Set<UUID> witherHumanDamaged = new HashSet<>();
+        final Map<UUID, Long> witherLastHumanActivityAt = new HashMap<>();
+        final Map<UUID, Set<UUID>> witherRevivedByPlayer = new HashMap<>();
+        final Map<UUID, Map<UUID, Integer>> witherKillsByAttackerTarget = new HashMap<>();
         final Map<UUID, Wither> witherDisguises = new HashMap<>();
         final Map<UUID, Skeleton> witherOutCopies = new HashMap<>();
         final Map<UUID, UUID> witherMinionOwners = new HashMap<>();
