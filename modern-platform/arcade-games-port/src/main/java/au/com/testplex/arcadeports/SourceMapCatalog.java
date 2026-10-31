@@ -1055,7 +1055,7 @@ public final class SourceMapCatalog {
         inferred.hasMinX = inferred.hasMaxX = inferred.hasMinZ = inferred.hasMaxZ = true;
         inferred.hasMinY = inferred.hasMaxY = true;
 
-        List<Location> spawns = findSafeSurfaceLocations(world, inferred, 16, 0.28D);
+        List<Location> spawns = findSafeSurfaceLocations(world, inferred, 16, 0.28D, bounds.populatedChunks());
         if (spawns.size() < 4) {
             plugin.getLogger().warning("Wizards archive " + resource
                     + " yielded only " + spawns.size() + " safe inferred starts; refusing to invent player spawns.");
@@ -1065,7 +1065,7 @@ public final class SourceMapCatalog {
 
         List<Location> chests = findWizardsChestBlocks(world, inferred, bounds.populatedChunks());
         if (chests.size() < 8) {
-            List<Location> replacements = findSafeSurfaceLocations(world, inferred, 32, 0.16D);
+            List<Location> replacements = findSafeSurfaceLocations(world, inferred, 32, 0.16D, bounds.populatedChunks());
             for (Location replacement : replacements) addDistinctSafeLocation(chests, replacement, 8.0D);
             plugin.getLogger().warning("Wizards archive " + resource
                     + " contains fewer than eight recoverable chest blocks; added test-only replacement chests.");
@@ -1174,23 +1174,50 @@ public final class SourceMapCatalog {
     }
 
     private static List<Location> findSafeSurfaceLocations(World world, MapData data, int wanted, double radiusFactor) {
+        return findSafeSurfaceLocations(world, data, wanted, radiusFactor, null);
+    }
+
+    private static List<Location> findSafeSurfaceLocations(
+            World world, MapData data, int wanted, double radiusFactor,
+            List<ChunkCoordinate> populatedChunks) {
         List<Location> found = new ArrayList<>();
+        java.util.Set<Long> allowedChunkKeys = null;
+        if (populatedChunks != null && !populatedChunks.isEmpty()) {
+            allowedChunkKeys = new java.util.HashSet<>();
+            for (ChunkCoordinate coordinate : populatedChunks) {
+                allowedChunkKeys.add(chunkKey(coordinate.x(), coordinate.z()));
+            }
+        }
+
         double radiusX = Math.max(4.0D, Math.min(data.width() * radiusFactor, data.width() / 2.0D - 4.0D));
         double radiusZ = Math.max(4.0D, Math.min(data.depth() * radiusFactor, data.depth() / 2.0D - 4.0D));
         for (int index = 0; index < wanted * 3 && found.size() < wanted; index++) {
             double angle = (Math.PI * 2.0D * index) / Math.max(1, wanted * 3);
             int x = (int) Math.round(data.centerX() + Math.cos(angle) * radiusX);
             int z = (int) Math.round(data.centerZ() + Math.sin(angle) * radiusZ);
-            addDistinctSafeLocation(found, findSafeSurfaceLocation(world, data, x, z, 8), 8.0D);
+            addDistinctSafeLocation(found,
+                    findSafeSurfaceLocation(world, data, x, z, 8, allowedChunkKeys), 8.0D);
         }
 
         int step = Math.max(8, (int) Math.min(data.width(), data.depth()) / 8);
         for (int x = data.minX + 4; x <= data.maxX - 4 && found.size() < wanted; x += step) {
             for (int z = data.minZ + 4; z <= data.maxZ - 4 && found.size() < wanted; z += step) {
-                addDistinctSafeLocation(found, findSafeSurfaceLocation(world, data, x, z, 4), 8.0D);
+                addDistinctSafeLocation(found,
+                        findSafeSurfaceLocation(world, data, x, z, 4, allowedChunkKeys), 8.0D);
             }
         }
         return found;
+    }
+
+    /** Pack signed chunk X/Z coordinates without losing negative values. */
+    static long chunkKey(int chunkX, int chunkZ) {
+        return ((long) chunkX << 32) | (chunkZ & 0xffffffffL);
+    }
+
+    /** Check original chunk membership before any Bukkit lookup can generate a missing terrain chunk. */
+    static boolean isBlockInPopulatedChunks(int blockX, int blockZ, java.util.Set<Long> chunkKeys) {
+        return chunkKeys == null || chunkKeys.contains(chunkKey(
+                Math.floorDiv(blockX, 16), Math.floorDiv(blockZ, 16)));
     }
 
     private static void addDistinctSafeLocation(List<Location> locations, Location candidate, double minimumDistance) {
@@ -1202,13 +1229,21 @@ public final class SourceMapCatalog {
         locations.add(candidate);
     }
 
-    private static Location findSafeSurfaceLocation(World world, MapData data, int targetX, int targetZ, int searchRadius) {
+    private static Location findSafeSurfaceLocation(
+            World world, MapData data, int targetX, int targetZ, int searchRadius) {
+        return findSafeSurfaceLocation(world, data, targetX, targetZ, searchRadius, null);
+    }
+
+    private static Location findSafeSurfaceLocation(
+            World world, MapData data, int targetX, int targetZ, int searchRadius,
+            java.util.Set<Long> allowedChunkKeys) {
         for (int radius = 0; radius <= searchRadius; radius++) {
             for (int dx = -radius; dx <= radius; dx++) {
                 for (int dz = -radius; dz <= radius; dz++) {
                     if (radius > 0 && Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
                     int x = targetX + dx, z = targetZ + dz;
                     if (x < data.minX + 2 || x > data.maxX - 2 || z < data.minZ + 2 || z > data.maxZ - 2) continue;
+                    if (!isBlockInPopulatedChunks(x, z, allowedChunkKeys)) continue;
                     int y = world.getHighestBlockYAt(x, z);
                     if (y < world.getMinHeight() || y + 2 >= world.getMaxHeight()) continue;
                     org.bukkit.block.Block floor = world.getBlockAt(x, y, z);
