@@ -16,6 +16,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private ArcadePortManager manager;
     private MonsterMazePlugin monsterMaze;
     private ArcadeMapSelectionMenu mapMenu;
+    private GamePreferenceMenu preferenceMenu;
     private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
 
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
@@ -47,10 +48,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         // in Monster Maze must not leave players in the unrelated survival world.
         manager = new ArcadePortManager(this);
         mapMenu = new ArcadeMapSelectionMenu(this);
+        preferenceMenu = new GamePreferenceMenu(this, manager);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
+        getServer().getPluginManager().registerEvents(preferenceMenu, this);
         getCommand("stats").setExecutor(this);
         getCommand("arcadeport").setExecutor(this);
+        getCommand("gamepreferences").setExecutor(this);
         publishArcadeRuntimeReadiness();
 
         // Monster Maze remains embedded in this Arcade host, but is not currently
@@ -243,6 +247,14 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if (command.getName().equalsIgnoreCase("gamepreferences")) {
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("Players only.");
+                return true;
+            }
+            preferenceMenu.open(player);
+            return true;
+        }
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
         switch (sub) {
             case "join":

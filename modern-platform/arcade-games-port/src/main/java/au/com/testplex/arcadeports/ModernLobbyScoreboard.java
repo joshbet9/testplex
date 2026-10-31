@@ -10,14 +10,16 @@ import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.ScoreboardManager;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * Paper 26.3 rendition of the 1.8 Testplex lobby sidebar.
+ * Paper 26.3 port of the actual 1.8 Nautilus Arcade lobby scoreboard.
  *
- * Game and kit are live lobby selections. Gems/Shards are isolated sandbox
- * values because the production Core account database is not connected.
+ * The source fields are Players, Kit, Gems (or Crowns on a crowns-enabled
+ * game), and Server. Division was only added for Minecraft League. This
+ * modern acceptance server has no Minecraft League/Crowns integration, so
+ * it deliberately renders the four standard fields only.
  */
 public final class ModernLobbyScoreboard {
     private final JavaPlugin plugin;
@@ -30,80 +32,37 @@ public final class ModernLobbyScoreboard {
         if (player == null || !player.isOnline()) return;
         ScoreboardManager manager = Bukkit.getScoreboardManager();
         if (manager == null) return;
+
         Scoreboard scoreboard = manager.getNewScoreboard();
-        String selectedGameId = plugin.getConfig().getString("lobby-selected-game", "bacon-brawl");
-        if (selectedGameId == null || selectedGameId.isBlank()) selectedGameId = "bacon-brawl";
-        boolean baconBrawlSelected = usesBaconBrawlLobbySidebar(selectedGameId);
-        String title = scoreboardTitleForGame(
-                selectedGameId, plugin.getConfig().getString("lobby-scoreboard.title", "Testplex"));
+        String status = plugin.getConfig().getString(
+                "lobby-countdown-status", "Waiting for players");
         Objective sidebar = scoreboard.registerNewObjective(
-                "testplex_lobby", Criteria.DUMMY,
-                org.bukkit.ChatColor.WHITE.toString() + ChatColor.BOLD + title);
+                "testplex_lobby", Criteria.DUMMY, scoreboardTitleForStatus(status));
         sidebar.setDisplaySlot(DisplaySlot.SIDEBAR);
 
-        String serverName = plugin.getConfig().getString("lobby-scoreboard.server-name", "Testplex Modern");
-        String website = plugin.getConfig().getString("lobby-scoreboard.website", "www.mineplex.com");
+        long currentPlayers = Bukkit.getOnlinePlayers().stream()
+                .filter(online -> ModernArcadeLobby.WORLD_NAME.equals(online.getWorld().getName()))
+                .count();
+        int playerCapacity = plugin.getConfig().getInt(
+                "lobby-scoreboard.player-capacity", Bukkit.getMaxPlayers());
+        if (playerCapacity < 1) playerCapacity = Math.max(1, Bukkit.getMaxPlayers());
 
-        List<String> owners = new ArrayList<>(plugin.getConfig().getStringList("owner-usernames"));
-        if (owners.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) owners.add("jn_playzmc");
-        boolean owner = owners.stream().anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
-
-        List<String> configuredAdmins = new ArrayList<>(plugin.getConfig().getStringList("admin-usernames"));
-        if (configuredAdmins.stream().noneMatch(name -> "jn_playzmc".equalsIgnoreCase(name))) configuredAdmins.add("jn_playzmc");
-        boolean configuredAdmin = configuredAdmins.stream()
-                .anyMatch(name -> name != null && name.equalsIgnoreCase(player.getName()));
-        boolean admin = player.isOp() || configuredAdmin
-                || player.hasPermission("testplex.arcadeports.admin")
-                || player.hasPermission("testplex.modern.admin");
-        String rank = rankName(owner, admin);
-
+        String selectedGameId = plugin.getConfig().getString("lobby-selected-game", "death-tag");
+        if (selectedGameId == null || selectedGameId.isBlank()) selectedGameId = "death-tag";
         String selectedKitId = plugin.getConfig().getString(
-                "lobby-kit-preferences." + player.getUniqueId() + "." + selectedGameId, "Default");
-        String gameName = formatGameName(selectedGameId);
+                "lobby-kit-preferences." + player.getUniqueId() + "." + selectedGameId, "None");
         String kitName = formatKitName(selectedKitId);
+        String serverName = plugin.getConfig().getString(
+                "lobby-scoreboard.server-name", "Testplex Modern");
+        String gems = String.valueOf(plugin.getConfig().getInt(
+                "lobby-scoreboard.gems." + player.getUniqueId(), 0));
 
-        String gems = String.valueOf(plugin.getConfig().getInt("lobby-scoreboard.gems." + player.getUniqueId(), 0));
-        String shards = String.valueOf(plugin.getConfig().getInt("lobby-scoreboard.shards." + player.getUniqueId(), 0));
-
-        // The legacy hub scoreboard changes to a game-owned sidebar when a game
-        // is loaded. Show a Bacon Brawl-specific lobby sidebar now, then the
-        // live Bacon meter scoreboard replaces it once the round actually starts.
-        // Every sidebar stays within Minecraft's 15-line limit.
-        List<String> lines = new ArrayList<>();
-        if (baconBrawlSelected) {
-            String status = plugin.getConfig().getString("lobby-countdown-status", "Awaiting start");
-            lines.add(ChatColor.GOLD.toString() + ChatColor.BOLD + "Kit");
-            lines.add(ChatColor.LIGHT_PURPLE + kitName);
-            lines.add(ChatColor.AQUA.toString() + ChatColor.BOLD + "Status");
-            lines.add(ChatColor.WHITE + status);
-            lines.add(ChatColor.GREEN.toString() + ChatColor.BOLD + "Objective");
-            lines.add(ChatColor.WHITE + "Last pig standing");
-            lines.add(ChatColor.GREEN.toString() + ChatColor.BOLD + "Gems");
-            lines.add(ChatColor.WHITE + gems);
-            lines.add(ChatColor.YELLOW.toString() + ChatColor.BOLD + "Shards");
-            lines.add(ChatColor.GRAY + shards);
-            lines.add(ChatColor.GOLD.toString() + ChatColor.BOLD + "Rank");
-            lines.add(ChatColor.DARK_GREEN + rank);
-            lines.add(ChatColor.RED.toString() + ChatColor.BOLD + "Website");
-            lines.add(ChatColor.DARK_AQUA + website);
-        } else {
-            lines.add(ChatColor.AQUA.toString() + ChatColor.BOLD + "Server");
-            lines.add(ChatColor.WHITE + serverName);
-            lines.add(ChatColor.GREEN.toString() + ChatColor.BOLD + "Game");
-            lines.add(ChatColor.AQUA + gameName);
-            lines.add(ChatColor.GOLD.toString() + ChatColor.BOLD + "Kit");
-            lines.add(ChatColor.LIGHT_PURPLE + kitName);
-            lines.add(ChatColor.GREEN.toString() + ChatColor.BOLD + "Gems");
-            lines.add(ChatColor.WHITE + gems);
-            lines.add(ChatColor.YELLOW.toString() + ChatColor.BOLD + "Shards");
-            lines.add(ChatColor.GRAY + shards);
-            lines.add(ChatColor.GOLD.toString() + ChatColor.BOLD + "Rank");
-            lines.add(ChatColor.DARK_GREEN + rank);
-            lines.add(ChatColor.RED.toString() + ChatColor.BOLD + "Website");
-            lines.add(ChatColor.DARK_AQUA + website);
-            lines.add("----------------");
-        }
-
+        List<String> lines = sidebarLines(
+                formatPlayerCount(currentPlayers, playerCapacity),
+                kitName,
+                gems,
+                serverName
+        );
         int score = lines.size();
         for (String line : lines) {
             sidebar.getScore(line).setScore(score--);
@@ -111,42 +70,81 @@ public final class ModernLobbyScoreboard {
         player.setScoreboard(scoreboard);
     }
 
-    static boolean usesBaconBrawlLobbySidebar(String gameId) {
-        return gameId != null && "bacon-brawl".equalsIgnoreCase(gameId.trim().replace('_', '-'));
+    /**
+     * Matches ArcadeManager's original draw() status title and colour changes.
+     */
+    static String scoreboardTitleForStatus(String status) {
+        String value = status == null || status.isBlank() ? "Waiting for players" : status.trim();
+        String lower = value.toLowerCase(Locale.ROOT);
+
+        if (lower.startsWith("vote ends in ")) {
+            String timer = value.substring("Vote ends in ".length());
+            return ChatColor.BOLD + "Vote ends in "
+                    + ChatColor.GREEN + ChatColor.BOLD + timer;
+        }
+        if (lower.startsWith("starting in ")) {
+            String countdown = value.substring("Starting in ".length());
+            return ChatColor.BOLD + "Starting in "
+                    + ChatColor.GREEN + ChatColor.BOLD + countdown;
+        }
+        return ChatColor.GREEN.toString() + ChatColor.BOLD + value;
     }
 
-    static String scoreboardTitleForGame(String gameId, String defaultTitle) {
-        return usesBaconBrawlLobbySidebar(gameId)
-                ? ChatColor.GOLD + "" + ChatColor.BOLD + "BACON BRAWL"
-                : defaultTitle;
+    /**
+     * Mirrors ArcadeScoreboardLine registration order:
+     * Players, Kit, Gems, Server, each with its original blank spacer.
+     */
+    static List<String> sidebarLines(
+            String players,
+            String kit,
+            String gems,
+            String server) {
+        return List.of(
+                spacer(0),
+                ChatColor.YELLOW.toString() + ChatColor.BOLD + "Players",
+                ChatColor.WHITE + players,
+                spacer(1),
+                ChatColor.GOLD.toString() + ChatColor.BOLD + "Kit",
+                ChatColor.WHITE + kit,
+                spacer(2),
+                ChatColor.GREEN.toString() + ChatColor.BOLD + "Gems",
+                ChatColor.WHITE + gems,
+                spacer(3),
+                ChatColor.AQUA.toString() + ChatColor.BOLD + "Server",
+                ChatColor.WHITE + server
+        );
     }
 
-    static String formatGameName(String gameId) {
-        if (gameId == null || gameId.isBlank()) return "Not selected";
-        ArcadePortGame game = ArcadePortGame.fromId(gameId);
-        return game != null ? game.displayName() : titleCase(gameId);
+    static String formatPlayerCount(long current, int capacity) {
+        int safeCapacity = Math.max(1, capacity);
+        long safeCurrent = Math.max(0L, current);
+        return safeCurrent + "/" + safeCapacity;
     }
 
     static String formatKitName(String kitId) {
-        if (kitId == null || kitId.isBlank()) return "Default";
+        if (kitId == null || kitId.isBlank()) return "None";
         return titleCase(kitId);
     }
 
-    static String rankName(boolean owner, boolean admin) {
-        if (owner) return "Owner";
-        return admin ? "Admin" : "No Rank";
+    private static String spacer(int index) {
+        return switch (index) {
+            case 0 -> ChatColor.BLACK + " ";
+            case 1 -> ChatColor.DARK_GRAY + " ";
+            case 2 -> ChatColor.GRAY + " ";
+            default -> ChatColor.WHITE + " ";
+        };
     }
 
     private static String titleCase(String value) {
         String normalized = value.trim().replace('_', '-');
-        if (normalized.isEmpty()) return "Default";
+        if (normalized.isEmpty()) return "None";
         StringBuilder result = new StringBuilder();
         for (String word : normalized.split("-")) {
             if (word.isBlank()) continue;
             if (!result.isEmpty()) result.append(' ');
             result.append(Character.toUpperCase(word.charAt(0)));
-            if (word.length() > 1) result.append(word.substring(1).toLowerCase(java.util.Locale.ROOT));
+            if (word.length() > 1) result.append(word.substring(1).toLowerCase(Locale.ROOT));
         }
-        return result.isEmpty() ? "Default" : result.toString();
+        return result.isEmpty() ? "None" : result.toString();
     }
 }

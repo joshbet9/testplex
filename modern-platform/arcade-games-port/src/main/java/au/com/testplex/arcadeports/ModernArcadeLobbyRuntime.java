@@ -18,6 +18,8 @@ import org.bukkit.entity.Mob;
 import org.bukkit.entity.Pig;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Sheep;
+import org.bukkit.entity.Skeleton;
+import org.bukkit.entity.Villager;
 import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -57,11 +59,6 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             "classic", "ember", "shockwave", "spark", "confetti", "frost", "slime"
     };
     private static final int[] KIT_MENU_SLOTS = {10, 11, 12, 13, 14, 15, 16, 17, 18};
-    private static final Material[] PEDESTAL_COLORS = {
-            Material.YELLOW_WOOL, Material.LIME_WOOL, Material.PINK_WOOL,
-            Material.ORANGE_WOOL, Material.LIGHT_BLUE_WOOL, Material.PURPLE_WOOL,
-            Material.RED_WOOL, Material.CYAN_WOOL, Material.GREEN_WOOL
-    };
     private static final int KIT_PEDESTAL_X = -17;
     private static final int QUEUE_PEDESTAL_X = 18;
 
@@ -160,23 +157,25 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private void refreshKitAndTeamNpcs() {
         World world = lobby.ensureWorld();
-        for (Entity e : new ArrayList<>(kitNpcs)) if (e != null && e.isValid()) e.remove();
+        for (Entity entity : new ArrayList<>(kitNpcs)) {
+            if (entity != null && entity.isValid()) entity.remove();
+        }
         kitNpcs.clear();
         if (teamNpc != null && teamNpc.isValid()) teamNpc.remove();
         teamNpc = null;
         if (world == null) return;
 
         List<KitChoice> choices = kitChoicesFor(selectedGame);
-        // A game with no selectable kits still gets its own labelled placeholder pedestal;
-        // do not leave the previous game's stations behind after a game change.
-        if (choices.isEmpty()) {
-            choices = List.of(new KitChoice("none", "No Kit Selection", Material.BARRIER));
-        }
+
+        // Clear the previous game's station footprints before creating the new
+        // layout. Otherwise switching from five kits to three leaves old wool,
+        // slabs and coloured borders visible behind the current stations.
+        clearKitAndQueuePedestalAreas(world);
+
         List<Pedestal> pedestals = new ArrayList<>();
         for (int i = 0; i < choices.size(); i++) {
             int centerZ = kitPedestalCenterZ(choices.size(), i);
-            Material color = PEDESTAL_COLORS[i % PEDESTAL_COLORS.length];
-            pedestals.add(new Pedestal(KIT_PEDESTAL_X, centerZ, color));
+            pedestals.add(new Pedestal(KIT_PEDESTAL_X, centerZ, choices.get(i).unlock.pedestalColor));
         }
         pedestals.add(new Pedestal(QUEUE_PEDESTAL_X, 0, Material.BLUE_WOOL));
         buildLegacyPedestals(world, pedestals);
@@ -186,47 +185,87 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             int centerZ = pedestals.get(i).centerZ;
             Location at = new Location(world, KIT_PEDESTAL_X + 0.5D,
                     ModernArcadeLobby.FLOOR_Y + 2.5D, centerZ + 0.5D);
-            LivingEntity npc;
-            if (selectedGame == ArcadePortGame.BACON_BRAWL && i == 2) {
-                Sheep sheep = world.spawn(at, Sheep.class);
-                sheep.setColor(DyeColor.PINK);
-                npc = sheep;
-            } else {
-                npc = world.spawn(at, Pig.class);
-            }
-            npc.setCustomName(("none".equals(choice.id) ? ChatColor.GRAY : ChatColor.YELLOW) + choice.name);
-            npc.setCustomNameVisible(true);
-            npc.setInvulnerable(true);
-            npc.setRemoveWhenFarAway(false);
-            npc.setPersistent(false);
-            npc.setSilent(true);
-            if (npc instanceof Mob mob) mob.setAI(false);
-            npc.getPersistentDataContainer().set(kitNpcKey, PersistentDataType.STRING, choice.id);
+            // The legacy kit stands faced back toward the spawn platform.
+            at.setYaw(-90.0F);
+            LivingEntity npc = spawnKitNpc(world, at, choice);
             kitNpcs.add(npc);
         }
 
         Location queueAt = new Location(world, QUEUE_PEDESTAL_X + 0.5D,
                 ModernArcadeLobby.FLOOR_Y + 2.5D, 0.5D);
+        queueAt.setYaw(90.0F);
         Sheep team = world.spawn(queueAt, Sheep.class);
         team.setColor(DyeColor.GRAY);
         String queueLabel = selectedGame == ArcadePortGame.BACON_BRAWL
                 ? "Free For All" : "Team / Queue";
-        team.setCustomName(ChatColor.AQUA + queueLabel + ChatColor.GRAY + " | right-click to queue");
+        team.setCustomName(ChatColor.AQUA + ChatColor.BOLD.toString() + queueLabel);
         team.setCustomNameVisible(true);
         team.setInvulnerable(true);
         team.setRemoveWhenFarAway(false);
         team.setPersistent(false);
         team.setSilent(true);
+        team.setGravity(false);
+        team.setCollidable(false);
         team.setAI(false);
         team.getPersistentDataContainer().set(teamNpcKey, PersistentDataType.STRING, "queue");
         teamNpc = team;
     }
 
+    private LivingEntity spawnKitNpc(World world, Location at, KitChoice choice) {
+        LivingEntity npc = world.spawn(at, choice.npcType);
+        npc.setCustomName(choice.unlock.nameColor + ChatColor.BOLD.toString() + choice.name);
+        npc.setCustomNameVisible(true);
+        npc.setInvulnerable(true);
+        npc.setRemoveWhenFarAway(false);
+        npc.setPersistent(false);
+        npc.setSilent(true);
+        npc.setGravity(false);
+        npc.setCollidable(false);
+        npc.setCanPickupItems(false);
+        npc.setRotation(at.getYaw(), 0.0F);
+        if (npc instanceof Mob mob) mob.setAI(false);
+        if (npc instanceof Sheep sheep && choice.entityColor != null) {
+            sheep.setColor(choice.entityColor);
+        }
+
+        org.bukkit.inventory.EntityEquipment equipment = npc.getEquipment();
+        if (equipment != null) {
+            equipment.setItemInMainHand(choice.heldItem == null ? null : new ItemStack(choice.heldItem));
+            equipment.setItemInMainHandDropChance(0.0F);
+            ItemStack[] armour = new ItemStack[4];
+            for (int slot = 0; slot < choice.armour.length; slot++) {
+                Material material = choice.armour[slot];
+                if (material != null) armour[slot] = new ItemStack(material);
+            }
+            equipment.setArmorContents(armour);
+            equipment.setBootsDropChance(0.0F);
+            equipment.setLeggingsDropChance(0.0F);
+            equipment.setChestplateDropChance(0.0F);
+            equipment.setHelmetDropChance(0.0F);
+        }
+
+        npc.getPersistentDataContainer().set(kitNpcKey, PersistentDataType.STRING, choice.id);
+        return npc;
+    }
+
+    private void clearKitAndQueuePedestalAreas(World world) {
+        clearPedestalArea(world, -22, -13, -20, 20);
+        clearPedestalArea(world, 15, 21, -4, 4);
+    }
+
+    private void clearPedestalArea(World world, int minX, int maxX, int minZ, int maxZ) {
+        for (int x = minX; x <= maxX; x++) {
+            for (int z = minZ; z <= maxZ; z++) {
+                world.getBlockAt(x, ModernArcadeLobby.FLOOR_Y, z).setType(Material.GRASS_BLOCK, false);
+                world.getBlockAt(x, ModernArcadeLobby.FLOOR_Y + 1, z).setType(Material.AIR, false);
+                world.getBlockAt(x, ModernArcadeLobby.FLOOR_Y + 2, z).setType(Material.AIR, false);
+            }
+        }
+    }
+
     /**
-     * LegacyGameLobbyManager.setKitTeamBlocks built a 4x4 coloured floor,
-     * 6x6 black outline, 2x2 raised wool block and slab cap. Build all outlines
-     * before the coloured floor patches so adjacent kit stations cannot paint
-     * over each other's coloured squares.
+     * Source-mapped Mineplex kit stations: individual coloured wool pads, a
+     * black outline, raised 2x2 wool blocks and stone-slab caps.
      */
     private void buildLegacyPedestals(World world, List<Pedestal> pedestals) {
         for (Pedestal pedestal : pedestals) {
@@ -257,7 +296,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         }
     }
 
-    /** Mirrors LegacyGameLobbyManager's four-block spacing around the kit display centre. */
+    /** Mirrors the legacy four-block kit spacing around the display centre. */
     static int kitPedestalCenterZ(int kitCount, int index) {
         if (kitCount < 1 || index < 0 || index >= kitCount) {
             throw new IllegalArgumentException("Invalid kit pedestal index/count.");
@@ -268,79 +307,173 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private List<KitChoice> kitChoicesFor(ArcadePortGame game) {
         return switch (game) {
             case BACON_BRAWL -> List.of(
-                    new KitChoice("el-muchacho-pigo", "El Muchacho Pigo", Material.PORKCHOP),
-                    new KitChoice("mama-piggles", "Mama Piggles", Material.COOKED_PORKCHOP),
-                    new KitChoice("pig", "Pig Cloak", Material.PHANTOM_MEMBRANE),
-                    new KitChoice("brutus-bacon", "Brutus Bacon", Material.SHIELD));
+                    choice("el-muchacho-pigo", "El Muchacho Pigo", Material.PORKCHOP,
+                            KitUnlock.FREE, Pig.class, null),
+                    choice("mama-piggles", "Mama Piggles", Material.COOKED_PORKCHOP,
+                            KitUnlock.GEM, Pig.class, null),
+                    choice("pig", "Pig Cloak", Material.PHANTOM_MEMBRANE,
+                            KitUnlock.GEM, Sheep.class, null, DyeColor.PINK),
+                    choice("brutus-bacon", "Brutus Bacon", Material.SHIELD,
+                            KitUnlock.ACHIEVEMENT, Pig.class, null));
             case BOMB_LOBBERS -> List.of(
-                    new KitChoice("jumper", "Jumper", Material.RABBIT_FOOT),
-                    new KitChoice("armorer", "Armorer", Material.IRON_CHESTPLATE),
-                    new KitChoice("pitcher", "Pitcher", Material.SNOWBALL),
-                    new KitChoice("waller", "Waller", Material.BRICKS));
+                    choice("jumper", "Jumper", Material.RABBIT_FOOT,
+                            KitUnlock.FREE, Zombie.class, Material.IRON_AXE),
+                    choice("armorer", "Armorer", Material.IRON_CHESTPLATE,
+                            KitUnlock.GEM, Zombie.class, Material.IRON_HELMET,
+                            null, Material.IRON_BOOTS, Material.IRON_LEGGINGS,
+                            Material.IRON_CHESTPLATE, Material.IRON_HELMET),
+                    choice("pitcher", "Pitcher", Material.SNOWBALL,
+                            KitUnlock.GEM, Zombie.class, Material.LEVER,
+                            null, Material.CHAINMAIL_BOOTS, Material.CHAINMAIL_LEGGINGS,
+                            Material.CHAINMAIL_CHESTPLATE, Material.CHAINMAIL_HELMET),
+                    choice("waller", "Waller", Material.BRICKS,
+                            KitUnlock.ACHIEVEMENT, Zombie.class, Material.STONE_BRICKS));
             case DEATH_TAG -> List.of(
-                    new KitChoice("runner-basher", "Runner Basher", Material.IRON_SWORD),
-                    new KitChoice("runner-archer", "Runner Archer", Material.BOW),
-                    new KitChoice("runner-traitor", "Runner Traitor", Material.GOLD_INGOT),
-                    new KitChoice("runner-null", "Runner Null", Material.BARRIER));
+                    choice("runner-basher", "Runner Basher", Material.IRON_SWORD,
+                            KitUnlock.FREE, Zombie.class, Material.IRON_SWORD),
+                    choice("runner-archer", "Runner Archer", Material.BOW,
+                            KitUnlock.GEM, Zombie.class, Material.BOW),
+                    choice("runner-traitor", "Runner Traitor", Material.GOLD_INGOT,
+                            KitUnlock.GEM, Zombie.class, Material.IRON_AXE));
             case DRAGON_ESCAPE -> List.of(
-                    new KitChoice("jumper", "Jumper", Material.FEATHER),
-                    new KitChoice("disruptor", "Disruptor", Material.TNT),
-                    new KitChoice("warper", "Warper", Material.ENDER_PEARL),
-                    new KitChoice("digger", "Digger", Material.IRON_PICKAXE));
+                    choice("jumper", "Jumper", Material.FEATHER,
+                            KitUnlock.FREE, Zombie.class, Material.IRON_AXE),
+                    choice("disruptor", "Disruptor", Material.TNT,
+                            KitUnlock.GEM, Zombie.class, Material.TNT),
+                    choice("warper", "Warper", Material.ENDER_PEARL,
+                            KitUnlock.GEM, Zombie.class, Material.ENDER_PEARL),
+                    choice("digger", "Digger", Material.IRON_PICKAXE,
+                            KitUnlock.ACHIEVEMENT, Zombie.class, Material.DIAMOND_PICKAXE));
             case DRAGONS -> List.of(
-                    new KitChoice("coward", "Coward", Material.FEATHER),
-                    new KitChoice("marksman", "Marksman", Material.BOW),
-                    new KitChoice("pyrotechnic", "Pyrotechnic", Material.FIREWORK_ROCKET));
+                    choice("coward", "Coward", Material.FEATHER,
+                            KitUnlock.FREE, Zombie.class, Material.IRON_AXE,
+                            null, Material.LEATHER_BOOTS, Material.LEATHER_LEGGINGS,
+                            Material.LEATHER_CHESTPLATE, Material.LEATHER_HELMET),
+                    choice("marksman", "Marksman", Material.BOW,
+                            KitUnlock.GEM, Zombie.class, Material.BOW,
+                            null, Material.CHAINMAIL_BOOTS, Material.CHAINMAIL_LEGGINGS,
+                            Material.CHAINMAIL_CHESTPLATE, Material.CHAINMAIL_HELMET),
+                    choice("pyrotechnic", "Pyrotechnic", Material.FIREWORK_ROCKET,
+                            KitUnlock.GEM, Zombie.class, Material.FIREWORK_ROCKET));
             case MICRO_BATTLES -> List.of(
-                    new KitChoice("micro-archer", "Archer", Material.BOW),
-                    new KitChoice("micro-worker", "Worker", Material.IRON_PICKAXE),
-                    new KitChoice("micro-fighter", "Fighter", Material.IRON_SWORD));
+                    choice("micro-archer", "Archer", Material.BOW,
+                            KitUnlock.FREE, Zombie.class, Material.BOW),
+                    choice("micro-worker", "Worker", Material.IRON_PICKAXE,
+                            KitUnlock.FREE, Zombie.class, Material.STONE_PICKAXE),
+                    choice("micro-fighter", "Fighter", Material.IRON_SWORD,
+                            KitUnlock.FREE, Zombie.class, Material.WOODEN_SWORD));
             case MONSTER_MAZE -> List.of(
-                    new KitChoice("jumper", "Jumper", Material.FEATHER),
-                    new KitChoice("slowball", "Slowballer", Material.SNOWBALL),
-                    new KitChoice("body-builder", "Body Builder", Material.APPLE),
-                    new KitChoice("repulsor", "Repulsor", Material.COAL),
-                    new KitChoice("maverick", "Maverick", Material.ARROW));
+                    choice("jumper", "Jumper", Material.FEATHER,
+                            KitUnlock.FREE, Skeleton.class, Material.FEATHER),
+                    choice("slowball", "Slowballer", Material.SNOWBALL,
+                            KitUnlock.GEM, Skeleton.class, Material.SNOWBALL),
+                    choice("body-builder", "Body Builder", Material.APPLE,
+                            KitUnlock.GEM, Skeleton.class, Material.IRON_CHESTPLATE),
+                    choice("repulsor", "Repulsor", Material.COAL,
+                            KitUnlock.ACHIEVEMENT, Skeleton.class, Material.COAL),
+                    choice("maverick", "Maverick", Material.ARROW,
+                            KitUnlock.ACHIEVEMENT, Skeleton.class, Material.BOW));
             case ONE_IN_THE_QUIVER -> List.of(
-                    new KitChoice("quiver-leaper", "Leaper", Material.RABBIT_FOOT),
-                    new KitChoice("quiver-brawler", "Brawler", Material.IRON_SWORD),
-                    new KitChoice("quiver-enchanter", "Enchanter", Material.ENCHANTED_BOOK),
-                    new KitChoice("quiver-slam-shot", "Slam Shot", Material.ARROW),
-                    new KitChoice("quiver-ninja", "Ninja", Material.ENDER_PEARL));
+                    choice("quiver-leaper", "Leaper", Material.RABBIT_FOOT,
+                            KitUnlock.FREE, Zombie.class, Material.STONE_SWORD),
+                    choice("quiver-brawler", "Brawler", Material.IRON_SWORD,
+                            KitUnlock.GEM, Zombie.class, Material.IRON_SWORD),
+                    choice("quiver-enchanter", "Enchanter", Material.ENCHANTED_BOOK,
+                            KitUnlock.GEM, Zombie.class, Material.BOW),
+                    choice("quiver-slam-shot", "Slam Shot", Material.ARROW,
+                            KitUnlock.GEM, Zombie.class, Material.DIAMOND_SHOVEL),
+                    choice("quiver-ninja", "Ninja", Material.ENDER_PEARL,
+                            KitUnlock.ACHIEVEMENT, Zombie.class, Material.GOLDEN_SWORD));
             case PAINTBALL -> List.of(
-                    new KitChoice("rifle", "Rifle", Material.IRON_HOE),
-                    new KitChoice("sniper", "Sniper", Material.CROSSBOW),
-                    new KitChoice("shotgun", "Shotgun", Material.BLAZE_ROD),
-                    new KitChoice("machine-gun", "Machine Gun", Material.DISPENSER));
+                    choice("rifle", "Rifle", Material.IRON_HOE,
+                            KitUnlock.FREE, Zombie.class, Material.IRON_HORSE_ARMOR),
+                    choice("sniper", "Sniper", Material.CROSSBOW,
+                            KitUnlock.ACHIEVEMENT, Zombie.class, Material.STONE_HOE),
+                    choice("shotgun", "Shotgun", Material.BLAZE_ROD,
+                            KitUnlock.GEM, Zombie.class, Material.IRON_HORSE_ARMOR),
+                    choice("machine-gun", "Machine Gun", Material.DISPENSER,
+                            KitUnlock.GEM, Zombie.class, Material.DIAMOND_HORSE_ARMOR));
             case RUNNER -> List.of(
-                    new KitChoice("runnerkit-leaper", "Leaper", Material.RABBIT_FOOT),
-                    new KitChoice("runnerkit-archer", "Archer", Material.BOW),
-                    new KitChoice("runnerkit-frosty", "Frosty", Material.SNOWBALL));
+                    choice("runnerkit-leaper", "Leaper", Material.RABBIT_FOOT,
+                            KitUnlock.FREE, Skeleton.class, Material.IRON_AXE),
+                    choice("runnerkit-archer", "Archer", Material.BOW,
+                            KitUnlock.GEM, Skeleton.class, Material.BOW),
+                    choice("runnerkit-frosty", "Frosty", Material.SNOWBALL,
+                            KitUnlock.GEM, Skeleton.class, Material.SNOWBALL));
             case SNEAKY_ASSASSINS -> List.of(
-                    new KitChoice("escape-artist", "Escape Artist", Material.INK_SAC),
-                    new KitChoice("assassin", "Assassin", Material.BOW),
-                    new KitChoice("briber", "Briber", Material.EMERALD),
-                    new KitChoice("revealer", "Revealer", Material.DIAMOND));
+                    choice("escape-artist", "Escape Artist", Material.INK_SAC,
+                            KitUnlock.FREE, Villager.class, Material.INK_SAC),
+                    choice("assassin", "Assassin", Material.BOW,
+                            KitUnlock.GEM, Villager.class, Material.BOW),
+                    choice("briber", "Briber", Material.EMERALD,
+                            KitUnlock.ACHIEVEMENT, Villager.class, Material.EMERALD),
+                    choice("revealer", "Revealer", Material.DIAMOND,
+                            KitUnlock.GEM, Villager.class, Material.DIAMOND));
             case SPLEEF -> List.of(
-                    new KitChoice("spleef-snowballer", "Snowballer", Material.SNOWBALL),
-                    new KitChoice("spleef-brawler", "Brawler", Material.IRON_SWORD),
-                    new KitChoice("spleef-archer", "Archer", Material.BOW));
+                    choice("spleef-snowballer", "Snowballer", Material.SNOWBALL,
+                            KitUnlock.FREE, Skeleton.class, Material.SNOWBALL),
+                    choice("spleef-brawler", "Brawler", Material.IRON_SWORD,
+                            KitUnlock.GEM, Skeleton.class, Material.IRON_AXE),
+                    choice("spleef-archer", "Archer", Material.BOW,
+                            KitUnlock.FREE, Skeleton.class, Material.BOW));
             case TURF_WARS -> List.of(
-                    new KitChoice("turf-wars-marksman", "Marksman", Material.BOW),
-                    new KitChoice("turf-wars-infiltrator", "Infiltrator", Material.IRON_SWORD),
-                    new KitChoice("turf-wars-shredder", "Shredder", Material.ARROW));
+                    choice("turf-wars-marksman", "Marksman", Material.BOW,
+                            KitUnlock.FREE, Zombie.class, Material.BOW),
+                    choice("turf-wars-infiltrator", "Infiltrator", Material.IRON_SWORD,
+                            KitUnlock.GEM, Zombie.class, Material.IRON_SWORD),
+                    choice("turf-wars-shredder", "Shredder", Material.ARROW,
+                            KitUnlock.GEM, Zombie.class, Material.BOW));
             default -> List.of();
         };
+    }
+
+    private static KitChoice choice(String id, String name, Material icon,
+                                    KitUnlock unlock, Class<? extends LivingEntity> npcType,
+                                    Material heldItem, Material... armour) {
+        return new KitChoice(id, name, icon, unlock, npcType, heldItem, null, armour);
+    }
+
+    private static KitChoice choice(String id, String name, Material icon,
+                                    KitUnlock unlock, Class<? extends LivingEntity> npcType,
+                                    Material heldItem, DyeColor entityColor) {
+        return new KitChoice(id, name, icon, unlock, npcType, heldItem, entityColor, new Material[0]);
+    }
+
+    private enum KitUnlock {
+        FREE(Material.YELLOW_WOOL, ChatColor.YELLOW),
+        GEM(Material.LIME_WOOL, ChatColor.GREEN),
+        ACHIEVEMENT(Material.MAGENTA_WOOL, ChatColor.LIGHT_PURPLE);
+
+        final Material pedestalColor;
+        final ChatColor nameColor;
+
+        KitUnlock(Material pedestalColor, ChatColor nameColor) {
+            this.pedestalColor = pedestalColor;
+            this.nameColor = nameColor;
+        }
     }
 
     private static final class KitChoice {
         final String id;
         final String name;
         final Material icon;
-        KitChoice(String id, String name, Material icon) {
+        final KitUnlock unlock;
+        final Class<? extends LivingEntity> npcType;
+        final Material heldItem;
+        final DyeColor entityColor;
+        final Material[] armour;
+
+        KitChoice(String id, String name, Material icon, KitUnlock unlock,
+                  Class<? extends LivingEntity> npcType, Material heldItem,
+                  DyeColor entityColor, Material... armour) {
             this.id = id;
             this.name = name;
             this.icon = icon;
+            this.unlock = unlock;
+            this.npcType = npcType;
+            this.heldItem = heldItem;
+            this.entityColor = entityColor;
+            this.armour = armour == null ? new Material[0] : armour.clone();
         }
     }
 

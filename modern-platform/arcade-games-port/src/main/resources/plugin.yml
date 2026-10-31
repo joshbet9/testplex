@@ -13,6 +13,10 @@ commands:
     description: Open local Testplex Arcade statistics (optionally for an online player).
     usage: /stats [player]
     aliases: [arcadestats]
+  gamepreferences:
+    description: Rate Arcade games and view their weighted rotation likelihood.
+    usage: /gamepreferences
+    aliases: [gameprefs]
   arcadeport:
     description: Start and test a modern Arcade game
     usage: /arcadeport <play|join|start|kit|ghost|maps|lobby|bot|status|stop>
