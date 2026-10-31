@@ -68,7 +68,7 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 | Standings | Distance and successful catches are broadcast after each completed batting attempt. |
 | Final results | Players receive a final hitting/fielding leaderboard and a personal recap with best hit, total uncaught distance, catches, home runs and at-bats. |
 | Player HUD | Every participant sees a live sidebar with phase, match clock, current batter, personal best, catches, kit/ability and the top three distances. |
-| Spectator camera and HUD | Spectators follow the batter between turns and the ItemDisplay ball during flight; a spectator-only scoreboard shows match time, batter, players and top five distances. |
+| Spectator camera and HUD | Spectators follow the next online batter during turn breaks and the ItemDisplay ball during flight; the spectator action bar and scoreboard name the next batter when one is queued, or show the round result when the round is complete. |
 | Progression menu | `/stats plexball` opens a read-only inventory page listing all nine achievements, four long-term career goals and the player's saved totals. |
 | Achievement unlocks | Each achievement unlocks once, is saved per UUID, and notifies the player with a message and challenge-complete sound. |
 | Milestone unlocks | Wins (250), successful catches (300), home runs (100) and uncaught hit distance (10km) progress cumulatively and persist between restarts. |
