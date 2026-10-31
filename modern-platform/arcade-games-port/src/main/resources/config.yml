@@ -25,6 +25,12 @@ game-preferences:
       - one-in-the-quiver
       - bomb-lobbers
 
+# Optional UUID-to-rank overrides for the Arcade tab list.
+# Valid values: owner, admin, mod, helper, ultra, player.
+# If no UUID override is present, owner-usernames/admin-usernames and rank permissions are used.
+lobby-scoreboard:
+  ranks: {}
+
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
   - jn_playzmc
