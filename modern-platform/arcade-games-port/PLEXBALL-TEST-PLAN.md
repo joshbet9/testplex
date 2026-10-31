@@ -1,6 +1,6 @@
 # Plexball — Paper 26.3 test plan
 
-Plexball is an experimental `ArcadePortGame` hosted by `ArcadeMechanicsModern` and started through the shared `ArcadePortManager` lifecycle. It remains outside the READY_FOR_TEST rotation allow-list, but is available through explicit Arcade lobby selection/queueing. The global manager owns the queue, countdown, active Session, participant/spectator membership, player snapshots, disconnect handling, stop and lobby restoration. Plexball owns only its game rules, batting turn order, ball simulation, scoreboard and progression. Its generated world is `testplex_plexball_arena_v1`.
+Plexball is a `READY_FOR_TEST` `ArcadePortGame` hosted by `ArcadeMechanicsModern` and started through the shared `ArcadePortManager` lifecycle. It is enabled in the controlled Testplex Arcade acceptance queue, not a claim of public production readiness. The shared manager owns its queue, 2–8 player limit, countdown, active Session, participant/spectator membership, player snapshots, disconnect handling, stop and lobby restoration. Plexball owns only its game rules, batting turn order, ball simulation, scoreboard and progression. Its generated world is `testplex_plexball_arena_v1`.
 
 ## Start and kit selection
 
@@ -19,7 +19,7 @@ Plexball is an experimental `ArcadePortGame` hosted by `ArcadeMechanicsModern` a
 - `/arcadeport status` — shows the Plexball queue or current phase.
 - `/arcadeport stop` — operator stop and return to lobby.
 
-At least two and at most eight players are supported. Queue admission, quick-start scheduling, explicit start and pre-game waiting are the same shared Arcade lifecycle used by other games; there is no Plexball-owned queue or countdown. On start, ArcadePortManager creates the active Session and captures player snapshots. Each player gets one initial batting turn. Everyone other than the current batter fields. The first round is capped at ten seconds per batter. Multiple home runs enter five-second sudden death, bounded by the same 180-second wall-clock match limit.
+At least two and at most eight real queued players are supported. Plexball bypasses the generic 16-player FakePlayerPlugin fixture; the game must never be inflated with AFK test bodies. Queue admission, quick-start scheduling, explicit start and pre-game waiting are the same shared Arcade lifecycle used by other games; there is no Plexball-owned queue or countdown. On start, ArcadePortManager creates the active Session and captures player snapshots. Each player gets one initial batting turn. Everyone other than the current batter fields. The first round is capped at ten seconds per batter. Multiple home runs enter five-second sudden death, bounded by the same 180-second wall-clock match limit.
 
 ## Achievements
 
@@ -57,7 +57,7 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 
 | Test | Expected |
 | --- | --- |
-| Join with 2–8 players | Queue starts and every participant enters the separate Plexball arena. |
+| Join with 2–8 players | The shared queue accepts no more than eight real participants; at least two are required; no 16-player fake-player fixture is spawned; every participant enters the separate Plexball arena. |
 | Spectate active match | `/arcadeport spectate plexball` adds the viewer to the global Arcade Session's `players` and `snapshots` maps but not its `alive` set; spectators do not bat, field, score, unlock progression or change match results. |
 | Queue leave | A player can remove themselves while queued; countdown resets if the queue falls below two players. |
 | Queue disconnect | A queued player's disconnect immediately updates the queue and cancels the countdown if fewer than two players remain. |
@@ -124,3 +124,4 @@ A high-ping client must not receive a catch merely because its packet arrived la
 - Ball rendering is an ItemDisplay moved by the server-side simulation. Its visual smoothness may vary by client FPS/network, but the server path and score do not.
 - The current catch rewind is capped at five ticks (approximately 250ms one-way estimate). Do not advertise Plexball as completely ping independent; validate the RTT matrix and adjust only with measured evidence.
 - Achievements and career milestones are implemented in a local Testplex profile (`plexball-progression.yml`). They provide unlock notifications and a stats menu, but do not award production Mineplex currency, XP, titles or cosmetics. Ranked leaderboards and public matchmaking are still out of scope. Plexball supports a read-only observer role for active test matches, limited to 16 concurrent viewers; observer membership and lifecycle are represented in the shared Arcade Session, not a Plexball-specific spectator set.
+- READY_FOR_TEST means available for controlled in-game acceptance only. Do not advertise or treat this as public production matchmaking until live multi-client, map, lifecycle and measured-RTT acceptance are signed off.
