@@ -54,6 +54,17 @@ class PlexballRulesTest {
     }
 
     @Test
+    void suddenDeathTimeoutDoesNotTreatAnIncompleteRoundAsComplete() {
+        Set<String> finalists = Set.of("alpha", "bravo", "charlie");
+        Set<String> completedTurns = Set.of("alpha", "bravo");
+        assertFalse(PlexballRules.hasCompletedRound(finalists, completedTurns));
+        assertFalse(PlexballRules.hasCompletedRound(finalists, Set.of()));
+        assertTrue(PlexballRules.hasCompletedRound(finalists, finalists));
+        assertTrue(PlexballRules.hasCompletedRound(Set.of("alpha"), Set.of("alpha")));
+        assertFalse(PlexballRules.hasCompletedRound(Set.of(), Set.of()));
+    }
+
+    @Test
     void catchCheckUsesSweptBallSegmentRatherThanOnlyEndPosition() {
         Vector player = new Vector(0.0D, 0.0D, 0.0D);
         Vector from = new Vector(-2.0D, 0.0D, 0.0D);
