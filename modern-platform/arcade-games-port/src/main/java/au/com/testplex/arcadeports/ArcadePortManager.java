@@ -73,6 +73,7 @@ import org.bukkit.entity.TNTPrimed;
 import org.bukkit.entity.ThrownPotion;
 import org.bukkit.entity.Zombie;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.Cancellable;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.configuration.file.YamlConfiguration;
@@ -90,6 +91,7 @@ import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import io.papermc.paper.event.entity.EntityKnockbackEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.ProjectileLaunchEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.EntityTargetEvent;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
@@ -112,6 +114,7 @@ import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerSwapHandItemsEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
@@ -1603,24 +1606,38 @@ public final class ArcadePortManager implements Listener {
         for (Player viewer : session.players.values()) {
             if (viewer == null || !viewer.isOnline()) continue;
             Scoreboard board = viewer.getScoreboard();
-            for (int id = 0; id < 4; id++) {
-                String name = "gt" + id;
-                Team old = board.getTeam(name);
-                if (old != null) old.unregister();
-                final int teamId = id;
-                if (!session.teams.containsValue(teamId)) continue;
-                Team team = board.registerNewTeam(name);
-                team.setColor(switch (id) {
-                    case 0 -> ChatColor.RED;
-                    case 1 -> ChatColor.BLUE;
-                    case 2 -> ChatColor.GREEN;
-                    default -> ChatColor.YELLOW;
-                });
-                for (Map.Entry<UUID, Player> member : session.players.entrySet()) {
-                    if (session.teams.getOrDefault(member.getKey(), -1) == teamId && member.getValue() != null) {
-                        team.addEntry(member.getValue().getName());
-                    }
+
+            // Scoreboard entries can only belong to one team. Replacing rank teams with
+            // gt0..gt3 therefore silently removed the rank prefix and sort priority.
+            // Rebuild one composite rank+game-team group for each player instead.
+            for (Team existing : new ArrayList<>(board.getTeams())) {
+                String name = existing.getName();
+                if (name.matches("r[0-5]_(owner|admin|mod|helper|ultra|player)(?:_t[0-3])?")
+                        || name.matches("gt[0-3]")) {
+                    existing.unregister();
                 }
+            }
+
+            for (Player tabPlayer : Bukkit.getOnlinePlayers()) {
+                if (tabPlayer == null || !tabPlayer.isOnline()) continue;
+                int teamId = session.players.containsKey(tabPlayer.getUniqueId())
+                        ? session.teams.getOrDefault(tabPlayer.getUniqueId(), -1) : -1;
+                if (teamId < 0 || teamId >= teamCountForGame(session.type)) teamId = -1;
+
+                String rank = ModernLobbyScoreboard.rankId(plugin, tabPlayer);
+                String groupName = ModernLobbyScoreboard.tabTeamSortKey(rank, teamId);
+                Team group = board.getTeam(groupName);
+                if (group == null) group = board.registerNewTeam(groupName);
+                group.setPrefix(ModernLobbyScoreboard.rankPrefix(plugin, tabPlayer));
+                if (teamId >= 0) {
+                    group.setColor(switch (teamId) {
+                        case 0 -> ChatColor.RED;
+                        case 1 -> ChatColor.BLUE;
+                        case 2 -> ChatColor.GREEN;
+                        default -> ChatColor.YELLOW;
+                    });
+                }
+                group.addEntry(tabPlayer.getName());
             }
         }
     }
@@ -19420,6 +19437,9 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
+        // Bukkit removes the quitter after this event. Refresh on the next tick so
+        // every remaining lobby viewer receives the corrected count and tab roster.
+        Bukkit.getScheduler().runTask(plugin, lobby::refreshLobbyScoreboards);
         UUID id = event.getPlayer().getUniqueId();
         PlayerSnapshot endingSnapshot = endingSnapshots.remove(id);
         if (endingSnapshot != null) pendingRestore.put(id, endingSnapshot);
@@ -19532,7 +19552,125 @@ public final class ArcadePortManager implements Listener {
             if (snapshot != null) snapshot.restore(player);
             if (!lobby.isLobbyWorld(player.getWorld())) lobby.sendToLobby(player);
             else lobby.ensurePanelItem(player);
+            lobby.refreshLobbyScoreboards();
         });
+    }
+
+    /**
+     * Shared Prepare-phase gate. Game-specific handlers remain focused on mechanics;
+     * this gate rejects all player-originated gameplay input until Live begins.
+     */
+    private boolean isPreparingParticipant(Player player) {
+        Session session = active;
+        return player != null && session != null
+                && session.players.containsKey(player.getUniqueId())
+                && !ArcadeLobbyLifecycleRules.gameplayInputAllowed(session.liveStarted);
+    }
+
+    private boolean cancelPrepareAction(Player player, Cancellable event) {
+        if (!isPreparingParticipant(player)) return false;
+        event.setCancelled(true);
+        return true;
+    }
+
+    private Player playerShooter(Entity source) {
+        if (source instanceof Player player) return player;
+        if (source instanceof Projectile projectile && projectile.getShooter() instanceof Player player) {
+            return player;
+        }
+        return null;
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPreparePlayerInteract(PlayerInteractEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPreparePlayerInteractEntity(PlayerInteractEntityEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareBlockBreak(BlockBreakEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareBlockPlace(BlockPlaceEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareDamage(EntityDamageEvent event) {
+        if (event.getEntity() instanceof Player victim && isPreparingParticipant(victim)) {
+            event.setCancelled(true);
+            return;
+        }
+        if (event instanceof EntityDamageByEntityEvent byEntity
+                && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) {
+            return;
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareProjectileLaunch(ProjectileLaunchEvent event) {
+        cancelPrepareAction(playerShooter(event.getEntity()), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareInventoryClick(InventoryClickEvent event) {
+        if (event.getWhoClicked() instanceof Player player) cancelPrepareAction(player, event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareInventoryDrag(InventoryDragEvent event) {
+        if (event.getWhoClicked() instanceof Player player) cancelPrepareAction(player, event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareItemDrop(PlayerDropItemEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareItemPickup(EntityPickupItemEvent event) {
+        if (event.getEntity() instanceof Player player) cancelPrepareAction(player, event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareItemConsume(PlayerItemConsumeEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareBucketFill(PlayerBucketFillEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareFishing(PlayerFishEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareFlightToggle(PlayerToggleFlightEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareHandSwap(PlayerSwapHandItemsEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareArmorStandManipulate(PlayerArmorStandManipulateEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareFoodChange(FoodLevelChangeEvent event) {
+        if (event.getEntity() instanceof Player player) cancelPrepareAction(player, event);
     }
 
     private static final class TurfWarsInfiltration {
