@@ -280,16 +280,13 @@ jobs:
             name="${existing##*/}"
             [[ "$name" =~ ^testplex-modern-artifacts-[0-9a-f]{40}$ ]] || continue
             [[ "$existing" == "$upload_dir" ]] && continue
-            # Another workflow may be actively uploading to a different SHA-named
-            # directory. Only prune caches that have been untouched for >24h.
-            mtime="$(stat -c %Y -- "$existing" 2>/dev/null || printf '0')"
-            if [[ "$mtime" =~ ^[0-9]+$ ]] && (( now_epoch - mtime > 86400 )); then
-              size="$(du -sh -- "$existing" 2>/dev/null | cut -f1 || true)"
-              echo "Removing abandoned modern deployment cache (>24h old): $existing (${size:-size unavailable})"
-              sudo -n rm -rf -- "$existing"
-            else
-              echo "Leaving recent/possibly active modern staging directory untouched: $existing"
-            fi
+            # All modern deploy invocations share this workflow's concurrency group, so no
+            # other modern upload can be active while this staging step runs. These directories
+            # contain generated transfer chunks only; the installed JARs and recovery backups live
+            # elsewhere and are never touched here.
+            size="$(du -sh -- "$existing" 2>/dev/null | cut -f1 || true)"
+            echo "Removing prior modern deployment staging cache: $existing (${size:-size unavailable})"
+            sudo -n rm -rf -- "$existing"
           done
           sudo -n rm -rf -- "$upload_dir"
           echo "Disk usage after staging-cache cleanup:"
