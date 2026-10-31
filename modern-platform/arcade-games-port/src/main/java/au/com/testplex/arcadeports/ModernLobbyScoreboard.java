@@ -175,6 +175,10 @@ public final class ModernLobbyScoreboard {
             String value = configured.trim().toLowerCase(Locale.ROOT);
             if (List.of("owner", "admin", "mod", "helper", "ultra", "player").contains(value)) return value;
         }
+        if (plugin.getConfig().getStringList("owner-usernames").stream()
+                .anyMatch(name -> name.equalsIgnoreCase(player.getName()))) return "owner";
+        if (plugin.getConfig().getStringList("admin-usernames").stream()
+                .anyMatch(name -> name.equalsIgnoreCase(player.getName()))) return "admin";
         if (player.hasPermission("testplex.rank.owner")) return "owner";
         if (player.hasPermission("testplex.rank.admin") || player.isOp()) return "admin";
         if (player.hasPermission("testplex.rank.mod")) return "mod";
