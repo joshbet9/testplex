@@ -53,6 +53,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     private UUID firstDisplayId;
     private UUID secondDisplayId;
     private UUID firstPasserId;
+    private UUID passPasserId;
     private UUID passReceiverId;
     private UUID firstShooterId;
     private UUID blockerId;
@@ -245,7 +246,7 @@ public final class HoopsPaperSmoke extends JavaPlugin {
             require(liveBall != null && intendedReceiver != null,
                     "launched pass or intended receiver disappeared before catch");
             Location livePosition = ((Location) field(liveBall, "location")).clone();
-            field(liveBall, "velocity", new Vector(0.0D, 0.0D, 0.0D));
+            setField(liveBall, "velocity", new Vector(0.0D, 0.0D, 0.0D));
             intendedReceiver.teleport(livePosition.subtract(0.0D, 1.0D, 0.0D));
             intendedReceiver.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
             return;
@@ -550,6 +551,11 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     private static Object field(Object target, String name) throws Exception {
         Field field = findField(target.getClass(), name);
         return field.get(target);
+    }
+
+    private static void setField(Object target, String name, Object value) throws Exception {
+        Field field = findField(target.getClass(), name);
+        field.set(target, value);
     }
 
     private static Method method(Class<?> type, String name, Class<?>... parameters) throws Exception {
