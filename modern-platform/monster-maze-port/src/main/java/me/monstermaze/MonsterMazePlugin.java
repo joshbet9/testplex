@@ -172,7 +172,7 @@ public final class MonsterMazePlugin {
         pause.setExecutor(new PauseCommand(this));
 
         statusHeartbeatReporter.start();
-        getLogger().info("Monster Maze game module registered with Testplex Arcade. Player joins, queues and returns are owned by Testplex.");
+        getLogger().info("Monster Maze gameplay initialization completed; awaiting Testplex Arcade manager attachment.");
         getLogger().info("Active map: " + mapManager.getActiveMap());
         getLogger().info("Mode: " + mode.id);
         getLogger().info("Run recording: " + recordRuns);

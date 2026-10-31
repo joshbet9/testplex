@@ -59,13 +59,16 @@ class ArcadePortGameTest {
     }
 
     @Test void sourceMapResetTargetsPaper263MigratedDimensionFolder() {
-        Path primaryWorld = Path.of("/srv/testplex/world");
-        assertEquals(primaryWorld.resolve("dimensions/minecraft/arcadeport_source_bacon_brawl"),
-                SourceMapCatalog.migratedDimensionFolder(primaryWorld, "arcadeport_source_bacon_brawl"));
+        Path primaryWorld = Path.of(System.getProperty("java.io.tmpdir"), "testplex", "world")
+                .toAbsolutePath().normalize();
+        Path migrated = SourceMapCatalog.migratedDimensionFolder(primaryWorld, "arcadeport_source_bacon_brawl");
+        assertEquals(primaryWorld.resolve("dimensions").resolve("minecraft").resolve("arcadeport_source_bacon_brawl"),
+                migrated);
+        assertTrue(migrated.startsWith(primaryWorld), "migrated source dimension must stay inside the primary world");
         assertNull(SourceMapCatalog.migratedDimensionFolder(primaryWorld, "world"));
         assertNull(SourceMapCatalog.migratedDimensionFolder(primaryWorld, "../arcadeport_source_bacon_brawl"));
         assertNull(SourceMapCatalog.migratedDimensionFolder(
-                Path.of("/srv/testplex/arcadeport_source_other"), "arcadeport_source_bacon_brawl"));
+                primaryWorld.resolveSibling("arcadeport_source_other"), "arcadeport_source_bacon_brawl"));
     }
 
     @Test void selectingBaconBrawlUsesItsOwnLobbyScoreboardAndLegacyStartCountdown() {
