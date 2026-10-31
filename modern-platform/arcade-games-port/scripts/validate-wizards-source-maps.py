@@ -88,6 +88,152 @@ def parse_config(raw):
     return meta
 
 
+def read_nbt_payload(stream, tag_type, depth=0):
+    import struct
+    if depth > 64:
+        raise ValueError("NBT nesting exceeds 64 levels")
+    def unpack(fmt):
+        size = struct.calcsize(fmt)
+        raw = stream.read(size)
+        if len(raw) != size:
+            raise ValueError("truncated NBT payload")
+        return struct.unpack(fmt, raw)[0]
+    def read_string():
+        length = unpack(">H")
+        raw = stream.read(length)
+        if len(raw) != length:
+            raise ValueError("truncated NBT string")
+        return raw.decode("utf-8", errors="replace")
+    if tag_type == 1: return unpack(">b")
+    if tag_type == 2: return unpack(">h")
+    if tag_type == 3: return unpack(">i")
+    if tag_type == 4: return unpack(">q")
+    if tag_type == 5: return unpack(">f")
+    if tag_type == 6: return unpack(">d")
+    if tag_type == 7:
+        length = unpack(">i")
+        raw = stream.read(length)
+        if length < 0 or len(raw) != length: raise ValueError("invalid NBT byte array")
+        return raw
+    if tag_type == 8: return read_string()
+    if tag_type == 9:
+        child_type = unpack(">B")
+        length = unpack(">i")
+        if length < 0 or length > 10_000_000: raise ValueError("invalid NBT list length")
+        return [read_nbt_payload(stream, child_type, depth + 1) for _ in range(length)]
+    if tag_type == 10:
+        result = {}
+        while True:
+            child_type = unpack(">B")
+            if child_type == 0: break
+            child_name = read_string()
+            result[child_name] = read_nbt_payload(stream, child_type, depth + 1)
+        return result
+    if tag_type == 11:
+        length = unpack(">i")
+        if length < 0 or length > 10_000_000: raise ValueError("invalid NBT int array")
+        return [unpack(">i") for _ in range(length)]
+    if tag_type == 12:
+        length = unpack(">i")
+        if length < 0 or length > 10_000_000: raise ValueError("invalid NBT long array")
+        return [unpack(">q") for _ in range(length)]
+    raise ValueError("unsupported NBT tag type " + str(tag_type))
+
+
+def read_nbt(raw):
+    import io, struct
+    stream = io.BytesIO(raw)
+    tag_type_raw = stream.read(1)
+    if not tag_type_raw or tag_type_raw[0] != 10:
+        raise ValueError("NBT root is not a compound")
+    length_raw = stream.read(2)
+    if len(length_raw) != 2: raise ValueError("truncated NBT root name")
+    name_length = struct.unpack(">H", length_raw)[0]
+    root_name = stream.read(name_length)
+    if len(root_name) != name_length: raise ValueError("truncated NBT root name")
+    return read_nbt_payload(stream, 10)
+
+
+def decompress_nbt(raw, compression):
+    import gzip, zlib
+    if compression == 1: return gzip.decompress(raw)
+    if compression == 2: return zlib.decompress(raw)
+    if compression == 3: return raw
+    raise ValueError("unknown Anvil chunk compression " + str(compression))
+
+
+def inspect_level_dat(zf, path):
+    try:
+        raw = zf.read(path)
+        import gzip
+        try: decoded = gzip.decompress(raw)
+        except OSError: decoded = raw
+        root = read_nbt(decoded)
+        data = root.get("Data", root)
+        spawn = {key: data.get("Spawn" + key) for key in ("X", "Y", "Z")}
+        version = data.get("DataVersion")
+        version_tag = data.get("Version")
+        if isinstance(version_tag, dict):
+            version = version_tag.get("Id", version)
+        return {"spawn": spawn, "data_version": version, "level_name": data.get("LevelName")}
+    except Exception as error:
+        return {"parse_error": str(error)}
+
+
+def inspect_region_chunks(zf, region_paths):
+    import struct
+    active_chunks = []
+    chests = []
+    failures = []
+    for region_path in region_paths:
+        try:
+            raw = zf.read(region_path)
+            if len(raw) < 8192:
+                failures.append(region_path + ": shorter than Anvil header")
+                continue
+            parts = PurePosixPath(region_path).stem.split(".")
+            region_x, region_z = int(parts[1]), int(parts[2])
+            for index in range(1024):
+                offset = int.from_bytes(raw[index * 4:index * 4 + 3], "big")
+                sectors = raw[index * 4 + 3]
+                if offset == 0 or sectors == 0:
+                    continue
+                location = offset * 4096
+                if location + 5 > len(raw):
+                    failures.append(region_path + ": chunk offset outside file")
+                    continue
+                length = struct.unpack(">I", raw[location:location + 4])[0]
+                compression = raw[location + 4]
+                if length < 1 or location + 4 + length > len(raw):
+                    failures.append(region_path + ": invalid chunk length")
+                    continue
+                chunk_x = region_x * 32 + (index % 32)
+                chunk_z = region_z * 32 + (index // 32)
+                active_chunks.append([chunk_x, chunk_z])
+                try:
+                    payload = decompress_nbt(raw[location + 5:location + 4 + length], compression)
+                    chunk = read_nbt(payload)
+                    level = chunk.get("Level", chunk)
+                    for tile in level.get("TileEntities", []) if isinstance(level, dict) else []:
+                        if not isinstance(tile, dict): continue
+                        tile_id = str(tile.get("id", "")).lower()
+                        if tile_id in {"chest", "minecraft:chest", "trapped_chest", "minecraft:trapped_chest"}:
+                            chests.append({
+                                "x": tile.get("x"), "y": tile.get("y"), "z": tile.get("z"),
+                                "id": tile_id,
+                            })
+                except Exception as error:
+                    failures.append(region_path + " chunk " + str(chunk_x) + "," + str(chunk_z) + ": " + str(error))
+        except Exception as error:
+            failures.append(region_path + ": " + str(error))
+    return {
+        "active_chunk_count": len(active_chunks),
+        "active_chunk_coordinates_sample": active_chunks[:100],
+        "chest_tile_entity_count": len(chests),
+        "chest_tile_entities_sample": chests[:100],
+        "region_parse_errors": failures[:20],
+    }
+
 def inspect_zip(path):
     with zipfile.ZipFile(path) as zf:
         infos = zf.infolist()
@@ -112,6 +258,9 @@ def inspect_zip(path):
             raise ValueError("ZIP CRC failed: " + bad)
 
         files = {name: info for name, info in entries if not info.is_dir()}
+        level_entries = [name for name in files if PurePosixPath(name).name.lower() == "level.dat"]
+        config_entries = [name for name in files if PurePosixPath(name).name.lower() == "worldconfig.dat"]
+        downloader_entries = [name for name in files if PurePosixPath(name).name.lower() == "worlddownloader.txt"]
         suffix_counts = {}
         top_level = set()
         for name in files:
@@ -132,6 +281,16 @@ def inspect_zip(path):
             name for name in files
             if "region" in PurePosixPath(name).parts and name.lower().endswith(".mca")
         ]
+        level_meta = inspect_level_dat(zf, level_entries[0]) if len(level_entries) == 1 else {
+            "parse_error": "expected exactly one level.dat; found " + str(len(level_entries))
+        }
+        world_downloader_text = None
+        if len(downloader_entries) == 1:
+            try:
+                world_downloader_text = zf.read(downloader_entries[0]).decode("utf-8", errors="replace")[:4000]
+            except Exception as error:
+                world_downloader_text = "Could not decode WorldDownloader.txt: " + str(error)
+        region_meta = inspect_region_chunks(zf, region_entries)
         schematics = [
             name for name in files
             if PurePosixPath(name).suffix.lower() in {".schematic", ".schem"}
@@ -166,6 +325,9 @@ def inspect_zip(path):
             "uncompressed_bytes": expanded,
             "inventory": inventory,
             "format_guess": format_guess,
+            "level_dat": level_meta,
+            "world_downloader_txt": world_downloader_text,
+            "region_data": region_meta,
         }
         if not roots:
             return {
@@ -316,6 +478,12 @@ def main():
             lines.append(f"  - Extensions: {inventory.get('extension_counts', {})}")
             lines.append(f"  - Relevant files: {', '.join(inventory.get('relevant_names', inventory.get('schematic_entries', []) + inventory.get('region_mca_entries', []) + inventory.get('world_config_entries', []) + inventory.get('level_dat_entries', []))) or 'none'}")
             lines.append(f"  - Sample files: {', '.join(inventory.get('sample_files', []))}")
+        if r.get("level_dat") is not None:
+            lines.append(f"  - level.dat parse: {r.get('level_dat')}")
+        if r.get("region_data") is not None:
+            lines.append(f"  - Region/chest scan: {r.get('region_data')}")
+        if r.get("world_downloader_txt"):
+            lines.append("  - WorldDownloader.txt: " + r["world_downloader_txt"].replace("\n", " / ")[:1000])
         for note in r.get("notes", []):
             lines.append(f"  - Review: {note}")
     lines += ["", "Structural PASS requires ZIP CRC success, one unambiguous shallowest world root with level.dat and WorldConfig.dat, and at least one region/*.mca terrain file. WorldConfig.dat is parsed for MAP_NAME, bounds, TEAM_SPAWNS, DATA_LOCS and CUSTOM_LOCS.",
