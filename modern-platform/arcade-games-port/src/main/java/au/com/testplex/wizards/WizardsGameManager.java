@@ -165,7 +165,22 @@ public final class WizardsGameManager implements Listener {
 
     private World createArena() {
         String sourceMap = SourceMapCatalog.selectedResourceForFolders(plugin, "wizards", WIZARDS_MAP_FOLDERS);
-        if (sourceMap != null) return createSourceMapArena(sourceMap);
+        if (sourceMap != null) {
+            World imported = createSourceMapArena(sourceMap);
+            if (imported != null) return imported;
+
+            // The source ZIP is experimental until it passes a live Paper round.
+            // Never strand Wizards because an archive's terrain cannot be adapted:
+            // fall back to the known generated test arena and keep the rejection in logs.
+            plugin.getLogger().warning("Wizards source map " + sourceMap
+                    + " failed runtime validation; using the generated test arena for this match.");
+            arena = null;
+            activeMapResource = null;
+            sourceMapData = null;
+            sourceSpawnLocations.clear();
+            chests.clear();
+            return createGeneratedArena();
+        }
 
         if (activeMapResource != null) {
             String sourceWorld = plugin.getConfig().getString("wizards.source-map-world", "arcadeport_source_wizards");
