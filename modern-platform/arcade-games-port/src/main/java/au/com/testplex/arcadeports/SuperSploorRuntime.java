@@ -62,6 +62,46 @@ public final class SuperSploorRuntime implements Listener {
             int bestSpecialTargets) { }
     public record TerritorySummary(int redUnits, int blueUnits, int totalUnits) { }
 
+    private static final class InkMine {
+        final UUID ownerId; final int team; final Location location;
+        final long armedAt; final long expiresAt;
+        final Set<UUID> hitPlayers = new HashSet<>();
+        InkMine(UUID ownerId, int team, Location location, long armedAt, long expiresAt) {
+            this.ownerId=ownerId; this.team=team; this.location=location.clone();
+            this.armedAt=armedAt; this.expiresAt=expiresAt;
+        }
+    }
+    private static final class Sprinkler {
+        final UUID ownerId; final int team; final Location location; final long expiresAt;
+        final Set<UUID> hitPlayers = new HashSet<>(); long nextPulseAt;
+        Sprinkler(UUID ownerId, int team, Location location, long now) {
+            this.ownerId=ownerId; this.team=team; this.location=location.clone();
+            this.expiresAt=now+6_000L; this.nextPulseAt=now;
+        }
+    }
+    private static final class TrackerFlare {
+        final UUID ownerId; final int team; final Location location; final long expiresAt;
+        long nextPulseAt;
+        TrackerFlare(UUID ownerId, int team, Location location, long now) {
+            this.ownerId=ownerId; this.team=team; this.location=location.clone();
+            this.expiresAt=now+4_000L; this.nextPulseAt=now;
+        }
+    }
+    private static final class DelayedBlast {
+        final UUID ownerId; final int team; final Location location; final long detonatesAt;
+        DelayedBlast(UUID ownerId, int team, Location location, long detonatesAt) {
+            this.ownerId=ownerId; this.team=team; this.location=location.clone(); this.detonatesAt=detonatesAt;
+        }
+    }
+    private static final class Paintstorm {
+        final UUID ownerId; final int team; final Location center; final long expiresAt;
+        final Set<UUID> hitPlayers = new HashSet<>(); long nextPulseAt; int pulsesRemaining=4;
+        Paintstorm(UUID ownerId, int team, Location center, long now) {
+            this.ownerId=ownerId; this.team=team; this.center=center.clone();
+            this.expiresAt=now+2_000L; this.nextPulseAt=now;
+        }
+    }
+
     private static final class MutableStats {
         long territoryPainted;
         long enemyTerritoryReclaimed;
@@ -102,6 +142,18 @@ public final class SuperSploorRuntime implements Listener {
     private final Map<UUID, Long> lastShotAt = new HashMap<>();
     private final Map<UUID, Long> lastInkRegenAt = new HashMap<>();
     private final Map<UUID, Long> chargerChargeStartedAt = new HashMap<>();
+    private final Map<UUID, Double> specialCharge = new HashMap<>();
+    private final Map<UUID, Long> secondaryReadyAt = new HashMap<>();
+    private final Map<UUID, Long> stampedeUntil = new HashMap<>();
+    private final Map<UUID, Long> stampedeNextPaintAt = new HashMap<>();
+    private final Map<UUID, Set<UUID>> stampedeHitPlayers = new HashMap<>();
+    private final Map<UUID, Set<UUID>> specialTargetsThisActivation = new HashMap<>();
+    private final List<InkMine> mines = new ArrayList<>();
+    private final List<Sprinkler> sprinklers = new ArrayList<>();
+    private final List<TrackerFlare> trackerFlares = new ArrayList<>();
+    private final List<DelayedBlast> delayedBlasts = new ArrayList<>();
+    private final List<Paintstorm> paintstorms = new ArrayList<>();
+    private final Map<UUID, String> projectileKinds = new HashMap<>();
     private final Map<UUID, Integer> dodgeRollCharges = new HashMap<>();
     private final Map<UUID, Long> nextDodgeRollRechargeAt = new HashMap<>();
     private final Map<UUID, Long> dualiesRollExpiresAt = new HashMap<>();
@@ -195,6 +247,9 @@ public final class SuperSploorRuntime implements Listener {
             MutableStats stats = new MutableStats();
             stats.kit = kit;
             playerStats.put(id, stats);
+            specialCharge.put(id, 0.0D);
+            secondaryReadyAt.put(id, now);
+            specialTargetsThisActivation.put(id, new HashSet<>());
             contributors.put(id, new HashSet<>());
             if ("dualies".equals(kit)) {
                 dodgeRollCharges.put(id, 2);
@@ -226,6 +281,8 @@ public final class SuperSploorRuntime implements Listener {
         if (!running || engine == null) return;
         updateChargerPaintLines();
         rechargeDodgeRolls(now);
+        updateTemporaryDevices(now);
+        updateStampedes(now);
         for (Map.Entry<UUID, Long> charge : new ArrayList<>(chargerChargeStartedAt.entrySet())) {
             Player chargingPlayer = players.get(charge.getKey());
             if (chargingPlayer != null && chargingPlayer.isOnline()) {
@@ -338,8 +395,12 @@ public final class SuperSploorRuntime implements Listener {
         };
         player.getInventory().setItem(0, namedItem(weapon, ChatColor.GOLD + name,
                 "Right-click to use your primary • ink cost depends on kit"));
+        player.getInventory().setItem(1, namedItem(secondaryIcon(kit),
+                ChatColor.GREEN + secondaryName(kit), secondaryDescription(kit)));
+        player.getInventory().setItem(2, namedItem(Material.BLAZE_POWDER,
+                ChatColor.LIGHT_PURPLE + specialName(kit), "Right-click when the Special gauge reaches 100%."));
         if ("dualies".equals(kit)) {
-            player.getInventory().setItem(1, namedItem(Material.ENDER_PEARL,
+            player.getInventory().setItem(3, namedItem(Material.ENDER_PEARL,
                     ChatColor.AQUA + "Dodge Roll", "Right-click to dodge. Two charges; one recharges every 5 seconds."));
         }
         player.getInventory().setItem(7, namedItem(Material.INK_SAC, ChatColor.AQUA + "Squid Mode",
@@ -391,8 +452,10 @@ public final class SuperSploorRuntime implements Listener {
         int value = ink.getOrDefault(id, 0);
         player.setExp(value / 100.0F);
         player.setLevel(value);
+        int special = (int) Math.floor(specialCharge.getOrDefault(id, 0.0D));
         player.sendActionBar(ChatColor.AQUA + "INK " + value + "%"
                 + (squidMode.contains(id) ? ChatColor.GREEN + "  SQUID" : "")
+                + ChatColor.GRAY + "  | " + ChatColor.LIGHT_PURPLE + " SPECIAL " + special + "%"
                 + ChatColor.GRAY + "  |  " + ChatColor.RED + engine.redUnits() + ChatColor.GRAY
                 + " : " + ChatColor.AQUA + engine.blueUnits());
     }
@@ -409,7 +472,14 @@ public final class SuperSploorRuntime implements Listener {
                 || !held.getItemMeta().hasDisplayName()) return;
         String heldName = ChatColor.stripColor(held.getItemMeta().getDisplayName());
         String kit = kits.getOrDefault(id, "sprayer");
-
+        if (event.getAction().isRightClick() && heldName.equals(secondaryName(kit))) {
+            useSecondary(player, id);
+            return;
+        }
+        if (event.getAction().isRightClick() && heldName.equals(specialName(kit))) {
+            useSpecial(player, id);
+            return;
+        }
         if ("dualies".equals(kit) && "Dodge Roll".equals(heldName)
                 && event.getAction().isRightClick()) {
             useDodgeRoll(player, id);
@@ -616,6 +686,10 @@ public final class SuperSploorRuntime implements Listener {
         if (stats == null || result == null) return;
         stats.territoryPainted += result.changedUnits();
         stats.enemyTerritoryReclaimed += result.enemyReclaimed();
+        if (!stampedeUntil.containsKey(ownerId)) {
+            specialCharge.merge(ownerId, result.changedUnits() * 0.10D,
+                    (oldValue, gain) -> Math.min(100.0D, oldValue + gain));
+        }
         if ("roller".equals(kits.get(ownerId))) stats.rollerTerritory += result.changedUnits();
         if ("lobber".equals(kits.get(ownerId))) stats.lobberEnemyReclaimed += result.enemyReclaimed();
     }
@@ -889,8 +963,9 @@ public final class SuperSploorRuntime implements Listener {
                 ChatColor.RED + "Red: " + red + "%",
                 ChatColor.AQUA + "Blue: " + blue + "%",
                 ChatColor.GRAY + "Neutral: " + neutral + "%",
+                ChatColor.LIGHT_PURPLE + "Special: charged in hotbar",
                 ChatColor.DARK_GRAY + " ",
-                ChatColor.WHITE + "Your ink: " + ChatColor.AQUA + "shown below");
+                ChatColor.WHITE + "Ink: " + ChatColor.AQUA + "XP bar");
         int score = lines.size();
         for (String line : lines) {
             sidebarEntries.add(line);
