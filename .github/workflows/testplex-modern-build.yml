@@ -43,6 +43,15 @@ jobs:
             modern-platform/snake-port/pom.xml
             modern-platform/arcade-games-port/pom.xml
 
+      - name: Set up Node.js 24 for Minecraft 26.3 protocol clients
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install pinned offline Minecraft 26.3 protocol client
+        run: |
+          npm install --prefix "$RUNNER_TEMP/wizards-protocol-client" --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "@wp2508/minecraft-protocol@1.69.5"
+
       - name: Build and run catalogue tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/pom.xml clean verify
 
@@ -61,7 +70,8 @@ jobs:
           bash modern-platform/arcade-games-port/scripts/run-wizards-paper-smoke.sh \
             modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar \
             "$smoke_dir/target/WizardsPaperSmoke.jar" \
-            "$RUNNER_TEMP/wizards-paper-smoke"
+            "$RUNNER_TEMP/wizards-paper-smoke" \
+            "$RUNNER_TEMP/wizards-protocol-client/node_modules"
 
       - name: Upload Wizards Paper smoke results and server log
         if: always()
@@ -71,6 +81,7 @@ jobs:
           path: |
             ${{ runner.temp }}/wizards-paper-smoke/plugins/WizardsPaperSmoke/results.tsv
             ${{ runner.temp }}/wizards-paper-smoke/server.log
+            ${{ runner.temp }}/wizards-paper-smoke/client-bots.log
           if-no-files-found: ignore
           retention-days: 14
 
