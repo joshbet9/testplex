@@ -668,11 +668,11 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
      * compiling against a version-specific getter.
      */
     private static String nmsDamageState(Player player) {
-        String[] names = {"damageCooldownTime", "lastHurt", "invulnerableDuration", "invulnerableTime", "hurtTime"};
+        String[] names = {"damageCooldownTime", "lastHurt", "invulnerableDuration", "invulnerableTime", "hurtTime",
+                "invulnerable", "removed"};
         StringBuilder result = new StringBuilder();
         try {
-            Method getHandle = player.getClass().getMethod("getHandle");
-            Object handle = getHandle.invoke(player);
+            Object handle = player.getClass().getMethod("getHandle").invoke(player);
             for (String name : names) {
                 Object value = "missing";
                 Class<?> cursor = handle.getClass();
@@ -689,10 +689,63 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 if (result.length() > 0) result.append(',');
                 result.append(name).append('=').append(value);
             }
+            Object abilities = handle.getClass().getMethod("getAbilities").invoke(handle);
+            result.append(",abilities.invulnerable=").append(readFieldValue(abilities, "invulnerable"));
+            result.append(",handle.isAlive=").append(invokeNoArgs(handle, "isAlive"));
+            result.append(",handle.isSpectator=").append(invokeNoArgs(handle, "isSpectator"));
+            result.append(",handle.isCreative=").append(invokeNoArgs(handle, "isCreative"));
+            Object damageSources = handle.getClass().getMethod("damageSources").invoke(handle);
+            Object generic = damageSources.getClass().getMethod("generic").invoke(damageSources);
+            Object level = handle.getClass().getMethod("level").invoke(handle);
+            Method query = null;
+            for (Class<?> cursor = handle.getClass(); cursor != null && query == null; cursor = cursor.getSuperclass()) {
+                for (Method method : cursor.getDeclaredMethods()) {
+                    if (method.getName().equals("isInvulnerableTo") && method.getParameterCount() == 2
+                            && method.getParameterTypes()[0].isInstance(level)
+                            && method.getParameterTypes()[1].isInstance(generic)) {
+                        query = method;
+                        break;
+                    }
+                }
+            }
+            if (query != null) {
+                query.setAccessible(true);
+                result.append(",handle.isInvulnerableToGeneric=").append(query.invoke(handle, level, generic));
+            } else {
+                result.append(",handle.isInvulnerableToGeneric=missing");
+            }
         } catch (Throwable failure) {
-            return "unavailable:" + failure.getClass().getSimpleName() + ":" + failure.getMessage();
+            result.append(",diagnosticError=").append(failure.getClass().getSimpleName())
+                    .append(':').append(failure.getMessage());
         }
         return result.toString();
+    }
+
+    private static Object readFieldValue(Object target, String name) {
+        try {
+            Class<?> cursor = target.getClass();
+            while (cursor != null) {
+                try {
+                    Field field = cursor.getDeclaredField(name);
+                    field.setAccessible(true);
+                    return field.get(target);
+                } catch (NoSuchFieldException missing) {
+                    cursor = cursor.getSuperclass();
+                }
+            }
+            return "missing";
+        } catch (Throwable failure) {
+            return "error:" + failure.getClass().getSimpleName();
+        }
+    }
+
+    private static Object invokeNoArgs(Object target, String name) {
+        try {
+            Method method = target.getClass().getMethod(name);
+            return method.invoke(target);
+        } catch (Throwable failure) {
+            return "error:" + failure.getClass().getSimpleName();
+        }
     }
 
     private static Boolean readMarkedInvulnerability(Player player) {
