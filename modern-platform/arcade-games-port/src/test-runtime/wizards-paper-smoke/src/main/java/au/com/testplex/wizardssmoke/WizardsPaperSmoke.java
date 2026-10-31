@@ -314,7 +314,11 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         Location beamTarget = findSafeLocationNear(owner);
         require(beamTarget != null, "could not find a safe nearby test location for the direct-target spell");
         rival.teleport(beamTarget);
+        // Reset both parts of vanilla's hurt-resistance window. noDamageTicks
+        // alone does not clear the last-hit threshold, which can reject the
+        // damage before Bukkit raises EntityDamageByEntityEvent.
         rival.setNoDamageTicks(0);
+        rival.setLastDamage(0.0D);
         rival.setHealth(0.25D);
         double beamDistance = owner.getEyeLocation().distance(rival.getEyeLocation());
         Class<?> rulesType = Class.forName("au.com.testplex.wizards.WizardsRules");
@@ -338,6 +342,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 + "|valid=" + rival.isValid() + "|dead=" + rival.isDead()
                 + "|sameWorld=" + rival.getWorld().equals(gameplayArena)
                 + "|noDamageTicks=" + rival.getNoDamageTicks()
+                + "|lastDamageAmount=" + rival.getLastDamage()
                 + "|markedInvulnerable=" + readMarkedInvulnerability(rival)
                 + "|health=" + (rival.isDead() ? 0.0D : rival.getHealth()));
         require(Math.abs((manaBeforeBeam - manaAfterBeam) - 17.0D) < 0.01D,
