@@ -6471,7 +6471,12 @@ public final class ArcadePortManager implements Listener {
         if(guess.equals(answer)){
             boolean first=session.drawCorrectGuessers.isEmpty();
             session.drawCorrectGuessers.add(playerId);session.scores.merge(playerId,first?3:1,Integer::sum);
+            String drawStatsPath = localStatsPath(playerId, "draw-my-thing");
+            plugin.getConfig().set(drawStatsPath + "correct-guesses",
+                    plugin.getConfig().getInt(drawStatsPath + "correct-guesses", 0) + 1);
             if(first){
+                plugin.getConfig().set(drawStatsPath + "first-guesses",
+                        plugin.getConfig().getInt(drawStatsPath + "first-guesses", 0) + 1);
                 if (used == 0) {
                     int streak = session.drawFirstGuessStreaks.merge(playerId, 1, Integer::sum);
                     if (streak >= 3) awardCatalogAchievement(player, "draw-my-thing", "triple-threat");
@@ -13803,10 +13808,13 @@ public final class ArcadePortManager implements Listener {
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean heroesOfGwenWinner = session.type == ArcadePortGame.HEROES_OF_GWEN
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean witherAssaultWinner = session.type == ArcadePortGame.WITHER_ASSAULT
+                    && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean deathTagWinner = session.type == ArcadePortGame.DEATH_TAG && winnerId != null
                     && session.tagged.contains(id) == session.tagged.contains(winnerId);
             boolean won = winnerId != null && (winnerId.equals(id) || turfWarsWinner || paintballWinner
-                    || sheepQuestWinner || milkCowWinner || castleAssaultWinner || heroesOfGwenWinner || deathTagWinner
+                    || sheepQuestWinner || milkCowWinner || castleAssaultWinner || heroesOfGwenWinner
+                    || witherAssaultWinner || deathTagWinner
                     || ((session.type == ArcadePortGame.BOMB_LOBBERS
                             || session.type == ArcadePortGame.MICRO_BATTLES)
                         && session.alive.contains(id)
@@ -17980,6 +17988,9 @@ public final class ArcadePortManager implements Listener {
         long lastActive = session.witherLastHumanActivityAt.getOrDefault(
                 human.getUniqueId(), session.startedAt);
         if (System.currentTimeMillis() - lastActive > 60_000L) return;
+        String statPath = localStatsPath(wither.getUniqueId(), "wither-assault");
+        plugin.getConfig().set(statPath + "kills",
+                plugin.getConfig().getInt(statPath + "kills", 0) + 1);
         Map<UUID, Integer> killsByVictim = session.witherKillsByAttackerTarget.computeIfAbsent(
                 wither.getUniqueId(), ignored -> new HashMap<>());
         int kills = killsByVictim.merge(human.getUniqueId(), 1, Integer::sum);
@@ -18011,6 +18022,9 @@ public final class ArcadePortManager implements Listener {
         }, 4L);
         session.alive.add(revivedId);
         session.lastLocations.put(revivedId, at.clone());
+        String reviveStatsPath = localStatsPath(thrower.getUniqueId(), "wither-assault");
+        plugin.getConfig().set(reviveStatsPath + "revives",
+                plugin.getConfig().getInt(reviveStatsPath + "revives", 0) + 1);
         Set<UUID> revivedHumans = session.witherRevivedByPlayer.computeIfAbsent(
                 thrower.getUniqueId(), ignored -> new HashSet<>());
         if (revivedHumans.add(revivedId) && revivedHumans.size() >= 5) {
