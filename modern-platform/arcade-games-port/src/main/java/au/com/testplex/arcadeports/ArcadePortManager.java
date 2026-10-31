@@ -391,15 +391,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     static int teamCountForGame(ArcadePortGame type) {
-        if (type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST) return 4;
-        return isLobbyTeamGame(type) ? 2 : 0;
+        return type == null ? 0 : type.lobbyTeamCount();
     }
 
     static boolean isLobbyTeamGame(ArcadePortGame type) {
-        return type == ArcadePortGame.BOMB_LOBBERS || type == ArcadePortGame.MICRO_BATTLES
-                || type == ArcadePortGame.SHEEP_QUEST || type == ArcadePortGame.PAINTBALL
-                || type == ArcadePortGame.TURF_WARS || type == ArcadePortGame.CASTLE_ASSAULT
-                || type == ArcadePortGame.HEROES_OF_GWEN;
+        return teamCountForGame(type) > 0;
     }
 
     private static boolean supportsMixedArcadeVariant(ArcadePortGame type) {
