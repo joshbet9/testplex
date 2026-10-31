@@ -71,27 +71,18 @@ class ArcadePortGameTest {
                 primaryWorld.resolveSibling("arcadeport_source_other"), "arcadeport_source_bacon_brawl"));
     }
 
-    @Test void everyGameUsesTheStandardLobbyScoreboardAndLegacyStartCountdown() {
-        assertEquals("TESTPLEX", org.bukkit.ChatColor.stripColor(
-                ModernLobbyScoreboard.scoreboardTitleForGame("bacon-brawl", "Testplex")));
-        assertEquals("TESTPLEX", org.bukkit.ChatColor.stripColor(
-                ModernLobbyScoreboard.scoreboardTitleForGame("paintball", "Testplex")));
+    @Test void modernLobbyScoreboardMatchesTheOriginalArcadeFieldsAndLifecycleTitle() {
+        assertEquals("Waiting for players",
+                org.bukkit.ChatColor.stripColor(
+                        ModernLobbyScoreboard.scoreboardTitleForStatus("Waiting for players")));
+        assertEquals("2/16",
+                ModernLobbyScoreboard.formatPlayerCount(2, 16));
+        assertEquals("El Muchacho Pigo",
+                ModernLobbyScoreboard.formatKitName("el-muchacho-pigo"));
+        assertEquals("None",
+                ModernLobbyScoreboard.formatKitName("None"));
         assertEquals(0, ArcadePortManager.MANUAL_START_COUNTDOWN_SECONDS,
                 "The modern lobby Start Game action should start immediately without a countdown.");
-    }
-
-    @Test void modernLobbyScoreboardShowsSelectedGameAndKitAsReadableLabels() {
-        assertEquals("Bacon Brawl", ModernLobbyScoreboard.formatGameName("bacon-brawl"));
-        assertEquals("Monster Maze", ModernLobbyScoreboard.formatGameName("monster-maze"));
-        assertEquals("El Muchacho Pigo", ModernLobbyScoreboard.formatKitName("el-muchacho-pigo"));
-        assertEquals("Default", ModernLobbyScoreboard.formatKitName("Default"));
-        assertEquals("Not selected", ModernLobbyScoreboard.formatGameName(""));
-    }
-
-    @Test void configuredTestplexOwnerReceivesOwnerRankInsteadOfGenericAdminRank() {
-        assertEquals("Owner", ModernLobbyScoreboard.rankName(true, true));
-        assertEquals("Admin", ModernLobbyScoreboard.rankName(false, true));
-        assertEquals("No Rank", ModernLobbyScoreboard.rankName(false, false));
     }
 
     @Test void modernArcadeLobbyHotbarMatchesLegacyTestplexSandboxItems() {
