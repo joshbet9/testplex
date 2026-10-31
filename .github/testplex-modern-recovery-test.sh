@@ -284,7 +284,7 @@ write_txn PREPARING true false
 sed -i 's/^previous_active=.*/previous_active=true/' "$STATE/current.properties"
 cp "$STATE/current.properties" "$BACKUP/transaction.properties"
 assert_file_text "$SERVER/.testplex-modern-deployed-build" "$old_sha"
-assert_file_text "$STATE/current.properties" "deployment_id=transaction-test"
+grep -Fxq "deployment_id=transaction-test" "$STATE/current.properties"
 echo "[test] prior build marker=$(cat "$SERVER/.testplex-modern-deployed-build"); journal previous_sha=$(sed -n 's/^previous_sha=//p' "$STATE/current.properties")"
 rm -f "$TESTPLEX_STUB_ACTIVE"
 run_helper recover "$target_sha" >/dev/null
