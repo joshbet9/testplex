@@ -13097,6 +13097,31 @@ public final class ArcadePortManager implements Listener {
         if (stats.territoryPainted() >= 350L) {
             awardCatalogAchievement(playerId, player, "super-sploor", "colour-outside-the-lines");
         }
+        if (stats.rollerTerritory() >= 500L) {
+            awardCatalogAchievement(playerId, player, "super-sploor", "road-roller");
+        }
+        if (stats.chargerFullHits() >= 5) {
+            awardCatalogAchievement(playerId, player, "super-sploor", "needle-threader");
+        }
+        if (stats.lobberEnemyReclaimed() >= 150L) {
+            awardCatalogAchievement(playerId, player, "super-sploor", "splash-zone");
+        }
+        if (stats.dualiesPostRollSplats() >= 3) {
+            awardCatalogAchievement(playerId, player, "super-sploor", "blink-and-youll-miss-it");
+        }
+        if (stats.bestSpecialTargets() >= 3) {
+            awardCatalogAchievement(playerId, player, "super-sploor", "special-delivery");
+        }
+        if (won) {
+            String kit = stats.kit() == null ? "sprayer" : stats.kit();
+            String kitWinsPath = statsPath + "kit-wins." + kit;
+            plugin.getConfig().set(kitWinsPath, plugin.getConfig().getInt(kitWinsPath, 0) + 1);
+            boolean masteredAllKits = List.of("sprayer", "roller", "charger", "lobber", "dualies")
+                    .stream().allMatch(value -> plugin.getConfig().getInt(statsPath + "kit-wins." + value, 0) > 0);
+            if (masteredAllKits) {
+                awardCatalogAchievement(playerId, player, "super-sploor", "master-of-the-palette");
+            }
+        }
         if (won && session.superSploorTerritory != null) {
             int total = Math.max(1, session.superSploorTerritory.totalUnits());
             int margin = Math.abs(session.superSploorTerritory.redUnits()
