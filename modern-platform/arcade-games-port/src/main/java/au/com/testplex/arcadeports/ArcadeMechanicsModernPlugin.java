@@ -90,7 +90,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         for (Player online : Bukkit.getOnlinePlayers()) {
             Bukkit.getScheduler().runTask(this, () -> {
                 if (online.isOnline() && manager != null) {
-                    manager.returnPlayerToLobby(online);
+                    boolean restoredCameraShy = cameraShy != null && cameraShy.restorePendingSnapshot(online);
+                    if (!restoredCameraShy) manager.returnPlayerToLobby(online);
                     grantConfiguredAdmin(online);
                     manager.restoreMonsterMazeKitPreference(online);
                 }
@@ -179,8 +180,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             if (player.isOnline() && manager != null) {
                 // Session fake players must remain in the game lifecycle that just admitted them.
                 if (manager.isTestPlayer(player)) return;
-                // The server's only human-facing spawn is the shared Testplex Arcade lobby.
-                manager.returnPlayerToLobby(player);
+                // A Camera Shy disconnect must restore the captured pre-match snapshot
+                // instead of leaving the temporary spyglass/kit inventory on reconnect.
+                boolean restoredCameraShy = cameraShy != null && cameraShy.restorePendingSnapshot(player);
+                if (!restoredCameraShy) manager.returnPlayerToLobby(player);
                 grantConfiguredAdmin(player);
                 manager.restoreMonsterMazeKitPreference(player);
             }
