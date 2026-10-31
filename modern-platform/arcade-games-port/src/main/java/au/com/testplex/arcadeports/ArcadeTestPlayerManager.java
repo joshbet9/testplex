@@ -120,11 +120,51 @@ final class ArcadeTestPlayerManager {
             // disabled body damage, because the resulting dummies would not be useful
             // for ability/combat testing.
             if (!plugin.getConfig().getBoolean("body.damageable", true)) return false;
+            configureDedicatedTestServerRuntime(plugin);
             api();
             return true;
         } catch (Exception exception) {
             host.getLogger().warning("FakePlayerPlugin API is unavailable: " + rootMessage(exception));
             return false;
+        }
+    }
+
+    /**
+     * FakePlayerPlugin does not currently expose per-bot respawn or persistence
+     * switches in its public API. Testplex runs on a dedicated sandbox server, so
+     * set the minimum runtime policy needed for real Player objects to survive a
+     * normal death/respawn event and never be restored as a global bot population.
+     */
+    private void configureDedicatedTestServerRuntime(Plugin plugin) {
+        if (!(plugin instanceof JavaPlugin fakePlayerPlugin)) {
+            throw new IllegalStateException("FakePlayerPlugin is not a JavaPlugin implementation.");
+        }
+        var config = fakePlayerPlugin.getConfig();
+        boolean changed = false;
+        if (!config.getBoolean("death.respawn-on-death", false)) {
+            config.set("death.respawn-on-death", true);
+            changed = true;
+        }
+        if (config.getInt("death.respawn-delay", 1) != 1) {
+            config.set("death.respawn-delay", 1);
+            changed = true;
+        }
+        if (config.getBoolean("persistence.enabled", true)) {
+            config.set("persistence.enabled", false);
+            changed = true;
+        }
+        if (config.getInt("persistence.autosave-interval-seconds", 120) != 0) {
+            config.set("persistence.autosave-interval-seconds", 0);
+            changed = true;
+        }
+        if (config.getInt("limits.max-bots", 1000) < TARGET_ROSTER_SIZE) {
+            config.set("limits.max-bots", TARGET_ROSTER_SIZE);
+            changed = true;
+        }
+        if (changed) {
+            fakePlayerPlugin.saveConfig();
+            host.getLogger().info("Applied dedicated Testplex FakePlayerPlugin policy: respawn enabled, "
+                    + "restart persistence disabled, 16-player capacity.");
         }
     }
 
@@ -248,7 +288,13 @@ final class ArcadeTestPlayerManager {
         // FPP's AFK bot type does not run player input/AI. Freeze it as well so the
         // target remains stationary until the game itself moves, teleports or kills it.
         invoke(handle, "setFrozen", new Class<?>[] {boolean.class}, true);
+        invoke(handle, "setHeadAiEnabled", new Class<?>[] {boolean.class}, false);
+        invoke(handle, "setSwimAiEnabled", new Class<?>[] {boolean.class}, false);
+        invoke(handle, "setPveEnabled", new Class<?>[] {boolean.class}, false);
+        invoke(handle, "setPickUpItemsEnabled", new Class<?>[] {boolean.class}, true);
+        invoke(handle, "setPickUpXpEnabled", new Class<?>[] {boolean.class}, true);
         player.setInvulnerable(false);
+        player.setNoDamageTicks(0);
         player.setCollidable(true);
         player.setCanPickupItems(true);
         player.setOp(false);
