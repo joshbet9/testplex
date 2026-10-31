@@ -27,6 +27,14 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
+    void configuredKitOrderMovesKnownEntriesAndKeepsUnlistedCatalogueOrder() {
+        assertEquals(List.of("waller", "jumper", "armorer", "pitcher"),
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BOMB_LOBBERS, List.of(),
+                        List.of("waller", "not-a-kit", "jumper")).stream()
+                        .map(choice -> choice.id).toList());
+    }
+
+    @Test
     void gamesWithoutLobbyKitStationsExposeNoChoices() {
         assertTrue(ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.SHEEP_QUEST, List.of()).isEmpty());
         assertTrue(ArcadeLobbyKitCatalogue.forGame(null, List.of()).isEmpty());
