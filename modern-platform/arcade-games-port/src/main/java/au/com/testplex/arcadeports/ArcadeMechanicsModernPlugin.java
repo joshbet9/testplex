@@ -243,6 +243,18 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if ("stats".equalsIgnoreCase(label) || "arcadestats".equalsIgnoreCase(label)) {
+            if (args.length == 1 && "plexball".equalsIgnoreCase(args[0])) {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                plexball.openStats(player);
+                return true;
+            }
+            sender.sendMessage(ChatColor.YELLOW + "Usage: /stats plexball");
+            return true;
+        }
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
         switch (sub) {
             case "join":
@@ -362,6 +374,17 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.GRAY + "Current beacon colour: " + manager.dragonEscapeBeaconColor(player.getUniqueId()));
                 } else manager.setDragonEscapeBeaconColor(player, args[1]);
                 return true;
+            case "stats":
+                if (!(sender instanceof Player statsPlayer)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                if (args.length < 2 || !"plexball".equalsIgnoreCase(args[1])) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport stats plexball");
+                    return true;
+                }
+                plexball.openStats(statsPlayer);
+                return true;
             case "status":
                 sender.sendMessage(ChatColor.GOLD + "Modern Arcade ports: " + ChatColor.WHITE + manager.status());
                 if (plexball != null) sender.sendMessage(ChatColor.GOLD + "Plexball: " + ChatColor.WHITE + plexball.status());
@@ -381,6 +404,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join plexball" + ChatColor.GRAY + " — join the Plexball queue");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport leave plexball" + ChatColor.GRAY + " — leave the Plexball queue");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <slugger|technician|curve-artist|sprinter|skyguard>" + ChatColor.GRAY + " — select a Plexball kit");
+                sender.sendMessage(ChatColor.YELLOW + "/stats plexball" + ChatColor.GRAY + " — view Plexball achievements, milestones and career stats");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join <game-id>" + ChatColor.GRAY + " — queue to join a multiplayer test");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>-mixed" + ChatColor.GRAY
