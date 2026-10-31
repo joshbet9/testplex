@@ -113,7 +113,7 @@ final class ArcadeTestPlayerManager {
     }
 
     boolean isCleanupInProgress() {
-        return cleanupTask != null || !retiringHandles.isEmpty()
+        return cleanupTask != null || !retiringHandles.isEmpty() || !activeHandles.isEmpty()
                 || pendingSpawnTask != null || !pendingHandles.isEmpty();
     }
 
