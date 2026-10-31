@@ -1,11 +1,12 @@
 # Hoops Remastered — Paper 26.3 acceptance plan
 
 ## Match format
-- 2–10 players, balanced RED / BLUE teams, one isolated court per session.
+- 2–16 players (up to 8v8), balanced RED / BLUE teams, one isolated court per session.
 - Five-minute regulation; first to 21 with a two-point lead; a tied regulation score enters next-basket-wins overtime.
 - 24-second shot clock. Two points inside the three-point arc and three points beyond it.
 
 ## Controls and gameplay
+- Double-tap jump to use Hops, a directional double-jump with an eight-second recharge.
 - Left-click with possession to pass toward a teammate in the player's forward passing lane; an unmarked pass travels forward and remains catchable.
 - Right-click with possession to shoot toward the crosshair. The player must aim at the rim; the server owns the ball trajectory and validates a descending rim crossing.
 - Left-click an opposing carrier in close range to attempt a deterministic steal (with a per-player cooldown).
@@ -20,13 +21,15 @@
 
 ## Automated validation
 - HoopsRemasteredRulesTest covers lobby sizes, two/three-point classification, win-by-two, sudden-death overtime, clutch/buzzer windows, assist expiry, box-score awards, comeback threshold, spawn assignment and clock formatting.
+- - The lobby accepts 2–16 participants only; team assignment remains 1–8 players per side.
 - Maven compile/test must pass on Paper 26.3 / Java 25.
 
 ## Live acceptance still required
 - Confirm the generated court and hoop geometry look correct from both ends.
 - Test short/long shots, both hoops, two/three-point line boundary, missed-shot rebound and blocked shot.
 - Test passes under pressure, steals from front/side, pass interceptions, shot-clock turnover and disconnect while holding the ball.
-- Run 2, 3, 6 and 10-player matches; confirm equal team assignment and no team with a player advantage greater than one.
+- Run 2, 3, 6, 8, 10, 12, 14 and 16-player matches; confirm equal team assignment, eight unique spawn lanes per side, and no team with a player advantage greater than one.
+- Specifically test a full 8v8 match for readable player spacing, pass target selection, interceptions, rebound races, steals and blocks.
 - Verify score resets, time expiration, tied overtime, win-by-two regulation, player snapshot restoration, scoreboard cleanup, and back-to-back matches.
 - Compare shot feel and court scale with the legacy source before promoting the game to normal rotation.
 

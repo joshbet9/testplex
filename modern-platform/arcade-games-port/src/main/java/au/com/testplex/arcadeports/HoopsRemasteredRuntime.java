@@ -29,6 +29,8 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
@@ -146,12 +148,13 @@ public final class HoopsRemasteredRuntime implements Listener {
             for (int z = -3; z <= 3; z++) world.getBlockAt(backboardX, y, z).setType(board, false);
         }
         // Open rim; the authoritative scoring cylinder is checked by the runtime.
-        for (int z = -1; z <= 1; z++) {
-            world.getBlockAt(rimX, 66, z).setType(Material.IRON_BARS, false);
-        }
+        // Leave the centre cell open so the ball can pass through the rim.
+        world.getBlockAt(rimX - 1, 66, 0).setType(Material.IRON_BARS, false);
+        world.getBlockAt(rimX + 1, 66, 0).setType(Material.IRON_BARS, false);
         world.getBlockAt(rimX, 66, -1).setType(Material.IRON_BARS, false);
         world.getBlockAt(rimX, 66, 1).setType(Material.IRON_BARS, false);
-        for (int z = -2; z <= 2; z++) world.getBlockAt(rimX, 65, z).setType(Material.CHAIN, false);
+        world.getBlockAt(rimX - 1, 65, 0).setType(Material.CHAIN, false);
+        world.getBlockAt(rimX + 1, 65, 0).setType(Material.CHAIN, false);
     }
 
     public boolean isActive(World world) {
@@ -160,7 +163,7 @@ public final class HoopsRemasteredRuntime implements Listener {
 
     public void start(World world, List<Player> players, Map<UUID, Integer> teams) {
         if (!HoopsRemasteredRules.supportsPlayerCount(players.size())) {
-            throw new IllegalArgumentException("Hoops Remastered requires 2–10 players.");
+            throw new IllegalArgumentException("Hoops Remastered requires 2–16 players.");
         }
         stopRuntime();
         Match current = new Match(world, players, teams);
@@ -175,6 +178,8 @@ public final class HoopsRemasteredRuntime implements Listener {
             player.setFoodLevel(20);
             player.setSaturation(20.0F);
             player.setFallDistance(0.0F);
+            player.setAllowFlight(true);
+            player.setFlying(false);
             player.getInventory().clear();
             player.getInventory().setHeldItemSlot(0);
             player.setWalkSpeed(0.2F);
@@ -210,7 +215,7 @@ public final class HoopsRemasteredRuntime implements Listener {
                 ChatColor.RED + "Red Team", ChatColor.RED + "Red Score",
                 ChatColor.AQUA + "Blue Team", ChatColor.AQUA + "Blue Score",
                 ChatColor.YELLOW + "Clock", ChatColor.GOLD + "Shot clock",
-                ChatColor.GRAY + "Target", ChatColor.DARK_GRAY + "Possession");
+                ChatColor.GRAY + "First to 21");
         Objective below = board.registerNewObjective("hoopspoints", "dummy", ChatColor.GOLD + "PTS");
         below.setDisplaySlot(DisplaySlot.BELOW_NAME);
         current.belowName = below;
@@ -229,7 +234,10 @@ public final class HoopsRemasteredRuntime implements Listener {
             current.sidebar.getScore(current.scoreboardEntries.get(5)).setScore(
                     current.overtime ? 0 : (int) Math.ceil(current.remainingMillis / 1000.0D));
             current.sidebar.getScore(current.scoreboardEntries.get(6)).setScore(2);
-            current.sidebar.getScore(current.scoreboardEntries.get(7)).setScore(1);
+            String possessionEntry = ChatColor.DARK_GRAY + "Ball: " + possession;
+            if (current.possessionEntry != null) board.resetScores(current.possessionEntry);
+            current.sidebar.getScore(possessionEntry).setScore(1);
+            current.possessionEntry = possessionEntry;
             Objective below = current.belowName;
             if (below != null) {
                 for (Player player : current.players.values()) {
@@ -256,8 +264,11 @@ public final class HoopsRemasteredRuntime implements Listener {
                     + ChatColor.GRAY + "  |  " + ChatColor.WHITE + "P " + stats.points
                     + "  A " + stats.assists + "  R " + stats.rebounds
                     + "  B " + stats.blocks + "  S " + stats.steals);
-            if (force) player.setCompassTarget(player.getLocation().clone().setDirection(
-                    new Vector((current.teams.getOrDefault(player.getUniqueId(), 0) == 0 ? 1 : -1), 0, 0)));
+            if (force) {
+                int team = current.teams.getOrDefault(player.getUniqueId(), 0);
+                player.setCompassTarget(new Location(current.world, team == 0 ? RIGHT_HOOP_X : LEFT_HOOP_X,
+                        FLOOR_Y, 0.0D));
+            }
         }
     }
 
@@ -294,10 +305,22 @@ public final class HoopsRemasteredRuntime implements Listener {
             if (oldHolder != null) clearBallItem(oldHolder);
             givePossessionToTeam(current, nextTeam, oldHolder == null ? current.world.getSpawnLocation() : oldHolder.getLocation());
         }
+        updateHops(current, now);
         tickBall(current, now);
         if (now - current.lastHudAt >= 500L) {
             current.lastHudAt = now;
             updateHud(current, false);
+        }
+    }
+
+    private void updateHops(Match current, long now) {
+        for (Player player : alivePlayers(current)) {
+            UUID id = player.getUniqueId();
+            long readyAt = current.hopsReadyAt.getOrDefault(id, 0L);
+            if (now >= readyAt && player.isOnGround() && !player.getAllowFlight()) {
+                player.setAllowFlight(true);
+                player.setFlying(false);
+            }
         }
     }
 
@@ -350,13 +373,28 @@ public final class HoopsRemasteredRuntime implements Listener {
                 return;
             }
         }
+        if (ball.location.getX() < -23.5D || ball.location.getX() > 23.5D
+                || ball.location.getZ() < -13.5D || ball.location.getZ() > 13.5D) {
+            int lastTeam = ball.lastToucher == null ? -1 : current.teams.getOrDefault(ball.lastToucher, -1);
+            Location outLocation = ball.location.clone();
+            removeBall(current);
+            if (lastTeam >= 0) {
+                announce(current, ChatColor.RED + "The ball went out of bounds. Possession changes.");
+                givePossessionToTeam(current, 1 - lastTeam, outLocation);
+            } else {
+                givePossessionToTeam(current, ThreadLocalRandom.current().nextInt(2),
+                        new Location(current.world, 0.0D, FLOOR_Y + 1.0D, 0.0D));
+            }
+            return;
+        }
         ball.display.teleport(ball.location);
         for (Player player : alivePlayers(current)) {
             if (player.getLocation().distanceSquared(ball.location) > 1.8D) continue;
             boolean rebound = ball.reboundEligible;
             UUID previousTeam = ball.lastToucher;
-            int previousPossessionTeam = previousTeam == null ? -1
-                    : current.teams.getOrDefault(previousTeam, -1);
+            int previousPossessionTeam = rebound && ball.shooterId != null
+                    ? current.teams.getOrDefault(ball.shooterId, -1)
+                    : previousTeam == null ? -1 : current.teams.getOrDefault(previousTeam, -1);
             int catchingTeam = current.teams.getOrDefault(player.getUniqueId(), -1);
             if (rebound) {
                 PlayerStats stats = current.playerStats.get(player.getUniqueId());
@@ -412,12 +450,12 @@ public final class HoopsRemasteredRuntime implements Listener {
             Player passer = current.players.get(ball.passerId);
             if (passer != null && current.teams.getOrDefault(ball.passerId, -1) == scoringTeam) {
                 current.playerStats.get(ball.passerId).assists++;
-                if (current.remainingMillis <= HoopsRemasteredRules.CLUTCH_WINDOW_MILLIS) {
+                if (!current.overtime && current.remainingMillis <= HoopsRemasteredRules.CLUTCH_WINDOW_MILLIS) {
                     current.clutchContributions.merge(ball.passerId, 1, Integer::sum);
                 }
             }
         }
-        if (current.remainingMillis <= HoopsRemasteredRules.CLUTCH_WINDOW_MILLIS) {
+        if (!current.overtime && current.remainingMillis <= HoopsRemasteredRules.CLUTCH_WINDOW_MILLIS) {
             current.clutchContributions.merge(ball.shooterId, points, Integer::sum);
         }
         int opponent = 1 - scoringTeam;
@@ -520,7 +558,10 @@ public final class HoopsRemasteredRuntime implements Listener {
         double projected = toHoop.dot(aim);
         Vector closest = eye.toVector().add(aim.clone().multiply(Math.max(0.0D, projected)));
         boolean aimedAtHoop = projected > 0.0D && closest.distance(hoop.toVector()) <= 4.5D;
-        Location target = aimedAtHoop ? hoop : eye.clone().add(aim.multiply(18.0D));
+        double hoopDistance = Math.sqrt(Math.pow(hoopX - shooter.getLocation().getX(), 2.0D)
+                + Math.pow(shooter.getLocation().getZ(), 2.0D));
+        boolean layup = hoopDistance <= 6.0D;
+        Location target = (aimedAtHoop || layup) ? hoop : eye.clone().add(aim.multiply(18.0D));
         double horizontal = Math.max(1.0D, Math.sqrt(
                 Math.pow(target.getX() - eye.getX(), 2.0D) + Math.pow(target.getZ() - eye.getZ(), 2.0D)));
         int flightTicks = (int) Math.max(8L, Math.min(22L, Math.round(horizontal / 1.05D)));
@@ -543,7 +584,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         current.lastPasserId = null;
         current.lastPassAt = 0L;
         shooter.playSound(shooter.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1.0F, points == 3 ? 1.2F : 0.9F);
-        shooter.sendActionBar(ChatColor.GOLD + (points == 3 ? "THREE-POINT ATTEMPT" : "SHOT ATTEMPT"));
+        shooter.sendActionBar(ChatColor.GOLD + (layup ? "LAYUP" : points == 3 ? "THREE-POINT ATTEMPT" : "SHOT ATTEMPT"));
     }
 
     private void blockShot(Match current, Player defender) {
@@ -793,6 +834,51 @@ public final class HoopsRemasteredRuntime implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onToggleFlight(PlayerToggleFlightEvent event) {
+        Match current = match;
+        Player player = event.getPlayer();
+        if (current == null || current.ending || !current.players.containsKey(player.getUniqueId())
+                || player.getWorld() != current.world) return;
+        event.setCancelled(true);
+        player.setFlying(false);
+        long now = System.currentTimeMillis();
+        long readyAt = current.hopsReadyAt.getOrDefault(player.getUniqueId(), 0L);
+        if (now < readyAt) {
+            player.sendActionBar(ChatColor.GRAY + "Hops recharging: "
+                    + Math.max(1L, (readyAt - now + 999L) / 1_000L) + "s");
+            return;
+        }
+        Vector direction = player.getLocation().getDirection().setY(0.0D);
+        if (direction.lengthSquared() > 0.001D) direction.normalize().multiply(0.48D);
+        player.setAllowFlight(false);
+        player.setVelocity(new Vector(direction.getX(), 0.78D, direction.getZ()));
+        current.hopsReadyAt.put(player.getUniqueId(), now + HoopsRemasteredRules.HOPS_COOLDOWN_MILLIS);
+        player.getWorld().spawnParticle(org.bukkit.Particle.CLOUD,
+                player.getLocation().clone().add(0.0D, 0.15D, 0.0D), 12, 0.28D, 0.08D, 0.28D, 0.04D);
+        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.7F, 1.5F);
+        player.sendActionBar(ChatColor.YELLOW + "HOPS!");
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onMove(PlayerMoveEvent event) {
+        Match current = match;
+        if (current == null || current.ending || event.getTo() == null) return;
+        Player player = event.getPlayer();
+        if (!current.players.containsKey(player.getUniqueId()) || player.getWorld() != current.world) return;
+        Location to = event.getTo();
+        if (to.getX() >= -23.5D && to.getX() <= 23.5D && to.getZ() >= -13.5D && to.getZ() <= 13.5D) return;
+        event.setTo(event.getFrom());
+        if (current.holderId != null && current.holderId.equals(player.getUniqueId())) {
+            int opponent = 1 - current.teams.getOrDefault(player.getUniqueId(), 0);
+            current.lastPasserId = null;
+            announce(current, ChatColor.RED + player.getName() + " stepped out of bounds. Possession changes.");
+            givePossessionToTeam(current, opponent, event.getFrom());
+        } else {
+            player.sendActionBar(ChatColor.RED + "OUT OF BOUNDS");
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onPlayerAttack(EntityDamageByEntityEvent event) {
         Match current = match;
         if (current == null || current.ending || !(event.getEntity() instanceof Player target)
@@ -849,6 +935,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         final Map<UUID, PlayerStats> playerStats = new HashMap<>();
         final Map<UUID, Location> lastLocations = new HashMap<>();
         final Map<UUID, Long> stealReadyAt = new HashMap<>();
+        final Map<UUID, Long> hopsReadyAt = new HashMap<>();
         final Map<UUID, Integer> clutchContributions = new HashMap<>();
         final Set<Integer> comebackTeams = new HashSet<>();
         final Set<UUID> entities = new HashSet<>();
@@ -868,6 +955,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         Objective sidebar;
         Objective belowName;
         List<String> scoreboardEntries = List.of();
+        String possessionEntry;
 
         Match(World world, List<Player> participants, Map<UUID, Integer> assignments) {
             this.world = world;

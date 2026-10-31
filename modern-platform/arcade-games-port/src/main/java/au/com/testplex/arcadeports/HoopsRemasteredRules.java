@@ -5,11 +5,12 @@ import java.util.Locale;
 /** Deterministic scoring, timing and lobby rules for Hoops Remastered. */
 public final class HoopsRemasteredRules {
     public static final int MIN_PLAYERS = 2;
-    public static final int MAX_PLAYERS = 10;
+    public static final int MAX_PLAYERS = 16;
     public static final int TARGET_SCORE = 21;
     public static final int WIN_BY = 2;
     public static final long REGULATION_MILLIS = 5 * 60_000L;
     public static final long SHOT_CLOCK_MILLIS = 24_000L;
+    public static final long HOPS_COOLDOWN_MILLIS = 8_000L;
     public static final long OFFENSIVE_REBOUND_SHOT_CLOCK_MILLIS = 14_000L;
     public static final long ASSIST_WINDOW_MILLIS = 8_000L;
     public static final long CLUTCH_WINDOW_MILLIS = 60_000L;
@@ -45,6 +46,10 @@ public final class HoopsRemasteredRules {
 
     public static boolean isClutchTime(long remainingMillis) {
         return remainingMillis >= 0L && remainingMillis <= CLUTCH_WINDOW_MILLIS;
+    }
+
+    public static boolean isHopsReady(long now, long readyAt) {
+        return now >= readyAt;
     }
 
     public static boolean isAssistEligible(long now, long lastPassAt) {
@@ -91,6 +96,6 @@ public final class HoopsRemasteredRules {
     }
 
     public static double spawnZ(int playerWithinTeam) {
-        return -4.0D + Math.floorMod(playerWithinTeam, 5) * 2.0D;
+        return -8.0D + Math.floorMod(playerWithinTeam, 8) * (16.0D / 7.0D);
     }
 }

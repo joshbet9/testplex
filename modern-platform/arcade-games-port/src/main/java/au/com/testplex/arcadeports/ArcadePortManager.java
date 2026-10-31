@@ -1706,7 +1706,7 @@ public final class ArcadePortManager implements Listener {
         }
         if (type == ArcadePortGame.HOOPS_REMASTERED
                 && !HoopsRemasteredRules.supportsPlayerCount(participants.size())) {
-            sender.sendMessage(ChatColor.RED + "Hoops Remastered supports 2–10 players.");
+            sender.sendMessage(ChatColor.RED + "Hoops Remastered supports 2–16 players (8 per team).");
             return;
         }
         if (type == ArcadePortGame.MASTER_BUILDERS

@@ -1,14 +1,18 @@
 package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
+import java.util.HashSet;
+import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 class HoopsRemasteredRulesTest {
-    @Test void supportsClassicTwoTeamLobbySizes() {
+    @Test void supportsTwoTeamLobbiesUpToSixteenPlayers() {
         assertFalse(HoopsRemasteredRules.supportsPlayerCount(1));
         assertTrue(HoopsRemasteredRules.supportsPlayerCount(2));
         assertTrue(HoopsRemasteredRules.supportsPlayerCount(10));
-        assertFalse(HoopsRemasteredRules.supportsPlayerCount(11));
+        assertTrue(HoopsRemasteredRules.supportsPlayerCount(11));
+        assertTrue(HoopsRemasteredRules.supportsPlayerCount(16));
+        assertFalse(HoopsRemasteredRules.supportsPlayerCount(17));
     }
 
     @Test void twoAndThreePointShotBoundaryIsExplicit() {
@@ -52,6 +56,13 @@ class HoopsRemasteredRulesTest {
         assertFalse(HoopsRemasteredRules.isClutchTime(60_001));
     }
 
+    @Test void HopsUsesEightSecondRechargeAndCannotFireEarly() {
+        assertEquals(8_000L, HoopsRemasteredRules.HOPS_COOLDOWN_MILLIS);
+        assertTrue(HoopsRemasteredRules.isHopsReady(10_000L, 10_000L));
+        assertFalse(HoopsRemasteredRules.isHopsReady(9_999L, 10_000L));
+        assertTrue(HoopsRemasteredRules.isHopsReady(18_000L, 10_000L));
+    }
+
     @Test void assistWindowRejectsStaleOrFuturePasses() {
         assertTrue(HoopsRemasteredRules.isAssistEligible(10_000, 2_000));
         assertFalse(HoopsRemasteredRules.isAssistEligible(10_001, 2_000));
@@ -79,8 +90,11 @@ class HoopsRemasteredRulesTest {
         assertEquals(0, HoopsRemasteredRules.teamForSpawnIndex(2));
         assertEquals(-10.0D, HoopsRemasteredRules.spawnX(0));
         assertEquals(10.0D, HoopsRemasteredRules.spawnX(1));
-        assertEquals(-4.0D, HoopsRemasteredRules.spawnZ(0));
-        assertEquals(4.0D, HoopsRemasteredRules.spawnZ(4));
+        assertEquals(-8.0D, HoopsRemasteredRules.spawnZ(0));
+        assertEquals(8.0D, HoopsRemasteredRules.spawnZ(7));
+        Set<Double> lanes = new HashSet<>();
+        for (int player = 0; player < 8; player++) lanes.add(HoopsRemasteredRules.spawnZ(player));
+        assertEquals(8, lanes.size(), "Each team must have eight distinct spawn lanes for 8v8.");
     }
 
     @Test void clockFormatsMinutesAndRoundsRemainingSecondsUp() {
