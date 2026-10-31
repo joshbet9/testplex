@@ -100,6 +100,7 @@ final class SneakyAssassinsMechanics {
     private final Map<UUID, Integer> powerUpCounts = new HashMap<>();
     private final Map<UUID, Long> masterCompassUpdateAt = new HashMap<>();
     private final Set<UUID> masterAssassins = new HashSet<>();
+    private final Map<UUID, UUID> pendingCompassKills = new HashMap<>();
     private final Set<UUID> rangedAssassinMeleeDamage = new HashSet<>();
     private final Set<UUID> escapeArtistSmokeUsed = new HashSet<>();
     private final Map<UUID, Set<UUID>> revealerTargets = new HashMap<>();
@@ -1008,6 +1009,17 @@ final class SneakyAssassinsMechanics {
         }
         if (attacker != null && (!players.containsKey(attacker.getUniqueId())
                 || !isAlive.test(attacker.getUniqueId()) || attacker.equals(target))) attacker = null;
+        boolean directPlayerAttack = event instanceof EntityDamageByEntityEvent byEntity
+                && byEntity.getDamager() instanceof Player direct
+                && attacker != null && direct.getUniqueId().equals(attacker.getUniqueId());
+        boolean lethalMasterCompassHit = directPlayerAttack && attacker != null
+                && SneakyAssassinsRules.shouldAwardYouNeedDirections(
+                        masterAssassins.contains(attacker.getUniqueId()), true,
+                        isMasterCompass(attacker.getInventory().getItemInMainHand()),
+                        target.getHealth() <= damage);
+        if (lethalMasterCompassHit) {
+            pendingCompassKills.put(target.getUniqueId(), attacker.getUniqueId());
+        }
         if (attacker != null) {
             cloakUntil.remove(attacker.getUniqueId());
             Villager proxy = disguises.get(attacker.getUniqueId());
@@ -1058,6 +1070,12 @@ final class SneakyAssassinsMechanics {
         projectile.remove();
     }
 
+    private boolean isMasterCompass(ItemStack item) {
+        return item != null && item.getType() == Material.COMPASS && item.hasItemMeta()
+                && "master-compass".equals(item.getItemMeta().getPersistentDataContainer()
+                        .get(itemKey, PersistentDataType.STRING));
+    }
+
     private void applyDamage(Player target, double damage, Player attacker, String reason) {
         if (target == null || !target.isOnline() || !isAlive.test(target.getUniqueId()) || damage <= 0.0D) return;
         if (target.getHealth() <= damage) {
@@ -1072,9 +1090,8 @@ final class SneakyAssassinsMechanics {
     void onKill(Player killer, Player victim) {
         if (killer == null || !killer.isOnline() || !players.containsKey(killer.getUniqueId())) return;
         UUID killerId = killer.getUniqueId();
-        ItemStack held = killer.getInventory().getItemInMainHand();
-        if (victim != null && masterAssassins.contains(killerId)
-                && held != null && held.getType() == Material.COMPASS) {
+        UUID compassKiller = victim == null ? null : pendingCompassKills.remove(victim.getUniqueId());
+        if (killerId.equals(compassKiller)) {
             awardAchievement(killer, "you-need-directions", "You Need Directions?");
         }
         if (victim != null) {
@@ -1206,6 +1223,7 @@ final class SneakyAssassinsMechanics {
         }
         for (UUID id : new ArrayList<>(revealerProjectiles.keySet())) removeRevealerProjectile(id);
         pendingProjectileDamage.clear();
+        pendingCompassKills.clear();
         rangedAssassinMeleeDamage.clear();
         escapeArtistSmokeUsed.clear();
         revealerTargets.clear();
