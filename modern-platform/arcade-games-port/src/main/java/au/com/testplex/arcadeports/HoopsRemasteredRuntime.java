@@ -11,6 +11,11 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
+import io.papermc.paper.dialog.Dialog;
+import io.papermc.paper.registry.data.dialog.DialogBase;
+import io.papermc.paper.registry.data.dialog.body.DialogBody;
+import io.papermc.paper.registry.data.dialog.type.DialogType;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Color;
@@ -230,7 +235,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         stopRuntime();
         Match current = new Match(world, players, teams);
         this.match = current;
-        buildCourt(world);
+        // ArcadePortManager performs the isolated arena build before invoking this runtime.
         for (Player player : current.players.values()) {
             if (player == null || !player.isOnline()) continue;
             int team = current.teams.getOrDefault(player.getUniqueId(), 0);
@@ -903,6 +908,41 @@ public final class HoopsRemasteredRuntime implements Listener {
         announceFinalResults(current, winningTeam);
         persistCareer(current, winningTeam);
         hooks.finish(representative, true);
+        Bukkit.getScheduler().runTask(plugin, () -> showFinalResultsDialogs(current, winningTeam));
+    }
+
+    private void showFinalResultsDialogs(Match current, int winningTeam) {
+        Player mvp = alivePlayers(current).stream()
+                .filter(player -> current.teams.getOrDefault(player.getUniqueId(), -1) == winningTeam)
+                .max(Comparator.comparingDouble(player ->
+                        performanceRating(current.playerStats.getOrDefault(player.getUniqueId(), new PlayerStats()))))
+                .orElse(null);
+        String winner = winningTeam == 0 ? "RED" : "BLUE";
+        for (Player player : current.players.values()) {
+            if (player == null || !player.isOnline()) continue;
+            PlayerStats stats = current.playerStats.getOrDefault(player.getUniqueId(), new PlayerStats());
+            int fieldGoal = stats.shotsAttempted == 0 ? 0
+                    : (int) Math.round(stats.shotsMade * 100.0D / stats.shotsAttempted);
+            String mvpName = mvp == null ? "Unavailable" : mvp.getName();
+            String body = "FINAL SCORE\\n"
+                    + "RED  " + current.teamScore[0] + "   -   BLUE  " + current.teamScore[1] + "\\n"
+                    + winner + " TEAM WINS\\n\\n"
+                    + "MATCH MVP\\n" + mvpName + "\\n\\n"
+                    + "YOUR BOX SCORE\\n"
+                    + "Points: " + stats.points + "\\n"
+                    + "Assists: " + stats.assists + "\\n"
+                    + "Rebounds: " + stats.rebounds + "\\n"
+                    + "Blocks: " + stats.blocks + "\\n"
+                    + "Steals: " + stats.steals + "\\n"
+                    + "Field goals: " + stats.shotsMade + "/" + stats.shotsAttempted
+                    + " (" + fieldGoal + "%)";
+            Dialog dialog = Dialog.create(builder -> builder.empty()
+                    .base(DialogBase.builder(Component.text("Hoops Remastered — Final Results"))
+                            .body(List.of(DialogBody.plainMessage(Component.text(body), 360)))
+                            .build())
+                    .type(DialogType.notice()));
+            player.showDialog(dialog);
+        }
     }
 
     private void announceFinalResults(Match current, int winningTeam) {

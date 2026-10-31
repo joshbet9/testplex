@@ -20,7 +20,7 @@
 - Floating in-world TextDisplay scoreboard above centre court, updated with score and both clocks.
 - Team-coloured name tags and tab-list entries through the match scoreboard teams.
 - Action bar: current player points, assists, rebounds, blocks, steals and field-goal percentage.
-- Final chat results: winning score, winning-team MVP and a top-five box-score summary.
+- Native Paper Dialog final-results screen after players return to the lobby: final score, winning team, match MVP and the player's own full box score; chat also broadcasts the top-five summary.
 - Local lifetime totals: games, wins, losses, points, assists, rebounds, blocks, steals, shots attempted/made and PPG/APG/RPG.
 - Court presentation uses only vanilla blocks, Paper's built-in BossBar/TextDisplay APIs, built-in particles and sounds. No resource pack or extra runtime plugin is required.
 - Hoops Remastered achievements use the existing progress catalogue; career milestones remain in its existing wins/points/assists/rebounds/steals/blocks catalogue.
@@ -34,6 +34,7 @@
 - Confirm the enclosed court, coloured spectator seating/platforms, lighting, centre display scoreboard and hoop geometry look correct from both ends.
 - Confirm RED / BLUE vanilla dyed leather uniforms and name colours survive the match and are fully restored afterward.
 - Verify bossbar, sidebar, floating scoreboard, team-coloured names and tab-list entries stay in sync for every player.
+- Verify the native results dialog appears after return-to-lobby cleanup for every connected participant and displays their own statistics.
 - Test crosshair shooting at several angles, layups, rising-jump dunks, both hoops, two/three-point line boundary, missed-shot rebound and blocked shot.
 - Test passes under pressure, teammate catches, missed pass recovery, facing-dependent steals, timed/facing-dependent blocks, shot-clock turnover, inventory/drop protection and disconnect while holding the ball.
 - Run 2, 3, 6, 8, 10, 12, 14 and 16-player matches; confirm equal team assignment, eight unique spawn lanes per side, and no team with a player advantage greater than one.

@@ -143,8 +143,8 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheTwentyThreeMechanicsGamesAndIntegratedMonsterMazeModule() {
-        assertEquals(23, ArcadePortGame.values().length);
+    @Test void exposesTheTwentyFourMechanicsGamesAndIntegratedMonsterMazeModule() {
+        assertEquals(24, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
