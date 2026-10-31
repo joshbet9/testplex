@@ -46,6 +46,7 @@ final class ArcadeTestPlayerManager {
     private Object pendingApi;
     private BukkitTask pendingSpawnTask;
     private boolean shuttingDown;
+    private boolean startupCleanupComplete;
 
     ArcadeTestPlayerManager(JavaPlugin host) {
         this.host = host;
@@ -67,6 +68,10 @@ final class ArcadeTestPlayerManager {
         return player != null && isTestPlayer(player.getUniqueId());
     }
 
+    boolean isStartupCleanupComplete() {
+        return startupCleanupComplete;
+    }
+
     int activeCount() {
         return activeHandles.size();
     }
@@ -77,7 +82,10 @@ final class ArcadeTestPlayerManager {
      */
     void cleanupStaleSessionPlayers() {
         Bukkit.getScheduler().runTaskLater(host, () -> {
-            if (shuttingDown) return;
+            if (shuttingDown) {
+                startupCleanupComplete = true;
+                return;
+            }
             try {
                 Object api = api();
                 Collection<?> bots = collection(invoke(api, "getBots"));
@@ -96,6 +104,8 @@ final class ArcadeTestPlayerManager {
             } catch (Exception exception) {
                 host.getLogger().warning("Could not inspect FakePlayerPlugin for stale Testplex bots: "
                         + rootMessage(exception));
+            } finally {
+                startupCleanupComplete = true;
             }
         }, 40L);
     }
