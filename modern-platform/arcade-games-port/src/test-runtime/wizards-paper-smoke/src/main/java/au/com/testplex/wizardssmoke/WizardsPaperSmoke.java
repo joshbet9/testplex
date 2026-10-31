@@ -12,6 +12,8 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.DisplaySlot;
@@ -30,8 +32,8 @@ import java.util.Set;
 /**
  * Disposable Paper 26.3 acceptance harness:
  *  - loads every source snapshot through WizardsGameManager.createArena();
- *  - then waits for two real protocol clients and starts a two-player Wizards round;
- *  - verifies kit/spawn/loot state and leave/winner/player-snapshot restoration.
+ *  - then waits for three real protocol clients and starts a three-player Wizards round;
+ *  - verifies kit/spawn/loot state, real eliminations, spectator respawn, progression and restoration.
  *
  * This plugin is only packaged in the temporary CI smoke server, never in Testplex jars.
  */
@@ -42,6 +44,8 @@ public final class WizardsPaperSmoke extends JavaPlugin {
             "industrialwest", "alicudi", "thaumaturgecolony", "magicallypossible", "kalamit");
     private static final String GAMEPLAY_MAP = "source-maps/Wizards/haven.zip";
     private static final String OWNER_NAME = "jn_playzmc";
+    private static final String RIVAL_NAME = "WizardSmoke2";
+    private static final String THIRD_NAME = "WizardSmoke3";
     private static final int MAX_CLIENT_WAIT_TICKS = 120 * 20 / 5;
     private static final int MAX_START_WAIT_TICKS = 60 * 20 / 5;
 
@@ -51,9 +55,11 @@ public final class WizardsPaperSmoke extends JavaPlugin {
     private BukkitTask gameplayTask;
     private Player owner;
     private Player rival;
+    private Player third;
     private World gameplayArena;
     private PlayerBaseline ownerBaseline;
     private PlayerBaseline rivalBaseline;
+    private PlayerBaseline thirdBaseline;
     private int gameplayStage;
     private int gameplayTicks;
     private boolean shuttingDown;
@@ -135,8 +141,8 @@ public final class WizardsPaperSmoke extends JavaPlugin {
     private void beginGameplaySmoke() {
         arcade.getConfig().set("selected-maps.wizards", GAMEPLAY_MAP);
         arcade.saveConfig();
-        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|WAITING|two offline protocol clients ("
-                + OWNER_NAME + " and WizardSmoke2)");
+        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|WAITING|three offline protocol clients ("
+                + OWNER_NAME + ", " + RIVAL_NAME + " and " + THIRD_NAME + ")");
         gameplayTask = Bukkit.getScheduler().runTaskTimer(this, this::tickGameplaySmoke, 20L, 5L);
     }
 
@@ -150,8 +156,9 @@ public final class WizardsPaperSmoke extends JavaPlugin {
         try {
             switch (gameplayStage) {
                 case 0 -> waitForClientsAndQueue();
-                case 1 -> verifyLiveRoundAndRequestLeave();
-                case 2 -> verifyPlayerRestorationAndFinish();
+                case 1 -> verifyLiveRoundAndEliminateFirstOpponent();
+                case 2 -> verifySpectatorAndEliminateFinalOpponent();
+                case 3 -> verifyPlayerRestorationAndFinish();
                 default -> failAndShutdown("GAMEPLAY_FAIL", "lifecycle",
                         new IllegalStateException("unknown gameplay smoke stage " + gameplayStage));
             }
@@ -163,47 +170,58 @@ public final class WizardsPaperSmoke extends JavaPlugin {
     private void waitForClientsAndQueue() throws Exception {
         List<Player> online = new ArrayList<>(Bukkit.getOnlinePlayers());
         owner = online.stream().filter(player -> OWNER_NAME.equalsIgnoreCase(player.getName())).findFirst().orElse(null);
-        rival = online.stream().filter(player -> !player.equals(owner)).findFirst().orElse(null);
-        if (owner == null || rival == null) {
+        rival = online.stream().filter(player -> RIVAL_NAME.equalsIgnoreCase(player.getName())).findFirst().orElse(null);
+        third = online.stream().filter(player -> THIRD_NAME.equalsIgnoreCase(player.getName())).findFirst().orElse(null);
+        if (owner == null || rival == null || third == null) {
             if (gameplayTicks >= MAX_CLIENT_WAIT_TICKS) {
-                throw new IllegalStateException("timed out waiting for two real clients; online="
+                throw new IllegalStateException("timed out waiting for three real clients; online="
                         + online.stream().map(Player::getName).toList());
             }
             return;
         }
 
-        // Settle the shared Arcade session before recording the lobby baseline;
-        // Wizards performs this same preflight before it snapshots players at round start.
+        // Settle the shared Arcade session before recording the lobby baselines.
         method(arcade.getClass(), "prepareForWizards").invoke(arcade);
+        seedBaselineProfile(owner, 0);
+        seedBaselineProfile(rival, 1);
+        seedBaselineProfile(third, 2);
         ownerBaseline = captureBaseline(owner);
         rivalBaseline = captureBaseline(rival);
+        thirdBaseline = captureBaseline(third);
         require(GAMEPLAY_MAP.equals(arcade.getConfig().getString("selected-maps.wizards")),
                 "gameplay map selection was not persisted");
+        require(!arcade.getConfig().getBoolean("wizards.allow-solo-start", true),
+                "one-player Wizards starts must remain disabled");
         require(Bukkit.dispatchCommand(owner, "arcadeport join wizards"),
                 "owner could not join the Wizards queue");
         require(Bukkit.dispatchCommand(rival, "arcadeport join wizards"),
                 "second client could not join the Wizards queue");
+        require(Bukkit.dispatchCommand(third, "arcadeport join wizards"),
+                "third client could not join the Wizards queue");
         require(Bukkit.dispatchCommand(owner, "arcadeport kit wizards mage"),
                 "Mage kit selection command was rejected");
         require(Bukkit.dispatchCommand(rival, "arcadeport kit wizards sorcerer"),
                 "Sorcerer kit selection command was rejected");
+        require(Bukkit.dispatchCommand(third, "arcadeport kit wizards mystic"),
+                "Mystic kit selection command was rejected");
 
         @SuppressWarnings("unchecked")
         Map<Object, Object> queue = (Map<Object, Object>) field(wizards, "queue");
-        require(queue.size() == 2, "expected two queued clients, found " + queue.size());
+        require(queue.size() == 3, "expected three queued clients, found " + queue.size());
         require(Bukkit.dispatchCommand(owner, "arcadeport start wizards"),
                 "owner could not force-start the Wizards round");
         gameplayStage = 1;
         gameplayTicks = 0;
-        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|QUEUED|players=" + owner.getName() + "," + rival.getName()
-                + "|map=" + GAMEPLAY_MAP + "|kits=MAGE,SORCERER");
+        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|QUEUED|players=" + owner.getName() + ","
+                + rival.getName() + "," + third.getName()
+                + "|map=" + GAMEPLAY_MAP + "|kits=MAGE,SORCERER,MYSTIC");
     }
 
-    private void verifyLiveRoundAndRequestLeave() throws Exception {
+    private void verifyLiveRoundAndEliminateFirstOpponent() throws Exception {
         boolean running = (Boolean) field(wizards, "running");
         if (!running) {
             if (gameplayTicks >= MAX_START_WAIT_TICKS) {
-                throw new IllegalStateException("Wizards did not start after both clients queued");
+                throw new IllegalStateException("Wizards did not start after three clients queued");
             }
             return;
         }
@@ -220,19 +238,66 @@ public final class WizardsPaperSmoke extends JavaPlugin {
                 "actual match fell back from selected map (active=" + activeResource + ")");
         require(gameplayArena != null && "arcadeport_source_wizards".equals(gameplayArena.getName()),
                 "actual Wizards round is not using the selected source world");
-        require(states.size() == 2, "expected two active wizard states, found " + states.size());
-        require(snapshots.size() == 2, "player snapshots were not captured for both clients");
+        require(states.size() == 3, "expected three active wizard states, found " + states.size());
+        require(snapshots.size() == 3, "player snapshots were not captured for all three clients");
         require(chests.size() >= 8, "live round has fewer than eight loot chests");
 
         validateLivePlayer(owner, states, "MAGE");
         validateLivePlayer(rival, states, "SORCERER");
+        validateLivePlayer(third, states, "MYSTIC");
         validateLootRefilled(chests);
 
-        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|ROUND_STARTED|players=2|map=" + GAMEPLAY_MAP
+        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|ROUND_STARTED|players=3|map=" + GAMEPLAY_MAP
                 + "|chests=" + chests.size() + "|snapshotCount=" + snapshots.size());
-        require(Bukkit.dispatchCommand(rival, "arcadeport leave wizards"),
-                "second client could not leave the live Wizards round");
+        rival.setNoDamageTicks(0);
+        rival.setHealth(1.0D);
+        rival.damage(100.0D, owner);
+        require(rival.isDead(), "the first real player-vs-player elimination did not kill the rival");
+        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|ELIMINATION|victim=" + rival.getName()
+                + "|attacker=" + owner.getName() + "|stage=1");
         gameplayStage = 2;
+        gameplayTicks = 0;
+    }
+
+    private void verifySpectatorAndEliminateFinalOpponent() throws Exception {
+        boolean running = (Boolean) field(wizards, "running");
+        if (!running) {
+            throw new IllegalStateException("the match ended before the third player could verify spectator mode");
+        }
+        if (rival == null || !rival.isOnline() || rival.isDead()) {
+            if (gameplayTicks >= 160) {
+                throw new IllegalStateException("the first eliminated player did not complete respawn");
+            }
+            return;
+        }
+
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> states = (Map<Object, Object>) field(wizards, "states");
+        Object rivalState = states.get(rival.getUniqueId());
+        Object ownerState = states.get(owner.getUniqueId());
+        Object thirdState = states.get(third.getUniqueId());
+        require(rivalState != null && Boolean.FALSE.equals(field(rivalState, "alive")),
+                "eliminated player was incorrectly marked alive after respawn");
+        require(rival.getGameMode() == GameMode.SPECTATOR,
+                "eliminated player did not respawn into spectator mode");
+        require(rival.getWorld().equals(gameplayArena),
+                "eliminated player was not kept in the active Wizards arena while spectating");
+        require(ownerState != null && thirdState != null
+                        && Boolean.TRUE.equals(field(ownerState, "alive"))
+                        && Boolean.TRUE.equals(field(thirdState, "alive")),
+                "the two remaining players are not alive after the first elimination");
+        require(((Number) field(ownerState, "kills")).intValue() == 1,
+                "the first PvP elimination was not credited to the attacker");
+
+        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|SPECTATOR|player=" + rival.getName()
+                + "|aliveRemaining=2|creditedKills=1");
+        third.setNoDamageTicks(0);
+        third.setHealth(1.0D);
+        third.damage(100.0D, owner);
+        require(third.isDead(), "the final opponent could not be eliminated in live combat");
+        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|ELIMINATION|victim=" + third.getName()
+                + "|attacker=" + owner.getName() + "|stage=2");
+        gameplayStage = 3;
         gameplayTicks = 0;
     }
 
@@ -244,37 +309,152 @@ public final class WizardsPaperSmoke extends JavaPlugin {
         Map<Object, Object> snapshots = (Map<Object, Object>) field(wizards, "snapshots");
         @SuppressWarnings("unchecked")
         Map<Object, Object> queue = (Map<Object, Object>) field(wizards, "queue");
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> pendingRestore = (Map<Object, Object>) field(wizards, "pendingRestore");
 
-        if (running || !states.isEmpty() || !snapshots.isEmpty() || !queue.isEmpty()) {
-            if (gameplayTicks >= 100) {
-                throw new IllegalStateException("round/player state was not fully restored after a player left"
+        if (running || !states.isEmpty() || !snapshots.isEmpty() || !queue.isEmpty()
+                || !pendingRestore.isEmpty()) {
+            if (gameplayTicks >= 240) {
+                throw new IllegalStateException("round/player state was not fully restored after PvP eliminations"
                         + " (running=" + running + ", states=" + states.size()
-                        + ", snapshots=" + snapshots.size() + ", queue=" + queue.size() + ")");
+                        + ", snapshots=" + snapshots.size() + ", queue=" + queue.size()
+                        + ", pendingRestore=" + pendingRestore.size() + ")");
             }
             return;
         }
 
-        require(owner.isOnline() && rival.isOnline(), "a player disconnected during leave/restore acceptance");
-        require(!owner.getWorld().equals(gameplayArena), "remaining player was not restored out of the match world");
-        require(!rival.getWorld().equals(gameplayArena), "leaving player was not restored out of the match world");
+        require(owner.isOnline() && rival.isOnline() && third.isOnline(),
+                "a client disconnected during death/respawn restoration acceptance");
+        require(!owner.getWorld().equals(gameplayArena), "winner was not restored out of the match world");
+        require(!rival.getWorld().equals(gameplayArena), "spectator was not restored out of the match world");
+        require(!third.getWorld().equals(gameplayArena), "final eliminated player was not restored out of the match world");
         validateRestoredPlayer(owner, ownerBaseline);
         validateRestoredPlayer(rival, rivalBaseline);
+        validateRestoredPlayer(third, thirdBaseline);
 
-        record("GAMEPLAY_PASS", GAMEPLAY_MAP, 2, 0, 0,
-                "two real clients; Mage/Sorcerer; live start and chest refill; leave triggered winner cleanup; both snapshots restored");
-        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|PASS|players=2|kits=MAGE,SORCERER"
-                + "|roundStarted=true|lootRefilled=true|leaveCleanup=true|snapshotsRestored=true");
-        long mapPasses = results.stream().filter(line -> line.startsWith("PASS\t")).count();
+        String statsRoot = "local-stats." + owner.getUniqueId() + ".wizards.";
+        require(arcade.getConfig().getLong(statsRoot + "wins") == 1L,
+                "match winner did not receive exactly one Wizards win");
+        require(arcade.getConfig().getLong(statsRoot + "kills") == 2L,
+                "winner did not receive both player elimination credits");
+
+        record("GAMEPLAY_PASS", GAMEPLAY_MAP, 3, 0, 0,
+                "three real clients; Mage/Sorcerer/Mystic; live start and chest refill; two PvP eliminations; spectator respawn; kill/win progression; full lobby state restored for winner and both eliminated players");
+        getLogger().info("WIZARDS_GAMEPLAY_SMOKE|PASS|players=3|kits=MAGE,SORCERER,MYSTIC"
+                + "|roundStarted=true|lootRefilled=true|pvpEliminations=2|spectatorRespawn=true"
+                + "|killWinProgress=true|snapshotsRestored=true");
+        long mapPasses = results.stream().filter(line -> line.startsWith("PASS	")).count();
         getLogger().info("WIZARDS_SOURCE_MAP_SMOKE|FINAL|mapsPassed=" + mapPasses
-                + "|gameplay=PASS|twoClientRound=PASS");
+                + "|gameplay=PASS|threeClientCombatRound=PASS");
         shutdownServer();
+    }
+
+    private void seedBaselineProfile(Player player, int variant) {
+        Material[] tokens = {Material.EMERALD, Material.DIAMOND, Material.GOLD_INGOT};
+        Material[] helmets = {Material.LEATHER_HELMET, Material.GOLDEN_HELMET, Material.IRON_HELMET};
+        PotionEffectType[] effects = {
+                PotionEffectType.SPEED, PotionEffectType.JUMP_BOOST, PotionEffectType.NIGHT_VISION
+        };
+        player.closeInventory();
+        player.getInventory().clear();
+        player.getInventory().setItem(20, new ItemStack(tokens[variant], variant + 2));
+        player.getInventory().setHelmet(new ItemStack(helmets[variant]));
+        player.setHealth(12.0D + variant);
+        player.setFoodLevel(12 + variant);
+        player.setSaturation(2.0F + variant);
+        player.setLevel(6 + variant);
+        player.setExp(0.25F);
+        player.setAbsorptionAmount(1.5D + variant);
+        player.getActivePotionEffects().forEach(effect -> player.removePotionEffect(effect.getType()));
+        player.addPotionEffect(new PotionEffect(effects[variant], 1200, variant, false, false, true));
+        player.setAllowFlight(true);
+        player.setFlying(true);
+        player.setWalkSpeed(0.25F + variant * 0.03F);
+        player.setFlySpeed(0.12F + variant * 0.02F);
+        player.setSprinting(true);
+        player.setCompassTarget(player.getWorld().getSpawnLocation().clone().add(variant + 5, 0, variant + 2));
     }
 
     private PlayerBaseline captureBaseline(Player player) {
         return new PlayerBaseline(player.getWorld(), player.getLocation().clone(),
-                player.getInventory().getContents().clone(), player.getGameMode(),
-                player.getScoreboard(), player.getHealth(), player.getFoodLevel(), player.getSaturation());
+                cloneItems(player.getInventory().getContents()), cloneItems(player.getInventory().getArmorContents()),
+                player.getGameMode(), player.getScoreboard(), player.getHealth(), player.getAbsorptionAmount(),
+                player.getFoodLevel(), player.getSaturation(), player.getLevel(), player.getExp(),
+                player.getAllowFlight(), player.isFlying(), player.isSprinting(),
+                player.getWalkSpeed(), player.getFlySpeed(), player.getFireTicks(),
+                player.getCompassTarget() == null ? null : player.getCompassTarget().clone(),
+                new ArrayList<>(player.getActivePotionEffects()));
     }
+
+    private void validateRestoredPlayer(Player player, PlayerBaseline baseline) {
+        require(baseline != null, "missing original lobby baseline for " + player.getName());
+        require(player.getWorld().equals(baseline.world()), player.getName() + " was not restored to the original world");
+        require(player.getLocation().distanceSquared(baseline.location()) <= 1.0D,
+                player.getName() + " was not restored to the original lobby location");
+        require(player.getGameMode() == baseline.gameMode(),
+                player.getName() + " game mode was not restored");
+        require(player.getScoreboard() == baseline.scoreboard(),
+                player.getName() + " scoreboard was not restored");
+        require(Math.abs(player.getHealth() - baseline.health()) < 0.01D,
+                player.getName() + " health was not restored");
+        require(Math.abs(player.getAbsorptionAmount() - baseline.absorption()) < 0.01D,
+                player.getName() + " absorption hearts were not restored");
+        require(player.getFoodLevel() == baseline.foodLevel()
+                        && Math.abs(player.getSaturation() - baseline.saturation()) < 0.01F,
+                player.getName() + " food/saturation was not restored");
+        require(player.getLevel() == baseline.level() && Math.abs(player.getExp() - baseline.exp()) < 0.001F,
+                player.getName() + " experience state was not restored");
+        require(player.getAllowFlight() == baseline.allowFlight() && player.isFlying() == baseline.flying(),
+                player.getName() + " flight permissions/state were not restored");
+        require(player.isSprinting() == baseline.sprinting(),
+                player.getName() + " sprint state was not restored");
+        require(Math.abs(player.getWalkSpeed() - baseline.walkSpeed()) < 0.001F
+                        && Math.abs(player.getFlySpeed() - baseline.flySpeed()) < 0.001F,
+                player.getName() + " movement speed settings were not restored");
+        require(player.getFireTicks() == baseline.fireTicks(),
+                player.getName() + " fire timer was not restored");
+        require(baseline.compassTarget() == null || (player.getCompassTarget() != null
+                        && player.getCompassTarget().getWorld().equals(baseline.compassTarget().getWorld())
+                        && player.getCompassTarget().distanceSquared(baseline.compassTarget()) < 0.01D),
+                player.getName() + " compass target was not restored");
+        require(player.getActivePotionEffects().size() == baseline.effects().size(),
+                player.getName() + " potion-effect count was not restored");
+        for (PotionEffect expected : baseline.effects()) {
+            PotionEffect actual = player.getPotionEffect(expected.getType());
+            require(actual != null && actual.getAmplifier() == expected.getAmplifier(),
+                    player.getName() + " potion effect " + expected.getType() + " was not restored");
+        }
+
+        assertItemsEqual(player.getName() + " inventory", player.getInventory().getContents(), baseline.inventory());
+        assertItemsEqual(player.getName() + " armour", player.getInventory().getArmorContents(), baseline.armour());
+    }
+
+    private void assertItemsEqual(String label, ItemStack[] actual, ItemStack[] expected) {
+        require(actual.length == expected.length, label + " size changed after restoration");
+        for (int slot = 0; slot < expected.length; slot++) {
+            ItemStack before = expected[slot];
+            ItemStack after = actual[slot];
+            if (before == null || before.getType().isAir()) {
+                require(after == null || after.getType().isAir(), label + " slot " + slot + " was not restored to empty");
+            } else {
+                require(after != null && before.isSimilar(after) && before.getAmount() == after.getAmount(),
+                        label + " slot " + slot + " was not restored");
+            }
+        }
+    }
+
+    private ItemStack[] cloneItems(ItemStack[] items) {
+        ItemStack[] copy = new ItemStack[items.length];
+        for (int i = 0; i < items.length; i++) copy[i] = items[i] == null ? null : items[i].clone();
+        return copy;
+    }
+
+    private record PlayerBaseline(
+            World world, Location location, ItemStack[] inventory, ItemStack[] armour, GameMode gameMode,
+            Scoreboard scoreboard, double health, double absorption, int foodLevel, float saturation,
+            int level, float exp, boolean allowFlight, boolean flying, boolean sprinting,
+            float walkSpeed, float flySpeed, int fireTicks, Location compassTarget,
+            List<PotionEffect> effects) {}
 
     private void validateRestoredPlayer(Player player, PlayerBaseline baseline) {
         require(baseline != null, "missing original lobby baseline for " + player.getName());
@@ -327,6 +507,15 @@ public final class WizardsPaperSmoke extends JavaPlugin {
         require(menu != null && !menu.getType().isAir(), player.getName() + " did not receive the spell menu item");
         require(player.getScoreboard().getObjective(DisplaySlot.SIDEBAR) != null,
                 player.getName() + " did not receive the Wizards match scoreboard");
+        require(player.getActivePotionEffects().isEmpty(),
+                player.getName() + " carried lobby potion effects into the match");
+        require(player.getAbsorptionAmount() == 0.0D,
+                player.getName() + " carried lobby absorption hearts into the match");
+        require(!player.getAllowFlight() && !player.isFlying() && !player.isSprinting(),
+                player.getName() + " carried lobby flight/sprint state into the match");
+        require(Math.abs(player.getWalkSpeed() - 0.2F) < 0.001F
+                        && Math.abs(player.getFlySpeed() - 0.1F) < 0.001F,
+                player.getName() + " did not receive standard match movement speeds");
     }
 
     private void validateLootRefilled(List<Location> chests) {
