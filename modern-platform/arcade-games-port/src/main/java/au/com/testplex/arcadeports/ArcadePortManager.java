@@ -1361,7 +1361,7 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
-        if (automaticRotationTask != null) {
+        if (automaticRotationTask != null || automaticRotationOnReturn) {
             cancelAutomaticRotationVote();
             player.sendMessage(ChatColor.YELLOW + "The automatic preference vote was cancelled by a manual queue selection.");
         }
