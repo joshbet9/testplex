@@ -13074,6 +13074,16 @@ public final class ArcadePortManager implements Listener {
                         + Math.max(0L, Math.round(stats.wallClimbBlocks())));
         plugin.getConfig().set(statsPath + "specials-used",
                 plugin.getConfig().getInt(statsPath + "specials-used", 0) + stats.specialsUsed());
+        plugin.getConfig().set(statsPath + "roller-territory",
+                plugin.getConfig().getLong(statsPath + "roller-territory", 0L) + stats.rollerTerritory());
+        plugin.getConfig().set(statsPath + "charger-full-hits",
+                plugin.getConfig().getInt(statsPath + "charger-full-hits", 0) + stats.chargerFullHits());
+        plugin.getConfig().set(statsPath + "lobber-enemy-reclaimed",
+                plugin.getConfig().getLong(statsPath + "lobber-enemy-reclaimed", 0L) + stats.lobberEnemyReclaimed());
+        plugin.getConfig().set(statsPath + "dualies-post-roll-splats",
+                plugin.getConfig().getInt(statsPath + "dualies-post-roll-splats", 0) + stats.dualiesPostRollSplats());
+        plugin.getConfig().set(statsPath + "best-special-targets",
+                Math.max(plugin.getConfig().getInt(statsPath + "best-special-targets", 0), stats.bestSpecialTargets()));
 
         awardCatalogAchievement(playerId, player, "super-sploor", "first-splash");
         if (stats.territoryPainted() >= 500L) {
@@ -13094,7 +13104,7 @@ public final class ArcadePortManager implements Listener {
         if (won && stats.deaths() == 0) {
             awardCatalogAchievement(playerId, player, "super-sploor", "clean-sweep");
         }
-        if (stats.territoryPainted() >= 350L) {
+        if ("sprayer".equals(stats.kit()) && stats.territoryPainted() >= 350L) {
             awardCatalogAchievement(playerId, player, "super-sploor", "colour-outside-the-lines");
         }
         if (stats.rollerTerritory() >= 500L) {
