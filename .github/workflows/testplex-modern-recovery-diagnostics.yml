@@ -147,7 +147,7 @@ jobs:
 
           echo "=== Current modern server artifacts (metadata only) ==="
           if [[ -d "$SERVER_DIR" ]]; then
-            find "$SERVER_DIR" -maxdepth 2 -type f \\( -name 'paper.jar' -o -name '*.jar' -o -name '.testplex-modern-deployed-build' -o -name '.testplex-paper-build' -o -name '.testplex-modern-sandbox' \\) -print 2>/dev/null | sort | sed -n '1,100p'
+            find "$SERVER_DIR" -maxdepth 2 -type f \( -name 'paper.jar' -o -name '*.jar' -o -name '.testplex-modern-deployed-build' -o -name '.testplex-paper-build' -o -name '.testplex-modern-sandbox' \) -print 2>/dev/null | sort | sed -n '1,100p'
             for file in "$SERVER_DIR/paper.jar" "$SERVER_DIR/.testplex-modern-deployed-build" "$SERVER_DIR/plugins/TestplexModernArcade.jar" "$SERVER_DIR/plugins/ArcadeMechanicsModern.jar" "$SERVER_DIR/plugins/SnakeModern.jar" "$SERVER_DIR/plugins/WizardsModern.jar"; do
               if [[ -s "$file" ]]; then sha256sum "$file"; fi
             done
