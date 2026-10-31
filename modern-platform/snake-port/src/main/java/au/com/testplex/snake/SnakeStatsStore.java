@@ -7,6 +7,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.io.IOException;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -15,6 +16,10 @@ public final class SnakeStatsStore {
     private final JavaPlugin plugin;
     private final File file;
     private final YamlConfiguration data;
+    private static final List<String> ACHIEVEMENTS = List.of(
+            "Cannibal", "ChooChoo", "SlimySheep",
+            "dont-want-none", "resilience-snakeified", "busted",
+            "one-of-the-ogs", "flawless", "bots-everywhere");
 
     public SnakeStatsStore(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -49,10 +54,16 @@ public final class SnakeStatsStore {
     }
 
     private boolean award(UUID player, String stat) {
-        String path = base(player) + ".achievements." + stat;
+        return awardAchievement(player, stat);
+    }
+
+    public boolean awardAchievement(UUID player, String achievement) {
+        if (player == null || achievement == null || !ACHIEVEMENTS.contains(achievement)) return false;
+        String path = base(player) + ".achievements." + achievement;
         if (data.getBoolean(path)) return false;
         data.set(path, true);
-        plugin.getLogger().info("Snake achievement " + stat + " awarded to " + player + ".");
+        plugin.getLogger().info("Snake achievement " + achievement + " awarded to " + player + ".");
+        save();
         return true;
     }
 
@@ -83,7 +94,7 @@ public final class SnakeStatsStore {
     public int bestTailLength(UUID player) { return data.getInt(base(player) + ".best-tail-length"); }
     public Set<String> achievements(UUID player) {
         Set<String> result = new LinkedHashSet<>();
-        for (String stat : Set.of("Cannibal", "ChooChoo", "SlimySheep")) {
+        for (String stat : ACHIEVEMENTS) {
             if (data.getBoolean(base(player) + ".achievements." + stat)) result.add(stat);
         }
         return Set.copyOf(result);

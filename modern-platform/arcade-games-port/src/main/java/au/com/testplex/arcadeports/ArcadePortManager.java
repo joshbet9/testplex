@@ -13390,7 +13390,9 @@ public final class ArcadePortManager implements Listener {
         plugin.getConfig().set(path + "lifetime-kills", Math.max(0, lifetimeKills));
         plugin.getConfig().set(path + "lifetime-slimes", Math.max(0, lifetimeSlimes));
         plugin.getConfig().set(path + "best-tail-length", Math.max(0, bestTailLength));
-        for (String achievement : List.of("Cannibal", "ChooChoo", "SlimySheep")) {
+        for (String achievement : List.of("Cannibal", "ChooChoo", "SlimySheep",
+                "dont-want-none", "resilience-snakeified", "busted", "one-of-the-ogs",
+                "flawless", "bots-everywhere")) {
             plugin.getConfig().set(path + "achievements." + achievement,
                     achievements != null && achievements.contains(achievement));
         }

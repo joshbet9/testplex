@@ -447,6 +447,14 @@ public final class SnakeMapCatalog {
             Location center = center();
             return center == null ? value : Math.max(center.getZ() - 42.0D, Math.min(center.getZ() + 42.0D, value));
         }
+        public boolean isWithinEdgeMargin(Location location, double margin) {
+            if (location == null || location.getWorld() != world
+                    || !hasMinX || !hasMaxX || !hasMinZ || !hasMaxZ) return false;
+            double edgeDistance = Math.min(
+                    Math.min(location.getX() - minX, maxX - location.getX()),
+                    Math.min(location.getZ() - minZ, maxZ - location.getZ()));
+            return edgeDistance >= 0.0D && edgeDistance <= Math.max(0.0D, margin);
+        }
         public int minY() { return hasMinY ? minY : 1; }
         public int maxY() { return hasMaxY ? maxY : (world == null ? 128 : world.getMaxHeight() - 5); }
         public boolean hasSpawnLocations() { return !teamSpawns.values().stream().allMatch(List::isEmpty); }
