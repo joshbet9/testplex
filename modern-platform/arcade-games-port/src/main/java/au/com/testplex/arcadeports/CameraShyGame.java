@@ -671,11 +671,11 @@ public final class CameraShyGame implements Listener {
         if (serverTick % 5L == 0L) refreshHud(now);
 
         long livingHumans = alive.stream().filter(humans::contains).count();
-        // A solo tester may be paired with AFK test dummies. Do not auto-award
-        // an instant win just because the fixture contains only one human.
-        if (livingHumans == 0L || (humans.size() > 1 && livingHumans == 1L)) {
+        if (CameraShyRules.shouldEndMatch(alive.size(), (int) livingHumans, humans.size())) {
             UUID winner = alive.stream().filter(humans::contains).findFirst().orElse(null);
-            finish(winner, winner == null ? "All human players were eliminated." : "Last player standing!", true);
+            String endReason = winner == null ? "All human players were eliminated."
+                    : alive.size() <= 1 ? "Last player standing!" : "Last human player standing!";
+            finish(winner, endReason, true);
         }
     }
 
@@ -1301,11 +1301,11 @@ public final class CameraShyGame implements Listener {
         ItemMeta meta = pickup.getItemMeta();
         meta.getPersistentDataContainer().set(groupPickupKey, PersistentDataType.BYTE, (byte) 1);
         pickup.setItemMeta(meta);
-        currentGroupPickup = arena.dropItem(location, pickup);
-        currentGroupPickup.setPickupDelay(0);
+        Item spawnedPickup = arena.dropItem(location, pickup);
+        currentGroupPickup = spawnedPickup;
+        spawnedPickup.setPickupDelay(0);
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (currentGroupPickup != null && currentGroupPickup.isValid()
-                    && System.currentTimeMillis() > now + GROUP_PICKUP_LIFETIME_MILLIS) clearGroupPickup();
+            if (currentGroupPickup == spawnedPickup) clearGroupPickup();
         }, GROUP_PICKUP_LIFETIME_MILLIS / 50L);
         arena.spawnParticle(Particle.HAPPY_VILLAGER, location, 16, 0.4D, 0.5D, 0.4D, 0.02D);
         broadcastMatch(ChatColor.LIGHT_PURPLE + "A Group Photo pickup has appeared somewhere in the maze!");
