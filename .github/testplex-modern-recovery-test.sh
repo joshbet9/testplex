@@ -134,7 +134,7 @@ status=$status
 EOF
   cp "$STATE/current.properties" "$BACKUP/transaction.properties"
 }
-run_helper() { "$HELPER" "$@"; }
+run_helper() { bash "$HELPER" "$@"; }
 assert_eq() { [[ "$1" == "$2" ]] || { echo "ASSERT expected '$2', got '$1'" >&2; exit 1; }; }
 assert_file_text() { [[ "$(cat "$1")" == "$2" ]] || { echo "ASSERT unexpected contents: $1" >&2; exit 1; }; }
 
@@ -297,18 +297,18 @@ printf 'first-install artifact\n' > "$FIRST_SERVER/paper.jar"
 printf '%s\n' "$target_sha" > "$FIRST_SERVER/.testplex-modern-deployed-build"
 TESTPLEX_SERVER_DIR="$FIRST_SERVER" TESTPLEX_STATE_DIR="$FIRST_STATE" TESTPLEX_UNIT_FILE="$FIRST_UNIT" \
 TESTPLEX_STUB_ACTIVE="$TMP/first-active" TESTPLEX_STUB_ENABLED="$TMP/first-enabled" \
-  "$HELPER" --locked begin first-install "$target_sha" "$FIRST_BACKUP" none none false not-found false false false false false '' ''
+  bash "$HELPER" --locked begin first-install "$target_sha" "$FIRST_BACKUP" none none false not-found false false false false false '' ''
 TESTPLEX_SERVER_DIR="$FIRST_SERVER" TESTPLEX_STATE_DIR="$FIRST_STATE" TESTPLEX_UNIT_FILE="$FIRST_UNIT" \
 TESTPLEX_STUB_ACTIVE="$TMP/first-active" TESTPLEX_STUB_ENABLED="$TMP/first-enabled" \
-  "$HELPER" --locked set-field backup_sha "$(awk '{print $1}' "$FIRST_BACKUP/server-artifacts.sha256")"
+  bash "$HELPER" --locked set-field backup_sha "$(awk '{print $1}' "$FIRST_BACKUP/server-artifacts.sha256")"
 TESTPLEX_SERVER_DIR="$FIRST_SERVER" TESTPLEX_STATE_DIR="$FIRST_STATE" TESTPLEX_UNIT_FILE="$FIRST_UNIT" \
 TESTPLEX_STUB_ACTIVE="$TMP/first-active" TESTPLEX_STUB_ENABLED="$TMP/first-enabled" \
-  "$HELPER" --locked set-field backup_complete true
+  bash "$HELPER" --locked set-field backup_complete true
 TESTPLEX_SERVER_DIR="$FIRST_SERVER" TESTPLEX_STATE_DIR="$FIRST_STATE" TESTPLEX_UNIT_FILE="$FIRST_UNIT" \
 TESTPLEX_STUB_ACTIVE="$TMP/first-active" TESTPLEX_STUB_ENABLED="$TMP/first-enabled" \
-  "$HELPER" --locked set-phase REPLACING
+  bash "$HELPER" --locked set-phase REPLACING
 output="$(TESTPLEX_SERVER_DIR="$FIRST_SERVER" TESTPLEX_STATE_DIR="$FIRST_STATE" TESTPLEX_UNIT_FILE="$FIRST_UNIT" \
-TESTPLEX_STUB_ACTIVE="$TMP/first-active" TESTPLEX_STUB_ENABLED="$TMP/first-enabled" "$HELPER" recover "$target_sha")"
+TESTPLEX_STUB_ACTIVE="$TMP/first-active" TESTPLEX_STUB_ENABLED="$TMP/first-enabled" bash "$HELPER" recover "$target_sha")"
 grep -q '^no-prior-deployment-restored:' <<< "$output"
 [[ ! -e "$FIRST_SERVER" && ! -e "$FIRST_UNIT" ]]
 [[ -f "$FIRST_BACKUP/failed-artifacts/attempt-001/no-prior-server-directory/paper.jar" ]]
