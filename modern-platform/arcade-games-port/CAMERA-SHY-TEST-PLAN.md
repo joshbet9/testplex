@@ -3,8 +3,9 @@
 ## Join and controls
 - `/arcadeport play camera-shy` queues the player and opens the short join window.
 - `/arcadeport join camera-shy` queues without starting the quick-start timer.
+- `/arcadeport lobby camera-shy` selects the game in the shared lobby and refreshes its kit selector.
 - `/arcadeport start camera-shy` starts the current lobby participants.
-- `/arcadeport kit smoke-artist|decoy|runner|spotter|understudy` selects a persistent lobby kit.
+- `/arcadeport kit camera-shy-smoke-artist|camera-shy-decoy|camera-shy-runner|camera-shy-spotter|camera-shy-understudy` selects a persistent kit; the lobby kit GUI offers the same choices.
 - Hold right-click with the vanilla spyglass to aim; press F (swap hands) to take a photograph.
 - `/arcadeport leave` leaves the waiting queue; `/arcadeport status` reports queue and match state.
 
