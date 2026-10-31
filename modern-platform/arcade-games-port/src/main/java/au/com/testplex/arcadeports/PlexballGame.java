@@ -794,7 +794,7 @@ public final class PlexballGame implements Listener {
         beatBar.setCharAt(markerPosition, markerPosition == 10 ? '*' : 'o');
         String timerLabel = remaining == 0 ? "BUFFER" : remaining + "s";
         batter.sendActionBar(Component.text("YOUR TURN  |  " + timerLabel + "  |  " + beatBar
-                + "  |  Aim at ball; right-click once when o meets |"));
+                + "  |  Aim at ball; right-click once when the marker reaches |"));
         for (UUID id : matchPlayers) {
             if (id.equals(batterId)) continue;
             Player fielder = Bukkit.getPlayer(id);
