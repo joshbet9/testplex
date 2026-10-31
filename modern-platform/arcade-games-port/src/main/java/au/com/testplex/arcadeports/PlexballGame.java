@@ -90,6 +90,7 @@ public final class PlexballGame implements Listener {
     private static final double CATCH_REACH = PlexballRules.BASE_CATCH_RADIUS;
     private static final double FIELD_PLAYER_EYE_OFFSET = 1.0D;
     private static final String STATS_MENU_TITLE = ChatColor.GOLD + "Plexball Progress";
+    private static final String KIT_MENU_TITLE = ChatColor.AQUA + "Plexball Kits";
 
     private enum Phase { IDLE, INTRO, BATTING, BALL_FLIGHT, TURN_BREAK }
 
@@ -343,9 +344,65 @@ public final class PlexballGame implements Listener {
         player.openInventory(inventory);
     }
 
+    public void openKitMenu(Player player) {
+        if (player == null || !player.isOnline()) return;
+        Inventory inventory = Bukkit.createInventory(null, 27, KIT_MENU_TITLE);
+        ItemStack filler = progressItem(Material.BLACK_STAINED_GLASS_PANE, " ", List.of());
+        for (int slot = 0; slot < inventory.getSize(); slot++) inventory.setItem(slot, filler);
+        Kit selected = selectedKits.getOrDefault(player.getUniqueId(), Kit.TECHNICIAN);
+        inventory.setItem(4, progressItem(Material.BOOK, ChatColor.AQUA + "Choose your Plexball kit", List.of(
+                ChatColor.GRAY + "Each kit has a distinct batting style and fielding ability.",
+                ChatColor.GRAY + "Your selection is saved for your next match.")));
+
+        int[] slots = {10, 12, 14, 16, 22};
+        Kit[] kits = Kit.values();
+        for (int index = 0; index < kits.length; index++) {
+            Kit kit = kits[index];
+            boolean active = kit == selected;
+            List<String> lore = new ArrayList<>();
+            lore.add(ChatColor.GRAY + describeKit(kit));
+            lore.add(ChatColor.GRAY + "Ability: " + ChatColor.AQUA + kit.abilityName());
+            lore.add(active ? ChatColor.GREEN + "CURRENT KIT" : ChatColor.YELLOW + "Click to select");
+            inventory.setItem(slots[index], progressItem(kit.abilityItem,
+                    (active ? ChatColor.GREEN : ChatColor.WHITE) + kit.displayName(), lore));
+        }
+        inventory.setItem(26, progressItem(Material.BARRIER, ChatColor.RED + "Close",
+                List.of(ChatColor.GRAY + "Return to the lobby.")));
+        player.openInventory(inventory);
+    }
+
+    private static String describeKit(Kit kit) {
+        return switch (kit) {
+            case SLUGGER -> "Higher batting power; Power Dive adds a forward lunge.";
+            case TECHNICIAN -> "More forgiving timing; Sure Hands extends and widens one catch.";
+            case CURVE_ARTIST -> "Adds ball movement; Read Flight previews the projected path.";
+            case SPRINTER -> "Faster, flatter contact; Burst gives a forward speed boost.";
+            case SKYGUARD -> "A higher launch profile; Leap adds vertical movement.";
+        };
+    }
+
     @EventHandler
     public void onProgressMenuClick(InventoryClickEvent event) {
-        if (!STATS_MENU_TITLE.equals(event.getView().getTitle())) return;
+        String title = event.getView().getTitle();
+        if (KIT_MENU_TITLE.equals(title)) {
+            event.setCancelled(true);
+            if (event.getWhoClicked() instanceof Player player) {
+                if (event.getRawSlot() == 26) {
+                    player.closeInventory();
+                    return;
+                }
+                int[] slots = {10, 12, 14, 16, 22};
+                for (int index = 0; index < slots.length; index++) {
+                    if (event.getRawSlot() == slots[index]) {
+                        selectKit(player, Kit.values()[index].id());
+                        openKitMenu(player);
+                        return;
+                    }
+                }
+            }
+            return;
+        }
+        if (!STATS_MENU_TITLE.equals(title)) return;
         event.setCancelled(true);
         if (event.getWhoClicked() instanceof Player player && event.getRawSlot() == 53) {
             player.closeInventory();
