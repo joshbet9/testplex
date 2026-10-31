@@ -42,6 +42,23 @@ Two additional Reborn games and their original archived map collections are regi
 
 Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Unit tests cover Castle Assault kit and perk rules, blast protection, Heroes of Gwen's ten-hero role mapping and Wither movement/Earthquake falloff, the 60s/30s objective TNT delay, half-cost calculation, archive registration and the central tower filter. These do not certify live in-game parity. Keep Castle Assault and Heroes of Gwen disabled until the remaining mechanics are accepted on the 26.3 test server.
 
+## Wizards — shared Arcade lifecycle prototype
+
+Wizards is now hosted by `ArcadeMechanicsModern` rather than requiring its own runtime plugin to own the match. Its existing 21 spell effects, four source kits, loot/chest progression, mana/wand loop, endgame and temporary spell cleanup remain in the Wizards controller.
+
+Use the shared Arcade entry points:
+
+- `/arcadeport play wizards` — join and trigger a short quick-start window.
+- `/arcadeport join wizards` — join the normal shared queue.
+- `/arcadeport start wizards` — operator-only force start.
+- `/arcadeport leave wizards` — leave the queue or active match.
+- `/arcadeport kit wizards <mage|sorcerer|mystic|witchdoctor>` — select a kit while queued.
+- `/arcadeport status` and `/arcadeport stop` — inspect or stop the shared test session.
+
+Wizards takes exclusive ownership of the Arcade test session: it stops an existing Arcade match before taking player snapshots, prevents another game from starting while its queue/match is active, and restores players to their pre-match shared-lobby state on elimination, leave, completion, disconnect/reconnect or server shutdown. It writes lifetime wins, kills and spell-binding counts to the common local stats configuration.
+
+This remains a mechanics-in-progress test port, not a READY_FOR_TEST game. The generated mechanics arena is retained because the original Wizards map archive is not present. Original-map parity, kit/armour/damage balance and live multi-client/reconnect acceptance remain outstanding. It is deliberately not added to the normal playable-game allow-list.
+
 ## Commands
 
 - `/gamepanel` → choose a supported game → **Start / Test**. The coordinator calls `/arcadeport play <game-id>`.

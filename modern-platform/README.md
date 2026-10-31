@@ -24,7 +24,7 @@ The build uses Paper's official Maven repository and a version range for the cur
 - Game Details routes Monster Maze through `/arcadeport play monster-maze`; its participants, queue, stop handling and return-to-lobby flow are owned by Testplex Arcade.
 - Deployment migrates saved module data from both old standalone data folders (`plugins/MonsterMazeStandalone/` and `plugins/MonsterMazeModern/`), then inspects plugin descriptors and quarantines any standalone Monster Maze Bukkit JAR (including the source project's actual `MonsterMazeStandalone.jar` name) in the deployment backup before Paper restarts. The independent `joshbet9/MonsterMaze` project and its separate services are not modified.
 
-**Important:** the 16 prototype loops are intentionally rough starting points, not a claim of original Mineplex parity. All 18 games remain in progress until their mechanics have passed in-game acceptance. CI confirms compile/unit-level checks only. Cosmetic renderers, progression milestones, and win scenes are out of scope during this parity pass for every game except Monster Maze, where customisation is a core pillar and remains part of acceptance.
+**Important:** the prototype loops are intentionally rough starting points, not a claim of original Mineplex parity. All games remain in progress until their mechanics have passed in-game acceptance. CI confirms compile/unit-level checks only. Wizards' 21 spell implementations are now hosted inside ArcadeMechanicsModern and use its shared queue/session commands, but Wizards remains gated pending original-map parity and live multiplayer acceptance. Cosmetic renderers, progression milestones, and win scenes are out of scope during this parity pass for every game except Monster Maze, where customisation is a core pillar and remains part of acceptance.
 
 ## Isolation from 1.8
 
@@ -68,7 +68,7 @@ The overall programme tracks 26 titles/variants: **24 shared Arcade catalogue ga
 | 22 | SkyWars Mixed | Mechanics-first 16-player port integrated | Disabled |
 | 23 | Milk the Cow | Mechanics-first port integrated | Disabled |
 | 24 | Wither Assault | Mechanics-first port integrated; generated test arena | Disabled |
-| 25 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
+| 25 | Wizards | Shared Arcade lifecycle prototype; 21 spell effects implemented; generated test arena pending original-map parity | Disabled |
 | 26 | Speed Builders Arcade | Planned; implementation not started | Not available |
 
 **Readiness rule:** only Death Tag and One in the Quiver are in the READY_FOR_TEST allow-list and enabled-games config. Catalogue presence and successful compilation do not automatically make a game available. Every other title remains disabled until source parity and isolated multi-client acceptance are completed.

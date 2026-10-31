@@ -13,3 +13,17 @@ owner-usernames:
 # Named accounts allowed operator access on this isolated modern test server.
 admin-usernames:
   - jn_playzmc
+
+# Experimental Wizards module. This configuration is nested so the game remains
+# owned by ArcadeMechanicsModern and cannot create a second independent game server.
+wizards:
+  arena-world: testplex_wizards_arena
+  arena-radius: 48
+  chest-count: 32
+  allow-solo-start: true
+  minimum-players: 2
+  kits:
+    default: MAGE
+  destructive-spells: false
+  temporary-spell-fire: true
+  destructive-endgame-blocks: false

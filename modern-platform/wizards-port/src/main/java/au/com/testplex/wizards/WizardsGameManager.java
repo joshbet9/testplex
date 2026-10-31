@@ -1,5 +1,7 @@
 package au.com.testplex.wizards;
 
+import au.com.testplex.arcadeports.ArcadeMechanicsModernPlugin;
+
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.DyeColor;
@@ -82,7 +84,7 @@ public final class WizardsGameManager implements Listener {
     private static final int ARENA_FLOOR_Y = 63;
     private static final int CHEST_COUNT_FALLBACK = 32;
 
-    private final WizardsModernPlugin plugin;
+    private final ArcadeMechanicsModernPlugin plugin;
     private final NamespacedKey spellKey;
     private final NamespacedKey wandKey;
     private final NamespacedKey menuKey;
@@ -111,11 +113,13 @@ public final class WizardsGameManager implements Listener {
     private final List<Location> chests = new ArrayList<>();
     private final Random random = new Random();
 
-    private final World arena;
+    private World arena;
     private final BukkitTask tickTask;
     private boolean running;
     private long startedAt;
     private int tick;
+    private long queueDeadlineTick = -1L;
+
     private int startingPlayerCount;
     private int paceStep;
     private boolean endgameStarted;
@@ -129,7 +133,7 @@ public final class WizardsGameManager implements Listener {
     private float endgameSize = 1.5F;
     private float meteorSpeed = 0.05F;
 
-    public WizardsGameManager(WizardsModernPlugin plugin) {
+    public WizardsGameManager(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
         spellKey = new NamespacedKey(plugin, "spell");
         wandKey = new NamespacedKey(plugin, "wand");
@@ -141,7 +145,6 @@ public final class WizardsGameManager implements Listener {
         anvilLevelKey = new NamespacedKey(plugin, "anvil-level");
         meteorKey = new NamespacedKey(plugin, "endgame-meteor-size");
         lightningHitKey = new NamespacedKey(plugin, "wizard-lightning-hit");
-        arena = createArena();
         Bukkit.getPluginManager().registerEvents(this, plugin);
         tickTask = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 1L, 1L);
     }
@@ -215,22 +218,39 @@ public final class WizardsGameManager implements Listener {
         return world;
     }
 
-    public void join(Player player) {
-        if (arena == null) {
-            player.sendMessage(ChatColor.RED + "Wizards arena could not be loaded. Check the server log.");
-            return;
-        }
+    /** Join the shared Arcade queue; play uses the shorter quick-start window. */
+    public void queue(Player player, boolean quickStart) {
+        if (player == null || !player.isOnline()) return;
         if (running) {
             player.sendMessage(ChatColor.RED + "A Wizards round is already running.");
             return;
         }
-        if (queue.putIfAbsent(player.getUniqueId(), player) != null) {
+        if (queue.containsKey(player.getUniqueId())) {
             player.sendMessage(ChatColor.YELLOW + "You are already queued for Wizards.");
             return;
         }
+        if (queue.isEmpty()) plugin.prepareForWizards();
+        queue.put(player.getUniqueId(), player);
         selectedKits.putIfAbsent(player.getUniqueId(), defaultKit());
-        player.sendMessage(ChatColor.GREEN + "Queued for Wizards. Choose a kit with /wizards kit <kit>.");
-        player.sendMessage(ChatColor.GRAY + "An operator or queued player can start with /wizards start.");
+        long requestedDeadline = tick + (quickStart ? 40L : 100L);
+        if (queueDeadlineTick < 0L || requestedDeadline < queueDeadlineTick) {
+            queueDeadlineTick = requestedDeadline;
+        }
+        player.sendMessage(ChatColor.GREEN + "Queued for Wizards (" + queue.size() + ").");
+        player.sendMessage(ChatColor.GRAY + "Choose a kit with /arcadeport kit wizards <kit>.");
+    }
+
+    /** Compatibility helper for the old module's join semantics. */
+    public void join(Player player) {
+        queue(player, false);
+    }
+
+    public boolean isSessionBusy() {
+        return running || !queue.isEmpty();
+    }
+
+    public void startQueued() {
+        start(plugin.getServer().getConsoleSender());
     }
 
     public void setKit(Player player, WizardsKit kit) {
@@ -256,6 +276,7 @@ public final class WizardsGameManager implements Listener {
             sender.sendMessage(ChatColor.RED + "Wizards is already running.");
             return;
         }
+        if (arena == null) arena = createArena();
         if (arena == null) {
             sender.sendMessage(ChatColor.RED + "Wizards arena failed to load.");
             return;
@@ -276,6 +297,10 @@ public final class WizardsGameManager implements Listener {
             return;
         }
 
+        // The shared Arcade manager must return any previous game to the lobby
+        // before Wizards snapshots player inventory, location and movement state.
+        plugin.prepareForWizards();
+        queueDeadlineTick = -1L;
         refillChests();
         running = true;
         startedAt = System.currentTimeMillis();
@@ -350,6 +375,7 @@ public final class WizardsGameManager implements Listener {
         UUID id = player.getUniqueId();
         if (queue.remove(id) != null) {
             selectedKits.remove(id);
+            if (queue.isEmpty()) queueDeadlineTick = -1L;
             player.sendMessage(ChatColor.YELLOW + "You left the Wizards queue.");
             return;
         }
@@ -375,6 +401,8 @@ public final class WizardsGameManager implements Listener {
     public void stop(String reason) {
         if (!running && snapshots.isEmpty()) {
             queue.clear();
+            selectedKits.clear();
+            queueDeadlineTick = -1L;
             states.clear();
             return;
         }
@@ -392,8 +420,11 @@ public final class WizardsGameManager implements Listener {
     }
 
     private void tick() {
-        if (!running) return;
         tick++;
+        if (!running) {
+            if (queueDeadlineTick >= 0L && tick >= queueDeadlineTick) startQueued();
+            return;
+        }
         tickSpectralArrows();
         tickSummonedWolves();
         tickManaBolts();
@@ -859,6 +890,7 @@ public final class WizardsGameManager implements Listener {
                 return;
             }
             if (event.getClick().isLeftClick()) {
+                if (state.wands[heldSlot] != spell) state.spellsBound++;
                 state.wands[heldSlot] = spell;
                 player.sendMessage(ChatColor.BLUE + "Spell on wand set to " + categoryColour(spell) + spell.displayName());
                 player.playSound(player.getLocation(), Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 0.8F, 1.2F);
@@ -1241,6 +1273,16 @@ public final class WizardsGameManager implements Listener {
         Player player = event.getEntity();
         WizardState state = states.get(player.getUniqueId());
         if (!running || state == null || !state.alive) return;
+        Player killer = player.getKiller();
+        if (killer == null && player.getLastDamageCause() instanceof EntityDamageByEntityEvent damage
+                && damage.getDamager() instanceof Wolf wolf) {
+            SummonedWolfData wolfData = summonedWolves.get(wolf.getUniqueId());
+            if (wolfData != null) killer = Bukkit.getPlayer(wolfData.owner);
+        }
+        WizardState killerState = killer == null ? null : states.get(killer.getUniqueId());
+        if (killer != null && !killer.equals(player) && killerState != null && killerState.alive) {
+            killerState.kills++;
+        }
         state.alive = false;
         dropDeathLoot(player, state);
         event.setKeepInventory(true);
@@ -1316,6 +1358,7 @@ public final class WizardsGameManager implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         UUID id = event.getPlayer().getUniqueId();
         queue.remove(id);
+        if (queue.isEmpty()) queueDeadlineTick = -1L;
         WizardState state = states.get(id);
         if (running && state != null && state.alive) {
             state.alive = false;
@@ -2243,6 +2286,7 @@ public final class WizardsGameManager implements Listener {
 
     private void finish(Player winner, String message) {
         running = false;
+        recordWizardsProgress(winner);
         if (message != null) {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 player.sendMessage(ChatColor.GOLD + "Wizards » " + ChatColor.YELLOW + message);
@@ -2277,6 +2321,7 @@ public final class WizardsGameManager implements Listener {
         states.clear();
         queue.clear();
         selectedKits.clear();
+        queueDeadlineTick = -1L;
         startingPlayerCount = 0;
         if (arena != null) {
             arena.setTime(6000L);
@@ -2286,6 +2331,20 @@ public final class WizardsGameManager implements Listener {
             border.setCenter(0.0D, 0.0D);
             border.setSize((Math.max(32, Math.min(96, plugin.getConfig().getInt("arena-radius", 48))) * 2.0D) + 4.0D);
         }
+    }
+
+    /** Persist match progress to the local-stats keys shared with the Arcade stats browser. */
+    private void recordWizardsProgress(Player winner) {
+        org.bukkit.configuration.file.FileConfiguration config = plugin.getConfig();
+        for (Map.Entry<UUID, WizardState> entry : states.entrySet()) {
+            WizardState state = entry.getValue();
+            WizardsProgressStore.increment(config, entry.getKey(), "kills", state.kills);
+            WizardsProgressStore.increment(config, entry.getKey(), "spells-bound", state.spellsBound);
+        }
+        if (winner != null && states.containsKey(winner.getUniqueId())) {
+            WizardsProgressStore.increment(config, winner.getUniqueId(), "wins", 1L);
+        }
+        plugin.saveConfig();
     }
 
     private void restoreTemporaryPlayer(Player player, UUID id) {
@@ -2417,6 +2476,8 @@ public final class WizardsGameManager implements Listener {
         private float mana;
         private int wandCount;
         private int soulStars;
+        private int kills;
+        private int spellsBound;
         private float cooldownModifier = 1.0F;
         private boolean alive = true;
 
@@ -2509,6 +2570,7 @@ public final class WizardsGameManager implements Listener {
             player.getActivePotionEffects().forEach(effect -> player.removePotionEffect(effect.getType()));
             for (PotionEffect effect : effects) player.addPotionEffect(effect);
             player.setWalkSpeed(walkSpeed);
+            player.setFlySpeed(flySpeed);
             player.setAllowFlight(allowFlight);
             if (allowFlight) player.setFlying(flying);
             else player.setFlying(false);

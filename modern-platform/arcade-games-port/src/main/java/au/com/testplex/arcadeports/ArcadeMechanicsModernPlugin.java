@@ -1,6 +1,8 @@
 package au.com.testplex.arcadeports;
 
 import me.monstermaze.MonsterMazePlugin;
+import au.com.testplex.wizards.WizardsGameManager;
+import au.com.testplex.wizards.WizardsKit;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
@@ -14,6 +16,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements CommandExecutor, Listener {
     private ArcadePortManager manager;
+    private WizardsGameManager wizards;
     private MonsterMazePlugin monsterMaze;
     private ArcadeMapSelectionMenu mapMenu;
     private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
@@ -46,6 +49,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         // Bring up Testplex's shared lobby before any optional game module. A failure
         // in Monster Maze must not leave players in the unrelated survival world.
         manager = new ArcadePortManager(this);
+        wizards = new WizardsGameManager(this);
         mapMenu = new ArcadeMapSelectionMenu(this);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
@@ -98,6 +102,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public void returnPlayerToArcadeLobby(Player player) {
         if (manager != null && player != null && player.isOnline()) manager.returnPlayerToLobby(player);
     }
+
+    /** Stop existing Arcade matches before Wizards takes exclusive ownership of the test session. */
+    public void prepareForWizards() {
+        if (manager != null) manager.stop("Wizards is taking over the shared Arcade test session.");
+    }
     public void stopMonsterMazeRound(String reason) {
         if (manager != null) manager.stop(reason == null ? "Monster Maze stopped" : reason);
     }
@@ -114,6 +123,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         } catch (java.io.IOException exception) {
             getLogger().warning("Could not remove an Arcade runtime readiness record: " + exception.getMessage());
         }
+        if (wizards != null) wizards.shutdown();
         if (manager != null) manager.shutdown();
         if (monsterMaze != null) monsterMaze.shutdown();
     }
@@ -232,6 +242,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 || normalized.equals("mixed-skywars") || normalized.equals("mixed-sky-wars");
     }
 
+    private boolean isWizardsId(String requestedId) {
+        if (requestedId == null) return false;
+        String normalized = requestedId.toLowerCase(java.util.Locale.ROOT)
+                .replace('_', '-').replace(' ', '-');
+        return normalized.equals("wizards") || normalized.equals("wizard");
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
@@ -246,10 +263,33 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport " + sub + " <game-id>");
                     return true;
                 }
+                if (isWizardsId(args[1])) {
+                    if (wizards == null) {
+                        sender.sendMessage(ChatColor.RED + "Wizards is unavailable in this Arcade runtime.");
+                    } else {
+                        wizards.queue(player, sub.equals("play"));
+                    }
+                    return true;
+                }
+                if (wizards != null && wizards.isSessionBusy()) {
+                    sender.sendMessage(ChatColor.RED + "Wizards currently owns the shared Arcade test session.");
+                    return true;
+                }
                 ArcadePortGame mixedJoinGame = mixedArcadeGameFromId(args[1]);
                 boolean mixedArcadeVariant = mixedJoinGame != null;
                 ArcadePortGame requestedGame = mixedArcadeVariant ? mixedJoinGame : ArcadePortGame.fromId(args[1]);
                 manager.queue(requestedGame, player, sub.equals("play"), mixedArcadeVariant);
+                return true;
+            case "leave":
+                if (!(sender instanceof Player leavingPlayer)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                if (args.length < 2 || !isWizardsId(args[1])) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport leave wizards");
+                    return true;
+                }
+                if (wizards != null) wizards.leave(leavingPlayer);
                 return true;
             case "lobby":
             case "selectgame":
@@ -287,6 +327,18 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport start <game-id>");
                     return true;
                 }
+                if (isWizardsId(args[1])) {
+                    if (!hasAdminAccess(sender)) {
+                        sender.sendMessage(ChatColor.RED + "Operator permission required to start Wizards.");
+                        return true;
+                    }
+                    if (wizards != null) wizards.startQueued();
+                    return true;
+                }
+                if (wizards != null && wizards.isSessionBusy()) {
+                    sender.sendMessage(ChatColor.RED + "Wizards currently owns the shared Arcade test session.");
+                    return true;
+                }
                 ArcadePortGame mixedStartGame = mixedArcadeGameFromId(args[1]);
                 boolean mixedArcadeStart = mixedStartGame != null;
                 ArcadePortGame requestedStartGame = mixedArcadeStart ? mixedStartGame : ArcadePortGame.fromId(args[1]);
@@ -297,8 +349,17 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage("Players only.");
                     return true;
                 }
+                if (args.length >= 3 && isWizardsId(args[1])) {
+                    WizardsKit kit = WizardsKit.parse(args[2]);
+                    if (kit == null) {
+                        player.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit wizards <mage|sorcerer|mystic|witchdoctor>");
+                    } else if (wizards != null) {
+                        wizards.setKit(player, kit);
+                    }
+                    return true;
+                }
                 if (args.length < 2) {
-                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit <el-muchacho-pigo|mama-piggles|pig|mama-pig|sheep-pig|jumper|armorer|pitcher|waller|coward|marksman|pyrotechnic|snowballer|spleef-brawler|micro-archer|worker|fighter|quiver-leaper|quiver-brawler|enchanter|slam-shot|ninja|runnerkit-leaper|runnerkit-archer|runnerkit-frosty|rifle|sniper|shotgun|machine-gun|runner-basher|runner-archer|runner-traitor|runner-null|turf-wars-marksman|turf-wars-infiltrator|turf-wars-shredder|escape-artist|assassin|briber|revealer>");
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit <game-kit>; use /arcadeport kit wizards <mage|sorcerer|mystic|witchdoctor> for Wizards");
                     return true;
                 }
                 manager.selectKit(player, args[1]);
@@ -323,12 +384,16 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 return true;
             case "status":
                 sender.sendMessage(ChatColor.GOLD + "Modern Arcade ports: " + ChatColor.WHITE + manager.status());
+                if (wizards != null) {
+                    sender.sendMessage(ChatColor.GOLD + "Wizards: " + ChatColor.WHITE + wizards.status());
+                }
                 return true;
             case "stop":
                 if (!hasAdminAccess(sender)) {
                     sender.sendMessage(ChatColor.RED + "Operator permission required.");
                     return true;
                 }
+                if (wizards != null) wizards.stop("Wizards test stopped by an operator.");
                 manager.stop("Stopped by an operator.");
                 return true;
             default:
@@ -336,6 +401,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>" + ChatColor.GRAY + " — quick solo test; starts after a short join window");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join <game-id>" + ChatColor.GRAY + " — queue to join a multiplayer test");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport play wizards" + ChatColor.GRAY + " — quick-start the Wizards queue");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport join wizards" + ChatColor.GRAY + " — join the Wizards queue");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport leave wizards" + ChatColor.GRAY + " — leave the Wizards queue or match");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit wizards <kit>" + ChatColor.GRAY + " — choose Mage, Sorcerer, Mystic or Witch Doctor");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport start wizards" + ChatColor.GRAY + " — operator-only force start");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>-mixed" + ChatColor.GRAY
                         + " — Mixed Arcade variants: Turf Wars, Castle Assault and Heroes of Gwen");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a Bomb Lobbers, Bacon Brawl, Dragons, Micro Battles, One in the Quiver, Paintball, Runner, Sneaky Assassins, Spleef, Death Tag or Turf Wars kit; use escape-artist, assassin, briber or revealer for Sneaky Assassins; turf-wars-<kit> for Turf Wars and runnerkit-<kit> for Runner");
