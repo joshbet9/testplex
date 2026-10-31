@@ -25,8 +25,8 @@ case "$cmd" in
     printf active > "$statefile"
     [[ "$statefile" != "$TESTPLEX_STUB_REBORN_ACTIVE" ]] || exit 0
     printf 'Paper server Done (3.0s)!\n' >> "$TESTPLEX_SERVER_DIR/logs/latest.log"
-    printf 'status=READY\nmodule=monster-maze\nmanager=testplex-arcade\nsource_sha=%s\nnonce=123e4567-e89b-12d3-a456-426614174000\ninvocation_id=0123456789abcdef0123456789abcdef\nprocess_id=4242\n' \
-      "$(cat "$TESTPLEX_SERVER_DIR/.testplex-modern-deployed-build")" > "$TESTPLEX_SERVER_DIR/plugins/ArcadeMechanicsModern/.monster-maze-readiness.properties"
+    printf 'status=READY\nmodule=arcade-lobby\nmanager=testplex-arcade\nworld=testplex_arcade_lobby_v1\nplane=100x100\nfloor_y=100\nsource_sha=%s\nnonce=123e4567-e89b-12d3-a456-426614174000\ninvocation_id=0123456789abcdef0123456789abcdef\nprocess_id=4242\n' \
+      "$(cat "$TESTPLEX_SERVER_DIR/.testplex-modern-deployed-build")" > "$TESTPLEX_SERVER_DIR/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties"
     ;;
   enable) printf enabled > "$TESTPLEX_STUB_ENABLED" ;;
   disable)
