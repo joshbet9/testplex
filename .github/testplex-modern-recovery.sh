@@ -334,6 +334,37 @@ verify_restored_runtime() {
   printf 'Rollback verified: restored artifact SHA=%s; runtime SHA=%s; process identity=VERIFIED InvocationID=%s MainPID=%s; prior_active=%s.\n' \
     "$previous_sha" "$runtime_sha" "$invocation" "$pid" "$prior_active"
 }
+verify_deployed_runtime() {
+  local target_sha runtime_info runtime_sha invocation pid attempts sleep_seconds
+  target_sha="$(value target_sha || true)"
+  [[ "$target_sha" =~ ^[0-9a-f]{40}$ ]] || fail "verified deployment has no valid target SHA"
+  [[ "$(cat "$SERVER_DIR/.testplex-modern-deployed-build" 2>/dev/null || true)" == "$target_sha" ]] ||
+    fail "live deployed-build marker differs from the verified transaction"
+  [[ -s "$SERVER_DIR/paper.jar" ]] || fail "deployed Paper artifact is missing"
+  [[ -s "$SERVER_DIR/plugins/ArcadeMechanicsModern/.testplex-modern-deploy-identity.properties" ]] ||
+    fail "deployed Arcade process identity is missing"
+  service_active || fail "modern Paper service is not active after deployment"
+  attempts="${TESTPLEX_DEPLOY_VERIFY_ATTEMPTS:-15}"
+  sleep_seconds="${TESTPLEX_DEPLOY_VERIFY_SLEEP:-2}"
+  [[ "$attempts" =~ ^[1-9][0-9]*$ && "$sleep_seconds" =~ ^[0-9]+$ ]] ||
+    fail "invalid deployed-runtime verification limits"
+  if ! runtime_info="$(TESTPLEX_VERIFY_ATTEMPTS="$attempts" TESTPLEX_VERIFY_SLEEP="$sleep_seconds" \
+      verify_running_runtime "$target_sha" ACTIVE)"; then
+    fail "deployed Paper service, 25568 listener, process identity, or Arcade lobby readiness is not currently healthy"
+  fi
+  runtime_sha="$(printf '%s\\n' "$runtime_info" | sed -n '1p')"
+  invocation="$(printf '%s\\n' "$runtime_info" | sed -n '2p')"
+  pid="$(printf '%s\\n' "$runtime_info" | sed -n '3p')"
+  [[ "$runtime_sha" == "$target_sha" ]] ||
+    fail "running Arcade process does not attest the target build SHA"
+  write_manifest runtime_sha "$runtime_sha"
+  write_manifest runtime_invocation_id "$invocation"
+  write_manifest runtime_pid "$pid"
+  write_manifest runtime_verified_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf 'Deployment already verified: target artifact SHA=%s; runtime SHA=%s; process identity=VERIFIED InvocationID=%s MainPID=%s; Paper and port 25568 ready.\\n' \
+    "$target_sha" "$runtime_sha" "$invocation" "$pid"
+}
+
 verify_already_recovered() {
   local previous_sha runtime_sha invocation pid prior_active
   if [[ "$(value status)" == NO_PRIOR_DEPLOYMENT_RESTORED ]]; then
@@ -425,26 +456,27 @@ EOF
       assert_backup_complete
       echo "Snapshot verified: artifact SHA=$(value backup_sha); transaction=$(value deployment_id)."
       ;;
+    verify-deployment)
+      local expected_target="${2:-}"
+      [[ "$expected_target" =~ ^[0-9a-f]{40}$ ]] || fail "a valid deployment SHA is required"
+      validate_transaction
+      [[ "$(value target_sha)" == "$expected_target" ]] ||
+        fail "deployment identity mismatch: journal targets $(value target_sha), requested $expected_target"
+      [[ "$(value status)" == DEPLOYMENT_VERIFIED ]] ||
+        fail "deployment transaction is not marked DEPLOYMENT_VERIFIED (status=$(value status || true))"
+      verify_deployed_runtime
+      ;;
     recover)
       local expected_target="${2:-}"
       if [[ ! -f "$MANIFEST" ]]; then echo "No durable transaction is present; no rollback was claimed."; return 0; fi
       if [[ -n "$expected_target" && "$(value target_sha || true)" != "$expected_target" ]]; then
-        status="$(value status || true)"
-      case "$status" in DEPLOYMENT_VERIFIED|RECOVERY_VERIFIED|NO_PRIOR_DEPLOYMENT_RESTORED)
-          echo "No unresolved transaction matches target $expected_target; current transaction is terminal ($status)."
-          return 0
-          ;;
-          *) fail "another unresolved deployment transaction blocks recovery" ;;
-        esac
+        fail "deployment identity mismatch: journal targets $(value target_sha || true), requested $expected_target"
       fi
       validate_transaction; status="$(value status || true)"
       case "$status" in
         RECOVERY_VERIFIED) verify_already_recovered; return 0 ;;
         NO_PRIOR_DEPLOYMENT_RESTORED) verify_already_recovered; return 0 ;;
-        DEPLOYMENT_VERIFIED)
-          printf 'Deployment already verified: target artifact SHA=%s; refusing rollback of a successful deployment.\n' "$(value target_sha)"
-          return 0
-          ;;
+        DEPLOYMENT_VERIFIED) verify_deployed_runtime; return 0 ;;
       esac
       replacement_started="$(value replacement_started || true)"
       if [[ "$replacement_started" != true ]]; then
