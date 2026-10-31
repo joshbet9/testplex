@@ -760,7 +760,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         Ball ball = current.ball;
         if (ball == null || ball.mode != BallMode.SHOT
                 || current.teams.getOrDefault(ball.shooterId, -1) == current.teams.getOrDefault(defender.getUniqueId(), -2)
-                || defender.getLocation().distanceSquared(ball.location)
+                || defender.getEyeLocation().distanceSquared(ball.location)
                         > HoopsRemasteredRules.BLOCK_RADIUS * HoopsRemasteredRules.BLOCK_RADIUS) {
             return;
         }
@@ -866,8 +866,10 @@ public final class HoopsRemasteredRuntime implements Listener {
     }
 
     private void removeBall(Match current) {
-        if (current.ball != null && current.ball.display != null && current.ball.display.isValid()) {
-            current.ball.display.remove();
+        if (current.ball != null && current.ball.display != null) {
+            UUID displayId = current.ball.display.getUniqueId();
+            if (current.ball.display.isValid()) current.ball.display.remove();
+            current.entities.remove(displayId);
         }
         current.ball = null;
     }
