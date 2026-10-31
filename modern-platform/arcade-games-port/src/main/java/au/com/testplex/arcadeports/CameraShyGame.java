@@ -1401,6 +1401,62 @@ public final class CameraShyGame implements Listener {
         broadcastQueue(ChatColor.GRAY + "Camera Shy is ready for another queue.");
     }
 
+    /** Show a player's persisted Camera Shy progression without requiring an active match. */
+    public void sendStats(Player viewer, Player subject, int requestedPage) {
+        if (viewer == null || !viewer.isOnline() || subject == null) return;
+        int page = Math.max(1, Math.min(requestedPage, CameraShyProgressCatalog.pageCount()));
+        UUID subjectId = subject.getUniqueId();
+        String path = "local-stats." + subjectId + ".camera-shy.";
+        int games = plugin.getConfig().getInt(path + "games-played", 0);
+        int wins = plugin.getConfig().getInt(path + "wins", 0);
+        int photosTaken = plugin.getConfig().getInt(path + "photos", 0);
+        int eliminationsMade = plugin.getConfig().getInt(path + "eliminations", 0);
+        int exposuresReceived = plugin.getConfig().getInt(path + "exposures-received", 0);
+        long unlocked = CameraShyProgressCatalog.achievements().stream()
+                .filter(achievement -> plugin.getConfig().getBoolean(
+                        "local-achievements." + subjectId + ".camera-shy." + achievement.id(), false))
+                .count();
+
+        viewer.sendMessage(ChatColor.DARK_GRAY + "----------------------------------------");
+        viewer.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "CAMERA SHY STATS"
+                + ChatColor.GRAY + " — " + ChatColor.WHITE + subject.getName());
+        viewer.sendMessage(ChatColor.YELLOW + "Games: " + ChatColor.WHITE + games
+                + ChatColor.GRAY + "  |  " + ChatColor.YELLOW + "Wins: " + ChatColor.WHITE + wins);
+        viewer.sendMessage(ChatColor.YELLOW + "Photographs: " + ChatColor.WHITE + photosTaken
+                + ChatColor.GRAY + "  |  " + ChatColor.YELLOW + "Eliminations: " + ChatColor.WHITE + eliminationsMade);
+        viewer.sendMessage(ChatColor.YELLOW + "Exposures received: " + ChatColor.WHITE + exposuresReceived
+                + ChatColor.GRAY + "  |  " + ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE
+                + unlocked + "/" + CameraShyProgressCatalog.achievements().size());
+
+        viewer.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "LIFETIME MILESTONES");
+        for (CameraShyProgressCatalog.Milestone milestone : CameraShyProgressCatalog.milestones()) {
+            int current = plugin.getConfig().getInt(path + milestone.statKey(), 0);
+            boolean complete = current >= milestone.target()
+                    || plugin.getConfig().getBoolean(
+                            "local-milestones." + subjectId + ".camera-shy." + milestone.id(), false);
+            viewer.sendMessage((complete ? ChatColor.GREEN + "✓ " : ChatColor.YELLOW + "• ")
+                    + milestone.name() + ChatColor.GRAY + " — "
+                    + Math.min(current, milestone.target()) + "/" + milestone.target() + " " + milestone.unit()
+                    + (complete ? ChatColor.GREEN + " COMPLETE" : ""));
+        }
+
+        viewer.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "ACHIEVEMENTS"
+                + ChatColor.GRAY + " — page " + page + "/" + CameraShyProgressCatalog.pageCount());
+        for (CameraShyProgressCatalog.Achievement achievement : CameraShyProgressCatalog.page(page)) {
+            boolean complete = plugin.getConfig().getBoolean(
+                    "local-achievements." + subjectId + ".camera-shy." + achievement.id(), false);
+            viewer.sendMessage((complete ? ChatColor.GREEN + "✓ " : ChatColor.DARK_GRAY + "✗ ")
+                    + (complete ? ChatColor.WHITE : ChatColor.GRAY) + achievement.name()
+                    + ChatColor.DARK_GRAY + " — " + ChatColor.GRAY + achievement.requirement());
+        }
+        String command = viewer.equals(subject)
+                ? "/stats camera-shy <page>"
+                : "/stats " + subject.getName() + " camera-shy <page>";
+        viewer.sendMessage(ChatColor.GRAY + "Use " + ChatColor.YELLOW + command
+                + ChatColor.GRAY + " to view another achievement page.");
+        viewer.sendMessage(ChatColor.DARK_GRAY + "----------------------------------------");
+    }
+
     private void recordMatchProgress(UUID winnerId) {
         for (UUID id : humans) {
             String path = "local-stats." + id + ".camera-shy.";
