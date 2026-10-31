@@ -89,6 +89,7 @@ public final class PlexballGame implements Listener {
     private static final double BALL_RADIUS = 0.24D;
     private static final double CATCH_REACH = PlexballRules.BASE_CATCH_RADIUS;
     private static final double FIELD_PLAYER_EYE_OFFSET = 1.0D;
+    private static final String STATS_MENU_TITLE = ChatColor.GOLD + "Plexball Progress";
 
     private enum Phase { IDLE, INTRO, BATTING, BALL_FLIGHT, TURN_BREAK }
 
