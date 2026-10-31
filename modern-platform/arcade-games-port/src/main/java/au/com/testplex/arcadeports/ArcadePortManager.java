@@ -224,6 +224,10 @@ public final class ArcadePortManager implements Listener {
     private boolean pendingMixedArcadeVariant;
     private BukkitTask manualStartCountdown;
     private ArcadePortGame manualStartType;
+    private boolean manualStartMixedVariant;
+    private long postGameEndsAtMillis;
+    private BukkitTask postGameReturnTask;
+    private final Map<UUID, PlayerSnapshot> endingSnapshots = new HashMap<>();
     private long lastDragonHazard;
     private long lastSheepSpawn;
     private List<Location> baconSourceSpawnOverrides = List.of();
@@ -349,10 +353,47 @@ public final class ArcadePortManager implements Listener {
         int count = queued == null ? 0
                 : (int) queued.values().stream().filter(p -> p != null && p.isOnline()).count();
         Map<UUID, Player> mixedQueue = queues.get(queueKey(type, true));
-        if (mixedQueue != null) {
-            count += (int) mixedQueue.values().stream().filter(p -> p != null && p.isOnline()).count();
-        }
+        if (mixedQueue != null) count += (int) mixedQueue.values().stream().filter(p -> p != null && p.isOnline()).count();
         return count;
+    }
+
+    public void selectLobbyTeam(Player player, ArcadePortGame type, int team) {
+        int count = teamCountForGame(type);
+        if (player == null || count < 2 || team < 0 || team >= count) return;
+        plugin.getConfig().set("lobby-team-preferences." + player.getUniqueId() + "." + type.id(), team);
+        plugin.saveConfig();
+    }
+
+    public int lobbyTeamPreference(Player player, ArcadePortGame type, int count) {
+        if (player == null || type == null || count < 2) return -1;
+        int selected = plugin.getConfig().getInt("lobby-team-preferences." + player.getUniqueId() + "." + type.id(), -1);
+        return selected >= 0 && selected < count ? selected : -1;
+    }
+
+    public int queuedCountForTeam(ArcadePortGame type, int team) {
+        int count = teamCountForGame(type);
+        if (count < 2 || team < 0 || team >= count) return 0;
+        int queuedCount = 0;
+        for (String key : List.of(type.id(), queueKey(type, true))) {
+            Map<UUID, Player> queued = queues.get(key);
+            if (queued == null) continue;
+            for (Player player : queued.values()) {
+                if (player != null && player.isOnline() && lobbyTeamPreference(player, type, count) == team) queuedCount++;
+            }
+        }
+        return queuedCount;
+    }
+
+    static int teamCountForGame(ArcadePortGame type) {
+        if (type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST) return 4;
+        return isLobbyTeamGame(type) ? 2 : 0;
+    }
+
+    static boolean isLobbyTeamGame(ArcadePortGame type) {
+        return type == ArcadePortGame.BOMB_LOBBERS || type == ArcadePortGame.MICRO_BATTLES
+                || type == ArcadePortGame.SHEEP_QUEST || type == ArcadePortGame.PAINTBALL
+                || type == ArcadePortGame.TURF_WARS || type == ArcadePortGame.CASTLE_ASSAULT
+                || type == ArcadePortGame.HEROES_OF_GWEN;
     }
 
     private static boolean supportsMixedArcadeVariant(ArcadePortGame type) {
@@ -1459,25 +1500,7 @@ public final class ArcadePortManager implements Listener {
                 ? player : null;
         List<Player> notifyPlayers = onlineQueuedPlayers(type, mixedArcadeVariant);
         String hostName = sender instanceof Player player ? player.getName() : "An operator";
-        clearLobbyCountdownStatus();
-        try {
-            startQueued(type, requester, sender, mixedArcadeVariant);
-        } catch (RuntimeException exception) {
-            plugin.getLogger().log(java.util.logging.Level.SEVERE,
-                    "Unhandled error while starting " + type.displayName() + ".", exception);
-            sender.sendMessage(ChatColor.RED + "Could not start " + type.displayName()
-                    + ". The error was logged on the server; no successful round start was recorded.");
-            return;
-        }
-        if (active != null && active.type == type
-                && active.mixedArcadeVariant == mixedArcadeVariant) {
-            for (Player player : notifyPlayers) {
-                if (player != null && player.isOnline()) {
-                    player.sendMessage(ChatColor.AQUA + "" + ChatColor.BOLD + hostName
-                            + ChatColor.AQUA + " has started the game.");
-                }
-            }
-        }
+        beginLobbyRecruitCountdown(type, sender, mixedArcadeVariant, hostName, notifyPlayers);
     }
 
     private List<Player> onlineQueuedPlayers(ArcadePortGame type) {
@@ -1490,24 +1513,133 @@ public final class ArcadePortManager implements Listener {
         return queue.values().stream().filter(player -> player != null && player.isOnline()).toList();
     }
 
-    private void updateLobbyCountdownStatus(ArcadePortGame type, int secondsRemaining) {
-        if (type == ArcadePortGame.BACON_BRAWL) {
-            plugin.getConfig().set("lobby-countdown-status", "Starting in " + secondsRemaining + "s");
-            lobby.refreshLobbyScoreboards();
+    private void beginLobbyRecruitCountdown(ArcadePortGame type,
+            org.bukkit.command.CommandSender sender, boolean mixedVariant,
+            String hostName, List<Player> notifyPlayers) {
+        int capacity = Math.max(1, plugin.getConfig().getInt("lobby-scoreboard.player-capacity", Bukkit.getMaxPlayers()));
+        int initial = ArcadeLobbyLifecycleRules.recruitCountdownSeconds(
+                queuedHumanCount(type, mixedVariant), ArcadeLobbyLifecycleRules.MINIMUM_TEST_PLAYERS, capacity);
+        if (initial < 0) {
+            sender.sendMessage(ChatColor.YELLOW + "Waiting for at least one eligible lobby player.");
+            return;
+        }
+        manualStartType = type;
+        manualStartMixedVariant = mixedVariant;
+        final int[] remaining = {initial};
+        manualStartCountdown = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (active != null || monsterMazeRunning()) {
+                cancelManualStartCountdown(type, "The start countdown was cancelled because another game became active.");
+                return;
+            }
+            List<Player> queued = onlineQueuedPlayers(type, mixedVariant);
+            int desired = ArcadeLobbyLifecycleRules.recruitCountdownSeconds(
+                    queuedHumanCount(type, mixedVariant), ArcadeLobbyLifecycleRules.MINIMUM_TEST_PLAYERS, capacity);
+            if (desired < 0) {
+                cancelManualStartCountdown(type, "The start countdown was cancelled because not enough players remained.");
+                return;
+            }
+            remaining[0] = Math.min(remaining[0], desired);
+            updateLobbyCountdownStatus(type, remaining[0]);
+            for (Player player : queued) {
+                if (player == null || !player.isOnline()) continue;
+                if (remaining[0] <= 5) player.sendTitle(ChatColor.GREEN + "Starting in " + remaining[0],
+                        ChatColor.GRAY + type.displayName(), 0, 20, 0);
+                if (remaining[0] > 0 && remaining[0] <= 10) {
+                    player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 0.7F, 1.2F);
+                }
+            }
+            if (remaining[0] <= 0) {
+                manualStartCountdown.cancel();
+                manualStartCountdown = null;
+                manualStartType = null;
+                manualStartMixedVariant = false;
+                clearLobbyCountdownStatus();
+                startQueued(type, null, sender, mixedVariant);
+                for (Player player : notifyPlayers) {
+                    if (player != null && player.isOnline()) player.sendMessage(
+                            ChatColor.AQUA + "" + ChatColor.BOLD + hostName + ChatColor.AQUA + " has started the game.");
+                }
+                return;
+            }
+            remaining[0]--;
+        }, 0L, 20L);
+        sender.sendMessage(ChatColor.GREEN + type.displayName() + " will start in " + initial + " seconds.");
+    }
+
+    private int queuedHumanCount(ArcadePortGame type, boolean mixedVariant) {
+        return (int) onlineQueuedPlayers(type, mixedVariant).stream()
+                .filter(player -> !testPlayers.isTestPlayer(player)).count();
+    }
+
+    private void setLobbyLifecycleStatus(String status) {
+        plugin.getConfig().set("lobby-countdown-status", status);
+        lobby.refreshLobbyScoreboards();
+        if (lobbyRuntime != null) lobbyRuntime.refreshDisplays();
+    }
+
+    private static int leastPopulatedTeam(int[] counts) {
+        int selected = 0;
+        for (int i = 1; i < counts.length; i++) if (counts[i] < counts[selected]) selected = i;
+        return selected;
+    }
+
+    private void applySessionTeamTabTeams(Session session) {
+        if (teamCountForGame(session.type) < 2) return;
+        for (Player viewer : session.players.values()) {
+            if (viewer == null || !viewer.isOnline()) continue;
+            Scoreboard board = viewer.getScoreboard();
+            for (int id = 0; id < 4; id++) {
+                String name = "gt" + id;
+                Team old = board.getTeam(name);
+                if (old != null) old.unregister();
+                final int teamId = id;
+                if (!session.teams.containsValue(teamId)) continue;
+                Team team = board.registerNewTeam(name);
+                team.setColor(switch (id) {
+                    case 0 -> ChatColor.RED;
+                    case 1 -> ChatColor.BLUE;
+                    case 2 -> ChatColor.GREEN;
+                    default -> ChatColor.YELLOW;
+                });
+                for (Map.Entry<UUID, Player> member : session.players.entrySet()) {
+                    if (session.teams.getOrDefault(member.getKey(), -1) == teamId && member.getValue() != null) {
+                        team.addEntry(member.getValue().getName());
+                    }
+                }
+            }
         }
     }
 
+    private void returnEndingPlayersToLobby() {
+        for (Map.Entry<UUID, PlayerSnapshot> entry : new HashMap<>(endingSnapshots).entrySet()) {
+            Player player = Bukkit.getPlayer(entry.getKey());
+            if (player != null && player.isOnline()) {
+                entry.getValue().restore(player);
+                lobby.sendToLobby(player);
+            } else pendingRestore.put(entry.getKey(), entry.getValue());
+        }
+        endingSnapshots.clear();
+        postGameEndsAtMillis = 0L;
+        postGameReturnTask = null;
+        clearLobbyCountdownStatus();
+    }
+
+    private void updateLobbyCountdownStatus(ArcadePortGame type, int secondsRemaining) {
+        setLobbyLifecycleStatus(ArcadeLobbyLifecycleRules.countdownStatus(secondsRemaining));
+    }
+
     private void clearLobbyCountdownStatus() {
-        plugin.getConfig().set("lobby-countdown-status", null);
-        lobby.refreshLobbyScoreboards();
+        setLobbyLifecycleStatus("Waiting for players");
     }
 
     private void cancelManualStartCountdown(ArcadePortGame type, String message) {
+        boolean mixed = manualStartMixedVariant;
         if (manualStartCountdown != null) manualStartCountdown.cancel();
         manualStartCountdown = null;
         manualStartType = null;
+        manualStartMixedVariant = false;
         clearLobbyCountdownStatus();
-        for (Player player : onlineQueuedPlayers(type)) player.sendMessage(message);
+        for (Player player : onlineQueuedPlayers(type, mixed)) player.sendMessage(message);
     }
 
     public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender) {
@@ -1516,6 +1648,17 @@ public final class ArcadePortManager implements Listener {
 
     public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
+        if (manualStartCountdown != null) {
+            manualStartCountdown.cancel();
+            manualStartCountdown = null;
+            manualStartType = null;
+            manualStartMixedVariant = false;
+            clearLobbyCountdownStatus();
+        }
+        if (postGameEndsAtMillis > System.currentTimeMillis()) {
+            sender.sendMessage(ChatColor.YELLOW + "The previous round's end presentation is still running.");
+            return;
+        }
         if (type == null || !isGameEnabled(type) || active != null || monsterMazeRunning()) {
             startQueuedInternal(type, requester, sender, mixedArcadeVariant);
             return;
@@ -1703,6 +1846,7 @@ public final class ArcadePortManager implements Listener {
             pendingType = null;
             pendingMixedArcadeVariant = false;
         }
+        setLobbyLifecycleStatus("Loading...");
         World world;
         if (SourceMapCatalog.hasMap(type)) {
             String sourceWorldName = "arcadeport_source_" + type.id().replace('-', '_');
@@ -1798,6 +1942,13 @@ public final class ArcadePortManager implements Listener {
         active = session;
         long now = System.currentTimeMillis();
         session.startedAt = now;
+        session.prepareDurationMillis = ArcadeLobbyLifecycleRules.prepareSeconds(
+                plugin.getConfig().getInt("lifecycle.prepare-seconds", ArcadeLobbyLifecycleRules.DEFAULT_PREPARE_SECONDS)) * 1_000L;
+        session.prepareEndsAt = now + session.prepareDurationMillis;
+        session.lastPrepareSecond = -1;
+        session.liveStarted = false;
+        setLobbyLifecycleStatus(ArcadeLobbyLifecycleRules.countdownStatus(
+                (int) (session.prepareDurationMillis / 1_000L)));
         if (type == ArcadePortGame.DRAW_MY_THING) {
             prepareDrawMyThing(session, participants);
         }
@@ -1961,6 +2112,9 @@ public final class ArcadePortManager implements Listener {
             session.witherAssaultYLimit = 76.0D;
             session.witherAssaultAttackStartsAt = now + 15_000L;
         }
+        int teamSlotCount = teamCountForGame(type);
+        int[] assignedTeamCounts = new int[Math.max(1, teamSlotCount)];
+        int[] authoredTeamSpawnIndexes = new int[Math.max(1, teamSlotCount)];
         for (int i = 0; i < participants.size(); i++) {
             Player player = participants.get(i);
             PlayerSnapshot pendingSnapshot = pendingRestore.remove(player.getUniqueId());
@@ -2017,16 +2171,16 @@ public final class ArcadePortManager implements Listener {
                 session.dragonEscapeNextTntAt.put(playerId,
                         now + ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_TNT_INTERVAL_MILLIS);
             }
-            int teamCount = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST ? 4 : 2;
-            boolean teamMode = type == ArcadePortGame.MICRO_BATTLES || type == ArcadePortGame.SHEEP_QUEST
-                    || type == ArcadePortGame.BOMB_LOBBERS || type == ArcadePortGame.PAINTBALL
-                    || type == ArcadePortGame.TURF_WARS || type == ArcadePortGame.CASTLE_ASSAULT
-                    || type == ArcadePortGame.HEROES_OF_GWEN;
+            int teamCount = teamCountForGame(type);
+            boolean teamMode = teamCount > 0;
             SourceMapCatalog.MapData selectedMap = sourceMapData.get(type.id());
             int teamId = (type == ArcadePortGame.MILK_THE_COW || type == ArcadePortGame.WITHER_ASSAULT)
                     ? (specialTeamSlots.contains(i) ? 1 : 0)
                     : teamMode && selectedMap != null ? selectedMap.teamIndexForSpawn(i, teamCount)
-                    : teamMode ? i % teamCount : i % 2;
+                    : teamMode ? leastPopulatedTeam(assignedTeamCounts) : i % 2;
+            int preferredTeam = teamMode ? lobbyTeamPreference(player, type, teamCount) : -1;
+            if (preferredTeam >= 0) teamId = preferredTeam;
+            if (teamMode && teamId >= 0 && teamId < assignedTeamCounts.length) assignedTeamCounts[teamId]++;
             session.teams.put(player.getUniqueId(), teamId);
             if (type == ArcadePortGame.TURF_WARS) {
                 session.turfWarsKits.put(player.getUniqueId(),
@@ -2089,6 +2243,13 @@ public final class ArcadePortManager implements Listener {
                 session.dragonNextArrowAt.put(playerId, now + ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
             }
             Location spawn = spawns.get(i % spawns.size()).clone();
+            if (teamMode && preferredTeam >= 0 && selectedMap != null) {
+                List<Location> sideSpawns = selectedMap.teamSpawnLocationsForTeam(teamId, teamCount);
+                if (!sideSpawns.isEmpty()) {
+                    int sideSpawnIndex = authoredTeamSpawnIndexes[teamId]++ % sideSpawns.size();
+                    spawn = sideSpawns.get(sideSpawnIndex).clone();
+                }
+            }
             if (type == ArcadePortGame.SKY_WARS
                     && "air".equals(session.skyWarsKits.get(player.getUniqueId()))) {
                 session.skyWarsSafeLocations.put(player.getUniqueId(), spawn.clone());
@@ -2123,6 +2284,8 @@ public final class ArcadePortManager implements Listener {
             player.setLevel(0);
             player.getInventory().clear();
             giveKit(session, player);
+            player.setInvulnerable(true);
+            player.setWalkSpeed(0.0F);
             if (type == ArcadePortGame.SKY_WARS) {
                 player.setInvulnerable(true);
                 player.setWalkSpeed(0.0F);
@@ -2154,6 +2317,7 @@ public final class ArcadePortManager implements Listener {
                                 player.isSprinting(), player.isOnGround()))));
             }
         }
+        applySessionTeamTabTeams(session);
         if (type == ArcadePortGame.DRAW_MY_THING) {
             startNextDrawMyThingRound(session, now);
         }
@@ -2300,7 +2464,7 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.MICRO_BATTLES) announce(session, ChatColor.AQUA + "Micro Battles: gather blocks; glass barriers drop after 10 seconds.");
         if (type == ArcadePortGame.MILK_THE_COW) announce(session, ChatColor.YELLOW + "Farmers: milk the Cows and drink milk to score. First to 15 wins.");
         if (type == ArcadePortGame.WITHER_ASSAULT) announce(session, ChatColor.GREEN + "Humans: survive for five minutes. Withers: eliminate every Human.");
-        else announce(session, ChatColor.GOLD + type.displayName() + " started! This is a first-pass mechanics test.");
+        else announce(session, ChatColor.GOLD + type.displayName() + " is preparing...");
         if (type == ArcadePortGame.TURF_WARS) {
             long openingSeconds = ArcadePortRules.turfWarsInitialBuildPhaseMillis(mixedArcadeVariant) / 1_000L;
             String modeLabel = mixedArcadeVariant ? " Mixed Arcade" : "";
@@ -6349,6 +6513,37 @@ public final class ArcadePortManager implements Listener {
         }
         long now = System.currentTimeMillis();
         session.ticks++;
+        if (!session.liveStarted) {
+            long remainingMillis = session.prepareEndsAt - now;
+            int seconds = (int) Math.max(0L, (remainingMillis + 999L) / 1_000L);
+            if (seconds > 0) {
+                if (seconds != session.lastPrepareSecond) {
+                    session.lastPrepareSecond = seconds;
+                    setLobbyLifecycleStatus(ArcadeLobbyLifecycleRules.countdownStatus(seconds));
+                    for (Player player : session.players.values()) {
+                        if (player == null || !player.isOnline()) continue;
+                        player.sendTitle(ChatColor.GREEN + "Starting in " + seconds,
+                                ChatColor.GRAY + session.type.displayName(), 0, 20, 0);
+                        if (seconds <= 10) player.playSound(player.getLocation(),
+                                Sound.BLOCK_NOTE_BLOCK_PLING, 0.7F, 1.2F);
+                    }
+                }
+                return;
+            }
+            session.liveStarted = true;
+            long prepareElapsed = Math.max(0L, session.prepareEndsAt - session.startedAt);
+            session.startedAt = now;
+            if (session.endsAt > 0L) session.endsAt += prepareElapsed;
+            for (Player player : session.players.values()) {
+                if (player == null || !player.isOnline() || !session.alive.contains(player.getUniqueId())) continue;
+                player.setInvulnerable(false);
+                player.setWalkSpeed(0.2F);
+                player.sendTitle(ChatColor.GREEN + "In Progress...", ChatColor.GRAY + session.type.displayName(), 5, 25, 5);
+                player.playSound(player.getLocation(), Sound.UI_TOAST_IN, 0.8F, 1.1F);
+            }
+            setLobbyLifecycleStatus("In Progress...");
+            announce(session, ChatColor.GREEN + session.type.displayName() + " is now in progress!");
+        }
         updateSourceWaterDamage(session, now);
         boolean sheepQuestUpdatedBeforeTimeout = false;
         if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) sneakyAssassins.tick();
@@ -12211,6 +12406,32 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        if (postGameReturnTask != null) postGameReturnTask.cancel();
+        endingSnapshots.clear();
+        if (announceWinner) {
+            int seconds = ArcadeLobbyLifecycleRules.endPresentationSeconds(plugin.getConfig().getInt(
+                    "lifecycle.end-presentation-seconds", ArcadeLobbyLifecycleRules.DEFAULT_END_PRESENTATION_SECONDS));
+            postGameEndsAtMillis = System.currentTimeMillis() + seconds * 1_000L;
+            for (Map.Entry<UUID, PlayerSnapshot> snapshot : session.snapshots.entrySet()) {
+                if (!testPlayers.isTestPlayer(snapshot.getKey())) endingSnapshots.put(snapshot.getKey(), snapshot.getValue());
+            }
+            setLobbyLifecycleStatus("In Progress...");
+            for (Player participant : session.players.values()) {
+                if (participant == null || !participant.isOnline() || testPlayers.isTestPlayer(participant)) continue;
+                String subtitle = winner == null ? "Round ended" : winner.getName() + " won " + session.type.displayName();
+                participant.sendTitle(ChatColor.GOLD + "Game Over", ChatColor.YELLOW + subtitle, 10, 80, 20);
+                participant.playSound(participant.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1.0F, 1.0F);
+                participant.getWorld().spawnParticle(Particle.FIREWORK, participant.getLocation().add(0, 1, 0),
+                        28, 0.7D, 0.9D, 0.7D, 0.08D);
+                participant.setInvulnerable(true);
+                participant.setWalkSpeed(0.0F);
+                participant.setGameMode(GameMode.SPECTATOR);
+                participant.setAllowFlight(true);
+                participant.setFlying(true);
+            }
+        } else {
+            postGameEndsAtMillis = 0L;
+        }
         if (announceWinner && session.type == ArcadePortGame.DEATH_TAG) {
             recordDeathTagRewards(session);
         }
@@ -12389,11 +12610,11 @@ public final class ArcadePortManager implements Listener {
                     player.closeInventory();
                 }
                 if (session.type == ArcadePortGame.SPLEEF) player.setCompassTarget(null);
-                snapshot.restore(player);
-                // Ended rounds always return testers to the actual Arcade lobby spawn,
-                // even when their restored snapshot is already inside the lobby world.
-                lobby.sendToLobby(player);
-            } else pendingRestore.put(entry.getKey(), snapshot);
+                if (!announceWinner) {
+                    snapshot.restore(player);
+                    lobby.sendToLobby(player);
+                }
+            } else if (!announceWinner) pendingRestore.put(entry.getKey(), snapshot);
         }
         session.sheep.clear();
         session.sheepOwners.clear();
@@ -12434,6 +12655,13 @@ public final class ArcadePortManager implements Listener {
         testPlayers.despawnSessionPlayers();
         if (session.type == ArcadePortGame.BACON_BRAWL) baconSourceSpawnOverrides = List.of();
         lobbyRuntime.refreshDisplays();
+        if (announceWinner && !endingSnapshots.isEmpty()) {
+            int seconds = ArcadeLobbyLifecycleRules.endPresentationSeconds(plugin.getConfig().getInt(
+                    "lifecycle.end-presentation-seconds", ArcadeLobbyLifecycleRules.DEFAULT_END_PRESENTATION_SECONDS));
+            if (seconds == 0) returnEndingPlayersToLobby();
+            else postGameReturnTask = Bukkit.getScheduler().runTaskLater(plugin,
+                    this::returnEndingPlayersToLobby, seconds * 20L);
+        } else clearLobbyCountdownStatus();
     }
 
     private String runnerAchievementKey(UUID playerId, String slug) {
@@ -13669,6 +13897,13 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void stop(String reason) {
+        if (postGameReturnTask != null) postGameReturnTask.cancel();
+        postGameReturnTask = null;
+        if (!endingSnapshots.isEmpty()) returnEndingPlayersToLobby();
+        if (manualStartCountdown != null) manualStartCountdown.cancel();
+        manualStartCountdown = null;
+        manualStartType = null;
+        manualStartMixedVariant = false;
         // A stop during asynchronous fake-player login must release the start gate too.
         testPlayerStartPending = false;
         if (pendingStart != null) {
@@ -19016,6 +19251,8 @@ public final class ArcadePortManager implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         UUID id = event.getPlayer().getUniqueId();
+        PlayerSnapshot endingSnapshot = endingSnapshots.remove(id);
+        if (endingSnapshot != null) pendingRestore.put(id, endingSnapshot);
         for (Map<UUID, Player> queue : queues.values()) queue.remove(id);
         gladiatorLobbyVotes.remove(id);
         Session session = active;
@@ -19601,6 +19838,10 @@ public final class ArcadePortManager implements Listener {
         long baconEscalationIntervalMillis = ArcadePortRules.BACON_INITIAL_KNOCKBACK_INTERVAL_MILLIS;
         int baconKnockbackEscalations;
         long startedAt;
+        long prepareEndsAt;
+        long prepareDurationMillis;
+        int lastPrepareSecond = -1;
+        boolean liveStarted;
          boolean microBarrierActive;
         final boolean mixedArcadeVariant;
         CastleAssaultHeroesOfGwenRuntime variantRuntime;
