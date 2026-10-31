@@ -358,7 +358,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>-mixed" + ChatColor.GRAY
                         + " — Mixed Arcade variants: Turf Wars, Castle Assault and Heroes of Gwen");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a game kit; Camera Shy: smoke-artist, decoy, runner, spotter or understudy");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport lobby camera-shy" + ChatColor.GRAY + " — select Camera Shy and show its five lobby kit choices");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a game kit; Camera Shy IDs: camera-shy-smoke-artist, camera-shy-decoy, camera-shy-runner, camera-shy-spotter, camera-shy-understudy");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport leave" + ChatColor.GRAY + " — leave the Camera Shy queue");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport ghost <on|off|toggle>" + ChatColor.GRAY + " — show or hide your Dragon Escape PB ghost");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport dragoncolor <colour>" + ChatColor.GRAY + " — set your Dragon Escape leader beacon colour");
