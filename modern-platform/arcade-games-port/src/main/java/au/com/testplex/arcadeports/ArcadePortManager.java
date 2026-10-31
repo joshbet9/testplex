@@ -19663,6 +19663,21 @@ public final class ArcadePortManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareBlockDamage(BlockDamageEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareHeldSlotChange(PlayerItemHeldEvent event) {
+        cancelPrepareAction(event.getPlayer(), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareBowShoot(EntityShootBowEvent event) {
+        if (event.getEntity() instanceof Player player) cancelPrepareAction(player, event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onPrepareDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player victim && isPreparingParticipant(victim)) {
             event.setCancelled(true);
