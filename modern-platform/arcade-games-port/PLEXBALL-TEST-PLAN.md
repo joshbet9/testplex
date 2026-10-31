@@ -9,7 +9,7 @@ Plexball is an experimental in-process mode hosted by `ArcadeMechanicsModern`. I
 - `/arcadeport kit curve-artist`
 - `/arcadeport kit sprinter`
 - `/arcadeport kit skyguard`
-- `/stats plexball` — open the Plexball career page with achievements, milestone progress and lifetime statistics.
+- `/stats` or `/stats plexball` — open the Plexball career page with achievements, milestone progress and lifetime statistics.
 - `/arcadeport join plexball` — normal five-second queue countdown.
 - `/arcadeport play plexball` — quick two-second queue countdown.
 - `/arcadeport leave plexball` — leave the queue before a match starts.
