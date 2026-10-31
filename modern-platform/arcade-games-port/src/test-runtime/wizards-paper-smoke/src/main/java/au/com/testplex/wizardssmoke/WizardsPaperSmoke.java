@@ -156,7 +156,7 @@ public final class WizardsPaperSmoke extends JavaPlugin {
         }
     }
 
-    private void waitForClientsAndQueue() {
+    private void waitForClientsAndQueue() throws Exception {
         List<Player> online = new ArrayList<>(Bukkit.getOnlinePlayers());
         owner = online.stream().filter(player -> OWNER_NAME.equalsIgnoreCase(player.getName())).findFirst().orElse(null);
         rival = online.stream().filter(player -> !player.equals(owner)).findFirst().orElse(null);
