@@ -6,6 +6,11 @@ import org.bukkit.Material;
 final class SneakyAssassinsRules {
     private SneakyAssassinsRules() { }
 
+    static boolean shouldAwardYouNeedDirections(boolean masterAssassin, boolean directPlayerAttack,
+                                                boolean actualMasterCompass, boolean lethalHit) {
+        return masterAssassin && directPlayerAttack && actualMasterCompass && lethalHit;
+    }
+
     static double swordDamage(Material weapon) {
         if (weapon == null) return 0.0D;
         return switch (weapon) {
