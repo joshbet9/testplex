@@ -32,6 +32,7 @@
 - Director's Spotlight periodically marks one living human player.
 - Final Snapshot begins with 30 seconds remaining and shortens shutter cooldown.
 - Smoke, fake flashes, decoys and pickup entities are removed at match end. Hedge leaves remain persistent and intact after several minutes of world ticks.
+- Director's Spotlight: existing glowing state is preserved after its three-second marker expires; elimination, disconnect, operator stop and a new round cannot leave an old spotlight task toggling the player's state.
 
 ## Progression acceptance
 - All 20 IDs in `CameraShyProgressCatalog` have a unique name and condition.
