@@ -268,7 +268,7 @@ public final class ArcadeCatalog {
 
         register(game("castle-assault", "Castle Assault", "TNT",
                 "Destroy the enemy sentry crystals and defeat their King. Mixed Arcade doubles objective TNT spawns.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("castle-breach", "Castle Breach", "The enemy castle gates collapse around the winning team."),
                 win("kingfall", "Kingfall", "The defeated King falls as the winning banner rises."),

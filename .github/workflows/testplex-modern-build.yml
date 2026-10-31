@@ -204,12 +204,12 @@ jobs:
             echo
             echo "- Runtime/API baseline: Java 25 / Paper 26.3"
             echo "- Separate from legacy Java 8 build and deployment"
-            echo "- Catalogue: 26 shared Arcade games (ten READY_FOR_TEST, 16 MECHANICS_IN_PROGRESS)"
+            echo "- Catalogue: 26 shared Arcade games (11 READY_FOR_TEST, 15 MECHANICS_IN_PROGRESS)"
             echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar, ArcadeMechanicsModern.jar and WizardsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: 26 shared Arcade catalogue entries are packaged; Plexball and Super Sploor are in the controlled READY_FOR_TEST queue, Wizards is a separate disabled module, and Speed Builders Arcade is planned but not implemented"
-            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef and Super Sploor; the remaining catalogue entries, Snake and Wizards remain gated pending readiness promotion"
+            echo "- Gameplay ports: 26 shared Arcade catalogue entries are packaged; Plexball, Super Sploor and Castle Assault are in the controlled READY_FOR_TEST queue, Wizards is a separate disabled module, and Speed Builders Arcade is planned but not implemented"
+            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor and Castle Assault; the remaining catalogue entries, Snake and Wizards remain gated pending readiness promotion"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
 

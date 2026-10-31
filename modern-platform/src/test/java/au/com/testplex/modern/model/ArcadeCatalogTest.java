@@ -39,15 +39,15 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void castleAssaultAndHeroesOfGwenAppearInTheLobbyAsInProgress() {
+    void castleAssaultIsReadyForControlledAcceptanceWhileHeroesOfGwenRemainsGated() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         GameDefinition castleAssault = catalog.getGame("castle-assault");
         GameDefinition heroesOfGwen = catalog.getGame("heroes-of-gwen");
         assertNotNull(castleAssault);
         assertNotNull(heroesOfGwen);
-        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, castleAssault.getPortStatus());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, castleAssault.getPortStatus());
+        assertTrue(castleAssault.isReadyForTest());
         assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, heroesOfGwen.getPortStatus());
-        assertFalse(castleAssault.isReadyForTest());
         assertFalse(heroesOfGwen.isReadyForTest());
         GameDefinition superSploor = catalog.getGame("super-sploor");
         assertNotNull(superSploor);
@@ -103,7 +103,7 @@ class ArcadeCatalogTest {
     @Test
     void explicitlyClearedGamesAreAvailableTogetherForInGameAcceptance() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor");
+        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "castle-assault");
 
         for (GameDefinition game : catalog.getGames()) {
             if (readyIds.contains(game.getId())) {
@@ -119,8 +119,8 @@ class ArcadeCatalogTest {
         long readyForTest = catalog.getGames().stream().filter(GameDefinition::isReadyForTest).count();
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
-        assertEquals(10, readyForTest);
-        assertEquals(16, inProgress);
+        assertEquals(11, readyForTest);
+        assertEquals(15, inProgress);
     }
 
     @Test
