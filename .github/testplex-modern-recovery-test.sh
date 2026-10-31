@@ -140,7 +140,9 @@ assert_file_text() { [[ "$(cat "$1")" == "$2" ]] || { echo "ASSERT unexpected co
 
 # Fresh process recovery models the original SSH/deployment process disappearing.
 write_txn REPLACING true true
-run_helper recover "$target_sha"
+# Independent recovery must recover the current journal even when the retrying
+# workflow's build SHA differs from the failed deployment's target SHA.
+run_helper recover
 run_helper assert-deployable >/dev/null
 assert_file_text "$SERVER/plugins/ArcadeMechanicsModern/plugin.dat" 'old plugin payload'
 assert_file_text "$SERVER/mm_void/region.dat" 'old map payload'
