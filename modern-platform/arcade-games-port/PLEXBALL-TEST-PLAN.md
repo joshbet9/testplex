@@ -19,6 +19,39 @@ Plexball is an experimental in-process mode hosted by `ArcadeMechanicsModern`. I
 
 At least two and at most eight players are supported. Each player gets one initial batting turn. Everyone other than the current batter fields. The first round is capped at ten seconds per batter. Multiple home runs enter five-second sudden death, bounded by the same 180-second wall-clock match limit.
 
+## Achievements
+
+Achievements are one-time challenges, unlocked from completed match results and saved per player UUID.
+
+| Achievement | Requirement |
+| --- | --- |
+| Sweet Spot | Land an uncaught hit of at least 50 metres. |
+| Warning Track | Land an uncaught hit of at least 90 metres. |
+| Out of the Park | Hit a fair 100-metre home run. |
+| Perfect Contact | Make contact using the top timing grade. |
+| Sticky Gloves | Make your first successful catch. |
+| Golden Glove | Make at least three catches in one match. |
+| All-Rounder | Make a catch and land an uncaught hit of at least 50 metres in one match. |
+| Clutch Performer | Win a match after hitting a home run in sudden death. |
+| Champion | Win a Plexball match. |
+
+Unlocks send a player notification and challenge-complete sound. They are local Testplex progression only; no production Mineplex currency, XP, title or cosmetic reward is granted.
+
+## Career milestones
+
+Milestones are cumulative and persist between matches and server restarts. The /stats page shows individual progress bars and completion states.
+
+| Track | Milestone tiers |
+| --- | --- |
+| Matches played | 1, 10, 25, 50 |
+| Wins | 1, 5, 10, 25 |
+| At-bats completed | 1, 10, 25, 50 |
+| Successful catches | 1, 5, 15, 30 |
+| Home runs | 1, 5, 10, 25 |
+| Total uncaught hit distance | 100m, 500m, 1km, 5km |
+
+The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. It is separate from kit preferences and production account/stat storage.
+
 ## Gameplay acceptance
 
 | Test | Expected |
