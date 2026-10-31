@@ -289,6 +289,11 @@ public final class ArcadePortManager implements Listener {
                 && module.getGameManager() != null;
     }
 
+    /** Identifies a server-side fake Player so human join/leave hooks do not redirect it. */
+    public boolean isTestPlayer(Player player) {
+        return testPlayers.isTestPlayer(player);
+    }
+
     /** Called after Monster Maze returns its roster; only despawn when the embedded module is truly idle. */
     public void cleanupTestPlayersIfNoGameIsRunning() {
         if (active == null && !monsterMazeRunning()) testPlayers.despawnSessionPlayers();
