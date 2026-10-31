@@ -100,6 +100,13 @@ jobs:
           jar tf "$arcade_jar" | grep -Fxq "source-maps/Draw My Thing/Draw_Stadium.zip"
           jar tf "$arcade_jar" | grep -Fxq "maps/spleef.zip"
 
+          arcade_config="$(unzip -p "$arcade_jar" config.yml)"
+          enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config" | paste -sd, -)"
+          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,gladiators,micro-battles,paintball,plexball,spleef" ]] || {
+            echo "Only the explicitly reviewed acceptance queue may be enabled. Found: [$enabled_ids]" >&2
+            exit 1
+          }
+
           # Every enabled game must ship every individual 1.8 Testplex map archive.
           # Super Paintball and Super Spleef are legacy rename folders for the same
           # Paintball and Spleef games, so their maps are included in the same catalogs.
@@ -153,12 +160,6 @@ jobs:
           grep -Fq 'MonsterMazeStandalone' "$deploy_workflow"
           grep -Fq 'me.monstermaze.MonsterMazePlugin' "$deploy_workflow"
           grep -Fq 'retired-monster-maze-plugins' "$deploy_workflow"
-          arcade_config="$(unzip -p "$arcade_jar" config.yml)"
-          enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config" | paste -sd, -)"
-          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,gladiators,micro-battles,paintball,plexball,spleef" ]] || {
-            echo "Only the explicitly reviewed acceptance queue may be enabled. Found: [$enabled_ids]" >&2
-            exit 1
-          }
           snake_config="$(unzip -p "$snake_jar" config.yml)"
           grep -Fxq "enabled: false" <<< "$snake_config"
           echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 25 shared Arcade catalogue games are packaged, Wizards is built as a separate module, Speed Builders Arcade is tracked as planned work, and Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball and Spleef are enabled for controlled acceptance; all individual 1.8 source map archives for every enabled game are compared against the packaged JAR; other unfinished games remain gated."
