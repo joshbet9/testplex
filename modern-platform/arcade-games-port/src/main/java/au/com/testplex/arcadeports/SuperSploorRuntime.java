@@ -57,7 +57,7 @@ import org.bukkit.util.Vector;
  */
 public final class SuperSploorRuntime implements Listener {
     public record PlayerMatchStats(String kit, long territoryPainted, long enemyTerritoryReclaimed,
-            int splats, int deaths, int assists, double squidTravelBlocks,
+            long neutralTerritoryClaimed, int splats, int deaths, int assists, double squidTravelBlocks,
             double wallClimbBlocks, int specialsUsed, long rollerTerritory,
             int chargerFullHits, long lobberEnemyReclaimed, int dualiesPostRollSplats,
             int bestSpecialTargets) { }
@@ -106,6 +106,7 @@ public final class SuperSploorRuntime implements Listener {
     private static final class MutableStats {
         long territoryPainted;
         long enemyTerritoryReclaimed;
+        long neutralTerritoryClaimed;
         int splats;
         int deaths;
         int assists;
@@ -120,8 +121,9 @@ public final class SuperSploorRuntime implements Listener {
         int bestSpecialTargets;
 
         PlayerMatchStats snapshot() {
-            return new PlayerMatchStats(kit, territoryPainted, enemyTerritoryReclaimed, splats, deaths,
-                    assists, squidTravelBlocks, wallClimbBlocks, specialsUsed,
+            return new PlayerMatchStats(kit, territoryPainted, enemyTerritoryReclaimed,
+                    neutralTerritoryClaimed, splats, deaths, assists, squidTravelBlocks,
+                    wallClimbBlocks, specialsUsed,
                     rollerTerritory, chargerFullHits, lobberEnemyReclaimed,
                     dualiesPostRollSplats, bestSpecialTargets);
         }
@@ -162,6 +164,7 @@ public final class SuperSploorRuntime implements Listener {
     private final Map<UUID, Long> nextDodgeRollRechargeAt = new HashMap<>();
     private final Map<UUID, Long> dualiesRollExpiresAt = new HashMap<>();
     private final Map<UUID, Set<UUID>> dualiesRollTargets = new HashMap<>();
+    private final Map<UUID, Set<UUID>> dualiesPostRollUniqueTargets = new HashMap<>();
     private final Map<UUID, Long> lastHitAt = new HashMap<>();
     private final Map<UUID, Long> nextMarkRecoveryAt = new HashMap<>();
     private final Map<UUID, Long> spawnProtectedUntil = new HashMap<>();
@@ -259,6 +262,7 @@ public final class SuperSploorRuntime implements Listener {
                 dodgeRollCharges.put(id, 2);
                 nextDodgeRollRechargeAt.put(id, Long.MAX_VALUE);
                 dualiesRollTargets.put(id, new HashSet<>());
+                dualiesPostRollUniqueTargets.put(id, new HashSet<>());
             }
             giveStarterLoadout(player, team, kit);
             player.setGameMode(GameMode.ADVENTURE);
@@ -1104,6 +1108,7 @@ public final class SuperSploorRuntime implements Listener {
         if (stats == null || result == null) return;
         stats.territoryPainted += result.changedUnits();
         stats.enemyTerritoryReclaimed += result.enemyReclaimed();
+        stats.neutralTerritoryClaimed += result.neutralClaimed();
         double currentCharge = specialCharge.getOrDefault(ownerId, 0.0D);
         specialCharge.put(ownerId, SuperSploorRules.nextSpecialCharge(
                 currentCharge, result.changedUnits(), specialChargeSuppressed.contains(ownerId)));
@@ -1238,7 +1243,8 @@ public final class SuperSploorRuntime implements Listener {
                 attackerStats.splats++;
                 if ("dualies".equals(kits.get(attackerId))
                         && dualiesRollExpiresAt.getOrDefault(attackerId, 0L) >= now
-                        && dualiesRollTargets.computeIfAbsent(attackerId, ignored -> new HashSet<>()).add(targetId)) {
+                        && dualiesRollTargets.computeIfAbsent(attackerId, ignored -> new HashSet<>()).add(targetId)
+                        && dualiesPostRollUniqueTargets.computeIfAbsent(attackerId, ignored -> new HashSet<>()).add(targetId)) {
                     attackerStats.dualiesPostRollSplats++;
                 }
             }
@@ -1253,6 +1259,13 @@ public final class SuperSploorRuntime implements Listener {
         long now = System.currentTimeMillis();
         respawnAt.put(targetId, now + SuperSploorRules.SPLAT_RESPAWN_MILLIS);
         exitSquidMode(target, targetId);
+        chargerChargeStartedAt.remove(targetId);
+        specialChargeSuppressed.remove(targetId);
+        stampedeUntil.remove(targetId);
+        stampedeNextPaintAt.remove(targetId);
+        stampedeHitPlayers.remove(targetId);
+        afterimageDashesRemaining.remove(targetId);
+        afterimageNextAt.remove(targetId);
         target.setInvulnerable(true);
         target.setGameMode(GameMode.SPECTATOR);
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_DEATH, 0.9F, 1.1F);
@@ -1464,6 +1477,7 @@ public final class SuperSploorRuntime implements Listener {
         nextDodgeRollRechargeAt.clear();
         dualiesRollExpiresAt.clear();
         dualiesRollTargets.clear();
+        dualiesPostRollUniqueTargets.clear();
         specialCharge.clear();
         specialChargeSuppressed.clear();
         secondaryReadyAt.clear();
@@ -1512,6 +1526,7 @@ public final class SuperSploorRuntime implements Listener {
         nextDodgeRollRechargeAt.remove(id);
         dualiesRollExpiresAt.remove(id);
         dualiesRollTargets.remove(id);
+        dualiesPostRollUniqueTargets.remove(id);
         specialCharge.remove(id);
         specialChargeSuppressed.remove(id);
         secondaryReadyAt.remove(id);
