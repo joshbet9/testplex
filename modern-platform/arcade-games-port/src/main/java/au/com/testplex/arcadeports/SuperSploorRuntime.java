@@ -1169,7 +1169,11 @@ public final class SuperSploorRuntime implements Listener {
         }
         Player owner = ownerId == null ? null : players.get(ownerId);
         if (event.getHitEntity() instanceof Player target && owner != null) {
-            if (fullyChargedProjectiles.remove(projectileId)) {
+            boolean validEnemyHit = !target.getUniqueId().equals(ownerId)
+                    && teams.getOrDefault(ownerId, -1) != teams.getOrDefault(target.getUniqueId(), -2)
+                    && !respawnAt.containsKey(target.getUniqueId())
+                    && spawnProtectedUntil.getOrDefault(target.getUniqueId(), 0L) <= System.currentTimeMillis();
+            if (fullyChargedProjectiles.remove(projectileId) && validEnemyHit) {
                 MutableStats ownerStats = playerStats.get(ownerId);
                 if (ownerStats != null) ownerStats.chargerFullHits++;
             }
