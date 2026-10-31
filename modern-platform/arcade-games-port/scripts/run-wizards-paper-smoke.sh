@@ -49,6 +49,8 @@ wizards:
   arena-radius: 48
   chest-count: 32
   allow-solo-start: false
+  allow-generated-test-arena: false
+  include-nano-maps: true
   minimum-players: 3
   maximum-players: 3
   kits:

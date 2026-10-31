@@ -92,6 +92,11 @@ public final class WizardsGameManager implements Listener {
     private static final int CHEST_COUNT_FALLBACK = 32;
     private static final List<String> WIZARDS_MAP_FOLDERS = List.of("Wizards", "Nano Wizards");
 
+    private List<String> enabledWizardsMapFolders() {
+        return plugin.getConfig().getBoolean("wizards.include-nano-maps", false)
+                ? WIZARDS_MAP_FOLDERS : List.of("Wizards");
+    }
+
     private final ArcadeMechanicsModernPlugin plugin;
     private final NamespacedKey spellKey;
     private final NamespacedKey wandKey;
@@ -164,7 +169,7 @@ public final class WizardsGameManager implements Listener {
     }
 
     private World createArena() {
-        String sourceMap = SourceMapCatalog.selectedResourceForFolders(plugin, "wizards", WIZARDS_MAP_FOLDERS);
+        String sourceMap = SourceMapCatalog.selectedResourceForFolders(plugin, "wizards", enabledWizardsMapFolders());
         if (sourceMap != null) {
             World imported = createSourceMapArena(sourceMap);
             if (imported != null) return imported;
@@ -207,7 +212,7 @@ public final class WizardsGameManager implements Listener {
             plugin.getLogger().severe("Could not safely reset the previous Wizards source-map world " + worldName + ".");
             return null;
         }
-        if (!SourceMapCatalog.installWizardsResource(plugin, resource, worldName, WIZARDS_MAP_FOLDERS)) {
+        if (!SourceMapCatalog.installWizardsResource(plugin, resource, worldName, enabledWizardsMapFolders())) {
             plugin.getLogger().severe("Could not install selected Wizards source map " + resource + ".");
             return null;
         }
@@ -453,7 +458,7 @@ public final class WizardsGameManager implements Listener {
             return;
         }
 
-        String desiredMap = SourceMapCatalog.selectedResourceForFolders(plugin, "wizards", WIZARDS_MAP_FOLDERS);
+        String desiredMap = SourceMapCatalog.selectedResourceForFolders(plugin, "wizards", enabledWizardsMapFolders());
         if (arena == null || !java.util.Objects.equals(activeMapResource, desiredMap)) {
             arena = createArena();
         }

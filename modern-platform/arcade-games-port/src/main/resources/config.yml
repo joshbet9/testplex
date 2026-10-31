@@ -28,6 +28,7 @@ wizards:
   chest-count: 32
   allow-solo-start: false
   allow-generated-test-arena: false
+  include-nano-maps: false
   minimum-players: 8
   maximum-players: 12
   kits:
