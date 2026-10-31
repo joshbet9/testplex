@@ -73,6 +73,13 @@ class CameraShyRulesTest {
     }
 
     @Test
+    void cameraShyQueueAndStartRequireExplicitReadyAllowListMembership() {
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled("camera-shy", java.util.List.of("camera-shy")));
+        assertFalse(ArcadePortRules.isArcadePortGameEnabled("camera-shy", java.util.List.of("plexball", "spleef")));
+        assertFalse(ArcadePortRules.isArcadePortGameEnabled("camera-shy", java.util.List.of()));
+    }
+
+    @Test
     void fiveExposureThresholdIsInclusive() {
         assertFalse(CameraShyRules.eliminatedAt(4));
         assertTrue(CameraShyRules.eliminatedAt(5));

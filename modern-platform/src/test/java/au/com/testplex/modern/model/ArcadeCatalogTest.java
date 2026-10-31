@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeCatalogTest {
     @Test
-    void registersAllTwentyFiveArcadeGames() {
+    void registersAllTwentySixArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         assertEquals(26, catalog.size());
         assertEquals(26, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
@@ -99,7 +99,7 @@ class ArcadeCatalogTest {
     @Test
     void explicitlyClearedGamesAreAvailableTogetherForInGameAcceptance() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "gladiators", "micro-battles", "paintball", "plexball", "spleef");
+        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "gladiators", "micro-battles", "paintball", "plexball", "spleef", "camera-shy");
 
         for (GameDefinition game : catalog.getGames()) {
             if (readyIds.contains(game.getId())) {
@@ -115,17 +115,17 @@ class ArcadeCatalogTest {
         long readyForTest = catalog.getGames().stream().filter(GameDefinition::isReadyForTest).count();
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
-        assertEquals(9, readyForTest);
-        assertEquals(17, inProgress);
+        assertEquals(10, readyForTest);
+        assertEquals(16, inProgress);
     }
 
     @Test
-    void cameraShyIsCataloguedAsAnInProgressSpyglassEliminationGame() {
+    void cameraShyIsCataloguedForControlledSpyglassEliminationTesting() {
         GameDefinition game = new ArcadeCatalog().getGame("camera-shy");
         assertNotNull(game);
         assertEquals("Camera Shy", game.getName());
-        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus());
-        assertFalse(game.isReadyForTest());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
+        assertTrue(game.isReadyForTest());
         assertTrue(game.getDescription().contains("five exposures"));
         assertEquals(List.of("last-photographer-standing"),
                 game.getWinEffects().stream().map(CosmeticOption::getId).toList());

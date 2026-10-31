@@ -419,6 +419,11 @@ public final class CameraShyGame implements Listener {
         return true;
     }
 
+    private boolean isEnabledForAcceptance() {
+        return ArcadePortRules.isArcadePortGameEnabled("camera-shy",
+                plugin.getConfig().getStringList("enabled-games"));
+    }
+
     public boolean isActive() { return phase == Phase.STARTING || phase == Phase.LIVE || phase == Phase.ENDING; }
 
     public String status() {
@@ -443,6 +448,10 @@ public final class CameraShyGame implements Listener {
 
     public void queue(Player player, boolean quickStart) {
         if (player == null || !player.isOnline()) return;
+        if (!isEnabledForAcceptance()) {
+            player.sendMessage(ChatColor.RED + "Camera Shy is not enabled for controlled acceptance yet.");
+            return;
+        }
         if (isActive()) {
             player.sendMessage(ChatColor.RED + "Camera Shy is already underway. You can join the next round.");
             return;
@@ -519,6 +528,10 @@ public final class CameraShyGame implements Listener {
     }
 
     public void startQueued(org.bukkit.command.CommandSender sender) {
+        if (!isEnabledForAcceptance()) {
+            sender.sendMessage(ChatColor.RED + "Camera Shy is not enabled for controlled acceptance yet.");
+            return;
+        }
         if (isActive()) {
             sender.sendMessage(ChatColor.RED + "Camera Shy is already active.");
             return;

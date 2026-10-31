@@ -323,7 +323,7 @@ public final class ArcadeCatalog {
 
         register(game("camera-shy", "Camera Shy", "SPYGLASS",
                 "Photograph opponents with a spyglass while avoiding five exposures. Last photographer standing wins.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("last-photographer-standing", "Last Photographer Standing",
                         "The winner is celebrated as the last photographer remaining in the maze.")));
