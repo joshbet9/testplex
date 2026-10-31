@@ -67,7 +67,7 @@ The overall programme tracks 27 titles/variants: **25 shared Arcade catalogue ga
 | 12 | Runner | Mechanics in progress | Disabled |
 | 13 | Sheep Quest | Mechanics in progress | Disabled |
 | 14 | Snake | Separate modern module; mechanics in progress | Disabled |
-| 15 | Spleef | Mechanics in progress | Disabled |
+| 15 | Spleef | Controlled acceptance candidate; all 37 original archives across Spleef and Super Spleef, three kits and source block mechanics | Enabled |
 | 16 | Turf Wars | Mechanics in progress | Disabled |
 | 17 | Draw My Thing | Mechanics in progress; large-lobby turn scaling present | Disabled |
 | 18 | Master Builders | Mechanics in progress; plot/review work present | Disabled |
@@ -81,4 +81,4 @@ The overall programme tracks 27 titles/variants: **25 shared Arcade catalogue ga
 | 26 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
 | 27 | Speed Builders Arcade | Planned; implementation not started | Not available |
 
-**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball and Plexball form the current shared controlled test queue and can be exercised together in the same test sessions. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable.
+**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball and Spleef form the current shared controlled test queue and can be exercised together in the same test sessions. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable.
