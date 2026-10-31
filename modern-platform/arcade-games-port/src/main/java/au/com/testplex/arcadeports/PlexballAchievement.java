@@ -14,7 +14,7 @@ public enum PlexballAchievement {
     GOLDEN_GLOVE("golden-glove", "Golden Glove", "Make at least three catches in one match.", Material.GOLDEN_CHESTPLATE),
     ALL_ROUNDER("all-rounder", "All-Rounder", "Make a catch and land an uncaught hit of at least 50 metres in one match.", Material.COMPASS),
     CLUTCH_PERFORMER("clutch-performer", "Clutch Performer", "Win a match after hitting a home run in sudden death.", Material.NETHER_STAR),
-    CHAMPION("champion", "Champion", "Win a Plexball match.", Material.TROPHY);
+    CHAMPION("champion", "Champion", "Win a Plexball match.", Material.NETHER_STAR);
 
     private final String slug;
     private final String displayName;
