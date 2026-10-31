@@ -849,6 +849,9 @@ public final class PlexballGame implements Listener {
                 }
             }
         }
+        if (announce && !participants.isEmpty()) {
+            broadcastFinalMatchSummary(participants, winners);
+        }
         phase = Phase.IDLE;
         queueCountdownTick = -1L;
         batterId = null;
@@ -865,6 +868,50 @@ public final class PlexballGame implements Listener {
             playerHuds.remove(id);
             Player player = Bukkit.getPlayer(id);
             if (player != null && player.isOnline()) plugin.returnPlayerToArcadeLobby(player);
+        }
+    }
+
+    private void broadcastFinalMatchSummary(List<UUID> participants, List<UUID> winners) {
+        Set<UUID> winnerIds = winners == null ? Set.of() : new HashSet<>(winners);
+        List<UUID> ordered = participants.stream().sorted((first, second) -> {
+            PlayerResult a = results.getOrDefault(first, new PlayerResult());
+            PlayerResult b = results.getOrDefault(second, new PlayerResult());
+            int bestHit = Double.compare(b.bestDistance, a.bestDistance);
+            if (bestHit != 0) return bestHit;
+            int catches = Integer.compare(b.catches, a.catches);
+            if (catches != 0) return catches;
+            return Integer.compare(b.homeRuns, a.homeRuns);
+        }).toList();
+
+        broadcastMatch(ChatColor.GOLD + "" + ChatColor.BOLD + "FINAL MATCH STATS"
+                + ChatColor.GRAY + " — best uncaught hit, then catches");
+        int place = 1;
+        for (UUID id : ordered) {
+            Player player = Bukkit.getPlayer(id);
+            PlayerResult result = results.getOrDefault(id, new PlayerResult());
+            String name = player == null ? "Disconnected player" : player.getName();
+            String status = winnerIds.contains(id)
+                    ? ChatColor.GOLD + "" + ChatColor.BOLD + "WINNER "
+                    : ChatColor.GRAY + "#" + place + " ";
+            broadcastMatch(status + ChatColor.WHITE + name
+                    + ChatColor.GRAY + " — best " + ChatColor.GREEN
+                    + String.format(java.util.Locale.ROOT, "%.1fm", result.bestDistance)
+                    + ChatColor.GRAY + " | catches " + ChatColor.AQUA + result.catches
+                    + ChatColor.GRAY + " | HR " + ChatColor.GOLD + result.homeRuns);
+            if (player != null && player.isOnline()) {
+                player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "YOUR MATCH RECAP");
+                player.sendMessage(ChatColor.GRAY + "Best hit: " + ChatColor.GREEN
+                        + String.format(java.util.Locale.ROOT, "%.1fm", result.bestDistance)
+                        + ChatColor.GRAY + " | total uncaught distance: " + ChatColor.GREEN
+                        + String.format(java.util.Locale.ROOT, "%.1fm", result.totalDistance));
+                player.sendMessage(ChatColor.GRAY + "Catches: " + ChatColor.AQUA + result.catches
+                        + ChatColor.GRAY + " | home runs: " + ChatColor.GOLD + result.homeRuns
+                        + ChatColor.GRAY + " | at-bats: " + ChatColor.WHITE + result.atBats);
+                player.sendMessage(winnerIds.contains(id)
+                        ? ChatColor.GOLD + "Match result: WINNER"
+                        : ChatColor.GRAY + "Match result: complete");
+            }
+            place++;
         }
     }
 
