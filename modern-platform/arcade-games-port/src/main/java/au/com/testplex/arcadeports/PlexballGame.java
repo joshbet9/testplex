@@ -141,6 +141,7 @@ public final class PlexballGame implements Listener {
         private long wins;
         private long atBats;
         private long totalDistanceTenths;
+        private long bestDistanceTenths;
         private long catches;
         private long homeRuns;
         private long perfectHits;
@@ -295,6 +296,8 @@ public final class PlexballGame implements Listener {
                 ChatColor.GRAY + "At-bats: " + ChatColor.WHITE + profile.atBats,
                 ChatColor.GRAY + "Uncaught distance: " + ChatColor.GREEN
                         + String.format(java.util.Locale.ROOT, "%.1fm", profile.totalDistanceTenths / 10.0D),
+                ChatColor.GRAY + "Best hit: " + ChatColor.GREEN
+                        + String.format(java.util.Locale.ROOT, "%.1fm", profile.bestDistanceTenths / 10.0D),
                 ChatColor.GRAY + "Catches: " + ChatColor.AQUA + profile.catches,
                 ChatColor.GRAY + "Home runs: " + ChatColor.GOLD + profile.homeRuns,
                 ChatColor.GRAY + "Perfect contacts: " + ChatColor.LIGHT_PURPLE + profile.perfectHits)));
@@ -750,9 +753,14 @@ public final class PlexballGame implements Listener {
         if (batterId != null && phase == Phase.BALL_FLIGHT && ballPosition != null) {
             PlayerResult current = results.computeIfAbsent(batterId, ignored -> new PlayerResult());
             current.atBats++;
-            double distance = PlexballRules.horizontalDistance(teeBallPosition, ballPosition);
-            current.bestDistance = Math.max(current.bestDistance,
-                    Math.min(PlexballRules.HOME_RUN_METRES, distance));
+            double distance = Math.min(PlexballRules.HOME_RUN_METRES,
+                    PlexballRules.horizontalDistance(teeBallPosition, ballPosition));
+            current.bestDistance = Math.max(current.bestDistance, distance);
+            current.totalDistance += distance;
+            if (terminalHomeRun && phase == Phase.BALL_FLIGHT) {
+                current.homeRuns++;
+                if (suddenDeath) current.suddenDeathHomeRuns++;
+            }
         } else if (batterId != null && phase == Phase.BATTING) {
             results.computeIfAbsent(batterId, ignored -> new PlayerResult()).atBats++;
         }
@@ -1628,6 +1636,7 @@ public final class PlexballGame implements Listener {
         profile.wins = progressionData.getLong(root + "wins");
         profile.atBats = progressionData.getLong(root + "at-bats");
         profile.totalDistanceTenths = progressionData.getLong(root + "total-distance-tenths");
+        profile.bestDistanceTenths = progressionData.getLong(root + "best-distance-tenths");
         profile.catches = progressionData.getLong(root + "catches");
         profile.homeRuns = progressionData.getLong(root + "home-runs");
         profile.perfectHits = progressionData.getLong(root + "perfect-contacts");
@@ -1646,6 +1655,8 @@ public final class PlexballGame implements Listener {
             profile.atBats = before.atBats + match.atBats;
             profile.totalDistanceTenths = before.totalDistanceTenths
                     + PlexballProgressionRules.distanceToTenths(match.totalDistance);
+            profile.bestDistanceTenths = Math.max(before.bestDistanceTenths,
+                    PlexballProgressionRules.distanceToTenths(match.bestDistance));
             profile.catches = before.catches + match.catches;
             profile.homeRuns = before.homeRuns + match.homeRuns;
             profile.perfectHits = before.perfectHits + match.perfectContacts;
@@ -1654,6 +1665,7 @@ public final class PlexballGame implements Listener {
             progressionData.set(root + "wins", profile.wins);
             progressionData.set(root + "at-bats", profile.atBats);
             progressionData.set(root + "total-distance-tenths", profile.totalDistanceTenths);
+            progressionData.set(root + "best-distance-tenths", profile.bestDistanceTenths);
             progressionData.set(root + "catches", profile.catches);
             progressionData.set(root + "home-runs", profile.homeRuns);
             progressionData.set(root + "perfect-contacts", profile.perfectHits);
