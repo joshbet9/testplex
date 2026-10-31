@@ -1203,15 +1203,9 @@ public final class SuperSploorRuntime implements Listener {
     public void onDamage(EntityDamageEvent event) {
         if (!running || !(event.getEntity() instanceof Player target)
                 || !players.containsKey(target.getUniqueId())) return;
+        // Every real paint hit is resolved by ProjectileHitEvent or the kit's explicit
+        // melee-shaped paint action. Vanilla punches and swords must not bypass the kit system.
         event.setCancelled(true);
-        if (event instanceof EntityDamageByEntityEvent byEntity
-                && byEntity.getDamager() instanceof Player attacker) {
-            UUID attackerId = attacker.getUniqueId();
-            if (players.containsKey(attackerId) && teams.getOrDefault(attackerId, -1)
-                    != teams.getOrDefault(target.getUniqueId(), -2)) {
-                applyMark(attackerId, target.getUniqueId(), target);
-            }
-        }
     }
 
     private void applyMark(UUID attackerId, UUID targetId, Player target) {
@@ -1225,8 +1219,7 @@ public final class SuperSploorRuntime implements Listener {
         int count = SuperSploorRules.markCountAfterHit(marks.getOrDefault(targetId, 0));
         marks.put(targetId, count);
         lastHitAt.put(targetId, now);
-        nextMarkRecoveryAt.put(targetId, now + SuperSploorRules.MARK_RECOVERY_DELAY_MILLIS
-                + SuperSploorRules.MARK_RECOVERY_INTERVAL_MILLIS);
+        nextMarkRecoveryAt.put(targetId, now + SuperSploorRules.MARK_RECOVERY_DELAY_MILLIS);
         paintArmour(target, targetTeam, count);
         target.playEffect(org.bukkit.EntityEffect.HURT);
         target.getWorld().spawnParticle(Particle.DUST, target.getLocation().add(0.0D, 1.0D, 0.0D),
@@ -1273,7 +1266,9 @@ public final class SuperSploorRuntime implements Listener {
                 ChatColor.GRAY + "Respawning in 2.5 seconds", 0, 30, 5);
         target.getWorld().spawnParticle(Particle.SPLASH, target.getLocation().add(0.0D, 1.0D, 0.0D),
                 45, 0.7D, 0.8D, 0.7D, 0.1D);
-        announce(ChatColor.GRAY + target.getName() + " was splatted.");
+        Player killer = players.get(killerId);
+        announce(ChatColor.GRAY + target.getName()
+                + (killer == null ? " was splatted." : " was splatted by " + killer.getName() + "."));
         MutableStats victimStats = playerStats.get(targetId);
         if (victimStats != null) victimStats.deaths++;
         Set<UUID> helpers = contributors.remove(targetId);
@@ -1431,6 +1426,17 @@ public final class SuperSploorRuntime implements Listener {
         if (!running) return;
         running = false;
         IntConsumer callback = finishMatch;
+        for (Map.Entry<UUID, Player> entry : players.entrySet()) {
+            Player player = entry.getValue();
+            MutableStats stats = playerStats.get(entry.getKey());
+            if (player != null && player.isOnline() && stats != null) {
+                player.sendMessage(ChatColor.GOLD + "Your Super Sploor stats: "
+                        + ChatColor.WHITE + stats.territoryPainted + " territory | "
+                        + ChatColor.AQUA + stats.enemyTerritoryReclaimed + " reclaimed | "
+                        + ChatColor.RED + stats.splats + " splats | "
+                        + ChatColor.GREEN + stats.assists + " assists.");
+            }
+        }
         if (callback != null) callback.accept(winningTeam);
     }
 
