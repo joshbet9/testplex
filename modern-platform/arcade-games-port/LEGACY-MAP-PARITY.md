@@ -20,9 +20,12 @@ The enabled modern acceptance queue must contain every original 1.8 Testplex map
 | Dragon Escape | `Dragon Escape` | 30 |
 | Sheep Quest | `Sheep Quest` | 1 |
 | Turf Wars | `Turf Wars` | 42 |
+| Draw My Thing | `Draw My Thing` | 1 |
+| Master Builders | Generated 4×4 plots; no 1.8 source folder | — |
+| Sneaky Assassins | Generated town; no 1.8 source folder | — |
 | Dragons (Solo) | `Dragons` | 40 |
 | Runner | `Runner` | 22 |
-| **Total archived source assets** | | **357 ZIP files** |
+| **Total archived source assets** | | **358 ZIP files** |
 
 The counts are source archive files, not a claim that every archive has unique binary contents. All original filenames are retained and verified.
 
@@ -34,10 +37,10 @@ The counts are source archive files, not a claim that every archive has unique b
 
 ## Newly promoted games
 
-Super Sploor uses the original `Sploor/NanoGames_Excavation.zip` archive. Dragon Escape, Sheep Quest, Turf Wars, Dragons (Solo) and Runner are now also in the controlled queue: Dragon Escape contributes 30 original map archives, Sheep Quest contributes one, Turf Wars contributes 42, Dragons contributes 40, and Runner contributes 22. Only Dragons (Solo) is in scope; Dragons Teams remains excluded. Their original source archives are checked by the same enabled-game-derived CI policy, with the complete filename checks in `DRAGON-ESCAPE-ACCEPTANCE-PLAN.md`, `SHEEP-QUEST-ACCEPTANCE-PLAN.md`, `TURF-WARS-ACCEPTANCE-PLAN.md`, `DRAGONS-ACCEPTANCE-PLAN.md` and `RUNNER-ACCEPTANCE-PLAN.md`.
+Super Sploor uses the original `Sploor/NanoGames_Excavation.zip` archive. Dragon Escape, Sheep Quest, Turf Wars, Draw My Thing, Master Builders, Sneaky Assassins, Dragons (Solo) and Runner are now also in the controlled queue: Dragon Escape contributes 30 original map archives, Sheep Quest contributes one, Turf Wars contributes 42, Draw My Thing contributes one, Master Builders and Sneaky Assassins use explicit generated-arena exceptions, Dragons contributes 40, and Runner contributes 22. Only Dragons (Solo) is in scope; Dragons Teams remains excluded. Their original source archives are checked by the same enabled-game-derived CI policy, with the complete filename checks in `DRAGON-ESCAPE-ACCEPTANCE-PLAN.md`, `SHEEP-QUEST-ACCEPTANCE-PLAN.md`, `TURF-WARS-ACCEPTANCE-PLAN.md`, `DRAW-MY-THING-ACCEPTANCE-PLAN.md`, `MASTER-BUILDERS-ACCEPTANCE-PLAN.md`, `SNEAKY-ASSASSINS-ACCEPTANCE-PLAN.md`, `DRAGONS-ACCEPTANCE-PLAN.md` and `RUNNER-ACCEPTANCE-PLAN.md`.
 
 ## Build enforcement
 
 The Paper 26.3 build reads the packaged plugin's actual `enabled-games` list and resolves each enabled game's legacy map folders. It compares the sorted ZIP filenames in each source folder with the entries actually packaged under `source-maps/<folder>/` in `ArcadeMechanicsModern.jar`. A missing file, unexpected file, or enabled game without an explicit map-source policy fails CI.
 
-Dragon Escape, Sheep Quest, Turf Wars, Super Sploor, Dragons (Solo) and Runner receive the same exact filename comparison as every other enabled map-backed game. When a new game is enabled, its source-folder mapping must be added to the build policy and `SourceMapCatalog.mapFoldersFor`. If the game has no 1.8 map archive (as with Plexball's or Camera Shy's modern arena), that exception must be explicit rather than silently skipping the check.
+Dragon Escape, Sheep Quest, Turf Wars, Draw My Thing, Super Sploor, Dragons (Solo) and Runner receive the same exact filename comparison as every other enabled map-backed game. When a new game is enabled, its source-folder mapping must be added to the build policy and `SourceMapCatalog.mapFoldersFor`. If the game has no 1.8 map archive (as with Plexball, Camera Shy, Master Builders or Sneaky Assassins), that generated-arena exception must be explicit rather than silently skipping the check.
