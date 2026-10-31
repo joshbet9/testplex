@@ -257,11 +257,23 @@ public final class ModernArcadeLobby implements Listener {
                 plugin.getLogger().warning("Could not read Arcade lobby marker; validating the plane in place.");
             }
         }
-        complete = complete && world.getBlockAt(0, FLOOR_Y, 0).getType() == Material.GRASS_BLOCK
-                && world.getBlockAt(PLANE_MIN, FLOOR_Y, PLANE_MIN).getType() == Material.GRASS_BLOCK
-                && world.getBlockAt(PLANE_MAX_EXCLUSIVE - 1, FLOOR_Y, PLANE_MAX_EXCLUSIVE - 1).getType() == Material.GRASS_BLOCK;
-        if (!complete) {
-            plugin.getLogger().info("Building the legacy 100x100 Testplex lobby plane at Y=" + FLOOR_Y + ".");
+        complete = complete && hasExpectedPlane(world);
+        if (complete) return;
+
+        plugin.getLogger().info("Generating the legacy 100x100 Testplex lobby plane at Y=" + FLOOR_Y + ".");
+        int minChunk = Math.floorDiv(PLANE_MIN, 16);
+        int maxChunk = Math.floorDiv(PLANE_MAX_EXCLUSIVE - 1, 16);
+        for (int chunkX = minChunk; chunkX <= maxChunk; chunkX++) {
+            for (int chunkZ = minChunk; chunkZ <= maxChunk; chunkZ++) {
+                // New chunks are populated directly by VoidLobbyChunkGenerator.
+                world.getChunkAt(chunkX, chunkZ);
+            }
+        }
+
+        // Repair an older world created by the previous empty generator. New worlds
+        // should already be complete from ChunkData, making this fallback unnecessary.
+        if (!hasExpectedPlane(world)) {
+            plugin.getLogger().warning("Repairing an existing incomplete Arcade lobby plane.");
             for (int x = PLANE_MIN; x < PLANE_MAX_EXCLUSIVE; x++) {
                 for (int z = PLANE_MIN; z < PLANE_MAX_EXCLUSIVE; z++) {
                     world.getBlockAt(x, FLOOR_Y - 2, z).setType(Material.BEDROCK, false);
@@ -269,14 +281,46 @@ public final class ModernArcadeLobby implements Listener {
                     world.getBlockAt(x, FLOOR_Y, z).setType(Material.GRASS_BLOCK, false);
                 }
             }
-            try {
-                Files.writeString(marker, LOBBY_MARKER + System.lineSeparator()
-                        + "X/Z -50..49; grass surface Y=100; bedrock void guard at Y=98.",
-                        StandardCharsets.UTF_8);
-            } catch (IOException exception) {
-                plugin.getLogger().warning("Could not mark generated Arcade lobby plane: " + exception.getMessage());
+        }
+        if (!hasExpectedPlane(world)) {
+            throw new IllegalStateException("The dedicated Testplex Arcade world did not generate its 100x100 platform.");
+        }
+        try {
+            Files.writeString(marker, LOBBY_MARKER + System.lineSeparator()
+                    + "X/Z -50..49; grass surface Y=100; bedrock void guard at Y=98.",
+                    StandardCharsets.UTF_8);
+        } catch (IOException exception) {
+            plugin.getLogger().warning("Could not mark generated Arcade lobby plane: " + exception.getMessage());
+        }
+    }
+
+    private boolean hasExpectedPlane(World world) {
+        int max = PLANE_MAX_EXCLUSIVE - 1;
+        int[][] samples = {
+                {PLANE_MIN, PLANE_MIN}, {PLANE_MIN, max}, {max, PLANE_MIN},
+                {max, max}, {0, 0}
+        };
+        for (int[] sample : samples) {
+            int x = sample[0], z = sample[1];
+            if (world.getBlockAt(x, FLOOR_Y - 2, z).getType() != Material.BEDROCK
+                    || world.getBlockAt(x, FLOOR_Y - 1, z).getType() != Material.STONE
+                    || world.getBlockAt(x, FLOOR_Y, z).getType() != Material.GRASS_BLOCK) {
+                return false;
             }
         }
+        return true;
+    }
+
+    static boolean isInsidePlane(int x, int z) {
+        return x >= PLANE_MIN && x < PLANE_MAX_EXCLUSIVE
+                && z >= PLANE_MIN && z < PLANE_MAX_EXCLUSIVE;
+    }
+
+    static Material planeLayerMaterial(int y) {
+        if (y == FLOOR_Y - 2) return Material.BEDROCK;
+        if (y == FLOOR_Y - 1) return Material.STONE;
+        if (y == FLOOR_Y) return Material.GRASS_BLOCK;
+        return null;
     }
 
     private void ensureDatapoints(World world) {
@@ -370,7 +414,20 @@ public final class ModernArcadeLobby implements Listener {
     private static final class VoidLobbyChunkGenerator extends ChunkGenerator {
         @Override
         public ChunkData generateChunkData(World world, Random random, int x, int z, BiomeGrid biome) {
-            return createChunkData(world);
+            ChunkData data = createChunkData(world);
+            for (int localX = 0; localX < 16; localX++) {
+                int blockX = x * 16 + localX;
+                if (blockX < PLANE_MIN || blockX >= PLANE_MAX_EXCLUSIVE) continue;
+                for (int localZ = 0; localZ < 16; localZ++) {
+                    int blockZ = z * 16 + localZ;
+                    if (!isInsidePlane(blockX, blockZ)) continue;
+                    for (int y = FLOOR_Y - 2; y <= FLOOR_Y; y++) {
+                        Material layer = planeLayerMaterial(y);
+                        if (layer != null) data.setBlock(localX, y, localZ, layer);
+                    }
+                }
+            }
+            return data;
         }
 
         @Override
