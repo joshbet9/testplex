@@ -8,10 +8,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeCatalogTest {
     @Test
-    void registersAllTwentyFourArcadeGames() {
+    void registersAllTwentyFiveArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(24, catalog.size());
-        assertEquals(24, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+        assertEquals(25, catalog.size());
+        assertEquals(25, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
     }
 
     @Test
@@ -118,7 +118,7 @@ class ArcadeCatalogTest {
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
         assertEquals(3, readyForTest);
-        assertEquals(21, inProgress);
+        assertEquals(22, inProgress);
     }
 
     @Test
@@ -168,6 +168,18 @@ class ArcadeCatalogTest {
             assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus(), id);
             assertFalse(game.isReadyForTest(), id);
         }
+    }
+
+    @Test
+    void cameraShyIsCataloguedAsAnInProgressFreeForAllGame() {
+        GameDefinition game = new ArcadeCatalog().getGame("camera-shy");
+        assertNotNull(game);
+        assertEquals("Camera Shy", game.getName());
+        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus());
+        assertFalse(game.isReadyForTest());
+        assertTrue(game.getDescription().contains("five exposures"));
+        assertEquals(List.of("last-photographer-standing"),
+                game.getWinEffects().stream().map(CosmeticOption::getId).toList());
     }
 
     @Test

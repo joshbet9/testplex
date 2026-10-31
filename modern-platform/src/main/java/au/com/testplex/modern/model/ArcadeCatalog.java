@@ -322,6 +322,13 @@ public final class ArcadeCatalog {
                 List.of(),
                 win("last-assassin-standing", "Last Assassin Standing",
                         "A simple survivor podium; no additional game-specific cosmetics are claimed yet.")));
+
+        register(game("camera-shy", "Camera Shy", "SPYGLASS",
+                "Photograph opponents with a spyglass while avoiding five exposures yourself. Last photographer standing wins.",
+                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                List.of(),
+                win("last-photographer-standing", "Last Photographer Standing",
+                        "The winner is celebrated as the last photographer remaining in the maze.")));
     }
 
     private void register(GameDefinition definition) {
