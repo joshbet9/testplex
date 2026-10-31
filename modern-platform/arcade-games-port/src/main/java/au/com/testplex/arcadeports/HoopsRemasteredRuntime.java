@@ -552,6 +552,10 @@ public final class HoopsRemasteredRuntime implements Listener {
         }
         ball.display.teleport(ball.location);
         for (Player player : alivePlayers(current)) {
+            // A pass begins at the thrower's eye position. Do not let the
+            // thrower immediately reclaim that same active pass on the first
+            // physics tick; possession must transfer to another player.
+            if (ball.mode == BallMode.PASS && player.getUniqueId().equals(ball.shooterId)) continue;
             Location catchPoint = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
             if (catchPoint.distanceSquared(ball.location) > 2.25D) continue;
             boolean rebound = ball.reboundEligible;
