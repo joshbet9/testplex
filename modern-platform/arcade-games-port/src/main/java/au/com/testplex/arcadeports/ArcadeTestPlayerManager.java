@@ -42,6 +42,8 @@ final class ArcadeTestPlayerManager {
     private final NamespacedKey markerKey;
     private final Map<UUID, Object> activeHandles = new LinkedHashMap<>();
     private final Map<UUID, Player> activePlayers = new LinkedHashMap<>();
+    private List<Object> pendingHandles = List.of();
+    private Object pendingApi;
     private BukkitTask pendingSpawnTask;
     private boolean shuttingDown;
 
@@ -50,7 +52,7 @@ final class ArcadeTestPlayerManager {
         this.markerKey = new NamespacedKey(host, "session-test-player");
     }
 
-    int additionalPlayersNeeded(int humanPlayers) {
+    static int additionalPlayersNeeded(int humanPlayers) {
         return Math.max(0, TARGET_ROSTER_SIZE - Math.max(0, humanPlayers));
     }
 
@@ -166,14 +168,15 @@ final class ArcadeTestPlayerManager {
             return;
         }
 
+        pendingHandles = List.copyOf(handles);
+        pendingApi = api;
         final int timeoutTicks = 200;
         final int[] elapsed = {0};
         pendingSpawnTask = Bukkit.getScheduler().runTaskTimer(host, () -> {
             if (shuttingDown) {
                 cancelPendingSpawn();
-                for (Object handle : handles) {
-                    try { despawn(api, handle); } catch (Exception ignored) { }
-                }
+                despawnBatch(api, handles);
+                clearPendingHandles();
                 completion.accept(new SpawnResult(List.of(), "Testplex is shutting down."));
                 return;
             }
@@ -192,9 +195,8 @@ final class ArcadeTestPlayerManager {
                 }
             } catch (Exception exception) {
                 cancelPendingSpawn();
-                for (Object handle : handles) {
-                    try { despawn(api, handle); } catch (Exception ignored) { }
-                }
+                despawnBatch(api, handles);
+                clearPendingHandles();
                 completion.accept(new SpawnResult(List.of(),
                         "FakePlayerPlugin created an incomplete player batch: " + rootMessage(exception)));
                 return;
@@ -203,6 +205,8 @@ final class ArcadeTestPlayerManager {
             elapsed[0]++;
             if (allReady && ready.size() == handles.size()) {
                 cancelPendingSpawn();
+                pendingHandles = List.of();
+                pendingApi = null;
                 for (int i = 0; i < handles.size(); i++) {
                     Player player = ready.get(i);
                     Object handle = handles.get(i);
@@ -215,9 +219,8 @@ final class ArcadeTestPlayerManager {
 
             if (elapsed[0] >= timeoutTicks) {
                 cancelPendingSpawn();
-                for (Object handle : handles) {
-                    try { despawn(api, handle); } catch (Exception ignored) { }
-                }
+                despawnBatch(api, handles);
+                clearPendingHandles();
                 completion.accept(new SpawnResult(List.of(),
                         "Timed out waiting for all " + handles.size()
                                 + " server-side fake players to complete their join lifecycle."));
@@ -241,33 +244,34 @@ final class ArcadeTestPlayerManager {
 
     void despawnSessionPlayers() {
         cancelPendingSpawn();
-        if (activeHandles.isEmpty()) {
-            activePlayers.clear();
-            return;
+        Object api = pendingApi;
+        if (api == null && (!activeHandles.isEmpty() || !pendingHandles.isEmpty())) {
+            try { api = api(); } catch (Exception ignored) { }
         }
-        try {
-            Object api = api();
-            for (Object handle : new ArrayList<>(activeHandles.values())) {
-                try {
-                    invoke(api, "despawnBot", new Class<?>[] {handle.getClass().getInterfaces()[0]}, handle);
-                } catch (Exception firstFailure) {
-                    // Use the API's public FppBot parameter type when the implementation
-                    // class exposes additional interfaces or a generated proxy.
-                    try {
-                        Method method = findSingleArgumentMethod(api.getClass(), "despawnBot", handle);
-                        method.invoke(api, handle);
-                    } catch (Exception secondFailure) {
-                        host.getLogger().warning("Could not despawn a Testplex fake player: "
-                                + rootMessage(secondFailure));
-                    }
-                }
+        if (api != null) {
+            despawnBatch(api, new ArrayList<>(pendingHandles));
+            despawnBatch(api, new ArrayList<>(activeHandles.values()));
+        }
+        clearPendingHandles();
+        activeHandles.clear();
+        activePlayers.clear();
+    }
+
+    private void despawnBatch(Object api, Collection<?> handles) {
+        if (api == null || handles == null) return;
+        for (Object handle : handles) {
+            try {
+                despawn(api, handle);
+            } catch (Exception exception) {
+                host.getLogger().warning("Could not despawn a Testplex fake player: "
+                        + rootMessage(exception));
             }
-        } catch (Exception exception) {
-            host.getLogger().warning("Could not clean up Testplex fake players: " + rootMessage(exception));
-        } finally {
-            activeHandles.clear();
-            activePlayers.clear();
         }
+    }
+
+    private void clearPendingHandles() {
+        pendingHandles = List.of();
+        pendingApi = null;
     }
 
     void shutdown() {
