@@ -103,7 +103,10 @@ class SourceMapCatalogWizardsPoolTest {
         SourceMapCatalog.ChunkBounds bounds =
                 SourceMapCatalog.chunkBoundsFromRegionHeader(1, -2, header);
 
-        assertEquals(new SourceMapCatalog.ChunkBounds(32, 33, -64, -63, 2), bounds);
+        assertEquals(new SourceMapCatalog.ChunkBounds(
+                32, 33, -64, -63, 2,
+                List.of(new SourceMapCatalog.ChunkCoordinate(32, -64),
+                        new SourceMapCatalog.ChunkCoordinate(33, -63))), bounds);
     }
 
     @Test
