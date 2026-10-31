@@ -27,7 +27,7 @@ jobs:
   build-modern-arcade:
     name: Build and test Paper 26.3 plugin
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -51,6 +51,28 @@ jobs:
 
       - name: Build Arcade mechanics and the integrated Monster Maze module
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
+
+      - name: Build and run ephemeral Wizards Paper 26.3 source-map smoke harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_dir="modern-platform/arcade-games-port/src/test-runtime/wizards-paper-smoke"
+          mvn --batch-mode --no-transfer-progress -f "$smoke_dir/pom.xml" clean package
+          bash modern-platform/arcade-games-port/scripts/run-wizards-paper-smoke.sh \
+            modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar \
+            "$smoke_dir/target/WizardsPaperSmoke.jar" \
+            "$RUNNER_TEMP/wizards-paper-smoke"
+
+      - name: Upload Wizards Paper smoke results and server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wizards-paper-26.3-smoke-results
+          path: |
+            ${{ runner.temp }}/wizards-paper-smoke/plugins/WizardsSourceMapSmoke/results.tsv
+            ${{ runner.temp }}/wizards-paper-smoke/server.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Build the disabled Wizards 26.3 port and run spell-rule tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/wizards-port/pom.xml clean verify
