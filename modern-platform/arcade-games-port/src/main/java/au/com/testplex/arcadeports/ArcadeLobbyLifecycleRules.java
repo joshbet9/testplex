@@ -12,6 +12,9 @@ final class ArcadeLobbyLifecycleRules {
         if (players >= Math.ceil(safeCapacity * 0.75D)) return 30;
         return 60;
     }
+    /** Gameplay input is not accepted until the session's Prepare phase has ended. */
+    static boolean gameplayInputAllowed(boolean liveStarted) { return liveStarted; }
+
     static int prepareSeconds(int seconds) { return Math.max(3, Math.min(30, seconds)); }
     static int endPresentationSeconds(int seconds) { return Math.max(0, Math.min(30, seconds)); }
     static String countdownStatus(int seconds) { return "Starting in " + Math.max(0, seconds) + " Seconds"; }
