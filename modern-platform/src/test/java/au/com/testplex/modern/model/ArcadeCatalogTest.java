@@ -10,15 +10,15 @@ class ArcadeCatalogTest {
     @Test
     void registersAllTwentyFiveArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(25, catalog.size());
-        assertEquals(25, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+        assertEquals(26, catalog.size());
+        assertEquals(26, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
     }
 
     @Test
     void eachGameHasItsOwnCosmeticLinesAndWinEffects() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         for (GameDefinition game : catalog.getGames()) {
-            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen", "milk-the-cow", "wither-assault", "plexball").contains(game.getId());
+            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen", "milk-the-cow", "wither-assault", "plexball", "super-sploor").contains(game.getId());
             assertEquals(gameplayFirstPort, game.getCosmeticLines().isEmpty(),
                     game.getId() + " cosmetic lines should remain optional during this gameplay-first port");
             assertTrue(game.getWinEffects().size() >= (gameplayFirstPort ? 1 : 3),
@@ -49,6 +49,10 @@ class ArcadeCatalogTest {
         assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, heroesOfGwen.getPortStatus());
         assertFalse(castleAssault.isReadyForTest());
         assertFalse(heroesOfGwen.isReadyForTest());
+        GameDefinition superSploor = catalog.getGame("super-sploor");
+        assertNotNull(superSploor);
+        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, superSploor.getPortStatus());
+        assertFalse(superSploor.isReadyForTest());
     }
 
     @Test
@@ -116,7 +120,7 @@ class ArcadeCatalogTest {
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
         assertEquals(9, readyForTest);
-        assertEquals(16, inProgress);
+        assertEquals(17, inProgress);
     }
 
     @Test
