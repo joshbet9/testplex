@@ -320,6 +320,13 @@ public final class ArcadeCatalog {
                 List.of(),
                 win("last-assassin-standing", "Last Assassin Standing",
                         "A simple survivor podium; no additional game-specific cosmetics are claimed yet.")));
+
+        register(game("plexball", "Plexball", "SNOWBALL",
+                "Take turns hitting a ball off a tee while every non-batter tries to catch it. Longest uncaught hit wins.",
+                GameDefinition.PortStatus.READY_FOR_TEST,
+                List.of(),
+                win("home-run-stage", "Home Run Stage", "A 100-metre marker rises behind the winner."),
+                win("golden-glove", "Golden Glove", "A golden glove and ball form a compact victory display.")));
     }
 
     private void register(GameDefinition definition) {
