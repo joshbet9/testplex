@@ -361,7 +361,7 @@ verify_deployed_runtime() {
   write_manifest runtime_invocation_id "$invocation"
   write_manifest runtime_pid "$pid"
   write_manifest runtime_verified_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf 'Deployment already verified: target artifact SHA=%s; runtime SHA=%s; process identity=VERIFIED InvocationID=%s MainPID=%s; Paper and port 25568 ready.\\n' \
+  printf 'Deployment already verified: target artifact SHA=%s; runtime SHA=%s; process identity=VERIFIED InvocationID=%s MainPID=%s; Paper and port 25568 ready.\n' \
     "$target_sha" "$runtime_sha" "$invocation" "$pid"
 }
 
