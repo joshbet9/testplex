@@ -181,7 +181,7 @@ public final class ArcadeCatalog {
                 win("archer-halo", "Archer Halo", "An archer's halo draws around the winner")));
 
         register(game("paintball", "Paintball", "SNOWBALL", "Control lanes with paintball weapons and team colours.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(lineMulti("weapon-and-pellet-identity", "Weapon & Pellet Identity",
                         "Equip one visible weapon finish and one visible in-flight pellet style. Both are shown to all players.",
                         "CROSSBOW",
