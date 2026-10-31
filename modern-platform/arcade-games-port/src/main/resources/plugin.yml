@@ -9,8 +9,8 @@ softdepend:
   - packetevents
 commands:
   stats:
-    description: Open local Testplex Arcade statistics (optionally for an online player).
-    usage: /stats [player]
+    description: Open local Testplex Arcade statistics or Plexball career progression.
+    usage: /stats [player|plexball]
     aliases: [arcadestats]
   arcadeport:
     description: Start and test a modern Arcade game
