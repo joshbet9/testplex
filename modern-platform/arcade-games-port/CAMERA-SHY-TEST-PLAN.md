@@ -38,6 +38,12 @@
 - Match-scoped achievements reset each round; lifetime milestones and consecutive-win tracking persist in local Testplex config.
 - AFK Test Player objects never receive human progression records.
 
+## Player progression and stats
+- `/stats` or `/stats camera-shy` shows the viewer's Camera Shy lifetime record.
+- `/stats camera-shy <1-4>` pages through all 20 achievements; every ID appears exactly once.
+- `/stats <online-player> camera-shy [page]` can inspect another online test participant's record.
+- Each lifetime milestone displays current progress toward 250 wins, 500 eliminations or 1,000 photographs and marks completed thresholds.
+
 ## Regression checks
 - Starting Camera Shy while another Arcade game is running is rejected.
 - Starting another Arcade game while Camera Shy is live is rejected.
