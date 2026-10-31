@@ -379,7 +379,8 @@ jobs:
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20)
           echo "[deploy] opening an exclusive remote deployment lock."
-          timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" <<'REMOTE_DEPLOY'
+          deploy_exit=0
+          timeout --foreground --signal=TERM --kill-after=30s 28m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" "$UPLOAD_DIR" "$ACCEPT_EULA" <<'REMOTE_DEPLOY' || deploy_exit=$?
           set -euo pipefail
           BUILD_SHA="$1"
           UPLOAD_DIR="$2"
@@ -840,11 +841,61 @@ jobs:
             rollback
             exit 1
           fi
-          sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR"
+          # All new artifacts are assigned monstermaze ownership at installation time;
+          # source-map trees are chowned individually when copied. Do not recursively
+          # traverse the entire server directory here: it includes large survival/map
+          # worlds and plugin data and can stall SSH after the server is already ready.
+          sudo -n chown monstermaze:monstermaze "$SERVER_DIR" "$SERVER_DIR/plugins"
+
+          echo "[deploy] Verified Testplex Arcade runtime readiness identity:"
+          sudo -n awk -F= '$1 ~ /^(status|module|manager|world|plane|floor_y|source_sha|invocation_id|process_id)$/ { print }' "$readiness_file"
+          sudo -n grep -F 'TESTPLEX_ARCADE_LOBBY_READY' "$SERVER_DIR/logs/latest.log" | tail -n 1 || true
+
           sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-phase DEPLOYMENT_VERIFIED
           echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby; Death Tag and One in the Quiver are enabled for acceptance; Monster Maze registration is reported separately above; Snake, Wizards and all other unfinished game ports remain disabled; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "On successful deployment, testplex-reborn.service remains stopped if it was active during preflight; a failed deployment restores services that were active before preflight. Separate Monster Maze project services/data were not modified."
           REMOTE_DEPLOY
+
+          # If the remote transaction finishes but its SSH response is lost, verify
+          # the durable transaction and live Paper process through a fresh connection.
+          # Acquire the same deployment lock first, so this cannot race the original
+          # deployment process or accidentally accept an older build's journal.
+          if [[ "$deploy_exit" -ne 0 ]]; then
+            echo "[deploy] Primary SSH session exited $deploy_exit; checking completed deployment through a fresh connection."
+            verify_ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+              -o BatchMode=yes -o StrictHostKeyChecking=yes
+              -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+              -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3
+              -o TCPKeepAlive=yes)
+            deployment_verified=false
+            for attempt in 1 2 3 4 5 6 7 8; do
+              echo "[deploy] independent live verification attempt $attempt/8."
+              verification_output=""
+              if verification_output="$(timeout --foreground --signal=TERM --kill-after=15s 90s \
+                  ssh "${verify_ssh_opts[@]}" "$remote" \
+                  sudo -n flock -n /var/lock/testplex-modern-deploy.lock \
+                  /usr/local/sbin/testplex-modern-recovery --locked verify-deployment "$BUILD_SHA" 2>&1)"; then
+                printf '%s\n' "$verification_output"
+                if grep -Fq "Deployment already verified: target artifact SHA=$BUILD_SHA; runtime SHA=$BUILD_SHA; process identity=VERIFIED" \
+                    <<< "$verification_output"; then
+                  deployment_verified=true
+                  break
+                fi
+                echo "[deploy] Remote journal/runtime check did not attest this build; it will not be reported as a successful deployment." >&2
+                break
+              else
+                verify_exit=$?
+                printf '%s\n' "$verification_output" >&2
+                echo "[deploy] Fresh verification connection failed with exit $verify_exit." >&2
+              fi
+              sleep 5
+            done
+            if [[ "$deployment_verified" != true ]]; then
+              echo "[deploy] Original SSH exit=$deploy_exit; independent live deployment verification did not succeed. Failure recovery will handle any unresolved transaction." >&2
+              exit "$deploy_exit"
+            fi
+            echo "[deploy] Original SSH response was lost, but a fresh locked connection verified the target artifact and live Paper runtime."
+          fi
 
           echo "Modern deployment completed. Server directory: /home/monstermaze/servers/testplex-modern"
           echo "Service: testplex-modern.service (disabled at boot by default)"
@@ -943,7 +994,7 @@ jobs:
             -o BatchMode=yes -o StrictHostKeyChecking=yes
             -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
             -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=8)
-          timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" bash -s -- "$BUILD_SHA" <<'REMOTE_STAGE_CLEANUP'
+          timeout --foreground --signal=TERM --kill-after=15s 3m ssh "${ssh_opts[@]}" "$remote" sudo -n flock -n /var/lock/testplex-modern-deploy.lock bash -s -- "$BUILD_SHA" <<'REMOTE_STAGE_CLEANUP'
           set -euo pipefail
           build_sha="$1"
           if [[ "$build_sha" =~ ^[0-9a-f]{40}$ ]]; then

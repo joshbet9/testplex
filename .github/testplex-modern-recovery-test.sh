@@ -240,13 +240,44 @@ write_txn REPLACING true true
 if run_helper recover cccccccccccccccccccccccccccccccccccccccc >/dev/null 2>&1; then echo 'FAIL mismatched deployment identity accepted' >&2; exit 1; fi
 echo 'PASS deployment identity fences independent recovery'
 
-# A deployment already marked healthy is never rolled back when its SSH response was lost.
+# A deployment marked complete is only accepted after a fresh process/port/Arcade-readiness check.
 write_txn DEPLOYMENT_VERIFIED true true
 printf 'successful target artifact\n' > "$SERVER/plugins/ArcadeMechanicsModern/plugin.dat"
+printf '%s\n' "$target_sha" > "$SERVER/.testplex-modern-deployed-build"
+printf 'deployed Paper artifact\n' > "$SERVER/paper.jar"
+nonce=123e4567-e89b-12d3-a456-426614174000
+printf 'source_sha=%s\nnonce=%s\n' "$target_sha" "$nonce" > "$SERVER/plugins/ArcadeMechanicsModern/.testplex-modern-deploy-identity.properties"
+printf 'status=READY\nmodule=arcade-lobby\nmanager=testplex-arcade\nworld=testplex_arcade_lobby_v1\nplane=100x100\nfloor_y=100\nsource_sha=%s\nnonce=%s\ninvocation_id=0123456789abcdef0123456789abcdef\nprocess_id=4242\n' "$target_sha" "$nonce" > "$SERVER/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties"
+printf active > "$TESTPLEX_STUB_ACTIVE"
+printf 'Paper server Done (3.0s)!\n' >> "$SERVER/logs/latest.log"
+output="$(run_helper verify-deployment "$target_sha")"
+grep -q "Deployment already verified: target artifact SHA=$target_sha; runtime SHA=$target_sha; process identity=VERIFIED" <<< "$output"
 output="$(run_helper recover "$target_sha")"
-grep -q '^Deployment already verified:' <<< "$output"
+grep -q "Deployment already verified: target artifact SHA=$target_sha; runtime SHA=$target_sha; process identity=VERIFIED" <<< "$output"
+grep -Fxq "runtime_sha=$target_sha" "$STATE/current.properties"
 assert_file_text "$SERVER/plugins/ArcadeMechanicsModern/plugin.dat" 'successful target artifact'
-echo 'PASS successful deployment is not rolled back after a lost SSH response'
+echo 'PASS completed deployment requires fresh live runtime attestation after lost SSH response'
+
+# A terminal journal record alone cannot make a stopped server look successfully deployed.
+rm -f "$TESTPLEX_STUB_ACTIVE"
+if run_helper verify-deployment "$target_sha" >/dev/null 2>&1; then
+  echo 'FAIL a terminal deployment journal was accepted while Paper was stopped' >&2; exit 1
+fi
+if run_helper recover "$target_sha" >/dev/null 2>&1; then
+  echo 'FAIL recovery claimed a completed deployment while Paper was stopped' >&2; exit 1
+fi
+assert_file_text "$SERVER/plugins/ArcadeMechanicsModern/plugin.dat" 'successful target artifact'
+printf active > "$TESTPLEX_STUB_ACTIVE"
+output="$(run_helper verify-deployment "$target_sha")"
+grep -q "runtime SHA=$target_sha; process identity=VERIFIED" <<< "$output"
+echo 'PASS a deployment journal is not treated as live health when its service is down'
+
+# Reset the simulated server to its prior deployed baseline for the remaining recovery cases.
+printf '%s\n' "$old_sha" > "$SERVER/.testplex-modern-deployed-build"
+printf 'old paper\n' > "$SERVER/paper.jar"
+printf 'old plugin payload\n' > "$SERVER/plugins/ArcadeMechanicsModern/plugin.dat"
+printf 'source_sha=%s\nnonce=%s\n' "$old_sha" "$nonce" > "$SERVER/plugins/ArcadeMechanicsModern/.testplex-modern-deploy-identity.properties"
+printf 'status=READY\nmodule=arcade-lobby\nmanager=testplex-arcade\nworld=testplex_arcade_lobby_v1\nplane=100x100\nfloor_y=100\nsource_sha=%s\nnonce=%s\ninvocation_id=0123456789abcdef0123456789abcdef\nprocess_id=4242\n' "$old_sha" "$nonce" > "$SERVER/plugins/ArcadeMechanicsModern/.testplex-arcade-readiness.properties"
 
 # A PREPARING transaction can recover a Modern service stopped by locked preflight.
 write_txn PREPARING true false
