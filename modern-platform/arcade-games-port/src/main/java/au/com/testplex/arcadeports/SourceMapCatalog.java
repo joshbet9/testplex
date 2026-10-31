@@ -1020,14 +1020,20 @@ public final class SourceMapCatalog {
         if (plugin == null || resource == null || world == null) return null;
         MapData original = readResource(plugin, resource, world);
         if (original != null && original.hasBounds() && !original.spawnLocations().isEmpty()) {
-            List<Location> chestMarkers = original.customLocations("54");
+            List<Location> chestMarkers = new ArrayList<>(original.customLocations("54"));
             if (chestMarkers.isEmpty()) chestMarkers = findWizardsChestBlocks(world, original);
-            if (chestMarkers.isEmpty()) {
-                chestMarkers = findSafeSurfaceLocations(world, original, 32, 0.18D);
+            if (chestMarkers.size() < 8) {
+                List<Location> replacements = findSafeSurfaceLocations(world, original, 32, 0.18D);
+                for (Location replacement : replacements) addDistinctSafeLocation(chestMarkers, replacement, 8.0D);
                 plugin.getLogger().warning("Wizards map " + resource
-                        + " has no recoverable chest blocks; placing test-only replacement chests.");
+                        + " needed replacement test chests to reach the minimum of eight usable loot chests.");
             }
-            if (!chestMarkers.isEmpty()) original.customLocations.put("54", chestMarkers);
+            if (chestMarkers.size() < 8) {
+                plugin.getLogger().warning("Wizards map " + resource
+                        + " could not provide eight usable chest positions; rejecting the source archive.");
+                return null;
+            }
+            original.customLocations.put("54", chestMarkers);
             return original;
         }
 
@@ -1058,17 +1064,18 @@ public final class SourceMapCatalog {
         inferred.teamSpawns.put("INFERRED_TEST_STARTS", spawns);
 
         List<Location> chests = findWizardsChestBlocks(world, inferred, bounds.populatedChunks());
-        if (chests.isEmpty()) {
-            chests = findSafeSurfaceLocations(world, inferred, 32, 0.16D);
+        if (chests.size() < 8) {
+            List<Location> replacements = findSafeSurfaceLocations(world, inferred, 32, 0.16D);
+            for (Location replacement : replacements) addDistinctSafeLocation(chests, replacement, 8.0D);
             plugin.getLogger().warning("Wizards archive " + resource
-                    + " contains no recoverable chest blocks; placing " + chests.size()
-                    + " test-only replacement chests on safe terrain.");
+                    + " contains fewer than eight recoverable chest blocks; added test-only replacement chests.");
         }
         if (chests.size() < 8) {
             plugin.getLogger().warning("Wizards archive " + resource
-                    + " has only " + chests.size() + " recovered/replacement chest positions.");
+                    + " yielded only " + chests.size() + " usable chest positions; rejecting the source archive.");
+            return null;
         }
-        if (!chests.isEmpty()) inferred.customLocations.put("54", chests);
+        inferred.customLocations.put("54", chests);
 
         plugin.getLogger().warning("Using inferred Wizards test metadata for " + resource
                 + ": bounds derived from " + bounds.activeChunks() + " populated chunks, "
@@ -1251,7 +1258,8 @@ public final class SourceMapCatalog {
             if (chunkMinX > data.maxX || chunkMinX + 15 < data.minX
                     || chunkMinZ > data.maxZ || chunkMinZ + 15 < data.minZ) continue;
 
-            org.bukkit.ChunkSnapshot snapshot = world.getChunkAt(coordinate.x(), coordinate.z()).getChunkSnapshot();
+            org.bukkit.ChunkSnapshot snapshot = world.getChunkAt(coordinate.x(), coordinate.z())
+                    .getChunkSnapshot(true, false, false);
             for (int localX = 0; localX < 16; localX++) {
                 int x = chunkMinX + localX;
                 if (x < data.minX || x > data.maxX) continue;
