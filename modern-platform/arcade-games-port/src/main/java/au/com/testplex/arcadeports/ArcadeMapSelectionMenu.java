@@ -43,6 +43,63 @@ public final class ArcadeMapSelectionMenu implements Listener {
         openMapSelection(player, game, 0);
     }
 
+    /** Nano Wizards shares the original Arcade Wizards map pool. */
+    public void openWizardsMapSelection(Player player) {
+        openWizardsMapSelection(player, 0);
+    }
+
+    private void openWizardsMapSelection(Player player, int requestedPage) {
+        List<SourceMapCatalog.MapArchive> maps = SourceMapCatalog.mapsForFolders(
+                plugin, "wizards", List.of("Wizards", "Nano Wizards"));
+        Inventory inventory = Bukkit.createInventory(null, 54, TITLE);
+        ItemStack back = createItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back",
+                ChatColor.GRAY + "Return to the Testplex Set Game page.");
+        markCustom(back, "back", "wizards", null);
+        inventory.setItem(4, back);
+
+        if (maps.isEmpty()) {
+            inventory.setItem(22, createItem(Material.BARRIER, ChatColor.RED + "No Wizards Source Maps Found",
+                    ChatColor.GRAY + "No Wizards ZIPs were found in the plugin or server map directory.",
+                    ChatColor.GRAY + "Set source-maps.directory in the plugin config to the existing update/maps folder.",
+                    ChatColor.GRAY + "Both Wizards and Nano Wizards folders are scanned."));
+            player.openInventory(inventory);
+            return;
+        }
+
+        int pageCount = Math.max(1, (maps.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+        int page = Math.max(0, Math.min(requestedPage, pageCount - 1));
+        String selected = SourceMapCatalog.selectedResourceForFolders(plugin, "wizards",
+                List.of("Wizards", "Nano Wizards"));
+        int start = page * PAGE_SIZE;
+        int end = Math.min(maps.size(), start + PAGE_SIZE);
+        int slot = FIRST_MAP_SLOT;
+        for (int index = start; index < end; index++) {
+            SourceMapCatalog.MapArchive map = maps.get(index);
+            boolean isSelected = map.resource().equals(selected);
+            ItemStack item = createItem(Material.PAPER,
+                    (isSelected ? ChatColor.GREEN + "✓ " : ChatColor.YELLOW.toString()) + map.displayName(),
+                    ChatColor.GRAY + "Source: Mineplex Wizards/Nano Wizards",
+                    ChatColor.YELLOW + "Left-click to select this source map.",
+                    isSelected ? ChatColor.GREEN + "Currently selected" : ChatColor.DARK_GRAY + map.resource());
+            markCustom(item, "select-map", "wizards", map.resource());
+            inventory.setItem(slot++, item);
+        }
+        inventory.setItem(49, createItem(Material.MAP,
+                ChatColor.AQUA + "Page " + (page + 1) + "/" + pageCount,
+                ChatColor.GRAY.toString() + maps.size() + " Wizards source maps available."));
+        if (page > 0) {
+            ItemStack previous = createItem(Material.ARROW, ChatColor.YELLOW + "Previous Page");
+            markPageCustom(previous, "previous-page", "wizards", page - 1);
+            inventory.setItem(45, previous);
+        }
+        if (page + 1 < pageCount) {
+            ItemStack next = createItem(Material.ARROW, ChatColor.YELLOW + "Next Page");
+            markPageCustom(next, "next-page", "wizards", page + 1);
+            inventory.setItem(53, next);
+        }
+        player.openInventory(inventory);
+    }
+
     /** Monster Maze maps are physical source worlds owned by its in-process game module. */
     private void openMonsterMazeMapSelection(Player player, int requestedPage) {
         if (!(plugin instanceof ArcadeMechanicsModernPlugin arcade)
@@ -175,7 +232,19 @@ public final class ArcadeMapSelectionMenu implements Listener {
         String resource = meta.getPersistentDataContainer().get(resourceKey, PersistentDataType.STRING);
         ArcadePortGame game = ArcadePortGame.fromId(gameId);
 
-        if ("back".equals(action)) {
+        if ("wizards".equalsIgnoreCase(gameId)
+                && ("previous-page".equals(action) || "next-page".equals(action))) {
+            Integer page = meta.getPersistentDataContainer().get(pageKey, PersistentDataType.INTEGER);
+            if (page != null) openWizardsMapSelection(player, page);
+        } else if ("select-map".equals(action) && "wizards".equalsIgnoreCase(gameId) && resource != null
+                && SourceMapCatalog.mapsForFolders(plugin, "wizards", List.of("Wizards", "Nano Wizards")).stream()
+                        .anyMatch(map -> map.resource().equals(resource))) {
+            plugin.getConfig().set("selected-maps.wizards", resource);
+            plugin.saveConfig();
+            player.sendMessage(ChatColor.GREEN + "Selected Wizards map " + SourceMapCatalog.displayName(plugin, resource)
+                    + ". It will load for the next Wizards match.");
+            player.closeInventory();
+        } else if ("back".equals(action)) {
             player.performCommand("setgame");
         } else if ("previous-page".equals(action) || "next-page".equals(action)) {
             Integer page = meta.getPersistentDataContainer().get(pageKey, PersistentDataType.INTEGER);
@@ -234,6 +303,21 @@ public final class ArcadeMapSelectionMenu implements Listener {
 
     private void markPage(ItemStack item, String action, ArcadePortGame game, int page) {
         mark(item, action, game, null);
+        ItemMeta meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(pageKey, PersistentDataType.INTEGER, page);
+        item.setItemMeta(meta);
+    }
+
+    private void markCustom(ItemStack item, String action, String gameId, String resource) {
+        ItemMeta meta = item.getItemMeta();
+        meta.getPersistentDataContainer().set(actionKey, PersistentDataType.STRING, action);
+        meta.getPersistentDataContainer().set(gameKey, PersistentDataType.STRING, gameId);
+        if (resource != null) meta.getPersistentDataContainer().set(resourceKey, PersistentDataType.STRING, resource);
+        item.setItemMeta(meta);
+    }
+
+    private void markPageCustom(ItemStack item, String action, String gameId, int page) {
+        markCustom(item, action, gameId, null);
         ItemMeta meta = item.getItemMeta();
         meta.getPersistentDataContainer().set(pageKey, PersistentDataType.INTEGER, page);
         item.setItemMeta(meta);

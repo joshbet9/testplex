@@ -55,6 +55,9 @@
                     <include>Skywars/**/*.zip</include>
                     <include>Turf Wars/**/*.zip</include>
                     <include>Milk the Cow/**/*.zip</include>
+                    <!-- Nano Wizards intentionally reuses the original Arcade Wizards map folder. -->
+                    <include>Wizards/**/*.zip</include>
+                    <include>Nano Wizards/**/*.zip</include>
                 </includes>
             </resource>
             <resource>

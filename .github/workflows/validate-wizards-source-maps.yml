@@ -1,0 +1,49 @@
+name: Validate Wizards Source Maps
+
+on:
+  pull_request:
+    paths:
+      - "modern-platform/arcade-games-port/scripts/validate-wizards-source-maps.py"
+      - "modern-platform/arcade-games-port/docs/wizards-source-map-catalogue.md"
+      - ".github/workflows/validate-wizards-source-maps.yml"
+  push:
+    branches:
+      - "**"
+    paths:
+      - "modern-platform/arcade-games-port/scripts/validate-wizards-source-maps.py"
+      - "modern-platform/arcade-games-port/docs/wizards-source-map-catalogue.md"
+      - ".github/workflows/validate-wizards-source-maps.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-wizards-source-maps:
+    name: Download and inspect original map archives
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Download and validate standard and Nano Wizards archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 modern-platform/arcade-games-port/scripts/validate-wizards-source-maps.py \
+            --output-dir "$RUNNER_TEMP/wizards-source-map-validation"
+
+      - name: Upload metadata-only validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wizards-source-map-validation
+          path: ${{ runner.temp }}/wizards-source-map-validation/
+          if-no-files-found: ignore
+          retention-days: 14
