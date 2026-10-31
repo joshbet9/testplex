@@ -34,6 +34,32 @@ class GamePreferenceRotationTest {
     }
 
     @Test
+    void preferenceDisplayMatchesTheNoRepeatSelectorOdds() {
+        Map<String, Double> probabilities = new LinkedHashMap<>();
+        probabilities.put("previous", 0.75D);
+        probabilities.put("next-a", 0.20D);
+        probabilities.put("next-b", 0.05D);
+
+        Map<String, Double> effective = GamePreferenceRotation.effectiveProbabilities(
+                probabilities, "previous", true);
+        assertEquals(0.0D, effective.get("previous"), 0.0000001D);
+        assertEquals(0.8D, effective.get("next-a"), 0.0000001D);
+        assertEquals(0.2D, effective.get("next-b"), 0.0000001D);
+        assertEquals(1.0D, effective.values().stream().mapToDouble(Double::doubleValue).sum(), 0.0000001D);
+    }
+
+    @Test
+    void keepsPreviousGameOddsWhenNoAlternativeHasPositiveWeight() {
+        Map<String, Double> probabilities = new LinkedHashMap<>();
+        probabilities.put("previous", 1.0D);
+        probabilities.put("zero", 0.0D);
+        Map<String, Double> effective = GamePreferenceRotation.effectiveProbabilities(
+                probabilities, "previous", true);
+        assertEquals(1.0D, effective.get("previous"), 0.0000001D);
+        assertEquals(0.0D, effective.get("zero"), 0.0000001D);
+    }
+
+    @Test
     void permitsThePreviousGameWhenItIsTheOnlyAvailableCandidate() {
         assertEquals("only-game", GamePreferenceRotation.chooseWeightedGameId(
                 Map.of("only-game", 1.0D), "only-game", true, 0.5D));
