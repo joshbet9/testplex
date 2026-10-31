@@ -13636,6 +13636,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void stop(String reason) {
+        // A stop during asynchronous fake-player login must release the start gate too.
+        testPlayerStartPending = false;
         if (pendingStart != null) {
             pendingStart.cancel();
             pendingStart = null;
