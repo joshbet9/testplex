@@ -564,7 +564,10 @@ public final class WizardsGameManager implements Listener {
             return;
         }
         WizardState state = states.get(id);
-        if (running && state != null && state.alive) {
+        if (running && state != null) {
+            // Eliminated spectators must be able to leave just like living players.
+            // Their progress is persisted here because they are removed from states
+            // before the match-wide finish pass can record it.
             state.alive = false;
             WizardsProgressStore.increment(plugin.getConfig(), id, "kills", state.kills);
             WizardsProgressStore.increment(plugin.getConfig(), id, "spells-bound", state.spellsBound);
@@ -575,7 +578,7 @@ public final class WizardsGameManager implements Listener {
             Bukkit.getScheduler().runTask(plugin, this::checkWinner);
             return;
         }
-        player.sendMessage(ChatColor.GRAY + "You are not queued or alive in a Wizards round.");
+        player.sendMessage(ChatColor.GRAY + "You are not queued or in a Wizards round.");
     }
 
     public String status() {
@@ -1303,7 +1306,11 @@ public final class WizardsGameManager implements Listener {
                     event.setCancelled(true);
                     return;
                 }
-                if ("web-shot".equals(projectileSpell) || "ice-prison".equals(projectileSpell)) {
+                if ("web-shot".equals(projectileSpell) || "ice-prison".equals(projectileSpell)
+                        || "fireball".equals(projectileSpell)) {
+                    // Fireball damage is resolved once by the custom impact/AOE
+                    // handler below; allowing vanilla's direct hit as well would
+                    // damage the direct target twice.
                     event.setCancelled(true);
                     return;
                 }
@@ -1577,7 +1584,7 @@ public final class WizardsGameManager implements Listener {
         PlayerInventory inventory = player.getInventory();
         for (int slot = MAX_WAND_SLOTS; slot < inventory.getSize(); slot++) {
             ItemStack item = inventory.getItem(slot);
-            if (item != null && !item.getType().isAir()) drop(player, item.clone());
+            if (item != null && !item.getType().isAir() && !isMenuBook(item)) drop(player, item.clone());
         }
         for (ItemStack armour : inventory.getArmorContents()) {
             if (armour != null && !armour.getType().isAir()) drop(player, armour.clone());
