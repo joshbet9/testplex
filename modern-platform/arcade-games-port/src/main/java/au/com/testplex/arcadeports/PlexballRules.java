@@ -51,6 +51,14 @@ public final class PlexballRules {
                 (int) Math.round(pingEstimateMillis / 100.0D)));
     }
 
+    /**
+     * Catch input may only be evaluated against ball positions already recorded
+     * by the server. A player event can run before the current tick's ball update.
+     */
+    public static long catchEvaluationThroughTick(long serverTick, long latestBallHistoryTick) {
+        return Math.min(serverTick, latestBallHistoryTick);
+    }
+
     /** Distance, in ticks, from the centre of the current randomly phased beat. */
     public static int timingDistanceTicks(long inputTick, long startTick, int cycleTicks, int phaseOffset) {
         if (cycleTicks < 4) throw new IllegalArgumentException("Timing cycle must be at least four ticks.");
