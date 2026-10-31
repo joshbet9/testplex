@@ -7451,7 +7451,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onBaconCompassMenuClick(InventoryClickEvent event) {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.BACON_BRAWL
                 || !isBaconCompassMenuTitle(event.getView().getTitle())) return;
@@ -8797,7 +8796,6 @@ public final class ArcadePortManager implements Listener {
     /** Reborn's Disruptor detonates on an opponent's pickup, not by proximity alone. */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDragonEscapeDisruptorPickup(EntityPickupItemEvent event) {
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.DRAGON_ESCAPE
@@ -14226,7 +14224,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDragonEscapeTrackingCompassDrop(PlayerDropItemEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session != null && session.type == ArcadePortGame.DRAGON_ESCAPE
                 && !session.alive.contains(event.getPlayer().getUniqueId())
@@ -14237,7 +14234,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(ignoreCancelled = true)
     public void onRunnerJump(PlayerJumpEvent event) {
-        if (isPreparingParticipant(event.getPlayer())) return;
         if (isPreparingParticipant(event.getPlayer())) return;
         Session session = active;
         Player player = event.getPlayer();
@@ -15045,8 +15041,6 @@ public final class ArcadePortManager implements Listener {
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
                 if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
-        if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
-                if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         Session session = active;
         if (session == null || event.getEntity().getWorld() != session.world) return;
         if ((session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN)
@@ -15513,7 +15507,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDragonsMarksmanShoot(EntityShootBowEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.DRAGONS
                 || !(event.getEntity() instanceof Player player)
@@ -15599,7 +15592,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onDeathTagBowShoot(EntityShootBowEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.DEATH_TAG
                 || !(event.getEntity() instanceof Player player)
@@ -15618,7 +15610,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onEvolutionChickenDoubleJump(PlayerToggleFlightEvent event) {
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         Player player = event.getPlayer();
@@ -15657,7 +15648,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onSheepQuestArcherBowShoot(EntityShootBowEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.SHEEP_QUEST
                 || !(event.getEntity() instanceof Player player)
@@ -15681,7 +15671,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onQuiverBowShoot(EntityShootBowEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
                 || !(event.getEntity() instanceof Player player)) return;
@@ -15699,7 +15688,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onMicroBowShoot(EntityShootBowEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.MICRO_BATTLES
                 || !(event.getEntity() instanceof Player player)
@@ -15712,7 +15700,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onBowShoot(EntityShootBowEvent event) {
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || !(event.getEntity() instanceof Player player)
@@ -15761,7 +15748,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onGladiatorFishing(PlayerFishEvent event) {
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         Player player = event.getPlayer();
@@ -16054,7 +16040,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onRunnerTrackingCompassDrop(PlayerDropItemEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.RUNNER
                 || session.alive.contains(event.getPlayer().getUniqueId())) return;
@@ -16064,7 +16049,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPaintballTrackingCompassDrop(org.bukkit.event.player.PlayerDropItemEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.PAINTBALL) return;
         if (isPaintballTrackingCompass(event.getItemDrop().getItemStack())) event.setCancelled(true);
@@ -16072,7 +16056,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBaconTrackingCompassDrop(org.bukkit.event.player.PlayerDropItemEvent event) {
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null) return;
@@ -16090,7 +16073,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBaconMeterItemMove(InventoryClickEvent event) {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.BACON_BRAWL) return;
         if (isBaconMeterItem(event.getCurrentItem()) || isBaconMeterItem(event.getCursor())) {
@@ -16101,7 +16083,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onSneakyAssassinsFoodLevelChange(FoodLevelChangeEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.SNEAKY_ASSASSINS
                 || !(event.getEntity() instanceof Player player)
@@ -16111,7 +16092,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onDragonsFoodLevelChange(FoodLevelChangeEvent event) {
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.DRAGONS
@@ -16132,7 +16112,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler
     public void onBaconFoodLevelChange(FoodLevelChangeEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.BACON_BRAWL
                 || !(event.getEntity() instanceof Player player)
@@ -16149,7 +16128,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onTurfWarsProtectedItemClick(InventoryClickEvent event) {
-        if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.TURF_WARS
@@ -16169,7 +16147,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onTurfWarsProtectedItemDrag(InventoryDragEvent event) {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.TURF_WARS
                 || !session.players.containsKey(event.getWhoClicked().getUniqueId())) return;
@@ -16188,7 +16165,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onTurfWarsFoodLevelChange(FoodLevelChangeEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session != null && session.type == ArcadePortGame.TURF_WARS
                 && event.getEntity() instanceof Player player
@@ -16199,8 +16175,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onTurfWarsFallDamage(EntityDamageEvent event) {
-        if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
-                if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
                 if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         Session session = active;
@@ -16214,7 +16188,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onTurfWarsItemPickup(EntityPickupItemEvent event) {
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session != null && session.type == ArcadePortGame.TURF_WARS
@@ -16235,7 +16208,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onPlayerInteract(PlayerInteractEvent event) {
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
@@ -16712,7 +16684,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onArcadeEntityInteract(PlayerInteractEntityEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         if (event.getHand() != EquipmentSlot.HAND) return;
         Session session = active;
         if (session == null) return;
@@ -16812,7 +16783,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInteractSheep(PlayerInteractEntityEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.SHEEP_QUEST
                 || !(event.getRightClicked() instanceof Sheep sheep) || !session.sheep.contains(sheep)
@@ -16844,7 +16814,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onMilkCowBucketFill(PlayerBucketFillEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session != null && session.type == ArcadePortGame.MILK_THE_COW
                 && event.getPlayer().getWorld() == session.world
@@ -16855,7 +16824,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onMilkCowDrink(PlayerItemConsumeEvent event) {
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         Player player = event.getPlayer();
@@ -16936,8 +16904,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onWitherMinionFallDamage(EntityDamageEvent event) {
-        if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
-                if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         if (event.getEntity() instanceof Player prepareVictim && cancelPrepareAction(prepareVictim, event)) return;
                 if (event instanceof EntityDamageByEntityEvent byEntity && cancelPrepareAction(playerShooter(byEntity.getDamager()), event)) return;
         Session session = active;
@@ -17534,7 +17500,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
         if (session.type == ArcadePortGame.DRAW_MY_THING) {
@@ -17603,7 +17568,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onSpleefBlockDamage(BlockDamageEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world
                 || !session.alive.contains(event.getPlayer().getUniqueId())) return;
@@ -17624,7 +17588,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent event) {
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
@@ -17720,7 +17683,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onWitherEditorItemPickup(EntityPickupItemEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.WITHER_ASSAULT
                 || !(event.getEntity() instanceof Player player)
@@ -17734,7 +17696,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDeathTagItemPickup(EntityPickupItemEvent event) {
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.DEATH_TAG
@@ -17764,7 +17725,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDeathTagCraftingClick(InventoryClickEvent event) {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.DEATH_TAG
                 || !session.players.containsKey(event.getWhoClicked().getUniqueId())) return;
@@ -17775,7 +17735,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBombLobbersTeamArmorMove(InventoryClickEvent event) {
-        if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.BOMB_LOBBERS
@@ -17808,7 +17767,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onSheepQuestHeldSlotChange(PlayerItemHeldEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         Player player = event.getPlayer();
         if (session == null || session.type != ArcadePortGame.SHEEP_QUEST
@@ -17820,7 +17778,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onDrop(PlayerDropItemEvent event) {
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || !session.players.containsKey(event.getPlayer().getUniqueId())) return;
@@ -17837,7 +17794,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onMicroTeamArmorMove(InventoryClickEvent event) {
-        if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.MICRO_BATTLES
@@ -17881,7 +17837,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDragonsKitItemMove(InventoryClickEvent event) {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.DRAGONS
                 || !(event.getWhoClicked() instanceof Player player)
@@ -17897,7 +17852,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDragonsKitItemDrag(InventoryDragEvent event) {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.DRAGONS
                 || !(event.getWhoClicked() instanceof Player player)
@@ -17907,7 +17861,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onSpleefItemDrop(org.bukkit.event.player.PlayerDropItemEvent event) {
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.SPLEEF
@@ -17921,7 +17874,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session currentSession = active;
         if (currentSession != null && currentSession.type == ArcadePortGame.MICRO_BATTLES
@@ -18145,7 +18097,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onGladiatorMenuDrag(InventoryDragEvent event) {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getView().getTopInventory().getHolder() instanceof GladiatorMenuHolder) {
             event.setCancelled(true);
         }
@@ -18352,7 +18303,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onQuiverCompassMenuClick(InventoryClickEvent event) {
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
-        if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.ONE_IN_THE_QUIVER
                 || !(ChatColor.DARK_GREEN + "Spectator Menu").equals(event.getView().getTitle())) return;
@@ -18445,7 +18395,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onBombLobbersCompassMenuClick(InventoryClickEvent event) {
-        if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getWhoClicked() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.BOMB_LOBBERS
@@ -18633,7 +18582,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBombLobbersPowerupPickup(EntityPickupItemEvent event) {
-        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.BOMB_LOBBERS
@@ -19213,7 +19161,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onWitherHumanDoubleJump(org.bukkit.event.player.PlayerToggleFlightEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         Player player = event.getPlayer();
         Session session = active;
         if (session == null || session.type != ArcadePortGame.WITHER_ASSAULT
@@ -19244,7 +19191,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onMilkCowDoubleJump(org.bukkit.event.player.PlayerToggleFlightEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         Player player = event.getPlayer();
         Session session = active;
         if (session == null || session.type != ArcadePortGame.MILK_THE_COW
@@ -19268,7 +19214,6 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onWitherAssaultFlightLock(org.bukkit.event.player.PlayerToggleFlightEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         Player player = event.getPlayer();
         Session session = active;
         if (session == null || session.type != ArcadePortGame.WITHER_ASSAULT
@@ -19280,7 +19225,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onQuiverDoubleJump(org.bukkit.event.player.PlayerToggleFlightEvent event) {
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Player player = event.getPlayer();
         Session session = active;
@@ -19300,7 +19244,6 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBombDoubleJump(org.bukkit.event.player.PlayerToggleFlightEvent event) {
-        if (cancelPrepareAction(event.getPlayer(), event)) return;
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Player player = event.getPlayer();
         Session session = active;
