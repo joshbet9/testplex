@@ -600,7 +600,7 @@ public final class SuperSploorRuntime implements Listener {
                     markSpecialTarget(ownerId, target);
                 }
             }
-            if (!block.isPassable() && engine.owner(block) != -2) break;
+
         }
         player.playSound(player.getLocation(), Sound.ENTITY_LIGHTNING_BOLT_THUNDER, 0.55F, 1.8F);
         announceTeam(ownerId, ChatColor.LIGHT_PURPLE + "PRISM BEAM fired!");
@@ -1282,7 +1282,7 @@ public final class SuperSploorRuntime implements Listener {
             for (UUID helperId : helpers) {
                 if (helperId.equals(killerId)) continue;
                 long lastHit = hitTimes.getOrDefault(helperId, 0L);
-                if (now - lastHit > 8_000L) continue;
+                if (!SuperSploorRules.isAssistEligible(now, lastHit)) continue;
                 MutableStats helperStats = playerStats.get(helperId);
                 if (helperStats != null) helperStats.assists++;
             }
