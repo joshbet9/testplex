@@ -175,13 +175,10 @@ class ArcadePortGameTest {
         assertEquals("snowballer", ArcadePortRules.normalizeSpleefKit("spleef-snowballer"));
         assertEquals("brawler", ArcadePortRules.normalizeSpleefKit("spleef-brawler"));
         assertEquals("archer", ArcadePortRules.normalizeSpleefKit("spleef-archer"));
-        assertEquals("basher", normalizeDeathTagKitForCatalogue("runner-basher"));
-    }
-
-    private static String normalizeDeathTagKitForCatalogue(String value) {
-        String kit = value.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
-        if (kit.startsWith("runner-")) kit = kit.substring("runner-".length());
-        return java.util.Set.of("basher", "archer", "traitor", "null").contains(kit) ? kit : null;
+        assertEquals("basher", ArcadePortRules.normalizeDeathTagRunnerKit("runner-basher"));
+        assertEquals("archer", ArcadePortRules.normalizeDeathTagRunnerKit("runner-archer"));
+        assertEquals("traitor", ArcadePortRules.normalizeDeathTagRunnerKit("runner-traitor"));
+        assertNull(ArcadePortRules.normalizeDeathTagRunnerKit("runner-invalid"));
     }
 
     @Test void normalizesSpacesAndUnderscoresInTestCommands() {
