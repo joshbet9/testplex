@@ -188,7 +188,7 @@ public final class WizardsGameManager implements Listener {
             plugin.getLogger().severe("Could not safely reset the previous Wizards source-map world " + worldName + ".");
             return null;
         }
-        if (!SourceMapCatalog.installResource(plugin, resource, worldName, WIZARDS_MAP_FOLDERS)) {
+        if (!SourceMapCatalog.installWizardsResource(plugin, resource, worldName, WIZARDS_MAP_FOLDERS)) {
             plugin.getLogger().severe("Could not install selected Wizards source map " + resource + ".");
             return null;
         }
@@ -198,7 +198,7 @@ public final class WizardsGameManager implements Listener {
             return null;
         }
 
-        SourceMapCatalog.MapData data = SourceMapCatalog.readResource(plugin, resource, world);
+        SourceMapCatalog.MapData data = SourceMapCatalog.readWizardsResource(plugin, resource, world);
         if (data == null || !data.hasBounds() || data.spawnLocations().isEmpty()) {
             plugin.getLogger().severe("Selected Wizards map " + resource
                     + " is missing valid WorldConfig bounds or TEAM_SPAWNS markers.");
@@ -237,8 +237,14 @@ public final class WizardsGameManager implements Listener {
         for (Location marker : chestMarkers) {
             if (marker == null || marker.getWorld() == null || !marker.getWorld().equals(world)) continue;
             Block block = marker.getBlock();
-            if (block.getType() != Material.CHEST) block.setType(Material.CHEST, false);
-            chests.add(block.getLocation());
+            // WorldDownloader's LOAD_TILE_ENTITY=false exports can retain the chest
+            // block ID while omitting its block-entity NBT. Recreate the container
+            // state explicitly so refillChests() always receives a usable inventory.
+            if (block.getType() != Material.CHEST || !(block.getState() instanceof Chest)) {
+                block.setType(Material.AIR, false);
+                block.setType(Material.CHEST, false);
+            }
+            if (block.getState() instanceof Chest) chests.add(block.getLocation());
         }
         if (chests.isEmpty()) {
             plugin.getLogger().severe("Selected Wizards map " + resource + " has no chest markers or placed chests.");
