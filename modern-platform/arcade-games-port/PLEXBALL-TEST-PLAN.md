@@ -11,6 +11,7 @@ Plexball is an experimental in-process mode hosted by `ArcadeMechanicsModern`. I
 - `/arcadeport kit skyguard`
 - `/arcadeport join plexball` — normal five-second queue countdown.
 - `/arcadeport play plexball` — quick two-second queue countdown.
+- `/arcadeport leave plexball` — leave the queue before a match starts.
 - `/arcadeport start plexball` — operator-only immediate start for two or more queued players.
 - `/arcadeport status` — shows the Plexball queue or current phase.
 - `/arcadeport stop` — operator stop and return to lobby.
@@ -22,8 +23,11 @@ At least two and at most eight players are supported. Each player gets one initi
 | Test | Expected |
 | --- | --- |
 | Join with 2–8 players | Queue starts and every participant enters the separate Plexball arena. |
+| Queue leave | A player can remove themselves while queued; countdown resets if the queue falls below two players. |
 | Batter turn | Only the selected batter can hit; movement is locked but look direction remains available. |
 | Fielder turn | Every non-batter can move throughout the fair triangle. |
+| Fielding hotbar | Fielder can switch between slot 0 (glove) and slot 1 (kit ability); other slots are blocked. |
+| Standings | Distance and successful catches are broadcast after each completed batting attempt. |
 | Crosshair | Clicking the tee Interaction entity only counts if the server-side eye ray intersects the smaller ball sphere. |
 | Timing | Each at-bat gets a newly phased beat; near-perfect timing grades progressively rather than binary hit/miss. |
 | Direction | Swing yaw must be inside the fair cone; off-cone direction is a foul. |
