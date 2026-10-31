@@ -337,7 +337,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         rival.damage(1.0D);
         double after = rival.isDead() ? 0.0D : rival.getHealth();
         getLogger().info("WIZARDS_DAMAGE_PROBE|GENERIC|health=" + before + "->" + after
-                + "|observed=" + lastAnyDamageObservation);
+                + "|observed=" + lastAnyDamageObservation + "|internal=" + nmsDamageState(rival));
         require(after < before, "ordinary LivingEntity.damage(1) did not damage a live Wizards player");
         gameplayStage = 5;
         gameplayTicks = 0;
@@ -353,7 +353,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         rival.damage(1.0D, owner);
         double after = rival.isDead() ? 0.0D : rival.getHealth();
         getLogger().info("WIZARDS_DAMAGE_PROBE|ATTRIBUTED|health=" + before + "->" + after
-                + "|observed=" + lastAnyDamageObservation);
+                + "|observed=" + lastAnyDamageObservation + "|internal=" + nmsDamageState(rival));
         require(after < before, "caster-attributed LivingEntity.damage(1, owner) did not damage a live Wizards player");
         gameplayStage = 6;
         gameplayTicks = 0;
@@ -667,6 +667,34 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
      * project's shared Bukkit compile surface does not. Reflect rather than
      * compiling against a version-specific getter.
      */
+    private static String nmsDamageState(Player player) {
+        String[] names = {"damageCooldownTime", "lastHurt", "invulnerableDuration", "invulnerableTime", "hurtTime"};
+        StringBuilder result = new StringBuilder();
+        try {
+            Method getHandle = player.getClass().getMethod("getHandle");
+            Object handle = getHandle.invoke(player);
+            for (String name : names) {
+                Object value = "missing";
+                Class<?> cursor = handle.getClass();
+                while (cursor != null) {
+                    try {
+                        Field field = cursor.getDeclaredField(name);
+                        field.setAccessible(true);
+                        value = field.get(handle);
+                        break;
+                    } catch (NoSuchFieldException missing) {
+                        cursor = cursor.getSuperclass();
+                    }
+                }
+                if (result.length() > 0) result.append(',');
+                result.append(name).append('=').append(value);
+            }
+        } catch (Throwable failure) {
+            return "unavailable:" + failure.getClass().getSimpleName() + ":" + failure.getMessage();
+        }
+        return result.toString();
+    }
+
     private static Boolean readMarkedInvulnerability(Player player) {
         try {
             java.lang.reflect.Method getter = player.getClass().getMethod("isMarkedInvulnerable");
