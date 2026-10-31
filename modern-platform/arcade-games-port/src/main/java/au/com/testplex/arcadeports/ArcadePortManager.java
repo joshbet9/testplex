@@ -1424,7 +1424,8 @@ public final class ArcadePortManager implements Listener {
             lobby.ensurePlayerInLobby(requestingPlayer);
         }
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (player.isOnline() && lobby.isLobbyWorld(player.getWorld())) {
+            if (player.isOnline() && lobby.isLobbyWorld(player.getWorld())
+                    && !testPlayers.isTestPlayer(player)) {
                 for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
                     existingQueue.remove(player.getUniqueId());
                 }
