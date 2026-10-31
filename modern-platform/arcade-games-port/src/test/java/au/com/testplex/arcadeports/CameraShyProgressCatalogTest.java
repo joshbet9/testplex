@@ -18,6 +18,20 @@ class CameraShyProgressCatalogTest {
     }
 
     @Test
+    void achievementPagesCoverTheCatalogueExactlyOnceAndClampInvalidPages() {
+        assertEquals(4, CameraShyProgressCatalog.pageCount());
+        HashSet<String> ids = new HashSet<>();
+        for (int page = 1; page <= CameraShyProgressCatalog.pageCount(); page++) {
+            var entries = CameraShyProgressCatalog.page(page);
+            assertEquals(5, entries.size());
+            for (var entry : entries) assertTrue(ids.add(entry.id()), "duplicate page entry: " + entry.id());
+        }
+        assertEquals(20, ids.size());
+        assertEquals(CameraShyProgressCatalog.page(1), CameraShyProgressCatalog.page(0));
+        assertEquals(CameraShyProgressCatalog.page(4), CameraShyProgressCatalog.page(99));
+    }
+
+    @Test
     void definesTheThreeLifetimeMilestonesAtTheAgreedThresholds() {
         var milestones = CameraShyProgressCatalog.milestones();
         assertEquals(3, milestones.size());
