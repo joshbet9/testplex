@@ -245,7 +245,7 @@ public final class ArcadeCatalog {
                 win("fruit-fountain", "Fruit Fountain", "Food items spiral into a colourful fountain")));
 
         register(game("spleef", "Spleef", "IRON_SHOVEL", "Break the floor beneath opponents and stay above the void.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("break-signature", "Block Break Signature", "A game-specific shape for each block break.", "IRON_SHOVEL",
                         grouped("snowburst", "Snowburst", "A short snow burst at the broken tile.", "signature"),
                         grouped("ice-shards", "Ice Shards", "Crystalline fragments spread outward.", "signature"),
