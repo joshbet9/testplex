@@ -44,7 +44,7 @@ Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Tu
 
 ## Wizards — shared Arcade lifecycle prototype
 
-Wizards is now hosted by `ArcadeMechanicsModern` rather than requiring its own runtime plugin to own the match. Its existing 21 spell effects, four source kits, loot/chest progression, mana/wand loop, endgame and temporary spell cleanup remain in the Wizards controller.
+Wizards is now hosted by `ArcadeMechanicsModern` rather than requiring its own runtime plugin to own the match. Its existing 21 spell effects, four source kits, loot/chest progression, mana/wand loop, endgame and temporary spell cleanup remain in the Wizards controller. Mage receives the source two-random-spell live-start bonus using each spell's original loot weight; Sorcerer, Mystic and Witch Doctor retain only Mana Bolt and Wizard's Compass as starter spells.
 
 Use the shared Arcade entry points:
 

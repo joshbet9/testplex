@@ -9,7 +9,7 @@ All spell books, wands, inventory menus and feedback use ordinary Paper/Minecraf
 ## First implementation milestone
 
 - Shared Arcade `/arcadeport` queue/start/leave/kit/status/stop controls (see below).
-- Four source kits: Mage, Sorcerer, Mystic and Witch Doctor. All kits begin with only Mana Bolt and Wizard's Compass; Mage does not receive additional random starter spells.
+- Four source kits: Mage, Sorcerer, Mystic and Witch Doctor. All kits begin with Mana Bolt and Wizard's Compass; Mage additionally receives two random starter spells selected using the original SpellType loot-weight roll.
 - Free-for-all, last-wizard-standing round flow in a generated isolated test arena.
 - Loot chests with food, armour, wands and spellbooks; spellbooks level known spells and convert duplicates at max level into mana.
 - Mana regeneration, Soul Star boosts, wand slots, per-spell cooldowns and an inventory spell selector.

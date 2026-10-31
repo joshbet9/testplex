@@ -6,6 +6,8 @@ public final class WizardsRules {
     public static final float BASE_MANA_PER_SECOND = 2.5F;
     public static final float SOUL_STAR_MANA_PER_SECOND = 0.2F;
     public static final int WAND_SLOT_COUNT = 5;
+    public static final int MAGE_RANDOM_STARTER_SPELL_COUNT = 2;
+    public static final int MAGE_STARTER_SPELL_SELECTION_ATTEMPTS = 100;
     public static final int BASE_MANA_BOOK_CONVERSION = 50;
     public static final int FULL_WAND_CONVERSION = 100;
     public static final int GAME_PACE_MINUTES[] = {2, 4, 6, 8, 9};
@@ -26,6 +28,11 @@ public final class WizardsRules {
 
     public static List<WizardsSpell> initialKnownSpells() {
         return List.of(WizardsSpell.MANA_BOLT, WizardsSpell.WIZARDS_COMPASS);
+    }
+
+    /** Original Mage starter selection: random SpellType, then roll 0-9 against its loot weight. */
+    public static boolean mageStarterSpellRollSucceeds(WizardsKit kit, int rarityRoll, int lootWeight) {
+        return kit == WizardsKit.MAGE && rarityRoll >= 0 && rarityRoll < 10 && rarityRoll < lootWeight;
     }
 
     public static int summonedWolfCount(int spellLevel) {

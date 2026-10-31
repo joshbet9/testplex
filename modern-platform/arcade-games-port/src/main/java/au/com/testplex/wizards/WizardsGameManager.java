@@ -327,6 +327,7 @@ public final class WizardsGameManager implements Listener {
             WizardsKit kit = selectedKits.getOrDefault(id, defaultKit());
             WizardState state = new WizardState(kit);
             states.put(id, state);
+            grantMageStarterSpells(player, state);
             preparePlayer(player, state, i, entrants.size());
         }
         queue.clear();
@@ -334,6 +335,28 @@ public final class WizardsGameManager implements Listener {
         for (Player player : entrants) {
             player.sendMessage(ChatColor.GOLD + "Wizards" + ChatColor.DARK_GRAY + " » "
                     + ChatColor.YELLOW + "Find spellbooks and supplies in chests. Last wizard alive wins!");
+        }
+    }
+
+    /**
+     * The original Mineplex Mage receives two random bonus spells when the round
+     * goes live. Each candidate is rolled against its SpellType loot weight, with
+     * up to 100 draws per bonus spell; all other kits keep only the two base spells.
+     */
+    private void grantMageStarterSpells(Player player, WizardState state) {
+        if (state.kit != WizardsKit.MAGE) return;
+        WizardsSpell[] spellTypes = WizardsSpell.values();
+        for (int bonus = 0; bonus < WizardsRules.MAGE_RANDOM_STARTER_SPELL_COUNT; bonus++) {
+            for (int attempt = 0; attempt < WizardsRules.MAGE_STARTER_SPELL_SELECTION_ATTEMPTS; attempt++) {
+                WizardsSpell candidate = spellTypes[random.nextInt(spellTypes.length)];
+                if (state.known.containsKey(candidate)) continue;
+                int rarityRoll = random.nextInt(10);
+                if (!WizardsRules.mageStarterSpellRollSucceeds(state.kit, rarityRoll, candidate.lootWeight())) continue;
+                state.known.put(candidate, 1);
+                player.sendMessage(ChatColor.GOLD + "Wizards » " + categoryColour(candidate)
+                        + candidate.displayName() + ChatColor.GRAY + " discovered as a Mage starter spell.");
+                break;
+            }
         }
     }
 
