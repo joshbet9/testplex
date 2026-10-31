@@ -349,6 +349,8 @@ public final class CameraShyGame implements Listener {
     private final List<FakeFlash> fakeFlashes = new ArrayList<>();
     private final Map<UUID, ArmorStand> understudyStands = new HashMap<>();
     private final Map<UUID, BossBar> bossBars = new HashMap<>();
+    private final Map<UUID, Long> spotlightGlowUntil = new HashMap<>();
+    private final Map<UUID, Boolean> spotlightOriginalGlow = new HashMap<>();
     private final Map<UUID, Location> spawnLocations = new HashMap<>();
     private final Set<UUID> groupPhotoCharges = new HashSet<>();
     private final Random random = new Random();
@@ -639,6 +641,7 @@ public final class CameraShyGame implements Listener {
         lastPhotoTarget.clear(); lastEliminationAt.clear(); eliminationStreaks.clear(); revengeMatchCounts.clear();
         focusAttempts.clear(); focusSeenThisTick.clear(); smokeClouds.clear(); fakeFlashes.clear();
         groupPhotoCharges.clear(); spawnLocations.clear(); aimingSince.clear();
+        spotlightGlowUntil.clear(); spotlightOriginalGlow.clear();
         for (ArmorStand stand : understudyStands.values()) if (stand != null && stand.isValid()) stand.remove();
         understudyStands.clear();
         clearGroupPickup();
@@ -961,6 +964,7 @@ public final class CameraShyGame implements Listener {
         if (phase != Phase.LIVE || !humans.contains(id) || !alive.remove(id)) return;
         ArmorStand understudy = understudyStands.remove(id);
         if (understudy != null && understudy.isValid()) understudy.remove();
+        clearSpotlight(id);
         PlayerSnapshot snapshot = snapshots.remove(id);
         if (snapshot != null) {
             if (player.isOnline()) {
@@ -1145,6 +1149,7 @@ public final class CameraShyGame implements Listener {
         target.sendTitle(ChatColor.DARK_RED + "ELIMINATED", ChatColor.GRAY + "Five photographs. Your match is over.", 5, 45, 10);
         target.playSound(target.getLocation(), Sound.ENTITY_WITHER_DEATH, 0.65F, 1.5F);
         removePlayerPresentation(targetId);
+        clearSpotlight(targetId);
         ArmorStand understudy = understudyStands.remove(targetId);
         if (understudy != null && understudy.isValid()) understudy.remove();
 
@@ -1498,11 +1503,10 @@ public final class CameraShyGame implements Listener {
         if (target == null || !target.isOnline()) return;
         broadcastMatch(ChatColor.GOLD + "DIRECTOR'S SPOTLIGHT: " + ChatColor.YELLOW + target.getName()
                 + ChatColor.GRAY + " has been caught in the light!");
+        spotlightOriginalGlow.put(selected, target.isGlowing());
+        spotlightGlowUntil.put(selected, now + 3_000L);
         target.setGlowing(true);
         arena.spawnParticle(Particle.FLASH, target.getLocation().add(0.0D, 1.0D, 0.0D), 1);
-        Bukkit.getScheduler().runTaskLater(plugin, () -> {
-            if (target.isOnline() && phase == Phase.LIVE) target.setGlowing(false);
-        }, 60L);
     }
 
     private void updateGroupPickup(long now) {
@@ -1541,6 +1545,16 @@ public final class CameraShyGame implements Listener {
     private void cleanupTemporaryEffects(long now) {
         smokeClouds.removeIf(cloud -> cloud.expiresAt <= now);
         fakeFlashes.removeIf(flash -> flash.expiresAt <= now);
+        for (Map.Entry<UUID, Long> entry : new ArrayList<>(spotlightGlowUntil.entrySet())) {
+            if (entry.getValue() <= now) clearSpotlight(entry.getKey());
+        }
+    }
+
+    private void clearSpotlight(UUID playerId) {
+        spotlightGlowUntil.remove(playerId);
+        Boolean originalGlow = spotlightOriginalGlow.remove(playerId);
+        Player target = players.get(playerId);
+        if (originalGlow != null && target != null && target.isOnline()) target.setGlowing(originalGlow);
     }
 
     private void clearGroupPickup() {
@@ -1591,7 +1605,7 @@ public final class CameraShyGame implements Listener {
                 if (humans.contains(id) && snapshot != null) snapshot.persist(plugin, id);
                 continue;
             }
-            if (player.isGlowing()) player.setGlowing(false);
+            clearSpotlight(id);
             if (humans.contains(id)) {
                 manager.returnPlayerToLobby(player);
                 if (snapshot != null) {
@@ -1619,6 +1633,7 @@ public final class CameraShyGame implements Listener {
         lastPhotoTarget.clear(); lastEliminationAt.clear(); eliminationStreaks.clear(); revengeMatchCounts.clear();
         focusAttempts.clear(); focusSeenThisTick.clear(); smokeClouds.clear(); fakeFlashes.clear();
         groupPhotoCharges.clear(); spawnLocations.clear(); aimingSince.clear();
+        spotlightGlowUntil.clear(); spotlightOriginalGlow.clear();
         selectedKits.keySet().removeIf(id -> !Bukkit.getOfflinePlayer(id).hasPlayedBefore());
         pendingHumans = List.of();
         finalSnapshot = false;
