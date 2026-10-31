@@ -257,6 +257,11 @@ public final class WizardsPaperSmoke extends JavaPlugin {
         Map<Object, Object> known = (Map<Object, Object>) field(ownerState, "known");
         int spellLevel = ((Number) known.get(manaBolt)).intValue();
         require(spellLevel >= 1, "the default Wizard did not receive Mana Bolt");
+        // Match mana starts empty; seed the test state so the cast can be
+        // checked immediately without waiting for natural regeneration.
+        Field manaField = ownerState.getClass().getDeclaredField("mana");
+        manaField.setAccessible(true);
+        manaField.setFloat(ownerState, 100.0F);
         double manaBefore = ((Number) field(ownerState, "mana")).doubleValue();
         @SuppressWarnings("unchecked")
         Map<Object, Object> manaBoltsBefore = (Map<Object, Object>) field(wizards, "manaBolts");
