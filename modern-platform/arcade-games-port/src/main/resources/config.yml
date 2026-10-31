@@ -1,6 +1,6 @@
 # The 27 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
 # READY_FOR_TEST games are available together for the shared controlled test session.
-# Dragon Escape, Sheep Quest, Turf Wars, Super Sploor, Dragons, Runner and Camera Shy join the controlled queue; other games remain disabled until promoted.
+# Dragon Escape, Sheep Quest, Turf Wars, Draw My Thing, Master Builders, Sneaky Assassins, Super Sploor, Dragons, Runner and Camera Shy join the controlled queue; other games remain disabled until promoted.
 enabled-games:
   - death-tag
   - one-in-the-quiver
@@ -18,6 +18,9 @@ enabled-games:
   - sheep-quest
   - turf-wars
   - camera-shy
+  - draw-my-thing
+  - master-builders
+  - sneaky-assassins
 lobby-selected-game: death-tag
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
