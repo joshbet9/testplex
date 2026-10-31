@@ -14,13 +14,16 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements CommandExecutor, Listener {
     private ArcadePortManager manager;
+    private PlexballGame plexball;
     private MonsterMazePlugin monsterMaze;
     private ArcadeMapSelectionMenu mapMenu;
     private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
 
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
-    private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "gladiators", "micro-battles", "paintball");
-    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-paintball-20261101-v1";
+    private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of(
+            "death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl",
+            "gladiators", "micro-battles", "paintball", "plexball");
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-plexball-20261101-v1";
 
     @Override
     public void onEnable() {
@@ -46,6 +49,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         // Bring up Testplex's shared lobby before any optional game module. A failure
         // in Monster Maze must not leave players in the unrelated survival world.
         manager = new ArcadePortManager(this);
+        plexball = new PlexballGame(this);
+        getServer().getPluginManager().registerEvents(plexball, this);
         mapMenu = new ArcadeMapSelectionMenu(this);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
@@ -95,6 +100,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     }
 
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
+    public ArcadePortManager getArcadePortManager() { return manager; }
+    public PlexballGame getPlexballGame() { return plexball; }
     public void returnPlayerToArcadeLobby(Player player) {
         if (manager != null && player != null && player.isOnline()) {
             manager.returnPlayerToLobby(player);
@@ -122,6 +129,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             getLogger().warning("Could not remove an Arcade runtime readiness record: " + exception.getMessage());
         }
         if (manager != null) manager.shutdown();
+        if (plexball != null) plexball.shutdown();
         if (monsterMaze != null) monsterMaze.shutdown();
     }
 
@@ -243,6 +251,19 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if ("stats".equalsIgnoreCase(label) || "arcadestats".equalsIgnoreCase(label)) {
+            if (args.length == 0 || (args.length == 1 && "plexball".equalsIgnoreCase(args[0]))) {
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                if (plexball != null) plexball.openStats(player);
+                else sender.sendMessage(ChatColor.RED + "Plexball progression is unavailable.");
+                return true;
+            }
+            sender.sendMessage(ChatColor.YELLOW + "Usage: /stats [plexball]");
+            return true;
+        }
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
         switch (sub) {
             case "join":
@@ -259,6 +280,32 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 boolean mixedArcadeVariant = mixedJoinGame != null;
                 ArcadePortGame requestedGame = mixedArcadeVariant ? mixedJoinGame : ArcadePortGame.fromId(args[1]);
                 manager.queue(requestedGame, player, sub.equals("play"), mixedArcadeVariant);
+                return true;
+            case "leave":
+                if (!(sender instanceof Player leavingPlayer)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                if (args.length < 2) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport leave <game-id>");
+                    return true;
+                }
+                ArcadePortGame leavingGame = ArcadePortGame.fromId(args[1]);
+                if (leavingGame == null || !manager.leaveQueue(leavingGame, leavingPlayer)) {
+                    sender.sendMessage(ChatColor.YELLOW + "You are not queued or spectating that Arcade game.");
+                }
+                return true;
+            case "spectate":
+                if (!(sender instanceof Player spectator)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                if (args.length < 2 || !"plexball".equalsIgnoreCase(args[1])) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport spectate plexball");
+                    return true;
+                }
+                if (plexball != null) plexball.spectate(spectator);
+                else sender.sendMessage(ChatColor.RED + "Plexball is unavailable.");
                 return true;
             case "lobby":
             case "selectgame":
@@ -296,6 +343,18 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport start <game-id>");
                     return true;
                 }
+                if ("plexball".equalsIgnoreCase(args[1])) {
+                    if (!hasAdminAccess(sender)) {
+                        sender.sendMessage(ChatColor.RED + "Operator permission required to force-start Plexball.");
+                        return true;
+                    }
+                    manager.startQueued(ArcadePortGame.PLEXBALL, null, sender);
+                    return true;
+                }
+                if (plexball != null && plexball.isActive()) {
+                    sender.sendMessage(ChatColor.RED + "Plexball is currently using the Arcade test arena.");
+                    return true;
+                }
                 ArcadePortGame mixedStartGame = mixedArcadeGameFromId(args[1]);
                 boolean mixedArcadeStart = mixedStartGame != null;
                 ArcadePortGame requestedStartGame = mixedArcadeStart ? mixedStartGame : ArcadePortGame.fromId(args[1]);
@@ -307,9 +366,15 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     return true;
                 }
                 if (args.length < 2) {
-                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit <el-muchacho-pigo|mama-piggles|pig|mama-pig|sheep-pig|jumper|armorer|pitcher|waller|coward|marksman|pyrotechnic|snowballer|spleef-brawler|micro-archer|worker|fighter|quiver-leaper|quiver-brawler|enchanter|slam-shot|ninja|runnerkit-leaper|runnerkit-archer|runnerkit-frosty|rifle|sniper|shotgun|machine-gun|runner-basher|runner-archer|runner-traitor|runner-null|turf-wars-marksman|turf-wars-infiltrator|turf-wars-shredder|escape-artist|assassin|briber|revealer>");
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport kit <kit-id|plexball>");
                     return true;
                 }
+                if ("plexball".equalsIgnoreCase(args[1])) {
+                    if (plexball != null) plexball.openKitMenu(player);
+                    else sender.sendMessage(ChatColor.RED + "Plexball is unavailable.");
+                    return true;
+                }
+                if (plexball != null && plexball.selectKit(player, args[1])) return true;
                 manager.selectKit(player, args[1]);
                 return true;
             case "ghost":
@@ -330,8 +395,21 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.GRAY + "Current beacon colour: " + manager.dragonEscapeBeaconColor(player.getUniqueId()));
                 } else manager.setDragonEscapeBeaconColor(player, args[1]);
                 return true;
+            case "stats":
+                if (!(sender instanceof Player statsPlayer)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                if (args.length < 2 || !"plexball".equalsIgnoreCase(args[1])) {
+                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport stats plexball");
+                    return true;
+                }
+                if (plexball != null) plexball.openStats(statsPlayer);
+                else sender.sendMessage(ChatColor.RED + "Plexball progression is unavailable.");
+                return true;
             case "status":
                 sender.sendMessage(ChatColor.GOLD + "Modern Arcade ports: " + ChatColor.WHITE + manager.status());
+                if (plexball != null) sender.sendMessage(ChatColor.GOLD + "Plexball: " + ChatColor.WHITE + plexball.status());
                 return true;
             case "stop":
                 if (!hasAdminAccess(sender)) {
@@ -343,6 +421,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             default:
                 sender.sendMessage(ChatColor.GOLD + "=== Modern Arcade Mechanics Prototypes ===");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>" + ChatColor.GRAY + " — quick solo test; starts after a short join window");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport play plexball" + ChatColor.GRAY + " — queue for Plexball");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport join plexball" + ChatColor.GRAY + " — join the Plexball queue");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport spectate plexball" + ChatColor.GRAY + " — watch an active Plexball match");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport leave plexball" + ChatColor.GRAY + " — leave the queue or stop spectating");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <slugger|technician|curve-artist|sprinter|skyguard>" + ChatColor.GRAY + " — select a Plexball kit");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit plexball" + ChatColor.GRAY + " — open the visual Plexball kit selector");
+                sender.sendMessage(ChatColor.YELLOW + "/stats plexball" + ChatColor.GRAY + " — view Plexball achievements, milestones and career stats");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join <game-id>" + ChatColor.GRAY + " — queue to join a multiplayer test");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>-mixed" + ChatColor.GRAY
