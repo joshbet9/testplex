@@ -29,6 +29,16 @@ class CameraShyRulesTest {
     }
 
     @Test
+    void aSmokeEscapeCanOnlyBeCreditedToItsOwnersOwnCloud() {
+        UUID owner = UUID.fromString("00000000-0000-0000-0000-000000000001");
+        UUID other = UUID.fromString("00000000-0000-0000-0000-000000000002");
+        assertTrue(CameraShyRules.smokeBelongsTo(owner, owner));
+        assertFalse(CameraShyRules.smokeBelongsTo(other, owner));
+        assertFalse(CameraShyRules.smokeBelongsTo(null, owner));
+        assertTrue(CameraShyRules.smokeBelongsTo(other, null));
+    }
+
+    @Test
     void smokeAndMirrorsRequiresTheCloudToObscureThePursuitBeforeItsWindowExpires() {
         assertTrue(CameraShyRules.shouldAwardSmokeEscape(true, 5_000L, 7_000L));
         assertFalse(CameraShyRules.shouldAwardSmokeEscape(false, 5_000L, 7_000L));
