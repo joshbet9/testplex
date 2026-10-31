@@ -820,30 +820,60 @@ public final class PlexballGame implements Listener {
     }
 
     private void finishAtTimeLimit() {
-        if (batterId != null && phase == Phase.BALL_FLIGHT && ballPosition != null) {
+        if (batterId != null && phase == Phase.BALL_FLIGHT) {
             PlayerResult current = results.computeIfAbsent(batterId, ignored -> new PlayerResult());
             current.atBats++;
-            double distance = Math.min(PlexballRules.HOME_RUN_METRES,
-                    PlexballRules.horizontalDistance(teeBallPosition, ballPosition));
+            double distance;
+            if (terminalResolutionTick >= 0L) {
+                // Respect an already determined foul/landing/home-run result;
+                // the ball may be parked outside the fair triangle awaiting grace.
+                distance = terminalDistance;
+            } else if (ballPosition != null && teeBallPosition != null) {
+                distance = Math.min(PlexballRules.HOME_RUN_METRES,
+                        PlexballRules.horizontalDistance(teeBallPosition, ballPosition));
+            } else {
+                distance = 0.0D;
+            }
             current.bestDistance = Math.max(current.bestDistance, distance);
             current.totalDistance += distance;
-            if (terminalHomeRun && phase == Phase.BALL_FLIGHT) {
+            if (terminalHomeRun) {
                 current.homeRuns++;
-                if (suddenDeath) current.suddenDeathHomeRuns++;
+                if (suddenDeath) {
+                    current.suddenDeathHomeRuns++;
+                    roundSurvivors.add(batterId);
+                } else {
+                    homeRunPlayers.add(batterId);
+                }
             }
+            if (suddenDeath) roundDistances.put(batterId, distance);
         } else if (batterId != null && phase == Phase.BATTING) {
             results.computeIfAbsent(batterId, ignored -> new PlayerResult()).atBats++;
+            // A batter whose turn is cut off by the hard wall-clock cap has
+            // completed a zero-distance turn for this playoff round.
+            if (suddenDeath) roundDistances.put(batterId, 0.0D);
         }
 
         if (suddenDeath && !finalists.isEmpty()) {
+            Set<UUID> finalistIds = new LinkedHashSet<>(finalists);
+            boolean roundComplete = PlexballRules.hasCompletedRound(finalistIds, roundDistances.keySet());
             List<UUID> candidates;
-            if (!roundSurvivors.isEmpty()) candidates = new ArrayList<>(roundSurvivors);
-            else if (!roundDistances.isEmpty()) candidates = new ArrayList<>(roundDistances.keySet());
-            else candidates = new ArrayList<>(finalists);
-            List<UUID> winners = !roundDistances.isEmpty() && !roundSurvivors.isEmpty()
+            if (!roundComplete) {
+                // Do not eliminate players who have not yet received their
+                // turn in this round. Use their completed match performance
+                // as the fair fallback for an interrupted round.
+                candidates = new ArrayList<>(finalists);
+            } else if (!roundSurvivors.isEmpty()) {
+                candidates = new ArrayList<>(roundSurvivors);
+            } else {
+                candidates = new ArrayList<>(roundDistances.keySet());
+            }
+            List<UUID> winners = roundComplete
                     ? rankPlayersByRound(candidates)
-                    : (!roundDistances.isEmpty() ? rankPlayersByRound(candidates) : rankPlayers(candidates));
-            finish(winners, "Three-minute time limit reached during sudden death.", true);
+                    : rankPlayers(candidates);
+            String reason = roundComplete
+                    ? "Three-minute time limit reached during sudden death."
+                    : "Three-minute time limit reached during an incomplete sudden-death round; all finalists remained eligible.";
+            finish(winners, reason, true);
             return;
         }
 
