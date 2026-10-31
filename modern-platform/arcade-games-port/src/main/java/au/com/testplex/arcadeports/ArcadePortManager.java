@@ -1428,10 +1428,10 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             if (sender instanceof Player requesting && requesting.isOnline()) lobby.ensurePlayerInLobby(requesting);
-            List<Player> lobbyPlayers = Bukkit.getOnlinePlayers().stream()
+            List<Player> lobbyPlayers = new ArrayList<>(Bukkit.getOnlinePlayers().stream()
                     .filter(player -> player.isOnline() && !testPlayers.isTestPlayer(player)
                             && lobby.isLobbyWorld(player.getWorld()))
-                    .toList();
+                    .toList());
             cameraShyModule.startFromLobby(sender, lobbyPlayers);
             return;
         }
@@ -13295,7 +13295,7 @@ public final class ArcadePortManager implements Listener {
                         complete ? Material.NETHER_STAR : Material.CLOCK,
                         (complete ? ChatColor.GREEN + "✓ " : ChatColor.GOLD) + milestone.name(),
                         List.of(" ", ChatColor.GRAY + "Progress: " + ChatColor.WHITE + value + "/" + milestone.target(),
-                                ChatColor.GRAY + "Lifetime " + milestone.unit + ".",
+                                ChatColor.GRAY + "Lifetime " + milestone.unit() + ".",
                                 complete ? ChatColor.GREEN + "Milestone complete" : ChatColor.YELLOW + "In progress"),
                         "noop", null, null));
             }
