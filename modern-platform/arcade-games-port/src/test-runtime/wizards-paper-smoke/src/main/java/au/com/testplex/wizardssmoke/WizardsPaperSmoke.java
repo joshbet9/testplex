@@ -168,6 +168,9 @@ public final class WizardsPaperSmoke extends JavaPlugin {
             return;
         }
 
+        // Settle the shared Arcade session before recording the lobby baseline;
+        // Wizards performs this same preflight before it snapshots players at round start.
+        method(arcade.getClass(), "prepareForWizards").invoke(arcade);
         ownerBaseline = captureBaseline(owner);
         rivalBaseline = captureBaseline(rival);
         require(GAMEPLAY_MAP.equals(arcade.getConfig().getString("selected-maps.wizards")),
