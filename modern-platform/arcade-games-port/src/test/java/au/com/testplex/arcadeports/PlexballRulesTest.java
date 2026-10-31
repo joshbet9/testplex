@@ -9,6 +9,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PlexballRulesTest {
     @Test
+    void spectatorsCanOnlyJoinActiveMatchesOutsideThePlayerRoster() {
+        assertTrue(PlexballRules.canJoinAsSpectator(true, false, 0));
+        assertTrue(PlexballRules.canJoinAsSpectator(true, false, PlexballRules.MAX_SPECTATORS - 1));
+        assertFalse(PlexballRules.canJoinAsSpectator(false, false, 0));
+        assertFalse(PlexballRules.canJoinAsSpectator(true, true, 0));
+        assertFalse(PlexballRules.canJoinAsSpectator(true, false, PlexballRules.MAX_SPECTATORS));
+        assertFalse(PlexballRules.canJoinAsSpectator(true, false, -1));
+    }
+
+    @Test
     void paperPingEstimateProvidesOnlyBoundedCompensation() {
         assertEquals(0, PlexballRules.latencyRewindTicks(-1));
         assertEquals(0, PlexballRules.latencyRewindTicks(0));
