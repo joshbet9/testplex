@@ -8,7 +8,15 @@ This is a separate modern platform inside the Testplex repository. It does **not
 - Paper **26.3**
 - Java **25**
 - Maven 3.9+
+- **FakePlayerPlugin 2.1.7** installed separately on the modern Paper server for actual server-side fake-player participants. It targets Paper 26.3; set its `body.damageable` option to `true`. The plugin is a separate proprietary dependency and is not bundled or redistributed by this repository: https://modrinth.com/plugin/fake-player-plugin-fpp
 
+## Game-scoped test players
+
+Every Arcade `/arcadeport start <game-id>` or quick-start fills the roster to **16 total players**: the number of real humans is subtracted, and the remainder are created as AFK/frozen server-side `Player` entities through FakePlayerPlugin's public API. They enter the same session setup as humans (team assignment, kit/loadout, player snapshots, scoreboards, damage and ability paths); they are not pigs, sheep, zombies, armour stands or packet-only tab entries.
+
+There is no persistent lobby bot roster. Legacy NPC bots are purged from loaded worlds and from chunks as they load; the old `test-bots` config is cleared. Match players are despawned on normal round completion, explicit stop, plugin shutdown, failed starts, and embedded Monster Maze cleanup. A startup sweep removes reserved `TPXTEST` names left by an interrupted prior process before a new roster can be created.
+
+Game start fails closed when FakePlayerPlugin is missing/disabled, its API is unavailable, `body.damageable` is false, or the full fake-player batch cannot join. Testplex does not fall back to mob NPCs, because those do not exercise player-targeted gameplay code.
 The build uses Paper's official Maven repository and a version range for the current 26.3 stable API. The dedicated workflow is `.github/workflows/testplex-modern-build.yml`; it builds, tests, and publishes the plugin artifact. A successful push to `feat/testplex-modern-26.3-platform` then automatically invokes `.github/workflows/deploy-testplex-modern-hyperv.yml` with the artifact from that same run. Pull requests and manually dispatched build-only runs do not auto-deploy. The isolated server uses `/home/monstermaze/servers/testplex-modern`, `testplex-modern.service`, and port `25568`; deployment stops only Testplex's own legacy service when necessary; the separate Monster Maze project and its services are not touched.
 
 ## Current implementation
