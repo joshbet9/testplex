@@ -1208,6 +1208,12 @@ public final class ArcadePortManager implements Listener {
             String reason, boolean advanceForKill) {
         if (active != session || target == null || !session.alive.contains(target.getUniqueId())) return;
         UUID targetId = target.getUniqueId();
+        session.turfDeaths.merge(targetId, 1, Integer::sum);
+        UUID shredder = session.turfLastShredderShotByVictim.remove(targetId);
+        if (shredder != null && killer != null && shredder.equals(killer.getUniqueId())
+                && "marksman".equals(session.turfWarsKits.getOrDefault(targetId, "marksman"))) {
+            awardCatalogAchievement(target, "turf-wars", "fair-game");
+        }
         // Register the pending respawn before eliminate() runs EndCheck.
         session.respawning.add(targetId);
         session.turfInfiltration.remove(targetId);
@@ -1219,6 +1225,12 @@ public final class ArcadePortManager implements Listener {
             if (state != null) {
                 state.hasKilled = true;
                 state.lastSlowAt = System.currentTimeMillis();
+            }
+            if ("infiltrator".equals(session.turfWarsKits.getOrDefault(killer.getUniqueId(), "marksman"))
+                    && session.turfLeftBase.contains(killer.getUniqueId())
+                    && !session.turfInfiltratorReturned.contains(killer.getUniqueId())) {
+                int streak = session.turfInfiltratorKillStreak.merge(killer.getUniqueId(), 1, Integer::sum);
+                if (streak >= 5) awardCatalogAchievement(killer, "turf-wars", "invincible");
             }
             advanceTurfWars(session, killer);
             if (active != session) return;
@@ -4279,6 +4291,7 @@ public final class ArcadePortManager implements Listener {
             arrow.setVelocity(player.getLocation().getDirection().add(jitter).multiply(3.0D));
             session.entities.add(arrow);
             session.turfTrackedArrows.add(arrow.getUniqueId());
+            session.turfBarrageArrowOwners.put(arrow.getUniqueId(), id);
             session.turfBarrageRemaining.put(id, remaining - 1);
             player.getWorld().playSound(player.getLocation(), Sound.ENTITY_ARROW_SHOOT, 1.0F, 1.0F);
         }
@@ -4290,6 +4303,7 @@ public final class ArcadePortManager implements Listener {
                 || session.turfBarrageCharges.containsKey(id)
                 || session.turfBarrageFiring.contains(id)
                 || countTurfWarsFletchedArrows(player) <= 0) return;
+        session.turfBarrageTargetsByOwner.put(id, new HashSet<>());
         session.turfBarrageCharges.put(id, 0);
         session.turfBarrageNextChargeAt.put(id,
                 System.currentTimeMillis() + ArcadePortRules.TURF_WARS_BARRAGE_FIRST_CHARGE_MILLIS);
@@ -7671,6 +7685,33 @@ public final class ArcadePortManager implements Listener {
         return direction.normalize().multiply(strength).setY(vertical);
     }
 
+
+    private void recordTurfWarsAchievements(Session session, Player winner) {
+        if (session == null) return;
+        int winningTeam = winner == null ? -1 : session.teams.getOrDefault(winner.getUniqueId(), -1);
+        int losingTeam = winningTeam == 0 ? 1 : 0;
+        if (winningTeam >= 0) {
+            int losingKills = session.players.keySet().stream()
+                    .filter(id -> session.teams.getOrDefault(id, -1) == losingTeam)
+                    .mapToInt(id -> session.scores.getOrDefault(id, 0)).sum();
+            if (losingKills == 0) awardCatalogAchievement(winner, "turf-wars", "romped");
+            for (UUID id : session.players.keySet()) {
+                if (session.teams.getOrDefault(id, -1) != winningTeam) continue;
+                Player player = session.players.get(id);
+                if (player != null && !session.turfLeftBase.contains(id)
+                        && session.turfDeaths.getOrDefault(id, 0) == 0) {
+                    awardCatalogAchievement(player, "turf-wars", "genius-mathematician");
+                }
+            }
+        }
+        for (UUID id : session.players.keySet()) {
+            if (winningTeam >= 0 && session.teams.getOrDefault(id, -1) == winningTeam) continue;
+            int deaths = session.turfDeaths.getOrDefault(id, 0);
+            int kills = session.scores.getOrDefault(id, 0);
+            if (deaths > 0 && kills == deaths * 5) awardCatalogAchievement(id, "turf-wars", "why");
+        }
+    }
+
     private void updateTurfWarsPhase(Session session, long now) {
         if (now < session.turfPhaseEndsAt) return;
         session.turfCombat = !session.turfCombat;
@@ -9910,6 +9951,7 @@ public final class ArcadePortManager implements Listener {
         if (holder != null && holder.isOnline()
                 && session.teams.getOrDefault(holderId, -1) == team) {
             if (previousOwner >= 0 && previousOwner != team) recordSheepQuestStat(holderId, "thief");
+            recordSheepQuestCapture(session, holderId);
             session.scores.merge(holderId, 1, Integer::sum);
             holder.playSound(holder.getLocation(), Sound.ENTITY_SHEEP_AMBIENT, 1.0F, 1.5F);
             holder.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, holder.getLocation().add(0, 1, 0),
@@ -9944,6 +9986,15 @@ public final class ArcadePortManager implements Listener {
                 }
                 double damage = ArcadePortRules.SHEEP_QUEST_THROWER_DAMAGE;
                 if (target.getHealth() <= damage) {
+                    if (thrown instanceof Player thrownPlayer
+                            && "brute".equals(session.sheepQuestKits.getOrDefault(entry.getValue(), "beserker"))
+                            && session.teams.getOrDefault(thrownPlayer.getUniqueId(), -2)
+                                    == session.teams.getOrDefault(entry.getValue(), -1)) {
+                        int kills = session.sheepBruteThrownKills.merge(entry.getValue(), 1, Integer::sum);
+                        if (kills >= 2 && thrower != null) {
+                            awardCatalogAchievement(thrower, "sheep-quest", "gladiator");
+                        }
+                    }
                     eliminate(session, target, thrower, "was hit by a thrown passenger");
                 } else {
                     target.setHealth(target.getHealth() - damage);
@@ -10067,6 +10118,23 @@ public final class ArcadePortManager implements Listener {
                 && ChatColor.stripColor(item.getItemMeta().getDisplayName()).contains("Fletched Arrow");
     }
 
+
+    private void recordSheepQuestCapture(Session session, UUID playerId) {
+        if (session == null || playerId == null) return;
+        long now = System.currentTimeMillis();
+        session.sheepQuestCaptures.merge(playerId, 1, Integer::sum);
+        session.sheepQuestCaptureTimes.computeIfAbsent(playerId, ignored -> new ArrayList<>()).add(now);
+        if (session.sheepQuestKills.getOrDefault(playerId, 0) >= 3) {
+            session.sheepQuestSoloCarryCaptures.merge(playerId, 1, Integer::sum);
+        }
+        Player carrier = session.players.get(playerId);
+        if (carrier != null && carrier.isOnline()
+                && "beserker".equals(session.sheepQuestKits.getOrDefault(playerId, "beserker"))
+                && !carrier.isOnGround()) {
+            session.sheepQuestAirborneCaptures.add(playerId);
+        }
+    }
+
     private void recordSheepQuestStat(UUID playerId, String stat) {
         if (playerId == null || stat == null || stat.isBlank()) return;
         String key = localStatsPath(playerId, "sheep-quest") + stat;
@@ -10075,18 +10143,44 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void recordSheepQuestRewards(Session session, Player winner) {
-        if (session == null || winner == null) return;
-        int winnerTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
-        if (winnerTeam < 0 || sheepQuestTeamCount(session, winnerTeam) <= 12) return;
+        if (session == null) return;
+        int winnerTeam = winner == null ? -1 : session.teams.getOrDefault(winner.getUniqueId(), -1);
+        long now = System.currentTimeMillis();
         for (Player player : session.players.values()) {
-            if (player == null || !player.isOnline()
-                    || session.teams.getOrDefault(player.getUniqueId(), -2) != winnerTeam) continue;
-            String key = "test-achievements.sheep-quest." + player.getUniqueId() + ".selfish";
-            if (plugin.getConfig().getBoolean(key, false)) continue;
-            plugin.getConfig().set(key, true);
-            player.sendMessage(ChatColor.GOLD
-                    + "Achievement unlocked: Selfish — win Sheep Quest with more than 12 sheep in your pen.");
-            plugin.saveConfig();
+            if (player == null || !player.isOnline()) continue;
+            UUID id = player.getUniqueId();
+            int team = session.teams.getOrDefault(id, -2);
+            int captures = session.sheepQuestCaptures.getOrDefault(id, 0);
+            int kills = session.sheepQuestKills.getOrDefault(id, 0);
+            if (winnerTeam >= 0 && team == winnerTeam) {
+                if (sheepQuestTeamCount(session, winnerTeam) > 12) {
+                    String key = "test-achievements.sheep-quest." + id + ".selfish";
+                    if (!plugin.getConfig().getBoolean(key, false)) {
+                        plugin.getConfig().set(key, true);
+                        player.sendMessage(ChatColor.GOLD
+                                + "Achievement unlocked: Selfish — win Sheep Quest with more than 12 sheep in your pen.");
+                        plugin.saveConfig();
+                    }
+                }
+                if (kills >= 10 && captures == 0) awardCatalogAchievement(player, "sheep-quest", "whats-a-sheep");
+                long recentCaptures = session.sheepQuestCaptureTimes.getOrDefault(id, List.of()).stream()
+                        .filter(at -> now - at <= 10_000L).count();
+                if (recentCaptures >= 5) awardCatalogAchievement(player, "sheep-quest", "cheeky");
+                if ("archer".equals(session.sheepQuestKits.getOrDefault(id, "beserker"))
+                        && !session.sheepQuestEnteredOwnPen.contains(id)) {
+                    awardCatalogAchievement(player, "sheep-quest", "unconventional-but-effective");
+                }
+                if ("beserker".equals(session.sheepQuestKits.getOrDefault(id, "beserker"))
+                        && session.sheepQuestAirborneCaptures.contains(id)) {
+                    awardCatalogAchievement(player, "sheep-quest", "yeet");
+                }
+                if (session.sheepQuestSoloCarryCaptures.getOrDefault(id, 0) >= 2
+                        && kills >= 3 && !session.sheepQuestSoloCarryAssisted.contains(id)) {
+                    awardCatalogAchievement(player, "sheep-quest", "solo-carry");
+                }
+            } else if (captures >= 8) {
+                awardCatalogAchievement(player, "sheep-quest", "the-biggest-loser");
+            }
         }
     }
 
@@ -10698,6 +10792,28 @@ public final class ArcadePortManager implements Listener {
 
     private void eliminate(Session session, Player player, Player killer, String reason) {
         if (active != session || player == null) return;
+        if (session.type == ArcadePortGame.SHEEP_QUEST && killer != null
+                && !killer.getUniqueId().equals(player.getUniqueId())) {
+            session.sheepQuestKills.merge(killer.getUniqueId(), 1, Integer::sum);
+            Set<UUID> contributors = session.sheepQuestAttackersByVictim.getOrDefault(
+                    player.getUniqueId(), Set.of());
+            for (UUID contributor : contributors) {
+                if (!contributor.equals(killer.getUniqueId())
+                        && session.teams.getOrDefault(contributor, -1)
+                                == session.teams.getOrDefault(killer.getUniqueId(), -2)) {
+                    session.sheepQuestSoloCarryAssisted.add(killer.getUniqueId());
+                }
+            }
+        }
+        if (session.type == ArcadePortGame.SPLEEF) {
+            UUID archer = session.spleefArrowLastHitBy.get(player.getUniqueId());
+            long hitAt = session.spleefArrowLastHitAt.getOrDefault(player.getUniqueId(), 0L);
+            boolean fallDeath = reason != null && (reason.toLowerCase(java.util.Locale.ROOT).contains("fell")
+                    || reason.toLowerCase(java.util.Locale.ROOT).contains("void"));
+            if (archer != null && fallDeath && System.currentTimeMillis() - hitAt <= 8_000L) {
+                session.spleefArrowAssists.merge(archer, 1, Integer::sum);
+            }
+        }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE && reason != null
                 && reason.toLowerCase(java.util.Locale.ROOT).contains("fell")) {
             UUID victimId = player.getUniqueId();
@@ -12088,6 +12204,21 @@ public final class ArcadePortManager implements Listener {
                 break;
             }
             case SHEEP_QUEST:
+                session.sheepQuestAttackersByVictim.computeIfAbsent(target.getUniqueId(),
+                        ignored -> new HashSet<>()).add(attacker.getUniqueId());
+                if ("sheep archer arrow".equals(source)
+                        && "archer".equals(session.sheepQuestKits.getOrDefault(attacker.getUniqueId(), "beserker"))
+                        && !isInsideSheepPen(session, target.getLocation(),
+                                session.teams.getOrDefault(target.getUniqueId(), -1))
+                        && System.currentTimeMillis() - session.sheepQuestLastMoveAt.getOrDefault(
+                                target.getUniqueId(), 0L) <= 5_000L
+                        && target.getHealth() <= ArcadePortRules.SHEEP_QUEST_PLAYER_HIT_DAMAGE) {
+                    Map<UUID, Integer> targets = session.sheepQuestArcherKills.computeIfAbsent(
+                            attacker.getUniqueId(), ignored -> new HashMap<>());
+                    if (targets.merge(target.getUniqueId(), 1, Integer::sum) >= 5) {
+                        awardCatalogAchievement(attacker, "sheep-quest", "baaaad-to-the-bone");
+                    }
+                }
                 // Rescuing a carrier drops the opposing team's sheep stack.
                 if (attacker != null && sheepCarriedBy(session, target.getUniqueId()) > 0
                         && session.teams.getOrDefault(attacker.getUniqueId(), -1)
@@ -12461,8 +12592,41 @@ public final class ArcadePortManager implements Listener {
             handleSpleefKnockback(session, shooter, target);
             projectile.remove();
         } else if (session.type == ArcadePortGame.TURF_WARS) {
+            UUID barrageOwner = session.turfBarrageArrowOwners.remove(projectile.getUniqueId());
+            if (barrageOwner != null) {
+                Set<UUID> barrageTargets = session.turfBarrageTargetsByOwner.computeIfAbsent(
+                        barrageOwner, ignored -> new HashSet<>());
+                barrageTargets.add(target.getUniqueId());
+                if (barrageTargets.size() >= 3) {
+                    awardCatalogAchievement(barrageOwner, "turf-wars", "barragist");
+                }
+            }
+            if ("shredder".equals(session.turfWarsKits.getOrDefault(shooter.getUniqueId(), "marksman"))
+                    && "projectile hit".equals("projectile hit")) {
+                session.turfLastShredderShotByVictim.put(target.getUniqueId(), shooter.getUniqueId());
+            }
+            double distance = shooter.getLocation().distance(target.getLocation());
+            if (distance > 0.0D) {
+                org.bukkit.util.Vector direction = target.getLocation().clone().add(0.0D, 0.15D, 0.0D)
+                        .toVector().subtract(shooter.getEyeLocation().toVector()).normalize();
+                var feetRay = shooter.getWorld().rayTraceBlocks(shooter.getEyeLocation(), direction,
+                        distance, org.bukkit.FluidCollisionMode.NEVER, true);
+                org.bukkit.util.Vector eyeDirection = target.getEyeLocation().toVector()
+                        .subtract(shooter.getEyeLocation().toVector()).normalize();
+                var eyeRay = shooter.getWorld().rayTraceBlocks(shooter.getEyeLocation(), eyeDirection,
+                        distance, org.bukkit.FluidCollisionMode.NEVER, true);
+                if (feetRay == null && eyeRay != null) {
+                    awardCatalogAchievement(shooter, "turf-wars", "watch-your-step");
+                }
+            }
             handlePlayerHit(session, shooter, target, "projectile hit");
             session.turfTrackedArrows.remove(projectile.getUniqueId());
+            session.entities.remove(projectile);
+            projectile.remove();
+        } else if (session.type == ArcadePortGame.SHEEP_QUEST
+                && projectile instanceof Arrow
+                && session.sheepArcherTrackedArrows.remove(projectile.getUniqueId())) {
+            handlePlayerHit(session, shooter, target, "sheep archer arrow");
             session.entities.remove(projectile);
             projectile.remove();
         } else if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER) {
@@ -12631,6 +12795,9 @@ public final class ArcadePortManager implements Listener {
         }
         if (announceWinner && session.type == ArcadePortGame.RUNNER) {
             recordRunnerAchievements(session, winner);
+        }
+        if (announceWinner && session.type == ArcadePortGame.TURF_WARS) {
+            recordTurfWarsAchievements(session, winner);
         }
         if (announceWinner && session.type == ArcadePortGame.PAINTBALL && winner != null) recordPaintballAchievements(session, winner);
         if (announceWinner && session.type == ArcadePortGame.ONE_IN_THE_QUIVER && winner != null) recordQuiverAchievements(session, winner);
@@ -13406,7 +13573,7 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             if (java.util.Set.of("bacon-brawl", "bomb-lobbers", "evolution", "gladiators", "micro-battles",
-                    "one-in-the-quiver", "turf-wars", "sheep-quest").contains(session.type.id())) {
+                    "one-in-the-quiver", "turf-wars").contains(session.type.id())) {
                 int priorKills = plugin.getConfig().getInt(path + "kills", 0);
                 plugin.getConfig().set(path + "kills", priorKills + score);
             }
@@ -13432,6 +13599,8 @@ public final class ArcadePortManager implements Listener {
                         + session.paintballLastStandAwards.getOrDefault(id, 0));
             }
             if (session.type == ArcadePortGame.SHEEP_QUEST) {
+                plugin.getConfig().set(path + "kills", plugin.getConfig().getInt(path + "kills", 0)
+                        + session.sheepQuestKills.getOrDefault(id, 0));
                 plugin.getConfig().set(path + "sheep-captures",
                         plugin.getConfig().getInt(path + "sheep-captures", 0)
                                 + session.sheepQuestCaptures.getOrDefault(id, 0));
@@ -14538,6 +14707,27 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (!isInsideSession(session, event.getTo())) return;
+        if (session.type == ArcadePortGame.SHEEP_QUEST && session.alive.contains(playerId)
+                && !(event instanceof PlayerTeleportEvent)) {
+            session.sheepQuestLastMoveAt.put(playerId, System.currentTimeMillis());
+            if (isInsideSheepPen(session, event.getTo(), session.teams.getOrDefault(playerId, -1))) {
+                session.sheepQuestEnteredOwnPen.add(playerId);
+            }
+        }
+        if (session.type == ArcadePortGame.TURF_WARS && session.alive.contains(playerId)
+                && !(event instanceof PlayerTeleportEvent)) {
+            int team = session.teams.getOrDefault(playerId, -1);
+            Location base = session.turfTeamSpawnCentres.get(team);
+            if (base != null) {
+                double distance = horizontalDistanceSquared(event.getTo(), base);
+                if (distance > 100.0D) session.turfLeftBase.add(playerId);
+                else if (session.turfLeftBase.contains(playerId)
+                        && "infiltrator".equals(session.turfWarsKits.getOrDefault(playerId, "marksman"))) {
+                    session.turfInfiltratorReturned.add(playerId);
+                    session.turfInfiltratorKillStreak.remove(playerId);
+                }
+            }
+        }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE && session.alive.contains(playerId)
                 && !(event instanceof PlayerTeleportEvent)
                 && event.getFrom().getWorld() == session.world && event.getTo().getWorld() == session.world) {
@@ -20208,6 +20398,17 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> sheepQuestKits = new HashMap<>();
         final Map<UUID, Long> sheepNextPickupAt = new HashMap<>();
         final Map<UUID, Long> sheepBerserkerReadyAt = new HashMap<>();
+        final Map<UUID, Integer> sheepQuestCaptures = new HashMap<>();
+        final Map<UUID, Integer> sheepQuestSoloCarryCaptures = new HashMap<>();
+        final Map<UUID, List<Long>> sheepQuestCaptureTimes = new HashMap<>();
+        final Map<UUID, Integer> sheepQuestKills = new HashMap<>();
+        final Set<UUID> sheepQuestEnteredOwnPen = new HashSet<>();
+        final Set<UUID> sheepQuestAirborneCaptures = new HashSet<>();
+        final Map<UUID, Map<UUID, Integer>> sheepQuestArcherKills = new HashMap<>();
+        final Map<UUID, Set<UUID>> sheepQuestAttackersByVictim = new HashMap<>();
+        final Set<UUID> sheepQuestSoloCarryAssisted = new HashSet<>();
+        final Map<UUID, Long> sheepQuestLastMoveAt = new HashMap<>();
+        final Map<UUID, Integer> sheepBruteThrownKills = new HashMap<>();
         final Map<UUID, Long> sheepFletcherNextArrowAt = new HashMap<>();
         final Map<UUID, Integer> sheepArcherCharge = new HashMap<>();
         final Map<UUID, Long> sheepArcherLastChargeAt = new HashMap<>();
@@ -20315,6 +20516,13 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> turfBarrageRemaining = new HashMap<>();
         final Set<UUID> turfBarrageFiring = new HashSet<>();
         final Set<UUID> turfTrackedArrows = new HashSet<>();
+        final Map<UUID, UUID> turfBarrageArrowOwners = new HashMap<>();
+        final Map<UUID, Set<UUID>> turfBarrageTargetsByOwner = new HashMap<>();
+        final Map<UUID, Integer> turfDeaths = new HashMap<>();
+        final Set<UUID> turfLeftBase = new HashSet<>();
+        final Map<UUID, UUID> turfLastShredderShotByVictim = new HashMap<>();
+        final Map<UUID, Integer> turfInfiltratorKillStreak = new HashMap<>();
+        final Set<UUID> turfInfiltratorReturned = new HashSet<>();
         final Map<UUID, String> microKits = new HashMap<>();
         final Map<Block, MicroPlacedBlockOwner> microPlacedBlockOwners = new HashMap<>();
         final Map<UUID, MicroPlacedBlockKnock> microPlacedBlockKnocks = new HashMap<>();
