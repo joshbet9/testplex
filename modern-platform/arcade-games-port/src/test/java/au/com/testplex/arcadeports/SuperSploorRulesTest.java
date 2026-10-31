@@ -45,6 +45,35 @@ class SuperSploorRulesTest {
     }
 
     @Test
+    void chargerChargeControlsInkCostAndProjectileSpeed() {
+        assertEquals(0.2D, SuperSploorRules.chargerChargeFraction(0), 0.0001D);
+        assertEquals(0.5D, SuperSploorRules.chargerChargeFraction(450), 0.0001D);
+        assertEquals(1.0D, SuperSploorRules.chargerChargeFraction(2_000), 0.0001D);
+        assertEquals(10, SuperSploorRules.chargerInkCost(0.2D));
+        assertEquals(13, SuperSploorRules.chargerInkCost(0.5D));
+        assertEquals(18, SuperSploorRules.chargerInkCost(1.0D));
+        assertEquals(3.0D, SuperSploorRules.chargerProjectileSpeed(1.0D), 0.0001D);
+    }
+
+    @Test
+    void specialMeterCapsAndDoesNotChargeFromItsOwnAbility() {
+        assertEquals(12.5D, SuperSploorRules.nextSpecialCharge(10.0D, 25, false), 0.0001D);
+        assertEquals(72.0D, SuperSploorRules.nextSpecialCharge(72.0D, 50, true), 0.0001D);
+        assertEquals(100.0D, SuperSploorRules.nextSpecialCharge(99.0D, 50, false), 0.0001D);
+        assertEquals(100.0D, SuperSploorRules.specialChargeAfterSplat(98.0D), 0.0001D);
+        assertTrue(SuperSploorRules.canUseSpecial(100.0D));
+        assertFalse(SuperSploorRules.canUseSpecial(99.99D));
+    }
+
+    @Test
+    void dodgeRollChargesAreBoundedAndSpendOneAtATime() {
+        assertEquals(1, SuperSploorRules.dodgeRollChargesAfterUse(2));
+        assertEquals(0, SuperSploorRules.dodgeRollChargesAfterUse(0));
+        assertEquals(2, SuperSploorRules.nextDodgeRollCharge(1));
+        assertEquals(2, SuperSploorRules.nextDodgeRollCharge(8));
+    }
+
+    @Test
     void overtimeRequiresAOnePercentLeadAndSquidTravelRejectsTeleports() {
         assertEquals(10, SuperSploorRules.overtimeLeadThreshold(1_000));
         assertFalse(SuperSploorRules.hasDecisiveOvertimeLead(500, 509, 1_000));
