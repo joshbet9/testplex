@@ -25,15 +25,15 @@ Achievements are one-time challenges, unlocked from completed match results and 
 
 | Achievement | Requirement |
 | --- | --- |
-| Sweet Spot | Land an uncaught hit of at least 50 metres. |
-| Warning Track | Land an uncaught hit of at least 90 metres. |
+| Sweet Spot | Land an uncaught hit of at least 75 metres. |
+| Warning Track | Land an uncaught hit of at least 95 metres. |
 | Out of the Park | Hit a fair 100-metre home run. |
-| Perfect Contact | Make contact using the top timing grade. |
-| Sticky Gloves | Make your first successful catch. |
-| Golden Glove | Make at least three catches in one match. |
-| All-Rounder | Make a catch and land an uncaught hit of at least 50 metres in one match. |
-| Clutch Performer | Win a match after hitting a home run in sudden death. |
-| Champion | Win a Plexball match. |
+| Perfect Contact | Record three top-grade contacts across your Plexball career. |
+| Sticky Gloves | Make at least three successful catches in one match. |
+| Golden Glove | Make at least five successful catches in one match. |
+| All-Rounder | Make a catch and land an uncaught hit of at least 75 metres in one match. |
+| Clutch Performer | Win a match after hitting at least two home runs in sudden death. |
+| Champion | Win five Plexball matches in a row. |
 
 Unlocks send a player notification and challenge-complete sound. They are local Testplex progression only; no production Mineplex currency, XP, title or cosmetic reward is granted.
 
@@ -41,14 +41,12 @@ Unlocks send a player notification and challenge-complete sound. They are local 
 
 Milestones are cumulative and persist between matches and server restarts. The /stats page shows individual progress bars and completion states.
 
-| Track | Milestone tiers |
-| --- | --- |
-| Matches played | 1, 10, 25, 50 |
-| Wins | 1, 5, 10, 25 |
-| At-bats completed | 1, 10, 25, 50 |
-| Successful catches | 1, 5, 15, 30 |
-| Home runs | 1, 5, 10, 25 |
-| Total uncaught hit distance | 100m, 500m, 1km, 5km |
+| Milestone | Lifetime target |
+| --- | ---: |
+| Winning Legend | 250 wins |
+| Wall of Leather | 300 successful catches |
+| Home Run Hero | 100 home runs |
+| 10 Kilometre Club | 10km total uncaught hit distance |
 
 The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. It is separate from kit preferences and production account/stat storage.
 
@@ -64,9 +62,9 @@ The progression file is plugins/ArcadeMechanicsModern/plexball-progression.yml. 
 | Fielding hotbar | Fielder can switch between slot 0 (glove) and slot 1 (kit ability); other slots are blocked. |
 | Standings | Distance and successful catches are broadcast after each completed batting attempt. |
 | Player HUD | Every participant sees a live sidebar with phase, match clock, current batter, personal best, catches, kit/ability and the top three distances. |
-| Progression menu | `/stats plexball` opens a read-only inventory page listing all nine achievements, 24 career milestones and the player's saved totals. |
+| Progression menu | `/stats plexball` opens a read-only inventory page listing all nine achievements, four long-term career goals and the player's saved totals. |
 | Achievement unlocks | Each achievement unlocks once, is saved per UUID, and notifies the player with a message and challenge-complete sound. |
-| Milestone unlocks | Match, win, at-bat, catch, home-run and uncaught-distance thresholds progress cumulatively and persist between restarts. |
+| Milestone unlocks | Wins (250), successful catches (300), home runs (100) and uncaught hit distance (10km) progress cumulatively and persist between restarts. |
 | Crosshair | Clicking the tee Interaction entity only counts if the server-side eye ray intersects the smaller ball sphere. |
 | Timing | Each at-bat gets a newly phased beat; near-perfect timing grades progressively rather than binary hit/miss. |
 | Direction | Swing yaw must be inside the fair cone; off-cone direction is a foul. |
