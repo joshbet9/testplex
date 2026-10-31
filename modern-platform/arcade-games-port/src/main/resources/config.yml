@@ -35,7 +35,13 @@ lobby-scoreboard:
 # their gameplay implementations. Each entry uses "game-id:kit-id", matching
 # the legacy KitAvailability.Hide behavior. Empty by default.
 lobby-kits:
+  # Entries use "game-id:kit-id". Empty by default.
   hidden: []
+  # Optional ordered IDs per game. Unlisted visible kits follow their catalogue order.
+  # Example:
+  # order:
+  #   bomb-lobbers: [jumper, armorer, pitcher, waller]
+  order: {}
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
