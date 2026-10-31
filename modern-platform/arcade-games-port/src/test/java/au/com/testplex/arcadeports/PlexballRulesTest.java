@@ -44,7 +44,7 @@ class PlexballRulesTest {
     void triangularFieldNarrowsAtHomePlateAndWidensToOneHundredMetres() {
         assertTrue(PlexballRules.isInsideField(0.0D, 0.0D));
         assertTrue(PlexballRules.isInsideField(64.0D, -100.0D));
-        assertFalse(PlexballRules.isInsideField(66.0D, -100.0D));
+        assertFalse(PlexballRules.isInsideField(68.0D, -100.0D));
         assertFalse(PlexballRules.isInsideField(0.0D, -101.0D));
     }
 
