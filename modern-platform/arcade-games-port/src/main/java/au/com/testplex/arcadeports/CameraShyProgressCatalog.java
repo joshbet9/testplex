@@ -38,8 +38,22 @@ public final class CameraShyProgressCatalog {
 
     private CameraShyProgressCatalog() { }
 
+    private static final int ACHIEVEMENTS_PER_PAGE = 5;
+
     public static List<Achievement> achievements() { return ACHIEVEMENTS; }
     public static List<Milestone> milestones() { return MILESTONES; }
+
+    public static int pageCount() {
+        return (ACHIEVEMENTS.size() + ACHIEVEMENTS_PER_PAGE - 1) / ACHIEVEMENTS_PER_PAGE;
+    }
+
+    /** Page numbers are one-based and clamp safely at either end of the catalogue. */
+    public static List<Achievement> page(int requestedPage) {
+        int page = Math.max(1, Math.min(requestedPage, pageCount()));
+        int start = (page - 1) * ACHIEVEMENTS_PER_PAGE;
+        int end = Math.min(start + ACHIEVEMENTS_PER_PAGE, ACHIEVEMENTS.size());
+        return ACHIEVEMENTS.subList(start, end);
+    }
 
     public static Achievement achievement(String id) {
         return ACHIEVEMENTS.stream().filter(value -> value.id().equals(id)).findFirst().orElse(null);
