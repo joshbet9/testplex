@@ -129,7 +129,7 @@ Live acceptance still needs to check the three achievement thresholds, the 90-se
 3. Observe each effect from a second player and a spectator positioned far from the break. All viewers in the Spleef match world must receive the selected effect, including during Brawler's multi-block Smasher and arrow-radius damage.
 4. Confirm slow-damage colour transitions do not play a break effect until the block is actually destroyed, and the original block material is used for the Ice Shards fragments.
 
-The catalogue and renderer contract are covered by unit tests. A passing build does not replace live two-client acceptance on Paper 26.3; Spleef remains `MECHANICS_IN_PROGRESS` until that check is completed.
+The catalogue and renderer contract are covered by unit tests. Spleef is now `READY_FOR_TEST`, not gameplay-accepted; the full two-client checklist is in `SPLEEF-ACCEPTANCE-PLAN.md`. Both `Speef` and `Super Spleef` source folders are one Spleef map catalogue (37 legacy archive files), not separate game modes. CI verifies that every enabled game's complete 1.8 map filename set is present in the packaged JAR; see the plan for Spleef map selection and gameplay checks.
 
 
 ## Wither Assault: smoother movement
