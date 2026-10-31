@@ -36,6 +36,7 @@ Achievements are one-time challenges, unlocked from completed match results and 
 | Champion | Win five Plexball matches in a row. |
 
 Unlocks send a player notification and challenge-complete sound. They are local Testplex progression only; no production Mineplex currency, XP, title or cosmetic reward is granted.
+Raised achievement requirements use versioned internal unlock keys, so an unlock earned under an earlier, easier requirement does not automatically satisfy the harder challenge. The 300-catch Wall of Leather milestone likewise has its own versioned key.
 
 ## Career milestones
 
