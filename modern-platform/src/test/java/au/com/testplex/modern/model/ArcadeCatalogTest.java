@@ -8,17 +8,17 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeCatalogTest {
     @Test
-    void registersAllTwentyFourArcadeGames() {
+    void registersAllTwentyFiveArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(24, catalog.size());
-        assertEquals(24, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+        assertEquals(25, catalog.size());
+        assertEquals(25, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
     }
 
     @Test
     void eachGameHasItsOwnCosmeticLinesAndWinEffects() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         for (GameDefinition game : catalog.getGames()) {
-            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen", "milk-the-cow", "wither-assault").contains(game.getId());
+            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen", "milk-the-cow", "wither-assault", "plexball").contains(game.getId());
             assertEquals(gameplayFirstPort, game.getCosmeticLines().isEmpty(),
                     game.getId() + " cosmetic lines should remain optional during this gameplay-first port");
             assertTrue(game.getWinEffects().size() >= (gameplayFirstPort ? 1 : 3),
@@ -118,7 +118,7 @@ class ArcadeCatalogTest {
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
         assertEquals(2, readyForTest);
-        assertEquals(22, inProgress);
+        assertEquals(23, inProgress);
     }
 
     @Test
