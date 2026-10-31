@@ -140,7 +140,8 @@ jobs:
 
   deploy-modern-test-server:
     name: Deploy successful integration build to isolated Paper 26.3 VM
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' && (contains(join(github.event.head_commit.added, ','), 'modern-platform/') || contains(join(github.event.head_commit.modified, ','), 'modern-platform/') || contains(join(github.event.head_commit.removed, ','), 'modern-platform/')) }}
+    # The workflow trigger already filters pushes by modern-platform/workflow paths. Do not re-check head_commit file lists here: merge-push payloads can omit those arrays.
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' }}
     needs: build-modern-arcade
     uses: ./.github/workflows/deploy-testplex-modern-hyperv.yml
     with:
