@@ -136,4 +136,22 @@ public final class SuperSploorRules {
         return lastContributionAtMillis > 0L && nowMillis >= lastContributionAtMillis
                 && nowMillis - lastContributionAtMillis <= 8_000L;
     }
+
+    public static boolean canMarkTarget(int attackerTeam, int targetTeam,
+            boolean targetRespawning, long nowMillis, long spawnProtectedUntil) {
+        return (attackerTeam == 0 || attackerTeam == 1)
+                && (targetTeam == 0 || targetTeam == 1)
+                && attackerTeam != targetTeam
+                && !targetRespawning
+                && nowMillis >= spawnProtectedUntil;
+    }
+
+    /** Exclude the authored spawn pad and its immediate room from territory and charge. */
+    public static boolean isSpawnSafeTerritoryBlock(int blockX, int blockY, int blockZ,
+            int spawnX, int spawnY, int spawnZ) {
+        int dx = blockX - spawnX;
+        int dz = blockZ - spawnZ;
+        int dy = blockY - spawnY;
+        return dx * dx + dz * dz <= 9 && dy >= -2 && dy <= 3;
+    }
 }
