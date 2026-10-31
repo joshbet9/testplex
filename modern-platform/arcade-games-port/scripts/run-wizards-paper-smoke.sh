@@ -48,7 +48,7 @@ wizards:
   source-map-world: arcadeport_source_wizards
   arena-radius: 48
   chest-count: 32
-  allow-solo-start: true
+  allow-solo-start: false
   minimum-players: 2
   kits:
     default: MAGE
@@ -118,7 +118,7 @@ echo "[wizards-smoke] Starting disposable Paper 26.3 build $paper_build."
 ) > "$server_log" 2>&1 &
 SERVER_PID=$!
 
-# The map-import harness writes 20 PASS rows and then waits for two real clients.
+# The map-import harness writes 20 PASS rows and then waits for three real clients.
 # If the harness fails earlier, it writes a 21st failure row and shuts the server down.
 deadline=$((SECONDS + 1200))
 waiting_for_clients=false
@@ -139,7 +139,7 @@ while (( SECONDS < deadline )); do
 done
 
 if [[ "$waiting_for_clients" == true ]]; then
-  echo "[wizards-smoke] Connecting two offline-mode Minecraft 26.3 protocol clients."
+  echo "[wizards-smoke] Connecting three offline-mode Minecraft 26.3 protocol clients."
   NODE_PATH="$BOT_NODE_MODULES" WIZARDS_SMOKE_HOST=127.0.0.1 WIZARDS_SMOKE_PORT=25578 \
     node "$BOT_SCRIPT" > "$client_log" 2>&1 &
   CLIENT_PID=$!
@@ -158,7 +158,7 @@ while (( SECONDS < result_deadline )); do
 done
 
 if [[ ! -s "$result_file" ]] || [[ "$(wc -l < "$result_file")" -lt 21 ]]; then
-  echo "[wizards-smoke] Timed out before all 20 map checks and the two-client gameplay check were recorded." >&2
+  echo "[wizards-smoke] Timed out before all 20 map checks and the three-client combat gameplay check were recorded." >&2
   tail -n 240 "$server_log" >&2 || true
   tail -n 160 "$client_log" >&2 2>/dev/null || true
   exit 1
@@ -204,14 +204,14 @@ echo
 pass_count="$(grep -c '^PASS[[:space:]]' "$result_file" || true)"
 fail_count="$(grep -Ec '^(FAIL|GAMEPLAY_FAIL|HARNESS_FAIL)[[:space:]]' "$result_file" || true)"
 gameplay_pass_count="$(grep -c '^GAMEPLAY_PASS[[:space:]]' "$result_file" || true)"
-bots_ready_count="$(grep -c 'BOT_READY|PASS|count=2' "$client_log" || true)"
+bots_ready_count="$(grep -c 'BOT_READY|PASS|count=3' "$client_log" || true)"
 echo "Paper exit=$server_exit; map PASS=$pass_count; FAIL=$fail_count; gameplay PASS=$gameplay_pass_count; bot clients ready=$bots_ready_count; client exit=$client_exit"
 if [[ "$pass_count" -ne 20 || "$fail_count" -ne 0 || "$gameplay_pass_count" -ne 1 \
       || "$bots_ready_count" -ne 1 || "$server_exit" -ne 0 || "$client_exit" -ne 0 ]]; then
-  echo "[wizards-smoke] Map import or two-client gameplay/lifecycle acceptance failed." >&2
+  echo "[wizards-smoke] Map import or three-client combat/lifecycle acceptance failed." >&2
   tail -n 240 "$server_log" >&2 || true
   tail -n 160 "$client_log" >&2 || true
   exit 1
 fi
 
-echo "[wizards-smoke] All 20 maps plus a real two-client Wizards round passed Paper 26.3 acceptance."
+echo "[wizards-smoke] All 20 maps plus a real three-client combat Wizards round passed Paper 26.3 acceptance."
