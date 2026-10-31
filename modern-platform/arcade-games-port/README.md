@@ -54,7 +54,8 @@ Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Tu
 
 - `/gamepanel` → choose a supported game → **Start / Test**. The coordinator calls `/arcadeport play <game-id>`.
 - /arcadeport play camera-shy — quick-start Camera Shy; hold right-click to scope with the spyglass and press F to take a photo.
-- /arcadeport join camera-shy then /arcadeport start camera-shy — queue a Camera Shy multiplayer match; select a kit with /arcadeport kit smoke-artist|decoy|runner|spotter|understudy.
+- `/arcadeport lobby camera-shy` — select Camera Shy in the shared lobby and expose its five kit choices.
+- `/arcadeport play camera-shy` or `/arcadeport join camera-shy` then `/arcadeport start camera-shy` — start a quick or queued test; direct kit IDs are `camera-shy-smoke-artist`, `camera-shy-decoy`, `camera-shy-runner`, `camera-shy-spotter` and `camera-shy-understudy`.
 - `/arcadeport play <id>` — joins a quick-start window, giving others a few seconds to join.
 - `/arcadeport join <id>` then `/arcadeport start <id>` — queue a multi-player test.
 - `/arcadeport play turf-wars-mixed` or `/arcadeport join turf-wars-mixed` then `/arcadeport start turf-wars-mixed` — use the dedicated Mixed Arcade Turf Wars timings and double-column capture. This variant has its own queue and does not change standard `turf-wars`.
