@@ -71,14 +71,14 @@ class ArcadePortGameTest {
                 primaryWorld.resolveSibling("arcadeport_source_other"), "arcadeport_source_bacon_brawl"));
     }
 
-    @Test void selectingBaconBrawlUsesItsOwnLobbyScoreboardAndLegacyStartCountdown() {
+    @Test void everyGameUsesTheStandardLobbyScoreboardAndLegacyStartCountdown() {
         assertTrue(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("bacon-brawl"));
         assertTrue(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("BACON_BRAWL"));
         assertFalse(ModernLobbyScoreboard.usesBaconBrawlLobbySidebar("paintball"));
-        assertEquals("BACON BRAWL", org.bukkit.ChatColor.stripColor(
+        assertEquals("TESTPLEX", org.bukkit.ChatColor.stripColor(
                 ModernLobbyScoreboard.scoreboardTitleForGame("bacon-brawl", "Testplex")));
-        assertEquals("Testplex",
-                ModernLobbyScoreboard.scoreboardTitleForGame("paintball", "Testplex"));
+        assertEquals("TESTPLEX", org.bukkit.ChatColor.stripColor(
+                ModernLobbyScoreboard.scoreboardTitleForGame("paintball", "Testplex")));
         assertEquals(0, ArcadePortManager.MANUAL_START_COUNTDOWN_SECONDS,
                 "The modern lobby Start Game action should start immediately without a countdown.");
     }
@@ -99,6 +99,7 @@ class ArcadePortGameTest {
 
     @Test void modernArcadeLobbyHotbarMatchesLegacyTestplexSandboxItems() {
         assertEquals(4, ModernArcadeLobby.HOTBAR_COSMETICS_SLOT);
+        assertEquals(6, ModernArcadeLobby.HOTBAR_GAME_PREFERENCES_SLOT);
         assertEquals(8, ModernArcadeLobby.HOTBAR_GAME_PANEL_SLOT);
     }
 
