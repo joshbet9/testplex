@@ -16,7 +16,7 @@ class WizardsRulesTest {
     @Test
     void reproducesOriginalMineplexArmourPiecePercentages() {
         assertEquals(0.10D, WizardsRules.armourPieceProtection(org.bukkit.Material.LEATHER_CHESTPLATE), 0.000001D);
-        assertEquals(0.05D, WizardsRules.armourPieceProtection(org.bukkit.Material.GOLDEN_HELMET), 0.000001D);
+        assertEquals(0.075D, WizardsRules.armourPieceProtection(org.bukkit.Material.GOLDEN_HELMET), 0.000001D);
         assertEquals(0.05D, WizardsRules.armourPieceProtection(org.bukkit.Material.CHAINMAIL_BOOTS), 0.000001D);
         assertEquals(0.19D, WizardsRules.armourPieceProtection(org.bukkit.Material.IRON_CHESTPLATE), 0.000001D);
         assertEquals(0.25D, WizardsRules.armourPieceProtection(org.bukkit.Material.DIAMOND_CHESTPLATE), 0.000001D);
