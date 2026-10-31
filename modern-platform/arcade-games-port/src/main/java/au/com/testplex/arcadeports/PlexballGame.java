@@ -1215,7 +1215,7 @@ public final class PlexballGame implements Listener {
 
         int gradedTimingDistance = kit == Kit.TECHNICIAN ? Math.max(0, timingDistance - 2) : timingDistance;
         timing = PlexballRules.timingMultiplier(gradedTimingDistance);
-        if (PlexballProgressionRules.shouldAwardPerfectContact(timing)) {
+        if (PlexballProgressionRules.isPerfectContact(timing)) {
             PlayerResult result = results.get(player.getUniqueId());
             if (result != null) result.perfectContacts++;
         }
