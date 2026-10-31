@@ -544,6 +544,7 @@ public final class WizardsGameManager implements Listener {
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.setGameMode(GameMode.SURVIVAL);
+        player.setInvulnerable(false);
         player.getActivePotionEffects().forEach(effect -> player.removePotionEffect(effect.getType()));
         player.setAbsorptionAmount(0.0D);
         player.setFlying(false);
@@ -2925,7 +2926,7 @@ public final class WizardsGameManager implements Listener {
     }
 
     private record PlayerSnapshot(Location location, ItemStack[] contents, ItemStack[] armour,
-                                  GameMode gameMode, double health, double absorption, int food, float saturation,
+                                  GameMode gameMode, boolean invulnerable, double health, double absorption, int food, float saturation,
                                   int level, float exp, boolean allowFlight, boolean flying, boolean sprinting,
                                   float walkSpeed, float flySpeed, int fireTicks, Location compassTarget,
                                   List<PotionEffect> effects, Scoreboard scoreboard) {
@@ -2935,6 +2936,7 @@ public final class WizardsGameManager implements Listener {
                     cloneItems(player.getInventory().getContents()),
                     cloneItems(player.getInventory().getArmorContents()),
                     player.getGameMode(),
+                    player.isInvulnerable(),
                     player.getHealth(),
                     player.getAbsorptionAmount(),
                     player.getFoodLevel(),
@@ -2977,6 +2979,7 @@ public final class WizardsGameManager implements Listener {
             if (compassTarget != null && compassTarget.getWorld() != null) player.setCompassTarget(compassTarget);
             player.setSprinting(sprinting);
             if (scoreboard != null) player.setScoreboard(scoreboard);
+            player.setInvulnerable(invulnerable);
         }
 
         private static ItemStack[] cloneItems(ItemStack[] source) {
