@@ -346,7 +346,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private List<ArcadeLobbyKitCatalogue.KitChoice> kitChoicesFor(ArcadePortGame game) {
         return ArcadeLobbyKitCatalogue.forGame(
-                game, plugin.getConfig().getStringList("lobby-kits.hidden"));
+                game,
+                plugin.getConfig().getStringList("lobby-kits.hidden"),
+                plugin.getConfig().getStringList("lobby-kits.order." + game.id()));
     }
 
     private static final class Pedestal {
