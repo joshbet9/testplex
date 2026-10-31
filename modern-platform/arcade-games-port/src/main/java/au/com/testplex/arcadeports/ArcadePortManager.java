@@ -228,6 +228,9 @@ public final class ArcadePortManager implements Listener {
     private long postGameEndsAtMillis;
     private BukkitTask postGameReturnTask;
     private final Map<UUID, PlayerSnapshot> endingSnapshots = new HashMap<>();
+    private BukkitTask automaticRotationTask;
+    private String lastAutomaticRotationGameId;
+    private boolean automaticRotationOnReturn;
     private long lastDragonHazard;
     private long lastSheepSpawn;
     private List<Location> baconSourceSpawnOverrides = List.of();
@@ -1358,6 +1361,10 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
+        if (automaticRotationTask != null) {
+            cancelAutomaticRotationVote();
+            player.sendMessage(ChatColor.YELLOW + "The automatic preference vote was cancelled by a manual queue selection.");
+        }
         if (active != null && active.type == type) {
             player.sendMessage(ChatColor.RED + "That game is already in progress. Use /arcadeport status or queue the next game.");
             return;
@@ -1445,6 +1452,7 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
+        cancelAutomaticRotationVote();
         if (active != null || monsterMazeRunning()) {
             sender.sendMessage(ChatColor.RED + "A modern Arcade test is already running"
                     + (active == null ? " (Monster Maze)." : ": " + active.type.displayName() + "."));
@@ -1618,6 +1626,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void returnEndingPlayersToLobby() {
+        boolean beginAutomaticVote = automaticRotationOnReturn;
+        automaticRotationOnReturn = false;
         for (Map.Entry<UUID, PlayerSnapshot> entry : new HashMap<>(endingSnapshots).entrySet()) {
             Player player = Bukkit.getPlayer(entry.getKey());
             if (player != null && player.isOnline()) {
@@ -1629,6 +1639,143 @@ public final class ArcadePortManager implements Listener {
         postGameEndsAtMillis = 0L;
         postGameReturnTask = null;
         clearLobbyCountdownStatus();
+        if (beginAutomaticVote) beginAutomaticRotationVote();
+    }
+
+    private List<Player> automaticRotationLobbyPlayers() {
+        List<Player> eligible = new ArrayList<>();
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (player != null && player.isOnline() && lobby.isLobbyWorld(player.getWorld())
+                    && !testPlayers.isTestPlayer(player)) {
+                eligible.add(player);
+            }
+        }
+        return eligible;
+    }
+
+    private List<ArcadePortGame> automaticRotationCandidates() {
+        List<ArcadePortGame> candidates = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (String id : plugin.getConfig().getStringList("enabled-games")) {
+            ArcadePortGame game = ArcadePortGame.fromId(id);
+            if (game == null || !isGameEnabled(game) || !seen.add(game.id())) continue;
+            if (SourceMapCatalog.hasMap(game)) {
+                String selectedResource = plugin.getConfig().getString("selected-maps." + game.id(),
+                        SourceMapCatalog.selectedResource(plugin, game));
+                if (selectedResource == null
+                        || !SourceMapCatalog.isInstalledResource(plugin, game, selectedResource)) continue;
+            }
+            candidates.add(game);
+        }
+        return candidates;
+    }
+
+    private void beginAutomaticRotationVote() {
+        if (!plugin.getConfig().getBoolean("game-preferences.automatic-rotation.enabled", false)
+                || active != null || monsterMazeRunning()) return;
+        if (automaticRotationTask != null) automaticRotationTask.cancel();
+
+        int minimumPlayers = Math.max(1, Math.min(ArcadeTestPlayerManager.TARGET_ROSTER_SIZE,
+                plugin.getConfig().getInt("game-preferences.automatic-rotation.minimum-players", 6)));
+        int voteSeconds = Math.max(10, Math.min(300,
+                plugin.getConfig().getInt("game-preferences.automatic-rotation.vote-seconds", 60)));
+        final int[] remaining = {-1};
+        automaticRotationTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (active != null || monsterMazeRunning() || manualStartCountdown != null
+                    || postGameEndsAtMillis > System.currentTimeMillis()) {
+                cancelAutomaticRotationVote();
+                return;
+            }
+
+            List<Player> eligible = automaticRotationLobbyPlayers();
+            if (eligible.size() < minimumPlayers) {
+                if (remaining[0] >= 0) {
+                    for (Player player : eligible) player.sendMessage(ChatColor.YELLOW
+                            + "The next-game vote is paused until at least " + minimumPlayers + " players are in the lobby.");
+                }
+                remaining[0] = -1;
+                setLobbyLifecycleStatus("Waiting for players");
+                return;
+            }
+
+            if (remaining[0] < 0) {
+                remaining[0] = voteSeconds;
+                for (Player player : eligible) {
+                    player.sendMessage(ChatColor.GREEN + "The next-game vote is open! Use /gamepreferences to Like or Dislike games.");
+                    player.sendMessage(ChatColor.GRAY + "The preference-weighted selection closes in " + voteSeconds + " seconds.");
+                }
+            }
+            setLobbyLifecycleStatus("Vote ends in " + remaining[0]);
+            for (Player player : eligible) {
+                player.sendActionBar(ChatColor.GREEN + "Next game vote: " + remaining[0] + "s remaining");
+            }
+            if (remaining[0] <= 0) {
+                completeAutomaticRotationVote(minimumPlayers);
+                return;
+            }
+            remaining[0]--;
+        }, 0L, 20L);
+    }
+
+    private void completeAutomaticRotationVote(int minimumPlayers) {
+        if (automaticRotationTask != null) automaticRotationTask.cancel();
+        automaticRotationTask = null;
+        List<Player> eligible = automaticRotationLobbyPlayers();
+        if (eligible.size() < minimumPlayers) {
+            setLobbyLifecycleStatus("Waiting for players");
+            beginAutomaticRotationVote();
+            return;
+        }
+        if (!ArcadeTestPlayerManager.canFitHumanPlayers(eligible.size())) {
+            for (Player player : eligible) player.sendMessage(ChatColor.RED
+                    + "Automatic rotation cancelled: the lobby exceeds the 16-player test roster limit.");
+            clearLobbyCountdownStatus();
+            return;
+        }
+
+        List<ArcadePortGame> candidates = automaticRotationCandidates();
+        if (candidates.isEmpty()) {
+            for (Player player : eligible) player.sendMessage(ChatColor.RED
+                    + "Automatic rotation could not find an enabled game with an installed map.");
+            clearLobbyCountdownStatus();
+            return;
+        }
+        boolean avoidConsecutive = plugin.getConfig().getBoolean(
+                "game-preferences.automatic-rotation.avoid-consecutive-games", true);
+        ArcadePortGame selected = GamePreferenceRotation.chooseNext(plugin, candidates, eligible,
+                avoidConsecutive ? lastAutomaticRotationGameId : null,
+                avoidConsecutive, java.util.concurrent.ThreadLocalRandom.current().nextDouble());
+        if (selected == null) {
+            for (Player player : eligible) player.sendMessage(ChatColor.RED
+                    + "Automatic rotation could not select a game. Check the configured base weights.");
+            clearLobbyCountdownStatus();
+            return;
+        }
+
+        LinkedHashMap<UUID, Player> targetQueue = queues.computeIfAbsent(
+                queueKey(selected, false), ignored -> new LinkedHashMap<>());
+        for (Player player : eligible) {
+            for (LinkedHashMap<UUID, Player> existingQueue : queues.values()) {
+                existingQueue.remove(player.getUniqueId());
+            }
+            targetQueue.put(player.getUniqueId(), player);
+        }
+        lastAutomaticRotationGameId = selected.id();
+        selectLobbyGame(selected);
+        for (Player player : eligible) {
+            player.sendTitle(ChatColor.GOLD + "Next Game", ChatColor.YELLOW + selected.displayName(), 10, 50, 10);
+            player.sendMessage(ChatColor.GREEN + "Lobby preferences selected " + selected.displayName()
+                    + ". The round is loading now.");
+        }
+        setLobbyLifecycleStatus("Loading...");
+        startQueued(selected, null, Bukkit.getConsoleSender(), false);
+    }
+
+    private void cancelAutomaticRotationVote() {
+        if (automaticRotationTask == null) return;
+        automaticRotationTask.cancel();
+        automaticRotationTask = null;
+        setLobbyLifecycleStatus("Waiting for players");
     }
 
     private void updateLobbyCountdownStatus(ArcadePortGame type, int secondsRemaining) {
@@ -1772,6 +1919,7 @@ public final class ArcadePortManager implements Listener {
 
     private void startQueuedInternal(ArcadePortGame type, Player requester,
             org.bukkit.command.CommandSender sender, boolean mixedArcadeVariant) {
+        cancelAutomaticRotationVote();
         if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
             sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
             return;
@@ -12413,6 +12561,8 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        automaticRotationOnReturn = announceWinner;
+        lastAutomaticRotationGameId = session.type.id();
         if (postGameReturnTask != null) postGameReturnTask.cancel();
         endingSnapshots.clear();
         if (announceWinner) {
@@ -12668,7 +12818,13 @@ public final class ArcadePortManager implements Listener {
             if (seconds == 0) returnEndingPlayersToLobby();
             else postGameReturnTask = Bukkit.getScheduler().runTaskLater(plugin,
                     this::returnEndingPlayersToLobby, seconds * 20L);
-        } else clearLobbyCountdownStatus();
+        } else {
+            clearLobbyCountdownStatus();
+            if (announceWinner) {
+                automaticRotationOnReturn = false;
+                beginAutomaticRotationVote();
+            }
+        }
     }
 
     private String runnerAchievementKey(UUID playerId, String slug) {
@@ -13904,6 +14060,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void stop(String reason) {
+        automaticRotationOnReturn = false;
+        cancelAutomaticRotationVote();
         if (postGameReturnTask != null) postGameReturnTask.cancel();
         postGameReturnTask = null;
         if (!endingSnapshots.isEmpty()) returnEndingPlayersToLobby();
@@ -13949,6 +14107,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     public void shutdown() {
+        automaticRotationOnReturn = false;
+        cancelAutomaticRotationVote();
         if (manualStartCountdown != null) manualStartCountdown.cancel();
         manualStartCountdown = null;
         manualStartType = null;

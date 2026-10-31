@@ -11,6 +11,13 @@ lobby-selected-game: death-tag
 # The final displayed likelihood is each adjusted weight divided by the sum of all adjusted weights.
 game-preferences:
   base-weights: {}
+  automatic-rotation:
+    # Disabled by default so the controlled acceptance queue remains operator-driven.
+    enabled: false
+    # Match the original Mixed Arcade threshold and vote window when enabled.
+    minimum-players: 6
+    vote-seconds: 60
+    avoid-consecutive-games: true
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
