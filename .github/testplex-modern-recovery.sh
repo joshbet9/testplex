@@ -423,7 +423,7 @@ EOF
     verify-snapshot)
       validate_transaction
       assert_backup_complete
-      printf 'Snapshot verified: artifact SHA=%s; transaction=%s.\\n' "$(value backup_sha)" "$(value deployment_id)"
+      echo "Snapshot verified: artifact SHA=$(value backup_sha); transaction=$(value deployment_id)."
       ;;
     recover)
       local expected_target="${2:-}"
