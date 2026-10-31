@@ -167,7 +167,6 @@ for i in $(seq -w 1 12000); do
 done
 tar -cpf "$BACKUP/server-artifacts.tar" -C "$LARGE_OLD" plugins paper.jar .testplex-modern-deployed-build server.properties mm_void
 sha256sum "$BACKUP/server-artifacts.tar" > "$BACKUP/server-artifacts.sha256"
-write_txn REPLACING true true
 if tar -tf "$BACKUP/server-artifacts.tar" | grep -Eq '^\.?/?plugins/?$'; then
   echo 'FAIL regression fixture did not trigger tar SIGPIPE under pipefail' >&2
   exit 1
@@ -178,7 +177,6 @@ echo 'PASS valid large snapshot is accepted without tar/grep pipefail false-nega
 # Restore the small fixture for the remaining lifecycle assertions.
 tar -cpf "$BACKUP/server-artifacts.tar" -C "$TMP/old" plugins paper.jar .testplex-modern-deployed-build server.properties mm_void
 sha256sum "$BACKUP/server-artifacts.tar" > "$BACKUP/server-artifacts.sha256"
-write_txn REPLACING true true
 
 # Repeated recovery verifies existing state without moving restored data again.
 attempts_before="$(cat "$BACKUP/recovery-attempts")"
