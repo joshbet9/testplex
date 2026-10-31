@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Source-mapped Speed Builders mechanics hosted by ArcadeMechanicsModern.
@@ -643,7 +642,12 @@ public final class SpeedBuildersGame implements Listener {
         PlayerState state = players.get(event.getPlayer().getUniqueId());
         if (state == null || state.eliminated) return;
         Location to = event.getTo();
-        if (to == null || to.getWorld() != arena) return;
+        if (to == null) return;
+        if (event.getFrom().getWorld() == arena && to.getWorld() != arena) {
+            event.setTo(event.getFrom());
+            return;
+        }
+        if (to.getWorld() != arena) return;
         if (!isInsidePlot(state, to)) event.setTo(event.getFrom());
     }
 
@@ -715,6 +719,7 @@ public final class SpeedBuildersGame implements Listener {
             if (x >= 2 && x <= 4 && z >= 2 && z <= 4) b.add(x, 4, z, Material.OAK_LEAVES);
         }
         b.add(3, 5, 3, Material.OAK_LEAVES);
+        for (int y = 0; y <= 3; y++) b.add(3, y, 3, Material.OAK_LOG);
         return b.build();
     }
 
@@ -850,8 +855,7 @@ public final class SpeedBuildersGame implements Listener {
     private static final class TemplateBuilder {
         private final String id;
         private final String name;
-        private final List<SpeedBuildersRules.Cell> cells = new ArrayList<>();
-        private final Set<SpeedBuildersRules.Coordinate> occupied = new LinkedHashSet<>();
+        private final Map<SpeedBuildersRules.Coordinate, SpeedBuildersRules.Cell> cells = new LinkedHashMap<>();
 
         private TemplateBuilder(String id, String name) {
             this.id = id;
@@ -860,11 +864,11 @@ public final class SpeedBuildersGame implements Listener {
 
         private void add(int x, int y, int z, Material material) {
             SpeedBuildersRules.Coordinate coordinate = new SpeedBuildersRules.Coordinate(x, y, z);
-            if (occupied.add(coordinate)) cells.add(new SpeedBuildersRules.Cell(x, y, z, material));
+            cells.put(coordinate, new SpeedBuildersRules.Cell(x, y, z, material));
         }
 
         private Template build() {
-            return new Template(id, name, List.copyOf(cells));
+            return new Template(id, name, List.copyOf(cells.values()));
         }
     }
 }
