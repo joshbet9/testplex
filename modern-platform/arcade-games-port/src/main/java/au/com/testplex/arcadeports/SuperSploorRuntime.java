@@ -194,7 +194,7 @@ public final class SuperSploorRuntime implements Listener {
                 + "Super Sploor! " + ChatColor.RED + "Red" + ChatColor.GRAY + " vs "
                 + ChatColor.AQUA + "Blue" + ChatColor.GRAY + " — paint the most territory.");
         for (Player player : players.values()) {
-            player.sendMessage(ChatColor.YELLOW + "Right-click your Splattershot to paint. Select the Ink Sac on slot 8 while standing on friendly paint to enter Squid Mode.");
+            player.sendMessage(ChatColor.YELLOW + "Right-click your selected primary weapon to paint. Select the Ink Sac on slot 8 while standing on friendly paint to enter Squid Mode.");
         }
         updateScoreboard(now);
     }
@@ -511,7 +511,13 @@ public final class SuperSploorRuntime implements Listener {
     public void onProjectileHit(ProjectileHitEvent event) {
         if (!running || !activeProjectiles.remove(event.getEntity().getUniqueId())) return;
         Projectile projectile = event.getEntity();
-        UUID ownerId = projectileOwners.remove(projectile.getUniqueId());
+        UUID projectileId = projectile.getUniqueId();
+        UUID ownerId = projectileOwners.remove(projectileId);
+        int paintRadius = projectilePaintRadii.getOrDefault(projectileId, 2);
+        projectileEntities.remove(projectileId);
+        projectilePaintRadii.remove(projectileId);
+        projectilePaintLines.remove(projectileId);
+        projectileLastLocations.remove(projectileId);
         Player owner = ownerId == null ? null : players.get(ownerId);
         Location impact = projectile.getLocation().clone();
         if (event.getHitEntity() instanceof Player target && owner != null) {
@@ -519,8 +525,7 @@ public final class SuperSploorRuntime implements Listener {
         }
         if (owner != null && owner.isOnline()) {
             int team = teams.getOrDefault(ownerId, -1);
-            SuperSploorEngine.PaintResult result = engine.paint(
-                    impact, team, projectilePaintRadii.getOrDefault(projectile.getUniqueId(), 2));
+            SuperSploorEngine.PaintResult result = engine.paint(impact, team, paintRadius);
             recordPaint(ownerId, result);
             if (result.changedUnits() > 0) {
                 impact.getWorld().spawnParticle(Particle.DUST, impact.clone().add(0.0D, 0.3D, 0.0D),
