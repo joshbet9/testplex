@@ -1342,7 +1342,14 @@ public final class SuperSploorRuntime implements Listener {
         stampedeHitPlayers.remove(targetId);
         afterimageDashesRemaining.remove(targetId);
         afterimageNextAt.remove(targetId);
+        dualiesRollExpiresAt.remove(targetId);
+        dualiesRollTargets.remove(targetId);
+        mines.removeIf(mine -> mine.ownerId.equals(targetId));
+        sprinklers.removeIf(device -> device.ownerId.equals(targetId));
+        trackerFlares.removeIf(flare -> flare.ownerId.equals(targetId));
+        delayedBlasts.removeIf(blast -> blast.ownerId.equals(targetId));
         paintstorms.removeIf(storm -> storm.ownerId.equals(targetId));
+        target.setWalkSpeed(0.2F);
         List<UUID> cancelledSpecialProjectiles = projectileKinds.entrySet().stream()
                 .filter(entry -> entry.getValue().equals("colourburst")
                         && targetId.equals(projectileOwners.get(entry.getKey())))
