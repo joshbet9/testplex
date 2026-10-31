@@ -370,9 +370,11 @@ public final class ModernArcadeLobby implements Listener {
                 ChatColor.BLUE + "" + ChatColor.BOLD + "TEAM SELECT");
         display(world, "adv-text", new Location(world, 0.0D, ADV_TEXT_Y, ADV_TEXT_Z),
                 ChatColor.GOLD + "" + ChatColor.BOLD + "ARCADE INFORMATION");
-        display(world, "kit-display", new Location(world, KIT_DISPLAY_X, FLOOR_Y + 2.5D, 0.0D),
+        // Keep station labels above the NPCs instead of at their spawn point.
+        // Y=102.5 overlapped the centre kit and queue NPCs.
+        display(world, "kit-display", new Location(world, KIT_DISPLAY_X, FLOOR_Y + 5.0D, 0.0D),
                 ChatColor.GREEN + "Kit display datapoint");
-        display(world, "team-display", new Location(world, TEAM_DISPLAY_X, FLOOR_Y + 2.5D, 0.0D),
+        display(world, "team-display", new Location(world, TEAM_DISPLAY_X, FLOOR_Y + 5.0D, 0.0D),
                 ChatColor.BLUE + "Team display datapoint");
         display(world, "podium", new Location(world, 0.0D, FLOOR_Y + 3.0D, AMP_STAND_Z),
                 ChatColor.GOLD + "Podium / amplifier datapoint");
@@ -403,8 +405,14 @@ public final class ModernArcadeLobby implements Listener {
     }
 
     private void display(World world, String id, Location location, String name) {
-        for (ArmorStand stand : world.getEntitiesByClass(ArmorStand.class)) {
-            if (id.equals(stand.getPersistentDataContainer().get(displayKey, PersistentDataType.STRING))) return;
+        for (ArmorStand existing : world.getEntitiesByClass(ArmorStand.class)) {
+            if (!id.equals(existing.getPersistentDataContainer().get(displayKey, PersistentDataType.STRING))) {
+                continue;
+            }
+            if (!existing.getLocation().equals(location)) existing.teleport(location);
+            existing.setCustomName(name);
+            existing.setCustomNameVisible(true);
+            return;
         }
         ArmorStand stand = world.spawn(location, ArmorStand.class);
         stand.setCustomName(name);
