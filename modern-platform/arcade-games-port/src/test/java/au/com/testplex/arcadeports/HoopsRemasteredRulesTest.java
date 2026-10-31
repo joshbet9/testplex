@@ -29,10 +29,19 @@ class HoopsRemasteredRulesTest {
         assertTrue(HoopsRemasteredRules.hasReachedTargetScore(23, 18));
     }
 
-    @Test void fiveMinuteLimitAwardsLeadOrRecordsADraw() {
-        assertEquals(0, HoopsRemasteredRules.winnerAtTimeLimit(12, 10));
-        assertEquals(1, HoopsRemasteredRules.winnerAtTimeLimit(9, 11));
-        assertEquals(-1, HoopsRemasteredRules.winnerAtTimeLimit(10, 10));
+    @Test void aTiedFiveMinuteScoreEntersNextBasketWinsOvertime() {
+        assertTrue(HoopsRemasteredRules.isTiedAtTimeLimit(10, 10));
+        assertTrue(HoopsRemasteredRules.isTiedAtTimeLimit(20, 20));
+        assertFalse(HoopsRemasteredRules.isTiedAtTimeLimit(11, 10));
+        assertFalse(HoopsRemasteredRules.isTiedAtTimeLimit(10, 11));
+    }
+
+    @Test void anyBasketWinsInOvertimeButRegulationStillUsesFirstToTwentyOne() {
+        assertFalse(HoopsRemasteredRules.isWinningBasket(20, 19, false));
+        assertTrue(HoopsRemasteredRules.isWinningBasket(21, 20, false));
+        assertTrue(HoopsRemasteredRules.isWinningBasket(20, 21, false));
+        assertTrue(HoopsRemasteredRules.isWinningBasket(10, 10, true));
+        assertTrue(HoopsRemasteredRules.isWinningBasket(10, 12, true));
     }
 
     @Test void offensiveReboundsHaveAShorterShotClockThanDefensiveRebounds() {

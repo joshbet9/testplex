@@ -13137,15 +13137,11 @@ public final class ArcadePortManager implements Listener {
                 } else {
                     announce(session, ChatColor.YELLOW + "Bacon Brawl ended with no pig left standing.");
                 }
-            } else if (session.type == ArcadePortGame.HOOPS_REMASTERED) {
-                if (winner == null) {
-                    announce(session, ChatColor.YELLOW + "Hoops Remastered ended in a draw!");
-                } else {
-                    int winningTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
-                    ChatColor colour = winningTeam == 0 ? ChatColor.RED : ChatColor.AQUA;
-                    announce(session, colour + (winningTeam == 0 ? "RED" : "BLUE")
-                            + ChatColor.GOLD + " team wins Hoops Remastered!");
-                }
+            } else if (session.type == ArcadePortGame.HOOPS_REMASTERED && winner != null) {
+                int winningTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
+                ChatColor colour = winningTeam == 0 ? ChatColor.RED : ChatColor.AQUA;
+                announce(session, colour + (winningTeam == 0 ? "RED" : "BLUE")
+                        + ChatColor.GOLD + " team wins Hoops Remastered!");
             } else {
                 announce(session, winner == null ? ChatColor.YELLOW + "Round ended." : ChatColor.GOLD + "" + ChatColor.BOLD + winner.getName() + " won " + session.type.displayName() + "!");
             }
@@ -14627,8 +14623,7 @@ public final class ArcadePortManager implements Listener {
 
     private void renderHoopsRemasteredStats(Inventory inventory, UUID targetId, int played, int wins) {
         String path = localStatsPath(targetId, "hoops-remastered");
-        int draws = plugin.getConfig().getInt(path + "draws", 0);
-        int losses = plugin.getConfig().getInt(path + "losses", Math.max(0, played - wins - draws));
+        int losses = plugin.getConfig().getInt(path + "losses", Math.max(0, played - wins));
         double divisor = Math.max(1.0D, played);
         double ppg = plugin.getConfig().getDouble(path + "ppg",
                 plugin.getConfig().getDouble(path + "points", 0.0D) / divisor);
@@ -14636,18 +14631,17 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().getDouble(path + "assists", 0.0D) / divisor);
         double rpg = plugin.getConfig().getDouble(path + "rpg",
                 plugin.getConfig().getDouble(path + "rebounds", 0.0D) / divisor);
-        int[] slots = {29, 30, 31, 32, 33, 34};
-        String[] labels = {"Wins", "Losses", "Draws", "PPG", "APG", "RPG"};
+        int[] slots = {29, 30, 31, 32, 33};
+        String[] labels = {"Wins", "Losses", "PPG", "APG", "RPG"};
         String[] values = {
                 Integer.toString(wins),
                 Integer.toString(losses),
-                Integer.toString(draws),
                 String.format(java.util.Locale.ROOT, "%.2f", ppg),
                 String.format(java.util.Locale.ROOT, "%.2f", apg),
                 String.format(java.util.Locale.ROOT, "%.2f", rpg)
         };
         for (int i = 0; i < slots.length; i++) {
-            boolean recorded = i < 3 ? Integer.parseInt(values[i]) > 0 : Double.parseDouble(values[i]) > 0.0D;
+            boolean recorded = i < 2 ? Integer.parseInt(values[i]) > 0 : Double.parseDouble(values[i]) > 0.0D;
             inventory.setItem(slots[i], statsItem(recorded ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
                     (recorded ? ChatColor.GREEN : ChatColor.RED) + labels[i],
                     List.of(" ", ChatColor.GRAY + "Recorded by this local Testplex server: "

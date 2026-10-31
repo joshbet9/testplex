@@ -2,7 +2,7 @@
 
 ## Match format
 - 2–16 players (up to 8v8), balanced RED / BLUE teams, one isolated court per session.
-- Match ends at the first of: one team reaches 21 points, or five minutes elapse. The first team to 21 wins immediately (no win-by-two); at five minutes the higher score wins and a tied score is a draw.
+- Match ends when one team reaches 21 points, or when five minutes elapse. First to 21 wins immediately (no win-by-two). If the five-minute buzzer finds the score tied, the match enters sudden-death overtime and the next basket wins.
 - 24-second shot clock. Two points inside the three-point arc and three points beyond it.
 
 ## Controls and gameplay
@@ -20,7 +20,7 @@
 - Hoops Remastered achievements use the existing progress catalogue; career milestones remain in its existing wins/points/assists/rebounds/steals/blocks catalogue.
 
 ## Automated validation
-- HoopsRemasteredRulesTest covers lobby sizes, two/three-point classification, first-to-21 without win-by-two, five-minute winner/draw resolution, clutch/buzzer windows, assist expiry, box-score awards, comeback threshold, spawn assignment and clock formatting.
+- HoopsRemasteredRulesTest covers lobby sizes, two/three-point classification, first-to-21 without win-by-two, five-minute leader resolution, tied-score sudden-death overtime, clutch/buzzer windows, assist expiry, box-score awards, comeback threshold, spawn assignment and clock formatting.
 - The lobby accepts 2–16 participants only; team assignment remains 1–8 players per side.
 - Maven compile/test must pass on Paper 26.3 / Java 25.
 
@@ -30,7 +30,7 @@
 - Test passes under pressure, steals from front/side, pass interceptions, shot-clock turnover and disconnect while holding the ball.
 - Run 2, 3, 6, 8, 10, 12, 14 and 16-player matches; confirm equal team assignment, eight unique spawn lanes per side, and no team with a player advantage greater than one.
 - Specifically test a full 8v8 match for readable player spacing, pass target selection, interceptions, rebound races, steals and blocks.
-- Verify score resets, time expiration, a tied five-minute draw, first-to-21 termination, player snapshot restoration, scoreboard cleanup, and back-to-back matches.
+- Verify score resets, time expiration, a tied five-minute transition to sudden death, first-to-21 termination, next-basket overtime termination, player snapshot restoration, scoreboard cleanup, and back-to-back matches.
 - Compare shot feel and court scale with the legacy source before promoting the game to normal rotation.
 
 Hoops Remastered remains disabled from normal rotation until the live checklist is accepted.

@@ -250,7 +250,8 @@ public final class HoopsRemasteredRuntime implements Listener {
         }
         long now = System.currentTimeMillis();
         long shotRemaining = Math.max(0L, current.shotClockEndsAt - now);
-        String clock = HoopsRemasteredRules.formatClock(current.remainingMillis);
+        String clock = current.overtime ? "OVERTIME — NEXT BASKET" :
+                HoopsRemasteredRules.formatClock(current.remainingMillis);
         Player currentHolder = current.holderId == null ? null : current.players.get(current.holderId);
         String possession = currentHolder == null ? "LOOSE BALL"
                 : currentHolder.getName() + " (" + teamName(current.teams.getOrDefault(current.holderId, 0)) + ")";
@@ -283,13 +284,23 @@ public final class HoopsRemasteredRuntime implements Listener {
                         holder == null ? current.world.getSpawnLocation() : holder.getLocation(), new Vector(0.0D, 0.2D, 0.0D), BallMode.LOOSE, null, null, -1);
             }
         }
-        current.remainingMillis = Math.max(0L,
-                HoopsRemasteredRules.REGULATION_MILLIS - (now - current.startedAt));
-        if (current.remainingMillis <= 0L) {
-            int winner = HoopsRemasteredRules.winnerAtTimeLimit(current.teamScore[0], current.teamScore[1]);
-            if (winner < 0) announce(current, ChatColor.YELLOW + "Five minutes are up — the match is tied.");
-            complete(current, winner);
-            return;
+        if (!current.overtime) {
+            current.remainingMillis = Math.max(0L,
+                    HoopsRemasteredRules.REGULATION_MILLIS - (now - current.startedAt));
+            if (current.remainingMillis <= 0L) {
+                if (HoopsRemasteredRules.isTiedAtTimeLimit(current.teamScore[0], current.teamScore[1])) {
+                    current.overtime = true;
+                    current.shotClockEndsAt = now + HoopsRemasteredRules.SHOT_CLOCK_MILLIS;
+                    announce(current, ChatColor.GOLD + "" + ChatColor.BOLD
+                            + "FIVE MINUTES — TIED GAME! NEXT BASKET WINS!");
+                    current.world.playSound(new Location(current.world, 0, FLOOR_Y + 1, 0),
+                            Sound.BLOCK_BELL_USE, 1.2F, 0.8F);
+                } else {
+                    complete(current, HoopsRemasteredRules.leadingTeam(
+                            current.teamScore[0], current.teamScore[1]));
+                    return;
+                }
+            }
         }
         if (current.holderId != null && now >= current.shotClockEndsAt) {
             UUID expiredHolder = current.holderId;
@@ -444,21 +455,22 @@ public final class HoopsRemasteredRuntime implements Listener {
             Player passer = current.players.get(ball.passerId);
             if (passer != null && current.teams.getOrDefault(ball.passerId, -1) == scoringTeam) {
                 current.playerStats.get(ball.passerId).assists++;
-                if (current.remainingMillis <= HoopsRemasteredRules.CLUTCH_WINDOW_MILLIS) {
+                if (!current.overtime && current.remainingMillis <= HoopsRemasteredRules.CLUTCH_WINDOW_MILLIS) {
                     current.clutchContributions.merge(ball.passerId, 1, Integer::sum);
                 }
             }
         }
-        if (current.remainingMillis <= HoopsRemasteredRules.CLUTCH_WINDOW_MILLIS) {
+        if (!current.overtime && current.remainingMillis <= HoopsRemasteredRules.CLUTCH_WINDOW_MILLIS) {
             current.clutchContributions.merge(ball.shooterId, points, Integer::sum);
         }
         int opponent = 1 - scoringTeam;
         if (HoopsRemasteredRules.isComebackEligible(current.teamScore[opponent], current.teamScore[scoringTeam])) {
             current.comebackTeams.add(opponent);
         }
-        boolean buzzer = HoopsRemasteredRules.isBuzzerBeater(current.remainingMillis);
-        boolean won = HoopsRemasteredRules.hasReachedTargetScore(
-                current.teamScore[0], current.teamScore[1]);
+        boolean buzzer = !current.overtime
+                && HoopsRemasteredRules.isBuzzerBeater(current.remainingMillis);
+        boolean won = HoopsRemasteredRules.isWinningBasket(
+                current.teamScore[0], current.teamScore[1], current.overtime);
         if (buzzer && won) {
             if (ball.passerId != null && current.players.containsKey(ball.passerId)) {
                 award(current, ball.passerId, "buzzer-beater");
@@ -944,6 +956,7 @@ public final class HoopsRemasteredRuntime implements Listener {
         long lastPassAt;
         UUID holderId;
         UUID lastPasserId;
+        boolean overtime;
         boolean ending;
         Ball ball;
         BukkitTask task;

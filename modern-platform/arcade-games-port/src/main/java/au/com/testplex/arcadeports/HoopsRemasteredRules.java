@@ -33,9 +33,14 @@ public final class HoopsRemasteredRules {
         return red >= TARGET_SCORE || blue >= TARGET_SCORE;
     }
 
-    /** Returns 0 for RED, 1 for BLUE, or -1 when the five-minute result is a draw. */
-    public static int winnerAtTimeLimit(int red, int blue) {
-        return leadingTeam(red, blue);
+    /** Regulation is tied when the five-minute buzzer sounds. */
+    public static boolean isTiedAtTimeLimit(int red, int blue) {
+        return red == blue;
+    }
+
+    /** A basket wins either by reaching 21 in regulation or by being scored in overtime. */
+    public static boolean isWinningBasket(int red, int blue, boolean overtime) {
+        return overtime || hasReachedTargetScore(red, blue);
     }
 
     public static int leadingTeam(int red, int blue) {
