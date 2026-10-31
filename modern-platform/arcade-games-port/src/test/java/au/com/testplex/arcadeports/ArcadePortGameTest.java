@@ -736,7 +736,7 @@ class ArcadePortGameTest {
 
     @Test void microBattlesUsesTheOriginalSourceMapArchive() {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MICRO_BATTLES));
-        assertEquals(List.of("Micro Battle"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.MICRO_BATTLES));
+        assertEquals(java.util.List.of("Micro Battle"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.MICRO_BATTLES));
     }
 
     @Test void microBattlesSourceKitsFletcherAndIronSkinAreExplicit() {
