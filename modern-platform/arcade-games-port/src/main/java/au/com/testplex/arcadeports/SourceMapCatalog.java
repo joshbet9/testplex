@@ -123,6 +123,126 @@ public final class SourceMapCatalog {
         return resources.stream().distinct().sorted(String.CASE_INSENSITIVE_ORDER).toList();
     }
 
+    /**
+     * Also discover map archives left beside the server checkout. This is useful
+     * for the Wizards/Nano Wizards source pool, whose original ZIPs may already
+     * exist on a Reborn server even when they are intentionally not committed to
+     * the application repository or copied into the modern plugin JAR.
+     */
+    private static List<String> availableMapResources(JavaPlugin plugin, List<String> mapFolders, String label) {
+        List<String> resources = new ArrayList<>(bundledMapResources(plugin, mapFolders, label));
+        for (Path root : externalMapRoots(plugin)) {
+            resources.addAll(externalMapResources(root, mapFolders));
+        }
+        return resources.stream().distinct().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+    }
+
+    private static List<Path> externalMapRoots(JavaPlugin plugin) {
+        if (plugin == null) return List.of();
+        java.util.LinkedHashSet<Path> roots = new java.util.LinkedHashSet<>();
+        Path workingDirectory = Path.of(System.getProperty("user.dir", ".")).toAbsolutePath().normalize();
+        String configured = plugin.getConfig().getString("source-maps.directory", "update/maps");
+        if (configured != null && !configured.isBlank()) {
+            try {
+                Path configuredPath = Path.of(configured);
+                addMapRoot(roots, configuredPath.isAbsolute() ? configuredPath : workingDirectory.resolve(configuredPath));
+            } catch (java.nio.file.InvalidPathException exception) {
+                plugin.getLogger().warning("Ignoring invalid source-maps.directory setting: " + configured);
+            }
+        }
+
+        Path worldContainer = Bukkit.getWorldContainer().toPath().toAbsolutePath().normalize();
+        Path worldParent = worldContainer.getParent();
+        if (worldParent != null) {
+            addMapRoot(roots, worldParent.resolve("update/maps"));
+            addMapRoot(roots, worldParent.resolve("../update/maps"));
+        }
+
+        Path pluginData = plugin.getDataFolder().toPath().toAbsolutePath().normalize();
+        Path pluginsDirectory = pluginData.getParent();
+        if (pluginsDirectory != null && pluginsDirectory.getParent() != null) {
+            addMapRoot(roots, pluginsDirectory.getParent().resolve("update/maps"));
+        }
+        return List.copyOf(roots);
+    }
+
+    private static void addMapRoot(java.util.Set<Path> roots, Path candidate) {
+        if (candidate == null) return;
+        Path normalized = candidate.toAbsolutePath().normalize();
+        if (!Files.isSymbolicLink(normalized)) roots.add(normalized);
+    }
+
+    /** List safe ZIP files in just the requested legacy map folders. */
+    static List<String> externalMapResources(Path mapRoot, List<String> mapFolders) {
+        if (mapRoot == null || mapFolders == null || mapFolders.isEmpty()) return List.of();
+        Path root = mapRoot.toAbsolutePath().normalize();
+        if (Files.isSymbolicLink(root) || !Files.isDirectory(root)) return List.of();
+        List<String> resources = new ArrayList<>();
+        for (String folder : mapFolders) {
+            if (folder == null || folder.isBlank() || folder.contains("..") || folder.indexOf('\\') >= 0) continue;
+            Path directory = root.resolve(folder).normalize();
+            if (!directory.startsWith(root) || directory.equals(root)
+                    || Files.isSymbolicLink(directory) || !Files.isDirectory(directory)) continue;
+            try (Stream<Path> paths = Files.walk(directory, 8)) {
+                paths.filter(path -> Files.isRegularFile(path, java.nio.file.LinkOption.NOFOLLOW_LINKS))
+                        .filter(path -> !hasSymbolicLinkBetween(root, path))
+                        .filter(path -> path.getFileName().toString().toLowerCase(java.util.Locale.ROOT).endsWith(".zip"))
+                        .map(path -> "source-maps/" + root.relativize(path).toString().replace('\\', '/'))
+                        .filter(resource -> resourcePathBelongsToFolders(mapFolders, resource))
+                        .forEach(resources::add);
+            } catch (IOException exception) {
+                // An inaccessible optional source directory must not prevent bundled maps from working.
+            }
+        }
+        return resources.stream().distinct().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+    }
+
+    private static boolean hasSymbolicLinkBetween(Path root, Path candidate) {
+        if (root == null || candidate == null) return true;
+        Path safeRoot = root.toAbsolutePath().normalize();
+        Path safeCandidate = candidate.toAbsolutePath().normalize();
+        if (!safeCandidate.startsWith(safeRoot) || safeCandidate.equals(safeRoot)) return true;
+        Path current = safeRoot;
+        for (Path segment : safeRoot.relativize(safeCandidate)) {
+            current = current.resolve(segment);
+            if (Files.isSymbolicLink(current)) return true;
+        }
+        return false;
+    }
+
+    /** Resolve one external ZIP while refusing traversal and symbolic-link escapes. */
+    static Path resolveExternalArchivePath(Path mapRoot, String resource) {
+        if (mapRoot == null || resource == null || resource.isBlank()
+                || !resource.startsWith("source-maps/") || resource.contains("..")
+                || resource.indexOf('\\') >= 0
+                || !resource.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) return null;
+        Path root = mapRoot.toAbsolutePath().normalize();
+        if (Files.isSymbolicLink(root) || !Files.isDirectory(root)) return null;
+        Path relative;
+        try {
+            relative = Path.of(resource.substring("source-maps/".length()));
+        } catch (java.nio.file.InvalidPathException exception) {
+            return null;
+        }
+        if (relative.isAbsolute()) return null;
+        Path candidate = root.resolve(relative).normalize();
+        if (!candidate.startsWith(root) || candidate.equals(root)
+                || hasSymbolicLinkBetween(root, candidate)
+                || !Files.isRegularFile(candidate, java.nio.file.LinkOption.NOFOLLOW_LINKS)) return null;
+        return candidate;
+    }
+
+    private static InputStream openMapArchive(JavaPlugin plugin, String resource) throws IOException {
+        if (plugin == null || resource == null || resource.isBlank()) return null;
+        InputStream bundled = plugin.getResource(resource);
+        if (bundled != null) return bundled;
+        for (Path root : externalMapRoots(plugin)) {
+            Path external = resolveExternalArchivePath(root, resource);
+            if (external != null) return Files.newInputStream(external);
+        }
+        return null;
+    }
+
     private static String mapNameFromResource(String resource) {
         if (resource == null) return "Unknown Map";
         String name = resource.substring(resource.lastIndexOf('/') + 1);
@@ -150,7 +270,7 @@ public final class SourceMapCatalog {
         if (plugin == null || selectionKey == null || selectionKey.isBlank()) return List.of();
         String selected = selectedResourceForFolders(plugin, selectionKey, mapFolders);
         List<MapArchive> maps = new ArrayList<>();
-        for (String resource : bundledMapResources(plugin, mapFolders, selectionKey)) {
+        for (String resource : availableMapResources(plugin, mapFolders, selectionKey)) {
             maps.add(new MapArchive(resource, displayName(plugin, resource)));
         }
         maps.sort((left, right) -> {
@@ -172,13 +292,13 @@ public final class SourceMapCatalog {
                 .anyMatch(resource::startsWith);
     }
 
-    /** Resolve the configured selection against a set of bundled source folders. */
+    /** Resolve the configured selection against bundled or server-local source folders. */
     public static String selectedResourceForFolders(JavaPlugin plugin, String selectionKey, List<String> mapFolders) {
         if (plugin == null || selectionKey == null || selectionKey.isBlank()) return null;
-        List<String> resources = bundledMapResources(plugin, mapFolders, selectionKey);
+        List<String> resources = availableMapResources(plugin, mapFolders, selectionKey);
         String configured = plugin.getConfig().getString("selected-maps." + selectionKey);
         if (configured != null && resourcePathBelongsToFolders(mapFolders, configured)
-                && resources.contains(configured) && plugin.getResource(configured) != null) return configured;
+                && resources.contains(configured) && archiveAvailable(plugin, configured)) return configured;
         return resources.isEmpty() ? null : resources.get(0);
     }
 
@@ -265,9 +385,9 @@ public final class SourceMapCatalog {
 
     public static String displayName(JavaPlugin plugin, String resource) {
         if (resource == null) return null;
-        InputStream raw = plugin.getResource(resource);
-        if (raw == null) return mapNameFromResource(resource);
-        try (ZipInputStream zip = new ZipInputStream(raw)) {
+        try (InputStream raw = openMapArchive(plugin, resource)) {
+            if (raw == null) return mapNameFromResource(resource);
+            try (ZipInputStream zip = new ZipInputStream(raw)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
                 if (entry.getName().endsWith("WorldConfig.dat")) {
@@ -279,11 +399,12 @@ public final class SourceMapCatalog {
                             if (!name.isEmpty()) return name;
                         }
                     }
+                    }
+                    zip.closeEntry();
                 }
-                zip.closeEntry();
             }
         } catch (IOException exception) {
-            plugin.getLogger().warning("Could not read map name from " + resource + ": " + exception.getMessage());
+            if (plugin != null) plugin.getLogger().warning("Could not read map name from " + resource + ": " + exception.getMessage());
         }
         return mapNameFromResource(resource);
     }
@@ -551,6 +672,14 @@ public final class SourceMapCatalog {
         return installResource(plugin, selectedResource(plugin, game), worldName, mapFoldersFor(game));
     }
 
+    private static boolean archiveAvailable(JavaPlugin plugin, String resource) {
+        try (InputStream input = openMapArchive(plugin, resource)) {
+            return input != null;
+        } catch (IOException exception) {
+            return false;
+        }
+    }
+
     /** Extract a source archive only when it belongs to the caller's expected folder pool. */
     public static boolean installResource(JavaPlugin plugin, String resource, String worldName, List<String> mapFolders) {
         if (!resourcePathBelongsToFolders(mapFolders, resource)) {
@@ -562,7 +691,7 @@ public final class SourceMapCatalog {
 
     /** Extract a selected archive discovered from any validated source-map folder pool. */
     public static boolean installResource(JavaPlugin plugin, String resource, String worldName) {
-        if (plugin == null || resource == null || resource.isBlank() || plugin.getResource(resource) == null) {
+        if (plugin == null || resource == null || resource.isBlank()) {
             if (plugin != null) plugin.getLogger().warning("Selected source map resource is missing: " + resource);
             return false;
         }
@@ -601,9 +730,9 @@ public final class SourceMapCatalog {
         try {
             deleteExtractionTree(staging, container);
             Files.createDirectories(staging);
-            try (InputStream input = plugin.getResource(resource)) {
+            try (InputStream input = openMapArchive(plugin, resource)) {
                 if (input == null) {
-                    plugin.getLogger().warning("Missing embedded original map resource: " + resource);
+                    plugin.getLogger().warning("Missing bundled or server-local original map archive: " + resource);
                     return false;
                 }
                 try (ZipInputStream zip = new ZipInputStream(input)) {
@@ -729,10 +858,10 @@ public final class SourceMapCatalog {
                     + ": no selected archive is configured.");
             return null;
         }
-        try (InputStream input = plugin.getResource(resource)) {
+        try (InputStream input = openMapArchive(plugin, resource)) {
             if (input == null) {
                 plugin.getLogger().warning("Cannot read source map metadata for " + game.displayName()
-                        + ": the selected embedded archive is missing: " + resource);
+                        + ": the selected bundled or server-local archive is missing: " + resource);
                 return null;
             }
             try (ZipInputStream zip = new ZipInputStream(input)) {
@@ -780,9 +909,9 @@ public final class SourceMapCatalog {
                         exception);
             }
         }
-        try (InputStream input = plugin.getResource(resource)) {
+        try (InputStream input = openMapArchive(plugin, resource)) {
             if (input == null) {
-                plugin.getLogger().warning("Cannot read source map metadata: selected embedded archive is missing: " + resource);
+                plugin.getLogger().warning("Cannot read source map metadata: selected bundled or server-local archive is missing: " + resource);
                 return null;
             }
             try (ZipInputStream zip = new ZipInputStream(input)) {
