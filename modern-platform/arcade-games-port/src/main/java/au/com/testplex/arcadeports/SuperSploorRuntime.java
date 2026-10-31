@@ -1320,12 +1320,25 @@ public final class SuperSploorRuntime implements Listener {
         respawnAt.put(targetId, now + SuperSploorRules.SPLAT_RESPAWN_MILLIS);
         exitSquidMode(target, targetId);
         chargerChargeStartedAt.remove(targetId);
-        specialChargeSuppressed.remove(targetId);
         stampedeUntil.remove(targetId);
         stampedeNextPaintAt.remove(targetId);
         stampedeHitPlayers.remove(targetId);
         afterimageDashesRemaining.remove(targetId);
         afterimageNextAt.remove(targetId);
+        paintstorms.removeIf(storm -> storm.ownerId.equals(targetId));
+        List<UUID> cancelledSpecialProjectiles = projectileKinds.entrySet().stream()
+                .filter(entry -> entry.getValue().equals("colourburst")
+                        && targetId.equals(projectileOwners.get(entry.getKey())))
+                .map(Map.Entry::getKey).toList();
+        for (UUID projectileId : cancelledSpecialProjectiles) {
+            Snowball projectile = projectileEntities.remove(projectileId);
+            if (projectile != null && projectile.isValid()) projectile.remove();
+            activeProjectiles.remove(projectileId);
+            projectileOwners.remove(projectileId);
+            projectilePaintRadii.remove(projectileId);
+            projectileKinds.remove(projectileId);
+        }
+        specialChargeSuppressed.remove(targetId);
         target.setInvulnerable(true);
         target.setGameMode(GameMode.SPECTATOR);
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_DEATH, 0.9F, 1.1F);
