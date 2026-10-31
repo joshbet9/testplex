@@ -245,8 +245,51 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 || normalized.equals("mixed-skywars") || normalized.equals("mixed-sky-wars");
     }
 
+    private boolean handleStatsCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player viewer)) {
+            sender.sendMessage("Players only.");
+            return true;
+        }
+        if (cameraShy == null) {
+            viewer.sendMessage(ChatColor.RED + "Camera Shy progression is unavailable.");
+            return true;
+        }
+
+        Player subject = viewer;
+        int index = 0;
+        if (args.length > 0 && !"camera-shy".equalsIgnoreCase(args[0])) {
+            subject = Bukkit.getPlayerExact(args[0]);
+            if (subject == null) {
+                viewer.sendMessage(ChatColor.RED + "That player is not online.");
+                viewer.sendMessage(ChatColor.YELLOW + "Usage: /stats [player] [camera-shy] [page]");
+                return true;
+            }
+            index = 1;
+        }
+        if (args.length > index && "camera-shy".equalsIgnoreCase(args[index])) index++;
+
+        int page = 1;
+        if (args.length > index) {
+            try {
+                page = Integer.parseInt(args[index]);
+            } catch (NumberFormatException invalidPage) {
+                viewer.sendMessage(ChatColor.YELLOW + "Page must be a number from 1 to "
+                        + CameraShyProgressCatalog.pageCount() + ".");
+                return true;
+            }
+        }
+        if (args.length > index + 1 || page < 1 || page > CameraShyProgressCatalog.pageCount()) {
+            viewer.sendMessage(ChatColor.YELLOW + "Usage: /stats [player] [camera-shy] [page 1-"
+                    + CameraShyProgressCatalog.pageCount() + "]");
+            return true;
+        }
+        cameraShy.sendStats(viewer, subject, page);
+        return true;
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
+        if ("stats".equalsIgnoreCase(command.getName())) return handleStatsCommand(sender, args);
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
         switch (sub) {
             case "join":
