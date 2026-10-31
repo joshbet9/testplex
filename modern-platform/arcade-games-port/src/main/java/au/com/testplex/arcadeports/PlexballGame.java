@@ -800,7 +800,7 @@ public final class PlexballGame implements Listener {
             Player fielder = Bukkit.getPlayer(id);
             if (fielder == null || !fielder.isOnline()) continue;
             Kit kit = selectedKits.getOrDefault(id, Kit.TECHNICIAN);
-            fielder.sendActionBar(Component.text("FIELDING  |  Move under ball  |  [1] Right-click glove  [2] "
+            fielder.sendActionBar(Component.text("FIELDING  |  Watch batter  |  On contact: [1] glove  [2] "
                     + kit.abilityName()));
         }
     }
@@ -864,6 +864,8 @@ public final class PlexballGame implements Listener {
             roleInstruction = "Next batting turn is starting";
         } else if (viewer.getUniqueId().equals(batterId) && phase == Phase.BATTING) {
             roleInstruction = "Right-click bat once";
+        } else if (phase == Phase.BATTING) {
+            roleInstruction = "Watch batter; field after contact";
         } else if (viewer.getUniqueId().equals(batterId)) {
             roleInstruction = "Watch your hit; wait for next turn";
         } else {
