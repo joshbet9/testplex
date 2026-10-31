@@ -21,6 +21,18 @@ class SuperSploorRulesTest {
     }
 
     @Test
+    void territoryTransitionsOnlyCountNeutralClaimsAndEnemyReclaims() {
+        assertEquals(1, SuperSploorRules.territoryPaintTransition(-1, 0));
+        assertEquals(2, SuperSploorRules.territoryPaintTransition(1, 0));
+        assertEquals(0, SuperSploorRules.territoryPaintTransition(0, 0));
+        assertEquals(1, SuperSploorRules.territoryPaintTransition(-1, 1));
+        assertEquals(2, SuperSploorRules.territoryPaintTransition(0, 1));
+        assertEquals(0, SuperSploorRules.territoryPaintTransition(1, 1));
+        assertEquals(0, SuperSploorRules.territoryPaintTransition(-2, 0));
+        assertEquals(0, SuperSploorRules.territoryPaintTransition(-1, 2));
+    }
+
+    @Test
     void fourMarksAreRequiredForASplat() {
         assertEquals(1, SuperSploorRules.markCountAfterHit(0));
         assertEquals(3, SuperSploorRules.markCountAfterHit(2));
