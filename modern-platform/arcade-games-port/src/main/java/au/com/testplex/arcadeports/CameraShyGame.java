@@ -688,7 +688,6 @@ public final class CameraShyGame implements Listener {
                 if (player != null && player.isOnline()) setupPlayer(player, spawnLocations.get(id));
             }
             phase = Phase.LIVE;
-            phase = Phase.LIVE;
         } catch (RuntimeException startupFailure) {
             plugin.getLogger().log(java.util.logging.Level.SEVERE,
                     "Camera Shy could not finish preparing every player; restoring the captured pre-match state.",
