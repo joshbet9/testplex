@@ -70,6 +70,7 @@ public final class SourceMapCatalog {
             case TURF_WARS -> List.of("Turf Wars");
             case DRAW_MY_THING -> List.of("Draw My Thing");
             case MASTER_BUILDERS -> List.of();
+            case SNEAKY_ASSASSINS -> List.of();
             case CAMERA_SHY -> List.of();
             case SKY_WARS -> List.of("Skywars");
             case MILK_THE_COW -> List.of("Milk the Cow");
