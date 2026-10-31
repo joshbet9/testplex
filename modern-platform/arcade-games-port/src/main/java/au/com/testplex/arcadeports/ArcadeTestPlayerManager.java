@@ -92,6 +92,14 @@ final class ArcadeTestPlayerManager {
         return Math.max(0, humanPlayers) <= TARGET_ROSTER_SIZE;
     }
 
+    /**
+     * Session test players must never write persistent progression, rewards, personal
+     * bests or leaderboard entries. Missing ids are also rejected so callers fail closed.
+     */
+    static boolean shouldPersistProgression(UUID playerId, boolean testPlayer) {
+        return playerId != null && !testPlayer;
+    }
+
     boolean isTestPlayer(UUID id) {
         if (id == null) return false;
         if (activeHandles.containsKey(id) || retiringHandles.containsKey(id)) return true;

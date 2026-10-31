@@ -168,6 +168,31 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         }
     }
 
+    public void recordMonsterMazeFirstSafePad(java.util.UUID playerId) {
+        if (manager != null) manager.recordMonsterMazeFirstSafePad(playerId);
+    }
+
+    public void recordMonsterMazeHighestStage(java.util.UUID playerId, int stage) {
+        if (manager != null) manager.recordMonsterMazeHighestStage(playerId, stage);
+    }
+
+    public void recordMonsterMazeWin(java.util.UUID playerId, int stage) {
+        if (manager != null) manager.recordMonsterMazeWin(playerId, stage);
+    }
+
+    public void recordMonsterMazeAchievement(java.util.UUID playerId, String achievementId) {
+        if (manager != null) manager.recordMonsterMazeAchievement(playerId, achievementId);
+    }
+
+    /** Test-player query for standalone game modules that persist their own progression. */
+    public boolean isTestPlayer(Player player) {
+        return manager != null && manager.isTestPlayer(player);
+    }
+
+    public boolean isTestPlayer(java.util.UUID playerId) {
+        return manager != null && manager.isTestPlayer(playerId);
+    }
+
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
