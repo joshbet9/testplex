@@ -39,8 +39,8 @@ jobs:
           test -n "$SSH_KNOWN_HOSTS"
           mkdir -p "$HOME/.ssh"
           chmod 700 "$HOME/.ssh"
-          printf '%s\\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/testplex_hyperv"
-          printf '%s\\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          printf '%s\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/testplex_hyperv"
+          printf '%s\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/testplex_hyperv" "$HOME/.ssh/known_hosts"
 
       - name: Read-only inspect of the unresolved deployment
@@ -81,18 +81,53 @@ jobs:
             echo "=== BACKUP CHECKSUM ==="
             sudo -n cat "$BACKUP/server-artifacts.sha256" 2>&1 || true
             sudo -n sha256sum "$BACKUP/server-artifacts.tar" 2>&1 || true
-            echo "=== ARCHIVE ROOT ENTRIES (first 80) ==="
-            sudo -n tar -tf "$BACKUP/server-artifacts.tar" 2>&1 | head -n 80 || true
-            echo "=== ARCHIVE EXPECTED-ENTRY CHECKS ==="
-            for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps .testplex-plugin-sha256sums .testplex-modern-sandbox plugins; do
-              if sudo -n tar -tf "$BACKUP/server-artifacts.tar" 2>/dev/null | grep -Eq "^\\./?$item/?$"; then
-                echo "ARCHIVE_HAS $item"
-              else
-                echo "ARCHIVE_MISSING $item"
-              fi
-            done
-            echo "=== ARCHIVE PLUGIN ENTRIES (first 80 matching) ==="
-            sudo -n tar -tf "$BACKUP/server-artifacts.tar" 2>/dev/null | grep -E '(^|/)plugins(/|$)' | head -n 80 || true
+            echo "=== ARCHIVE MEMBER HEADER AUDIT (seeks over file payloads) ==="
+            sudo -n python3 - "$BACKUP/server-artifacts.tar" <<'PY'
+          import sys
+          path = sys.argv[1]
+          expected = {
+              "paper.jar", "server.properties", "eula.txt",
+              ".testplex-modern-deployed-build", ".testplex-paper-build",
+              ".testplex-mm-source-maps", ".testplex-plugin-sha256sums",
+              ".testplex-modern-sandbox", "plugins",
+          }
+          seen = set()
+          count = 0
+          with open(path, "rb") as archive:
+              while True:
+                  header = archive.read(512)
+                  if len(header) != 512:
+                      print("ARCHIVE_TRUNCATED_HEADER")
+                      break
+                  if header == bytes(512):
+                      print("ARCHIVE_END")
+                      break
+                  raw_name = header[0:100].split(b"\0", 1)[0]
+                  raw_prefix = header[345:500].split(b"\0", 1)[0]
+                  raw_size = header[124:136].strip(b"\0 ")
+                  if raw_size:
+                      try:
+                          size = int(raw_size, 8)
+                      except ValueError:
+                          size = 0
+                  else:
+                      size = 0
+                  name = (raw_prefix + b"/" + raw_name if raw_prefix else raw_name).decode("utf-8", "replace")
+                  clean = name.removeprefix("./").lstrip("/")
+                  root = clean.split("/", 1)[0].rstrip("/")
+                  if root:
+                      seen.add(root)
+                  count += 1
+                  if count <= 120:
+                      kind = chr(header[156]) if header[156] else "0"
+                      print(f"MEMBER {name!r} type={kind} size={size}")
+                  archive.seek(((size + 511) // 512) * 512, 1)
+          print(f"MEMBER_HEADERS={count}")
+          for name in sorted(expected):
+              print(("ARCHIVE_HAS " if name in seen else "ARCHIVE_MISSING ") + name)
+          print("ROOT_NAMES=" + ",".join(sorted(seen)[:200]))
+          PY
+            echo "=== ARCHIVE LIST COMPLETE ==="
             echo "=== BACKUP TRANSACTION COPY ==="
             sudo -n cat "$BACKUP/transaction.properties" 2>&1 || true
           else
