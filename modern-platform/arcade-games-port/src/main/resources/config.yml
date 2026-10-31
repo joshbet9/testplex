@@ -27,7 +27,8 @@ wizards:
   arena-radius: 48
   chest-count: 32
   allow-solo-start: false
-  minimum-players: 2
+  minimum-players: 8
+  maximum-players: 12
   kits:
     default: WIZARD
   destructive-spells: false

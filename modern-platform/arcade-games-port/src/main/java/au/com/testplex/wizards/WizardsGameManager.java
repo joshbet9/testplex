@@ -367,6 +367,12 @@ public final class WizardsGameManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "You are already queued for Wizards.");
             return;
         }
+        int maximumPlayers = Math.max(2, Math.min(WizardsRules.MAX_PLAYERS,
+                plugin.getConfig().getInt("wizards.maximum-players", WizardsRules.MAX_PLAYERS)));
+        if (queue.size() >= maximumPlayers) {
+            player.sendMessage(ChatColor.RED + "The Wizards queue is full (" + maximumPlayers + " players).");
+            return;
+        }
         if (queue.isEmpty()) plugin.prepareForWizards();
         queue.put(player.getUniqueId(), player);
         selectedKits.putIfAbsent(player.getUniqueId(), defaultKit());
@@ -428,8 +434,12 @@ public final class WizardsGameManager implements Listener {
         for (Player player : queue.values()) {
             if (player.isOnline()) entrants.add(player);
         }
-        int minimum = Math.max(1, plugin.getConfig().getInt("wizards.minimum-players", 2));
-        boolean allowSolo = plugin.getConfig().getBoolean("wizards.allow-solo-start", true);
+        int maximum = Math.max(2, Math.min(WizardsRules.MAX_PLAYERS,
+                plugin.getConfig().getInt("wizards.maximum-players", WizardsRules.MAX_PLAYERS)));
+        if (entrants.size() > maximum) entrants = new ArrayList<>(entrants.subList(0, maximum));
+        int minimum = Math.max(2, Math.min(maximum,
+                plugin.getConfig().getInt("wizards.minimum-players", WizardsRules.MIN_PLAYERS)));
+        boolean allowSolo = plugin.getConfig().getBoolean("wizards.allow-solo-start", false);
         if (entrants.size() < minimum && !(allowSolo && entrants.size() == 1)) {
             sender.sendMessage(ChatColor.RED + "Wizards needs " + minimum + " queued players to start.");
             return;
@@ -1416,23 +1426,33 @@ public final class WizardsGameManager implements Listener {
         entity.remove();
     }
 
-    private void createIcePrison(Location centre, int strength) {
+    private void createIcePrison(Location centre, int level) {
         if (centre == null || centre.getWorld() == null) return;
-        int radius = Math.max(1, strength);
+        int size = Math.max(4, Math.min(6, level + 3));
+        double horizontalRadius = size / 2.0D;
         long duration = (20L + random.nextInt(10)) * 20L;
         int placed = 0;
-        for (int x = -radius; x <= radius; x++) {
-            for (int y = -radius; y <= radius; y++) {
-                for (int z = -radius; z <= radius; z++) {
-                    if ((x * x) + (y * y) + (z * z) > radius * radius) continue;
-                    Location block = centre.getBlock().getLocation().add(x, y, z);
-                    if (setTemporaryBlock(block, Material.ICE, duration, false)) placed++;
+        Block base = centre.getBlock();
+        for (int y = 0; y < size; y++) {
+            double vertical = y / (double) (size - 1);
+            double layerRadius = horizontalRadius * Math.sqrt(Math.max(0.0D, 1.0D - vertical * vertical));
+            for (int x = 0; x < size; x++) {
+                double dx = x - (size - 1) / 2.0D;
+                for (int z = 0; z < size; z++) {
+                    double dz = z - (size - 1) / 2.0D;
+                    double radialDistance = Math.sqrt(dx * dx + dz * dz);
+                    boolean wall = radialDistance <= layerRadius
+                            && (y == 0 || radialDistance >= Math.max(0.0D, layerRadius - 1.15D));
+                    boolean cap = y == size - 1 && Math.abs(dx) <= 0.5D && Math.abs(dz) <= 0.5D;
+                    if (!wall && !cap) continue;
+                    Block block = base.getRelative(x - size / 2, y, z - size / 2);
+                    if (setTemporaryBlock(block.getLocation(), Material.ICE, duration, false)) placed++;
                 }
             }
         }
         if (placed > 0) {
             centre.getWorld().spawnParticle(Particle.SNOWFLAKE, centre, Math.min(80, 20 + placed),
-                    radius / 2.0D, radius / 2.0D, radius / 2.0D, 0.04D);
+                    size / 2.0D, size / 2.0D, size / 2.0D, 0.04D);
             centre.getWorld().playSound(centre, Sound.ENTITY_SILVERFISH_HURT, 2.0F, 1.0F);
         }
     }
@@ -1729,17 +1749,17 @@ public final class WizardsGameManager implements Listener {
                     return false;
                 }
                 Location centre = target.getLocation().add(0.5D, 0.5D, 0.5D);
-                int size = (int) (1.5F + level * 0.7F);
-                int radius = size * 2;
+                int width = Math.max(2, level * 2);
+                int height = Math.max(1, level);
+                double radius = width;
                 List<Block> affected = new ArrayList<>();
-                for (int x = -radius; x <= radius; x++) {
-                    for (int y = -radius; y <= radius; y++) {
-                        for (int z = -radius; z <= radius; z++) {
-                            Block block = target.getRelative(x, y, z);
+                for (int x = 0; x < width; x++) {
+                    for (int y = 0; y < height; y++) {
+                        for (int z = 0; z < width; z++) {
+                            Block block = target.getRelative(x - width / 2, y, z - width / 2);
                             if (block.getType().isAir() || block.getType() == Material.BEDROCK
                                     || block.getState() instanceof InventoryHolder || block.getState() instanceof TileState) continue;
-                            Location blockCentre = block.getLocation().add(0.5D, 0.5D, 0.5D);
-                            if (centre.distance(blockCentre) + Math.abs(y / 4.0D) <= radius + 0.5D) affected.add(block);
+                            affected.add(block);
                         }
                     }
                 }
@@ -1783,7 +1803,6 @@ public final class WizardsGameManager implements Listener {
                         if (victim.equals(caster) || !victim.getWorld().equals(centre.getWorld())) continue;
                         double distance = victim.getLocation().distance(centre);
                         if (distance <= radius + 2.0D) {
-                            victim.damage(Math.max(1.0D, (2.0D + level * 2.0D) * (1.0D - distance / (radius + 3.0D))), caster);
                             Vector push = victim.getLocation().toVector().subtract(centre.toVector());
                             if (push.lengthSquared() > 0.001D) victim.setVelocity(push.normalize().multiply(0.65D).setY(0.35D));
                         }
@@ -1976,12 +1995,13 @@ public final class WizardsGameManager implements Listener {
                 forward.normalize();
                 Vector side = new Vector(-forward.getZ(), 0, forward.getX());
                 Location centre = caster.getLocation().add(forward.multiply(3.0D));
-                int halfWidth = 2 + level;
+                int barrierWidth = 2 * level + 4;
                 int height = 1 + level;
                 int placed = 0;
-                for (int width = -halfWidth; width <= halfWidth; width++) {
+                for (int width = 0; width < barrierWidth; width++) {
+                    double offset = width - (barrierWidth - 1) / 2.0D;
                     for (int y = 0; y < height; y++) {
-                        Location location = centre.clone().add(side.clone().multiply(width)).add(0, y, 0);
+                        Location location = centre.clone().add(side.clone().multiply(offset)).add(0, y, 0);
                         if (setTemporaryBlock(location, Material.ICE, 100L)) placed++;
                     }
                 }
@@ -2049,7 +2069,7 @@ public final class WizardsGameManager implements Listener {
                 projectile.getPersistentDataContainer().set(projectileKey, PersistentDataType.STRING, "ice-prison");
                 projectile.getPersistentDataContainer().set(projectileOwnerKey, PersistentDataType.STRING,
                         caster.getUniqueId().toString());
-                projectile.getPersistentDataContainer().set(anvilLevelKey, PersistentDataType.INTEGER, 3 + level);
+                projectile.getPersistentDataContainer().set(anvilLevelKey, PersistentDataType.INTEGER, level);
                 ownedEntities.add(projectile.getUniqueId());
                 caster.getWorld().playSound(caster.getLocation(), Sound.ENTITY_CREEPER_PRIMED, 0.7F, 0.8F);
                 return true;
@@ -2071,8 +2091,15 @@ public final class WizardsGameManager implements Listener {
                     return false;
                 }
                 caster.setCompassTarget(target.getLocation());
+                double distance = caster.getEyeLocation().distance(target.getEyeLocation());
                 caster.sendMessage(ChatColor.AQUA + "Nearest wizard: " + ChatColor.WHITE + target.getName()
-                        + ChatColor.GRAY + " (" + Math.round(caster.getLocation().distance(target.getLocation())) + " blocks)");
+                        + ChatColor.GRAY + " (" + Math.round(distance) + " blocks)");
+                Vector directionToTarget = target.getEyeLocation().toVector()
+                        .subtract(caster.getEyeLocation().toVector()).normalize();
+                for (double step = 2.0D; step < distance; step += 2.0D) {
+                    Location point = caster.getEyeLocation().clone().add(directionToTarget.clone().multiply(step));
+                    caster.getWorld().spawnParticle(Particle.ENCHANT, point, 2, 0.04D, 0.04D, 0.04D, 0.0D, caster);
+                }
                 target.getWorld().spawnParticle(Particle.ENCHANT, target.getLocation().add(0, 1, 0), 8, 0.35, 0.5, 0.35, 0.1, caster);
                 caster.playSound(caster.getLocation(), Sound.UI_BUTTON_CLICK, 0.7F, 1.4F);
                 return true;

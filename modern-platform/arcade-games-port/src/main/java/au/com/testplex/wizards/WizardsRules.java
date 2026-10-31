@@ -12,6 +12,8 @@ public final class WizardsRules {
     public static final int MAGE_STARTER_SPELL_SELECTION_ATTEMPTS = 100;
     public static final int BASE_MANA_BOOK_CONVERSION = 50;
     public static final int FULL_WAND_CONVERSION = 100;
+    public static final int MIN_PLAYERS = 8;
+    public static final int MAX_PLAYERS = 12;
     public static final int[] GAME_PACE_MINUTES = {4, 5, 6, 7, 8, 9};
     public static final int ENDGAME_START_MINUTES = 10;
     public static final int ENDGAME_INITIAL_STRIKE_MILLIS = 6_000;

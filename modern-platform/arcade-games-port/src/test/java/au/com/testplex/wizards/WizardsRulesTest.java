@@ -42,8 +42,8 @@ class WizardsRulesTest {
         assertEquals(8, WizardsSpell.ANVIL_DROP.cooldownSeconds(1, 0.5D));
 
         assertEquals(25, WizardsSpell.HEAL.manaCost(1, 0.5D));
-        assertEquals(30, WizardsSpell.HEAL.cooldownSeconds(1, 0.5D));
-        assertEquals(20, WizardsSpell.RAINBOW_ROAD.cooldownSeconds(1, 0.5D));
+        assertEquals(15, WizardsSpell.HEAL.cooldownSeconds(1, 0.5D));
+        assertEquals(10, WizardsSpell.RAINBOW_ROAD.cooldownSeconds(1, 0.5D));
     }
 
     @Test
@@ -67,6 +67,8 @@ class WizardsRulesTest {
 
     @Test
     void followsTheOriginalPowerSurgeScheduleAndSpellFormulas() {
+        assertEquals(8, WizardsRules.MIN_PLAYERS);
+        assertEquals(12, WizardsRules.MAX_PLAYERS);
         assertEquals(java.util.List.of(4, 5, 6, 7, 8, 9), WizardsRules.gamePaceMinutes());
         assertEquals(5, WizardsSpell.ICE_SHARDS.maximumLevel());
         assertEquals(5, WizardsSpell.RUMBLE.maximumLevel());

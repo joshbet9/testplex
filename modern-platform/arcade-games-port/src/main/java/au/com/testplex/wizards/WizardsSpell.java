@@ -80,7 +80,7 @@ public enum WizardsSpell {
 
     public int cooldownSeconds(int level, double modifier) {
         int raw = baseCooldown + cooldownPerLevel * Math.max(0, level - 1);
-        double scale = (this == HEAL || this == RAINBOW_ROAD) ? 1.0D : Math.max(0.0D, modifier);
+        double scale = Math.max(0.0D, modifier);
         return Math.max(0, (int) Math.round(raw * scale));
     }
 
