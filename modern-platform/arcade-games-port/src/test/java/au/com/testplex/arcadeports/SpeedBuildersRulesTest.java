@@ -61,7 +61,16 @@ class SpeedBuildersRulesTest {
                 new SpeedBuildersRules.PlayerScore("empty", 0, 10, true),
                 new SpeedBuildersRules.PlayerScore("low", 2, 10, false),
                 new SpeedBuildersRules.PlayerScore("high", 8, 10, false));
-        assertEquals(Set.of("empty", "low"), SpeedBuildersRules.eliminationCandidates(scores));
+        assertEquals(Set.of("empty"), SpeedBuildersRules.eliminationCandidates(scores));
+    }
+
+    @Test
+    void uniqueLowestNonEmptyBuildIsEliminated() {
+        var scores = List.of(
+                new SpeedBuildersRules.PlayerScore("low", 2, 10, false),
+                new SpeedBuildersRules.PlayerScore("middle", 5, 10, false),
+                new SpeedBuildersRules.PlayerScore("high", 8, 10, false));
+        assertEquals(Set.of("low"), SpeedBuildersRules.eliminationCandidates(scores));
     }
 
     @Test
