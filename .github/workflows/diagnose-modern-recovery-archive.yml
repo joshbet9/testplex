@@ -1,0 +1,151 @@
+name: Diagnose Testplex Modern recovery archive (read-only)
+
+on:
+  push:
+    branches:
+      - "diagnose/modern-recovery-archive-20261031"
+    paths:
+      - ".github/workflows/diagnose-modern-recovery-archive.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testplex-modern-recovery-diagnostics
+  cancel-in-progress: false
+
+jobs:
+  inspect:
+    name: Inspect recovery journal and backup without changing the VM
+    runs-on: ubuntu-22.04
+    environment: hyperv
+    timeout-minutes: 10
+    steps:
+      - name: Connect runner to Hyper-V over Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:github-actions
+
+      - name: Prepare SSH credentials
+        shell: bash
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.HYPERV_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.HYPERV_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$SSH_PRIVATE_KEY"
+          test -n "$SSH_KNOWN_HOSTS"
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\\n' "$SSH_PRIVATE_KEY" > "$HOME/.ssh/testplex_hyperv"
+          printf '%s\\n' "$SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/testplex_hyperv" "$HOME/.ssh/known_hosts"
+
+      - name: Read-only inspect of the unresolved deployment
+        shell: bash
+        env:
+          HYPERV_SSH_HOST: ${{ secrets.HYPERV_SSH_HOST }}
+          HYPERV_SSH_USER: ${{ secrets.HYPERV_SSH_USER }}
+          HYPERV_SSH_PORT: ${{ secrets.HYPERV_SSH_PORT }}
+        run: |
+          set -euo pipefail
+          SSH_PORT="${HYPERV_SSH_PORT:-22}"
+          remote="$HYPERV_SSH_USER@$HYPERV_SSH_HOST"
+          ssh_opts=(-p "$SSH_PORT" -i "$HOME/.ssh/testplex_hyperv"
+            -o BatchMode=yes -o StrictHostKeyChecking=yes
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts"
+            -o ConnectTimeout=15 -o ServerAliveInterval=5 -o ServerAliveCountMax=4)
+          timeout --foreground --signal=TERM --kill-after=10s 4m ssh "${ssh_opts[@]}" "$remote" \
+            sudo -n flock -s /var/lock/testplex-modern-deploy.lock bash -s <<'REMOTE_INSPECT'
+          set -u
+          SERVER=/home/monstermaze/servers/testplex-modern
+          STATE=/var/lib/testplex-modern-deploy
+          echo "=== HOST ==="
+          date -Is
+          uptime
+          free -h
+          df -h / /var/tmp
+          echo "=== SERVICES ==="
+          systemctl is-active testplex-modern.service || true
+          systemctl is-active testplex-reborn.service || true
+          systemctl show testplex-modern.service --property=MainPID,InvocationID,ActiveState,SubState,ExecMainStatus --no-pager || true
+          echo "=== CURRENT JOURNAL ==="
+          sudo -n cat "$STATE/current.properties" 2>&1 || true
+          BACKUP="$(sudo -n sed -n 's/^backup_dir=//p' "$STATE/current.properties" 2>/dev/null | head -n 1)"
+          echo "=== BACKUP DIRECTORY ==="
+          printf 'backup_dir=%s\\n' "$BACKUP"
+          if [[ -n "$BACKUP" && -d "$BACKUP" ]]; then
+            sudo -n stat -c '%n | type=%F | size=%s | mode=%a | owner=%U:%G | mtime=%y' "$BACKUP" "$BACKUP/server-artifacts.tar" "$BACKUP/server-artifacts.sha256" 2>&1 || true
+            echo "=== BACKUP CHECKSUM ==="
+            sudo -n cat "$BACKUP/server-artifacts.sha256" 2>&1 || true
+            sudo -n sha256sum "$BACKUP/server-artifacts.tar" 2>&1 || true
+            echo "=== ARCHIVE MEMBER HEADER AUDIT (seeks over file payloads) ==="
+            sudo -n python3 - "$BACKUP/server-artifacts.tar" <<'PY'
+          import sys
+          path = sys.argv[1]
+          expected = {
+              "paper.jar", "server.properties", "eula.txt",
+              ".testplex-modern-deployed-build", ".testplex-paper-build",
+              ".testplex-mm-source-maps", ".testplex-plugin-sha256sums",
+              ".testplex-modern-sandbox", "plugins",
+          }
+          seen = set()
+          count = 0
+          with open(path, "rb") as archive:
+              while True:
+                  header = archive.read(512)
+                  if len(header) != 512:
+                      print("ARCHIVE_TRUNCATED_HEADER")
+                      break
+                  if header == bytes(512):
+                      print("ARCHIVE_END")
+                      break
+                  raw_name = header[0:100].split(b"\\0", 1)[0]
+                  raw_prefix = header[345:500].split(b"\\0", 1)[0]
+                  raw_size = header[124:136].strip(b"\\0 ")
+                  if raw_size:
+                      try:
+                          size = int(raw_size, 8)
+                      except ValueError:
+                          size = 0
+                  else:
+                      size = 0
+                  name = (raw_prefix + b"/" + raw_name if raw_prefix else raw_name).decode("utf-8", "replace")
+                  clean = name.removeprefix("./").lstrip("/")
+                  root = clean.split("/", 1)[0].rstrip("/")
+                  if root:
+                      seen.add(root)
+                  count += 1
+                  if count <= 120:
+                      kind = chr(header[156]) if header[156] else "0"
+                      print(f"MEMBER {name!r} type={kind} size={size}")
+                  archive.seek(((size + 511) // 512) * 512, 1)
+          print(f"MEMBER_HEADERS={count}")
+          for name in sorted(expected):
+              print(("ARCHIVE_HAS " if name in seen else "ARCHIVE_MISSING ") + name)
+          print("ROOT_NAMES=" + ",".join(sorted(seen)[:200]))
+          PY
+            echo "=== ARCHIVE LIST COMPLETE ==="
+            echo "=== BACKUP TRANSACTION COPY ==="
+            sudo -n cat "$BACKUP/transaction.properties" 2>&1 || true
+          else
+            echo "BACKUP_DIRECTORY_NOT_FOUND"
+          fi
+          echo "=== LIVE SERVER ROOT ARTIFACTS ==="
+          for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps .testplex-plugin-sha256sums .testplex-modern-sandbox plugins; do
+            if sudo -n test -e "$SERVER/$item"; then
+              sudo -n stat -c '%n | type=%F | size=%s | mode=%a | owner=%U:%G | mtime=%y' "$SERVER/$item"
+            else
+              echo "LIVE_MISSING $item"
+            fi
+          done
+          echo "=== LIVE BUILD MARKERS ==="
+          sudo -n cat "$SERVER/.testplex-modern-deployed-build" "$SERVER/.testplex-paper-build" 2>&1 || true
+          echo "=== LIVE PLUGIN JARS ==="
+          sudo -n find "$SERVER/plugins" -maxdepth 1 -type f -name '*.jar' -printf '%f | %s bytes | %u:%g | %TY-%Tm-%TdT%TH:%TM:%TS\\n' 2>&1 | sort || true
+          echo "=== CURRENT SERVER LOG TAIL ==="
+          sudo -n tail -n 100 "$SERVER/logs/latest.log" 2>&1 || true
+          echo "=== END READ-ONLY INSPECTION ==="
+          REMOTE_INSPECT
