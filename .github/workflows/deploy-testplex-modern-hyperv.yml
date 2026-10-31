@@ -280,19 +280,21 @@ jobs:
             name="${existing##*/}"
             [[ "$name" =~ ^testplex-modern-artifacts-[0-9a-f]{40}$ ]] || continue
             [[ "$existing" == "$upload_dir" ]] && continue
-            # Another workflow may be actively uploading to a different SHA-named
-            # directory. Only prune caches that have been untouched for >24h.
-            mtime="$(stat -c %Y -- "$existing" 2>/dev/null || printf '0')"
-            if [[ "$mtime" =~ ^[0-9]+$ ]] && (( now_epoch - mtime > 86400 )); then
-              size="$(du -sh -- "$existing" 2>/dev/null | cut -f1 || true)"
-              echo "Removing abandoned modern deployment cache (>24h old): $existing (${size:-size unavailable})"
-              sudo -n rm -rf -- "$existing"
-            else
-              echo "Leaving recent/possibly active modern staging directory untouched: $existing"
-            fi
+            # All modern deploy invocations share this workflow's concurrency group, so no
+            # other modern upload can be active while this staging step runs. These directories
+            # contain generated transfer chunks only; the installed JARs and recovery backups live
+            # elsewhere and are never touched here.
+            size="$(du -sh -- "$existing" 2>/dev/null | cut -f1 || true)"
+            echo "Removing prior modern deployment staging cache: $existing (${size:-size unavailable})"
+            sudo -n rm -rf -- "$existing"
           done
           sudo -n rm -rf -- "$upload_dir"
-          echo "Disk usage after staging-cache cleanup:"
+          # Downloaded package archives are reproducible cache, not installed software.
+          # Clearing them is safe and can recover the last few MiB needed for an atomic upload.
+          apt_cache_before="$(sudo -n du -sh /var/cache/apt/archives 2>/dev/null | cut -f1 || true)"
+          sudo -n apt-get clean
+          echo "Cleared downloaded APT package cache (${apt_cache_before:-size unavailable}); installed packages were not removed."
+          echo "Disk usage after staging-cache and package-cache cleanup:"
           df -h /var/tmp
           df -i /var/tmp
           avail_kb="$(df -Pk /var/tmp | awk 'END {print $4}')"
@@ -923,7 +925,7 @@ jobs:
           sudo -n grep -F 'TESTPLEX_ARCADE_LOBBY_READY' "$SERVER_DIR/logs/latest.log" | tail -n 1 || true
 
           sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-phase DEPLOYMENT_VERIFIED
-          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and the ten-game controlled acceptance queue, including Camera Shy; Monster Maze registration is reported separately above; Snake, Wizards and all other unfinished game ports remain disabled; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
+          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and the eleven-game controlled acceptance queue, including Super Sploor and Camera Shy; Monster Maze registration is reported separately above; Snake, Wizards and all other unfinished game ports remain disabled; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "On successful deployment, testplex-reborn.service remains stopped if it was active during preflight; a failed deployment restores services that were active before preflight. Separate Monster Maze project services/data were not modified."
           REMOTE_DEPLOY
 

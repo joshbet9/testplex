@@ -1,6 +1,6 @@
 # The 26 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
 # READY_FOR_TEST games are available together for the shared controlled test session.
-# Camera Shy joins the controlled queue; other games remain disabled until promoted.
+# Super Sploor and Camera Shy join the controlled queue; other games remain disabled until promoted.
 enabled-games:
   - death-tag
   - one-in-the-quiver
@@ -11,6 +11,7 @@ enabled-games:
   - paintball
   - plexball
   - spleef
+  - super-sploor
   - camera-shy
 lobby-selected-game: death-tag
 

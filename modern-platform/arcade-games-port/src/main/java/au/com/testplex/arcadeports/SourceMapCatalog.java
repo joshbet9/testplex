@@ -63,6 +63,7 @@ public final class SourceMapCatalog {
             case MICRO_BATTLES -> List.of("Micro Battle");
             case ONE_IN_THE_QUIVER -> List.of("One in the Quiver");
             case PAINTBALL -> List.of("Paintball", "Super Paintball");
+            case SUPER_SPLOOR -> List.of("Sploor");
             case RUNNER -> List.of("Runner");
             case SHEEP_QUEST -> List.of("Sheep Quest");
             case SPLEEF -> List.of("Speef", "Super Spleef");
@@ -128,7 +129,7 @@ public final class SourceMapCatalog {
         String[] prefixes = {
                 "BaconBrawl_", "CastleAssault_", "HOG_", "Lobbers_", "DeathTag_", "DragonEscape_", "Dragons_",
                 "DR_", "Gladiators_", "Micro_", "OITQ_", "Quiver_", "Paintball_",
-                "Runner_", "Spleef_", "SP_", "TF_", "Draw_"
+                "Runner_", "Spleef_", "SP_", "TF_", "Draw_", "NanoGames_"
         };
         for (String prefix : prefixes) {
             if (name.regionMatches(true, 0, prefix, 0, prefix.length())) {

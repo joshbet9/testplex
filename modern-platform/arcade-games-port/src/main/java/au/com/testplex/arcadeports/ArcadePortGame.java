@@ -16,6 +16,7 @@ public enum ArcadePortGame {
     MICRO_BATTLES("micro-battles", "Micro Battles", Material.LIGHT_BLUE_STAINED_GLASS),
     ONE_IN_THE_QUIVER("one-in-the-quiver", "One in the Quiver", Material.STONE_BRICKS),
     PAINTBALL("paintball", "Paintball", Material.LIME_TERRACOTTA),
+    SUPER_SPLOOR("super-sploor", "Super Sploor", Material.RED_WOOL),
     PLEXBALL("plexball", "Plexball", Material.WHITE_CONCRETE),
     RUNNER("runner", "Runner", Material.WHITE_CONCRETE),
     SHEEP_QUEST("sheep-quest", "Sheep Quest", Material.GRASS_BLOCK),

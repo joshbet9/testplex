@@ -334,6 +334,12 @@ public final class ArcadeCatalog {
                 List.of(),
                 win("home-run-stage", "Home Run Stage", "A 100-metre marker rises behind the winner."),
                 win("golden-glove", "Golden Glove", "A golden glove and ball form a compact victory display.")));
+
+        register(game("super-sploor", "Super Sploor", "INK_SAC",
+                "Paint and reclaim territory as a five-kit team in the NANO-inspired Squid Turf War.",
+                GameDefinition.PortStatus.READY_FOR_TEST,
+                List.of(),
+                win("colour-surge", "Colour Surge", "A vivid wash of team-coloured ink rolls across the winning team's podium.")));
     }
 
     private void register(GameDefinition definition) {

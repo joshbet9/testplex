@@ -14,9 +14,10 @@ The enabled modern acceptance queue must contain every original 1.8 Testplex map
 | Micro Battles | `Micro Battle` | 50 |
 | Paintball | `Paintball` + `Super Paintball` | 46 |
 | Spleef | `Speef` + `Super Spleef` | 37 |
+| Super Sploor | `Sploor` | 1 |
 | Plexball | Modern dedicated arena; no 1.8 source map folder | — |
 | Camera Shy | Procedural modern hedge maze; no 1.8 source map folder | — |
-| **Total archived source assets** | | **221 ZIP files** |
+| **Total archived source assets** | | **222 ZIP files** |
 
 The counts are source archive files, not a claim that every archive has unique binary contents. All original filenames are retained and verified.
 

@@ -25,10 +25,10 @@ The build uses Paper's official Maven repository and a version range for the cur
 - /arcadecosmetics — game-specific cosmetic lines and a separate win-effect selector.
 - /arcadetest status — administrative port-status summary.
 - player-preferences.yml — per-player, per-game, per-line preferences; separate from the legacy profile format.
-- All 26 shared Arcade games are catalogued with optional future concepts for cosmetic lines and win scenes; these are not current parity acceptance criteria.
+- All 27 shared Arcade games are catalogued with optional future concepts for cosmetic lines and win scenes; these are not current parity acceptance criteria.
 - `monster-maze-port/` contains the 1.21 Monster Maze gameplay source. It is compiled directly into `ArcadeMechanicsModern.jar` as an in-process game module; it has no Bukkit plugin descriptor, join listener, private lobby, NPC selector or separate server lifecycle.
 - `snake-port/` builds `SnakeModern.jar`, a Paper-native mechanics-first port with an isolated arena.
-- `arcade-games-port/` builds `ArcadeMechanicsModern.jar`, dedicated test arenas and game loops for the modern shared Arcade catalogue, including Draw My Thing, Master Builders, Plexball and Camera Shy.
+- `arcade-games-port/` builds `ArcadeMechanicsModern.jar`, dedicated test arenas and game loops for the modern shared Arcade catalogue, including Draw My Thing, Master Builders, Plexball, Super Sploor and Camera Shy.
 - Plexball is enabled for controlled Paper 26.3 acceptance testing through the shared 2–8-player Arcade queue. It uses the normal lobby kit pedestals, player snapshots, Session/stop lifecycle and return-to-lobby flow; gameplay commands are `/arcadeport play plexball`, `/arcadeport join plexball`, `/arcadeport spectate plexball`, `/arcadeport leave plexball`, `/arcadeport kit plexball` and `/stats plexball`. It is not a public production rotation claim: measured-latency and live multiplayer acceptance remain required.
 - Game Details routes Monster Maze through `/arcadeport play monster-maze`; its participants, queue, stop handling and return-to-lobby flow are owned by Testplex Arcade.
 - Deployment migrates saved module data from both old standalone data folders (`plugins/MonsterMazeStandalone/` and `plugins/MonsterMazeModern/`), then inspects plugin descriptors and quarantines any standalone Monster Maze Bukkit JAR (including the source project's actual `MonsterMazeStandalone.jar` name) in the deployment backup before Paper restarts. The independent `joshbet9/MonsterMaze` project and its separate services are not modified.
@@ -47,9 +47,9 @@ Modern server provisioning and deployment use a separate directory, unit (`testp
 2. Compare each of the other 14 rough game loops to the existing Reborn source and resolve mechanics/API/lifecycle issues game by game.
 3. Keep cosmetic lines, progression milestones and win scenes parked for all games during the mechanics pass. Exception: Monster Maze customisation remains a core pillar and is tested alongside its mechanics.
 
-## Complete 28-game programme register (1 November 2026)
+## Complete 29-game programme register (1 November 2026)
 
-The overall programme tracks 28 titles/variants: **26 shared Arcade catalogue games**, the separately packaged **Wizards** module, and the planned **Speed Builders Arcade** variant. Speed Builders currently has no implementation branch or runtime code; it is tracked as planned work rather than represented by a non-functional placeholder.
+The overall programme tracks 29 titles/variants: **27 shared Arcade catalogue games**, the separately packaged **Wizards** module, and the planned **Speed Builders Arcade** variant. Speed Builders currently has no implementation branch or runtime code; it is tracked as planned work rather than represented by a non-functional placeholder.
 
 | # | Game | Current implementation state | Test access |
 |---:|---|---|---|
@@ -79,7 +79,8 @@ The overall programme tracks 28 titles/variants: **26 shared Arcade catalogue ga
 | 24 | Wither Assault | Mechanics-first port integrated; generated test arena | Disabled |
 | 25 | Plexball | Controlled acceptance; server-authoritative batting/fielding, kits, HUD, progression and shared Arcade lifecycle; modern arena (no 1.8 map archive) | Enabled |
 | 26 | Camera Shy | Spyglass-based photographic elimination game; five exposures eliminate; full live acceptance pending | Enabled for controlled testing |
-| 27 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
-| 28 | Speed Builders Arcade | Planned; implementation not started | Not available |
+| 27 | Super Sploor | NANO-inspired five-kit team territory shooter with original Sploor map | Enabled for controlled testing |
+| 28 | Wizards | Separate resource-packless module; 10 of 21 spell effects implemented | Disabled |
+| 29 | Speed Builders Arcade | Planned; implementation not started | Not available |
 
-**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef and Camera Shy form the shared controlled test queue. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable. The 221 archived 1.8 map ZIPs for enabled games are tracked in [the legacy map parity register](arcade-games-port/LEGACY-MAP-PARITY.md); Plexball is explicitly documented as using a modern arena.
+**Readiness rule:** Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor and Camera Shy form the shared controlled test queue. Being enabled means a game is available for controlled testing, not that every mechanic has already passed live acceptance. Fix issues found during combined testing, keep playable games available, and expand the queue as other games become testable. The 222 archived 1.8 map ZIPs for enabled games are tracked in [the legacy map parity register](arcade-games-port/LEGACY-MAP-PARITY.md); Plexball is explicitly documented as using a modern arena.
