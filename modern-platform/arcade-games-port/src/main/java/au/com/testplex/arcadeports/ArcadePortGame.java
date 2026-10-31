@@ -26,7 +26,8 @@ public enum ArcadePortGame {
     SNEAKY_ASSASSINS("sneaky-assassins", "Sneaky Assassins", Material.EMERALD_BLOCK),
     SKY_WARS("skywars", "SkyWars", Material.END_STONE_BRICKS),
     MILK_THE_COW("milk-the-cow", "Milk the Cow", Material.GRASS_BLOCK),
-    WITHER_ASSAULT("wither-assault", "Wither Assault", Material.STONE_BRICKS);
+    WITHER_ASSAULT("wither-assault", "Wither Assault", Material.STONE_BRICKS),
+    CAMERA_SHY("camera-shy", "Camera Shy", Material.SPYGLASS);
 
     private final String id;
     private final String displayName;

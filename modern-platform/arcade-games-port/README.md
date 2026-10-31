@@ -1,6 +1,6 @@
 # Modern Arcade mechanics prototypes (Paper 26.3)
 
-This plugin adds first-pass playable mechanics harnesses for the 15 Arcade games outside the dedicated Monster Maze and Snake modules. It is a compatibility/work-in-progress layer intended to expose API and game-loop problems early; it is **not** a claim that all original Mineplex mechanics or maps have been faithfully ported yet.
+This plugin adds first-pass playable mechanics harnesses for the 16 Arcade games outside the dedicated Monster Maze and Snake modules. It is a compatibility/work-in-progress layer intended to expose API and game-loop problems early; it is **not** a claim that all original Mineplex mechanics or maps have been faithfully ported yet.
 
 ## SkyWars — fast Mixed Arcade FFA
 
@@ -13,6 +13,14 @@ The lobby kit selector exposes the five legacy SkyWars kits: Ice (temporary brid
 Join with `/arcadeport join skywars-mixed`, quick-start with `/arcadeport play skywars-mixed`, or start the queued lobby with `/arcadeport start skywars-mixed`. Choose an installed map with `/arcadeport maps skywars`.
 
 SkyWars remains a manual-acceptance candidate, not a claim of complete 1.8 parity. The port still needs local Maven compilation and in-game validation, including all archived maps, loot rolls, each kit under combat, guardian pathing/death rewards, TNT damage and disconnect cleanup.
+
+## Camera Shy — spyglass photographic elimination
+
+Camera Shy is an in-process free-for-all: hold right-click with the vanilla spyglass to aim and press F (swap hands) to take a photograph. Five successful photographs eliminate a player. The camera has server-side line-of-sight and range validation, a shutter cooldown and short exposure protection; taking a photograph reveals the photographer's approximate position. The three-minute round ends with the last human player standing, while eliminated players spectate.
+
+The lobby offers Smoke Artist (smoke screen), Decoy (fake snapshot), Runner (short Speed II escape burst), Spotter (nearby-player scan) and Understudy (player-skin stand-in). A rare Group Photo pickup can photograph two opponents in one frame; Director's Spotlight periodically highlights a player; Final Snapshot speeds up the shutter in the last 30 seconds. The dedicated maze is isolated from the lobby and other game worlds.
+
+The stats menu exposes the 20 Camera Shy achievements and three lifetime milestones: 250 wins, 500 eliminations and 1,000 photographs. This is a new mechanics-first implementation and remains outside the ready-for-test allow-list pending live acceptance.
 
 ## Games covered in this first pass
 
@@ -45,6 +53,8 @@ Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Tu
 ## Commands
 
 - `/gamepanel` → choose a supported game → **Start / Test**. The coordinator calls `/arcadeport play <game-id>`.
+- /arcadeport play camera-shy — quick-start Camera Shy; hold right-click to scope with the spyglass and press F to take a photo.
+- /arcadeport join camera-shy then /arcadeport start camera-shy — queue a Camera Shy multiplayer match; select a kit with /arcadeport kit smoke-artist|decoy|runner|spotter|understudy.
 - `/arcadeport play <id>` — joins a quick-start window, giving others a few seconds to join.
 - `/arcadeport join <id>` then `/arcadeport start <id>` — queue a multi-player test.
 - `/arcadeport play turf-wars-mixed` or `/arcadeport join turf-wars-mixed` then `/arcadeport start turf-wars-mixed` — use the dedicated Mixed Arcade Turf Wars timings and double-column capture. This variant has its own queue and does not change standard `turf-wars`.
@@ -52,7 +62,7 @@ Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Tu
 - `/arcadeport ghost <on|off|toggle>` — enable or hide your Dragon Escape translucent PB player ghost.
 - `/arcadeport status`, `/arcadeport stop` (operator only).
 
-Game IDs are: `bacon-brawl`, `bomb-lobbers`, `castle-assault`, `death-tag`, `dragon-escape`, `dragons`, `draw-my-thing`, `evolution`, `gladiators`, `heroes-of-gwen`, `master-builders`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. Mixed Arcade aliases use `<game-id>-mixed` or `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Castle Assault and Heroes of Gwen remain disabled pending acceptance.
+Game IDs include `camera-shy` alongside `bacon-brawl`, `bomb-lobbers`, `castle-assault`, `death-tag`, `dragon-escape`, `dragons`, `draw-my-thing`, `evolution`, `gladiators`, `heroes-of-gwen`, `master-builders`, `micro-battles`, `one-in-the-quiver`, `paintball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. Mixed Arcade aliases use `<game-id>-mixed` or `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Castle Assault and Heroes of Gwen remain disabled pending acceptance.
 
 ## Acceptance boundary
 

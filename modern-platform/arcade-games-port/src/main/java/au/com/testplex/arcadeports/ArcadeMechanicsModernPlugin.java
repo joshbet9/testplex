@@ -16,6 +16,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private ArcadePortManager manager;
     private MonsterMazePlugin monsterMaze;
     private ArcadeMapSelectionMenu mapMenu;
+    private CameraShyGame cameraShy;
     private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
 
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
@@ -46,6 +47,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         // Bring up Testplex's shared lobby before any optional game module. A failure
         // in Monster Maze must not leave players in the unrelated survival world.
         manager = new ArcadePortManager(this);
+        cameraShy = new CameraShyGame(this, manager);
+        manager.setCameraShyModule(cameraShy);
+        getServer().getPluginManager().registerEvents(cameraShy, this);
         mapMenu = new ArcadeMapSelectionMenu(this);
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getPluginManager().registerEvents(mapMenu, this);
@@ -260,6 +264,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 ArcadePortGame requestedGame = mixedArcadeVariant ? mixedJoinGame : ArcadePortGame.fromId(args[1]);
                 manager.queue(requestedGame, player, sub.equals("play"), mixedArcadeVariant);
                 return true;
+            case "leave":
+                if (!(sender instanceof Player player)) {
+                    sender.sendMessage("Players only.");
+                    return true;
+                }
+                if (cameraShy != null) cameraShy.leaveQueue(player);
+                return true;
             case "lobby":
             case "selectgame":
                 if (args.length < 2) {
@@ -347,7 +358,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>-mixed" + ChatColor.GRAY
                         + " — Mixed Arcade variants: Turf Wars, Castle Assault and Heroes of Gwen");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a Bomb Lobbers, Bacon Brawl, Dragons, Micro Battles, One in the Quiver, Paintball, Runner, Sneaky Assassins, Spleef, Death Tag or Turf Wars kit; use escape-artist, assassin, briber or revealer for Sneaky Assassins; turf-wars-<kit> for Turf Wars and runnerkit-<kit> for Runner");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a game kit; Camera Shy: smoke-artist, decoy, runner, spotter or understudy");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport leave" + ChatColor.GRAY + " — leave the Camera Shy queue");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport ghost <on|off|toggle>" + ChatColor.GRAY + " — show or hide your Dragon Escape PB ghost");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport dragoncolor <colour>" + ChatColor.GRAY + " — set your Dragon Escape leader beacon colour");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport status" + ChatColor.GRAY + " — active game and queue counts");
