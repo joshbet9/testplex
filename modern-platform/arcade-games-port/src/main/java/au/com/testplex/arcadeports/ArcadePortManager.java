@@ -5489,6 +5489,8 @@ public final class ArcadePortManager implements Listener {
         int baseY = to.getBlockY();
         int baseZ = to.getBlockZ();
         UUID playerId = player.getUniqueId();
+        // "Jumper" in this achievement means a player airborne during the collision;
+        // Micro Battles itself has Archer, Worker and Fighter kits only.
         int playerTeam = session.teams.getOrDefault(playerId, -1);
         if (playerTeam < 0) return;
 
@@ -5526,8 +5528,7 @@ public final class ArcadePortManager implements Listener {
         if (reason == null) return false;
         String normalized = reason.toLowerCase(java.util.Locale.ROOT);
         return normalized.contains("fell") || normalized.contains("void")
-                || normalized.contains("border") || normalized.contains("lava")
-                || normalized.contains("water");
+                || normalized.contains("lava") || normalized.contains("water");
     }
 
     private void recordMicroBattlesSniperKnockout(Session session, Player victim) {
@@ -10800,11 +10801,12 @@ public final class ArcadePortManager implements Listener {
             UUID victimId = player.getUniqueId();
             String normalizedReason = reason == null ? "" : reason.toLowerCase(java.util.Locale.ROOT);
             boolean environmentalKnockOut = isMicroBattlesEnvironmentalKnockOut(reason);
+            boolean liquidKnockOut = normalizedReason.contains("lava") || normalizedReason.contains("water");
             if (normalizedReason.contains("border")) session.microBorderDeaths.add(victimId);
 
             MicroPlacedBlockKnock blockKnock = session.microPlacedBlockKnocks.remove(victimId);
             boolean blockKnockCredited = false;
-            if (environmentalKnockOut && blockKnock != null
+            if (liquidKnockOut && blockKnock != null
                     && MicroBattlesAchievementRules.isRecent(System.currentTimeMillis(),
                             blockKnock.knockedAtMillis(),
                             MicroBattlesAchievementRules.PLACED_BLOCK_KNOCK_WINDOW_MILLIS)) {
