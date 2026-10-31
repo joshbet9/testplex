@@ -5,8 +5,9 @@ import org.bukkit.util.Vector;
 /**
  * Deterministic Plexball rules shared by the live game and unit tests.
  *
- * All time values are server ticks. Ping compensation is derived from the
- * server-observed RTT; no client timestamp or client-reported hit result is used.
+ * Gameplay outcomes are server-owned. Paper's ping estimate is used only as
+ * a bounded compensation hint; it is not a network RTT measurement or an
+ * anti-cheat signal.
  */
 public final class PlexballRules {
     public static final int MAX_PLAYERS = 8;
@@ -26,13 +27,14 @@ public final class PlexballRules {
     private PlexballRules() { }
 
     /**
-     * Convert server-measured round-trip ping to an estimated one-way rewind.
-     * Minecraft runs at 20 ticks/second, so RTT / 2 / 50ms gives ping / 100.
+     * Convert Paper's coarse ping estimate into a cautious bounded rewind.
+     * This estimate is not guaranteed to equal network RTT. It only offsets
+     * ordinary input delay and must never be used to judge or punish a player.
      */
-    public static int latencyRewindTicks(int measuredPingMillis) {
-        if (measuredPingMillis <= 0) return 0;
+    public static int latencyRewindTicks(int pingEstimateMillis) {
+        if (pingEstimateMillis <= 0) return 0;
         return Math.max(0, Math.min(MAX_REWIND_TICKS,
-                (int) Math.round(measuredPingMillis / 100.0D)));
+                (int) Math.round(pingEstimateMillis / 100.0D)));
     }
 
     /** Distance, in ticks, from the centre of the current randomly phased beat. */
