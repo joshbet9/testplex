@@ -87,6 +87,7 @@ public final class SuperSploorRuntime implements Listener {
     private final Map<UUID, Integer> teams = new HashMap<>();
     private final Map<UUID, Location> spawns = new HashMap<>();
     private final Map<UUID, Integer> ink = new HashMap<>();
+    private final Map<UUID, String> kits = new HashMap<>();
     private final Map<UUID, Integer> marks = new HashMap<>();
     private final Map<UUID, Long> lastShotAt = new HashMap<>();
     private final Map<UUID, Long> lastInkRegenAt = new HashMap<>();
@@ -100,6 +101,10 @@ public final class SuperSploorRuntime implements Listener {
     private final Set<UUID> squidMode = new HashSet<>();
     private final Set<UUID> activeProjectiles = new HashSet<>();
     private final Map<UUID, UUID> projectileOwners = new HashMap<>();
+    private final Map<UUID, Snowball> projectileEntities = new HashMap<>();
+    private final Map<UUID, Integer> projectilePaintRadii = new HashMap<>();
+    private final Set<UUID> projectilePaintLines = new HashSet<>();
+    private final Map<UUID, Location> projectileLastLocations = new HashMap<>();
 
     private SuperSploorEngine engine;
     private World world;
@@ -141,7 +146,7 @@ public final class SuperSploorRuntime implements Listener {
 
     public void start(SuperSploorEngine engine, Map<UUID, Player> participants,
             Map<UUID, Integer> participantTeams, Map<UUID, Location> participantSpawns,
-            IntConsumer finishMatch) {
+            Map<UUID, String> participantKits, IntConsumer finishMatch) {
         stop();
         if (engine == null || participants == null || participantTeams == null
                 || participantSpawns == null || participants.isEmpty()) {
@@ -163,6 +168,8 @@ public final class SuperSploorRuntime implements Listener {
             players.put(id, player);
             teams.put(id, team);
             spawns.put(id, spawn.clone());
+            String kit = normalizeKit(participantKits == null ? null : participantKits.get(id));
+            kits.put(id, kit);
             ink.put(id, SuperSploorRules.MAX_INK);
             marks.put(id, 0);
             lastShotAt.put(id, now - SuperSploorRules.PRIMARY_SHOT_INTERVAL_MILLIS);
@@ -171,7 +178,7 @@ public final class SuperSploorRuntime implements Listener {
             kills.put(id, 0);
             playerStats.put(id, new MutableStats());
             contributors.put(id, new HashSet<>());
-            giveStarterLoadout(player, team);
+            giveStarterLoadout(player, team, kit);
             player.setGameMode(GameMode.ADVENTURE);
             player.setInvulnerable(true);
             updateInkBar(player, id);
@@ -194,6 +201,7 @@ public final class SuperSploorRuntime implements Listener {
 
     public void tick(long now) {
         if (!running || engine == null) return;
+        updateChargerPaintLines();
         lastTickAt = now;
         for (UUID id : new ArrayList<>(players.keySet())) {
             Player player = players.get(id);
@@ -275,10 +283,30 @@ public final class SuperSploorRuntime implements Listener {
 
     private long lastScoreboardAt;
 
-    private void giveStarterLoadout(Player player, int team) {
+    private static String normalizeKit(String requested) {
+        if (requested == null) return "sprayer";
+        String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        return Set.of("sprayer", "roller", "charger", "lobber", "dualies").contains(value) ? value : "sprayer";
+    }
+
+    private void giveStarterLoadout(Player player, int team, String kit) {
         player.getInventory().clear();
-        player.getInventory().setItem(0, namedItem(Material.BLAZE_ROD, ChatColor.GOLD + "Splattershot",
-                "Right-click to fire paint • 4 ink per shot"));
+        String name = switch (kit) {
+            case "roller" -> "Paint Roller";
+            case "charger" -> "Ink Charger";
+            case "lobber" -> "Paint Lobber";
+            case "dualies" -> "Twin Blasters";
+            default -> "Splattershot";
+        };
+        Material weapon = switch (kit) {
+            case "roller" -> Material.IRON_HOE;
+            case "charger" -> Material.CROSSBOW;
+            case "lobber" -> Material.SNOWBALL;
+            case "dualies" -> Material.FLINT;
+            default -> Material.BLAZE_ROD;
+        };
+        player.getInventory().setItem(0, namedItem(weapon, ChatColor.GOLD + name,
+                "Right-click to use your primary • ink cost depends on kit"));
         player.getInventory().setItem(7, namedItem(Material.INK_SAC, ChatColor.AQUA + "Squid Mode",
                 "Select this slot on your team's paint to swim, climb and refill ink"));
         player.getInventory().setHeldItemSlot(PRIMARY_SLOT);
@@ -344,33 +372,139 @@ public final class SuperSploorRuntime implements Listener {
         event.setCancelled(true);
         if (!event.getAction().isRightClick()) return;
         ItemStack held = event.getItem();
-        if (held == null || held.getType() != Material.BLAZE_ROD
-                || !held.hasItemMeta() || held.getItemMeta() == null
-                || !ChatColor.stripColor(held.getItemMeta().getDisplayName()).equals("Splattershot")) return;
+        if (held == null || !held.hasItemMeta() || held.getItemMeta() == null) return;
+        String kit = kits.getOrDefault(id, "sprayer");
+        String expected = switch (kit) {
+            case "roller" -> "Paint Roller";
+            case "charger" -> "Ink Charger";
+            case "lobber" -> "Paint Lobber";
+            case "dualies" -> "Twin Blasters";
+            default -> "Splattershot";
+        };
+        if (!ChatColor.stripColor(held.getItemMeta().getDisplayName()).equals(expected)) return;
         event.setCancelled(true);
         firePrimary(player, id);
     }
 
     private void firePrimary(Player player, UUID id) {
         long now = System.currentTimeMillis();
+        String kit = kits.getOrDefault(id, "sprayer");
         int current = ink.getOrDefault(id, 0);
         long previous = lastShotAt.getOrDefault(id, 0L);
-        if (!SuperSploorRules.canFire(current, now, previous)) {
-            if (current < SuperSploorRules.INK_PER_PRIMARY_SHOT) {
-                player.sendActionBar(ChatColor.RED + "Out of ink! Swim through your team's paint to refill.");
-            }
+        int cost = switch (kit) {
+            case "roller" -> 10;
+            case "charger" -> 18;
+            case "lobber" -> 14;
+            case "dualies" -> 4;
+            default -> SuperSploorRules.INK_PER_PRIMARY_SHOT;
+        };
+        long interval = switch (kit) {
+            case "roller" -> 500L;
+            case "charger" -> 1_000L;
+            case "lobber" -> 1_100L;
+            case "dualies" -> 350L;
+            default -> SuperSploorRules.PRIMARY_SHOT_INTERVAL_MILLIS;
+        };
+        if (current < cost || now < previous || now - previous < interval) {
+            if (current < cost) player.sendActionBar(ChatColor.RED + "Out of ink! Swim through your team's paint to refill.");
             return;
         }
-        ink.put(id, SuperSploorRules.spendInk(current, SuperSploorRules.INK_PER_PRIMARY_SHOT));
+        ink.put(id, SuperSploorRules.spendInk(current, cost));
         lastShotAt.put(id, now);
+
+        if ("roller".equals(kit)) {
+            rollPaintPath(player, id);
+            player.getWorld().playSound(player.getLocation(), Sound.ITEM_HOE_TILL, 0.8F, 0.8F);
+            updateInkBar(player, id);
+            return;
+        }
+
         Snowball projectile = player.launchProjectile(Snowball.class);
         projectile.setItem(new ItemStack(teams.get(id) == RED ? Material.RED_DYE : Material.LIGHT_BLUE_DYE));
-        projectile.setVelocity(player.getEyeLocation().getDirection().normalize().multiply(1.85D));
+        Vector direction = player.getEyeLocation().getDirection().normalize();
+        double speed = switch (kit) {
+            case "charger" -> 3.0D;
+            case "lobber" -> 1.15D;
+            case "dualies" -> 1.45D;
+            default -> 1.85D;
+        };
+        Vector velocity = direction.multiply(speed);
+        if ("lobber".equals(kit)) velocity.setY(velocity.getY() + 0.16D);
+        projectile.setVelocity(velocity);
         projectile.getPersistentDataContainer().set(projectileKey, PersistentDataType.BYTE, (byte) 1);
-        projectileOwners.put(projectile.getUniqueId(), id);
-        activeProjectiles.add(projectile.getUniqueId());
-        player.getWorld().playSound(player.getLocation(), Sound.ENTITY_SNOWBALL_THROW, 0.7F, 1.45F);
+        UUID projectileId = projectile.getUniqueId();
+        projectileOwners.put(projectileId, id);
+        projectileEntities.put(projectileId, projectile);
+        activeProjectiles.add(projectileId);
+        projectilePaintRadii.put(projectileId, switch (kit) {
+            case "lobber" -> 3;
+            case "dualies" -> 1;
+            case "charger" -> 0;
+            default -> 2;
+        });
+        if ("charger".equals(kit)) {
+            projectilePaintLines.add(projectileId);
+            projectileLastLocations.put(projectileId, projectile.getLocation().clone());
+        }
+        player.playSound(player.getLocation(), Sound.ENTITY_SNOWBALL_THROW, 0.7F,
+                "charger".equals(kit) ? 1.8F : "lobber".equals(kit) ? 0.75F : 1.45F);
         updateInkBar(player, id);
+    }
+
+    private void rollPaintPath(Player player, UUID id) {
+        int team = teams.getOrDefault(id, -1);
+        Vector direction = player.getLocation().getDirection().setY(0.0D);
+        if (direction.lengthSquared() < 1.0E-5D) return;
+        direction.normalize();
+        Location origin = player.getLocation().clone();
+        for (int step = 0; step <= 5; step++) {
+            Location point = origin.clone().add(direction.clone().multiply(step));
+            point.setY(player.getLocation().getY() - 0.35D);
+            recordPaint(id, engine.paint(point, team, 1));
+        }
+        // The Roller pressures close opponents but cannot repeatedly mark one target every tick.
+        for (Player target : new ArrayList<>(players.values())) {
+            if (target == null || !target.isOnline() || target.getUniqueId().equals(id)
+                    || teams.getOrDefault(target.getUniqueId(), -1) == team
+                    || respawnAt.containsKey(target.getUniqueId())) continue;
+            Vector relative = target.getLocation().toVector().subtract(origin.toVector());
+            double along = relative.dot(direction);
+            if (along < 0.0D || along > 4.5D) continue;
+            double lateral = relative.clone().subtract(direction.clone().multiply(along)).length();
+            if (lateral <= 1.25D) {
+                applyMark(id, target.getUniqueId(), target);
+            }
+        }
+    }
+
+    private void recordPaint(UUID ownerId, SuperSploorEngine.PaintResult result) {
+        MutableStats stats = playerStats.get(ownerId);
+        if (stats == null || result == null) return;
+        stats.territoryPainted += result.changedUnits();
+        stats.enemyTerritoryReclaimed += result.enemyReclaimed();
+    }
+
+    private void updateChargerPaintLines() {
+        if (engine == null || world == null) return;
+        for (UUID projectileId : new ArrayList<>(projectilePaintLines)) {
+            Snowball projectile = projectileEntities.get(projectileId);
+            UUID ownerId = projectileOwners.get(projectileId);
+            if (projectile == null || !projectile.isValid() || ownerId == null) {
+                projectilePaintLines.remove(projectileId);
+                projectileLastLocations.remove(projectileId);
+                continue;
+            }
+            Location current = projectile.getLocation();
+            Location previous = projectileLastLocations.put(projectileId, current.clone());
+            if (previous == null || previous.getWorld() != current.getWorld()) continue;
+            double distance = previous.distance(current);
+            int samples = Math.max(1, Math.min(16, (int) Math.ceil(distance / 0.35D)));
+            Vector segment = current.toVector().subtract(previous.toVector());
+            for (int sample = 1; sample <= samples; sample++) {
+                Location point = previous.clone().add(segment.clone().multiply(sample / (double) samples));
+                recordPaint(ownerId, engine.paint(point, teams.getOrDefault(ownerId, -1), 0));
+            }
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -385,12 +519,9 @@ public final class SuperSploorRuntime implements Listener {
         }
         if (owner != null && owner.isOnline()) {
             int team = teams.getOrDefault(ownerId, -1);
-            SuperSploorEngine.PaintResult result = engine.paint(impact, team, 2);
-            MutableStats stats = playerStats.get(ownerId);
-            if (stats != null) {
-                stats.territoryPainted += result.changedUnits();
-                stats.enemyTerritoryReclaimed += result.enemyReclaimed();
-            }
+            SuperSploorEngine.PaintResult result = engine.paint(
+                    impact, team, projectilePaintRadii.getOrDefault(projectile.getUniqueId(), 2));
+            recordPaint(ownerId, result);
             if (result.changedUnits() > 0) {
                 impact.getWorld().spawnParticle(Particle.DUST, impact.clone().add(0.0D, 0.3D, 0.0D),
                         18, 0.55D, 0.35D, 0.55D, 0.0D,
@@ -506,7 +637,7 @@ public final class SuperSploorRuntime implements Listener {
         player.setGameMode(GameMode.ADVENTURE);
         player.setHealth(player.getMaxHealth());
         player.setInvulnerable(true);
-        giveStarterLoadout(player, teams.getOrDefault(id, RED));
+        giveStarterLoadout(player, teams.getOrDefault(id, RED), kits.getOrDefault(id, "sprayer"));
         player.sendMessage(ChatColor.GREEN + "Respawned! Your ink tank is full.");
         player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.7F, 1.3F);
     }
@@ -645,6 +776,10 @@ public final class SuperSploorRuntime implements Listener {
         }
         activeProjectiles.clear();
         projectileOwners.clear();
+        projectileEntities.clear();
+        projectilePaintRadii.clear();
+        projectilePaintLines.clear();
+        projectileLastLocations.clear();
         for (UUID id : new ArrayList<>(squidMode)) {
             Player player = players.get(id);
             exitSquidMode(player, id);
@@ -662,6 +797,7 @@ public final class SuperSploorRuntime implements Listener {
         players.clear();
         teams.clear();
         spawns.clear();
+        kits.clear();
         ink.clear();
         marks.clear();
         lastShotAt.clear();
@@ -694,6 +830,7 @@ public final class SuperSploorRuntime implements Listener {
         if (player != null) exitSquidMode(player, id);
         teams.remove(id);
         spawns.remove(id);
+        kits.remove(id);
         ink.remove(id);
         marks.remove(id);
         respawnAt.remove(id);
