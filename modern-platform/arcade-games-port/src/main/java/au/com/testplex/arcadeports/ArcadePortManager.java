@@ -976,10 +976,8 @@ public final class ArcadePortManager implements Listener {
 
     public void selectDeathTagRunnerKit(Player player, String requestedKit) {
         if (player == null) return;
-        String kit = requestedKit == null ? "" : requestedKit.toLowerCase(java.util.Locale.ROOT)
-                .replace('_', '-').replace(' ', '-');
-        if (kit.startsWith("runner-")) kit = kit.substring("runner-".length());
-        if (!Set.of("basher", "archer", "traitor", "null").contains(kit)) {
+        String kit = ArcadePortRules.normalizeDeathTagRunnerKit(requestedKit);
+        if (kit == null) {
             player.sendMessage(ChatColor.YELLOW + "Death Tag runner kits: basher, archer, traitor, null.");
             return;
         }
