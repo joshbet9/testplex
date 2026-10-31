@@ -98,6 +98,8 @@ public final class SuperSploorEngine {
     public static boolean isPaintable(Material material) {
         if (material == null) return false;
         String name = material.name();
+        if (name.endsWith("_GLAZED_TERRACOTTA")) return false;
+        if (name.equals("TERRACOTTA")) return true;
         for (String suffix : PAINTABLE_SUFFIXES) {
             if (name.endsWith(suffix)) return true;
         }
