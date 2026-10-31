@@ -612,6 +612,35 @@ jobs:
           sudo -n install -o monstermaze -g monstermaze -m 0644 \
             "$FPP_TMP" "$SERVER_DIR/plugins/FakePlayerPlugin.jar"
 
+          # Disable FPP restart persistence before Paper starts. Its own onEnable
+          # restores saved bots before Testplex can sweep them, so this prevents a
+          # previous match roster from briefly becoming a global lobby population
+          # after a crash/restart. Existing FPP settings are preserved otherwise.
+          FPP_DATA_DIR="$SERVER_DIR/plugins/FakePlayerPlugin"
+          FPP_CONFIG="$FPP_DATA_DIR/config.yml"
+          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$FPP_DATA_DIR"
+          if ! sudo -n test -f "$FPP_CONFIG"; then
+            sudo -n unzip -p "$FPP_TMP" config.yml | sudo -n tee "$FPP_CONFIG" >/dev/null
+          fi
+          FPP_CONFIG_TMP="$FPP_CONFIG.testplex-tmp"
+          sudo -n awk '
+            /^persistence:[[:space:]]*$/ { in_persistence=1; print; next }
+            in_persistence && /^[^[:space:]#]/ { in_persistence=0 }
+            in_persistence && /^  enabled:[[:space:]]*/ { print "  enabled: false"; updated=1; next }
+            { print }
+            END { if (!updated) exit 41 }
+          ' "$FPP_CONFIG" > "$FPP_CONFIG_TMP" || {
+            sudo -n rm -f -- "$FPP_CONFIG_TMP"
+            echo "Could not safely disable FakePlayerPlugin restart persistence in $FPP_CONFIG." >&2
+            exit 1
+          }
+          sudo -n install -o monstermaze -g monstermaze -m 0640 "$FPP_CONFIG_TMP" "$FPP_CONFIG"
+          sudo -n rm -f -- "$FPP_CONFIG_TMP"
+          sudo -n grep -A 2 '^persistence:' "$FPP_CONFIG" | grep -Fxq '  enabled: false' || {
+            echo "FakePlayerPlugin restart persistence is not disabled before server startup." >&2
+            exit 1
+          }
+
           # Migrate persistent state from both historical standalone data-folder names.
           # The 1.21 source plugin.yml names the plugin MonsterMazeStandalone, so
           # Paper stores its data in plugins/MonsterMazeStandalone (not only the
