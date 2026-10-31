@@ -69,7 +69,7 @@ jobs:
         with:
           name: wizards-paper-26.3-smoke-results
           path: |
-            ${{ runner.temp }}/wizards-paper-smoke/plugins/WizardsSourceMapSmoke/results.tsv
+            ${{ runner.temp }}/wizards-paper-smoke/plugins/WizardsPaperSmoke/results.tsv
             ${{ runner.temp }}/wizards-paper-smoke/server.log
           if-no-files-found: ignore
           retention-days: 14
