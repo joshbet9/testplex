@@ -16,6 +16,7 @@ The enabled modern acceptance queue must contain every original 1.8 Testplex map
 | Spleef | `Speef` + `Super Spleef` | 37 |
 | Super Sploor | `Sploor` | 1 |
 | Plexball | Modern dedicated arena; no 1.8 source map folder | — |
+| Camera Shy | Procedural modern hedge maze; no 1.8 source map folder | — |
 | Dragons (Solo) | `Dragons` | 40 |
 | Runner | `Runner` | 22 |
 | **Total archived source assets** | | **284 ZIP files** |
@@ -30,15 +31,10 @@ The counts are source archive files, not a claim that every archive has unique b
 
 ## Newly promoted games
 
-Super Sploor is already in the enabled queue and contributes the original `Sploor/NanoGames_Excavation.zip` archive. Runner and Dragons (Solo) are now also in the shared controlled test queue. Their original source archives are checked by the same enabled-game-derived CI policy. None of these titles is being introduced as an alias of another game.
+Super Sploor uses the original `Sploor/NanoGames_Excavation.zip` archive. Dragons (Solo) and Runner are now also in the controlled queue: Dragons contributes 40 original map archives, and Runner contributes 22. Only Dragons (Solo) is in scope; Dragons Teams remains excluded. Their original source archives are checked by the same enabled-game-derived CI policy, with the complete filename checks in `DRAGONS-ACCEPTANCE-PLAN.md` and `RUNNER-ACCEPTANCE-PLAN.md`.
 
-Runner's 22 original files are listed in [RUNNER-ACCEPTANCE-PLAN.md](RUNNER-ACCEPTANCE-PLAN.md). The two Clay Plaza filenames are distinct source archives.
-
-Dragons' 40 original files are listed in [DRAGONS-ACCEPTANCE-PLAN.md](DRAGONS-ACCEPTANCE-PLAN.md). The similarly named Balloon Town, Sky Ship and Voyage files are distinct original archives and must not be collapsed by filename normalisation. Only **Dragons (Solo)** is in scope; Dragons Teams remains excluded.
 ## Build enforcement
 
 The Paper 26.3 build reads the packaged plugin's actual `enabled-games` list and resolves each enabled game's legacy map folders. It compares the sorted ZIP filenames in each source folder with the entries actually packaged under `source-maps/<folder>/` in `ArcadeMechanicsModern.jar`. A missing file, unexpected file, or enabled game without an explicit map-source policy fails CI.
 
-Super Sploor, Runner and Dragons now receive the same exact filename comparison as every other enabled map-backed game, using the enabled-game-derived source-vs-JAR policy.
-
-When a new game is enabled, its source-folder mapping must be added to the build policy and `SourceMapCatalog.mapFoldersFor`. If the game has no 1.8 map archive (as with Plexball's modern arena), that exception must be explicit rather than silently skipping the check.
+Super Sploor, Dragons (Solo) and Runner receive the same exact filename comparison as every other enabled map-backed game. When a new game is enabled, its source-folder mapping must be added to the build policy and `SourceMapCatalog.mapFoldersFor`. If the game has no 1.8 map archive (as with Plexball's or Camera Shy's modern arena), that exception must be explicit rather than silently skipping the check.

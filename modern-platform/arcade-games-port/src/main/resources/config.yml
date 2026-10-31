@@ -1,6 +1,6 @@
-# The 25 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
+# The 26 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
 # READY_FOR_TEST games are available together for the shared controlled test session.
-# Other games remain disabled until their implementations are promoted.
+# Super Sploor, Dragons, Runner and Camera Shy join the controlled queue; other games remain disabled until promoted.
 enabled-games:
   - death-tag
   - one-in-the-quiver
@@ -14,6 +14,7 @@ enabled-games:
   - super-sploor
   - dragons
   - runner
+  - camera-shy
 lobby-selected-game: death-tag
 
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.

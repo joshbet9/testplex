@@ -342,6 +342,12 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                     new KitChoice("turf-wars-marksman", "Marksman", Material.BOW),
                     new KitChoice("turf-wars-infiltrator", "Infiltrator", Material.IRON_SWORD),
                     new KitChoice("turf-wars-shredder", "Shredder", Material.ARROW));
+            case CAMERA_SHY -> List.of(
+                    new KitChoice("camera-shy-smoke-artist", "Smoke Artist", Material.POTION),
+                    new KitChoice("camera-shy-decoy", "Decoy", Material.FIREWORK_ROCKET),
+                    new KitChoice("camera-shy-runner", "Runner", Material.SUGAR),
+                    new KitChoice("camera-shy-spotter", "Spotter", Material.COMPASS),
+                    new KitChoice("camera-shy-understudy", "Understudy", Material.ARMOR_STAND));
             default -> List.of();
         };
     }
@@ -461,12 +467,23 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             case SHEEP_QUEST -> new String[] {"sheep-bell", "wool-confetti", "shepherd-flare"};
             case SPLEEF -> new String[] {"snowburst", "ice-shards", "chalk-grid"};
             case TURF_WARS -> new String[] {"team-sigil", "turf-crack", "painted-chevron"};
+            case CAMERA_SHY -> new String[] {"smoke-artist", "decoy", "runner", "spotter", "understudy"};
             default -> new String[] {"classic", "inferno", "frost"};
         };
     }
 
     private Material showcaseIcon(ArcadePortGame game, String option) {
         String value = option == null ? "" : option.toLowerCase(Locale.ROOT);
+        if (game == ArcadePortGame.CAMERA_SHY) {
+            return switch (value) {
+                case "smoke-artist" -> Material.POTION;
+                case "decoy" -> Material.FIREWORK_ROCKET;
+                case "runner" -> Material.SUGAR;
+                case "spotter" -> Material.COMPASS;
+                case "understudy" -> Material.ARMOR_STAND;
+                default -> Material.SPYGLASS;
+            };
+        }
         if (game == ArcadePortGame.BOMB_LOBBERS) {
             if (value.contains("tnt") || "classic".equals(value) || "ember".equals(value)) return Material.TNT;
             if ("shockwave".equals(value)) return Material.TARGET;
@@ -550,8 +567,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
     private void openQueueMenu(Player p){
         Inventory inv=Bukkit.createInventory(null,27,QUEUE_TITLE);
-        inv.setItem(4,item(Material.PORKCHOP,ChatColor.GOLD+selectedGame.displayName(),
-                ChatColor.GRAY+(selectedGame==ArcadePortGame.BACON_BRAWL?"Free-for-all: no team is required.":"Team queue for this game."),
+        boolean freeForAll = selectedGame == ArcadePortGame.BACON_BRAWL
+                || selectedGame == ArcadePortGame.CAMERA_SHY;
+        inv.setItem(4,item(selectedGame.floor(),ChatColor.GOLD+selectedGame.displayName(),
+                ChatColor.GRAY+(freeForAll?"Free-for-all: no team is required.":"Team queue for this game."),
                 ChatColor.GRAY+"Human players queued: "+manager.queuedCount(selectedGame),ChatColor.GRAY+"AFK player targets: created when the game starts"));
         ItemStack join=item(Material.LIME_DYE,ChatColor.GREEN+"Join Queue",ChatColor.GRAY+"Join the selected game's pre-game queue.");mark(join,"queue-join",null);inv.setItem(11,join);
         ItemStack leave=item(Material.RED_DYE,ChatColor.RED+"Leave Queue",ChatColor.GRAY+"Remove yourself from all waiting queues.");mark(leave,"queue-leave",null);inv.setItem(15,leave);

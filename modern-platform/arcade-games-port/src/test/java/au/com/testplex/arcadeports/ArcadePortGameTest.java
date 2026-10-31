@@ -35,6 +35,8 @@ class ArcadePortGameTest {
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.DRAW_MY_THING));
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS).isEmpty(),
                 "Master Builders uses generated plots rather than a fabricated source map");
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.CAMERA_SHY).isEmpty(),
+                "Camera Shy uses its dedicated procedural maze, not an invented legacy map archive");
     }
 
     @Test void selectedMapArchivePathsAreValidatedAgainstTheirGame() {
@@ -156,8 +158,8 @@ class ArcadePortGameTest {
     }
 
 
-    @Test void exposesTheMechanicsGamesAndIntegratedMonsterMazeModuleWithPlexball() {
-        assertEquals(25, ArcadePortGame.values().length);
+    @Test void exposesTheMechanicsGamesAndIntegratedModules() {
+        assertEquals(26, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -166,12 +168,25 @@ class ArcadePortGameTest {
         }
         assertEquals(ArcadePortGame.MONSTER_MAZE, ArcadePortGame.fromId("monster-maze"));
         assertEquals(ArcadePortGame.PLEXBALL, ArcadePortGame.fromId("plexball"));
+        assertEquals(ArcadePortGame.CAMERA_SHY, ArcadePortGame.fromId("camera-shy"));
+        assertEquals(ArcadePortGame.SUPER_SPLOOR, ArcadePortGame.fromId("super-sploor"));
         assertEquals("Plexball", ArcadePortGame.PLEXBALL.displayName());
-        java.util.List<String> enabled = java.util.List.of("death-tag", "plexball", "spleef");
+        java.util.List<String> enabled = java.util.List.of("death-tag", "plexball", "spleef", "super-sploor", "dragons", "runner", "camera-shy");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.PLEXBALL.id(), enabled),
                 "Plexball is promoted into the controlled READY_FOR_TEST queue.");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.SPLEEF.id(), enabled),
                 "Spleef is promoted into the controlled READY_FOR_TEST queue.");
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.DRAGONS.id(), enabled),
+                "Dragons Solo is promoted into the controlled READY_FOR_TEST queue.");
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.RUNNER.id(), enabled),
+                "Runner is promoted into the controlled READY_FOR_TEST queue.");
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.SUPER_SPLOOR.id(), enabled),
+                "Super Sploor is promoted into the controlled READY_FOR_TEST queue.");
+        assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.CAMERA_SHY.id(), enabled),
+                "Camera Shy is promoted into the controlled READY_FOR_TEST queue.");
+        assertFalse(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.CAMERA_SHY.id(),
+                java.util.List.of("death-tag", "plexball", "spleef")),
+                "Camera Shy must remain gated when it is removed from the reviewed allow-list.");
         assertNull(ArcadePortGame.fromId("snake"));
         assertEquals(ArcadePortGame.DRAW_MY_THING, ArcadePortGame.fromId("Draw My Thing"));
         assertEquals(ArcadePortGame.MASTER_BUILDERS, ArcadePortGame.fromId("master_builders"));
@@ -179,7 +194,6 @@ class ArcadePortGameTest {
         assertEquals(ArcadePortGame.SKY_WARS, ArcadePortGame.fromId("skywars"));
         assertEquals(ArcadePortGame.MILK_THE_COW, ArcadePortGame.fromId("milk-the-cow"));
         assertEquals(ArcadePortGame.WITHER_ASSAULT, ArcadePortGame.fromId("wither-assault"));
-        assertEquals(ArcadePortGame.SUPER_SPLOOR, ArcadePortGame.fromId("super-sploor"));
     }
 
     @Test void normalizesSpacesAndUnderscoresInTestCommands() {
@@ -660,6 +674,10 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGON_ESCAPE));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGONS));
         assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.EVOLUTION));
+        assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.CAMERA_SHY));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SUPER_SPLOOR));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGONS));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.RUNNER));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.GLADIATORS));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.MICRO_BATTLES));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.ONE_IN_THE_QUIVER));

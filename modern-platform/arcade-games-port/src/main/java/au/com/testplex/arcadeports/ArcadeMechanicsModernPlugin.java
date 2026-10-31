@@ -17,13 +17,14 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private PlexballGame plexball;
     private MonsterMazePlugin monsterMaze;
     private ArcadeMapSelectionMenu mapMenu;
+    private CameraShyGame cameraShy;
     private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
 
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
     private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of(
             "death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl",
-            "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragons", "runner");
-    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-super-sploor-runner-dragons-20261101-v1";
+            "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragons", "runner", "camera-shy");
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-super-sploor-dragons-runner-camera-shy-20261101-v1";
 
     @Override
     public void onEnable() {
@@ -49,6 +50,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         // Bring up Testplex's shared lobby before any optional game module. A failure
         // in Monster Maze must not leave players in the unrelated survival world.
         manager = new ArcadePortManager(this);
+        cameraShy = new CameraShyGame(this, manager);
+        manager.setCameraShyModule(cameraShy);
+        getServer().getPluginManager().registerEvents(cameraShy, this);
         plexball = new PlexballGame(this);
         getServer().getPluginManager().registerEvents(plexball, this);
         mapMenu = new ArcadeMapSelectionMenu(this);
@@ -91,7 +95,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         for (Player online : Bukkit.getOnlinePlayers()) {
             Bukkit.getScheduler().runTask(this, () -> {
                 if (online.isOnline() && manager != null) {
-                    manager.returnPlayerToLobby(online);
+                    boolean restoredCameraShy = cameraShy != null && cameraShy.restorePendingSnapshot(online);
+                    if (!restoredCameraShy) manager.returnPlayerToLobby(online);
                     grantConfiguredAdmin(online);
                     manager.restoreMonsterMazeKitPreference(online);
                 }
@@ -183,8 +188,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             if (player.isOnline() && manager != null) {
                 // Session fake players must remain in the game lifecycle that just admitted them.
                 if (manager.isTestPlayer(player)) return;
-                // The server's only human-facing spawn is the shared Testplex Arcade lobby.
-                manager.returnPlayerToLobby(player);
+                // A Camera Shy disconnect must restore the captured pre-match snapshot
+                // instead of leaving the temporary spyglass/kit inventory on reconnect.
+                boolean restoredCameraShy = cameraShy != null && cameraShy.restorePendingSnapshot(player);
+                if (!restoredCameraShy) manager.returnPlayerToLobby(player);
                 grantConfiguredAdmin(player);
                 manager.restoreMonsterMazeKitPreference(player);
             }
@@ -249,10 +256,53 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 || normalized.equals("mixed-skywars") || normalized.equals("mixed-sky-wars");
     }
 
+    private boolean handleStatsCommand(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player viewer)) {
+            sender.sendMessage("Players only.");
+            return true;
+        }
+        if (cameraShy == null) {
+            viewer.sendMessage(ChatColor.RED + "Camera Shy progression is unavailable.");
+            return true;
+        }
+
+        Player subject = viewer;
+        int index = 0;
+        if (args.length > 0 && !"camera-shy".equalsIgnoreCase(args[0])) {
+            subject = Bukkit.getPlayerExact(args[0]);
+            if (subject == null) {
+                viewer.sendMessage(ChatColor.RED + "That player is not online.");
+                viewer.sendMessage(ChatColor.YELLOW + "Usage: /stats [player] [camera-shy] [page]");
+                return true;
+            }
+            index = 1;
+        }
+        if (args.length > index && "camera-shy".equalsIgnoreCase(args[index])) index++;
+
+        int page = 1;
+        if (args.length > index) {
+            try {
+                page = Integer.parseInt(args[index]);
+            } catch (NumberFormatException invalidPage) {
+                viewer.sendMessage(ChatColor.YELLOW + "Page must be a number from 1 to "
+                        + CameraShyProgressCatalog.pageCount() + ".");
+                return true;
+            }
+        }
+        if (args.length > index + 1 || page < 1 || page > CameraShyProgressCatalog.pageCount()) {
+            viewer.sendMessage(ChatColor.YELLOW + "Usage: /stats [player] [camera-shy] [page 1-"
+                    + CameraShyProgressCatalog.pageCount() + "]");
+            return true;
+        }
+        cameraShy.sendStats(viewer, subject, page);
+        return true;
+    }
+
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if ("stats".equalsIgnoreCase(label) || "arcadestats".equalsIgnoreCase(label)) {
-            if (args.length == 0 || (args.length == 1 && "plexball".equalsIgnoreCase(args[0]))) {
+        if ("stats".equalsIgnoreCase(command.getName())
+                || "stats".equalsIgnoreCase(label) || "arcadestats".equalsIgnoreCase(label)) {
+            if (CameraShyRules.routesToPlexballStats(args)) {
                 if (!(sender instanceof Player player)) {
                     sender.sendMessage("Players only.");
                     return true;
@@ -261,8 +311,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 else sender.sendMessage(ChatColor.RED + "Plexball progression is unavailable.");
                 return true;
             }
-            sender.sendMessage(ChatColor.YELLOW + "Usage: /stats [plexball]");
-            return true;
+            return handleStatsCommand(sender, args);
         }
         String sub = args.length == 0 ? "help" : args[0].toLowerCase(java.util.Locale.ROOT);
         switch (sub) {
@@ -287,7 +336,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     return true;
                 }
                 if (args.length < 2) {
-                    sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport leave <game-id>");
+                    if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
+                    return true;
+                }
+                if ("camera-shy".equalsIgnoreCase(args[1])) {
+                    if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
                     return true;
                 }
                 ArcadePortGame leavingGame = ArcadePortGame.fromId(args[1]);
@@ -432,7 +485,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>-mixed" + ChatColor.GRAY
                         + " — Mixed Arcade variants: Turf Wars, Castle Assault and Heroes of Gwen");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a Bomb Lobbers, Bacon Brawl, Dragons, Micro Battles, One in the Quiver, Paintball, Runner, Sneaky Assassins, Spleef, Death Tag or Turf Wars kit; use escape-artist, assassin, briber or revealer for Sneaky Assassins; turf-wars-<kit> for Turf Wars and runnerkit-<kit> for Runner");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport lobby camera-shy" + ChatColor.GRAY + " — select Camera Shy and show its five lobby kit choices");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a game kit; Camera Shy IDs: camera-shy-smoke-artist, camera-shy-decoy, camera-shy-runner, camera-shy-spotter, camera-shy-understudy");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport leave" + ChatColor.GRAY + " — leave the Camera Shy queue");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport ghost <on|off|toggle>" + ChatColor.GRAY + " — show or hide your Dragon Escape PB ghost");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport dragoncolor <colour>" + ChatColor.GRAY + " — set your Dragon Escape leader beacon colour");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport status" + ChatColor.GRAY + " — active game and queue counts");

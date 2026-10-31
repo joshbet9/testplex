@@ -7,7 +7,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Modern catalogue for all 21 Arcade games. Each game owns its own cosmetic
+ * Modern catalogue for all 25 Arcade games. Each game owns its own cosmetic
  * lines and win-scene choices; actual render/gameplay handlers are added with
  * each port rather than pretending global cosmetics are game-specific.
  */
@@ -320,6 +320,13 @@ public final class ArcadeCatalog {
                 List.of(),
                 win("last-assassin-standing", "Last Assassin Standing",
                         "A simple survivor podium; no additional game-specific cosmetics are claimed yet.")));
+
+        register(game("camera-shy", "Camera Shy", "SPYGLASS",
+                "Photograph opponents with a spyglass while avoiding five exposures. Last photographer standing wins.",
+                GameDefinition.PortStatus.READY_FOR_TEST,
+                List.of(),
+                win("last-photographer-standing", "Last Photographer Standing",
+                        "The winner is celebrated as the last photographer remaining in the maze.")));
 
         register(game("plexball", "Plexball", "SNOWBALL",
                 "Take turns hitting a ball off a tee while every non-batter tries to catch it. Longest uncaught hit wins.",
