@@ -1548,12 +1548,23 @@ public final class PlexballGame implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        UUID id = event.getPlayer().getUniqueId();
-        queue.remove(id);
+        Player quitter = event.getPlayer();
+        UUID id = quitter.getUniqueId();
+        boolean wasQueued = queue.remove(id) != null;
+        if (wasQueued) {
+            if (queue.size() < PlexballRules.MIN_PLAYERS) queueCountdownTick = -1L;
+            broadcastQueue(ChatColor.YELLOW + quitter.getName()
+                    + " disconnected; " + queue.size() + " player(s) remain queued.");
+        }
         catchAttempts.remove(id);
         playerHuds.remove(id);
         if (phase == Phase.IDLE || !matchPlayers.contains(id)) return;
-        if (id.equals(batterId)) resolveAttempt(0.0D, false, false, "Batter disconnected.");
+        if (id.equals(batterId)) {
+            resolveAttempt(0.0D, false, false, "Batter disconnected.");
+        } else {
+            broadcastMatch(ChatColor.YELLOW + quitter.getName()
+                    + " disconnected; their fielding position is now vacant.");
+        }
     }
 
     private void setupPlayer(Player player) {
