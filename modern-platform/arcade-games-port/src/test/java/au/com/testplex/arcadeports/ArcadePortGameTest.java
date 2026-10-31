@@ -15,6 +15,10 @@ class ArcadePortGameTest {
         assertEquals(java.util.List.of("Dragon Escape"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.DRAGON_ESCAPE));
         assertEquals(java.util.List.of("Paintball", "Super Paintball"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.PAINTBALL));
+        assertEquals(java.util.List.of("Death Tag"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.DEATH_TAG));
+        assertEquals(java.util.List.of("One in the Quiver"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.ONE_IN_THE_QUIVER));
+        assertEquals(java.util.List.of("Gladiators"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.GLADIATORS));
+        assertEquals(java.util.List.of("Micro Battle"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.MICRO_BATTLES));
         assertEquals(java.util.List.of("Speef", "Super Spleef"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.SPLEEF));
         assertEquals(java.util.List.of("Turf Wars"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.TURF_WARS));
