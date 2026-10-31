@@ -12,6 +12,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.DisplaySlot;
 
@@ -41,8 +42,8 @@ public final class WizardsPaperSmoke extends JavaPlugin {
             "industrialwest", "alicudi", "thaumaturgecolony", "magicallypossible", "kalamit");
     private static final String GAMEPLAY_MAP = "source-maps/Wizards/haven.zip";
     private static final String OWNER_NAME = "jn_playzmc";
-    private static final int MAX_CLIENT_WAIT_TICKS = 300 * 20;
-    private static final int MAX_START_WAIT_TICKS = 60 * 20;
+    private static final int MAX_CLIENT_WAIT_TICKS = 300 * 20 / 5;
+    private static final int MAX_START_WAIT_TICKS = 60 * 20 / 5;
 
     private final List<String> results = new ArrayList<>();
     private Plugin arcade;
@@ -51,6 +52,8 @@ public final class WizardsPaperSmoke extends JavaPlugin {
     private Player owner;
     private Player rival;
     private World gameplayArena;
+    private PlayerBaseline ownerBaseline;
+    private PlayerBaseline rivalBaseline;
     private int gameplayStage;
     private int gameplayTicks;
     private boolean shuttingDown;
@@ -165,7 +168,9 @@ public final class WizardsPaperSmoke extends JavaPlugin {
             return;
         }
 
-        require(arcade.getConfig().getString("selected-maps.wizards").equals(GAMEPLAY_MAP),
+        ownerBaseline = captureBaseline(owner);
+        rivalBaseline = captureBaseline(rival);
+        require(GAMEPLAY_MAP.equals(arcade.getConfig().getString("selected-maps.wizards")),
                 "gameplay map selection was not persisted");
         require(Bukkit.dispatchCommand(owner, "arcadeport join wizards"),
                 "owner could not join the Wizards queue");
@@ -245,10 +250,8 @@ public final class WizardsPaperSmoke extends JavaPlugin {
         require(owner.isOnline() && rival.isOnline(), "a player disconnected during leave/restore acceptance");
         require(!owner.getWorld().equals(gameplayArena), "remaining player was not restored out of the match world");
         require(!rival.getWorld().equals(gameplayArena), "leaving player was not restored out of the match world");
-        require(owner.getGameMode() != GameMode.SPECTATOR && rival.getGameMode() != GameMode.SPECTATOR,
-                "player game modes were not restored after the round");
-        require(owner.getInventory().getItem(0) == null || owner.getInventory().getItem(0).getType() != Material.BARRIER,
-                "owner inventory was not restored from the lobby snapshot");
+        validateRestoredPlayer(owner, ownerBaseline);
+        validateRestoredPlayer(rival, rivalBaseline);
 
         record("GAMEPLAY_PASS", GAMEPLAY_MAP, 2, 0, 0,
                 "two real clients; Mage/Sorcerer; live start and chest refill; leave triggered winner cleanup; both snapshots restored");
@@ -259,6 +262,47 @@ public final class WizardsPaperSmoke extends JavaPlugin {
                 + "|gameplay=PASS|twoClientRound=PASS");
         shutdownServer();
     }
+
+    private PlayerBaseline captureBaseline(Player player) {
+        return new PlayerBaseline(player.getWorld(), player.getLocation().clone(),
+                player.getInventory().getContents().clone(), player.getGameMode(),
+                player.getScoreboard(), player.getHealth(), player.getFoodLevel(), player.getSaturation());
+    }
+
+    private void validateRestoredPlayer(Player player, PlayerBaseline baseline) {
+        require(baseline != null, "missing original lobby baseline for " + player.getName());
+        require(player.getWorld().equals(baseline.world()), player.getName() + " was not restored to the original world");
+        require(player.getLocation().distanceSquared(baseline.location()) <= 1.0D,
+                player.getName() + " was not restored to the original lobby location");
+        require(player.getGameMode() == baseline.gameMode(),
+                player.getName() + " game mode was not restored");
+        require(player.getScoreboard() == baseline.scoreboard(),
+                player.getName() + " scoreboard was not restored");
+        require(Math.abs(player.getHealth() - baseline.health()) < 0.01D,
+                player.getName() + " health was not restored");
+        require(player.getFoodLevel() == baseline.foodLevel()
+                        && Math.abs(player.getSaturation() - baseline.saturation()) < 0.01F,
+                player.getName() + " food/saturation was not restored");
+
+        ItemStack[] actual = player.getInventory().getContents();
+        ItemStack[] expected = baseline.inventory();
+        require(actual.length == expected.length, player.getName() + " inventory size changed after restoration");
+        for (int slot = 0; slot < expected.length; slot++) {
+            ItemStack before = expected[slot];
+            ItemStack after = actual[slot];
+            if (before == null || before.getType().isAir()) {
+                require(after == null || after.getType().isAir(),
+                        player.getName() + " inventory slot " + slot + " was not restored to empty");
+            } else {
+                require(after != null && before.isSimilar(after) && before.getAmount() == after.getAmount(),
+                        player.getName() + " inventory slot " + slot + " was not restored");
+            }
+        }
+    }
+
+    private record PlayerBaseline(
+            World world, Location location, ItemStack[] inventory, GameMode gameMode,
+            Scoreboard scoreboard, double health, int foodLevel, float saturation) {}
 
     private void validateLivePlayer(Player player, Map<Object, Object> states, String expectedKit) throws Exception {
         require(player != null && player.isOnline(), "a queued test client is no longer online");
