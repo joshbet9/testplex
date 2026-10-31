@@ -20,7 +20,7 @@
 - Timeout winner selection is deterministic: lowest exposure count, then most photographs, then most eliminations.
 
 ## Kit acceptance
-- Smoke Artist: smoke sphere blocks camera rays; encounter escape achievement counts three distinct escapes.
+- Smoke Artist: smoke sphere blocks camera rays. Confirm an active cloud causes the initial loss of pursuit visibility, then move far enough away to escape; the cloud need not still intersect the line when the escape timer completes. Wall-only or range-only escapes must not count toward Smoke and Mirrors.
 - Decoy: fake shutter/flash fools three distinct human opponents. Looking at a fake flash through a solid wall does not count; a genuine approach to its location still does.
 - Understudy: its owner is credited only when a different human photographs the stand-in; photographing your own stand-in cannot unlock Method Actor.
 - Runner: Speed II for three seconds; shutter is disabled during the burst; a successful escape within the follow-up window unlocks Catch Me If You Can.
