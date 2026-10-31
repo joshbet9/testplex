@@ -9,7 +9,7 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockData;
+import org.bukkit.block.data.BlockData;
 
 /**
  * Authoritative, per-match territory map for Super Sploor.
