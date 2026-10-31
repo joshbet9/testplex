@@ -17,7 +17,7 @@
 - A flash and nearby shutter cue reveal the photographer's approximate location.
 - Photographed players enter spectator mode; game end restores human players' saved inventory, location, mode, effects and movement settings.
 - The match runs for three minutes. The last remaining human wins; a solo human test session does not end immediately just because the fixture has one human and AFK targets.
-- Timeout winner selection is deterministic: lowest exposure count, then most photographs, then most eliminations.
+- Timeout winner selection is deterministic: lowest exposure count, then most photographs, then most eliminations, then a stable UUID tie-break if every match statistic is equal.
 
 ## Kit acceptance
 - Smoke Artist: smoke sphere blocks camera rays. Confirm the escaping player's own active cloud causes the initial loss of pursuit visibility, then move far enough away to escape; the cloud need not still intersect the line when the escape timer completes. Another player's cloud, wall-only or range-only escapes must not count toward Smoke and Mirrors.
