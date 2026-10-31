@@ -220,7 +220,7 @@ public final class ArcadeCatalog {
                 win("runner-statue", "Runner Statue", "A running silhouette assembles into a statue")));
 
         register(game("sheep-quest", "Sheep Quest", "WHITE_WOOL", "Capture sheep and return them to your team's pen.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("capture-signature", "Capture Signature", "Distinct feedback when a sheep is secured.", "LEAD",
                         single("sheep-bell", "Sheep Bell", "A distinct bell and wool puff."),
                         single("wool-confetti", "Wool Confetti", "Colour-coded wool flecks burst outward."),
