@@ -9,6 +9,7 @@ Plexball is an experimental in-process mode hosted by `ArcadeMechanicsModern`. I
 - `/arcadeport kit curve-artist`
 - `/arcadeport kit sprinter`
 - `/arcadeport kit skyguard`
+- `/stats plexball` — open the Plexball career page with achievements, milestone progress and lifetime statistics.
 - `/arcadeport join plexball` — normal five-second queue countdown.
 - `/arcadeport play plexball` — quick two-second queue countdown.
 - `/arcadeport leave plexball` — leave the queue before a match starts.
@@ -30,6 +31,9 @@ At least two and at most eight players are supported. Each player gets one initi
 | Fielding hotbar | Fielder can switch between slot 0 (glove) and slot 1 (kit ability); other slots are blocked. |
 | Standings | Distance and successful catches are broadcast after each completed batting attempt. |
 | Player HUD | Every participant sees a live sidebar with phase, match clock, current batter, personal best, catches, kit/ability and the top three distances. |
+| Progression menu | `/stats plexball` opens a read-only inventory page listing all nine achievements, 24 career milestones and the player's saved totals. |
+| Achievement unlocks | Each achievement unlocks once, is saved per UUID, and notifies the player with a message and challenge-complete sound. |
+| Milestone unlocks | Match, win, at-bat, catch, home-run and uncaught-distance thresholds progress cumulatively and persist between restarts. |
 | Crosshair | Clicking the tee Interaction entity only counts if the server-side eye ray intersects the smaller ball sphere. |
 | Timing | Each at-bat gets a newly phased beat; near-perfect timing grades progressively rather than binary hit/miss. |
 | Direction | Swing yaw must be inside the fair cone; off-cone direction is a foul. |
@@ -76,4 +80,4 @@ A high-ping client must not receive a catch merely because its packet arrived la
 - The current version uses right-click to swing at the tee Interaction entity and right-click the glove to attempt a catch. The match HUD uses a persistent scoreboard, role-specific action-bar prompts and phase/result titles. It does not provide a custom client-side crosshair overlay or a full swing animation.
 - Ball rendering is an ItemDisplay moved by the server-side simulation. Its visual smoothness may vary by client FPS/network, but the server path and score do not.
 - The current catch rewind is capped at five ticks (approximately 250ms one-way estimate). Do not advertise Plexball as completely ping independent; validate the RTT matrix and adjust only with measured evidence.
-- Cosmetics, achievements, ranked statistics, spectator controls and a public matchmaking/lobby selector are not part of this first mechanics prototype.
+- Achievements and career milestones are implemented in a local Testplex profile (`plexball-progression.yml`). They provide unlock notifications and a stats menu, but do not award production Mineplex currency, XP, titles or cosmetics. Ranked leaderboards, spectator controls and public matchmaking are still out of scope.
