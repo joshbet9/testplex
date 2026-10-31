@@ -1073,14 +1073,28 @@ public final class PlexballGame implements Listener {
         return spectatorPlayers().stream().map(Player::getUniqueId).toList();
     }
 
+    /** Resolve the player viewers should see during the brief gap between at-bats. */
+    private UUID upcomingBatterId() {
+        if (phase != Phase.TURN_BREAK) return batterId;
+        List<UUID> order = suddenDeath ? new ArrayList<>(finalists) : matchPlayers;
+        int currentIndex = suddenDeath ? suddenDeathTurnIndex : initialTurnIndex;
+        for (int index = currentIndex + 1; index < order.size(); index++) {
+            UUID candidate = order.get(index);
+            Player player = Bukkit.getPlayer(candidate);
+            if (player != null && player.isOnline()) return candidate;
+        }
+        return null;
+    }
+
     private void updateSpectatorHud() {
-        Player currentBatter = batterId == null ? null : Bukkit.getPlayer(batterId);
+        UUID displayBatterId = upcomingBatterId();
+        Player currentBatter = displayBatterId == null ? null : Bukkit.getPlayer(displayBatterId);
         String batterName = currentBatter == null ? "—" : currentBatter.getName();
         String status = switch (phase) {
             case INTRO -> "Match starting";
             case BATTING -> batterName + " is batting";
             case BALL_FLIGHT -> "Ball in flight";
-            case TURN_BREAK -> "Next turn preparing";
+            case TURN_BREAK -> currentBatter == null ? "Round result" : "Next up: " + batterName;
             default -> "Match ending";
         };
         String distance = ballPosition == null || teeBallPosition == null ? ""
@@ -1099,8 +1113,9 @@ public final class PlexballGame implements Listener {
 
     private void refreshSpectatorTarget(Player spectator) {
         if (spectator == null || !spectator.isOnline() || arena == null) return;
+        UUID displayBatterId = upcomingBatterId();
         Entity target = phase == Phase.BALL_FLIGHT && ballDisplay != null && ballDisplay.isValid()
-                ? ballDisplay : (batterId == null ? null : Bukkit.getPlayer(batterId));
+                ? ballDisplay : (displayBatterId == null ? null : Bukkit.getPlayer(displayBatterId));
         if (target != null && target.isValid() && target.getWorld() == arena && target != spectator) {
             if (spectator.getSpectatorTarget() != target) spectator.setSpectatorTarget(target);
         } else {
@@ -1147,7 +1162,8 @@ public final class PlexballGame implements Listener {
         for (String entry : hud.entries) hud.scoreboard.resetScores(entry);
         List<String> lines = new ArrayList<>();
         boolean observing = plugin.getArcadePortManager().isActiveSpectator(ArcadePortGame.PLEXBALL, viewer.getUniqueId());
-        Player currentBatter = batterId == null ? null : Bukkit.getPlayer(batterId);
+        UUID displayBatterId = upcomingBatterId();
+        Player currentBatter = displayBatterId == null ? null : Bukkit.getPlayer(displayBatterId);
         if (observing) {
             lines.add(ChatColor.AQUA.toString() + ChatColor.BOLD + "SPECTATING");
             lines.add(ChatColor.WHITE + "Time left: " + formatMatchTime());
@@ -1185,9 +1201,10 @@ public final class PlexballGame implements Listener {
             lines.add(ChatColor.GOLD.toString() + ChatColor.BOLD + phaseLabel);
             lines.add(ChatColor.WHITE + "Time left: " + formatMatchTime());
             String batterLabel = phase == Phase.INTRO ? "First up: "
-                    : (phase == Phase.TURN_BREAK ? "Next turn: " : "At bat: ");
-            String batterName = phase == Phase.TURN_BREAK ? "Preparing"
-                    : (currentBatter == null ? "—" : currentBatter.getName());
+                    : (phase == Phase.TURN_BREAK ? "Next up: " : "At bat: ");
+            String batterName = currentBatter == null
+                    ? (phase == Phase.TURN_BREAK ? "Round result" : "—")
+                    : currentBatter.getName();
             lines.add(ChatColor.YELLOW + batterLabel + batterName);
             String roleInstruction;
             if (phase == Phase.INTRO) {
