@@ -559,9 +559,14 @@ public final class SuperSploorRuntime implements Listener {
     }
 
     private void markSpecialTarget(UUID ownerId, Player target) {
-        if (target == null || !target.isOnline()) return;
+        if (target == null || !target.isOnline() || ownerId == null) return;
+        UUID targetId = target.getUniqueId();
+        long now = System.currentTimeMillis();
+        if (!SuperSploorRules.canMarkTarget(
+                teams.getOrDefault(ownerId, -1), teams.getOrDefault(targetId, -1),
+                respawnAt.containsKey(targetId), now, spawnProtectedUntil.getOrDefault(targetId, 0L))) return;
         Set<UUID> hits = specialTargetsThisActivation.computeIfAbsent(ownerId, ignored -> new HashSet<>());
-        if (!hits.add(target.getUniqueId())) return;
+        if (!hits.add(targetId)) return;
         MutableStats stats = playerStats.get(ownerId);
         if (stats != null) stats.bestSpecialTargets = Math.max(stats.bestSpecialTargets, hits.size());
         applyMark(ownerId, target.getUniqueId(), target);
@@ -1285,10 +1290,12 @@ public final class SuperSploorRuntime implements Listener {
         if (!running || target == null || !target.isOnline()
                 || !players.containsKey(targetId) || respawnAt.containsKey(targetId)) return;
         if (spawnProtectedUntil.getOrDefault(targetId, 0L) > System.currentTimeMillis()) return;
+        if (attackerId == null) return;
         int attackerTeam = teams.getOrDefault(attackerId, -1);
         int targetTeam = teams.getOrDefault(targetId, -2);
-        if (attackerId == null || attackerTeam < 0 || attackerTeam == targetTeam) return;
         long now = System.currentTimeMillis();
+        if (!SuperSploorRules.canMarkTarget(attackerTeam, targetTeam,
+                respawnAt.containsKey(targetId), now, spawnProtectedUntil.getOrDefault(targetId, 0L))) return;
         int count = SuperSploorRules.markCountAfterHit(marks.getOrDefault(targetId, 0));
         marks.put(targetId, count);
         lastHitAt.put(targetId, now);
