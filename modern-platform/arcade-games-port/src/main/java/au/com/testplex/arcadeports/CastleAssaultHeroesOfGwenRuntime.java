@@ -1380,6 +1380,19 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onHeroesOfGwenRowenaBombardmentMove(PlayerMoveEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
+        Player player = event.getPlayer();
+        if (!rowenaBombardments.containsKey(player.getUniqueId()) || event.getTo() == null) return;
+        Location from = event.getFrom();
+        Location to = event.getTo();
+        if (from.getX() != to.getX() || from.getZ() != to.getZ()) {
+            event.setTo(new Location(from.getWorld(), from.getX(), to.getY(), from.getZ(),
+                    to.getYaw(), to.getPitch()));
+        }
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onHeroesOfGwenRoleDamage(EntityDamageByEntityEvent event) {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN
@@ -1441,12 +1454,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     @EventHandler
     public void onHeroesOfGwenBardolfPlayerDeath(PlayerDeathEvent event) {
-        if (game == ArcadePortGame.HEROES_OF_GWEN) removeBardolfPack(event.getEntity().getUniqueId());
+        if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            removeBardolfPack(event.getEntity().getUniqueId());
+            removeRowenaState(event.getEntity().getUniqueId());
+        }
     }
 
     @EventHandler
     public void onHeroesOfGwenBardolfPlayerQuit(PlayerQuitEvent event) {
-        if (game == ArcadePortGame.HEROES_OF_GWEN) removeBardolfPack(event.getPlayer().getUniqueId());
+        if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            removeBardolfPack(event.getPlayer().getUniqueId());
+            removeRowenaState(event.getPlayer().getUniqueId());
+        }
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -2593,6 +2612,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (hero == null) hero = "hattori";
         String previous = selectedHeroesOfGwen.put(player.getUniqueId(), hero);
         if (!hero.equals(previous) && "bardolf".equals(previous)) removeBardolfPack(player.getUniqueId());
+        if (!hero.equals(previous) && "rowena".equals(previous)) removeRowenaState(player.getUniqueId());
         if (!hero.equals(previous) && previous != null) {
             int team = teams.getOrDefault(player.getUniqueId(), -1);
             boolean ownTowerLost = towers.getOrDefault(team, List.of()).stream().anyMatch(tower -> tower.dead);
@@ -2615,6 +2635,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         larissaWaterDashEndsAt.remove(id);
         larissaStormBlessingEndsAt.remove(id);
         larissaStormBlessingNextHealAt.remove(id);
+        rowenaLightArrowsRemaining.remove(id);
+        rowenaLightArrowNextHitAt.remove(id);
+        rowenaCombatSlideEndsAt.remove(id);
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.getInventory().setItem(8, namedItem(Material.GOLD_INGOT,
@@ -3925,6 +3948,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         updateLarissaAbilities(now);
         updateLarissaFountains(now);
         updateBardolfWolves(now);
+        updateRowenaAbilities(now);
         for (Map.Entry<UUID, BardolfPounceState> entry : new HashMap<>(bardolfPounces).entrySet()) {
             if (now >= entry.getValue().expiresAt) bardolfPounces.remove(entry.getKey());
         }
@@ -4005,6 +4029,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             Player player = Bukkit.getPlayer(id);
             if (player != null && player.isOnline()) restoreCarrierHelmet(player);
         }
+        for (UUID id : new ArrayList<>(rowenaBombardments.keySet())) endRowenaBombardment(id, false);
         for (Entity entity : new ArrayList<>(entities)) if (entity != null && entity.isValid()) entity.remove();
         for (Map.Entry<Block, BlockData> block : changedBlocks.entrySet()) {
             if (block.getKey() != null && block.getKey().getWorld() == world) block.getKey().setBlockData(block.getValue(), false);
@@ -4043,6 +4068,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         bardolfPounces.clear();
         bardolfFullMoonEndsAt.clear();
         bardolfOriginalWalkSpeeds.clear();
+        rowenaLightArrowsRemaining.clear();
+        rowenaLightArrowNextHitAt.clear();
+        rowenaCombatSlideEndsAt.clear();
+        rowenaBombardments.clear();
         castleAssaultPlayerKits.clear();
         castleArcherNextArrowAt.clear();
         castleDemolitionistNextTntAt.clear();
@@ -4086,6 +4115,22 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             this.colour = colour;
             this.center = center;
             this.wool = wool;
+        }
+    }
+
+    private static final class RowenaBombardmentState {
+        final Block anchorBlock;
+        final BlockData originalBlock;
+        final ItemStack originalBow;
+        final long expiresAt;
+        int shotsRemaining;
+        RowenaBombardmentState(Block anchorBlock, BlockData originalBlock, ItemStack originalBow,
+                long expiresAt, int shotsRemaining) {
+            this.anchorBlock = anchorBlock;
+            this.originalBlock = originalBlock.clone();
+            this.originalBow = originalBow == null ? null : originalBow.clone();
+            this.expiresAt = expiresAt;
+            this.shotsRemaining = shotsRemaining;
         }
     }
 
