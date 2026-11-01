@@ -133,6 +133,7 @@ function connect(username) {
         }
       }, 50);
       clientTickTimer.unref?.();
+      log('BOT_TICK_END|PASS|' + username + '|intervalMs=50|protocol=777');
       resolve(client);
     });
 
