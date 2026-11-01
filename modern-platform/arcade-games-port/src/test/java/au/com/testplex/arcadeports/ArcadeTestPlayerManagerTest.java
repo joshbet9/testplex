@@ -22,6 +22,18 @@ class ArcadeTestPlayerManagerTest {
     }
 
     @Test
+    void disposableThreeClientAcceptanceNeedsNoFakePlayersButLiveDefaultRemainsSixteen() {
+        assertEquals(3, ArcadeTestPlayerManager.additionalPlayersNeeded(0, 3));
+        assertEquals(1, ArcadeTestPlayerManager.additionalPlayersNeeded(2, 3));
+        assertEquals(0, ArcadeTestPlayerManager.additionalPlayersNeeded(3, 3));
+        assertEquals(0, ArcadeTestPlayerManager.additionalPlayersNeeded(4, 3));
+        assertEquals(16, ArcadeTestPlayerManager.additionalPlayersNeeded(0, 16));
+        assertEquals(15, ArcadeTestPlayerManager.additionalPlayersNeeded(1, 16));
+        assertEquals(16, ArcadeTestPlayerManager.additionalPlayersNeeded(0, 999));
+        assertEquals(1, ArcadeTestPlayerManager.additionalPlayersNeeded(0, -1));
+    }
+
+    @Test
     void rejectsHumanQueuesLargerThanTheSixteenPlayerFixtureRoster() {
         assertTrue(ArcadeTestPlayerManager.canFitHumanPlayers(0));
         assertTrue(ArcadeTestPlayerManager.canFitHumanPlayers(16));
