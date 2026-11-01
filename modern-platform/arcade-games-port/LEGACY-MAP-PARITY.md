@@ -22,9 +22,12 @@ The enabled modern acceptance queue must contain every original 1.8 Testplex map
 | Turf Wars | `Turf Wars` | 42 |
 | Dragons (Solo) | `Dragons` | 40 |
 | Runner | `Runner` | 22 |
-| **Total archived source assets** | | **357 ZIP files** |
+| SkyWars Mixed | `Skywars` | 50 |
+| Wither Assault | Generated controlled-test arena; no original Industrial West/Labyrinth/Sky Ruins archives in repository | — |
+| Sneaky Assassins | Generated controlled-test town; no original map/NPC-route archive in repository | — |
+| **Total archived source assets** | | **419 ZIP files** |
 
-The counts are source archive files, not a claim that every archive has unique binary contents. All original filenames are retained and verified.
+The counts are source archive files, not a claim that every archive has unique binary contents. All original filenames are retained and verified. The total includes 369 original ZIPs for the prior enabled set and 50 SkyWars Mixed archives. Wither Assault and Sneaky Assassins are intentionally enabled for generated-arena mechanics testing and contribute no archived source maps.
 
 ## Rename handling
 
@@ -34,10 +37,10 @@ The counts are source archive files, not a claim that every archive has unique b
 
 ## Newly promoted games
 
-Super Sploor uses the original `Sploor/NanoGames_Excavation.zip` archive. Dragon Escape, Sheep Quest, Turf Wars, Dragons (Solo) and Runner are now also in the controlled queue: Dragon Escape contributes 30 original map archives, Sheep Quest contributes one, Turf Wars contributes 42, Dragons contributes 40, and Runner contributes 22. Only Dragons (Solo) is in scope; Dragons Teams remains excluded. Their original source archives are checked by the same enabled-game-derived CI policy, with the complete filename checks in `DRAGON-ESCAPE-ACCEPTANCE-PLAN.md`, `SHEEP-QUEST-ACCEPTANCE-PLAN.md`, `TURF-WARS-ACCEPTANCE-PLAN.md`, `DRAGONS-ACCEPTANCE-PLAN.md` and `RUNNER-ACCEPTANCE-PLAN.md`.
+Super Sploor uses the original `Sploor/NanoGames_Excavation.zip` archive. SkyWars Mixed adds all 50 original `Skywars` archives to the controlled queue. Wither Assault and Sneaky Assassins are enabled only for mechanics testing in generated arenas; authentic source map and (for Sneaky) patrol-route archives are absent. Dragon Escape, Sheep Quest, Turf Wars, Dragons (Solo) and Runner are also in the controlled queue: Dragon Escape contributes 30 original map archives, Sheep Quest contributes one, Turf Wars contributes 42, Dragons contributes 40, and Runner contributes 22. Only Dragons (Solo) is in scope; Dragons Teams remains excluded. Their original source archives are checked by the same enabled-game-derived CI policy, with the complete filename checks in `DRAGON-ESCAPE-ACCEPTANCE-PLAN.md`, `SHEEP-QUEST-ACCEPTANCE-PLAN.md`, `TURF-WARS-ACCEPTANCE-PLAN.md`, `DRAGONS-ACCEPTANCE-PLAN.md` and `RUNNER-ACCEPTANCE-PLAN.md`.
 
 ## Build enforcement
 
 The Paper 26.3 build reads the packaged plugin's actual `enabled-games` list and resolves each enabled game's legacy map folders. It compares the sorted ZIP filenames in each source folder with the entries actually packaged under `source-maps/<folder>/` in `ArcadeMechanicsModern.jar`. A missing file, unexpected file, or enabled game without an explicit map-source policy fails CI.
 
-Dragon Escape, Sheep Quest, Turf Wars, Super Sploor, Dragons (Solo) and Runner receive the same exact filename comparison as every other enabled map-backed game. When a new game is enabled, its source-folder mapping must be added to the build policy and `SourceMapCatalog.mapFoldersFor`. If the game has no 1.8 map archive (as with Plexball's or Camera Shy's modern arena), that exception must be explicit rather than silently skipping the check.
+Dragon Escape, Sheep Quest, Turf Wars, Super Sploor, Dragons (Solo), Runner and SkyWars Mixed receive the same exact filename comparison as every other enabled map-backed game. When a new game is enabled, its source-folder mapping must be added to the build policy and `SourceMapCatalog.mapFoldersFor`. If the game has no 1.8 map archive (as with Plexball's or Camera Shy's modern arena), that exception must be explicit rather than silently skipping the check.
