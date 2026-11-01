@@ -27,17 +27,6 @@ public final class WitherAssaultRules {
         return blockY >= Math.ceil(witherSpawnY - 4.0D);
     }
 
-    /** Only a living Human Archer owns the source Smoke Arrow perk. */
-    public static boolean isHumanArcherSmokeArrowEligible(int teamId, String kitId, boolean alive) {
-        return alive && teamId == 0 && "archer".equals(normalizeHumanKit(kitId));
-    }
-
-    /** The source proximity check blinds every Wither strictly inside the six-block radius. */
-    public static boolean shouldSmokeArrowBlindAtDistanceSquared(double distanceSquared, double radius) {
-        if (!Double.isFinite(distanceSquared) || !Double.isFinite(radius)
-                || distanceSquared < 0.0D || radius <= 0.0D) return false;
-        return distanceSquared < radius * radius;
-    }
 
     /** Fletcher and Smoke Arrow are shared by the source Archer and Editor kits. */
     public static boolean hasFletcher(String kit) {
