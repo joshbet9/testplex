@@ -35,7 +35,8 @@ final class SessionTimestampShifter {
     static List<String> shift(Object target, long pausedMillis) {
         if (target == null || pausedMillis <= 0L) return List.of();
         List<String> failures = new ArrayList<>();
-        Class<?> ownerClass = target.getClass().getEnclosingClass();
+        Class<?> ownerClass = target.getClass().getEnclosingClass() == null
+                ? target.getClass() : target.getClass().getEnclosingClass();
         shiftObject(target, pausedMillis, ownerClass, failures, new IdentityHashMap<>(), "session");
         return List.copyOf(failures);
     }
