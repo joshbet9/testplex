@@ -2185,31 +2185,24 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onHeroesOfGwenStoreDamageModifiers(EntityDamageByEntityEvent event) {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN
-                || !(event.getEntity() instanceof LivingEntity target)) return;
+                || !(event.getEntity() instanceof Player target)
+                || !activePlayers.contains(target.getUniqueId())) return;
         Player attacker = resolveAttacker(event);
         if (attacker == null || !activePlayers.contains(attacker.getUniqueId())
                 || heroesOfGwenAbilityDamageTargets.contains(target.getUniqueId())) return;
         int attackingTeam = teams.getOrDefault(attacker.getUniqueId(), -1);
-        if (attackingTeam < 0 || heroesOfGwenEntityTeam(target) == attackingTeam) return;
+        if (attackingTeam < 0 || teams.getOrDefault(target.getUniqueId(), -2) == attackingTeam) return;
 
+        Set<String> items = heroesOfGwenOwnedStoreItemNames(attacker);
+        boolean abilityDamage = false;
+        boolean basicAttack = event.getDamager() instanceof Player || event.getDamager() instanceof Arrow;
         if (event.getDamager() instanceof Projectile projectile) {
             String projectileType = projectile.getPersistentDataContainer()
                     .get(heroProjectileTypeKey, PersistentDataType.STRING);
-            if (projectileType != null) {
-                event.setDamage(heroesOfGwenStoreAbilityDamage(attacker, target, event.getDamage()));
-                return;
-            }
-            if (event.getDamager() instanceof Arrow) {
-                event.setDamage(ArcadePortRules.heroesOfGwenStoreBasicAttackDamage(
-                        event.getDamage(), heroesOfGwenOwnedStoreItemNames(attacker)));
-            }
-            return;
+            abilityDamage = projectileType != null;
         }
-        if (event.getDamager() instanceof Player) {
-            Set<String> items = heroesOfGwenOwnedStoreItemNames(attacker);
-            double damage = ArcadePortRules.heroesOfGwenStoreBasicAttackDamage(event.getDamage(), items);
-            event.setDamage(ArcadePortRules.heroesOfGwenStoreMeleeDamage(damage, items));
-        }
+        event.setDamage(ArcadePortRules.heroesOfGwenStorePlayerCombatDamage(
+                event.getDamage(), items, abilityDamage, basicAttack));
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
