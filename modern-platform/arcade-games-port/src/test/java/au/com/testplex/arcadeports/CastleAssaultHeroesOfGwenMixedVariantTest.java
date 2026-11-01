@@ -427,6 +427,10 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertEquals(1, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_REGENERATION_AMPLIFIER);
         assertEquals(1.5D, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DAMAGE_MULTIPLIER, 0.00001D);
         assertEquals(30_000L, ArcadePortRules.HEROES_OF_GWEN_MONOCHROME_SKELETONS_DURATION_MILLIS);
+        assertEquals(4, ArcadePortRules.HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP);
+        assertEquals(8, ArcadePortRules.HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP);
+        assertEquals(90_000L, ArcadePortRules.HEROES_OF_GWEN_POWER_POTION_DURATION_MILLIS);
+        assertEquals(180_000L, ArcadePortRules.HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS);
     }
 
     @Test
