@@ -124,7 +124,16 @@ final class SneakyAssassinsRules {
         return 200;
     }
 
-    /** Town NPCs persist until killed or their entity disappears; never cull a live villager by timer. */
+    /** Source NpcManager removes one random town NPC every four seconds while Live. */
+    static long npcCullIntervalMillis() {
+        return 4_000L;
+    }
+
+    static boolean shouldCullTownNpc(boolean live, long nowMillis, long nextCullAtMillis, int npcCount) {
+        return live && npcCount > 0 && nowMillis >= nextCullAtMillis;
+    }
+
+    /** Invalid or missing entities are pruned from the runtime's UUID index. */
     static boolean shouldPruneTownNpc(boolean entityExists, boolean validVillager) {
         return !entityExists || !validVillager;
     }
