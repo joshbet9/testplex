@@ -137,6 +137,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     private String activeMapResource;
     private BukkitTask tickTask;
     private boolean initialized;
+    private boolean stopRequested;
     private boolean running;
     private long startedAt;
     private int tick;
@@ -704,7 +705,12 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             states.clear();
             return;
         }
-        finish(null, reason);
+        stopRequested = true;
+        try {
+            finish(null, reason);
+        } finally {
+            stopRequested = false;
+        }
     }
 
     public void shutdown() {
@@ -2808,6 +2814,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                     : Math.max(48.0D, Math.max(sourceMapData.width(), sourceMapData.depth()) + 8.0D);
             border.setSize(size);
         }
+        if (!stopRequested) plugin.onWizardsRoundCompleted();
     }
 
     /** Persist match progress to the local-stats keys shared with the Arcade stats browser. */
