@@ -2653,7 +2653,7 @@ public final class ArcadePortRules {
     // Source Moba Heroes Valley / Monochrome mid-match sidequests.
     public static final long HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS = 300_000L;
     public static final long HEROES_OF_GWEN_PUMPKIN_KING_RESPAWN_DELAY_MILLIS = 300_000L;
-    public static final long HEROES_OF_GWEN_PUMPKIN_KING_ATTACK_INTERVAL_MILLIS = 250L;
+    public static final long HEROES_OF_GWEN_PUMPKIN_KING_ATTACK_INTERVAL_MILLIS = 500L;
     public static final int HEROES_OF_GWEN_PUMPKIN_KING_HEALTH = 100;
     public static final double HEROES_OF_GWEN_PUMPKIN_KING_TARGET_SPEED = 5.0D;
     public static final double HEROES_OF_GWEN_PUMPKIN_KING_HOME_SPEED = 3.0D;
