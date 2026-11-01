@@ -57,6 +57,8 @@ public final class ArcadeProgressCatalog {
                     a("over-9000", "Over 9000", "Win a 1v3 clutch using only powerups."),
                     a("grenade-from-the-grave", "Grenade From the Grave", "Get 2 kills after you die in one Bomb Lobbers game."))),
             Map.entry("death-tag", List.of(
+                    a("death-proof", "Death Proof", "Win 50 games of Death Tag."),
+                    a("come-at-me-bro", "Come At Me Bro!", "Kill 2 Undead Chasers in a single game."),
                     a("statue", "Statue", "Win while staying in the same 5×5 area for 3 minutes."),
                     a("gallows", "Gallows", "As Runner Traitor, assist 3 comrade deaths in one game."))),
             Map.entry("dragon-escape", List.of(
@@ -67,7 +69,15 @@ public final class ArcadeProgressCatalog {
             Map.entry("dragons", List.of(
                     a("win-three-in-a-row", "Win 3 in a row", "Win three completed Dragons games consecutively."),
                     a("survive-five-minutes", "Survive 5 minutes", "Stay alive in a Dragons match for at least five minutes."),
-                    a("no-damage-win", "Untouched", "Win a Dragons match without taking damage."))),
+                    a("no-damage-win", "Untouched", "Win a Dragons match without taking damage."),
+                    a("adept", "Adept", "Win a Dragons game without using your kit ability."),
+                    a("sharpshooter", "Sharpshooter", "Shoot a dragon 20 times in one game."),
+                    a("ultra", "Ultra", "Eliminate the final opponent with a sparkler-attracted dragon."),
+                    a("survivors-guilt", "Survivor’s Guilt", "Win after being on half a heart during the game."),
+                    a("freefallin", "Freefallin’", "Win a Dragons game while falling in the void."),
+                    a("dodgems", "Dodgems", "Stay alive for a full minute without a dragon hit."),
+                    a("sticks-and-stones", "Sticks and stones", "Survive at least 7.5 hearts of fall damage in one landing."),
+                    a("mlg-pro", "MLG Pro", "Win with no fall damage after saving a dangerous fall using Leap."))),
             Map.entry("evolution", List.of(
                     a("overkill", "Overkill", "Get 2 kills before each evolution."),
                     a("mercy-rule", "Mercy Rule", "Win without manually evolving."),

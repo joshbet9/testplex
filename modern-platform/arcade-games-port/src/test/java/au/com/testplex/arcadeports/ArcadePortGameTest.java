@@ -434,17 +434,17 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.areBombLobbersEnemies(1, ArcadePortRules.opposingBombLobbersTeam(1)));
     }
 
-    @Test void bombLobbersPowerupSpawnRateAndCapacityScaleWithLobbySize() {
-        assertEquals(30_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(1));
-        assertEquals(30_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(2));
-        assertEquals(25_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(4));
-        assertEquals(20_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(8));
-        assertEquals(15_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(12));
-        assertEquals(12_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(16));
-        assertEquals(1, ArcadePortRules.bombLobbersPowerupMaxActive(2));
+    @Test void bombLobbersPowerupUsesPairedOneMinuteAverageWaveAndTwoActiveDrops() {
+        assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(1));
+        assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(2));
+        assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(4));
+        assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(8));
+        assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(12));
+        assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(16));
+        assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(2));
         assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(6));
-        assertEquals(3, ArcadePortRules.bombLobbersPowerupMaxActive(10));
-        assertEquals(4, ArcadePortRules.bombLobbersPowerupMaxActive(16));
+        assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(10));
+        assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(16));
     }
 
     @Test void bombLobbersSuperAndFieryTntHaveDistinctBlastEffects() {
@@ -1162,7 +1162,7 @@ class ArcadePortGameTest {
         }
     }
 
-    @Test void baconBrawlExposesTheThreeSourceKitsAndDoubleHungerRules() {
+    @Test void baconBrawlExposesAllRestoredKitsAndDoubleHungerRules() {
         assertEquals("pig", ArcadePortRules.normalizeBaconBrawlKit("Pig"));
         assertEquals("pig", ArcadePortRules.normalizeBaconBrawlKit("sheep-pig"));
         assertEquals("mama-piggles", ArcadePortRules.normalizeBaconBrawlKit("mama"));
@@ -1175,7 +1175,8 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.baconBrawlUsesSheepAvatar("Sheep Pig"));
         assertFalse(ArcadePortRules.baconBrawlUsesSheepAvatar("mama-piggles"));
         assertFalse(ArcadePortRules.baconBrawlUsesSheepAvatar("el-muchacho-pigo"));
-        assertNull(ArcadePortRules.normalizeBaconBrawlKit("chris-p-bacon"));
+        assertEquals("chris-p-bacon", ArcadePortRules.normalizeBaconBrawlKit("chris-p-bacon"));
+        assertEquals("chris-p-bacon", ArcadePortRules.normalizeBaconBrawlKit("Chris P. Bacon"));
         assertNull(ArcadePortRules.normalizeBaconBrawlKit("unknown"));
         assertEquals(4_000L, ArcadePortRules.BACON_SLOW_UPDATE_INTERVAL_MILLIS);
         assertFalse(ArcadePortRules.BACON_BRAWL_HAS_ROUND_TIMER,
@@ -1221,8 +1222,10 @@ class ArcadePortGameTest {
                 org.bukkit.Material.IRON_AXE, false, "pig"));
         assertFalse(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
                 org.bukkit.Material.STICK, false, "pig"));
-        assertFalse(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
+        assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
                 org.bukkit.Material.IRON_AXE, false, "chris-p-bacon"));
+        assertTrue(ArcadePortRules.shouldActivateBaconBrawlAbility(true,
+                org.bukkit.Material.IRON_AXE, true, "Chris P. Bacon"));
     }
 
     @Test void baconBrutusGuardBlocksFrontHitsButBackstabsBreakItAndPigCloakUsesTimedDuration() {

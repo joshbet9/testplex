@@ -353,8 +353,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             }
         }
         for (Pedestal pedestal : pedestals) {
-            for (int dx = -1; dx <= 0; dx++) {
-                for (int dz = -1; dz <= 0; dz++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
                     world.getBlockAt(pedestal.centerX + dx, ModernArcadeLobby.FLOOR_Y + 1, pedestal.centerZ + dz)
                             .setType(pedestal.color, false);
                     world.getBlockAt(pedestal.centerX + dx, ModernArcadeLobby.FLOOR_Y + 2, pedestal.centerZ + dz)
@@ -373,10 +373,16 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     }
 
     private List<ArcadeLobbyKitCatalogue.KitChoice> kitChoicesFor(ArcadePortGame game) {
+        List<String> order = plugin.getConfig().getStringList("lobby-kits.order." + game.id());
+        // Dragons is in the controlled test queue: never let stale hidden-kit
+        // entries from an older VM config hide five of its six acceptance kits.
+        if (game == ArcadePortGame.DRAGONS) {
+            return ArcadeLobbyKitCatalogue.forGame(game, List.of(), order);
+        }
         return ArcadeLobbyKitCatalogue.forGame(
                 game,
                 plugin.getConfig().getStringList("lobby-kits.hidden"),
-                plugin.getConfig().getStringList("lobby-kits.order." + game.id()));
+                order);
     }
 
     private static final class Pedestal {
@@ -826,19 +832,32 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         // No persistent or lobby-wide test bots are ticked here. Match players are
         // created by ArcadeTestPlayerManager and destroyed when their round ends.
     }
+    private boolean isTaggedLobbyNpc(Entity entity) {
+        return entity != null && (entity.getPersistentDataContainer().has(kitNpcKey, PersistentDataType.STRING)
+                || entity.getPersistentDataContainer().has(teamNpcKey, PersistentDataType.STRING));
+    }
+
     private void clearLobbyNpcFire() {
-        for (Entity entity : new ArrayList<>(kitNpcs)) {
-            if (entity != null && entity.isValid() && entity.getFireTicks() > 0) {
+        // Search the real world entity set instead of only cached lists. This catches recreated
+        // NPCs immediately after a refresh and clears every visual fire tick.
+        for (World world : Bukkit.getWorlds()) {
+            for (Entity entity : new ArrayList<>(world.getEntities())) {
+                if (!isTaggedLobbyNpc(entity)) continue;
+                if (entity instanceof Zombie zombie) zombie.setShouldBurnInDay(false);
                 entity.setFireTicks(0);
                 entity.setVisualFire(false);
             }
         }
-        for (Entity entity : new ArrayList<>(teamNpcs)) {
-            if (entity != null && entity.isValid() && entity.getFireTicks() > 0) {
-                entity.setFireTicks(0);
-                entity.setVisualFire(false);
-            }
-        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onLobbyNpcCombust(org.bukkit.event.entity.EntityCombustEvent event) {
+        Entity entity = event.getEntity();
+        if (!isTaggedLobbyNpc(entity)) return;
+        event.setCancelled(true);
+        if (entity instanceof Zombie zombie) zombie.setShouldBurnInDay(false);
+        entity.setFireTicks(0);
+        entity.setVisualFire(false);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)

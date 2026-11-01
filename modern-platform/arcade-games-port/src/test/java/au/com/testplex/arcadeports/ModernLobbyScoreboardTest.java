@@ -46,6 +46,7 @@ class ModernLobbyScoreboardTest {
         assertEquals("Death Tag", ModernLobbyScoreboard.formatGameName("death-tag"));
         assertEquals("Monster Maze", ModernLobbyScoreboard.formatGameName("monster-maze-speed"));
         assertEquals("Speed Builders", ModernLobbyScoreboard.formatGameName("speed-builders"));
+        assertEquals("Snap", ModernLobbyScoreboard.formatGameName("camera-shy"));
     }
 
     @Test
@@ -115,5 +116,10 @@ class ModernLobbyScoreboardTest {
         assertEquals("Runner Basher", ModernLobbyScoreboard.formatKitName("runner-basher"));
         assertEquals("None", ModernLobbyScoreboard.formatKitName("None"));
         assertEquals("None", ModernLobbyScoreboard.formatKitName(""));
+        assertEquals(ChatColor.YELLOW + "El Muchacho Pigo",
+                ModernLobbyScoreboard.formatKitDisplayName("bacon-brawl", "el-muchacho-pigo"));
+        assertEquals(ChatColor.LIGHT_PURPLE + "Chris P. Bacon",
+                ModernLobbyScoreboard.formatKitDisplayName("bacon-brawl", "chris-p-bacon"),
+                "The restored achievement kit must show its purple unlock-tier colour.");
     }
 }
