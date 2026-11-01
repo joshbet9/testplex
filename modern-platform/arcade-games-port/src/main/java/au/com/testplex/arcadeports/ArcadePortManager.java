@@ -210,6 +210,7 @@ public final class ArcadePortManager implements Listener {
     private final Map<UUID, String> spleefKitPreferences = new HashMap<>();
     private final Map<UUID, String> microKitPreferences = new HashMap<>();
     private final Map<UUID, String> evolutionKitPreferences = new HashMap<>();
+    private final Map<UUID, String> witherAssaultKitPreferences = new HashMap<>();
     private final Map<UUID, String> quiverKitPreferences = new HashMap<>();
     private final Map<UUID, String> runnerKitPreferences = new HashMap<>();
     private final Map<UUID, String> sheepQuestKitPreferences = new HashMap<>();
@@ -856,6 +857,10 @@ public final class ArcadePortManager implements Listener {
                                 + sheepKit.substring(1)) + " for Sheep Quest.");
                 return;
             }
+            if (lobbyGame == ArcadePortGame.WITHER_ASSAULT) {
+                selectWitherAssaultKit(player, value);
+                return;
+            }
         }
         boolean explicitMonsterMazeKit = value.startsWith("monster-maze-");
         if (explicitMonsterMazeKit) value = value.substring("monster-maze-".length());
@@ -901,6 +906,7 @@ public final class ArcadePortManager implements Listener {
                     return;
                 }
                 case SNEAKY_ASSASSINS -> { sneakyAssassins.selectKit(player, value); return; }
+                case WITHER_ASSAULT -> { selectWitherAssaultKit(player, value); return; }
                 case TURF_WARS -> { selectTurfWarsKit(player, value); return; }
                 case PLEXBALL -> {
                     PlexballGame game = plugin.getPlexballGame();
@@ -918,7 +924,8 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
-        if (ArcadePortRules.normalizeCastleAssaultKit(value) != null) selectCastleAssaultKit(player, value);
+        if (WitherAssaultRules.normalizeHumanKit(value) != null) selectWitherAssaultKit(player, value);
+        else if (ArcadePortRules.normalizeCastleAssaultKit(value) != null) selectCastleAssaultKit(player, value);
         else if (ArcadePortRules.normalizeHeroesOfGwenHero(value) != null) selectHeroesOfGwenHero(player, value);
         else if (value.startsWith("quiver-")) { selectQuiverKit(player, value); }
         else if (value.startsWith("spleef-")) { selectSpleefKit(player, value.substring("spleef-".length())); }
@@ -936,6 +943,25 @@ public final class ArcadePortManager implements Listener {
         else if (ArcadePortRules.normalizeTurfWarsKit(value) != null) selectTurfWarsKit(player, value);
         else if (normalizeSuperSploorKit(value) != null) selectSuperSploorKit(player, value);
         else selectDeathTagRunnerKit(player, value);
+    }
+
+    private void selectWitherAssaultKit(Player player, String requestedKit) {
+        if (player == null) return;
+        String kit = WitherAssaultRules.normalizeHumanKit(requestedKit);
+        if (kit == null) {
+            player.sendMessage(ChatColor.YELLOW + "Wither Assault Human kits: Archer, Medic or Editor.");
+            return;
+        }
+        UUID id = player.getUniqueId();
+        witherAssaultKitPreferences.put(id, kit);
+        plugin.getConfig().set("lobby-kit-preferences." + id + ".wither-assault", kit);
+        plugin.saveConfig();
+        Session session = active;
+        boolean inRound = session != null && session.type == ArcadePortGame.WITHER_ASSAULT
+                && session.players.containsKey(id);
+        player.sendMessage(ChatColor.GREEN + "Selected " + Character.toUpperCase(kit.charAt(0))
+                + kit.substring(1) + " for " + (inRound ? "your next Wither Assault round." : "Wither Assault."));
+        if (lobby.isLobbyWorld(player.getWorld())) lobby.refreshPlayerScoreboard(player);
     }
 
     private String normalizeSuperSploorKit(String requestedKit) {
@@ -2833,6 +2859,14 @@ public final class ArcadePortManager implements Listener {
             if (preferredTeam >= 0) teamId = preferredTeam;
             if (teamMode && teamId >= 0 && teamId < assignedTeamCounts.length) assignedTeamCounts[teamId]++;
             session.teams.put(player.getUniqueId(), teamId);
+            if (type == ArcadePortGame.WITHER_ASSAULT) {
+                UUID witherPlayerId = player.getUniqueId();
+                String savedKit = plugin.getConfig().getString(
+                        "lobby-kit-preferences." + witherPlayerId + ".wither-assault", "archer");
+                String requested = witherAssaultKitPreferences.getOrDefault(witherPlayerId, savedKit);
+                String selected = WitherAssaultRules.normalizeHumanKit(requested);
+                session.witherAssaultKits.put(witherPlayerId, selected == null ? "archer" : selected);
+            }
             if (type == ArcadePortGame.TURF_WARS) {
                 session.turfWarsKits.put(player.getUniqueId(),
                         turfWarsKitPreferences.getOrDefault(player.getUniqueId(), "marksman"));
@@ -5145,6 +5179,66 @@ public final class ArcadePortManager implements Listener {
         player.getInventory().addItem(new ItemStack(wool, ArcadePortRules.TURF_WARS_BUILD_PHASE_WOOL));
     }
 
+    private ItemStack witherAssaultLeatherPiece(Material material, Color colour) {
+        ItemStack item = new ItemStack(material);
+        if (item.getItemMeta() instanceof LeatherArmorMeta meta) {
+            meta.setColor(colour);
+            item.setItemMeta(meta);
+        }
+        return item;
+    }
+
+    private void giveWitherAssaultKit(Session session, Player player) {
+        UUID id = player.getUniqueId();
+        int team = session.teams.getOrDefault(id, 0);
+        player.setWalkSpeed(0.2F);
+        player.setFlySpeed(0.1F);
+        player.getInventory().setArmorContents(new ItemStack[] {
+                witherAssaultLeatherPiece(Material.LEATHER_BOOTS, team == 1 ? Color.fromRGB(45, 45, 45) : Color.fromRGB(35, 170, 55)),
+                witherAssaultLeatherPiece(Material.LEATHER_LEGGINGS, team == 1 ? Color.fromRGB(45, 45, 45) : Color.fromRGB(35, 170, 55)),
+                witherAssaultLeatherPiece(Material.LEATHER_CHESTPLATE, team == 1 ? Color.fromRGB(45, 45, 45) : Color.fromRGB(35, 170, 55)),
+                witherAssaultLeatherPiece(Material.LEATHER_HELMET, team == 1 ? Color.fromRGB(45, 45, 45) : Color.fromRGB(35, 170, 55))
+        });
+        if (team == 1) {
+            player.setAllowFlight(true);
+            player.setFlying(true);
+            player.setExp(1.0F);
+            player.getInventory().setItem(0, namedItem(Material.GOLDEN_SWORD,
+                    "Wither Skull", "Left-click to launch a Wither Skull. Recharges every 2 seconds."));
+            player.getInventory().setItem(1, namedItem(Material.DIAMOND_SWORD,
+                    "Wither Minions", "Right-click to summon two skeletal minions. Recharges every 10 seconds."));
+            player.getInventory().setItem(2, namedItem(Material.COMPASS,
+                    "Smell Humans", "Right-click to reveal every living Human. Recharges every 30 seconds."));
+            player.getInventory().setItemInOffHand(namedItem(Material.SHIELD,
+                    "Fire Storm", "Hold right-click to release a charged arrow storm."));
+            return;
+        }
+
+        player.setAllowFlight(false);
+        player.setFlying(false);
+        String kit = session.witherAssaultKits.getOrDefault(id, "archer");
+        ItemStack[] revival = {revivalPotion(), revivalPotion()};
+        ItemStack stew = new ItemStack(Material.MUSHROOM_STEW, 2);
+        switch (kit) {
+            case "medic" -> {
+                player.getInventory().addItem(new ItemStack(Material.STONE_AXE), revival[0], revival[1], stew);
+                player.sendMessage(ChatColor.GREEN + "Medic: keep your Revival Potions ready for downed Humans.");
+            }
+            case "editor" -> {
+                player.getInventory().addItem(new ItemStack(Material.STONE_AXE),
+                        new ItemStack(Material.STONE_PICKAXE), new ItemStack(Material.STONE_SHOVEL),
+                        new ItemStack(Material.COBBLESTONE, 32), new ItemStack(Material.OAK_PLANKS, 32),
+                        revival[0], revival[1], stew);
+                player.sendMessage(ChatColor.GREEN + "Editor: place and break blocks above the four-block floor limit.");
+            }
+            default -> {
+                player.getInventory().addItem(new ItemStack(Material.IRON_SWORD),
+                        new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 2),
+                        revival[0], revival[1], stew);
+            }
+        }
+    }
+
     private void giveKit(Session session, Player player) {
         player.getInventory().clear();
         switch (session.type) {
@@ -5172,6 +5266,9 @@ public final class ArcadePortManager implements Listener {
                     session.variantRuntime.setHeroesOfGwenHero(player,
                             heroesOfGwenHeroPreferences.getOrDefault(player.getUniqueId(), "hattori"));
                 }
+                break;
+            case WITHER_ASSAULT:
+                giveWitherAssaultKit(session, player);
                 break;
             case SNEAKY_ASSASSINS:
                 sneakyAssassins.giveKit(player);
@@ -13306,6 +13403,7 @@ public final class ArcadePortManager implements Listener {
             removeAllMicroBorderWarnings(session);
             for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
         }
+        if (session.type == ArcadePortGame.WITHER_ASSAULT) restoreWitherEditorBlocks(session);
         if (session.variantRuntime != null) {
             session.variantRuntime.stop();
             session.variantRuntime = null;
@@ -17295,6 +17393,7 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         boolean bombLeftClick = session.type == ArcadePortGame.BOMB_LOBBERS && event.getAction().isLeftClick();
+        boolean witherLeftClick = session.type == ArcadePortGame.WITHER_ASSAULT && event.getAction().isLeftClick();
         boolean quiverLeftClick = session.type == ArcadePortGame.ONE_IN_THE_QUIVER
                 && event.getAction().isLeftClick();
         boolean runnerLeftClick = session.type == ArcadePortGame.RUNNER && event.getAction().isLeftClick();
@@ -17312,7 +17411,8 @@ public final class ArcadePortManager implements Listener {
                 && isMicroTrackingCompass(event.getItem()) && event.getAction().isLeftClick();
         if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick
                 && !baconNonRightClick && !dragonEscapeDisruptorLeftClick
-                && !microCompassLeftClick && !dragonsSparklerLeftClick && !spleefCompassLeftClick) return;
+                && !microCompassLeftClick && !dragonsSparklerLeftClick && !spleefCompassLeftClick
+                && !witherLeftClick) return;
         Player player = event.getPlayer();
         ItemStack heldItem = event.getItem();
         if (session.type == ArcadePortGame.MICRO_BATTLES && isMicroTeamLockedItem(heldItem)
@@ -17339,6 +17439,14 @@ public final class ArcadePortManager implements Listener {
                     session.microSpectateNextTeleportAt.put(player.getUniqueId(), now + 3_000L);
                 } else player.sendMessage(ChatColor.YELLOW + "There are no living opponents to track.");
             }
+            return;
+        }
+        if (session.type == ArcadePortGame.WITHER_ASSAULT
+                && session.alive.contains(player.getUniqueId())
+                && event.getAction().isRightClick() && event.getClickedBlock() != null
+                && session.witherEditorBlocks.contains(event.getClickedBlock())) {
+            event.setCancelled(true);
+            temporarilyRemoveWitherEditorBlock(session, event.getClickedBlock());
             return;
         }
         Material item = heldItem == null ? Material.AIR : heldItem.getType();
@@ -17377,8 +17485,8 @@ public final class ArcadePortManager implements Listener {
                     && session.teams.getOrDefault(player.getUniqueId(), 0) == 1
                     && session.alive.contains(player.getUniqueId());
             boolean forceWitherMinionOrScent = session.type == ArcadePortGame.WITHER_ASSAULT
-                    && heldItem != null && (heldItem.getType() == Material.DIAMOND_SWORD
-                    || heldItem.getType() == Material.COMPASS)
+                    && event.getAction().isRightClick() && heldItem != null
+                    && (heldItem.getType() == Material.DIAMOND_SWORD || heldItem.getType() == Material.COMPASS)
                     && session.teams.getOrDefault(player.getUniqueId(), 0) == 1
                     && session.alive.contains(player.getUniqueId());
             boolean forceBombControlClick = session.type == ArcadePortGame.BOMB_LOBBERS
@@ -17397,7 +17505,8 @@ public final class ArcadePortManager implements Listener {
                     && !session.alive.contains(player.getUniqueId()) && isMicroTrackingCompass(heldItem)
                     && (event.getAction().isRightClick() || event.getAction().isLeftClick());
             if (!forceGladiatorHotbar && !forceBaconAbility && !forceBombControlClick
-                    && !forceSpleefCompass && !forceMicroCompass) return;
+                    && !forceSpleefCompass && !forceMicroCompass
+                    && !forceWitherBlast && !forceWitherMinionOrScent) return;
         }
         if (session.type == ArcadePortGame.GLADIATORS
                 && session.alive.contains(player.getUniqueId())
@@ -17525,6 +17634,25 @@ public final class ArcadePortManager implements Listener {
                 openDragonsSpectatorMenu(session, player);
             }
             return;
+        }
+        if (session.type == ArcadePortGame.WITHER_ASSAULT
+                && session.teams.getOrDefault(player.getUniqueId(), 0) == 1) {
+            long now = System.currentTimeMillis();
+            if (item == Material.GOLDEN_SWORD && event.getAction().isLeftClick()) {
+                event.setCancelled(true);
+                launchWitherAssaultSkull(session, player, now);
+                return;
+            }
+            if (item == Material.DIAMOND_SWORD && event.getAction().isRightClick()) {
+                event.setCancelled(true);
+                launchWitherMinions(session, player, now);
+                return;
+            }
+            if (item == Material.COMPASS && event.getAction().isRightClick()) {
+                event.setCancelled(true);
+                useWitherScent(session, player, now);
+                return;
+            }
         }
         if (!session.alive.contains(player.getUniqueId())) return;
         if (session.type == ArcadePortGame.TURF_WARS
@@ -17930,6 +18058,69 @@ public final class ArcadePortManager implements Listener {
                 && ChatColor.stripColor(meta.getDisplayName()).equalsIgnoreCase("Revival Potion");
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onWitherAssaultRevivalSplash(PotionSplashEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.WITHER_ASSAULT
+                || !(event.getPotion().getShooter() instanceof Player thrower)
+                || !session.alive.contains(thrower.getUniqueId())
+                || session.teams.getOrDefault(thrower.getUniqueId(), 1) != 0
+                || !isWitherRevivalPotion(event.getPotion().getItem())) return;
+
+        UUID nearestDowned = null;
+        double nearestDistance = 16.0D;
+        for (Map.Entry<UUID, Skeleton> entry : session.witherOutCopies.entrySet()) {
+            Player downed = session.players.get(entry.getKey());
+            Skeleton marker = entry.getValue();
+            if (downed == null || !downed.isOnline() || marker == null || !marker.isValid()
+                    || session.teams.getOrDefault(entry.getKey(), 1) != 0
+                    || marker.getWorld() != event.getPotion().getWorld()) continue;
+            double distance = marker.getLocation().distanceSquared(event.getPotion().getLocation());
+            if (distance <= nearestDistance) {
+                nearestDistance = distance;
+                nearestDowned = entry.getKey();
+            }
+        }
+        if (nearestDowned != null) {
+            event.setCancelled(true);
+            reviveWitherHuman(session, thrower, nearestDowned);
+        }
+    }
+
+    private boolean isWitherEditorBlockUnderAnotherPlayer(Session session, Block block, Player editor) {
+        for (UUID id : session.alive) {
+            if (id.equals(editor.getUniqueId())) continue;
+            Player other = session.players.get(id);
+            if (other == null || !other.isOnline() || other.getWorld() != session.world) continue;
+            Block feet = other.getLocation().getBlock();
+            if (feet.equals(block) || feet.getRelative(0, -1, 0).equals(block)) return true;
+        }
+        return false;
+    }
+
+    private void temporarilyRemoveWitherEditorBlock(Session session, Block block) {
+        if (active != session || block == null || !session.witherEditorBlocks.remove(block)) return;
+        BlockData visibleData = block.getBlockData().clone();
+        block.setType(Material.AIR, false);
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (active != session || !block.getType().isAir()) return;
+            block.setBlockData(visibleData, false);
+            session.witherEditorBlocks.add(block);
+        }, 40L);
+    }
+
+    private void restoreWitherEditorBlocks(Session session) {
+        if (session == null) return;
+        for (Map.Entry<Block, BlockData> entry : new HashMap<>(session.witherEditorReplacedBlocks).entrySet()) {
+            Block block = entry.getKey();
+            if (block != null && block.getWorld() == session.world && entry.getValue() != null) {
+                block.setBlockData(entry.getValue(), false);
+            }
+        }
+        session.witherEditorBlocks.clear();
+        session.witherEditorReplacedBlocks.clear();
+    }
+
     private void disguiseMilkCowPlayer(Session session, Player player) {
         UUID id = player.getUniqueId();
         Cow disguise = session.milkCowDisguises.get(id);
@@ -18121,6 +18312,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void launchWitherMinions(Session session, Player player, long now) {
+        if (now < session.witherAssaultAttackStartsAt) {
+            player.sendMessage(ChatColor.YELLOW + "Wither attacks unlock when the preparation window ends.");
+            return;
+        }
         UUID owner = player.getUniqueId();
         if (now < session.witherMinionReadyAt.getOrDefault(owner, 0L)) {
             player.sendMessage(ChatColor.YELLOW + "Wither Minions are recharging.");
@@ -18302,6 +18497,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void launchWitherAssaultSkull(Session session, Player player, long now) {
+        if (now < session.witherAssaultAttackStartsAt) {
+            player.sendMessage(ChatColor.YELLOW + "Wither attacks unlock when the preparation window ends.");
+            return;
+        }
         UUID id = player.getUniqueId();
         if (now < session.witherLastAttackAt.getOrDefault(id, 0L)) {
             player.sendMessage(ChatColor.YELLOW + "Wither Skull is recharging.");
@@ -18668,6 +18867,23 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             return;
         }
+        if (session.type == ArcadePortGame.WITHER_ASSAULT) {
+            Player editor = event.getPlayer();
+            Block block = event.getBlock();
+            boolean canEdit = session.alive.contains(editor.getUniqueId())
+                    && session.teams.getOrDefault(editor.getUniqueId(), 1) == 0
+                    && "editor".equals(session.witherAssaultKits.getOrDefault(editor.getUniqueId(), "archer"))
+                    && WitherAssaultRules.canEditorModifyBlock(block.getY(), session.witherAssaultSpawnY,
+                            isWitherEditorBlockUnderAnotherPlayer(session, block, editor));
+            if (!canEdit) {
+                event.setCancelled(true);
+            } else {
+                event.setDropItems(false);
+                event.setExpToDrop(0);
+                session.witherEditorBlocks.remove(block);
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.ONE_IN_THE_QUIVER
                 && session.alive.contains(event.getPlayer().getUniqueId())
                 && isQuiverBreakableGlass(event.getBlock().getType())) {
@@ -18751,6 +18967,23 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.DRAW_MY_THING) {
             event.setCancelled(true);
+            return;
+        }
+        if (session.type == ArcadePortGame.WITHER_ASSAULT) {
+            Player editor = event.getPlayer();
+            Block placed = event.getBlockPlaced();
+            boolean canEdit = session.alive.contains(editor.getUniqueId())
+                    && session.teams.getOrDefault(editor.getUniqueId(), 1) == 0
+                    && "editor".equals(session.witherAssaultKits.getOrDefault(editor.getUniqueId(), "archer"))
+                    && WitherAssaultRules.canEditorModifyBlock(placed.getY(), session.witherAssaultSpawnY,
+                            isWitherEditorBlockUnderAnotherPlayer(session, placed, editor));
+            if (!canEdit) {
+                event.setCancelled(true);
+            } else {
+                session.witherEditorBlocks.add(placed);
+                BlockData previous = event.getBlockReplacedState().getBlockData().clone();
+                session.witherEditorReplacedBlocks.putIfAbsent(placed, previous);
+            }
             return;
         }
         if (session.type == ArcadePortGame.MASTER_BUILDERS) {
