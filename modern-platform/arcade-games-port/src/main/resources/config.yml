@@ -1,6 +1,6 @@
-# The 28 Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
+# The 30 Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
 # READY_FOR_TEST games are available together for the shared controlled test session.
-# The 27-game controlled queue includes Evolution and Speed Builders (dedicated 2–16 player queue).
+# The 29-ID controlled queue includes Evolution, Speed Builders, and all three Monster Maze modes.
 enabled-games:
   - death-tag
   - one-in-the-quiver
@@ -21,6 +21,8 @@ enabled-games:
   - turf-wars
   - camera-shy
   - monster-maze
+  - monster-maze-speed
+  - monster-maze-modern
   - snake
   - draw-my-thing
   - master-builders
