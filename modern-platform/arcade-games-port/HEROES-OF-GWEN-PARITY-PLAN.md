@@ -210,6 +210,20 @@ The modern runtime now follows the original `MobaAI` target contract more closel
 **Validation boundary:** this is a source-parity correction, not Wither acceptance. The Wither is still represented by a native Paper Wither rather than the original disguised 3×5 ArmorStand, and patrol, boundary, boss/tower damage interactions and both-map behaviour still require live comparison.
 
 
+### Source consumables — current implementation slice
+
+The shared role-shop consumables now execute their archived effects when purchased:
+
+- Small Health Potion: instant heal for 4 HP; 100 gold.
+- Large Health Potion: instant heal for 8 HP; 200 gold.
+- Power Potion: Strength I for 90 seconds; 1,000 gold.
+- Speed Potion: Speed I for 180 seconds; 500 gold.
+- Ender Pearl remains the normal 750-gold teleport consumable.
+
+The effects are attached to real potion metadata, rather than merely granting named water potions. Regression assertions cover the source healing amounts and durations. The mixed variant still calculates the half-price charge through the existing shared cost helper.
+
+**Remaining shop work:** source equipment enchantments and persistent item passives are not fully implemented. This slice does not claim the role shops are accepted.
+
 ### Map-specific mid-match sidequests — current implementation slice
 
 The current branch now contains separate source-map sidequest paths, matching the map-type selection in Reborn's `Moba.java`:
