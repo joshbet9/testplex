@@ -11,6 +11,9 @@ import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.attribute.Attribute;
+import org.bukkit.boss.BarColor;
+import org.bukkit.boss.BarStyle;
+import org.bukkit.boss.BossBar;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.block.Chest;
@@ -151,6 +154,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final List<CapturePointState> capturePoints = new ArrayList<>();
     private final Map<Integer, Wither> withers = new HashMap<>();
     private final Map<Integer, Boolean> witherDamageable = new HashMap<>();
+    private final Map<Integer, BossBar> witherTeamBars = new HashMap<>();
+    private final Map<Integer, Long> witherNextHudAt = new HashMap<>();
+    private final Map<Integer, Long> witherLastInformAt = new HashMap<>();
     private final Map<Integer, Location> witherHomes = new HashMap<>();
     private final Map<Integer, List<Location>> witherBoundaries = new HashMap<>();
     private final Map<Integer, UUID> witherTargets = new HashMap<>();
@@ -632,6 +638,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         withers.put(team, wither);
         witherDamageable.put(team, false);
         witherHomes.put(team, location.clone());
+        BossBar teamBar = Bukkit.createBossBar(teamColour(team)
+                + (team == 0 ? "Red" : "Blue") + " Wither", team == 0 ? BarColor.RED : BarColor.BLUE,
+                BarStyle.SEGMENTED_20);
+        teamBar.setProgress(1.0D);
+        for (Player player : activeMatchPlayers()) {
+            if (teams.getOrDefault(player.getUniqueId(), -1) == team) teamBar.addPlayer(player);
+        }
+        witherTeamBars.put(team, teamBar);
+        witherNextHudAt.put(team, System.currentTimeMillis());
         String boundaryMarker = team == 0 ? "ORANGE" : "LIGHT_BLUE";
         List<Location> boundary = new ArrayList<>(map.dataLocations(boundaryMarker).stream()
                 .map(Location::clone).toList());
@@ -643,6 +658,34 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         witherBoundaries.put(team, boundary);
         witherNextEarthquakeAt.put(team, System.currentTimeMillis() + ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS);
+    }
+
+    private void updateWitherTeamHud(int team, Wither wither, long now) {
+        updateWitherTeamHud(team, wither, now, false);
+    }
+
+    private void updateWitherTeamHud(int team, Wither wither, long now, boolean force) {
+        BossBar bar = witherTeamBars.get(team);
+        if (bar == null || wither == null || !wither.isValid()) return;
+        if (!force && now < witherNextHudAt.getOrDefault(team, 0L)) return;
+        double maximum = wither.getMaxHealth();
+        double progress = maximum <= 0.0D ? 0.0D : wither.getHealth() / maximum;
+        bar.setProgress(Math.max(0.0D, Math.min(1.0D, progress)));
+        bar.setTitle(teamColour(team) + (team == 0 ? "Red" : "Blue") + " Wither "
+                + ChatColor.WHITE + (int) Math.ceil(wither.getHealth()) + "/" + (int) Math.ceil(maximum));
+        witherNextHudAt.put(team, now + 1_000L);
+    }
+
+    private void addPlayerToWitherTeamHud(Player player) {
+        if (player == null) return;
+        int team = teams.getOrDefault(player.getUniqueId(), -1);
+        BossBar bar = witherTeamBars.get(team);
+        if (bar != null) bar.addPlayer(player);
+    }
+
+    private void removePlayerFromWitherTeamHud(Player player) {
+        if (player == null) return;
+        for (BossBar bar : witherTeamBars.values()) bar.removePlayer(player);
     }
 
     private void updateMobaWithers(long now) {
@@ -670,6 +713,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             Location goal = target == null ? home : target.getLocation();
             moveWitherDirectly(wither, goal, target == null
                     ? ArcadePortRules.HEROES_OF_GWEN_WITHER_HOME_SPEED : ArcadePortRules.HEROES_OF_GWEN_WITHER_TARGET_SPEED);
+            updateWitherTeamHud(team, wither, now);
             if (target != null) {
                 long nextAttack = witherNextEarthquakeAt.getOrDefault(team, now);
                 if (now >= nextAttack) {
@@ -2731,27 +2775,50 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             return;
         }
         for (Map.Entry<Integer, Wither> entry : withers.entrySet()) {
-            if (!entry.getValue().equals(damaged)) continue;
+            int ownerTeam = entry.getKey();
+            Wither wither = entry.getValue();
+            if (!wither.equals(damaged)) continue;
+
+            // Capture the post-armour amount before cancelling vanilla damage.
+            // Reading getFinalDamage() after setCancelled(true) can yield zero.
+            double damage = event.getFinalDamage();
             event.setCancelled(true);
             if (!(event instanceof EntityDamageByEntityEvent byEntity)) return;
             Player attacker = resolveAttacker(byEntity);
-            if (attacker == null || teams.getOrDefault(attacker.getUniqueId(), -1) == entry.getKey()) return;
-            if (!Boolean.TRUE.equals(witherDamageable.get(entry.getKey()))) {
-                attacker.sendMessage(ChatColor.RED + "Destroy every tower protecting this Wither first.");
+            if (attacker == null || !activePlayers.contains(attacker.getUniqueId())
+                    || teams.getOrDefault(attacker.getUniqueId(), -1) == ownerTeam) return;
+            if (event.getCause() == EntityDamageEvent.DamageCause.FIRE
+                    || event.getCause() == EntityDamageEvent.DamageCause.FIRE_TICK) return;
+            if (!isInsideWitherBoundary(ownerTeam, attacker.getLocation())) {
+                attacker.sendMessage(ChatColor.RED + "You must enter your enemy Wither's territory to attack it.");
                 return;
             }
-            Wither wither = entry.getValue();
-            double damage = event.getFinalDamage();
-            if (wither.getHealth() <= damage) {
-                if (attacker != null) {
-                    heroesOfGwenFinalObjectiveHits.computeIfAbsent(attacker.getUniqueId(), ignored -> new HashSet<>())
-                            .add("boss:" + entry.getKey());
+            if (!Boolean.TRUE.equals(witherDamageable.get(ownerTeam))) {
+                attacker.sendMessage(ChatColor.RED + "Destroy both enemy towers before attacking the Wither.");
+                return;
+            }
+            if (damage <= 0.0D) return;
+
+            long now = System.currentTimeMillis();
+            long lastInform = witherLastInformAt.getOrDefault(ownerTeam, 0L);
+            if (now - lastInform >= 30_000L) {
+                witherLastInformAt.put(ownerTeam, now);
+                for (Player defender : activeMatchPlayers()) {
+                    if (teams.getOrDefault(defender.getUniqueId(), -1) != ownerTeam) continue;
+                    defender.playSound(defender.getLocation(), Sound.BLOCK_ANVIL_LAND, 1.0F, 0.5F);
+                    defender.sendMessage(ChatColor.RED + "Your Wither is under attack!");
                 }
-                int winnerTeam = 1 - entry.getKey();
+            }
+            wither.playEffect(org.bukkit.EntityEffect.HURT);
+            if (wither.getHealth() <= damage) {
+                heroesOfGwenFinalObjectiveHits.computeIfAbsent(attacker.getUniqueId(), ignored -> new HashSet<>())
+                        .add("boss:" + ownerTeam);
+                int winnerTeam = 1 - ownerTeam;
                 announce(ChatColor.GOLD + teamName(winnerTeam) + " destroyed the enemy Wither!");
                 finishHeroesOfGwen(winnerTeam, "enemy Wither defeated");
             } else {
                 wither.setHealth(wither.getHealth() - damage);
+                updateWitherTeamHud(ownerTeam, wither, now, true);
             }
             return;
         }
@@ -3262,6 +3329,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (player == null || !player.isOnline() || !players.containsKey(player.getUniqueId())) return;
         activePlayers.add(player.getUniqueId());
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            addPlayerToWitherTeamHud(player);
             restoreHeroesOfGwenPurchasedEquipment(player);
             applyHeroesOfGwenStoreRespawnPassives(player, false);
         }
@@ -3271,6 +3339,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (player == null) return;
         UUID id = player.getUniqueId();
         activePlayers.remove(id);
+        removePlayerFromWitherTeamHud(player);
         openStores.remove(id);
         if (game == ArcadePortGame.CASTLE_ASSAULT && id.equals(objectiveCarrier)) {
             detonateObjectiveTnt(player);
@@ -5994,6 +6063,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         for (UUID id : new ArrayList<>(ivyHooks.keySet())) removeIvyState(id);
         for (UUID id : new ArrayList<>(ivyFloralLeaps.keySet())) removeIvyState(id);
         for (UUID id : new ArrayList<>(ivyThornWalls.keySet())) removeIvyState(id);
+        for (BossBar bar : witherTeamBars.values()) {
+            bar.removeAll();
+            bar.setVisible(false);
+        }
+        witherTeamBars.clear();
+        witherNextHudAt.clear();
+        witherLastInformAt.clear();
         for (Entity entity : new ArrayList<>(entities)) if (entity != null && entity.isValid()) entity.remove();
         for (Map.Entry<Block, BlockData> block : changedBlocks.entrySet()) {
             if (block.getKey() != null && block.getKey().getWorld() == world) block.getKey().setBlockData(block.getValue(), false);
