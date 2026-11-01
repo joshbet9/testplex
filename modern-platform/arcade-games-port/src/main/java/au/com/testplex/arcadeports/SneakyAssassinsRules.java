@@ -128,4 +128,29 @@ final class SneakyAssassinsRules {
     static boolean shouldPruneTownNpc(boolean entityExists, boolean validVillager) {
         return !entityExists || !validVillager;
     }
+    /** Reborn considers only town spawn points within sixteen blocks on each horizontal axis. */
+    static boolean isNpcPatrolAnchorNearby(double npcX, double npcZ, double anchorX, double anchorZ) {
+        return Double.isFinite(npcX) && Double.isFinite(npcZ)
+                && Double.isFinite(anchorX) && Double.isFinite(anchorZ)
+                && Math.abs(npcX - anchorX) <= 16.0D
+                && Math.abs(npcZ - anchorZ) <= 16.0D;
+    }
+
+    /** Reborn picks one independent patrol waypoint attempt with probability 1/40 each tick. */
+    static boolean shouldIssueNpcPatrolOrder(int randomRoll) {
+        return randomRoll >= 0 && randomRoll < 40;
+    }
+
+    /** A generated-town patrol destination needs support, two clear blocks and no liquid floor. */
+    static boolean isSafeNpcPatrolDestination(boolean solidFloor, boolean liquidFloor,
+            boolean feetPassable, boolean headPassable) {
+        return solidFloor && !liquidFloor && feetPassable && headPassable;
+    }
+
+    /** Reborn applies a recovery jump when a bribed villager cannot move for 800 ms. */
+    static boolean shouldRecoverBribedNpc(long nowMillis, long lastMovementAtMillis) {
+        return lastMovementAtMillis > 0L && nowMillis >= lastMovementAtMillis
+                && nowMillis - lastMovementAtMillis >= 800L;
+    }
+
 }
