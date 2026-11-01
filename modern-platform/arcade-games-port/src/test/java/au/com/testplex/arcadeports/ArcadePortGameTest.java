@@ -162,6 +162,10 @@ class ArcadePortGameTest {
         assertEquals(0, ArcadePortGame.ONE_IN_THE_QUIVER.lobbyTeamCount());
         assertEquals(0, ArcadePortGame.MILK_THE_COW.lobbyTeamCount());
         assertEquals(0, ArcadePortGame.WITHER_ASSAULT.lobbyTeamCount());
+        assertTrue(ArcadePortGame.MILK_THE_COW.lobbyRolesAssignedAutomatically());
+        assertTrue(ArcadePortGame.WITHER_ASSAULT.lobbyRolesAssignedAutomatically());
+        assertFalse(ArcadePortGame.PAINTBALL.lobbyRolesAssignedAutomatically());
+        assertFalse(ArcadePortGame.BACON_BRAWL.lobbyRolesAssignedAutomatically());
         assertEquals(ArcadePortGame.MICRO_BATTLES.lobbyTeamCount(),
                 ArcadePortManager.teamCountForGame(ArcadePortGame.MICRO_BATTLES));
         assertEquals(ArcadePortGame.BOMB_LOBBERS.lobbyTeamCount(),
