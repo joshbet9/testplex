@@ -2499,6 +2499,25 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.getInventory().getItem(7).setAmount(3);
                 heroAmmoNextAt.put(id, System.currentTimeMillis() + 3_000L);
             }
+            case "rowena" -> {
+                ItemStack bow = new ItemStack(Material.BOW);
+                ItemMeta bowMeta = bow.getItemMeta();
+                bowMeta.setUnbreakable(true);
+                bowMeta.setDisplayName(ChatColor.GREEN + "Bow");
+                bow.setItemMeta(bowMeta);
+                player.getInventory().setItem(0, bow);
+                player.getInventory().setItem(1, namedItem(Material.GOLD_NUGGET,
+                        ChatColor.GREEN + "Light Arrows", "Rowena's light-arrow ability; effect values still need source validation."));
+                player.getInventory().setItem(2, namedItem(Material.FEATHER,
+                        ChatColor.GREEN + "Combat Slide", "Movement ability; its archived movement values still need source validation."));
+                player.getInventory().setItem(3, namedItem(Material.NETHER_STAR,
+                        ChatColor.GREEN + "Bombardment", "Ultimate ability; its archived targeting values still need source validation."));
+                player.getInventory().setItem(7, namedItem(Material.ARROW,
+                        ChatColor.YELLOW + "Fletched Arrow", "Fletcher supplies one arrow every two seconds, up to two."));
+                player.getInventory().getItem(7).setAmount(ArcadePortRules.HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS);
+                heroAmmoNextAt.put(id, System.currentTimeMillis()
+                        + ArcadePortRules.HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS);
+            }
             default -> {
                 String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
                 Material primary = "Hunter".equals(role) ? Material.BOW
@@ -2912,19 +2931,22 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         for (UUID id : new ArrayList<>(activePlayers)) {
             Player player = players.get(id);
             if (player == null || !player.isOnline()) continue;
-            if ("devon".equals(selectedHeroesOfGwen.get(id))) {
-                long nextAmmo = heroAmmoNextAt.getOrDefault(id, now + 3_000L);
+            String hunterHero = selectedHeroesOfGwen.get(id);
+            int fletcherCapacity = ArcadePortRules.heroesOfGwenFletcherMaxArrows(hunterHero);
+            long fletcherReload = ArcadePortRules.heroesOfGwenFletcherReloadMillis(hunterHero);
+            if (fletcherCapacity > 0 && fletcherReload > 0L) {
+                long nextAmmo = heroAmmoNextAt.getOrDefault(id, now + fletcherReload);
                 if (now >= nextAmmo) {
                     ItemStack ammo = player.getInventory().getItem(7);
                     int count = ammo != null && ammo.getType() == Material.ARROW ? ammo.getAmount() : 0;
-                    if (count < 3) {
+                    if (count < fletcherCapacity) {
                         if (ammo == null || ammo.getType() != Material.ARROW) {
                             player.getInventory().setItem(7, namedItem(Material.ARROW,
-                                    ChatColor.YELLOW + "Hunting Arrow", "Replenished by Devon's kit."));
+                                    ChatColor.YELLOW + "Fletched Arrow", "Replenished by Fletcher."));
                         } else ammo.setAmount(count + 1);
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.5F, 1.3F);
                     }
-                    heroAmmoNextAt.put(id, now + 3_000L);
+                    heroAmmoNextAt.put(id, now + fletcherReload);
                 }
             }
             if (heroInfinityEndsAt.getOrDefault(id, 0L) > now) {
