@@ -283,7 +283,9 @@ public final class SpeedBuildersGame implements Listener {
             for (Player player : participants) {
                 if (player.isOnline()) {
                     player.sendMessage(ChatColor.RED + "Speed Builders could not start: " + failure.getMessage());
-                    restoreAfterReturningToLobby(player, state.snapshot);
+                    PlayerState state = players.get(player.getUniqueId());
+                    if (state != null) restoreAfterReturningToLobby(player, state.snapshot);
+                    else plugin.returnPlayerToArcadeLobby(player);
                 }
             }
             players.clear();
