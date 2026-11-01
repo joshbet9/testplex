@@ -251,7 +251,8 @@ public final class ModernLobbyScoreboard {
             case 0 -> ChatColor.BLACK + " ";
             case 1 -> ChatColor.DARK_GRAY + " ";
             case 2 -> ChatColor.GRAY + " ";
-            default -> ChatColor.WHITE + " ";
+            case 3 -> ChatColor.WHITE + " ";
+            default -> ChatColor.DARK_AQUA + " ";
         };
     }
 

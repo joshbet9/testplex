@@ -16570,6 +16570,7 @@ public final class ArcadePortManager implements Listener {
             case "micro-battles" -> ArcadePortRules.microBattlesAchievementConfigKey(playerId, achievementId);
             case "gladiators" -> ArcadePortRules.gladiatorsAchievementConfigKey(playerId, achievementId);
             case "evolution" -> "local-achievements." + playerId + ".evolution." + achievementId;
+            case "snake" -> "local-stats." + playerId + ".snake.achievements." + achievementId;
             default -> "local-achievements." + playerId + "." + gameId + "." + achievementId;
         };
     }
