@@ -8,6 +8,19 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CastleAssaultHeroesOfGwenMixedVariantTest {
     @Test
+    void allFiveCastleAssaultKitsAndAliasesNormalizeToCanonicalIds() {
+        assertEquals("alchemist", ArcadePortRules.normalizeCastleAssaultKit("Alchemist"));
+        assertEquals("archer", ArcadePortRules.normalizeCastleAssaultKit("Archer"));
+        assertEquals("demolitionist", ArcadePortRules.normalizeCastleAssaultKit("Demolitionist"));
+        assertEquals("demolitionist", ArcadePortRules.normalizeCastleAssaultKit("demo"));
+        assertEquals("demolitionist", ArcadePortRules.normalizeCastleAssaultKit("demolition"));
+        assertEquals("fighter", ArcadePortRules.normalizeCastleAssaultKit("Fighter"));
+        assertEquals("tank", ArcadePortRules.normalizeCastleAssaultKit("Tank"));
+        assertNull(ArcadePortRules.normalizeCastleAssaultKit("mage"));
+        assertNull(ArcadePortRules.normalizeCastleAssaultKit(null));
+    }
+
+    @Test
     void castleAssaultMixedArcadeHalvesObjectiveTntRespawnDelay() {
         assertEquals(60_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(false));
         assertEquals(30_000L, ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(true));

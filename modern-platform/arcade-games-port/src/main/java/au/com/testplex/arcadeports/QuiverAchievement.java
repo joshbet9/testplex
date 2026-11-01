@@ -11,7 +11,9 @@ public enum QuiverAchievement {
     SPEEDRUNNER("speedrunner", "Speedrunner",
             "Win a game in under 1:30."),
     THATS_NOT_A_SWORD("thats-not-a-sword", "That's not a sword…",
-            "Get 3 kills with fist/bow punch.");
+            "Get 3 kills with fist/bow punch."),
+    HEADS("heads", "HEADS!", "Kill a player with a high-arced bow shot."),
+    RHYTHM_HEAVEN("rhythm-heaven", "Rhythm Heaven", "Win with 10 separate two-kill streaks.");
 
     private final String slug;
     private final String displayName;

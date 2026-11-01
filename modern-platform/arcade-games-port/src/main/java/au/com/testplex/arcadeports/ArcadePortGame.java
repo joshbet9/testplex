@@ -68,6 +68,7 @@ public enum ArcadePortGame {
     public static ArcadePortGame fromId(String id) {
         if (id == null) return null;
         String value = id.toLowerCase(Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if ("snap".equals(value)) return CAMERA_SHY;
         for (ArcadePortGame game : values()) {
             if (game.id.equals(value)
                     || game.name().toLowerCase(Locale.ROOT).replace('_', '-').equals(value)) {
