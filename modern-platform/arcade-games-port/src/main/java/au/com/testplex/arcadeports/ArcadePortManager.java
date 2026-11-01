@@ -6589,6 +6589,8 @@ public final class ArcadePortManager implements Listener {
         UUID id=event.getPlayer().getUniqueId();
         if(!session.players.containsKey(id))return;
         event.setCancelled(true);
+        // Chat guesses are a gameplay action; keep them out of the round until Live.
+        if(!session.liveStarted)return;
         if(id.equals(session.drawCurrentDrawer))return;
         String message=PlainTextComponentSerializer.plainText().serialize(event.message());
         Bukkit.getScheduler().runTask(plugin,()->processDrawMyThingGuess(session,id,message));
@@ -20308,7 +20310,7 @@ public final class ArcadePortManager implements Listener {
         long prepareEndsAt;
         long prepareDurationMillis;
         int lastPrepareSecond = -1;
-        boolean liveStarted;
+        volatile boolean liveStarted;
         boolean startupComplete;
          boolean microBarrierActive;
         final boolean mixedArcadeVariant;
