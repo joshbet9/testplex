@@ -64,6 +64,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.Damageable;
 import org.bukkit.inventory.meta.EnchantmentStorageMeta;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.inventory.meta.PotionMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.potion.PotionEffect;
@@ -809,22 +810,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         addStoreEntry("Warrior", Material.IRON_HELMET, "Archer's Bane", 150, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.IRON_HELMET, "Superior Archer's Bane", 350, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.IRON_HELMET, "Brawler's Plate", 350, "Legacy Warrior store item.");
-        addStoreEntry("Warrior", Material.IRON_HELMET, "Superior Brawler's Plate", 750, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.DIAMOND_HELMET, "Prince's Plate", 1200, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.IRON_CHESTPLATE, "Archer's Bane", 200, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.IRON_CHESTPLATE, "Superior Archer's Bane", 450, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.IRON_CHESTPLATE, "Brawler's Plate", 450, "Legacy Warrior store item.");
-        addStoreEntry("Warrior", Material.IRON_CHESTPLATE, "Superior Brawler's Plate", 1000, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.DIAMOND_CHESTPLATE, "Prince's Plate", 1500, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.IRON_LEGGINGS, "Archer's Bane", 200, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.IRON_LEGGINGS, "Superior Archer's Bane", 450, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.IRON_LEGGINGS, "Brawler's Plate", 450, "Legacy Warrior store item.");
-        addStoreEntry("Warrior", Material.IRON_LEGGINGS, "Superior Brawler's Plate", 1000, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.DIAMOND_LEGGINGS, "Prince's Plate", 1500, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.IRON_BOOTS, "Archer's Bane", 150, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.IRON_BOOTS, "Superior Archer's Bane", 350, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.IRON_BOOTS, "Brawler's Plate", 350, "Legacy Warrior store item.");
-        addStoreEntry("Warrior", Material.IRON_BOOTS, "Superior Brawler's Plate", 750, "Legacy Warrior store item.");
         addStoreEntry("Warrior", Material.DIAMOND_BOOTS, "Prince's Plate", 1200, "Legacy Warrior store item.");
         addStoreEntry("Mage", Material.LEATHER_HELMET, "Leather Cap", 200, "Legacy Mage store item.");
         addStoreEntry("Mage", Material.LEATHER_HELMET, "Adept's Cap", 750, "Legacy Mage store item.");
@@ -2675,6 +2672,34 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         ItemStack reward = new ItemStack(entry.material);
         ItemMeta rewardMeta = reward.getItemMeta();
         rewardMeta.setDisplayName(ChatColor.GREEN + entry.name);
+        if (entry.material != Material.POTION) rewardMeta.setUnbreakable(true);
+        int enchantmentLevel = ArcadePortRules.heroesOfGwenStoreEnchantmentLevel(entry.name);
+        if (enchantmentLevel > 0) {
+            String enchantment = ArcadePortRules.heroesOfGwenStoreEnchantment(entry.name);
+            Enchantment type = switch (enchantment) {
+                case "POWER" -> Enchantment.POWER;
+                case "SHARPNESS" -> Enchantment.SHARPNESS;
+                case "PROJECTILE_PROTECTION" -> Enchantment.PROJECTILE_PROTECTION;
+                case "PROTECTION" -> Enchantment.PROTECTION;
+                default -> null;
+            };
+            if (type != null) rewardMeta.addEnchant(type, enchantmentLevel, true);
+        }
+        if (rewardMeta instanceof LeatherArmorMeta leatherMeta) {
+            Color color = switch (entry.name) {
+                case "Leather Cap of Nimble Fingers", "Leather Chestplate of Nimble Fingers",
+                        "Leather Leggings of Nimble Fingers", "Leather Boots of Nimble Fingers" -> Color.GREEN;
+                case "Focused Cap", "Focused Chestplate", "Focused Leggings", "Focused Boots",
+                        "Helm of Focus", "Chestplate of Focus", "Leggings of Focus", "Boots of Focus" -> Color.PURPLE;
+                case "Vampiric Helmet", "Vampiric Chestplate", "Vampiric Leggings", "Vampiric Boots" -> Color.RED;
+                case "Adept's Cap", "Adept's Chestplate", "Adept's Leggings", "Adept's Boots" ->
+                        Color.fromBGR(181, 7, 123);
+                case "Battle Mage Cap", "Battle Mage Chestplate", "Battle Mage Leggings", "Battle Mage Boots" ->
+                        Color.fromBGR(254, 89, 200);
+                default -> null;
+            };
+            if (color != null) leatherMeta.setColor(color);
+        }
         if (entry.material == Material.POTION && rewardMeta instanceof PotionMeta potionMeta) {
             switch (entry.name) {
                 case "Small Health Potion" -> potionMeta.addCustomEffect(new PotionEffect(
