@@ -51,6 +51,7 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
@@ -1330,6 +1331,29 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onHeroesOfGwenHattoriDoubleJump(PlayerToggleFlightEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
+        Player player = event.getPlayer();
+        UUID id = player.getUniqueId();
+        if (!activePlayers.contains(id) || !"hattori".equals(selectedHeroesOfGwen.get(id))
+                || player.getGameMode() == org.bukkit.GameMode.CREATIVE
+                || player.getGameMode() == org.bukkit.GameMode.SPECTATOR) return;
+        event.setCancelled(true);
+        player.setFlying(false);
+        player.setAllowFlight(false);
+        if (!isHeroSkillReady(player, "hattori.double_jump")) return;
+        setHeroSkillCooldown(player, "hattori.double_jump",
+                ArcadePortRules.HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_COOLDOWN_MILLIS);
+        Vector velocity = player.getVelocity();
+        player.setVelocity(new Vector(velocity.getX() * 0.2D,
+                ArcadePortRules.HEROES_OF_GWEN_HATTORI_DOUBLE_JUMP_POWER,
+                velocity.getZ() * 0.2D));
+        world.spawnParticle(Particle.FLAME, player.getLocation().clone().add(0.0D, 0.8D, 0.0D),
+                16, 0.35D, 0.2D, 0.35D, 0.04D);
+        player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.8F, 1.4F);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onHeroesOfGwenSneak(PlayerToggleSneakEvent event) {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN || !event.isSneaking()) return;
         Player player = event.getPlayer();
@@ -1613,7 +1637,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (held != null && held.getType() == Material.DIAMOND_SWORD
                 && held.hasItemMeta() && held.getItemMeta().hasDisplayName()
                 && held.getItemMeta().getDisplayName().contains("ENDER BLADE")) {
-            event.setDamage(event.getDamage() + 9.0D);
+            event.setDamage(event.getDamage()
+                    + ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_DAMAGE_BONUS);
         }
     }
 
@@ -2731,14 +2756,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         rowenaLightArrowsRemaining.remove(id);
         rowenaLightArrowNextHitAt.remove(id);
         rowenaCombatSlideEndsAt.remove(id);
+        player.setFlying(false);
+        player.setAllowFlight(false);
         player.getInventory().clear();
         player.getInventory().setArmorContents(new ItemStack[4]);
         player.getInventory().setItem(8, namedItem(Material.GOLD_INGOT,
                 ChatColor.GOLD + "Open Gold Upgrades", "Right-click to open your role shop."));
         switch (hero) {
             case "hattori" -> {
+                player.setAllowFlight(player.isOnGround());
                 player.getInventory().setItem(0, namedItem(Material.WOODEN_SWORD,
-                        ChatColor.GREEN + "Sword", "Basic Hattori weapon."));
+                        ChatColor.GREEN + "Sword", "Basic Hattori weapon; includes Double Jump."));
                 giveHeroesOfGwenSkillItem(player, 1, "hattori.shuriken", Material.SNOWBALL,
                         "Shuriken", "Fires three damaging snowballs.");
                 giveHeroesOfGwenSkillItem(player, 2, "hattori.ninja_dash", Material.FEATHER,
@@ -2907,9 +2935,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         UUID id = player.getUniqueId();
         switch (skill) {
             case "hattori.shuriken" -> {
-                setHeroSkillCooldown(player, skill, 1_500L);
-                for (int i = 0; i < 3; i++) {
-                    final long delay = i * 4L;
+                setHeroSkillCooldown(player, skill,
+                        ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_COOLDOWN_MILLIS);
+                for (int i = 0; i < ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_COUNT; i++) {
+                    final long delay = i * ArcadePortRules.HEROES_OF_GWEN_HATTORI_SHURIKEN_SPACING_TICKS;
                     Bukkit.getScheduler().runTaskLater(plugin, () -> {
                         if (!player.isOnline() || !activePlayers.contains(id)) return;
                         Snowball snowball = player.launchProjectile(Snowball.class);
@@ -2919,7 +2948,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.playSound(player.getLocation(), Sound.ENTITY_SNOWBALL_THROW, 1.0F, 1.3F);
             }
             case "hattori.ninja_dash" -> {
-                setHeroSkillCooldown(player, skill, 7_000L);
+                setHeroSkillCooldown(player, skill,
+                        ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_COOLDOWN_MILLIS);
                 performHattoriDash(player);
             }
             case "hattori.ender_blade" -> {
@@ -2932,22 +2962,28 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 enderBlade.setItemMeta(meta);
                 player.getInventory().setItem(0, enderBlade);
                 player.getInventory().setHeldItemSlot(0);
-                heroEnderBladeEndsAt.put(id, System.currentTimeMillis() + 7_000L);
-                setHeroSkillCooldown(player, skill, 67_000L);
+                heroEnderBladeEndsAt.put(id, System.currentTimeMillis()
+                        + ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_ACTIVE_MILLIS);
+                setHeroSkillCooldown(player, skill,
+                        ArcadePortRules.HEROES_OF_GWEN_HATTORI_ENDER_BLADE_REUSE_DELAY_MILLIS);
                 player.sendMessage(ChatColor.LIGHT_PURPLE + "Hattori activated Ender Blade!");
                 player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.8F);
             }
             case "devon.tnt_infusion" -> {
-                heroTntArrowCharges.put(id, 3);
+                heroTntArrowCharges.put(id, ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_ARROW_COUNT);
                 ItemStack skillItem = player.getInventory().getItem(1);
-                if (skillItem != null) skillItem.setAmount(3);
+                if (skillItem != null) skillItem.setAmount(ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_ARROW_COUNT);
                 player.sendMessage(ChatColor.GOLD + "Your next three arrows are infused with TNT.");
                 player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.2F);
             }
             case "devon.hunters_boost" -> {
-                setHeroSkillCooldown(player, skill, 10_000L);
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 3 * 20, 1, true, true, true));
-                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 3 * 20, 0, true, true, true));
+                setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_COOLDOWN_MILLIS);
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
+                        (int) (ArcadePortRules.HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_DURATION_MILLIS / 50L),
+                        1, true, true, true));
+                player.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST,
+                        (int) (ArcadePortRules.HEROES_OF_GWEN_DEVON_HUNTERS_BOOST_DURATION_MILLIS / 50L),
+                        0, true, true, true));
                 player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.8F, 1.5F);
             }
             case "devon.infinity" -> activateDevonInfinity(player);
@@ -3477,8 +3513,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         } else if (ammo.getAmount() < 3) {
             ammo.setAmount(ammo.getAmount() + 1);
         }
-        heroInfinityEndsAt.put(id, System.currentTimeMillis() + 7_000L);
-        setHeroSkillCooldown(player, "devon.infinity", 67_000L);
+        heroInfinityEndsAt.put(id, System.currentTimeMillis()
+                + ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_ACTIVE_MILLIS);
+        setHeroSkillCooldown(player, "devon.infinity",
+                ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_REUSE_DELAY_MILLIS);
         player.sendMessage(ChatColor.LIGHT_PURPLE + "Infinity activated: homing arrows and Wither for seven seconds.");
         player.playSound(player.getLocation(), Sound.ENTITY_ENDERMAN_TELEPORT, 1.0F, 0.8F);
     }
@@ -4982,6 +5020,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             Player player = players.get(id);
             if (player == null || !player.isOnline()) continue;
             String hunterHero = selectedHeroesOfGwen.get(id);
+            if ("hattori".equals(hunterHero) && player.isOnGround()
+                    && player.getGameMode() != org.bukkit.GameMode.CREATIVE
+                    && player.getGameMode() != org.bukkit.GameMode.SPECTATOR
+                    && isHeroSkillReady(player, "hattori.double_jump")) {
+                player.setAllowFlight(true);
+            }
             if ("larissa".equals(hunterHero)) {
                 long nextWaterStone = heroAmmoNextAt.getOrDefault(id,
                         now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS);
@@ -5029,7 +5073,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             .filter(candidate -> !candidate.equals(player)
                                     && teams.getOrDefault(candidate.getUniqueId(), -1)
                                             != teams.getOrDefault(id, -2)
-                                    && candidate.getLocation().distanceSquared(arrow.getLocation()) <= 36.0D)
+                                    && candidate.getLocation().distanceSquared(arrow.getLocation())
+                                            <= ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_HOMING_RANGE
+                                                    * ArcadePortRules.HEROES_OF_GWEN_DEVON_INFINITY_HOMING_RANGE)
                             .min(java.util.Comparator.comparingDouble(candidate ->
                                     candidate.getLocation().distanceSquared(arrow.getLocation())))
                             .orElse(null);
