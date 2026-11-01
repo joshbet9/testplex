@@ -71,8 +71,13 @@ function connect(username) {
           yaw: Number(packet.yaw || 0), pitch: Number(packet.pitch || 0),
           flags: { onGround: false, hasHorizontalCollision: false },
         });
+        // Paper 26.3 allows one position-bearing packet per client tick. Vanilla
+        // closes the tick with ServerboundClientTickEndPacket (protocol name:
+        // tick_end); without it the next teleport acknowledgement is rejected.
+        client.write('tick_end', {});
         log('BOT_TELEPORT_ACK|PASS|' + username + '|id=' + teleportId
           + '|reason=' + reason + '|pos=' + packet.x + ',' + packet.y + ',' + packet.z);
+        log('BOT_TICK_END|PASS|' + username + '|after-position');
         sendPlayerLoaded('teleport-' + teleportId);
       } catch (error) {
         log('BOT_TELEPORT_ACK|FAIL|' + username + '|id=' + teleportId + '|' + String(error));
