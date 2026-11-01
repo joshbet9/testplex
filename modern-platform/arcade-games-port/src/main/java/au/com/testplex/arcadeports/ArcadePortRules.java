@@ -2703,4 +2703,113 @@ public final class ArcadePortRules {
                 : Character.toUpperCase(canonical.charAt(0)) + canonical.substring(1);
     }
 
+
+
+    // Restored source-derived Micro Battles helpers used by the shared manager.
+    public static double microBattlesDistanceToBorder(double playerX, double playerZ,
+            double centerX, double centerZ, double borderSize) {
+        if (!Double.isFinite(playerX) || !Double.isFinite(playerZ)
+                || !Double.isFinite(centerX) || !Double.isFinite(centerZ)
+                || !Double.isFinite(borderSize) || borderSize <= 0.0D) return Double.NaN;
+        double halfSize = borderSize / 2.0D;
+        double distanceToXFace = halfSize - Math.abs(playerX - centerX);
+        double distanceToZFace = halfSize - Math.abs(playerZ - centerZ);
+        return Math.min(distanceToXFace, distanceToZFace);
+    }
+
+    public static boolean shouldShowMicroBattlesBorderParticles(double playerX, double playerZ,
+            double centerX, double centerZ, double borderSize) {
+        double distance = microBattlesDistanceToBorder(playerX, playerZ, centerX, centerZ, borderSize);
+        return Double.isFinite(distance) && distance >= 0.0D
+                && distance <= MICRO_BATTLES_BORDER_PARTICLE_DISTANCE;
+    }
+
+    public static Material microBattlesGlassMaterial(String requested) {
+        String colour = normalizeMicroBattlesColour(requested);
+        if (colour == null) colour = MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR;
+        Material material = Material.matchMaterial(colour.toUpperCase(java.util.Locale.ROOT).replace('-', '_')
+                + "_STAINED_GLASS");
+        return material == null ? Material.LIGHT_BLUE_STAINED_GLASS : material;
+    }
+
+    public static Color microBattlesParticleColour(String requested) {
+        String colour = normalizeMicroBattlesColour(requested);
+        if (colour == null) colour = MICRO_BATTLES_DEFAULT_COSMETIC_COLOUR;
+        return switch (colour) {
+            case "white" -> Color.fromRGB(249, 255, 254);
+            case "orange" -> Color.fromRGB(249, 128, 29);
+            case "magenta" -> Color.fromRGB(199, 78, 189);
+            case "yellow" -> Color.fromRGB(254, 216, 61);
+            case "lime" -> Color.fromRGB(128, 199, 31);
+            case "pink" -> Color.fromRGB(243, 139, 170);
+            case "gray" -> Color.fromRGB(71, 79, 82);
+            case "light-gray" -> Color.fromRGB(157, 157, 151);
+            case "cyan" -> Color.fromRGB(22, 156, 156);
+            case "purple" -> Color.fromRGB(137, 50, 184);
+            case "blue" -> Color.fromRGB(60, 68, 170);
+            case "brown" -> Color.fromRGB(131, 84, 50);
+            case "green" -> Color.fromRGB(94, 124, 22);
+            case "red" -> Color.fromRGB(176, 46, 38);
+            case "black" -> Color.fromRGB(29, 29, 33);
+            default -> Color.fromRGB(58, 179, 218);
+        };
+    }
+
+    public static String microBattlesAchievementConfigKey(java.util.UUID playerId, String achievementSlug) {
+        if (playerId == null || achievementSlug == null
+                || !achievementSlug.matches("[a-z0-9-]+")) return "";
+        return "test-achievements.micro-battles." + playerId + "." + achievementSlug;
+    }
+
+
+    public static int microBattlesTimeoutTeam(int[] aliveByTeam, int[] killsByTeam) {
+        if (aliveByTeam == null || killsByTeam == null || aliveByTeam.length < 2
+                || aliveByTeam.length != killsByTeam.length) return -1;
+        int bestTeam = -1;
+        int bestAlive = -1;
+        int bestKills = -1;
+        boolean tied = false;
+        for (int team = 0; team < aliveByTeam.length; team++) {
+            if (aliveByTeam[team] < 0 || killsByTeam[team] < 0) return -1;
+            if (aliveByTeam[team] > bestAlive
+                    || (aliveByTeam[team] == bestAlive && killsByTeam[team] > bestKills)) {
+                bestTeam = team;
+                bestAlive = aliveByTeam[team];
+                bestKills = killsByTeam[team];
+                tied = false;
+            } else if (aliveByTeam[team] == bestAlive && killsByTeam[team] == bestKills) {
+                tied = true;
+            }
+        }
+        return bestAlive <= 0 || tied ? -1 : bestTeam;
+    }
+
+    public static double microBattlesMeleeDamage(String materialName) {
+        if (materialName == null) return 1.0D;
+        String material = materialName.toUpperCase(java.util.Locale.ROOT);
+        if (!material.endsWith("_SWORD") && !material.endsWith("_AXE")) return 1.0D;
+        int damage = 6;
+        if (material.contains("WOOD")) damage -= 3;
+        else if (material.contains("STONE")) damage -= 2;
+        else if (material.contains("DIAMOND")) damage += 1;
+        return damage;
+    }
+
+    public static double microBattlesArrowDamage(double velocityLength) {
+        if (!Double.isFinite(velocityLength) || velocityLength <= 0.0D) return 0.0D;
+        return velocityLength * 3.0D;
+    }
+
+    public static double microBattlesDamageAfterArmour(double damage, double armourPoints, boolean ignoreArmour) {
+        if (!Double.isFinite(damage) || damage <= 0.0D) return 0.0D;
+        if (ignoreArmour) return damage;
+        double armour = Double.isFinite(armourPoints) ? Math.max(0.0D, Math.min(20.0D, armourPoints)) : 0.0D;
+        return damage * (25.0D - armour) / 25.0D;
+    }
+
+    public static double microBattlesKnockbackStrength(double damage, boolean projectile) {
+        if (!Double.isFinite(damage)) return 0.0D;
+        return Math.log10(Math.max(damage, 2.0D)) * (projectile ? 1.6D : 1.0D);
+    }
+
 }
