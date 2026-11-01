@@ -205,8 +205,17 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 completedGame != null && completedGame.isMonsterMaze() ? completedGame : ArcadePortGame.MONSTER_MAZE);
     }
 
-    public void onWizardsRoundCompleted() {
-        if (manager != null) manager.onExternalGameCompleted(ArcadePortGame.WIZARDS);
+    /** Natural Wizards completion enters the same Game Over and lobby-return path as every Arcade game. */
+    public void onWizardsRoundCompleted(Player winner) {
+        if (manager != null) manager.finishWizardsSession(winner);
+    }
+
+    public void markWizardsParticipantEliminated(Player player) {
+        if (manager != null) manager.markWizardsParticipantEliminated(player);
+    }
+
+    public void returnWizardsParticipantToLobby(Player player) {
+        if (manager != null) manager.returnWizardsParticipantToLobby(player);
     }
 
     public WizardsGameManager getWizardsGameManager() { return wizards; }
