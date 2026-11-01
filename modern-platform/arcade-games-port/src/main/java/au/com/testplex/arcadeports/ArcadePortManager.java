@@ -216,6 +216,8 @@ public final class ArcadePortManager implements Listener {
     private DragonEscapeGhostBridge dragonEscapeGhostBridge;
     private final Map<String, List<DragonEscapeGhostFrame>> dragonEscapeGhostFrameCache = new HashMap<>();
     private Session active;
+    /** Prevent a standalone in-process test module from overlapping the shared Arcade session. */
+    private boolean standaloneGameActive;
     private BukkitTask pendingStart;
     private ArcadePortGame pendingType;
     private boolean pendingMixedArcadeVariant;
@@ -313,7 +315,7 @@ public final class ArcadePortManager implements Listener {
 
     /** Called after Monster Maze returns its roster; only despawn when the embedded module is truly idle. */
     public void cleanupTestPlayersIfNoGameIsRunning() {
-        if (active == null && !monsterMazeRunning()) testPlayers.despawnSessionPlayers();
+        if (active == null && !monsterMazeRunning() && !standaloneGameActive) testPlayers.despawnSessionPlayers();
     }
 
     public void returnPlayerToLobby(Player player) {
@@ -326,12 +328,49 @@ public final class ArcadePortManager implements Listener {
 
     CameraShyGame cameraShyModule() { return cameraShyModule; }
 
-    boolean canStartCameraShy() { return active == null && !monsterMazeRunning(); }
+    boolean canStartCameraShy() { return active == null && !monsterMazeRunning() && !standaloneGameActive; }
+
+    /** Availability guard for standalone Arcade-hosted test modules. */
+    public boolean canStartExternalGame() {
+        return !standaloneGameActive && active == null && !monsterMazeRunning()
+                && (cameraShyModule == null || !cameraShyModule.isActive());
+    }
+
+    /** Atomically reserve the shared test session for a standalone module. */
+    public boolean tryAcquireStandaloneGameLock() {
+        if (!canStartExternalGame()) return false;
+        standaloneGameActive = true;
+        return true;
+    }
+
+    /** Release the shared test session after standalone player restoration is complete. */
+    public void releaseStandaloneGameLock() { standaloneGameActive = false; }
+
+    /** Remove a player from all shared queues before they join a standalone game queue. */
+    void removePlayerFromOtherQueues(Player player) {
+        if (player == null) return;
+        UUID id = player.getUniqueId();
+        for (LinkedHashMap<UUID, Player> queue : queues.values()) queue.remove(id);
+        gladiatorLobbyVotes.remove(id);
+        if (cameraShyModule != null) cameraShyModule.removeFromQueue(id);
+        if (automaticRotationTask != null || automaticRotationOnReturn) cancelAutomaticRotationVote();
+        if (pendingStart != null && pendingType != null) {
+            LinkedHashMap<UUID, Player> pendingQueue = queues.get(queueKey(pendingType, pendingMixedArcadeVariant));
+            boolean hasOnlinePlayers = pendingQueue != null && pendingQueue.values().stream()
+                    .anyMatch(queued -> queued != null && queued.isOnline() && !testPlayers.isTestPlayer(queued));
+            if (!hasOnlinePlayers) {
+                pendingStart.cancel();
+                pendingStart = null;
+                pendingType = null;
+                pendingMixedArcadeVariant = false;
+            }
+        }
+    }
 
     /** Start an explicit participant set through the same Testplex Arcade queue/manager path. */
     public boolean startMonsterMazeTournamentRound(List<Player> requestedParticipants) {
         if (requestedParticipants == null || requestedParticipants.isEmpty()
-                || monsterMazeModule == null || active != null || monsterMazeRunning()
+                || monsterMazeModule == null || active != null || monsterMazeRunning() || standaloneGameActive
                 || !isRotationCandidateAvailable(ArcadePortGame.MONSTER_MAZE)) return false;
         LinkedHashMap<UUID, Player> selected = new LinkedHashMap<>();
         for (Player player : requestedParticipants) {
@@ -1644,6 +1683,10 @@ public final class ArcadePortManager implements Listener {
 
     public void queue(ArcadePortGame type, Player player, boolean quickStart, boolean mixedArcadeVariant) {
         if (player == null || !player.isOnline()) return;
+        if (standaloneGameActive) {
+            player.sendMessage(ChatColor.RED + "A standalone Arcade test is already running. Wait for it to finish before joining another queue.");
+            return;
+        }
         if (type == ArcadePortGame.CAMERA_SHY) {
             // Camera Shy uses a dedicated queue implementation, but it is still subject
             // to the central acceptance allow-list and manual-rotation cancellation.
@@ -1864,6 +1907,10 @@ public final class ArcadePortManager implements Listener {
             boolean mixedArcadeVariant) {
         if (!plugin.hasAdminAccess(sender)) {
             sender.sendMessage(ChatColor.RED + "Operator permission required to start a queued Arcade game.");
+            return;
+        }
+        if (standaloneGameActive) {
+            sender.sendMessage(ChatColor.RED + "A standalone Arcade test is currently running. Wait for it to finish before starting another game.");
             return;
         }
         if (cameraShyModule != null && cameraShyModule.isActive()) {
@@ -2318,6 +2365,20 @@ public final class ArcadePortManager implements Listener {
 
     public void startQueued(ArcadePortGame type, Player requester, org.bukkit.command.CommandSender sender,
             boolean mixedArcadeVariant) {
+        if (standaloneGameActive) {
+            sender.sendMessage(ChatColor.YELLOW + "A standalone Arcade test is active; this queued game will wait until it finishes.");
+            if (type != null && pendingStart == null) {
+                pendingType = type;
+                pendingMixedArcadeVariant = mixedArcadeVariant;
+                pendingStart = Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                    pendingStart = null;
+                    pendingType = null;
+                    pendingMixedArcadeVariant = false;
+                    startQueued(type, null, Bukkit.getConsoleSender(), mixedArcadeVariant);
+                }, JOIN_WINDOW_TICKS);
+            }
+            return;
+        }
         if (manualStartCountdown != null) {
             manualStartCountdown.cancel();
             manualStartCountdown = null;
@@ -2465,6 +2526,10 @@ public final class ArcadePortManager implements Listener {
 
     private void startQueuedInternal(ArcadePortGame type, Player requester,
             org.bukkit.command.CommandSender sender, boolean mixedArcadeVariant) {
+        if (standaloneGameActive) {
+            sender.sendMessage(ChatColor.RED + "A standalone Arcade test is currently running.");
+            return;
+        }
         cancelAutomaticRotationVote();
         if (mixedArcadeVariant && !supportsMixedArcadeVariant(type)) {
             sender.sendMessage(ChatColor.RED + "Mixed Arcade variants are only available for Turf Wars, Castle Assault, and Heroes of Gwen.");
