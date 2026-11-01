@@ -2812,4 +2812,21 @@ public final class ArcadePortRules {
         return Math.log10(Math.max(damage, 2.0D)) * (projectile ? 1.6D : 1.0D);
     }
 
+
+
+    // Additional source-derived Micro Battles achievements and contribution rules.
+    public static boolean shouldAwardMicroBattlesAnnihilation(int killsThisGame) {
+        return killsThisGame == MICRO_BATTLES_ANNIHILATION_KILLS;
+    }
+
+    public static boolean shouldAwardMicroBattlesLastTwo(int aliveTeams) {
+        return aliveTeams == 2;
+    }
+
+
+    public static boolean isMicroBattlesCombatContributionFresh(long nowMillis, long lastDamageAtMillis) {
+        return nowMillis >= lastDamageAtMillis
+                && nowMillis - lastDamageAtMillis < MICRO_BATTLES_COMBAT_LOG_EXPIRE_MILLIS;
+    }
+
 }
