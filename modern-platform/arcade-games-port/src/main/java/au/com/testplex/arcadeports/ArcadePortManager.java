@@ -206,6 +206,7 @@ public final class ArcadePortManager implements Listener {
     private final ArcadeTestPlayerManager testPlayers;
     private boolean testPlayerStartPending;
     private final SneakyAssassinsMechanics sneakyAssassins;
+    private final HoopsRemasteredRuntime hoops;
     private final Map<String, LinkedHashMap<UUID, Player>> queues = new HashMap<>();
     private final Map<String, World> worlds = new HashMap<>();
     private final Set<String> sourceMapWorlds = new HashSet<>();
@@ -264,6 +265,12 @@ public final class ArcadePortManager implements Listener {
         this.superSploor = new SuperSploorRuntime(plugin);
         this.testPlayers = new ArcadeTestPlayerManager(plugin);
         this.sneakyAssassins = new SneakyAssassinsMechanics(plugin, testPlayers::isTestPlayer);
+        this.hoops = new HoopsRemasteredRuntime(plugin, (winner, announceWinner) -> {
+            Session hoopsSession = active;
+            if (hoopsSession != null && hoopsSession.type == ArcadePortGame.HOOPS_REMASTERED) {
+                ArcadePortManager.this.finish(hoopsSession, winner, announceWinner);
+            }
+        });
         this.statsActionKey = new NamespacedKey(plugin, "stats-action");
         this.statsCategoryKey = new NamespacedKey(plugin, "stats-category");
         this.statsGameKey = new NamespacedKey(plugin, "stats-game");
@@ -276,6 +283,7 @@ public final class ArcadePortManager implements Listener {
         }
         Bukkit.getPluginManager().registerEvents(this, plugin);
         Bukkit.getPluginManager().registerEvents(lobby, plugin);
+        Bukkit.getPluginManager().registerEvents(hoops, plugin);
         plugin.getLogger().info("TESTPLEX_ARCADE_LOBBY_READY world=" + ModernArcadeLobby.WORLD_NAME
                 + " bounds=-50..49 floor-y=" + ModernArcadeLobby.FLOOR_Y);
         this.lobbyRuntime = new ModernArcadeLobbyRuntime(plugin, this, lobby);
@@ -2736,6 +2744,7 @@ public final class ArcadePortManager implements Listener {
                 || type == ArcadePortGame.DRAW_MY_THING
                 || type == ArcadePortGame.MASTER_BUILDERS
                 || type == ArcadePortGame.GLADIATORS || type == ArcadePortGame.SUPER_SPLOOR
+                || type == ArcadePortGame.HOOPS_REMASTERED
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 0L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
@@ -3444,6 +3453,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void buildArena(ArcadePortGame type, World world) {
+        if (type == ArcadePortGame.HOOPS_REMASTERED) {
+            HoopsRemasteredRuntime.buildCourt(world);
+            return;
+        }
         if (type == ArcadePortGame.SNEAKY_ASSASSINS) {
             sneakyAssassins.buildArena(world);
             return;
@@ -3509,6 +3522,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private List<Location> spawnLocations(ArcadePortGame type, int count) {
+        if (type == ArcadePortGame.HOOPS_REMASTERED) {
+            return HoopsRemasteredRuntime.spawnLocations(worlds.get(type.id()), count);
+        }
         if (type == ArcadePortGame.BACON_BRAWL && !baconSourceSpawnOverrides.isEmpty()) {
             List<Location> chosen = new ArrayList<>();
             for (int i = 0; i < Math.max(1, count); i++) {
@@ -11946,6 +11962,9 @@ public final class ArcadePortManager implements Listener {
             case TURF_WARS -> (session.turfCombat ? "COMBAT" : "BUILD") + " | turf " + session.turfFrontlineX;
             case CAMERA_SHY -> "Camera Shy runs in its dedicated match controller";
             case PLEXBALL -> "Plexball | " + session.alive.size() + " active";
+            case HOOPS_REMASTERED -> "basketball | "
+                    + (session.teams.getOrDefault(id, 0) == 0 ? "RED" : "BLUE")
+                    + " | " + scoreFor(session, id) + " pts";
             // Monster Maze owns its own in-process GameManager session and does not
             // create an ArcadePortManager Session object.
             case MONSTER_MAZE -> "Monster Maze";
@@ -14147,6 +14166,7 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        if (session.type == ArcadePortGame.HOOPS_REMASTERED) hoops.onManagerFinish();
         if (session.type == ArcadePortGame.SUPER_SPLOOR) {
             session.superSploorPlayerStats = superSploor.snapshotStats();
             session.superSploorTerritory = superSploor.snapshotTerritory();
@@ -14323,6 +14343,11 @@ public final class ArcadePortManager implements Listener {
                 } else {
                     announce(session, ChatColor.YELLOW + "Bacon Brawl ended with no pig left standing.");
                 }
+            } else if (session.type == ArcadePortGame.HOOPS_REMASTERED && winner != null) {
+                int winningTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
+                ChatColor colour = winningTeam == 0 ? ChatColor.RED : ChatColor.AQUA;
+                announce(session, colour + (winningTeam == 0 ? "RED" : "BLUE")
+                        + ChatColor.GOLD + " team wins Hoops Remastered!");
             } else if (session.type == ArcadePortGame.SUPER_SPLOOR) {
                 if (winner == null) {
                     announce(session, ChatColor.YELLOW + "Super Sploor ended in a draw.");
@@ -15250,7 +15275,7 @@ public final class ArcadePortManager implements Listener {
 
 
     private void recordLocalStats(Session session, Player winner, boolean completed) {
-        if (!completed) return;
+        if (!completed || session.type == ArcadePortGame.HOOPS_REMASTERED) return;
         if (session.type == ArcadePortGame.DRAGONS && winner != null && !testPlayers.isTestPlayer(winner)) {
             awardDragonEndGems(session, winner);
         }
@@ -16652,6 +16677,7 @@ public final class ArcadePortManager implements Listener {
             plugin.getPlexballGame().stopForArcadeLifecycle(reason);
         }
         if (stopping != null) finish(stopping, null, false);
+        else hoops.shutdown();
         if (monsterMazeRunning() && monsterMazeModule != null
                 && monsterMazeModule.getGameManager() != null) {
             monsterMazeModule.getGameManager().forceStop();
