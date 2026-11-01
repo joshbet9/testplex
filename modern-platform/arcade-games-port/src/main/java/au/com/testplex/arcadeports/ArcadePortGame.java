@@ -29,7 +29,7 @@ public enum ArcadePortGame {
     SKY_WARS("skywars", "SkyWars", Material.END_STONE_BRICKS),
     MILK_THE_COW("milk-the-cow", "Milk the Cow", Material.GRASS_BLOCK),
     WITHER_ASSAULT("wither-assault", "Wither Assault", Material.STONE_BRICKS),
-    CAMERA_SHY("camera-shy", "Camera Shy", Material.SPYGLASS);
+    CAMERA_SHY("camera-shy", "Snap", Material.SPYGLASS);
 
     private final String id;
     private final String displayName;
@@ -45,6 +45,7 @@ public enum ArcadePortGame {
     public static ArcadePortGame fromId(String id) {
         if (id == null) return null;
         String value = id.toLowerCase(Locale.ROOT).replace('_', '-').replace(' ', '-');
+        if ("snap".equals(value)) return CAMERA_SHY;
         for (ArcadePortGame game : values()) if (game.id.equals(value) || game.name().toLowerCase(Locale.ROOT).replace('_','-').equals(value)) return game;
         return null;
     }
