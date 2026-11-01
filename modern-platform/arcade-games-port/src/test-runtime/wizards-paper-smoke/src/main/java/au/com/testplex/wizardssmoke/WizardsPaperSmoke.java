@@ -223,8 +223,10 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
             return;
         }
 
-        // Settle the shared Arcade session before recording the lobby baselines.
-        method(arcade.getClass(), "prepareForWizards").invoke(arcade);
+        // Reset through the host manager, exactly as the operator Stop Game action does.
+        Object arcadeManager = field(arcade, "manager");
+        method(arcadeManager.getClass(), "stop", String.class).invoke(
+                arcadeManager, "Wizards Paper smoke setup");
         seedBaselineProfile(owner, 0);
         seedBaselineProfile(rival, 1);
         seedBaselineProfile(third, 2);
@@ -248,11 +250,12 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         require(Bukkit.dispatchCommand(third, "arcadeport kit wizards mystic"),
                 "Mystic kit selection command was rejected");
 
-        @SuppressWarnings("unchecked")
-        Map<Object, Object> queue = (Map<Object, Object>) field(wizards, "queue");
-        require(queue.size() == 3, "expected three queued clients, found " + queue.size());
+        int queued = (Integer) method(arcadeManager.getClass(), "queuedCount",
+                au.com.testplex.arcadeports.ArcadePortGame.class)
+                .invoke(arcadeManager, au.com.testplex.arcadeports.ArcadePortGame.WIZARDS);
+        require(queued == 3, "expected three players in the shared Arcade queue, found " + queued);
         require(Bukkit.dispatchCommand(owner, "arcadeport start wizards"),
-                "owner could not force-start the Wizards round");
+                "owner could not start Wizards through the shared Arcade queue");
         gameplayStage = 1;
         gameplayTicks = 0;
         getLogger().info("WIZARDS_GAMEPLAY_SMOKE|QUEUED|players=" + owner.getName() + ","
