@@ -693,6 +693,8 @@ public final class ArcadePortManager implements Listener {
         Location impact = target.getLocation().clone().add(0.0D, 1.0D, 0.0D);
         target.getWorld().spawnParticle(Particle.CLOUD, impact, 10, 0.35D, 0.4D, 0.35D, 0.04D);
         target.playEffect(EntityEffect.HURT);
+        LivingEntity avatar = baconPlayerAvatar(session, targetId);
+        if (avatar != null) avatar.playEffect(EntityEffect.HURT);
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
 
         return true;
@@ -9659,6 +9661,8 @@ public final class ArcadePortManager implements Listener {
                 target.getLocation().add(0.0D, 1.0D, 0.0D), 6, 0.28D, 0.35D, 0.28D, 0.01D);
         attacker.playSound(attacker.getLocation(), Sound.ENTITY_PLAYER_ATTACK_STRONG, 0.8F, 1.1F);
         target.playEffect(EntityEffect.HURT);
+        LivingEntity avatar = baconPlayerAvatar(session, targetId);
+        if (avatar != null) avatar.playEffect(EntityEffect.HURT);
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
         showBaconHitFeedback(session, attacker, target, timingMultiplier);
 
