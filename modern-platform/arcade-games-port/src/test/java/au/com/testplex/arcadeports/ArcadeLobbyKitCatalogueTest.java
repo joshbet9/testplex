@@ -17,9 +17,13 @@ class ArcadeLobbyKitCatalogueTest {
     }
 
     @Test
-    void baconBrawlKeepsChrisPBaconRemovedFromTheSelectableCatalogue() {
-        assertFalse(ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BACON_BRAWL, List.of()).stream()
-                .anyMatch(choice -> choice.id.equals("chris-p-bacon")));
+    void baconBrawlRestoresChrisPBaconAsAnAchievementKit() {
+        ArcadeLobbyKitCatalogue.KitChoice chris =
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.BACON_BRAWL, List.of()).stream()
+                        .filter(choice -> choice.id.equals("chris-p-bacon")).findFirst().orElseThrow();
+        assertEquals("Chris P. Bacon", chris.name);
+        assertEquals(ArcadeLobbyKitCatalogue.Unlock.ACHIEVEMENT, chris.unlock);
+        assertEquals(org.bukkit.Material.IRON_AXE, chris.heldItem);
     }
 
     @Test
