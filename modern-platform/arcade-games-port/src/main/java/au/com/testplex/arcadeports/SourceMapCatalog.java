@@ -987,6 +987,19 @@ public final class SourceMapCatalog {
      * migration does not preserve this Reborn-only metadata beside the imported
      * terrain, so archive lookup is the authoritative fallback after load.
      */
+    /** Compatibility overload for source-map callers that include the game label. */
+    public static MapData readResource(JavaPlugin plugin, String gameName, String resource, World world) {
+        if (plugin == null || gameName == null || gameName.isBlank()
+                || resource == null || resource.isBlank() || resource.startsWith("/")
+                || resource.contains("..") || resource.indexOf('\\') >= 0
+                || !resource.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) {
+            if (plugin != null) plugin.getLogger().warning(
+                    "Refusing an invalid source-map metadata request for " + gameName + ".");
+            return null;
+        }
+        return readResource(plugin, resource, world);
+    }
+
     public static MapData readResource(JavaPlugin plugin, String resource, World world) {
         if (plugin == null || resource == null || world == null) return null;
         Path config = resolveWorldConfigPath(world.getWorldFolder().toPath(),
