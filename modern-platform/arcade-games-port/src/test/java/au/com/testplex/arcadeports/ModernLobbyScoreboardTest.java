@@ -74,6 +74,24 @@ class ModernLobbyScoreboardTest {
     }
 
     @Test
+    void liveMineplexPermissionGroupsKeepLegacyRankPriorityAndTheirExactIdentity() {
+        assertEquals("r0_owner_OWNER_t0",
+                ModernLobbyScoreboard.tabTeamSortKeyForGroup("owner", "OWNER", 0));
+        assertEquals("r1_admin_ADMIN_t1",
+                ModernLobbyScoreboard.tabTeamSortKeyForGroup("admin", "ADMIN", 1));
+        assertEquals("r1_admin_DEV_t1",
+                ModernLobbyScoreboard.tabTeamSortKeyForGroup("admin", "DEV", 1));
+        assertEquals("r2_mod_SRMOD",
+                ModernLobbyScoreboard.tabTeamSortKeyForGroup("mod", "SRMOD", -1));
+        assertEquals("r3_helper_SUPPORT_t2",
+                ModernLobbyScoreboard.tabTeamSortKeyForGroup("helper", "SUPPORT", 2));
+        assertEquals("r5_player_MAPPER_t3",
+                ModernLobbyScoreboard.tabTeamSortKeyForGroup("player", "MAPPER", 3));
+        assertEquals("r5_player",
+                ModernLobbyScoreboard.tabTeamSortKeyForGroup("player", null, -1));
+    }
+
+    @Test
     void playerCountIsFormattedLikeTheOriginalPlayersValue() {
         assertEquals("0/16", ModernLobbyScoreboard.formatPlayerCount(0, 16));
         assertEquals("3/16", ModernLobbyScoreboard.formatPlayerCount(3, 16));
