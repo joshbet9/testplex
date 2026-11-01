@@ -39,6 +39,7 @@ import org.bukkit.event.block.BlockGrowEvent;
 import org.bukkit.event.block.LeavesDecayEvent;
 import org.bukkit.event.world.StructureGrowEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
+import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerBucketFillEvent;
@@ -46,6 +47,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.inventory.InventoryPickupItemEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -1264,8 +1266,6 @@ public final class SpeedBuildersGame implements Listener {
         event.setCancelled(true);
         Block block = event.getBlock();
         Material material = block.getType();
-        ItemStack tool = event.getPlayer().getInventory().getItemInMainHand();
-        if (tool == null) tool = new ItemStack(Material.AIR);
         if (material == Material.AIR) return;
 
         // Reborn returns dismantled build pieces to the palette regardless of tool tier.
@@ -1367,6 +1367,22 @@ public final class SpeedBuildersGame implements Listener {
     public void onDrop(PlayerDropItemEvent event) {
         if (players.containsKey(event.getPlayer().getUniqueId())) event.setCancelled(true);
     }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onPickup(EntityPickupItemEvent event) {
+        if (event.getEntity() instanceof Player player && players.containsKey(player.getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onInventoryPickup(InventoryPickupItemEvent event) {
+        if (event.getInventory().getLocation() != null
+                && event.getInventory().getLocation().getWorld() == arena) {
+            event.setCancelled(true);
+        }
+    }
+
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
