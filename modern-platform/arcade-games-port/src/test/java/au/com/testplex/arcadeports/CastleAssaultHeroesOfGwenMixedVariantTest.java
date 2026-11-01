@@ -434,6 +434,26 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesOfGwenStorePassiveValuesMatchSourceEquipmentEffects() {
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreAbilityDamageFactor("Urchin's Leggings"), 0.00001D);
+        assertEquals(0.20D, ArcadePortRules.heroesOfGwenStoreAbilityDamageFactor("Specialist's Bow"), 0.00001D);
+        assertEquals(0.15D, ArcadePortRules.heroesOfGwenStoreAbilityDamageFactor("Adept's Chestplate"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreBasicAttackDamageFactor("Battle Mage Chestplate"), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.heroesOfGwenStoreMeleeDamageBonus("Urchin's Chestcloth"), 0.00001D);
+        assertEquals(0.20D, ArcadePortRules.heroesOfGwenStoreHealthRegenBonus("Vampiric Helmet"), 0.00001D);
+        assertEquals(0.15D, ArcadePortRules.heroesOfGwenStoreHealthRegenBonus("Prince's Plate Helmet"), 0.00001D);
+        assertEquals(0.17D, ArcadePortRules.heroesOfGwenStoreSpeedFactor("Urchin's Boots"), 0.00001D);
+        assertEquals(0.15D, ArcadePortRules.heroesOfGwenStoreSpeedFactor("Leather Crosstrainers"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreSpeedFactor("Prince's Plate Boots"), 0.00001D);
+        assertEquals(2, ArcadePortRules.heroesOfGwenStoreMaxHealthBonus("Brawler's Plate Chestplate"));
+        assertEquals(4, ArcadePortRules.heroesOfGwenStoreMaxHealthBonus("Prince's Plate Chestplate"));
+        assertEquals(3.0D, ArcadePortRules.heroesOfGwenStoreKillHeal("Sword of Time"), 0.00001D);
+        assertEquals(0.15D, ArcadePortRules.heroesOfGwenStoreKillHeal("Vampiric Bow"), 0.00001D);
+        assertEquals(1, ArcadePortRules.heroesOfGwenStoreAmmoIncrease("Leather Cap of Holding"));
+        assertEquals(0, ArcadePortRules.heroesOfGwenStoreAmmoIncrease("Leather Cap of Nimble Fingers"));
+    }
+
+    @Test
     void heroesOfGwenStoreTracksOnlyReplaceableEquipmentCategories() {
         assertEquals("helmet", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("IRON_HELMET"));
         assertEquals("chestplate", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("LEATHER_CHESTPLATE"));
