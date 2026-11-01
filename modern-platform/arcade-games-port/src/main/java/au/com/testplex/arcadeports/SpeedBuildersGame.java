@@ -120,6 +120,7 @@ public final class SpeedBuildersGame implements Listener {
     private Template currentTemplate;
     private String stopReason = "";
     private boolean shuttingDown;
+    private boolean standaloneSessionLockAcquired;
 
     SpeedBuildersGame(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
@@ -196,6 +197,9 @@ public final class SpeedBuildersGame implements Listener {
         if (queue.size() >= SpeedBuildersRules.MAX_PLAYERS) {
             player.sendMessage(ChatColor.RED + "The Speed Builders queue is full (" + SpeedBuildersRules.MAX_PLAYERS + " builders).");
             return;
+        }
+        if (plugin.getArcadePortManager() != null) {
+            plugin.getArcadePortManager().removePlayerFromOtherQueues(player);
         }
         queue.add(player.getUniqueId());
         long requestedDeadline = tick + (quickStart ? QUICK_QUEUE_TICKS : NORMAL_QUEUE_TICKS);
@@ -289,6 +293,17 @@ public final class SpeedBuildersGame implements Listener {
         }
     }
 
+    /** Release only a lock acquired by this match, after queued restoration tasks have run. */
+    private void releaseSessionLockAfterRestoration() {
+        if (!standaloneSessionLockAcquired) return;
+        standaloneSessionLockAcquired = false;
+        if (shuttingDown || !plugin.isEnabled()) {
+            plugin.releaseSpeedBuildersLock();
+            return;
+        }
+        Bukkit.getScheduler().runTask(plugin, plugin::releaseSpeedBuildersLock);
+    }
+
     private void restoreAfterReturningToLobby(Player player, PlayerSnapshot snapshot) {
         if (player == null || snapshot == null || !player.isOnline()) return;
         if (shuttingDown) {
@@ -354,6 +369,7 @@ public final class SpeedBuildersGame implements Listener {
     private void startMatch(List<Player> participants) {
         try {
             plugin.prepareForSpeedBuilders();
+            standaloneSessionLockAcquired = true;
             loadSourceTemplates();
             arena = ensureArena();
             buildArenaFloor();
@@ -398,6 +414,7 @@ public final class SpeedBuildersGame implements Listener {
             removeGwen();
             phase = Phase.IDLE;
             currentTemplate = null;
+            releaseSessionLockAfterRestoration();
         }
     }
 
@@ -871,6 +888,7 @@ public final class SpeedBuildersGame implements Listener {
         matchHistory.clear();
         restorePlot(reviewPlot);
         refreshHud();
+        releaseSessionLockAfterRestoration();
     }
 
     private void persistMatchProgress(Set<UUID> winnerIds) {
