@@ -180,7 +180,7 @@ public final class SourceMapCatalog {
     /** Pure path validation, kept separate so the game's resource mapping is unit-testable. */
     static boolean resourcePathBelongsToGame(ArcadePortGame game, String resource) {
         if (game == null || resource == null || resource.isBlank()
-                || resource.startsWith("/") || resource.contains("..") || resource.contains("\\\\")) {
+                || resource.startsWith("/") || resource.contains("..") || resource.contains("\\")) {
             return false;
         }
         if (resource.equals(resourceFor(game))) return true;
@@ -516,7 +516,7 @@ public final class SourceMapCatalog {
     public static boolean installResource(JavaPlugin plugin, String gameName, String resource, String worldName) {
         if (plugin == null || gameName == null || gameName.isBlank()
                 || resource == null || resource.isBlank()
-                || resource.startsWith("/") || resource.contains("..") || resource.contains("\\\\")
+                || resource.startsWith("/") || resource.contains("..") || resource.contains("\\")
                 || !resource.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")) {
             if (plugin != null) plugin.getLogger().severe("Refusing an invalid source-map resource for " + gameName + ".");
             return false;
@@ -714,7 +714,7 @@ public final class SourceMapCatalog {
     /** Read map metadata from a selected embedded archive, independent of the Arcade enum. */
     public static MapData readResource(JavaPlugin plugin, String gameName, String resource, World world) {
         if (plugin == null || gameName == null || resource == null || world == null
-                || resource.startsWith("/") || resource.contains("..") || resource.contains("\\\\")) return null;
+                || resource.startsWith("/") || resource.contains("..") || resource.contains("\\")) return null;
         Path config = resolveWorldConfigPath(world.getWorldFolder().toPath(),
                 Bukkit.getWorldContainer().toPath(), world.getName());
         if (config != null && Files.isRegularFile(config)) {
@@ -736,10 +736,10 @@ public final class SourceMapCatalog {
             try (ZipInputStream zip = new ZipInputStream(input)) {
                 ZipEntry entry;
                 while ((entry = zip.getNextEntry()) != null) {
-                    if (entry.getName().replace('\\\\', '/').endsWith("/WorldConfig.dat")
+                    if (entry.getName().replace('\\', '/').endsWith("/WorldConfig.dat")
                             || entry.getName().equals("WorldConfig.dat")) {
                         String contents = new String(zip.readAllBytes(), StandardCharsets.UTF_8);
-                        return parseMapConfig(world, java.util.Arrays.asList(contents.split("\\\\R", -1)));
+                        return parseMapConfig(world, java.util.Arrays.asList(contents.split("\\R", -1)));
                     }
                     zip.closeEntry();
                 }
