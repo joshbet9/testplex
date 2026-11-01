@@ -2862,6 +2862,31 @@ public final class ArcadePortRules {
         return 0L;
     }
 
+    // Biff — source values from SkillLeash, SkillBiffDash and SkillWarHorse.
+    public static final long HEROES_OF_GWEN_BIFF_TETHER_COOLDOWN_MILLIS = 12_000L;
+    public static final long HEROES_OF_GWEN_BIFF_TETHER_ACTIVE_MILLIS = 5_000L;
+    public static final long HEROES_OF_GWEN_BIFF_TETHER_REUSE_DELAY_MILLIS = 17_000L;
+    public static final double HEROES_OF_GWEN_BIFF_TETHER_RANGE = 8.0D;
+    public static final double HEROES_OF_GWEN_BIFF_TETHER_BREAK_DISTANCE_SQUARED = 100.0D;
+    public static final double HEROES_OF_GWEN_BIFF_TETHER_PULL_STOP_DISTANCE_SQUARED = 4.0D;
+    public static final long HEROES_OF_GWEN_BIFF_TETHER_SLOW_DURATION_MILLIS = 5_000L;
+    public static final int HEROES_OF_GWEN_BIFF_TETHER_SLOW_AMPLIFIER = 1;
+    public static final long HEROES_OF_GWEN_BIFF_BATTLE_LEAP_COOLDOWN_MILLIS = 11_000L;
+    public static final double HEROES_OF_GWEN_BIFF_BATTLE_LEAP_VERTICAL_VELOCITY = 1.0D;
+    public static final long HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_FLIGHT_MILLIS = 1_000L;
+    public static final double HEROES_OF_GWEN_BIFF_BATTLE_LEAP_LANDING_RADIUS = 5.0D;
+    public static final double HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE = 4.0D;
+    public static final double HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_KNOCK_UP = 0.6D;
+    public static final double HEROES_OF_GWEN_BIFF_BATTLE_LEAP_RANDOM_KNOCK_UP = 0.5D;
+    public static final long HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_COOLDOWN_MILLIS = 45_000L;
+    public static final long HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_REUSE_DELAY_MILLIS = 50_500L;
+    public static final long HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DURATION_MILLIS = 6_000L;
+    public static final long HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_RECHARGE_MILLIS = 2_000L;
+    public static final long HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_DURATION_MILLIS = 1_000L;
+    public static final double HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_RADIUS = 5.0D;
+    public static final double HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DAMAGE = 4.0D;
+    public static final double HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_JUMP_STRENGTH = 1.0D;
+
     // Dana — source values from SkillPulseHeal, SkillDanaDash and SkillRally.
     public static final long HEROES_OF_GWEN_DANA_PULSE_HEAL_COOLDOWN_MILLIS = 8_000L;
     public static final double HEROES_OF_GWEN_DANA_PULSE_HEAL_RADIUS = 7.0D;
