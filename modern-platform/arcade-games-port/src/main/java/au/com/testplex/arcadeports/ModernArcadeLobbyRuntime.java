@@ -76,6 +76,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     private BukkitTask task;
 
     ModernArcadeLobbyRuntime(JavaPlugin plugin, ArcadePortManager manager, ModernArcadeLobby lobby) {
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-constructor-start");
         this.plugin = plugin; this.manager = manager; this.lobby = lobby;
         actionKey = new NamespacedKey(plugin, "lobby-runtime-action");
         themeKey = new NamespacedKey(plugin, "lobby-bot-theme");
@@ -84,8 +85,11 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         displayKey = new NamespacedKey(plugin, "legacy-lobby-datapoint");
         kitNpcKey = new NamespacedKey(plugin, "lobby-kit-npc");
         teamNpcKey = new NamespacedKey(plugin, "lobby-team-npc");
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-legacy-bot-cleanup-start");
         clearLegacyBots();
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-legacy-bot-cleanup-complete");
         task = Bukkit.getScheduler().runTaskTimer(plugin, this::tick, 20L, 10L);
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-runtime-constructor-complete");
     }
 
     /**
@@ -125,13 +129,18 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     public void setSelectedGame(ArcadePortGame game) {
         if (game == null) return;
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-refresh-start game=" + game.id());
         selectedGame = game;
         plugin.getConfig().set("lobby-selected-game", game.id());
         plugin.saveConfig();
         lobby.refreshLobbyScoreboards();
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-scoreboards-complete");
         refreshDisplays();
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-displays-complete");
         refreshKitAndTeamNpcs();
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-kit-team-npcs-complete");
         refreshShowcase();
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=selected-game-showcase-complete");
     }
 
     public void refreshDisplays() {
