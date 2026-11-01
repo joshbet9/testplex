@@ -7,6 +7,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.io.File;
 import java.io.IOException;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -15,6 +16,10 @@ public final class SnakeStatsStore {
     private final JavaPlugin plugin;
     private final File file;
     private final YamlConfiguration data;
+    private static final List<String> ACHIEVEMENTS = List.of(
+            "Cannibal", "ChooChoo", "SlimySheep",
+            "dont-want-none", "resilience-snakeified", "busted",
+            "one-of-the-ogs", "flawless", "bots-everywhere");
 
     public SnakeStatsStore(JavaPlugin plugin) {
         this.plugin = plugin;
@@ -49,25 +54,19 @@ public final class SnakeStatsStore {
     }
 
     private boolean award(UUID player, String stat) {
-        String path = base(player) + ".achievements." + stat;
-        if (data.getBoolean(path)) return false;
-        data.set(path, true);
-        plugin.getLogger().info("Snake achievement " + stat + " awarded to " + player + ".");
-        return true;
+        return awardAchievement(player, stat);
     }
 
-    public boolean awardAchievement(UUID playerId, String achievement) {
-        if (playerId == null || achievement == null || !Set.of(
-                "Cannibal", "ChooChoo", "SlimySheep",
-                "dont-want-none", "resilience-snakeified", "busted",
-                "one-of-the-ogs", "flawless", "bots-everywhere").contains(achievement)) return false;
-        String path = base(playerId) + ".achievements." + achievement;
+    public boolean awardAchievement(UUID player, String achievement) {
+        if (player == null || achievement == null || !ACHIEVEMENTS.contains(achievement)) return false;
+        String path = base(player) + ".achievements." + achievement;
         if (data.getBoolean(path)) return false;
         data.set(path, true);
-        plugin.getLogger().info("Snake achievement " + achievement + " awarded to " + playerId + ".");
+        plugin.getLogger().info("Snake achievement " + achievement + " awarded to " + player + ".");
         save();
         return true;
     }
+
 
     public void recordGameEnd(UUID player, boolean won, int killsThisRound) {
         String path = base(player);

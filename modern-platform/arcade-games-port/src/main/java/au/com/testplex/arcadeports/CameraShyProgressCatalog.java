@@ -2,7 +2,7 @@ package au.com.testplex.arcadeports;
 
 import java.util.List;
 
-/** Exact Camera Shy progression contract used by match awards and the /stats menu. */
+/** Exact Snap progression contract used by match awards and the /stats menu. */
 public final class CameraShyProgressCatalog {
     public record Achievement(String id, String name, String requirement) { }
     public record Milestone(String id, String name, String statKey, int target, String unit) { }
@@ -16,7 +16,7 @@ public final class CameraShyProgressCatalog {
             a("revenge-is-sweet", "Revenge Is Sweet", "Eliminate three players who previously photographed you in one game."),
             a("double-elimination", "Double Elimination", "Eliminate two opponents within 15 seconds."),
             a("picture-perfect", "Picture Perfect", "Win a match with at least 10 successful photographs taken."),
-            a("camera-shy", "Camera Shy", "Win without receiving a photograph."),
+            a("camera-shy", "Snap", "Win without receiving a photograph."),
             a("stage-fright", "Stage Fright", "Survive 60 seconds with four exposures."),
             a("narrow-escape", "Narrow Escape", "Win while having four exposures."),
             a("untouchable", "Untouchable", "Win three consecutive games."),
@@ -31,7 +31,7 @@ public final class CameraShyProgressCatalog {
     );
 
     private static final List<Milestone> MILESTONES = List.of(
-            new Milestone("wins", "Camera Shy Champion", "wins", 250, "wins"),
+            new Milestone("wins", "Snap Champion", "wins", 250, "wins"),
             new Milestone("eliminations", "Serial Photographer", "eliminations", 500, "eliminations"),
             new Milestone("photos", "Master Photographer", "photos", 1_000, "photos")
     );

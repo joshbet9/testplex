@@ -36,7 +36,9 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS).isEmpty(),
                 "Master Builders uses generated plots rather than a fabricated source map");
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.CAMERA_SHY).isEmpty(),
-                "Camera Shy uses its dedicated procedural maze, not an invented legacy map archive");
+                "Snap uses its dedicated procedural maze, not an invented legacy map archive");
+        assertEquals("Snap", ArcadePortGame.CAMERA_SHY.displayName());
+        assertEquals(ArcadePortGame.CAMERA_SHY, ArcadePortGame.fromId("snap"));
     }
 
     @Test void selectedMapArchivePathsAreValidatedAgainstTheirGame() {
@@ -166,16 +168,16 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.SPLEEF.id(), enabled),
                 "Spleef is promoted into the controlled READY_FOR_TEST queue.");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.DRAGONS.id(), enabled),
-                "Dragons Solo is promoted into the controlled READY_FOR_TEST queue.");
+                "Dragons is promoted into the controlled READY_FOR_TEST queue.");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.RUNNER.id(), enabled),
                 "Runner is promoted into the controlled READY_FOR_TEST queue.");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.SUPER_SPLOOR.id(), enabled),
                 "Super Sploor is promoted into the controlled READY_FOR_TEST queue.");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.CAMERA_SHY.id(), enabled),
-                "Camera Shy is promoted into the controlled READY_FOR_TEST queue.");
+                "Snap is promoted into the controlled READY_FOR_TEST queue.");
         assertFalse(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.CAMERA_SHY.id(),
                 java.util.List.of("death-tag", "plexball", "spleef")),
-                "Camera Shy must remain gated when it is removed from the reviewed allow-list.");
+                "Snap must remain gated when it is removed from the reviewed allow-list.");
         assertNull(ArcadePortGame.fromId("snake"));
         assertEquals(ArcadePortGame.DRAW_MY_THING, ArcadePortGame.fromId("Draw My Thing"));
         assertEquals(ArcadePortGame.MASTER_BUILDERS, ArcadePortGame.fromId("master_builders"));
@@ -314,10 +316,74 @@ class ArcadePortGameTest {
     }
 
     @Test void microBattlesVerticalMapScanIncludesSourceMaximumY() {
+        assertEquals(3.0D, ArcadePortRules.microBattlesDistanceToBorder(7.0D, 0.0D, 0.0D, 0.0D, 20.0D), 0.00001D);
+        assertTrue(ArcadePortRules.shouldShowMicroBattlesBorderParticles(7.0D, 0.0D, 0.0D, 0.0D, 20.0D));
+        assertTrue(ArcadePortRules.shouldShowMicroBattlesBorderParticles(-9.5D, 0.0D, 0.0D, 0.0D, 20.0D));
+        assertFalse(ArcadePortRules.shouldShowMicroBattlesBorderParticles(6.99D, 0.0D, 0.0D, 0.0D, 20.0D));
+        assertFalse(ArcadePortRules.shouldShowMicroBattlesBorderParticles(10.01D, 0.0D, 0.0D, 0.0D, 20.0D));
+        assertFalse(ArcadePortRules.shouldShowMicroBattlesBorderParticles(Double.NaN, 0.0D, 0.0D, 0.0D, 20.0D));
+        assertTrue(Double.isNaN(ArcadePortRules.microBattlesDistanceToBorder(0.0D, 0.0D, 0.0D, 0.0D, 0.0D)));
+    }
+
+    @Test void microBattlesPersonalGlassAndSharedBorderColoursResolveTheSameSixteenChoices() {
+        for (String colour : java.util.List.of("white", "orange", "magenta", "light-blue", "yellow", "lime",
+                "pink", "gray", "light-gray", "cyan", "purple", "blue", "brown", "green", "red", "black")) {
+            assertNotNull(ArcadePortRules.microBattlesGlassMaterial(colour), colour);
+            assertNotNull(ArcadePortRules.microBattlesParticleColour(colour), colour);
+            assertEquals(colour, ArcadePortRules.normalizeMicroBattlesColour(colour));
+        }
+        assertEquals(Material.LIGHT_BLUE_STAINED_GLASS, ArcadePortRules.microBattlesGlassMaterial("unknown"));
+        assertEquals("light-blue", ArcadePortRules.normalizeMicroBattlesColour("aqua"));
+        assertEquals("light-gray", ArcadePortRules.normalizeMicroBattlesColour("silver"));
+        assertNull(ArcadePortRules.normalizeMicroBattlesColour("not-a-colour"));
+    }
+
+    @Test void microBattlesTimeoutConsidersAllFourTeamsAndReturnsDraws() {
+        assertEquals(2, ArcadePortRules.microBattlesTimeoutTeam(
+                new int[] {1, 1, 2, 0}, new int[] {99, 99, 0, 99}));
+        assertEquals(3, ArcadePortRules.microBattlesTimeoutTeam(
+                new int[] {1, 1, 1, 1}, new int[] {4, 2, 3, 5}));
+        assertEquals(1, ArcadePortRules.microBattlesTimeoutTeam(
+                new int[] {2, 2, 1, 0}, new int[] {4, 7, 99, 99}));
+        assertEquals(-1, ArcadePortRules.microBattlesTimeoutTeam(
+                new int[] {1, 1, 0, 0}, new int[] {4, 4, 99, 99}));
+        assertEquals(-1, ArcadePortRules.microBattlesTimeoutTeam(
+                new int[] {0, 0, 0, 0}, new int[] {0, 0, 0, 0}));
+        assertEquals(-1, ArcadePortRules.microBattlesTimeoutTeam(
+                new int[] {1, 2}, new int[] {1}));
+    }
+
+    @Test void microBattlesAnnihilationMatchesEightKillSourceTracker() {
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesAnnihilation(0));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesAnnihilation(7));
+        assertTrue(ArcadePortRules.shouldAwardMicroBattlesAnnihilation(8));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesAnnihilation(9));
+
+        java.util.UUID playerId = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
+        assertEquals("test-achievements.micro-battles." + playerId + ".annihilation",
+                MicroBattlesAchievement.ANNIHILATION.configKey(playerId));
+        assertEquals("", ArcadePortRules.microBattlesAchievementConfigKey(null, "annihilation"));
+        assertEquals("", ArcadePortRules.microBattlesAchievementConfigKey(playerId, "Invalid Slug"));
+    }
+
+    @Test void microBattlesLastTwoMissionOnlyTriggersWithExactlyTwoAliveTeams() {
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesLastTwo(0));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesLastTwo(1));
+        assertTrue(ArcadePortRules.shouldAwardMicroBattlesLastTwo(2));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesLastTwo(3));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesLastTwo(4));
+
+        java.util.UUID playerId = java.util.UUID.fromString("00000000-0000-0000-0000-000000000002");
+        assertEquals("test-achievements.micro-battles." + playerId + ".last-two",
+                MicroBattlesAchievement.LAST_TWO.configKey(playerId));
+    }
+
+    @Test void microBattlesVerticalMapScanIncludesSourceMaximumY() {
         assertFalse(ArcadePortRules.isMicroCrumbleScanComplete(95, 96));
         assertFalse(ArcadePortRules.isMicroCrumbleScanComplete(96, 96));
         assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(97, 96));
         assertFalse(ArcadePortRules.isMicroCrumbleScanComplete(0, 0));
+        assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(1, 0));
         assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(1, 0));
     }
 
@@ -2078,16 +2144,16 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.allGladiatorPairsResolved(0, 0));
     }
 
-    @Test void dragonsSoloScoreboardMatchesSourceThresholds() {
-        assertEquals(0, ArcadePortRules.dragonsSoloScoreboardMode(14, 14));
-        assertEquals(0, ArcadePortRules.dragonsSoloScoreboardMode(14, 3));
-        assertEquals(1, ArcadePortRules.dragonsSoloScoreboardMode(15, 15));
-        assertEquals(1, ArcadePortRules.dragonsSoloScoreboardMode(25, 15));
-        assertEquals(2, ArcadePortRules.dragonsSoloScoreboardMode(16, 16));
-        assertEquals(2, ArcadePortRules.dragonsSoloScoreboardMode(40, 20));
+    @Test void dragonsScoreboardMatchesSourceThresholds() {
+        assertEquals(0, ArcadePortRules.dragonsScoreboardMode(14, 14));
+        assertEquals(0, ArcadePortRules.dragonsScoreboardMode(14, 3));
+        assertEquals(1, ArcadePortRules.dragonsScoreboardMode(15, 15));
+        assertEquals(1, ArcadePortRules.dragonsScoreboardMode(25, 15));
+        assertEquals(2, ArcadePortRules.dragonsScoreboardMode(16, 16));
+        assertEquals(2, ArcadePortRules.dragonsScoreboardMode(40, 20));
     }
 
-    @Test void dragonsSoloSurvivalAndPlacementGemRulesMatchSource() {
+    @Test void dragonsSurvivalAndPlacementGemRulesMatchSource() {
         assertEquals(0.0D, ArcadePortRules.dragonSurvivalGems(-1L), 0.00001D);
         assertEquals(0.9999D, ArcadePortRules.dragonSurvivalGems(9_999L), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.dragonSurvivalGems(10_000L), 0.00001D);
@@ -2138,30 +2204,26 @@ class ArcadePortGameTest {
         assertFalse(ArcadePortRules.shouldAllowDragonWorldItem(Material.FIREWORK_ROCKET));
     }
 
-    @Test void dragonsFlareChargesAndLegacyAbilityRefreshValuesAreExplicit() {
-        assertEquals(1, ArcadePortRules.dragonsFlareCharges("coward"));
-        assertEquals(3, ArcadePortRules.dragonsFlareCharges("marksman"));
-        assertEquals(2, ArcadePortRules.dragonsFlareCharges("pyrotechnic"));
-        assertEquals(3, ArcadePortRules.dragonsFlareCharges("Dragons Marksman"));
-        assertEquals(0, ArcadePortRules.dragonsFlareCharges("unknown"));
+    @Test void dragonsHaveSixCommunityKitsAndSourceAbilityRefreshValues() {
+        assertEquals("coward", ArcadePortRules.normalizeDragonsKit("coward"));
+        assertEquals("marksman", ArcadePortRules.normalizeDragonsKit("dragons marksman"));
+        assertEquals("pyrotechnic", ArcadePortRules.normalizeDragonsKit("pyro"));
+        assertEquals("frost", ArcadePortRules.normalizeDragonsKit("ice bridge"));
+        assertEquals("glider", ArcadePortRules.normalizeDragonsKit("glide"));
+        assertEquals("tamer", ArcadePortRules.normalizeDragonsKit("dragon tamer"));
+        assertNull(ArcadePortRules.normalizeDragonsKit("unknown"));
         assertEquals(1, ArcadePortRules.DRAGONS_MARKSMAN_START_ARROWS);
         assertEquals(4, ArcadePortRules.DRAGONS_MARKSMAN_MAX_ARROWS);
         assertEquals(4_000L, ArcadePortRules.DRAGONS_MARKSMAN_ARROW_INTERVAL_MILLIS);
         assertEquals(2, ArcadePortRules.DRAGONS_MAX_SPARKLERS);
         assertEquals(25_000L, ArcadePortRules.DRAGONS_SPARKLER_INTERVAL_MILLIS);
-    }
-
-    @Test void dragonFlareExclusionUsesAHorizontalRadiusAndLimitedVerticalEnvelope() {
-        assertTrue(ArcadePortRules.isDragonFlareLocationProtected(0.0D, 0.0D));
-        assertTrue(ArcadePortRules.isDragonFlareLocationProtected(ArcadePortRules.DRAGONS_FLARE_RADIUS_SQUARED, 0.0D));
-        assertTrue(ArcadePortRules.isDragonFlareLocationProtected(100.0D, 24.0D));
-        assertFalse(ArcadePortRules.isDragonFlareLocationProtected(ArcadePortRules.DRAGONS_FLARE_RADIUS_SQUARED + 0.01D, 0.0D));
-        assertFalse(ArcadePortRules.isDragonFlareLocationProtected(1.0D, 24.01D));
-        assertFalse(ArcadePortRules.isDragonFlareLocationProtected(-1.0D, 0.0D));
-        assertFalse(ArcadePortRules.isDragonFlareLocationProtected(Double.NaN, 0.0D));
-        assertTrue(ArcadePortRules.isDragonFlareActive(5_999L, 6_000L));
-        assertFalse(ArcadePortRules.isDragonFlareActive(6_000L, 6_000L));
-        assertEquals(6_000L, ArcadePortRules.DRAGONS_FLARE_DURATION_MILLIS);
+        assertEquals(25_000L, ArcadePortRules.DRAGONS_FROST_COOLDOWN_MILLIS);
+        assertEquals(16, ArcadePortRules.DRAGONS_FROST_BRIDGE_LENGTH);
+        assertEquals(6_000L, ArcadePortRules.DRAGONS_FROST_BRIDGE_LIFETIME_MILLIS);
+        assertEquals(15_000L, ArcadePortRules.DRAGONS_GLIDER_COOLDOWN_MILLIS);
+        assertEquals(3_500L, ArcadePortRules.DRAGONS_GLIDER_DURATION_MILLIS);
+        assertEquals(90_000L, ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS);
+        assertEquals(15_000L, ArcadePortRules.DRAGONS_TAMER_DURATION_MILLIS);
         assertEquals(3_000L, ArcadePortRules.DRAGONS_SPECTATOR_TELEPORT_COOLDOWN_MILLIS);
         assertTrue(ArcadePortRules.canUseDragonSpectatorTeleport(3_000L, 3_000L));
         assertFalse(ArcadePortRules.canUseDragonSpectatorTeleport(2_999L, 3_000L));
@@ -2603,6 +2665,24 @@ class ArcadePortGameTest {
     @Test void microBattlesDamageMatchesRebornRawDamageIronSkinAndArmour() {
         assertEquals(3.0D, ArcadePortRules.microBattlesMeleeDamage("WOODEN_SWORD"), 0.00001D);
         assertEquals(4.0D, ArcadePortRules.microBattlesMeleeDamage("STONE_SWORD"), 0.00001D);
+        assertEquals(7.0D, ArcadePortRules.microBattlesMeleeDamage("DIAMOND_SWORD"), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.microBattlesMeleeDamage("GOLDEN_SWORD"), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.microBattlesMeleeDamage("STONE_SHOVEL"), 0.00001D);
+        assertEquals(3.0D, ArcadePortRules.microBattlesArrowDamage(1.0D), 0.00001D);
+        assertEquals(4.5D, ArcadePortRules.microBattlesArrowDamage(1.5D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.microBattlesArrowDamage(Double.NaN), 0.00001D);
+        assertEquals(2.5D, ArcadePortRules.microBattlesDamageAfterIronSkin(3.0D, true), 0.00001D);
+        assertEquals(3.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(3.0D, false), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(1.0D, true), 0.00001D);
+        assertEquals(2.16D, ArcadePortRules.microBattlesDamageAfterArmour(3.0D, 7.0D, false), 0.00001D);
+        assertEquals(1.8D, ArcadePortRules.microBattlesDamageAfterArmour(2.5D, 7.0D, false), 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.microBattlesDamageAfterArmour(5.0D, 7.0D, true), 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.microBattlesDamageAfterArmour(5.0D, 0.0D, false), 0.00001D);
+        assertTrue(ArcadePortRules.isMicroBattlesCombatContributionFresh(10_000L, 9_999L));
+        assertFalse(ArcadePortRules.isMicroBattlesCombatContributionFresh(25_000L, 10_000L));
+    }
+
+    @Test void microBattlesUsesMinimumHunger() {
         assertEquals(7.0D, ArcadePortRules.microBattlesMeleeDamage("DIAMOND_SWORD"), 0.00001D);
         assertEquals(6.0D, ArcadePortRules.microBattlesMeleeDamage("GOLDEN_SWORD"), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.microBattlesMeleeDamage("STONE_SHOVEL"), 0.00001D);

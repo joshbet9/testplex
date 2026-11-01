@@ -73,7 +73,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Server-authoritative Camera Shy implementation for the shared Paper 26.3 Arcade host.
+ * Server-authoritative Snap implementation for the shared Paper 26.3 Arcade host.
  * Players use a vanilla spyglass to aim and swap-hands (F) to take a photograph.
  */
 public final class CameraShyGame implements Listener {
@@ -415,7 +415,7 @@ public final class CameraShyGame implements Listener {
         snapshot.restore(player);
         plugin.getConfig().set(path, null);
         plugin.saveConfig();
-        player.sendMessage(ChatColor.YELLOW + "Your Camera Shy session ended while you were offline. Your pre-match state has been restored.");
+        player.sendMessage(ChatColor.YELLOW + "Your Snap session ended while you were offline. Your pre-match state has been restored.");
         return true;
     }
 
@@ -449,19 +449,19 @@ public final class CameraShyGame implements Listener {
     public void queue(Player player, boolean quickStart) {
         if (player == null || !player.isOnline()) return;
         if (!isEnabledForAcceptance()) {
-            player.sendMessage(ChatColor.RED + "Camera Shy is not enabled for controlled acceptance yet.");
+            player.sendMessage(ChatColor.RED + "Snap is not enabled for controlled acceptance yet.");
             return;
         }
         if (isActive()) {
-            player.sendMessage(ChatColor.RED + "Camera Shy is already underway. You can join the next round.");
+            player.sendMessage(ChatColor.RED + "Snap is already underway. You can join the next round.");
             return;
         }
         if (queue.containsKey(player.getUniqueId())) {
-            player.sendMessage(ChatColor.YELLOW + "You are already queued for Camera Shy.");
+            player.sendMessage(ChatColor.YELLOW + "You are already queued for Snap.");
             return;
         }
         if (queue.size() >= CameraShyRules.MAX_PLAYERS) {
-            player.sendMessage(ChatColor.RED + "Camera Shy is full (16/16).");
+            player.sendMessage(ChatColor.RED + "Snap is full (16/16).");
             return;
         }
         for (Player queued : queue.values()) {
@@ -471,45 +471,45 @@ public final class CameraShyGame implements Listener {
         queue.put(player.getUniqueId(), player);
         String kit = plugin.getConfig().getString("camera-shy-kit-preferences." + player.getUniqueId(), "smoke-artist");
         selectedKits.put(player.getUniqueId(), Kit.fromId(kit) == null ? "smoke-artist" : kit);
-        player.sendMessage(ChatColor.GREEN + "Queued for Camera Shy (" + queue.size() + "/16).");
+        player.sendMessage(ChatColor.GREEN + "Queued for Snap (" + queue.size() + "/16).");
         if (quickStart && quickStartTask == null) {
             quickStartTask = Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 quickStartTask = null;
                 startQueued(Bukkit.getConsoleSender());
             }, QUEUE_WINDOW_TICKS);
-            broadcastQueue(ChatColor.YELLOW + "Camera Shy starts in 5 seconds. More players can still join!");
+            broadcastQueue(ChatColor.YELLOW + "Snap starts in 5 seconds. More players can still join!");
         }
     }
 
     public void leaveQueue(Player player) {
         if (player == null) return;
         if (queue.remove(player.getUniqueId()) == null) {
-            player.sendMessage(ChatColor.YELLOW + "You are not queued for Camera Shy.");
+            player.sendMessage(ChatColor.YELLOW + "You are not queued for Snap.");
             return;
         }
-        player.sendMessage(ChatColor.GREEN + "You left the Camera Shy queue.");
+        player.sendMessage(ChatColor.GREEN + "You left the Snap queue.");
         if (queue.isEmpty() && quickStartTask != null) {
             quickStartTask.cancel();
             quickStartTask = null;
         }
-        broadcastQueue(ChatColor.YELLOW + player.getName() + " left the Camera Shy queue (" + queue.size() + ").");
+        broadcastQueue(ChatColor.YELLOW + player.getName() + " left the Snap queue (" + queue.size() + ").");
     }
 
     public void selectKit(Player player, String requestedKit) {
         if (player == null || requestedKit == null) return;
         Kit kit = Kit.fromId(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Camera Shy kits: smoke-artist, decoy, runner, spotter, understudy.");
+            player.sendMessage(ChatColor.YELLOW + "Snap kits: smoke-artist, decoy, runner, spotter, understudy.");
             return;
         }
         if (phase == Phase.LIVE && players.containsKey(player.getUniqueId())) {
-            player.sendMessage(ChatColor.RED + "Camera Shy kits cannot be changed during a live match.");
+            player.sendMessage(ChatColor.RED + "Snap kits cannot be changed during a live match.");
             return;
         }
         selectedKits.put(player.getUniqueId(), kit.id());
         plugin.getConfig().set("camera-shy-kit-preferences." + player.getUniqueId(), kit.id());
         plugin.saveConfig();
-        player.sendMessage(ChatColor.GREEN + "Camera Shy kit selected: " + kit.display() + ".");
+        player.sendMessage(ChatColor.GREEN + "Snap kit selected: " + kit.display() + ".");
     }
 
     public void startFromLobby(org.bukkit.command.CommandSender sender, Collection<Player> lobbyPlayers) {
@@ -529,11 +529,11 @@ public final class CameraShyGame implements Listener {
 
     public void startQueued(org.bukkit.command.CommandSender sender) {
         if (!isEnabledForAcceptance()) {
-            sender.sendMessage(ChatColor.RED + "Camera Shy is not enabled for controlled acceptance yet.");
+            sender.sendMessage(ChatColor.RED + "Snap is not enabled for controlled acceptance yet.");
             return;
         }
         if (isActive()) {
-            sender.sendMessage(ChatColor.RED + "Camera Shy is already active.");
+            sender.sendMessage(ChatColor.RED + "Snap is already active.");
             return;
         }
         if (!manager.canStartCameraShy()) {
@@ -543,7 +543,7 @@ public final class CameraShyGame implements Listener {
         List<Player> humansInQueue = queue.values().stream().filter(p -> p != null && p.isOnline())
                 .limit(CameraShyRules.MAX_PLAYERS).toList();
         if (humansInQueue.isEmpty()) {
-            sender.sendMessage(ChatColor.YELLOW + "No players are queued for Camera Shy. Use /arcadeport join camera-shy.");
+            sender.sendMessage(ChatColor.YELLOW + "No players are queued for Snap. Use /arcadeport join snap.");
             return;
         }
         if (quickStartTask != null) {
@@ -551,15 +551,15 @@ public final class CameraShyGame implements Listener {
             quickStartTask = null;
         }
         if (pendingStartTask != null) {
-            sender.sendMessage(ChatColor.YELLOW + "Camera Shy is already preparing its match.");
+            sender.sendMessage(ChatColor.YELLOW + "Snap is already preparing its match.");
             return;
         }
         pendingHumans = List.copyOf(humansInQueue);
         queue.clear();
         startWaitTicks = 0;
-        manager.stop("Camera Shy is taking over the shared Arcade test lane.");
+        manager.stop("Snap is taking over the shared Arcade test lane.");
         phase = Phase.STARTING;
-        sender.sendMessage(ChatColor.GOLD + "Preparing Camera Shy for " + pendingHumans.size() + " human player(s)...");
+        sender.sendMessage(ChatColor.GOLD + "Preparing Snap for " + pendingHumans.size() + " human player(s)...");
         scheduleStartAttempt();
     }
 
@@ -574,7 +574,7 @@ public final class CameraShyGame implements Listener {
             pendingStartTask.cancel();
             pendingStartTask = null;
         }
-        finish(null, reason == null || reason.isBlank() ? "Camera Shy was stopped." : reason, false);
+        finish(null, reason == null || reason.isBlank() ? "Snap was stopped." : reason, false);
     }
 
     public void shutdown() {
@@ -583,7 +583,7 @@ public final class CameraShyGame implements Listener {
         if (pendingStartTask != null) pendingStartTask.cancel();
         quickStartTask = null;
         pendingStartTask = null;
-        if (phase != Phase.IDLE) finish(null, "Camera Shy is shutting down.", false);
+        if (phase != Phase.IDLE) finish(null, "Snap is shutting down.", false);
         queue.clear();
     }
 
@@ -608,7 +608,7 @@ public final class CameraShyGame implements Listener {
             }
             ensureArena();
             if (arena == null) {
-                abortStart("The Camera Shy maze world could not be loaded.");
+                abortStart("The Snap maze world could not be loaded.");
                 return;
             }
             int missing = CameraShyRules.MAX_PLAYERS - pendingHumans.size();
@@ -618,10 +618,10 @@ public final class CameraShyGame implements Listener {
             }
             if (!testPlayers.isAvailableForDamageablePlayers()) {
                 if (pendingHumans.size() >= CameraShyRules.MIN_PLAYERS) {
-                    plugin.getLogger().warning("Camera Shy is starting without AFK test players: FakePlayerPlugin is unavailable.");
+                    plugin.getLogger().warning("Snap is starting without AFK test players: FakePlayerPlugin is unavailable.");
                     startMatch(pendingHumans, List.of());
                 } else {
-                    abortStart("Camera Shy needs at least four players. Install/enable FakePlayerPlugin to fill the test roster.");
+                    abortStart("Snap needs at least four players. Install/enable FakePlayerPlugin to fill the test roster.");
                 }
                 return;
             }
@@ -636,11 +636,11 @@ public final class CameraShyGame implements Listener {
                     List<Player> botsReady = new ArrayList<>(result.players());
                     startMatch(pendingHumans, botsReady);
                 } else if (pendingHumans.size() >= CameraShyRules.MIN_PLAYERS) {
-                    plugin.getLogger().warning("Camera Shy test-player fill failed; starting with humans only: " + result.error());
+                    plugin.getLogger().warning("Snap test-player fill failed; starting with humans only: " + result.error());
                     startMatch(pendingHumans, List.of());
                 } else {
                     testPlayers.despawnSessionPlayers();
-                    abortStart("Could not fill the Camera Shy test roster: " + result.error());
+                    abortStart("Could not fill the Snap test roster: " + result.error());
                 }
             });
         }, 20L);
@@ -651,9 +651,9 @@ public final class CameraShyGame implements Listener {
         pendingHumans = List.of();
         queue.clear();
         testPlayers.despawnSessionPlayers();
-        plugin.getLogger().warning("Camera Shy start aborted: " + reason);
+        plugin.getLogger().warning("Snap start aborted: " + reason);
         for (Player player : Bukkit.getOnlinePlayers()) {
-            if (player.isOnline()) player.sendMessage(ChatColor.RED + "Camera Shy could not start: " + reason);
+            if (player.isOnline()) player.sendMessage(ChatColor.RED + "Snap could not start: " + reason);
         }
     }
 
@@ -683,7 +683,7 @@ public final class CameraShyGame implements Listener {
         List<Player> all = new ArrayList<>(humansInMatch);
         all.addAll(testBots);
         if (all.size() < CameraShyRules.MIN_PLAYERS) {
-            abortStart("Camera Shy needs at least four total players.");
+            abortStart("Snap needs at least four total players.");
             return;
         }
         Collections.shuffle(all, random);
@@ -724,25 +724,25 @@ public final class CameraShyGame implements Listener {
             phase = Phase.LIVE;
         } catch (RuntimeException startupFailure) {
             plugin.getLogger().log(java.util.logging.Level.SEVERE,
-                    "Camera Shy could not finish preparing every player; restoring the captured pre-match state.",
+                    "Snap could not finish preparing every player; restoring the captured pre-match state.",
                     startupFailure);
-            finish(null, "Camera Shy could not initialise. No round was played.", false);
+            finish(null, "Snap could not initialise. No round was played.", false);
             return;
         }
 
-        broadcastMatch(ChatColor.GOLD + "" + ChatColor.BOLD + "CAMERA SHY"
+        broadcastMatch(ChatColor.GOLD + "" + ChatColor.BOLD + "SNAP"
                 + ChatColor.YELLOW + " — photograph your opponents five times to eliminate them!");
         for (UUID id : humans) {
             Player player = Bukkit.getPlayer(id);
             if (player != null) {
-                player.sendTitle(ChatColor.GOLD + "CAMERA SHY",
+                player.sendTitle(ChatColor.GOLD + "SNAP",
                         ChatColor.YELLOW + "Right-click to scope • Press F to take a photo", 5, 60, 10);
                 player.sendMessage(ChatColor.GRAY + "Hold your spyglass to aim. Press " + ChatColor.AQUA + "F"
                         + ChatColor.GRAY + " to take the photograph.");
                 player.sendMessage(ChatColor.GRAY + "Five photographs eliminate a player. Exposure never decays.");
             }
         }
-        plugin.getLogger().info("Camera Shy started with " + humans.size() + " humans and " + bots.size() + " AFK test players.");
+        plugin.getLogger().info("Snap started with " + humans.size() + " humans and " + bots.size() + " AFK test players.");
     }
 
     private void setupPlayer(Player player, Location spawn) {
@@ -765,7 +765,7 @@ public final class CameraShyGame implements Listener {
             player.removePotionEffect(effect.getType());
         }
         giveKit(player);
-        BossBar bar = Bukkit.createBossBar(ChatColor.GOLD + "CAMERA SHY", BarColor.YELLOW, BarStyle.SEGMENTED_10);
+        BossBar bar = Bukkit.createBossBar(ChatColor.GOLD + "SNAP", BarColor.YELLOW, BarStyle.SEGMENTED_10);
         bar.addPlayer(player);
         bar.setVisible(true);
         bossBars.put(player.getUniqueId(), bar);
@@ -874,7 +874,7 @@ public final class CameraShyGame implements Listener {
             if (player == null || !player.isOnline()) continue;
             BossBar bar = bossBars.get(id);
             if (bar != null) {
-                bar.setTitle(ChatColor.GOLD + "CAMERA SHY " + ChatColor.WHITE + time
+                bar.setTitle(ChatColor.GOLD + "SNAP " + ChatColor.WHITE + time
                         + ChatColor.GRAY + " | " + ChatColor.RED + exposures.getOrDefault(id, 0) + "/5");
                 bar.setProgress(Math.max(0.0D, Math.min(1.0D, (double) (endsAt - now)
                         / (CameraShyRules.MATCH_SECONDS * 1_000.0D))));
@@ -1646,7 +1646,7 @@ public final class CameraShyGame implements Listener {
                     plugin.getConfig().set("camera-shy-pending-restores." + id, null);
                     pendingRestoreChanged = true;
                 }
-                player.sendMessage(ChatColor.GOLD + "Camera Shy ended: " + ChatColor.YELLOW + reason);
+                player.sendMessage(ChatColor.GOLD + "Snap ended: " + ChatColor.YELLOW + reason);
                 if (winnerId != null && winnerId.equals(id)) {
                     player.sendTitle(ChatColor.GOLD + "" + ChatColor.BOLD + "VICTORY!",
                             ChatColor.YELLOW + "You were the last photographer standing.", 5, 60, 15);
@@ -1670,10 +1670,10 @@ public final class CameraShyGame implements Listener {
         selectedKits.keySet().removeIf(id -> !Bukkit.getOfflinePlayer(id).hasPlayedBefore());
         pendingHumans = List.of();
         finalSnapshot = false;
-        broadcastQueue(ChatColor.GRAY + "Camera Shy is ready for another queue.");
+        broadcastQueue(ChatColor.GRAY + "Snap is ready for another queue.");
     }
 
-    /** Show a player's persisted Camera Shy progression without requiring an active match. */
+    /** Show a player's persisted Snap progression without requiring an active match. */
     public void sendStats(Player viewer, Player subject, int requestedPage) {
         if (viewer == null || !viewer.isOnline() || subject == null) return;
         int page = Math.max(1, Math.min(requestedPage, CameraShyProgressCatalog.pageCount()));
@@ -1690,7 +1690,7 @@ public final class CameraShyGame implements Listener {
                 .count();
 
         viewer.sendMessage(ChatColor.DARK_GRAY + "----------------------------------------");
-        viewer.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "CAMERA SHY STATS"
+        viewer.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "SNAP STATS"
                 + ChatColor.GRAY + " — " + ChatColor.WHITE + subject.getName());
         viewer.sendMessage(ChatColor.YELLOW + "Games: " + ChatColor.WHITE + games
                 + ChatColor.GRAY + "  |  " + ChatColor.YELLOW + "Wins: " + ChatColor.WHITE + wins);
@@ -1722,7 +1722,7 @@ public final class CameraShyGame implements Listener {
                     + ChatColor.DARK_GRAY + " — " + ChatColor.GRAY + achievement.requirement());
         }
         String command = viewer.equals(subject)
-                ? "/stats camera-shy <page>"
+                ? "/stats snap <page>"
                 : "/stats " + subject.getName() + " camera-shy <page>";
         viewer.sendMessage(ChatColor.GRAY + "Use " + ChatColor.YELLOW + command
                 + ChatColor.GRAY + " to view another achievement page.");
@@ -1919,7 +1919,7 @@ public final class CameraShyGame implements Listener {
             world.getBlockAt(x, FLOOR_Y + 2, z).setType(Material.HAY_BLOCK, false);
         }
         world.setSpawnLocation(0, FLOOR_Y + 1, 0);
-        plugin.getLogger().info("Built the Camera Shy 15x15 hedge maze in " + WORLD_NAME + ".");
+        plugin.getLogger().info("Built the Snap 15x15 hedge maze in " + WORLD_NAME + ".");
     }
 
     private void buildWall(World world, int x, int z, boolean horizontal) {

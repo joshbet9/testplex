@@ -130,7 +130,20 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, String> castleAssaultPlayerKits = new HashMap<>();
     private final Map<UUID, Long> castleArcherNextArrowAt = new HashMap<>();
     private final Map<UUID, Long> castleDemolitionistNextTntAt = new HashMap<>();
+    private final Map<UUID, Integer> castleKillsByPlayer = new HashMap<>();
+    private final Map<UUID, Integer> castleTntHolderKillsByPlayer = new HashMap<>();
+    private final Map<UUID, Integer> castleCrystalsDestroyedByPlayer = new HashMap<>();
+    private final Set<UUID> castleRodUsed = new HashSet<>();
+    private final Set<UUID> castleFinalKingHitByPlayer = new HashSet<>();
+    private final Set<UUID> castleCreditedVictims = new HashSet<>();
+    private boolean castleResultRecorded;
     private final Map<UUID, String> selectedHeroesOfGwen = new HashMap<>();
+    private final Map<UUID, Integer> heroesOfGwenKills = new HashMap<>();
+    private final Map<UUID, Map<String, Integer>> heroesOfGwenRoleKills = new HashMap<>();
+    private final Set<UUID> heroesOfGwenCounterpartOnly = new HashSet<>();
+    private final Set<UUID> heroesOfGwenChangedAfterTowerLoss = new HashSet<>();
+    private final Map<UUID, Set<String>> heroesOfGwenFinalObjectiveHits = new HashMap<>();
+    private boolean heroesOfGwenResultRecorded;
     private final Map<UUID, Map<String, Long>> heroSkillReadyAt = new HashMap<>();
     private final Map<UUID, Integer> heroTntArrowCharges = new HashMap<>();
     private final Map<UUID, Long> heroAmmoNextAt = new HashMap<>();
@@ -187,6 +200,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             this.activePlayers.add(player.getUniqueId());
         }
         this.teams.putAll(teams);
+        if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            this.heroesOfGwenCounterpartOnly.addAll(this.players.keySet());
+        }
 
         boolean prepared = game == ArcadePortGame.CASTLE_ASSAULT
                 ? prepareCastleAssault()
@@ -1028,10 +1044,19 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return meta != null && meta.hasDisplayName() && meta.getDisplayName().contains("Fletched Arrow");
     }
 
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onCastlePlayerRespawn(org.bukkit.event.player.PlayerRespawnEvent event) {
+        if (game == ArcadePortGame.CASTLE_ASSAULT) {
+            castleCreditedVictims.remove(event.getPlayer().getUniqueId());
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onCastleKitDeath(PlayerDeathEvent event) {
         if (stopped || game != ArcadePortGame.CASTLE_ASSAULT) return;
         Player player = event.getEntity();
+        Player killer = player.getKiller();
+        if (killer != null) recordCastleKill(killer, player, false);
         String kit = castleAssaultPlayerKits.get(player.getUniqueId());
         if ("demolitionist".equals(kit)) {
             event.getDrops().removeIf(item -> item != null && item.getType() == Material.TNT);
@@ -1046,6 +1071,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Player player = event.getPlayer();
         if (!players.containsKey(player.getUniqueId())) return;
         if (game == ArcadePortGame.CASTLE_ASSAULT) {
+            if (event.getItem() != null && event.getItem().getType() == Material.FISHING_ROD) {
+                castleRodUsed.add(player.getUniqueId());
+            }
             if (event.getAction().isRightClick() && player.getUniqueId().equals(objectiveCarrier)) {
                 event.setCancelled(true);
                 detonateObjectiveTnt(player);
@@ -1115,6 +1143,22 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (heroInfinityEndsAt.getOrDefault(player.getUniqueId(), 0L) > System.currentTimeMillis()
                 && event.getProjectile() instanceof Arrow arrow) {
             markHeroProjectile(arrow, player, "devon.infinity_arrow");
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onHeroesOfGwenRoleDamage(EntityDamageByEntityEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN
+                || !(event.getEntity() instanceof Player victim)) return;
+        Player attacker = resolveAttacker(event);
+        if (attacker == null || attacker.equals(victim)
+                || teams.getOrDefault(attacker.getUniqueId(), -1) == teams.getOrDefault(victim.getUniqueId(), -2)) return;
+        String attackerRole = ArcadePortRules.heroesOfGwenHeroRole(
+                selectedHeroesOfGwen.getOrDefault(attacker.getUniqueId(), "hattori"));
+        String victimRole = ArcadePortRules.heroesOfGwenHeroRole(
+                selectedHeroesOfGwen.getOrDefault(victim.getUniqueId(), "hattori"));
+        if (attackerRole == null || !attackerRole.equals(victimRole)) {
+            heroesOfGwenCounterpartOnly.remove(attacker.getUniqueId());
         }
     }
 
@@ -1297,8 +1341,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             double damage = 10.0D * Math.max(0.0D, 1.0D - distance / radius);
             damage *= ArcadePortRules.castleAssaultBlastDamageMultiplier(castleBlastProtectionEpf(target));
             if (damage <= 0.0D) continue;
-            if (target.getHealth() <= damage) hooks.eliminate(target, owner, "was caught in a Castle Assault TNT blast");
-            else target.setHealth(target.getHealth() - damage);
+            if (target.getHealth() <= damage) {
+                recordCastleKill(owner, target, objective);
+                hooks.eliminate(target, owner, "was caught in a Castle Assault TNT blast");
+            } else target.setHealth(target.getHealth() - damage);
             Vector direction = target.getLocation().toVector().subtract(center.toVector());
             if (direction.lengthSquared() > 0.001D) {
                 double knockback = ArcadePortRules.castleAssaultBlastKnockbackMultiplier(
@@ -1322,6 +1368,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (!king.crystals.remove(crystal)) return;
         entities.remove(crystal);
         crystal.remove();
+        castleCrystalsDestroyedByPlayer.merge(attacker.getUniqueId(), 1, Integer::sum);
         attacker.sendMessage(ChatColor.GREEN + "Sentry crystal destroyed!");
         Block beaconBase = crystal.getLocation().getBlock().getRelative(0, -2, 0);
         rememberBlock(beaconBase);
@@ -1339,8 +1386,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             king.entity.playEffect(org.bukkit.EntityEffect.HURT);
         }
         if (king.health <= 0) {
-            announce(ChatColor.GOLD + king.name + " has fallen. " + teamName(1 - king.team) + " wins Castle Assault!");
-            hooks.finish(firstPlayerOnTeam(1 - king.team), 1 - king.team, "enemy king defeated");
+            if (attacker != null && castleCrystalsDestroyedByPlayer.getOrDefault(attacker.getUniqueId(), 0) >= 2) {
+                castleFinalKingHitByPlayer.add(attacker.getUniqueId());
+            }
+            int winningTeam = 1 - king.team;
+            recordCastleAssaultResult(winningTeam);
+            announce(ChatColor.GOLD + king.name + " has fallen. " + teamName(winningTeam) + " wins Castle Assault!");
+            hooks.finish(firstPlayerOnTeam(winningTeam), winningTeam, "enemy king defeated");
         }
     }
 
@@ -1504,9 +1556,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             Wither wither = entry.getValue();
             double damage = event.getFinalDamage();
             if (wither.getHealth() <= damage) {
+                if (attacker != null) {
+                    heroesOfGwenFinalObjectiveHits.computeIfAbsent(attacker.getUniqueId(), ignored -> new HashSet<>())
+                            .add("boss:" + entry.getKey());
+                }
                 int winnerTeam = 1 - entry.getKey();
                 announce(ChatColor.GOLD + teamName(winnerTeam) + " destroyed the enemy Wither!");
-                hooks.finish(firstPlayerOnTeam(winnerTeam), winnerTeam, "enemy Wither defeated");
+                finishHeroesOfGwen(winnerTeam, "enemy Wither defeated");
             } else {
                 wither.setHealth(wither.getHealth() - damage);
             }
@@ -1525,6 +1581,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             return;
         }
         tower.dead = true;
+        if (attacker != null) {
+            heroesOfGwenFinalObjectiveHits.computeIfAbsent(attacker.getUniqueId(), ignored -> new HashSet<>())
+                    .add("tower:" + tower.marker);
+        }
         if (tower.guardian != null) {
             entities.remove(tower.guardian);
             tower.guardian.remove();
@@ -1543,9 +1603,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (wither != null && wither.isValid()) {
             double witherDamage = tower.first ? 50.0D : 100.0D;
             if (wither.getHealth() <= witherDamage) {
+                if (attacker != null) {
+                    heroesOfGwenFinalObjectiveHits.computeIfAbsent(attacker.getUniqueId(), ignored -> new HashSet<>())
+                            .add("boss:" + tower.owner);
+                }
                 int winnerTeam = 1 - tower.owner;
                 announce(ChatColor.GOLD + teamName(winnerTeam) + " destroyed the enemy Wither!");
-                hooks.finish(firstPlayerOnTeam(winnerTeam), winnerTeam, "enemy Wither defeated by tower damage");
+                finishHeroesOfGwen(winnerTeam, "enemy Wither defeated by tower damage");
                 return;
             }
             wither.setHealth(wither.getHealth() - witherDamage);
@@ -1711,7 +1775,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     && teams.getOrDefault(player.getUniqueId(), -1) == currentTeam);
             if (!hasOnlinePlayer) {
                 int winner = 1 - team;
-                hooks.finish(firstPlayerOnTeam(winner), winner, "opposing team left the match");
+                if (game == ArcadePortGame.CASTLE_ASSAULT) recordCastleAssaultResult(winner);
+                if (game == ArcadePortGame.HEROES_OF_GWEN) {
+                    finishHeroesOfGwen(winner, "opposing team left the match");
+                } else {
+                    hooks.finish(firstPlayerOnTeam(winner), winner, "opposing team left the match");
+                }
                 return;
             }
         }
@@ -1843,7 +1912,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     void onPlayerKill(Player killer) {
-        if (stopped || game != ArcadePortGame.CASTLE_ASSAULT || killer == null) return;
+        if (stopped || killer == null) return;
+        if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            UUID id = killer.getUniqueId();
+            int kills = heroesOfGwenKills.merge(id, 1, Integer::sum);
+            String hero = selectedHeroesOfGwen.getOrDefault(id, "hattori");
+            String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
+            if (role != null) heroesOfGwenRoleKills.computeIfAbsent(id, ignored -> new HashMap<>())
+                    .merge(role, 1, Integer::sum);
+            if (kills >= 15) awardHeroesOfGwenAchievement(killer, "objective-null");
+            return;
+        }
+        if (game != ArcadePortGame.CASTLE_ASSAULT) return;
         int team = teams.getOrDefault(killer.getUniqueId(), -1);
         if (team < 0) return;
         int streak = castleKillStreaks.merge(killer.getUniqueId(), 1, Integer::sum);
@@ -2006,6 +2086,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String hero = ArcadePortRules.normalizeHeroesOfGwenHero(requestedHero);
         if (hero == null) hero = "hattori";
         String previous = selectedHeroesOfGwen.put(player.getUniqueId(), hero);
+        if (!hero.equals(previous) && previous != null) {
+            int team = teams.getOrDefault(player.getUniqueId(), -1);
+            boolean ownTowerLost = towers.getOrDefault(team, List.of()).stream().anyMatch(tower -> tower.dead);
+            if (ownTowerLost) heroesOfGwenChangedAfterTowerLoss.add(player.getUniqueId());
+        }
         if (!hero.equals(previous)) giveHeroesOfGwenLoadout(player, hero);
         String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
         player.sendActionBar(ChatColor.GOLD + "Hero: " + ArcadePortRules.heroesOfGwenHeroDisplayName(hero)
@@ -2332,6 +2417,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         castleArcherNextArrowAt.clear();
         castleDemolitionistNextTntAt.clear();
         selectedHeroesOfGwen.clear();
+        heroesOfGwenKills.clear();
+        heroesOfGwenRoleKills.clear();
+        heroesOfGwenCounterpartOnly.clear();
+        heroesOfGwenChangedAfterTowerLoss.clear();
+        heroesOfGwenFinalObjectiveHits.clear();
     }
 
     private static final class KingState {

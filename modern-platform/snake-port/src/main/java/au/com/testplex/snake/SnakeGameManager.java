@@ -996,9 +996,9 @@ public final class SnakeGameManager implements Listener {
             removeSegments(state);
             if (recordStats) {
                 boolean won = winner != null && winner.getUniqueId().equals(state.player.getUniqueId());
+                UUID playerId = state.player.getUniqueId();
                 boolean knockedOut = !state.alive;
                 if (won) {
-                    UUID playerId = state.player.getUniqueId();
                     if (state.kills == 0) stats.awardAchievement(playerId, "dont-want-none");
                     if (state.hitByTenSecondNerf) stats.awardAchievement(playerId, "resilience-snakeified");
                     if (!state.abilityUsed) stats.awardAchievement(playerId, "one-of-the-ogs");
@@ -1506,6 +1506,10 @@ public final class SnakeGameManager implements Listener {
         long lastMovementAt;
         long spectateTeleportCooldownUntil;
         int kills;
+
+        int sameNerfStreak;
+        ControlDebuff lastNerf;
+
         int slimesEaten;
         int maxTailLength;
         boolean abilityUsed;
