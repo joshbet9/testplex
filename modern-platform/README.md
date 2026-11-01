@@ -80,8 +80,8 @@ The overall programme tracks 30 titles/variants: **27 shared Arcade catalogue ga
 | 25 | Plexball | Controlled acceptance; server-authoritative batting/fielding, kits, HUD, progression and shared Arcade lifecycle; modern arena (no 1.8 map archive) | Enabled |
 | 26 | Camera Shy | Spyglass-based photographic elimination game; five exposures eliminate; full live acceptance pending | Enabled for controlled testing |
 | 27 | Super Sploor | NANO-inspired five-kit team territory shooter with original Sploor map | Enabled for controlled testing |
-| 28 | Wizards | Shared Arcade lifecycle integration remains in draft; 21 spells implemented and CI two-client smoke passed; no VM deployment | Disabled |
+| 28 | Wizards | Selective shared-Arcade integration branch; five kits, 21 spells, source-map importer and Paper smoke harness are being revalidated | Disabled |
 | 29 | Speed Builders Arcade | Source-map implementation in draft PR #86; build and live acceptance still pending | Disabled |
-| 30 | Hoops Remastered | Playable 2–16 player basketball slice in draft PR #74; four-client smoke exposed winner-transition restoration failure | Disabled |
+| 30 | Hoops Remastered | Selective shared-lifecycle candidate in PR #102; four-client smoke verifies scoring and is refining post-game restoration checks | Disabled |
 
 **Readiness rule:** The 25-game controlled queue is Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons (Solo), Runner, Sheep Quest, Turf Wars, Snap, Monster Maze, Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault and Sneaky Assassins. `READY_FOR_TEST` means available for isolated controlled testing, not live gameplay acceptance or full source parity. Wither Assault and Sneaky Assassins use generated arenas; SkyWars Mixed carries all 50 original source map archives. The 419 archived ZIPs for enabled map-backed games are tracked in [the legacy map parity register](arcade-games-port/LEGACY-MAP-PARITY.md); Plexball, Snap, Master Builders, Wither Assault and Sneaky Assassins use modern/generated arenas.
