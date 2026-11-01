@@ -8,10 +8,24 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ArcadeCatalogTest {
     @Test
-    void registersAllTwentyEightArcadeGames() {
+    void registersAllThirtyArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertEquals(28, catalog.size());
+        assertEquals(30, catalog.size());
         assertEquals(28, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+    }
+
+    @Test
+    void monsterMazeOriginalSpeedAndModernAreSeparateReadyToTestGames() {
+        ArcadeCatalog catalog = new ArcadeCatalog();
+        assertEquals("Monster Maze (Original)", catalog.getGame("monster-maze").getName());
+        assertEquals("Monster Maze (Speed)", catalog.getGame("monster-maze-speed").getName());
+        assertEquals("Monster Maze (Modern)", catalog.getGame("monster-maze-modern").getName());
+        for (String id : List.of("monster-maze", "monster-maze-speed", "monster-maze-modern")) {
+            GameDefinition game = catalog.getGame(id);
+            assertNotNull(game);
+            assertTrue(game.isReadyForTest(), id + " must use the standard ready-game selection flow");
+            assertEquals(2, game.getCosmeticLines().size());
+        }
     }
 
     @Test
