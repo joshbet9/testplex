@@ -68,9 +68,9 @@ final class SkyWarsMixedMapArchiveTest {
         try (ZipInputStream zip = new ZipInputStream(raw)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
-                if (entry.getName().replace('\\\\', '/').endsWith("WorldConfig.dat")) {
+                if (entry.getName().replace('\\', '/').endsWith("WorldConfig.dat")) {
                     String config = new String(zip.readAllBytes(), StandardCharsets.UTF_8);
-                    return SourceMapCatalog.parseMapConfig(null, List.of(config.split("\\\\R", -1)));
+                    return SourceMapCatalog.parseMapConfig(null, List.of(config.split("\\R", -1)));
                 }
                 zip.closeEntry();
             }
