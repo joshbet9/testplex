@@ -22,8 +22,12 @@ acceptance checks.
   arena (1), ORANGE semifinals (2), YELLOW quarterfinals (4), GREEN initial
   arenas (8), BLACK duel spawns (30), and PINK stage connectors (14).
 - `update/maps/One in the Quiver/Quiver_Twin Peaks 2.0.zip` has 16 GREEN
-  **Quiver** starts, but *no* Evolution RED/GREEN/YELLOW evolution platform
-  data. Matching names and having 16 starts do not make this an Evolution map.
+  **Quiver** starts, all 16 of which have a solid supporting block and two
+  clear headroom blocks at their authored Y in the recovered original terrain.
+  They are a *real, physically plausible starting-point reference*, not
+  authenticated Evolution PvP placements. There is *no* Evolution
+  RED/GREEN/YELLOW evolution platform data, so this cannot yet be loaded as
+  an Evolution map. Matching names alone do not make the layout equivalent.
 
 ## Reproducible spatial review
 

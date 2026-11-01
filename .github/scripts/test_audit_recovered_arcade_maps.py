@@ -89,8 +89,19 @@ CUSTOM_LOCS:16,17,18:
         ref = audit.ROOT / "update/maps/One in the Quiver/Quiver_Twin Peaks 2.0.zip"
         report, _, _, _ = audit.scan_archive(ref, False)
         self.assertEqual(report["authored_marker_counts"], {"TEAM:GREEN": 16})
-        # Its 16 Quiver spawns are not evidence of the RED/GREEN/YELLOW
-        # platform + viewing + storage trio required by Evolution.
+        with ZipFile(ref) as original:
+            config = next(name for name in original.namelist()
+                          if name.replace("\\", "/").endswith("WorldConfig.dat"))
+            markers = audit.parse_reborn_config(original.read(config).decode())
+        spawns = [m for m in markers if m["kind"] == "TEAM" and m["name"] == "GREEN"]
+        self.assertEqual(len(spawns), 16)
+        world = bracket.WorldBlocks(ref)
+        # These are *real, authored Quiver* coordinates with safe floor and
+        # two-block clearance, so the old map is worth a manual Evo review.
+        self.assertTrue(all(m["y"] in world.safe_feet_levels(int(m["x"]), int(m["z"]), 1, 80)
+                            for m in spawns))
+        # Being collision-safe does NOT demonstrate safe Evolution PvP
+        # distances or supply the missing RED/GREEN/YELLOW station trio.
 
     def test_nixuge_recovery_still_has_no_authored_spawns(self):
         provenance = json.loads(audit.PROVENANCE.read_text())
