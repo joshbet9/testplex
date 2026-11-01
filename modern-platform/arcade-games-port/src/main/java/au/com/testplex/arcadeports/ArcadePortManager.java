@@ -2782,7 +2782,6 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.WITHER_ASSAULT) {
             session.witherAssaultSpawnY = 76.0D;
             session.witherAssaultYLimit = 76.0D;
-            session.witherAssaultAttackStartsAt = now + 15_000L;
         }
         int teamSlotCount = teamCountForGame(type);
         int[] assignedTeamCounts = new int[Math.max(1, teamSlotCount)];
@@ -5206,7 +5205,7 @@ public final class ArcadePortManager implements Listener {
             player.getInventory().setItem(0, namedItem(Material.GOLDEN_SWORD,
                     "Wither Skull", "Left-click to launch a Wither Skull. Recharges every 2 seconds."));
             player.getInventory().setItem(1, namedItem(Material.DIAMOND_SWORD,
-                    "Wither Minions", "Right-click to summon two skeletal minions. Recharges every 10 seconds."));
+                    "Wither Minions", "Left-click to summon two skeletal minions. Recharges every 10 seconds."));
             player.getInventory().setItem(2, namedItem(Material.COMPASS,
                     "Smell Humans", "Right-click to reveal every living Human. Recharges every 30 seconds."));
             player.getInventory().setItemInOffHand(namedItem(Material.SHIELD,
@@ -5227,6 +5226,7 @@ public final class ArcadePortManager implements Listener {
             case "editor" -> {
                 player.getInventory().addItem(new ItemStack(Material.STONE_AXE),
                         new ItemStack(Material.STONE_PICKAXE), new ItemStack(Material.STONE_SHOVEL),
+                        new ItemStack(Material.BOW), new ItemStack(Material.ARROW, 2),
                         new ItemStack(Material.COBBLESTONE, 32), new ItemStack(Material.OAK_PLANKS, 32),
                         revival[0], revival[1], stew);
                 player.sendMessage(ChatColor.GREEN + "Editor: place and break blocks above the four-block floor limit.");
@@ -16859,6 +16859,22 @@ public final class ArcadePortManager implements Listener {
         session.microFletchedArrows.add(arrow.getUniqueId());
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onWitherHumanBowShoot(EntityShootBowEvent event) {
+        if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.WITHER_ASSAULT
+                || !(event.getEntity() instanceof Player player)
+                || !session.players.containsKey(player.getUniqueId())
+                || !(event.getProjectile() instanceof Arrow arrow)) return;
+        UUID id = player.getUniqueId();
+        String kit = session.witherAssaultKits.getOrDefault(id, "archer");
+        if (!WitherAssaultRules.shouldTrackSmokeArrow(
+                session.teams.getOrDefault(id, 1), kit, session.alive.contains(id), true)) return;
+        session.entities.add(arrow);
+        session.witherBlindArrows.add(arrow.getUniqueId());
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onBowShoot(EntityShootBowEvent event) {
         if (event.getEntity() instanceof Player preparePlayer && cancelPrepareAction(preparePlayer, event)) return;
@@ -17481,12 +17497,13 @@ public final class ArcadePortManager implements Listener {
             String bombKit = session.bombLobbersKits.getOrDefault(player.getUniqueId(), "jumper");
             boolean forceWitherBlast = session.type == ArcadePortGame.WITHER_ASSAULT
                     && event.getAction().isLeftClick() && heldItem != null
-                    && heldItem.getType() == Material.GOLDEN_SWORD
+                    && (heldItem.getType() == Material.GOLDEN_SWORD || heldItem.getType() == Material.DIAMOND_SWORD)
                     && session.teams.getOrDefault(player.getUniqueId(), 0) == 1
                     && session.alive.contains(player.getUniqueId());
             boolean forceWitherMinionOrScent = session.type == ArcadePortGame.WITHER_ASSAULT
-                    && event.getAction().isRightClick() && heldItem != null
-                    && (heldItem.getType() == Material.DIAMOND_SWORD || heldItem.getType() == Material.COMPASS)
+                    && heldItem != null
+                    && ((heldItem.getType() == Material.DIAMOND_SWORD && event.getAction().isLeftClick())
+                            || (heldItem.getType() == Material.COMPASS && event.getAction().isRightClick()))
                     && session.teams.getOrDefault(player.getUniqueId(), 0) == 1
                     && session.alive.contains(player.getUniqueId());
             boolean forceBombControlClick = session.type == ArcadePortGame.BOMB_LOBBERS
@@ -17643,7 +17660,7 @@ public final class ArcadePortManager implements Listener {
                 launchWitherAssaultSkull(session, player, now);
                 return;
             }
-            if (item == Material.DIAMOND_SWORD && event.getAction().isRightClick()) {
+            if (item == Material.DIAMOND_SWORD && event.getAction().isLeftClick()) {
                 event.setCancelled(true);
                 launchWitherMinions(session, player, now);
                 return;
@@ -18312,10 +18329,6 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void launchWitherMinions(Session session, Player player, long now) {
-        if (now < session.witherAssaultAttackStartsAt) {
-            player.sendMessage(ChatColor.YELLOW + "Wither attacks unlock when the preparation window ends.");
-            return;
-        }
         UUID owner = player.getUniqueId();
         if (now < session.witherMinionReadyAt.getOrDefault(owner, 0L)) {
             player.sendMessage(ChatColor.YELLOW + "Wither Minions are recharging.");
@@ -18433,7 +18446,8 @@ public final class ArcadePortManager implements Listener {
                 }
                 session.witherMedicNextRefillAt.put(id, now + 45_000L);
             }
-            if ("archer".equals(kit) && now >= session.witherFletcherNextAt.getOrDefault(id, now + 4_000L)) {
+            if (WitherAssaultRules.hasFletcher(kit)
+                    && now >= session.witherFletcherNextAt.getOrDefault(id, now + 4_000L)) {
                 int arrows = human.getInventory().all(Material.ARROW).values().stream()
                         .mapToInt(ItemStack::getAmount).sum();
                 if (arrows < 4) human.getInventory().addItem(new ItemStack(Material.ARROW, 1));
@@ -18497,10 +18511,6 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void launchWitherAssaultSkull(Session session, Player player, long now) {
-        if (now < session.witherAssaultAttackStartsAt) {
-            player.sendMessage(ChatColor.YELLOW + "Wither attacks unlock when the preparation window ends.");
-            return;
-        }
         UUID id = player.getUniqueId();
         if (now < session.witherLastAttackAt.getOrDefault(id, 0L)) {
             player.sendMessage(ChatColor.YELLOW + "Wither Skull is recharging.");
@@ -21467,7 +21477,6 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Double> witherFlySpeeds = new HashMap<>();
         double witherAssaultSpawnY = 76.0D;
         double witherAssaultYLimit = 76.0D;
-        long witherAssaultAttackStartsAt;
         long milkNextHerdUpdateAt;
         final Set<UUID> tagged = new HashSet<>();
         final Set<UUID> alphaChasers = new HashSet<>();
