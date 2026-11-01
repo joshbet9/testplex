@@ -6,9 +6,9 @@
 
 ## Current implementation inventory
 
-The current Paper 26.3 runtime includes the nine canonical hero kits and all named active/passive ability handlers: Hattori, Bardolf, Anath, Larissa, Devon, Rowena, Dana, Biff and Ivy. The standard game uses the original Heroes Valley and Tartarus map archives and reads their team-base, tower, beacon, minion and Wither-boundary markers. The merged objective work includes lane minions, tower target priority, tower gating, team gold, capture points and Wither movement/earthquake handling.
+The current Paper 26.3 runtime includes the nine canonical hero kits and their named active/passive ability handlers: Hattori, Bardolf, Anath, Larissa, Devon, Rowena, Dana, Biff and Ivy. The standard game packages the original Heroes Valley and Tartarus archives and reads team-base, tower, beacon, minion and Wither-boundary markers. The objective runtime includes lane minions, target-entry priority, tower gating, gold/capture income and Wither movement/earthquake handling.
 
-The match runtime also contains both map-specific sidequest implementations: Pumpkin King on Heroes Valley (including untyped maps, which Reborn defaults to Heroes Valley) and the 30-second Wither Skeleton kill challenge on Monochrome. The four role-specific store catalogues, role-filtered purchases and Mixed Arcade half-price calculation are present. **The store's source item enchantments/passive effects are not yet fully ported**: purchases currently award plain named equipment/items and do not yet apply every source MobaItemEffect. Wither visuals also remain a native Paper Wither rather than the original source representation. Neither of those gaps is considered accepted.
+The match runtime contains map-specific sidequests: Pumpkin King on Heroes Valley (including untyped maps, which Reborn defaults to Heroes Valley) and the 30-second Wither Skeleton kill challenge on Monochrome. The four role-specific store catalogues, role-filtered purchases and Mixed Arcade half-price calculation are present. Store purchases now have real consumable effects, source enchantments/colours, unbreakable gear and a player/role/slot ownership ledger that restores purchased equipment after respawn without dropping it on death. Implemented passives include cooldown and Hunter ammo reload reductions, extra ammo, Bow of Renewal arrow refunds, movement speed, maximum health, HP5 regen, base and item kill healing, Bow of Pursuit/Frostbound hit conditions and Swift Blade slowness immunity. Remaining shop gaps are the source ability-damage, basic-attack-damage and flat melee-damage modifiers, plus a final complete item-by-item source-price/effect audit. Wither visuals still use a native Paper Wither rather than the original source 3×5 representation. These gaps and all live acceptance items remain open.
 
 ## Canonical hero/ability inventory
 
@@ -63,6 +63,8 @@ Reference: [Mineplex Wiki — Heroes of Gwen gameplay and classes](https://minep
 - [ ] All nine canonical heroes have complete loadouts and working abilities.
 - [ ] Ability cooldowns, damage/healing, projectiles, area effects and movement match the source references.
 - [ ] Hero-specific passives and shop upgrades apply only to the correct role and player.
+- [ ] Source ability-damage, basic-attack-damage and flat melee-damage shop modifiers are applied to the correct damage paths.
+- [ ] Verify each role item, source price, enchantment/colour, passive, purchase replacement and respawn restoration in-game.
 - [ ] Purchases deduct the correct gold exactly once; consumables do not refill or heal unexpectedly.
 - [ ] Mixed Arcade halves both displayed and charged prices without changing standard prices.
 
@@ -188,7 +190,7 @@ Bardolf's source kit is now implemented in the match-scoped runtime:
 
 The active ability kits, lane minion loop and both sidequest paths now have implementation coverage, but the game is **not test-ready**. Remaining work is:
 
-- Complete the role-store item-effect engine. Consumable potion effects, source equipment enchantments and leather colour families are now implemented. Persistent `MobaItemEffect` behaviours still outstanding include cooldown/ammo reductions, ability/basic-attack damage, healing/regen, kill effects, hit effects, speed/health and condition immunity.
+- Complete the remaining role-store item-effect engine. Consumables, base enchantments/colours, purchase persistence, cooldown/ammo reductions, extra ammo, Bow of Renewal arrow refunds, speed/health, HP5 regen, base/item kill healing, Bow of Pursuit/Frostbound hit effects and Swift Blade slowness immunity are implemented and have deterministic coverage. Source ability-damage, basic-attack-damage and flat melee-damage modifiers are still mapped/tested but not yet applied to the relevant live damage paths. Verify every role item and price against source.
 - Verify the four role catalogues against the source, including consumables, exact standard prices and Mixed Arcade half-price display/charge. The current tests cover the price helper, not the full purchase/effect matrix.
 - Compare the modern native Wither against the source custom boss representation and validate patrol boundary, target persistence, earthquake timing/falloff, tower protection and boss damage/death interactions on both maps.
 - Verify both source map archives (Heroes Valley and Tartarus) load all original markers correctly. In particular, confirm the Pumpkin King boundary/spawn on Heroes Valley and Monochrome map-type detection/challenge markers on the relevant Monochrome map.
@@ -246,3 +248,17 @@ The current branch now contains separate source-map sidequest paths, matching th
 - Added tests for source timing, boss combat values and Monochrome winner/draw rules.
 
 **Validation boundary:** latest Paper 26.3 run #4413 passed. This confirms compilation and deterministic rules tests, not live sidequest acceptance. The 3×5 custom boss visual/representation and its source presentation effects still need comparison; Heroes of Gwen remains gated.
+
+
+### Shop passive implementation — current validated slice
+
+The source shop effect engine has progressed beyond item presentation:
+
+- Store purchases are tracked by player, selected role and equipment category. A purchase replaces only its matching category; role gear is restored after respawn and does not drop on death. Switching heroes does not leak one role's equipment into another.
+- Cooldown modifiers and Hunter/Mage ammo-reload modifiers use the source item percentages; Hunter's Leather Cap of Holding adds one arrow to the reload cap, and Bow of Renewal returns an arrow when an arrow hits an enemy player.
+- Source movement speed and maximum-health bonuses are applied and recalculated after purchase/loadout/respawn.
+- HP manager: 0.66 HP every five seconds, modified by the source HP5 helmet effect; the pulse is suppressed while Withered and ordinary SATIATED regen is cancelled. Player kills heal 25% of maximum HP plus the relevant source item kill-heal bonus.
+- Source hit conditions: Bow of Pursuit grants Speed II to the shooter for three seconds on arrow hit; Frostbound Sword applies Slowness I to the enemy for three seconds on melee hit; Swift Blade blocks Slowness effects.
+- Consumable effects, item enchantments, colour families and disabled source shop entries are also represented.
+
+Regression coverage is in the Paper 26.3 branch; latest combined runtime build [#4443](https://github.com/joshbet9/testplex/actions/runs/41294890236) passed. The remaining mapped-but-not-applied shop effects are the role-specific ability-damage, basic-attack-damage and flat melee-damage modifiers. This does not count as in-game shop acceptance.
