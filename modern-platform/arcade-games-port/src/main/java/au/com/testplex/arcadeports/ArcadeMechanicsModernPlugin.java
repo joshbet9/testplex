@@ -148,15 +148,23 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public SpeedBuildersGame getSpeedBuildersGame() { return speedBuilders; }
 
     public boolean canStartSpeedBuilders() {
-        return manager != null && manager.canStartCameraShy()
+        return manager != null && manager.canStartExternalGame()
                 && (plexball == null || !plexball.isActive())
                 && (cameraShy == null || !cameraShy.isActive());
     }
 
     public void prepareForSpeedBuilders() {
-        if (!canStartSpeedBuilders()) {
-            throw new IllegalStateException("Another Arcade, Plexball, Snap or Monster Maze session is active. "
+        if (!canStartSpeedBuilders() || !manager.tryAcquireStandaloneGameLock()) {
+            throw new IllegalStateException("Another Arcade, Plexball or Monster Maze session is active. "
                     + "Speed Builders has kept its queue; retry /arcadeport start speed-builders after that match.");
+        }
+    }
+
+    /** Release the shared Arcade lock after Speed Builders player restoration is complete. */
+    public void releaseSpeedBuildersLock() {
+        if (manager != null) {
+            manager.releaseStandaloneGameLock();
+            manager.cleanupTestPlayersIfNoGameIsRunning();
         }
     }
 
