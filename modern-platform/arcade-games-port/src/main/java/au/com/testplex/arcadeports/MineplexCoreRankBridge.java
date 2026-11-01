@@ -99,7 +99,7 @@ final class MineplexCoreRankBridge {
                     getPrimaryGroup, getCanBePrimary, getDisplay, inheritsFrom, adminGroup);
             bridge.registerPrimaryRankUpdateListener(loader, rankUpdateListener);
             return Optional.of(bridge);
-        } catch (ReflectiveOperationException | LinkageError failure) {
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException failure) {
             plugin.getLogger().warning("Mineplex Hub is present, but its CoreClient rank API "
                     + "could not be connected; using isolated Testplex rank overrides. "
                     + failure.getClass().getSimpleName() + ": " + failure.getMessage());
