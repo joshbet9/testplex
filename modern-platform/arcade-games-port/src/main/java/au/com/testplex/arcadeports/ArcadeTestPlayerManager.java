@@ -92,6 +92,11 @@ final class ArcadeTestPlayerManager {
         return Math.max(0, humanPlayers) <= TARGET_ROSTER_SIZE;
     }
 
+    /** Exclude session test players and missing UUIDs from persistent progression and rewards. */
+    static boolean shouldPersistProgression(UUID playerId, boolean testPlayer) {
+        return playerId != null && !testPlayer;
+    }
+
     boolean isTestPlayer(UUID id) {
         if (id == null) return false;
         if (activeHandles.containsKey(id) || retiringHandles.containsKey(id)) return true;

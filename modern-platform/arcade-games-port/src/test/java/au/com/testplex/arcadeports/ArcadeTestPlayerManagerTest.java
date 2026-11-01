@@ -2,6 +2,8 @@ package au.com.testplex.arcadeports;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.UUID;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -47,6 +49,14 @@ class ArcadeTestPlayerManagerTest {
                 ArcadeTestPlayerManager.cleanupAction(false, false, false, true, true, false));
         assertEquals(ArcadeTestPlayerManager.CleanupAction.COMPLETE,
                 ArcadeTestPlayerManager.cleanupAction(false, false, false, false, true, false));
+    }
+
+    @Test
+    void persistentProgressionExcludesTestPlayersAndMissingIds() {
+        assertTrue(ArcadeTestPlayerManager.shouldPersistProgression(UUID.randomUUID(), false));
+        assertFalse(ArcadeTestPlayerManager.shouldPersistProgression(UUID.randomUUID(), true));
+        assertFalse(ArcadeTestPlayerManager.shouldPersistProgression(null, false));
+        assertFalse(ArcadeTestPlayerManager.shouldPersistProgression(null, true));
     }
 
     @Test

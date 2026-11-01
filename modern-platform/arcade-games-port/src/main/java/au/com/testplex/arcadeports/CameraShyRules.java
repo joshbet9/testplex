@@ -5,7 +5,7 @@ import org.bukkit.util.Vector;
 
 import java.util.UUID;
 
-/** Deterministic rules shared by the Camera Shy match controller and its tests. */
+/** Deterministic rules shared by the Snap match controller and its tests. */
 public final class CameraShyRules {
     public static final int PHOTOS_TO_ELIMINATE = 5;
     public static final int MAX_PLAYERS = 16;
@@ -64,10 +64,9 @@ public final class CameraShyRules {
         return firstId.compareTo(secondId);
     }
 
-    /** Keep the existing default /stats route for Plexball; Camera Shy is explicitly selected. */
+    /** Plexball has a dedicated page only when explicitly requested; bare /stats stays on the shared root menu. */
     public static boolean routesToPlexballStats(String[] args) {
-        return args == null || args.length == 0
-                || (args.length == 1 && "plexball".equalsIgnoreCase(args[0]));
+        return args != null && args.length == 1 && "plexball".equalsIgnoreCase(args[0]);
     }
 
     public static boolean eliminatedAt(int exposures) {

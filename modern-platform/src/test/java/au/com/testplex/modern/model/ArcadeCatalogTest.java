@@ -39,28 +39,37 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void castleAssaultIsReadyWhileHeroesOfGwenRemainsInProgress() {
+    void castleAssaultAndMilkTheCowAreReadyWhileHeroesOfGwenRemainsGated() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         GameDefinition castleAssault = catalog.getGame("castle-assault");
+        GameDefinition milkTheCow = catalog.getGame("milk-the-cow");
         GameDefinition heroesOfGwen = catalog.getGame("heroes-of-gwen");
         assertNotNull(castleAssault);
+        assertNotNull(milkTheCow);
         assertNotNull(heroesOfGwen);
         assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, castleAssault.getPortStatus());
+        assertTrue(castleAssault.isReadyForTest());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, milkTheCow.getPortStatus());
+        assertTrue(milkTheCow.isReadyForTest());
         assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, heroesOfGwen.getPortStatus());
-        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, castleAssault.getPortStatus());
         assertFalse(heroesOfGwen.isReadyForTest());
     }
 
     @Test
-    void dragonsExposeServerVisibleFlareEffectChoices() {
+    void dragonsUsePyroAndSparklerCosmeticsWithoutDragonFlares() {
         GameDefinition dragons = new ArcadeCatalog().getGame("dragons");
-        CosmeticLineDefinition flares = dragons.getCosmeticLines().stream()
-                .filter(line -> line.getId().equals("flare-effects"))
+        assertNotNull(dragons);
+        assertTrue(dragons.getCosmeticLines().stream()
+                .anyMatch(line -> line.getId().equals("pyro-signature")));
+        CosmeticLineDefinition sparklers = dragons.getCosmeticLines().stream()
+                .filter(line -> line.getId().equals("sparkler-effects"))
                 .findFirst().orElseThrow();
-        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, flares.getSelectionMode());
-        assertEquals("classic", flares.getDefaultOptionId());
-        assertEquals(Set.of("classic", "ember", "frost", "ender", "solar", "aurora"),
-                new HashSet<>(flares.getOptions().stream().map(CosmeticOption::getId).toList()));
+        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, sparklers.getSelectionMode());
+        assertEquals("golden-thread", sparklers.getDefaultOptionId());
+        assertEquals(Set.of("golden-thread", "cinder-drift", "glacier-dust", "void-motes", "starlight", "prismatic"),
+                new HashSet<>(sparklers.getOptions().stream().map(CosmeticOption::getId).toList()));
+        assertFalse(dragons.getCosmeticLines().stream()
+                .anyMatch(line -> line.getId().equals("flare-effects")));
     }
 
     @Test
@@ -159,7 +168,7 @@ class ArcadeCatalogTest {
     void cameraShyIsCataloguedForControlledSpyglassEliminationTesting() {
         GameDefinition game = new ArcadeCatalog().getGame("camera-shy");
         assertNotNull(game);
-        assertEquals("Camera Shy", game.getName());
+        assertEquals("Snap", game.getName());
         assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
         assertTrue(game.isReadyForTest());
         assertTrue(game.getDescription().contains("five exposures"));
@@ -176,6 +185,21 @@ class ArcadeCatalogTest {
         assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
         assertTrue(game.isReadyForTest());
         assertTrue(game.getCosmeticLines().isEmpty());
+    }
+
+    @Test
+    void microBattlesUsesOneCombinedMultiSelectGlassAndBorderLine() {
+        GameDefinition game = new ArcadeCatalog().getGame("micro-battles");
+        assertNotNull(game);
+        assertEquals(1, game.getCosmeticLines().size());
+        CosmeticLineDefinition line = game.getCosmeticLines().get(0);
+        assertEquals("island-visuals", line.getId());
+        assertEquals(CosmeticLineDefinition.SelectionMode.MULTI, line.getSelectionMode());
+        assertEquals(32, line.getOptions().size());
+        assertEquals(16, line.getOptions().stream().filter(option -> option.getId().startsWith("glass-")).count());
+        assertEquals(16, line.getOptions().stream().filter(option -> option.getId().startsWith("border-")).count());
+        assertTrue(line.getDescription().contains("private starting-glass"));
+        assertTrue(line.getDescription().contains("shared border-particle"));
     }
 
     @Test
@@ -217,18 +241,14 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void newlyPromotedGamesAreReadyForControlledAcceptance() {
+    void newlyPromotedGamesAreReadyWhileOnlyEvolutionAndHeroesOfGwenRemainGated() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        assertTrue(catalog.getGame("castle-assault").isReadyForTest());
-        assertTrue(catalog.getGame("milk-the-cow").isReadyForTest());
-        assertTrue(catalog.getGame("skywars").isReadyForTest());
-        assertTrue(catalog.getGame("wither-assault").isReadyForTest());
-        assertTrue(catalog.getGame("sneaky-assassins").isReadyForTest());
-    }
-
-    @Test
-    void onlyEvolutionAndHeroesOfGwenRemainGatedAfterTwentyFiveGamePromotion() {
-        ArcadeCatalog catalog = new ArcadeCatalog();
+        for (String id : List.of("skywars", "wither-assault", "sneaky-assassins")) {
+            GameDefinition game = catalog.getGame(id);
+            assertNotNull(game, id);
+            assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus(), id);
+            assertTrue(game.isReadyForTest(), id);
+        }
         for (String id : List.of("evolution", "heroes-of-gwen")) {
             GameDefinition game = catalog.getGame(id);
             assertNotNull(game, id);
@@ -245,12 +265,11 @@ class ArcadeCatalogTest {
         assertNull(catalog.getGame("not-a-game"));
     }
     @Test
-    void sneakyAssassinsIsCataloguedWithoutInventingCosmeticLines() {
+    void sneakyAssassinsIsReadyForTestWithoutInventingCosmeticLines() {
         GameDefinition game = new ArcadeCatalog().getGame("sneaky-assassins");
         assertNotNull(game);
         assertEquals("Sneaky Assassins", game.getName());
         assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
-        assertTrue(game.isReadyForTest());
         assertTrue(game.getCosmeticLines().isEmpty());
         assertEquals(List.of("last-assassin-standing"),
                 game.getWinEffects().stream().map(CosmeticOption::getId).toList());
