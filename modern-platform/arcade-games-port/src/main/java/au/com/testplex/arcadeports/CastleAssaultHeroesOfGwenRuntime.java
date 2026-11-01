@@ -2962,75 +2962,317 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
+
+    private void fireAnathFlameWand(Player player) {
+        UUID id = player.getUniqueId();
+        String skill = "anath.flame_wand";
+        if (!isHeroSkillReady(player, skill)) return;
+        ItemStack ammo = player.getInventory().getItem(7);
+        if (ammo == null || ammo.getType() != Material.BLAZE_POWDER
+                || ammo.getAmount() <= 0 || !ammo.hasItemMeta()
+                || !ammo.getItemMeta().hasDisplayName()
+                || !ammo.getItemMeta().getDisplayName().contains("Embers")) {
+            player.sendActionBar(ChatColor.RED + "Flame Wand needs an Ember charge.");
+            return;
+        }
+        if (ammo.getAmount() == 1) player.getInventory().setItem(7, null);
+        else ammo.setAmount(ammo.getAmount() - 1);
+
+        Vector direction = player.getLocation().getDirection().normalize();
+        Location origin = player.getEyeLocation().clone()
+                .add(direction.clone().multiply(0.8D));
+        Item ember = world.dropItem(origin, new ItemStack(Material.BLAZE_POWDER));
+        ember.setPickupDelay(Integer.MAX_VALUE);
+        ember.setGravity(false);
+        ember.setVelocity(direction.clone().multiply(
+                ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_PROJECTILE_SPEED));
+        entities.add(ember);
+        anathFlameEmbers.put(ember.getUniqueId(), new AnathFlameEmberState(
+                id, ember.getLocation().clone(), direction,
+                System.currentTimeMillis() + 3_000L));
+        setHeroSkillCooldown(player, skill,
+                ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_INTERVAL_MILLIS);
+        player.playSound(player.getLocation(), Sound.ITEM_FIRECHARGE_USE, 0.65F, 1.4F);
+        player.sendActionBar(ChatColor.GOLD + "Embers: "
+                + Math.max(0, ammo.getAmount()));
+    }
+
     private void activateAnathBurnBeam(Player player) {
         UUID id = player.getUniqueId();
-        long now = System.currentTimeMillis();
         String skill = "anath.burn_beam";
         if (!isHeroSkillReady(player, skill)) {
             player.sendActionBar(ChatColor.RED + "Burn Beam is recharging.");
             return;
         }
-        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS);
+        Vector direction = player.getLocation().getDirection();
+        direction.setY(0.0D);
+        if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.0D, 1.0D);
+        direction.normalize();
+        Location origin = player.getLocation().clone().add(direction.clone());
+        anathBurnBeams.put(id, new AnathBurnBeamState(origin, direction, System.currentTimeMillis()));
+        setHeroSkillCooldown(player, skill,
+                ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS);
+        player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 1.0F, 0.65F);
+        player.sendActionBar(ChatColor.GOLD + "Burn Beam!");
+    }
 
-        Vector direction = player.getEyeLocation().getDirection().normalize();
-        Location start = player.getEyeLocation().clone();
-        Set<UUID> hitPlayers = new HashSet<>();
-        Set<UUID> hitMinions = new HashSet<>();
-        Set<Integer> hitWithers = new HashSet<>();
-        int team = teams.getOrDefault(id, -1);
+    private void activateAnathFlameDash(Player player) {
+        UUID id = player.getUniqueId();
+        if (!isHeroSkillReady(player, "anath.flame_dash")
+                || anathFlameDashEndsAt.containsKey(id)) return;
+        long now = System.currentTimeMillis();
+        anathFlameDashEndsAt.put(id, now
+                + ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_DURATION_MILLIS);
+        setHeroSkillCooldown(player, "anath.flame_dash",
+                ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_COOLDOWN_MILLIS);
+        Vector direction = player.getLocation().getDirection();
+        direction.setY(0.0D);
+        if (direction.lengthSquared() < 0.001D) direction = new Vector(0.0D, 0.0D, 1.0D);
+        player.setVelocity(direction.normalize()
+                .multiply(ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_SPEED));
+        player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 1.0F, 1.1F);
+    }
 
-        for (double distance = 0.5D; distance <= ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE;
-                distance += 0.5D) {
-            Location center = start.clone().add(direction.clone().multiply(distance));
-            // The reference describes a ten-block-high wall that advances as far as twenty blocks.
-            world.spawnParticle(Particle.FLAME, center.clone().add(0.0D, 5.0D, 0.0D),
-                    18, 0.45D, 5.0D, 0.45D, 0.02D);
-            world.spawnParticle(Particle.LAVA, center.clone().add(0.0D, 5.0D, 0.0D),
-                    4, 0.35D, 4.5D, 0.35D, 0.0D);
-
-            for (Entity entity : world.getNearbyEntities(center,
-                    1.25D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_HEIGHT / 2.0D,
-                    1.25D)) {
-                if (entity instanceof Player target && !target.equals(player)
-                        && activePlayers.contains(target.getUniqueId())
-                        && teams.getOrDefault(target.getUniqueId(), -1) != team) {
-                    hitPlayers.add(target.getUniqueId());
-                } else if (entity instanceof Mob minion) {
-                    Integer minionTeam = heroesOfGwenMinionTeams.get(minion.getUniqueId());
-                    if (minionTeam != null && minionTeam != team) hitMinions.add(minion.getUniqueId());
-                } else if (entity instanceof Wither wither) {
-                    for (Map.Entry<Integer, Wither> entry : withers.entrySet()) {
-                        if (entry.getValue().equals(wither) && entry.getKey() != team) hitWithers.add(entry.getKey());
+    private void updateAnathAbilities(long now) {
+        for (Map.Entry<UUID, AnathFlameEmberState> entry
+                : new HashMap<>(anathFlameEmbers).entrySet()) {
+            UUID entityId = entry.getKey();
+            AnathFlameEmberState state = entry.getValue();
+            Entity entity = Bukkit.getEntity(entityId);
+            if (!(entity instanceof Item ember) || !ember.isValid()
+                    || now >= state.expiresAt
+                    || ember.getLocation().distanceSquared(state.origin)
+                            >= ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_MAX_RANGE
+                                    * ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_MAX_RANGE) {
+                removeAnathEmber(entityId);
+                continue;
+            }
+            Player owner = players.get(state.ownerId);
+            if (owner == null || !owner.isOnline() || !activePlayers.contains(state.ownerId)) {
+                removeAnathEmber(entityId);
+                continue;
+            }
+            ember.setVelocity(state.direction.clone()
+                    .multiply(ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_PROJECTILE_SPEED));
+            Location point = ember.getLocation();
+            world.spawnParticle(Particle.FLAME, point, 3, 0.08D, 0.08D, 0.08D, 0.015D);
+            world.spawnParticle(Particle.SMOKE, point, 1, 0.03D, 0.03D, 0.03D, 0.005D);
+            int ownerTeam = teams.getOrDefault(state.ownerId, -1);
+            double radius = ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_HIT_RADIUS;
+            boolean hit = false;
+            for (Entity target : world.getNearbyEntities(point, radius, radius, radius)) {
+                if (target.equals(ember) || target.equals(owner) || !target.isValid()) continue;
+                TowerState tower = towerFor(target);
+                if (tower != null) {
+                    if (tower.owner != ownerTeam && canDamageMobaTower(tower, ownerTeam)
+                            && owner.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                        damageMobaTower(tower,
+                                ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE, owner);
+                        hit = true;
+                        break;
                     }
+                    continue;
+                }
+                Integer minionTeam = heroesOfGwenMinionTeams.get(target.getUniqueId());
+                if (minionTeam != null && target instanceof Mob minion) {
+                    if (minionTeam == ownerTeam) continue;
+                    minion.damage(ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE, owner);
+                    minion.setFireTicks(Math.max(minion.getFireTicks(),
+                            ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS));
+                    hit = true;
+                    break;
+                }
+                if (target instanceof Player victim && activePlayers.contains(victim.getUniqueId())) {
+                    if (teams.getOrDefault(victim.getUniqueId(), -1) == ownerTeam) continue;
+                    victim.damage(ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE, owner);
+                    victim.setFireTicks(Math.max(victim.getFireTicks(),
+                            ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS));
+                    hit = true;
+                    break;
+                }
+                if (target instanceof Wither wither) {
+                    Integer enemyTeam = withers.entrySet().stream()
+                            .filter(witherEntry -> witherEntry.getValue().equals(wither))
+                            .map(Map.Entry::getKey).findFirst().orElse(null);
+                    if (enemyTeam == null || enemyTeam == ownerTeam
+                            || !witherDamageable.getOrDefault(enemyTeam, false)) continue;
+                    double damage = ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE;
+                    if (wither.getHealth() <= damage) {
+                        finishHeroesOfGwen(ownerTeam, "enemy Wither defeated by Anath's Flame Wand");
+                        removeAnathEmber(entityId);
+                        return;
+                    }
+                    wither.setHealth(wither.getHealth() - damage);
+                    wither.setFireTicks(Math.max(wither.getFireTicks(),
+                            ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS));
+                    hit = true;
+                    break;
+                }
+            }
+            if (hit) removeAnathEmber(entityId);
+        }
+
+        for (Map.Entry<UUID, AnathBurnBeamState> entry
+                : new HashMap<>(anathBurnBeams).entrySet()) {
+            UUID ownerId = entry.getKey();
+            Player owner = players.get(ownerId);
+            AnathBurnBeamState state = entry.getValue();
+            if (owner == null || !owner.isOnline() || !activePlayers.contains(ownerId)
+                    || !"anath".equals(selectedHeroesOfGwen.get(ownerId))) {
+                anathBurnBeams.remove(ownerId);
+                continue;
+            }
+            Map<UUID, Long> targetCooldowns = anathBurnBeamNextHitAt.computeIfAbsent(ownerId,
+                    ignored -> new HashMap<>());
+            int team = teams.getOrDefault(ownerId, -1);
+            boolean finished = false;
+            for (int step = 0; step < ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_STEPS_PER_TICK; step++) {
+                state.distance += ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_STEP;
+                if (state.distance > ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE) {
+                    finished = true;
+                    break;
+                }
+                Location center = state.origin.clone().add(
+                        state.direction.clone().multiply(state.distance));
+                Location flameColumn = center.clone().add(0.0D, 5.0D, 0.0D);
+                world.spawnParticle(Particle.FLAME, flameColumn, 30,
+                        0.4D, 5.0D, 0.4D, 0.05D);
+                if (Math.random() < 0.1D) {
+                    world.playSound(center, Sound.ENTITY_GHAST_SHOOT, 0.45F, 0.7F);
+                }
+                double radius = ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_HIT_RADIUS;
+                for (Entity entity : world.getNearbyEntities(center, radius, radius, radius)) {
+                    if (!(entity instanceof LivingEntity target) || target.equals(owner)
+                            || !target.isValid() || target.isDead()
+                            || center.distanceSquared(target.getLocation()) > radius * radius
+                            || targetCooldowns.getOrDefault(target.getUniqueId(), 0L) > now) continue;
+                    if (target instanceof Player victim && !activePlayers.contains(victim.getUniqueId())) continue;
+                    int targetTeam = heroesOfGwenEntityTeam(target);
+                    if (targetTeam >= 0 && targetTeam == team) continue;
+                    targetCooldowns.put(target.getUniqueId(),
+                            now + ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_TARGET_RECHARGE_MILLIS);
+                    TowerState tower = towerFor(target);
+                    if (tower != null) {
+                        if (tower.owner != team && canDamageMobaTower(tower, team)
+                                && owner.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                            damageMobaTower(tower, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE, owner);
+                        }
+                    } else if (target instanceof Wither wither) {
+                        Integer enemyTeam = withers.entrySet().stream()
+                                .filter(witherEntry -> witherEntry.getValue().equals(wither))
+                                .map(Map.Entry::getKey).findFirst().orElse(null);
+                        if (enemyTeam != null && enemyTeam != team
+                                && witherDamageable.getOrDefault(enemyTeam, false)) {
+                            double damage = ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE;
+                            if (wither.getHealth() <= damage) {
+                                finishHeroesOfGwen(team, "enemy Wither defeated by Anath's Burn Beam");
+                                anathBurnBeams.remove(ownerId);
+                                return;
+                            }
+                            wither.setHealth(wither.getHealth() - damage);
+                        }
+                    } else {
+                        target.damage(ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE, owner);
+                    }
+                    world.playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.35F, 0.8F);
+                }
+            }
+            if (finished) anathBurnBeams.remove(ownerId);
+        }
+
+        for (Map.Entry<UUID, Long> entry : new HashMap<>(anathFlameDashEndsAt).entrySet()) {
+            UUID ownerId = entry.getKey();
+            Player player = players.get(ownerId);
+            if (now >= entry.getValue() || player == null || !player.isOnline()
+                    || !activePlayers.contains(ownerId)
+                    || !"anath".equals(selectedHeroesOfGwen.get(ownerId))) {
+                if (player != null && player.isOnline()) player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+                anathFlameDashEndsAt.remove(ownerId);
+                continue;
+            }
+            Vector direction = player.getLocation().getDirection();
+            direction.setY(0.0D);
+            if (direction.lengthSquared() > 0.001D) {
+                player.setVelocity(direction.normalize()
+                        .multiply(ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_SPEED));
+            }
+            Block ground = player.getLocation().getBlock();
+            int safety = 0;
+            while (!ground.getType().isSolid() && safety++ < 32
+                    && ground.getY() > world.getMinHeight()) {
+                ground = ground.getRelative(BlockFace.DOWN);
+            }
+            if (ground.getType().isSolid()) {
+                Block fireBlock = ground.getRelative(BlockFace.UP);
+                if (fireBlock.isPassable() && !anathFireTrailBlocks.containsKey(fireBlock)) {
+                    anathFireTrailBlocks.put(fireBlock, new AnathFireTrailState(
+                            fireBlock.getBlockData().clone(),
+                            now + ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DELAY_MILLIS));
                 }
             }
         }
 
-        for (UUID targetId : hitPlayers) {
-            Player target = players.get(targetId);
-            if (target != null && target.isOnline() && activePlayers.contains(targetId)) {
-                target.damage(ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE, player);
-                target.setFireTicks(Math.max(target.getFireTicks(), 40));
+        for (Map.Entry<Block, AnathFireTrailState> entry
+                : new HashMap<>(anathFireTrailBlocks).entrySet()) {
+            Block block = entry.getKey();
+            AnathFireTrailState state = entry.getValue();
+            if (!state.placed && now >= state.placeAt) {
+                if (block.isPassable()) {
+                    block.setType(Material.FIRE, false);
+                    state.placed = true;
+                    state.expiresAt = now + ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_DASH_FIRE_DURATION_MILLIS;
+                } else {
+                    anathFireTrailBlocks.remove(block);
+                }
+            } else if (state.placed && now >= state.expiresAt) {
+                if (block.getType() == Material.FIRE) block.setBlockData(state.originalData, false);
+                anathFireTrailBlocks.remove(block);
             }
         }
-        for (UUID minionId : hitMinions) {
-            Entity entity = Bukkit.getEntity(minionId);
-            if (entity instanceof Mob minion && minion.isValid()) {
-                minion.damage(Math.max(100.0D, minion.getHealth() + 1.0D), player);
+
+        for (UUID id : new ArrayList<>(activePlayers)) {
+            if (!"anath".equals(selectedHeroesOfGwen.get(id))) continue;
+            Player player = players.get(id);
+            if (player == null || !player.isOnline()) continue;
+            long nextAmmo = heroAmmoNextAt.getOrDefault(id,
+                    now + ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS);
+            if (now >= nextAmmo) {
+                ItemStack ammo = player.getInventory().getItem(7);
+                int count = ammo != null && ammo.getType() == Material.BLAZE_POWDER
+                        && ammo.hasItemMeta() && ammo.getItemMeta().hasDisplayName()
+                        && ammo.getItemMeta().getDisplayName().contains("Embers") ? ammo.getAmount() : 0;
+                if (count < ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_CAPACITY) {
+                    if (count <= 0) {
+                        player.getInventory().setItem(7, namedItem(Material.BLAZE_POWDER,
+                                ChatColor.GOLD + "Embers", "Flame Wand ammunition."));
+                    } else {
+                        ammo.setAmount(count + 1);
+                    }
+                    player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.45F, 1.4F);
+                }
+                heroAmmoNextAt.put(id,
+                        now + ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS);
             }
         }
-        for (Integer enemyTeam : hitWithers) {
-            Wither wither = withers.get(enemyTeam);
-            if (wither == null || !wither.isValid()) continue;
-            // The source ability can damage a Wither, but never damages towers.
-            if (wither.getHealth() <= ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE) {
-                finishHeroesOfGwen(team, "enemy Wither defeated by Anath's Burn Beam");
-                return;
-            }
-            wither.setHealth(wither.getHealth() - ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE);
+    }
+
+    private void removeAnathEmber(UUID entityId) {
+        AnathFlameEmberState state = anathFlameEmbers.remove(entityId);
+        Entity entity = Bukkit.getEntity(entityId);
+        if (entity != null) {
+            entities.remove(entity);
+            entity.remove();
         }
-        player.playSound(player.getLocation(), Sound.ITEM_FIRECHARGE_USE, 1.0F, 0.8F);
-        player.sendActionBar(ChatColor.GOLD + "Burn Beam!");
+    }
+
+    private void removeAnathState(UUID ownerId) {
+        anathBurnBeams.remove(ownerId);
+        anathBurnBeamNextHitAt.remove(ownerId);
+        anathFlameDashEndsAt.remove(ownerId);
+        for (Map.Entry<UUID, AnathFlameEmberState> entry
+                : new HashMap<>(anathFlameEmbers).entrySet()) {
+            if (entry.getValue().ownerId.equals(ownerId)) removeAnathEmber(entry.getKey());
+        }
     }
 
     private void launchAnathMeteor(Player player) {
