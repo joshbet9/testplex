@@ -8,6 +8,9 @@ import org.bukkit.GameRule;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.block.Sign;
+import org.bukkit.entity.EntityType;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
 import org.bukkit.entity.Player;
@@ -48,6 +51,8 @@ import java.util.UUID;
  */
 public final class SpeedBuildersGame implements Listener {
     private static final String ARENA_WORLD_NAME = "testplex_speedbuilders_arena_v1";
+    private static final String SOURCE_WORLD_NAME = "testplex_speedbuilders_source_v1";
+    private static final String SOURCE_MAP_RESOURCE = "source-maps/Speed Builders/SpeedBuilders_Shroomland_Lake.zip";
     private static final int FLOOR_Y = 65;
     private static final int PLOT_SPACING = 18;
     private static final int PLOT_MARGIN = 4;
@@ -60,10 +65,11 @@ public final class SpeedBuildersGame implements Listener {
     private final ArcadeMechanicsModernPlugin plugin;
     private final LinkedHashSet<UUID> queue = new LinkedHashSet<>();
     private final LinkedHashMap<UUID, PlayerState> players = new LinkedHashMap<>();
-    private final List<Template> templates = defaultTemplates();
+    private List<Template> templates = List.of();
     private final List<Template> unusedTemplates = new ArrayList<>();
     private BukkitTask ticker;
     private World arena;
+    private World sourceWorld;
     private Phase phase = Phase.IDLE;
     private long tick;
     private long queueDeadlineTick = -1L;
@@ -85,6 +91,7 @@ public final class SpeedBuildersGame implements Listener {
     public String status() {
         if (phase == Phase.IDLE) return "queue=" + queue.size();
         return phase.name() + " round=" + round + " alive=" + alivePlayers().size()
+                + " templates=" + templates.size()
                 + " build=" + (currentTemplate == null ? "none" : currentTemplate.name());
     }
 
@@ -198,6 +205,7 @@ public final class SpeedBuildersGame implements Listener {
     private void startMatch(List<Player> participants) {
         try {
             plugin.prepareForSpeedBuilders();
+            loadSourceTemplates();
             arena = ensureArena();
             buildArenaFloor();
             players.clear();
@@ -230,6 +238,91 @@ public final class SpeedBuildersGame implements Listener {
             players.clear();
             phase = Phase.IDLE;
             currentTemplate = null;
+        }
+    }
+
+    /** Load the real Mineplex Reborn build definitions from the original Shroomland Lake map. */
+    private void loadSourceTemplates() {
+        if (sourceWorld == null) sourceWorld = Bukkit.getWorld(SOURCE_WORLD_NAME);
+        if (sourceWorld == null) {
+            if (!SourceMapCatalog.resetTestWorld(plugin, SOURCE_WORLD_NAME)) {
+                throw new IllegalStateException("Could not safely reset the isolated Speed Builders source-map world.");
+            }
+            if (!SourceMapCatalog.installResource(plugin, "Speed Builders", SOURCE_MAP_RESOURCE, SOURCE_WORLD_NAME)) {
+                throw new IllegalStateException("The original Speed Builders map archive could not be installed.");
+            }
+            sourceWorld = new WorldCreator(SOURCE_WORLD_NAME)
+                    .environment(World.Environment.NORMAL)
+                    .generateStructures(false)
+                    .createWorld();
+        }
+        if (sourceWorld == null) {
+            throw new IllegalStateException("Paper could not load the isolated Speed Builders source map.");
+        }
+        sourceWorld.setGameRule(GameRule.DO_MOB_SPAWNING, false);
+        sourceWorld.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+
+        SourceMapCatalog.MapData mapData = SourceMapCatalog.readResource(
+                plugin, "Speed Builders", SOURCE_MAP_RESOURCE, sourceWorld);
+        if (mapData == null) {
+            throw new IllegalStateException("The original Speed Builders WorldConfig.dat could not be read.");
+        }
+        int playerPlots = mapData.dataLocations("YELLOW").size();
+        if (mapData.dataLocations("RED").isEmpty() || playerPlots < SpeedBuildersRules.MAX_PLAYERS) {
+            throw new IllegalStateException("The original Speed Builders map is missing its RED centre or 16 YELLOW plots "
+                    + "(found " + playerPlots + ").");
+        }
+
+        List<Template> loaded = new ArrayList<>();
+        for (Map.Entry<String, List<Location>> entry : mapData.customLocationGroups().entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(String.CASE_INSENSITIVE_ORDER)).toList()) {
+            if (entry.getValue().isEmpty()) continue;
+            SpeedBuildersRules.TemplateTiming timing = SpeedBuildersRules.parseTemplateName(entry.getKey());
+            String displayName = ChatColor.translateAlternateColorCodes('&', timing.displayName());
+            Location origin = entry.getValue().getFirst().clone().subtract(0.5D, 0.0D, 0.5D);
+            Location buildMin = origin.clone().subtract(3.0D, 10.0D, 3.0D);
+            List<SpeedBuildersRules.Cell> cells = new ArrayList<>();
+            List<MobCell> mobs = new ArrayList<>();
+            for (int x = 0; x < SpeedBuildersRules.BUILD_WIDTH; x++) {
+                for (int y = 0; y < SpeedBuildersRules.BUILD_HEIGHT; y++) {
+                    for (int z = 0; z < SpeedBuildersRules.BUILD_WIDTH; z++) {
+                        Block block = sourceWorld.getBlockAt(
+                                buildMin.getBlockX() + x, buildMin.getBlockY() + y, buildMin.getBlockZ() + z);
+                        if (block.getState() instanceof Sign sign) {
+                            EntityType mobType = parseMobMarker(sign.getLine(0));
+                            if (mobType != null) {
+                                mobs.add(new MobCell(mobType, x, y, z));
+                                continue;
+                            }
+                        }
+                        if (!block.getType().isAir()) {
+                            cells.add(new SpeedBuildersRules.Cell(x, y, z,
+                                    block.getType(), block.getBlockData().getAsString()));
+                        }
+                    }
+                }
+            }
+            if (!cells.isEmpty() || !mobs.isEmpty()) {
+                String id = entry.getKey().toLowerCase(java.util.Locale.ROOT)
+                        .replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
+                loaded.add(new Template(id, displayName, List.copyOf(cells),
+                        List.copyOf(mobs), timing));
+            }
+        }
+        if (loaded.isEmpty()) {
+            throw new IllegalStateException("No playable templates were found in the original Speed Builders map.");
+        }
+        templates = List.copyOf(loaded);
+        plugin.getLogger().info("Loaded " + templates.size() + " original Speed Builders templates from "
+                + mapData.mapName() + " with " + playerPlots + " authored build plots.");
+    }
+
+    private EntityType parseMobMarker(String marker) {
+        if (marker == null || marker.isBlank()) return null;
+        try {
+            return EntityType.valueOf(marker.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException ignored) {
+            return null;
         }
     }
 
@@ -287,7 +380,8 @@ public final class SpeedBuildersGame implements Listener {
         }
         currentTemplate = unusedTemplates.removeFirst();
         round++;
-        if (round > 1) buildSeconds = Math.max(SpeedBuildersRules.MIN_BUILD_SECONDS, buildSeconds - 1);
+        if (round > 1) buildSeconds = Math.max(1, buildSeconds - 1);
+        buildSeconds = currentTemplate.timing().buildSeconds(buildSeconds);
         phase = Phase.VIEWING;
         phaseDeadlineTick = tick + SpeedBuildersRules.DEFAULT_VIEW_SECONDS * 20L;
 
@@ -460,10 +554,13 @@ public final class SpeedBuildersGame implements Listener {
             int x = plot.centerX() - 3 + cell.x();
             int y = FLOOR_Y + 1 + cell.y();
             int z = plot.centerZ() - 3 + cell.z();
-            Material material = arena.getBlockAt(x, y, z).getType();
-            if (!material.isAir()) actual.put(cell.coordinate(), material);
+            Block block = arena.getBlockAt(x, y, z);
+            if (!block.getType().isAir()) {
+                actual.put(cell.coordinate(), new SpeedBuildersRules.BlockState(
+                        block.getType(), block.getBlockData().getAsString()));
+            }
         }
-        return SpeedBuildersRules.score(currentTemplate.cells(), actual);
+        return SpeedBuildersRules.scoreBlockStates(currentTemplate.cells(), actual);
     }
 
     private boolean isPlotEmpty(Plot plot) {
@@ -480,14 +577,16 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private int percent(int score) {
-        return currentTemplate == null || currentTemplate.cells().isEmpty()
-                ? 0 : (int) Math.round(score * 100.0D / currentTemplate.cells().size());
+        return currentTemplate == null || currentTemplate.expectedScore() == 0
+                ? 0 : (int) Math.round(score * 100.0D / currentTemplate.expectedScore());
     }
 
     private void pasteTemplate(Plot plot, Template template) {
         for (SpeedBuildersRules.Cell cell : template.cells()) {
-            arena.getBlockAt(plot.centerX() - 3 + cell.x(), FLOOR_Y + 1 + cell.y(),
-                    plot.centerZ() - 3 + cell.z()).setType(cell.material(), false);
+            Block block = arena.getBlockAt(plot.centerX() - 3 + cell.x(), FLOOR_Y + 1 + cell.y(),
+                    plot.centerZ() - 3 + cell.z());
+            if (cell.blockData().isBlank()) block.setType(cell.material(), false);
+            else block.setBlockData(Bukkit.createBlockData(cell.blockData()), false);
         }
     }
 
@@ -874,7 +973,15 @@ public final class SpeedBuildersGame implements Listener {
         }
     }
 
-    private record Template(String id, String name, List<SpeedBuildersRules.Cell> cells) { }
+    private record Template(String id, String name, List<SpeedBuildersRules.Cell> cells,
+                            List<MobCell> mobs, SpeedBuildersRules.TemplateTiming timing) {
+        private Template(String id, String name, List<SpeedBuildersRules.Cell> cells) {
+            this(id, name, cells, List.of(), new SpeedBuildersRules.TemplateTiming(name, 0, 0, 1.0D, null));
+        }
+        private int expectedScore() { return cells.size() + mobs.size(); }
+    }
+
+    private record MobCell(EntityType type, int x, int y, int z) { }
 
     private static final class TemplateBuilder {
         private final String id;
