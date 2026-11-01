@@ -1,5 +1,6 @@
-# Snake is packaged with Testplex Modern but remains unavailable until READY_FOR_TEST.
-enabled: false
+# Snake is promoted to the shared controlled acceptance queue.
+enabled: true
+readiness-revision: snake-controlled-acceptance-20261101-v1
 test-mode: true
 selected-map: Snake_Pit.zip
 kits: {}
