@@ -26,4 +26,14 @@ public final class WitherAssaultRules {
         if (!Double.isFinite(witherSpawnY) || underOtherPlayer) return false;
         return blockY >= Math.ceil(witherSpawnY - 4.0D);
     }
+
+    /** Fletcher and Smoke Arrow are shared by the source Archer and Editor kits. */
+    public static boolean hasFletcher(String kit) {
+        return "archer".equals(normalizeHumanKit(kit)) || "editor".equals(normalizeHumanKit(kit));
+    }
+
+    /** Only living Humans with a bow kit create tracked Smoke Arrows. */
+    public static boolean shouldTrackSmokeArrow(int team, String kit, boolean alive, boolean arrowProjectile) {
+        return team == 0 && alive && arrowProjectile && hasFletcher(kit);
+    }
 }
