@@ -967,6 +967,230 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return ArcadePortRules.castleAssaultObjectiveTntRespawnMillis(mixedArcade);
     }
 
+    private List<Location> orderBoundaryPoints(List<Location> points) {
+        if (points == null || points.size() < 3) return List.of();
+        List<Location> ordered = new ArrayList<>(points.stream().map(Location::clone).toList());
+        double centerX = ordered.stream().mapToDouble(Location::getX).average().orElse(0.0D);
+        double centerZ = ordered.stream().mapToDouble(Location::getZ).average().orElse(0.0D);
+        ordered.sort(java.util.Comparator.comparingDouble(point ->
+                Math.atan2(point.getZ() - centerZ, point.getX() - centerX)));
+        return List.copyOf(ordered);
+    }
+
+    private void updateHeroesOfGwenSidequest(long now) {
+        heroesOfGwenPumpkinBuffEndsAt.entrySet().removeIf(entry -> entry.getValue() <= now);
+        if (heroesOfGwenSidequestType == HeroesOfGwenSidequestType.PUMPKIN_KING) {
+            if (heroesOfGwenPumpkinKing == null && heroesOfGwenPumpkinKingRespawnAt > 0L
+                    && now >= heroesOfGwenPumpkinKingRespawnAt) {
+                spawnHeroesOfGwenPumpkinKing(now);
+            }
+            if (heroesOfGwenPumpkinKing != null) updateHeroesOfGwenPumpkinKing(now);
+        } else if (heroesOfGwenSidequestType == HeroesOfGwenSidequestType.MONOCHROME_SKELETONS) {
+            if (heroesOfGwenMonochromeEndsAt > 0L && now >= heroesOfGwenMonochromeEndsAt) {
+                finishHeroesOfGwenMonochromeSidequest();
+            }
+            if (heroesOfGwenMonochromeEndsAt == 0L && heroesOfGwenSidequestNextStartAt > 0L
+                    && now >= heroesOfGwenSidequestNextStartAt) {
+                startHeroesOfGwenMonochromeSidequest(now);
+            }
+        }
+    }
+
+    private void spawnHeroesOfGwenPumpkinKing(long now) {
+        List<Location> spawns = map.dataLocations("BLACK");
+        if (spawns.isEmpty() || heroesOfGwenPumpkinBoundary.size() < 3) {
+            plugin.getLogger().warning("Cannot spawn the Heroes of Gwen Pumpkin King: source spawn/boundary markers are missing.");
+            heroesOfGwenPumpkinKingRespawnAt = 0L;
+            return;
+        }
+        WitherSkeleton king = world.spawn(spawns.get(0).clone(), WitherSkeleton.class);
+        king.setAI(false);
+        king.setSilent(false);
+        king.setRemoveWhenFarAway(false);
+        king.setCanPickupItems(false);
+        var maximumHealth = king.getAttribute(Attribute.MAX_HEALTH);
+        if (maximumHealth != null) maximumHealth.setBaseValue(ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HEALTH);
+        king.setHealth(ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HEALTH);
+        king.getEquipment().setHelmet(new ItemStack(Material.PUMPKIN));
+        king.getEquipment().setItemInMainHand(new ItemStack(Material.STONE_SWORD));
+        king.getEquipment().setHelmetDropChance(0.0F);
+        king.getEquipment().setItemInMainHandDropChance(0.0F);
+        king.setCustomName(ChatColor.DARK_RED + "Pumpkin King " + ChatColor.RED + "❤ "
+                + ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HEALTH);
+        king.setCustomNameVisible(true);
+        heroesOfGwenPumpkinKing = king;
+        heroesOfGwenPumpkinKingTarget = null;
+        heroesOfGwenPumpkinKingNextAttackAt = now;
+        heroesOfGwenPumpkinKingRespawnAt = 0L;
+        entities.add(king);
+        world.strikeLightningEffect(king.getLocation());
+        world.playSound(king.getLocation(), Sound.ENTITY_WITHER_SPAWN, 1.0F, 0.4F);
+        announce(ChatColor.DARK_RED + "The Pumpkin King has awoken! "
+                + ChatColor.GRAY + "Defeat him to grant your team a powerful blessing.");
+    }
+
+    private boolean isInsideHeroesOfGwenPumpkinBoundary(Location location) {
+        List<Location> points = heroesOfGwenPumpkinBoundary;
+        if (location == null || points.size() < 3 || location.getWorld() != world) return false;
+        double x = location.getX();
+        double z = location.getZ();
+        boolean inside = false;
+        for (int i = 0, j = points.size() - 1; i < points.size(); j = i++) {
+            double xi = points.get(i).getX();
+            double zi = points.get(i).getZ();
+            double xj = points.get(j).getX();
+            double zj = points.get(j).getZ();
+            boolean crosses = (zi > z) != (zj > z)
+                    && x < (xj - xi) * (z - zi) / ((zj - zi) == 0.0D ? 0.000001D : zj - zi) + xi;
+            if (crosses) inside = !inside;
+        }
+        return inside;
+    }
+
+    private boolean isValidHeroesOfGwenPumpkinTarget(LivingEntity target) {
+        if (target == null || target.equals(heroesOfGwenPumpkinKing)
+                || !target.isValid() || target.isDead()
+                || !isInsideHeroesOfGwenPumpkinBoundary(target.getLocation())) return false;
+        if (target instanceof Player player) {
+            return player.isOnline() && activePlayers.contains(player.getUniqueId());
+        }
+        return true;
+    }
+
+    private LivingEntity findHeroesOfGwenPumpkinTarget() {
+        Entity currentEntity = heroesOfGwenPumpkinKingTarget == null
+                ? null : Bukkit.getEntity(heroesOfGwenPumpkinKingTarget);
+        LivingEntity current = currentEntity instanceof LivingEntity living ? living : null;
+        if (isValidHeroesOfGwenPumpkinTarget(current)) return current;
+        Location home = heroesOfGwenPumpkinKing.getLocation();
+        return world.getEntities().stream()
+                .filter(entity -> entity instanceof LivingEntity)
+                .map(entity -> (LivingEntity) entity)
+                .filter(this::isValidHeroesOfGwenPumpkinTarget)
+                .min(java.util.Comparator.comparingDouble(candidate ->
+                        candidate.getLocation().distanceSquared(home)))
+                .orElse(null);
+    }
+
+    private void moveHeroesOfGwenPumpkinKing(Location goal, double sourceSpeed) {
+        WitherSkeleton king = heroesOfGwenPumpkinKing;
+        if (king == null || goal == null) return;
+        Location current = king.getLocation();
+        Vector direction = goal.toVector().subtract(current.toVector());
+        if (direction.lengthSquared() < 4.0D) return;
+        current.setDirection(direction);
+        current.add(direction.normalize().multiply(ArcadePortRules.heroesOfGwenWitherStepPerTick(sourceSpeed)));
+        king.teleport(current);
+    }
+
+    private void updateHeroesOfGwenPumpkinKing(long now) {
+        WitherSkeleton king = heroesOfGwenPumpkinKing;
+        if (king == null || !king.isValid() || king.isDead()) return;
+        LivingEntity target = findHeroesOfGwenPumpkinTarget();
+        heroesOfGwenPumpkinKingTarget = target == null ? null : target.getUniqueId();
+        moveHeroesOfGwenPumpkinKing(target == null ? map.dataLocations("BLACK").get(0) : target.getLocation(),
+                target == null ? ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HOME_SPEED
+                        : ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_TARGET_SPEED);
+        king.setCustomName(ChatColor.DARK_RED + "Pumpkin King " + ChatColor.RED + "❤ "
+                + (int) Math.ceil(king.getHealth()));
+
+        if (now < heroesOfGwenPumpkinKingNextAttackAt) return;
+        heroesOfGwenPumpkinKingNextAttackAt = now
+                + ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_ATTACK_INTERVAL_MILLIS;
+        if (target == null) {
+            king.setHealth(Math.min(king.getMaxHealth(),
+                    king.getHealth() + ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_OUT_OF_COMBAT_HEAL));
+            return;
+        }
+        if (king.getLocation().distanceSquared(target.getLocation())
+                < ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_RANGE_SQUARED) {
+            target.damage(ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_DAMAGE, king);
+        }
+        double radius = ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_AREA_RADIUS;
+        for (Entity nearby : world.getNearbyEntities(king.getLocation(), radius, radius, radius)) {
+            if (!(nearby instanceof LivingEntity victim) || victim.equals(king)
+                    || !victim.isValid() || victim.isDead()
+                    || victim.getLocation().distanceSquared(king.getLocation()) > radius * radius) continue;
+            if (victim instanceof Player player && !activePlayers.contains(player.getUniqueId())) continue;
+            victim.damage(ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_AREA_DAMAGE, king);
+            Vector knockback = victim.getLocation().toVector().subtract(king.getLocation().toVector());
+            if (knockback.lengthSquared() > 0.001D) {
+                victim.setVelocity(knockback.normalize().setY(1.0D));
+            }
+            world.spawnParticle(Particle.FLAME, victim.getLocation().clone().add(0.0D, 1.0D, 0.0D),
+                    5, 0.35D, 0.35D, 0.35D, 0.04D);
+        }
+    }
+
+    private void startHeroesOfGwenMonochromeSidequest(long now) {
+        for (int team = 0; team < heroesOfGwenMonochromeKills.length; team++) {
+            heroesOfGwenMonochromeKills[team] = 0;
+        }
+        int spawned = 0;
+        for (Location location : map.dataLocations("BLACK")) {
+            WitherSkeleton skeleton = world.spawn(location.clone(), WitherSkeleton.class);
+            skeleton.setRemoveWhenFarAway(false);
+            skeleton.setCanPickupItems(false);
+            skeleton.getEquipment().setItemInMainHand(new ItemStack(Material.STONE_SWORD));
+            skeleton.getEquipment().setItemInMainHandDropChance(0.0F);
+            skeleton.setCustomName(ChatColor.DARK_RED + "Wither Skeleton");
+            skeleton.setCustomNameVisible(true);
+            heroesOfGwenMonochromeSkeletons.add(skeleton.getUniqueId());
+            entities.add(skeleton);
+            spawned++;
+        }
+        if (spawned == 0) {
+            heroesOfGwenSidequestNextStartAt = now
+                    + ArcadePortRules.HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS;
+            return;
+        }
+        heroesOfGwenMonochromeEndsAt = now
+                + ArcadePortRules.HEROES_OF_GWEN_MONOCHROME_SKELETONS_DURATION_MILLIS;
+        heroesOfGwenSidequestNextStartAt = now
+                + ArcadePortRules.HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS;
+        announce(ChatColor.RED + "Wither Skeletons have spawned! "
+                + ChatColor.GRAY + "Your team has 30 seconds to defeat more than the opposing team.");
+        for (Player player : onlinePlayers()) {
+            player.playSound(player.getLocation(), Sound.ENTITY_WITHER_SPAWN, 0.8F, 0.5F);
+        }
+    }
+
+    private void finishHeroesOfGwenMonochromeSidequest() {
+        int winner = ArcadePortRules.heroesOfGwenMonochromeWinner(
+                heroesOfGwenMonochromeKills[0], heroesOfGwenMonochromeKills[1]);
+        for (UUID id : new HashSet<>(heroesOfGwenMonochromeSkeletons)) {
+            Entity entity = Bukkit.getEntity(id);
+            if (entity != null && entity.isValid()) entity.remove();
+            if (entity != null) entities.remove(entity);
+        }
+        heroesOfGwenMonochromeSkeletons.clear();
+        heroesOfGwenMonochromeEndsAt = 0L;
+        if (winner < 0) {
+            announce(ChatColor.GOLD + "The Wither Skeleton challenge ended in a draw. No team received a buff.");
+        } else {
+            announce(ChatColor.GOLD + teamName(winner) + " defeated the most Wither Skeletons and earned the Pumpkin King's blessing!");
+            grantHeroesOfGwenPumpkinKingBuff(winner);
+        }
+    }
+
+    private void grantHeroesOfGwenPumpkinKingBuff(int team) {
+        long expiresAt = System.currentTimeMillis()
+                + ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_BUFF_DURATION_MILLIS;
+        for (Player player : activeMatchPlayers()) {
+            if (teams.getOrDefault(player.getUniqueId(), -1) != team) continue;
+            heroesOfGwenPumpkinBuffEndsAt.put(player.getUniqueId(), expiresAt);
+            player.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION,
+                    (int) (ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_BUFF_DURATION_MILLIS / 50L),
+                    ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_REGENERATION_AMPLIFIER,
+                    false, true, true));
+            player.playSound(player.getLocation(), Sound.BLOCK_PORTAL_TRAVEL, 1.0F, 0.5F);
+            world.spawnParticle(Particle.LAVA, player.getLocation().clone().add(0.0D, 1.0D, 0.0D),
+                    10, 0.5D, 0.5D, 0.5D, 0.05D);
+            player.sendMessage(ChatColor.GOLD + "Pumpkin King's blessing: "
+                    + ChatColor.GREEN + "Regeneration II and 50% increased damage for 60 seconds.");
+        }
+    }
+
     void tick(long now) {
         if (stopped || !ready) return;
         if (game == ArcadePortGame.CASTLE_ASSAULT) tickCastleAssault(now);
@@ -5393,6 +5617,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         heroesOfGwenCounterpartOnly.clear();
         heroesOfGwenChangedAfterTowerLoss.clear();
         heroesOfGwenFinalObjectiveHits.clear();
+    }
+
+    private enum HeroesOfGwenSidequestType {
+        NONE,
+        PUMPKIN_KING,
+        MONOCHROME_SKELETONS
     }
 
     private static final class KingState {
