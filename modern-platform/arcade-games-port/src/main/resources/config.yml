@@ -1,6 +1,7 @@
 # The Arcade catalogue and controlled test queue grow as source-faithful games are promoted.
 # READY_FOR_TEST games are available together for the shared controlled test session.
-# The 32-ID controlled queue includes Heroes of Gwen, Hoops Remastered and Wizards alongside Evolution, Speed Builders, and all three selectable Monster Maze modes.
+# The 31-ID enabled queue includes Wizards, Hoops Remastered and Heroes of Gwen.
+# Evolution remains catalogued but disabled pending its separate source-map clearance.
 enabled-games:
   - death-tag
   - one-in-the-quiver
@@ -30,7 +31,6 @@ enabled-games:
   - wither-assault
   - sneaky-assassins
   - speed-builders
-  - evolution
   - heroes-of-gwen
   - hoops-remastered
   - wizards
