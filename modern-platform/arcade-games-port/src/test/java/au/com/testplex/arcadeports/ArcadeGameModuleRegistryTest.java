@@ -85,7 +85,7 @@ class ArcadeGameModuleRegistryTest {
 
         private FakeModule(ArcadePortGame game, List<String> events, ArcadePortGame... gameIds) {
             this.game = game;
-            this.games = new java.util.LinkedHashSet<>(List.of(gameIds));
+            this.games = new java.util.LinkedHashSet<>(gameIds.length == 0 ? List.of(game) : List.of(gameIds));
             this.events = events;
         }
 
