@@ -61,6 +61,11 @@ lobby-kits:
   #   bomb-lobbers: [jumper, armorer, pitcher, waller]
   order: {}
 
+# Optional source map archives on the server filesystem. Relative paths use the
+# server process working directory; set an absolute path if maps live elsewhere.
+source-maps:
+  directory: update/maps
+
 # The named sandbox owner has direct test-harness access even if OP permissions are stale.
 owner-usernames:
   - jn_playzmc
@@ -68,3 +73,21 @@ owner-usernames:
 # Named accounts allowed operator access on this isolated modern test server.
 admin-usernames:
   - jn_playzmc
+
+# Experimental Wizards module. This configuration is nested so the game remains
+# owned by ArcadeMechanicsModern and cannot create a second independent game server.
+wizards:
+  arena-world: testplex_wizards_arena
+  source-map-world: arcadeport_source_wizards
+  arena-radius: 48
+  chest-count: 32
+  allow-solo-start: false
+  allow-generated-test-arena: false
+  include-nano-maps: false
+  minimum-players: 8
+  maximum-players: 12
+  kits:
+    default: WIZARD
+  destructive-spells: false
+  temporary-spell-fire: true
+  destructive-endgame-blocks: false
