@@ -255,8 +255,8 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         int queued = (Integer) method(arcadeManager.getClass(), "queuedCount", arcadeGameType)
                 .invoke(arcadeManager, wizardsGameId);
         require(queued == 3, "expected three players in the shared Arcade queue, found " + queued);
-        require(Bukkit.dispatchCommand(owner, "arcadeport start wizards"),
-                "owner could not start Wizards through the shared Arcade queue");
+        require(Bukkit.dispatchCommand(owner, "arcadeport start wizards immediate"),
+                "owner could not immediately start Wizards through the shared Arcade queue");
         gameplayStage = 1;
         gameplayTicks = 0;
         getLogger().info("WIZARDS_GAMEPLAY_SMOKE|QUEUED|players=" + owner.getName() + ","
@@ -898,70 +898,3 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         record(status, resource, 0, 0, gameplayTicks * 50L, message);
         shutdownServer();
     }
-
-    private void shutdownServer() {
-        if (shuttingDown) return;
-        shuttingDown = true;
-        if (gameplayTask != null) gameplayTask.cancel();
-        writeResults();
-        Bukkit.shutdown();
-    }
-
-    private void record(String status, String resource, int starts, int chests, long elapsedMs, String detail) {
-        String safeDetail = detail == null ? "" : detail.replace('\t', ' ').replace('\n', ' ').replace('\r', ' ');
-        results.add(status + "\t" + resource + "\t" + starts + "\t" + chests
-                + "\t" + elapsedMs + "\t" + safeDetail);
-        writeResults();
-    }
-
-    private void writeResults() {
-        try {
-            Files.createDirectories(getDataFolder().toPath());
-            Path output = getDataFolder().toPath().resolve("results.tsv");
-            Files.writeString(output, String.join("\n", results) + "\n", StandardCharsets.UTF_8);
-        } catch (Exception exception) {
-            getLogger().severe("Could not persist Wizards source-map smoke results: " + exception);
-        }
-    }
-
-    private static Object field(Object target, String name) throws Exception {
-        for (Class<?> type = target.getClass(); type != null; type = type.getSuperclass()) {
-            try {
-                Field field = type.getDeclaredField(name);
-                field.setAccessible(true);
-                return field.get(target);
-            } catch (NoSuchFieldException ignored) {
-                // Search the parent type.
-            }
-        }
-        throw new NoSuchFieldException(name);
-    }
-
-    private static Method method(Class<?> type, String name, Class<?>... parameters) throws Exception {
-        for (Class<?> current = type; current != null; current = current.getSuperclass()) {
-            try {
-                Method method = current.getDeclaredMethod(name, parameters);
-                method.setAccessible(true);
-                return method;
-            } catch (NoSuchMethodException ignored) {
-                // Search the parent type.
-            }
-        }
-        throw new NoSuchMethodException(name);
-    }
-
-    private static Throwable rootCause(Throwable failure) {
-        Throwable cause = failure;
-        while (cause.getCause() != null && cause.getCause() != cause) cause = cause.getCause();
-        return cause;
-    }
-
-    private static void require(boolean condition, String message) {
-        if (!condition) throw new IllegalStateException(message);
-    }
-
-    private static String safeMessage(Throwable failure) {
-        String message = failure.getMessage();
-        return message == null ? failure.toString() : message.replace('\t', ' ').replace('\n', ' ');
-    }
-}
