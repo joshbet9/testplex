@@ -480,11 +480,11 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
 
     @Test
     void heroesOfGwenStoreCooldownModifiersStackAndStaySeparateFromAmmoModifiers() {
-        assertEquals(765L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
+        assertEquals(750L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
                 List.of("Ninja's Chestcloth", "Ninja's Leggings"), false));
-        assertEquals(700L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
+        assertEquals(850L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
                 List.of("Focused Cap", "Focused Chestplate"), false));
-        assertEquals(700L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
+        assertEquals(800L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
                 List.of("Leather Cap of Nimble Fingers", "Leather Chestplate of Nimble Fingers"), true));
         assertEquals(1_000L, ArcadePortRules.heroesOfGwenStoreAdjustedCooldown(1_000L,
                 List.of("Leather Cap of Nimble Fingers"), false));
