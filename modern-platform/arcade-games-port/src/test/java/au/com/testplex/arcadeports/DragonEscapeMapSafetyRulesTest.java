@@ -13,7 +13,8 @@ final class DragonEscapeMapSafetyRulesTest {
 
     @Test
     void legacyNamedLowAltitudeExceptionsRemainStable() {
-        assertEquals(24.0D, ArcadePortRules.dragonEscapeVoidThresholdY("Through Hell", true, 10));
+        assertEquals(9.0D, ArcadePortRules.dragonEscapeVoidThresholdY("Through Hell", true, 10));
+        assertEquals(24.0D, ArcadePortRules.dragonEscapeVoidThresholdY("Through Hell", false, 0));
         assertEquals(0.0D, ArcadePortRules.dragonEscapeVoidThresholdY("Pirate Bay", false, 0));
     }
 

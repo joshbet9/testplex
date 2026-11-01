@@ -2821,6 +2821,32 @@ public final class ArcadePortManager implements Listener {
                     + " map or its WorldConfig metadata could not be loaded. No fallback arena was generated; see server logs.");
             return;
         }
+        if (type == ArcadePortGame.DRAGON_ESCAPE) {
+            SourceMapCatalog.MapData escapeMap = sourceMapData.get(type.id());
+            if (escapeMap == null) {
+                sender.sendMessage(ChatColor.RED + "Dragon Escape has no original WorldConfig.dat metadata.");
+                return;
+            }
+            List<Location> originalStarts = escapeMap.teamSpawnLocationsForName("Green");
+            if (originalStarts.isEmpty()) originalStarts = escapeMap.spawnLocations();
+            long validStarts = originalStarts.stream().filter(this::dragonEscapeSpawnHasTerrain).count();
+            if (validStarts == 0L) {
+                plugin.getLogger().severe("Dragon Escape map '" + escapeMap.mapName()
+                        + "' has no GREEN team starts on loaded terrain ("
+                        + originalStarts.size() + " authored markers). Original archive: "
+                        + SourceMapCatalog.selectedResource(plugin, type));
+                sender.sendMessage(ChatColor.RED + "The selected Dragon Escape map has no safe GREEN team spawns "
+                        + "on loaded terrain. Refusing to spawn players in the void; check the map archive.");
+                return;
+            }
+            if (escapeMap.dataLocations("RED").isEmpty() || escapeMap.dataLocations("BLACK").isEmpty()) {
+                plugin.getLogger().severe("Dragon Escape map '" + escapeMap.mapName()
+                        + "' is missing RED Douglas start or BLACK route markers.");
+                sender.sendMessage(ChatColor.RED + "The selected Dragon Escape map is missing its authentic "
+                        + "Douglas spawn/route markers.");
+                return;
+            }
+        }
         if (type == ArcadePortGame.DRAGONS) {
             SourceMapCatalog.MapData dragonsMap = sourceMapData.get(type.id());
             if (dragonsMap == null || dragonsMap.dataLocations("RED").isEmpty()) {
@@ -3057,10 +3083,14 @@ public final class ArcadePortManager implements Listener {
         WorldBorder border = world.getWorldBorder();
         if (sourceMap != null && sourceMap.hasBounds()) {
             border.setCenter(sourceMap.centerX(), sourceMap.centerZ());
-            border.setSize(Math.max(40.0D, Math.max(sourceMap.width(), sourceMap.depth()) + 8.0D));
+            // Dragons is bounded by its original terrain and AI targeting logic;
+            // a visible vanilla border just outside the map is not part of gameplay.
+            border.setSize(type == ArcadePortGame.DRAGONS ? 4096.0D
+                    : Math.max(40.0D, Math.max(sourceMap.width(), sourceMap.depth()) + 8.0D));
         } else {
             border.setCenter(0.0D, 0.0D);
-            border.setSize(type == ArcadePortGame.MICRO_BATTLES ? 42.0D : 80.0D);
+            border.setSize(type == ArcadePortGame.MICRO_BATTLES ? 42.0D
+                    : type == ArcadePortGame.DRAGONS ? 4096.0D : 80.0D);
         }
         border.setDamageAmount(0.0D);
         List<Location> spawns = spawnLocations(type, participants.size());
@@ -3723,6 +3753,23 @@ public final class ArcadePortManager implements Listener {
         if (type == ArcadePortGame.SHEEP_QUEST) buildSheepPens(world);
     }
 
+    /** Keep an original Dragon Escape spawn only when its imported terrain exists.
+     * This never creates/edits a map block; it detects incomplete Paper imports. */
+    private boolean dragonEscapeSpawnHasTerrain(Location spawn) {
+        if (spawn == null || spawn.getWorld() == null) return false;
+        World world = spawn.getWorld();
+        int x = spawn.getBlockX(), z = spawn.getBlockZ();
+        // Explicitly load the authored chunk before checking it; a missing region
+        // should not look like a legitimate airborne start.
+        world.getChunkAt(x >> 4, z >> 4);
+        for (int y = spawn.getBlockY() - 1; y >= spawn.getBlockY() - 8; y--) {
+            if (y < world.getMinHeight()) break;
+            Material block = world.getBlockAt(x, y, z).getType();
+            if (block.isSolid() || block == Material.WATER) return true;
+        }
+        return false;
+    }
+
     private List<Location> spawnLocations(ArcadePortGame type, int count) {
         if (type == ArcadePortGame.HOOPS_REMASTERED) {
             return HoopsRemasteredRuntime.spawnLocations(worlds.get(type.id()), count);
@@ -3774,15 +3821,20 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (sourceMap != null && type == ArcadePortGame.DRAGON_ESCAPE) {
-            // Reborn defines Dragon Escape player starts as GREEN data points, not team spawns.
-            List<Location> authoredGreenSpawns = sourceMap.dataLocations("GREEN");
+            // Legacy map authoring requires GREEN *team spawns* for runners.
+            // GREEN DATA_LOCS instead encode Douglas's speed (X / 100), and
+            // treating that marker as a player spawn can put racers in the void.
+            List<Location> authoredGreenSpawns = sourceMap.teamSpawnLocationsForName("Green");
             if (authoredGreenSpawns.isEmpty()) authoredGreenSpawns = sourceMap.spawnLocations();
             if (!authoredGreenSpawns.isEmpty()) {
+                List<Location> safe = authoredGreenSpawns.stream()
+                        .filter(this::dragonEscapeSpawnHasTerrain)
+                        .toList();
                 List<Location> chosen = new ArrayList<>();
-                for (int i = 0; i < Math.max(1, count); i++) {
-                    chosen.add(authoredGreenSpawns.get(i % authoredGreenSpawns.size()).clone());
+                for (int i = 0; i < Math.max(1, count) && !safe.isEmpty(); i++) {
+                    chosen.add(safe.get(i % safe.size()).clone());
                 }
-                return chosen;
+                if (!chosen.isEmpty()) return chosen;
             }
         }
         if (sourceMap != null && !sourceMap.spawnLocations().isEmpty()) {
