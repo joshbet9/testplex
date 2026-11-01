@@ -39,7 +39,7 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void castleAssaultAndHeroesOfGwenAppearInTheLobbyAsInProgress() {
+    void castleAssaultIsReadyWhileHeroesOfGwenRemainsInProgress() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         GameDefinition castleAssault = catalog.getGame("castle-assault");
         GameDefinition heroesOfGwen = catalog.getGame("heroes-of-gwen");
@@ -47,7 +47,7 @@ class ArcadeCatalogTest {
         assertNotNull(heroesOfGwen);
         assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, castleAssault.getPortStatus());
         assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, heroesOfGwen.getPortStatus());
-        assertFalse(castleAssault.isReadyForTest());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, castleAssault.getPortStatus());
         assertFalse(heroesOfGwen.isReadyForTest());
     }
 
