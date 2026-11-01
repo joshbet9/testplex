@@ -79,6 +79,20 @@ class GamePreferenceRotationTest {
     }
 
     @Test
+    void effectiveOddsStayFiniteForExtremeFiniteWeights() {
+        Map<String, Double> probabilities = new LinkedHashMap<>();
+        probabilities.put("heavy", Double.MAX_VALUE);
+        probabilities.put("half", Double.MAX_VALUE / 2.0D);
+
+        Map<String, Double> effective = GamePreferenceRotation.effectiveProbabilities(
+                probabilities, null, false);
+        assertEquals(2.0D / 3.0D, effective.get("heavy"), 0.000001D);
+        assertEquals(1.0D / 3.0D, effective.get("half"), 0.000001D);
+        assertEquals("heavy", GamePreferenceRotation.chooseWeightedGameId(
+                probabilities, null, false, 0.25D));
+    }
+
+    @Test
     void clampsOutOfRangeRandomDraws() {
         assertEquals("first", GamePreferenceRotation.chooseWeightedGameId(
                 Map.of("first", 1.0D), null, false, -3.0D));
