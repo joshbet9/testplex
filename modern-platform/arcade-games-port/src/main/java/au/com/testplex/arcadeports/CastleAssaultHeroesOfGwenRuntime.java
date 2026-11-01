@@ -42,6 +42,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.EntityRegainHealthEvent;
 import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
@@ -162,6 +163,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private long heroesOfGwenPumpkinKingNextAttackAt;
     private long heroesOfGwenSidequestNextStartAt;
     private long heroesOfGwenMonochromeEndsAt;
+    private long heroesOfGwenNextHpRegenAt;
     private final Set<UUID> heroesOfGwenMonochromeSkeletons = new HashSet<>();
     private final int[] heroesOfGwenMonochromeKills = new int[2];
     private final Map<UUID, Long> heroesOfGwenPumpkinBuffEndsAt = new HashMap<>();
@@ -318,6 +320,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (!isReady() || listenersRegistered) return;
         Bukkit.getPluginManager().registerEvents(this, plugin);
         listenersRegistered = true;
+        if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            heroesOfGwenNextHpRegenAt = System.currentTimeMillis()
+                    + ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS;
+        }
         if (game == ArcadePortGame.HEROES_OF_GWEN
                 && heroesOfGwenSidequestType != HeroesOfGwenSidequestType.NONE) {
             long firstSidequestAt = System.currentTimeMillis()
@@ -1286,7 +1292,26 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
+    private void updateHeroesOfGwenHealthRegen(long now) {
+        if (heroesOfGwenNextHpRegenAt <= 0L) {
+            heroesOfGwenNextHpRegenAt = now + ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS;
+            return;
+        }
+        if (now < heroesOfGwenNextHpRegenAt) return;
+        while (heroesOfGwenNextHpRegenAt <= now) {
+            heroesOfGwenNextHpRegenAt += ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS;
+        }
+        for (Player player : activeMatchPlayers()) {
+            if (player.hasPotionEffect(PotionEffectType.WITHER)) continue;
+            double regen = ArcadePortRules.heroesOfGwenStoreHpRegenAmount(
+                    ArcadePortRules.HEROES_OF_GWEN_BASE_HP_REGEN_PER_INTERVAL,
+                    heroesOfGwenOwnedStoreItemNames(player));
+            player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + regen));
+        }
+    }
+
     private void tickHeroesOfGwen(long now) {
+        updateHeroesOfGwenHealthRegen(now);
         updateMobaWithers(now);
         updateHeroesOfGwenSidequest(now);
         updateHeroesOfGwenAbilities(now);
@@ -1926,16 +1951,27 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         });
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onHeroesOfGwenDisableHungerRegeneration(EntityRegainHealthEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN
+                || !(event.getEntity() instanceof Player player)
+                || !activePlayers.contains(player.getUniqueId())) return;
+        if (event.getRegainReason() == EntityRegainHealthEvent.RegainReason.SATIATED) {
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onHeroesOfGwenStoreKillHeal(PlayerDeathEvent event) {
         if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
         Player killer = event.getEntity().getKiller();
         if (killer == null || !killer.isOnline() || !activePlayers.contains(killer.getUniqueId())) return;
-        double heal = 0.0D;
+        double heal = killer.getMaxHealth()
+                * ArcadePortRules.HEROES_OF_GWEN_BASE_KILL_HEAL_FACTOR;
         for (String itemName : heroesOfGwenOwnedStoreItemNames(killer)) {
             heal += ArcadePortRules.heroesOfGwenStoreKillHeal(itemName);
         }
-        if (heal > 0.0D) killer.setHealth(Math.min(killer.getMaxHealth(), killer.getHealth() + heal));
+        killer.setHealth(Math.min(killer.getMaxHealth(), killer.getHealth() + heal));
     }
 
     @EventHandler
@@ -5790,6 +5826,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         heroesOfGwenPumpkinBuffEndsAt.clear();
         heroesOfGwenMonochromeEndsAt = 0L;
         heroesOfGwenSidequestNextStartAt = 0L;
+        heroesOfGwenNextHpRegenAt = 0L;
         heroesOfGwenPumpkinKingRespawnAt = 0L;
         heroesOfGwenMinionTeams.clear();
         heroesOfGwenIronMinionTeams.clear();
