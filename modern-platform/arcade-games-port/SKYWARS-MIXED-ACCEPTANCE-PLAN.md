@@ -1,6 +1,6 @@
 # SkyWars Mixed Arcade acceptance plan
 
-SkyWars Mixed is a separate 16-player free-for-all implementation. It does not replace or modify legacy Solo SkyWars or Team SkyWars. The current port contains the fast-round runtime, five source kits, original island/connector/middle loot families, throwable TNT, Zombie Guardians, island crumble and a closing world border. It remains gated until the 50-map archive/marker gate and live two-client/multi-client acceptance pass.
+SkyWars Mixed is **READY_FOR_TEST** for the shared controlled queue. It is a separate 16-player free-for-all and does not replace or modify legacy Solo SkyWars or Team SkyWars. The current port contains the fast-round runtime, five source kits, original island/connector/middle loot families, throwable TNT, Zombie Guardians, island crumble, closing border and the merged source ore/block parity corrections. CI validates all 50 original map archives and their required authored markers. This promotion makes it available for controlled sessions; it does not claim live gameplay acceptance or complete 1.8 parity.
 
 ## Automated archive gate
 

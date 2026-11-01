@@ -4,20 +4,20 @@ This plugin adds first-pass playable mechanics harnesses for the 17 Arcade games
 
 ## Current controlled acceptance queue
 
-The shared Paper 26.3 Testplex allow-list contains 22 games:
+The shared Paper 26.3 Testplex allow-list contains 25 games:
 
-Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Runner, Sheep Quest, Turf Wars, Snap (legacy ID `camera-shy`), Monster Maze, Snake, Draw My Thing and Master Builders.
+Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Runner, Sheep Quest, Turf Wars, Snap (legacy ID `camera-shy`), Monster Maze, Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault and Sneaky Assassins.
 
-`READY_FOR_TEST` means available for the isolated shared test session. It does not mean the game has passed live multiplayer or map-by-map acceptance. See the game-specific acceptance plans for the required checks. Evolution, Heroes of Gwen, Wither Assault, SkyWars Mixed and Sneaky Assassins remain gated.
+`READY_FOR_TEST` means available for the isolated shared test session. It does not mean the game has passed live multiplayer or map-by-map acceptance. See the game-specific acceptance plans for the required checks. Evolution and Heroes of Gwen remain gated.
 
-### Recent readiness work (PR #88 and the 22-game promotion)
+### Recent readiness work (PR #88–#96 and the 25-game promotion)
 
 - **Milk the Cow**: the original BobsFarm archive is checked at package time for the WHITE/PINK/PURPLE animal spawn groups used by the runtime. The full multi-player play/score/role/achievement checklist is in `MILK-THE-COW-ACCEPTANCE-PLAN.md`.
 - **Castle Assault**: all 11 original maps are checked for King, crystal and objective-TNT markers. The live map-by-map objective and five-kit checklist is in `CASTLE-ASSAULT-ACCEPTANCE-PLAN.md`.
-- **Wither Assault**: Human Archer, Medic and Editor are now selectable and persisted; the round applies their loadouts, connects Wither Skull/minion/scent controls and revival potions, and tracks/restores Editor blocks. Source-map parity is unavailable and Archer Smoke Arrow / remaining passives and live acceptance are still outstanding. See `WITHER-ASSAULT-ACCEPTANCE-PLAN.md`.
-- **Sneaky Assassins**: mirrors the source town-NPC cadence (200 starting villagers, one randomly removed every four seconds during Live) and uses per-NPC 1-in-40/tick waypoint orders within a 16-block spawn window, with safe five-attempt offset selection and bribed-NPC stuck recovery. The generated town and velocity-steered patrol remain explicit test substitutes because the authentic source archive and NMS patrol data are absent. See `SNEAKY-ASSASSINS-ACCEPTANCE-PLAN.md`.
+- **Wither Assault**: now `READY_FOR_TEST` for controlled mechanics sessions. The source Human kits are selectable; Archer/Editor Smoke Arrows and Fletcher are wired; opening blindness no longer blocks Wither attacks; sword/compass controls match the source; revival and Editor block restoration are connected. Medic Repair Master/Healing Hands and further combat parity remain outstanding. Testing uses a generated arena because the three original source maps are absent. See `WITHER-ASSAULT-ACCEPTANCE-PLAN.md`.
+- **Sneaky Assassins**: now `READY_FOR_TEST` for controlled sessions. The merged NPC work mirrors the 200-villager source roster/cull cadence, per-NPC patrol decisions, safe destination selection and bribed-NPC recovery. The generated town, generated patrol anchors and velocity steering remain test substitutes; the original map and NMS navigation are not available. See `SNEAKY-ASSASSINS-ACCEPTANCE-PLAN.md`.
 
-Castle Assault and Milk the Cow are now included in the controlled acceptance queue after their original map archives, world bounds, objective/chest markers and gameplay prerequisites passed CI packaging tests. This promotion is for isolated test sessions only; live multiplayer and map-by-map acceptance are still outstanding. Wither Assault and Sneaky Assassins remain gated because source parity gaps and missing source-world data remain.
+Castle Assault and Milk the Cow remain available for controlled testing after their original archive and marker checks. SkyWars Mixed, Wither Assault and Sneaky Assassins now join them in the 25-game queue. SkyWars has all 50 original map archives and source ore/block rules packaged; Wither and Sneaky use explicitly labelled generated arenas. All three still require live multiplayer acceptance, and Wither/Sneaky do not claim authentic map parity.
 
 ## SkyWars — fast Mixed Arcade FFA
 
@@ -29,7 +29,7 @@ The lobby kit selector exposes the five legacy SkyWars kits: Ice (temporary brid
 
 Join with `/arcadeport join skywars-mixed`, quick-start with `/arcadeport play skywars-mixed`, or start the queued lobby with `/arcadeport start skywars-mixed`. Choose an installed map with `/arcadeport maps skywars`.
 
-SkyWars Mixed remains `MECHANICS_IN_PROGRESS`, not a claim of complete 1.8 parity. CI now checks that all 50 original SkyWars map archives are packaged unchanged and that every map retains authored player spawns, the LIME TNT generator and its chest markers; RED guardian points remain optional on maps where Reborn omitted them. Live validation remains required for map selection, loot rolls, all five kits under combat, guardian tether/death rewards, TNT timing/damage, crumble/border pacing, disconnect recovery and repeated-round cleanup. The modern map setup also clears source marker 19 sponge blocks, restores source marker 56 island ore-vein placement and hidden-ore reveal (diamond, iron and gravel), applies the source cobweb/gravel/iron bonus drops, enforces source block-placement restrictions, and cancels block burn, leaf decay, block fade/spread and Fire Aspect enchanting in the isolated SkyWars world. See `SKYWARS-MIXED-ACCEPTANCE-PLAN.md`.
+SkyWars Mixed is now `READY_FOR_TEST` for controlled sessions, not a claim of complete 1.8 gameplay acceptance. CI checks that all 50 original map archives are packaged unchanged and that every map retains its authored player spawns, LIME TNT generator and chest markers; RED guardian points remain optional where Reborn omitted them. Live validation remains required for map selection, loot rolls, all five kits under combat, guardian tether/death rewards, TNT timing/damage, crumble/border pacing, disconnect recovery and repeated-round cleanup. The modern map setup also clears source marker 19 sponge blocks, restores source marker 56 island ore-vein placement and hidden-ore reveal (diamond, iron and gravel), applies the source cobweb/gravel/iron bonus drops, enforces source block-placement restrictions, and cancels block burn, leaf decay, block fade/spread and Fire Aspect enchanting in the isolated SkyWars world. See `SKYWARS-MIXED-ACCEPTANCE-PLAN.md`.
 
 ## Camera Shy — spyglass photographic elimination
 
@@ -84,7 +84,7 @@ Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Tu
 - `/arcadeport ghost <on|off|toggle>` — enable or hide your Dragon Escape translucent PB player ghost.
 - `/arcadeport status`, `/arcadeport stop` (operator only).
 
-Game IDs include `camera-shy` and `super-sploor` alongside `bacon-brawl`, `bomb-lobbers`, `castle-assault`, `death-tag`, `dragon-escape`, `dragons`, `draw-my-thing`, `evolution`, `gladiators`, `heroes-of-gwen`, `master-builders`, `micro-battles`, `one-in-the-quiver`, `paintball`, `plexball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. Mixed Arcade aliases use `<game-id>-mixed` or `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Castle Assault and Heroes of Gwen remain disabled pending acceptance.
+Game IDs include `camera-shy`, `super-sploor`, `skywars`, `wither-assault` and `sneaky-assassins` alongside `bacon-brawl`, `bomb-lobbers`, `castle-assault`, `death-tag`, `dragon-escape`, `dragons`, `draw-my-thing`, `evolution`, `gladiators`, `heroes-of-gwen`, `master-builders`, `micro-battles`, `milk-the-cow`, `monster-maze`, `one-in-the-quiver`, `paintball`, `plexball`, `runner`, `sheep-quest`, `snake`, `spleef` and `turf-wars`. Mixed Arcade aliases use `<game-id>-mixed` or `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Castle Assault is enabled for controlled testing; Heroes of Gwen and Evolution remain gated.
 
 See `GLADIATORS-ACCEPTANCE-PLAN.md` and `MICRO-BATTLES-ACCEPTANCE-PLAN.md` for combined-session live checks and known caveats.
 
@@ -164,11 +164,9 @@ Live acceptance still needs to check the three achievement thresholds, the 90-se
 The catalogue and renderer contract are covered by unit tests. Spleef, Dragon Escape, Dragons (Solo), Runner, Sheep Quest and Turf Wars are now `READY_FOR_TEST`, not gameplay-accepted; their source acceptance checklists are in `SPLEEF-ACCEPTANCE-PLAN.md`, `DRAGON-ESCAPE-ACCEPTANCE-PLAN.md`, `DRAGONS-ACCEPTANCE-PLAN.md`, `RUNNER-ACCEPTANCE-PLAN.md`, `SHEEP-QUEST-ACCEPTANCE-PLAN.md` and `TURF-WARS-ACCEPTANCE-PLAN.md`. Both `Speef` and `Super Spleef` source folders are one Spleef map catalogue (37 legacy archive files), not separate game modes. CI verifies that every enabled game's complete 1.8 map filename set is present in the packaged JAR; see [the global map parity register](LEGACY-MAP-PARITY.md).
 
 
-## Wither Assault: Human kits and remaining parity
+## Wither Assault: controlled-testing boundary
 
-The controlled-port branch exposes the three source Human kits (Archer, Medic and Editor), persists each player's choice, provides the corresponding loadouts, connects Wither Skull/minion/scent abilities, and revives a downed Human with the custom Revival Potion. Editor blocks are tracked, temporarily removable, constrained by the four-block floor rule and restored at round teardown. See WITHER-ASSAULT-ACCEPTANCE-PLAN.md.
-
-This is not an enablement promotion. The source map archive is absent, the Human Archer Smoke Arrow and other kit passives still need source comparison, and map-specific achievements cannot be certified without the source map set.
+Wither Assault is enabled for controlled mechanics testing in its generated arena. Human Archer/Editor Smoke Arrows and Fletcher are connected, the opening blindness no longer prevents Wither attacks, Wither sword/compass controls follow the source layout, and revival/Editor restoration paths are wired. Human Medic Repair Master and Healing Hands, additional combat/movement parity, and the original Industrial West, Labyrinth and Sky Ruins archives remain outstanding. Do not describe the generated arena as authentic source-map parity.
 
 ## Wither Assault: smoother movement
 

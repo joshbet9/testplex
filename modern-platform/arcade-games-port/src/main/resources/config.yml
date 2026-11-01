@@ -1,6 +1,6 @@
 # The 27 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
 # READY_FOR_TEST games are available together for the shared controlled test session.
-# The 22-game controlled queue includes Monster Maze, Snake, Draw My Thing, Master Builders, Castle Assault and Milk the Cow.
+# The 25-game controlled queue adds SkyWars Mixed plus generated-arena Wither Assault and Sneaky Assassins.
 enabled-games:
   - death-tag
   - one-in-the-quiver
@@ -24,6 +24,9 @@ enabled-games:
   - snake
   - draw-my-thing
   - master-builders
+  - skywars
+  - wither-assault
+  - sneaky-assassins
 lobby-selected-game: death-tag
 
 # Base selection weights used by the Like/Dislike preference calculation.

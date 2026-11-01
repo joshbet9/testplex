@@ -288,13 +288,13 @@ public final class ArcadeCatalog {
                 win("dairy-champion", "Dairy Champion", "The winning farmer is celebrated above the dairy arena")));
 
         register(game("wither-assault", "Wither Assault", "WITHER_SKELETON_SKULL",
-                "Defend your team and control the Wither Assault objective using source-derived movement rules.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, List.of(),
+                "Defend your team and control the Wither Assault objective using source-derived movement rules. Controlled testing uses a generated arena; original maps and Medic passives remain outstanding.",
+                GameDefinition.PortStatus.READY_FOR_TEST, List.of(),
                 win("wither-victory", "Wither Victory", "The surviving team stands above the defeated Wither")));
 
         register(game("skywars", "SkyWars Mixed", "TNT",
                 "Fast 16-player Mixed Arcade free-for-all: loot your island, throw TNT and survive the collapse.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(line("sky-combat-signature", "Sky Combat Signature",
                         "A visible identity for throwable TNT and fast island collapse.", "TNT",
                         single("tnt-burst", "TNT Burst", "A bright TNT burst with smoke and ember sparks."),
@@ -315,8 +315,8 @@ public final class ArcadeCatalog {
                 win("banner-wave", "Banner Wave", "A moving wall of team banners celebrates the winner")));
 
         register(game("sneaky-assassins", "Sneaky Assassins", "VILLAGER_SPAWN_EGG",
-                "Stay disguised as a villager, collect power-ups and be the last assassin alive.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                "Stay disguised as a villager, collect power-ups and be the last assassin alive. Controlled testing uses a generated town while authentic map and NMS patrol parity remain outstanding.",
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("last-assassin-standing", "Last Assassin Standing",
                         "A simple survivor podium; no additional game-specific cosmetics are claimed yet.")));

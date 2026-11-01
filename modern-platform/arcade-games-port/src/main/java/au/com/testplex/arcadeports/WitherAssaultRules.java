@@ -27,6 +27,30 @@ public final class WitherAssaultRules {
         return blockY >= Math.ceil(witherSpawnY - 4.0D);
     }
 
+    /** Fletcher and Smoke Arrow are shared by the source Archer and Editor kits. */
+    public static boolean hasFletcher(String kit) {
+        return "archer".equals(normalizeHumanKit(kit)) || "editor".equals(normalizeHumanKit(kit));
+    }
+
+    /** Only living Humans with a bow kit create tracked Smoke Arrows. */
+    public static boolean shouldTrackSmokeArrow(int team, String kit, boolean alive, boolean arrowProjectile) {
+        return team == 0 && alive && arrowProjectile && hasFletcher(kit);
+    }
+    public static boolean shouldLaunchSkull(String itemType, boolean leftClick) {
+        return leftClick && "golden_sword".equals(normalizeItem(itemType));
+    }
+
+    public static boolean shouldLaunchMinions(String itemType, boolean leftClick) {
+        return leftClick && "diamond_sword".equals(normalizeItem(itemType));
+    }
+
+    public static boolean shouldStartFireStorm(String itemType, boolean rightClick) {
+        String item = normalizeItem(itemType);
+        return rightClick && ("golden_sword".equals(item) || "diamond_sword".equals(item));
+    }
+
+    public static int minionCount() { return 3; }
+
     /** Only a living Human Archer owns the source Smoke Arrow perk. */
     public static boolean isHumanArcherSmokeArrowEligible(int teamId, String kitId, boolean alive) {
         return alive && teamId == 0 && "archer".equals(normalizeHumanKit(kitId));
@@ -37,5 +61,9 @@ public final class WitherAssaultRules {
         if (!Double.isFinite(distanceSquared) || !Double.isFinite(radius)
                 || distanceSquared < 0.0D || radius <= 0.0D) return false;
         return distanceSquared < radius * radius;
+    }
+
+    private static String normalizeItem(String itemType) {
+        return itemType == null ? "" : itemType.trim().toLowerCase(Locale.ROOT);
     }
 }

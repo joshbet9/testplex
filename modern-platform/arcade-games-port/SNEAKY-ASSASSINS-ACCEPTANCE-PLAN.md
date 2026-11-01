@@ -1,6 +1,6 @@
 # Sneaky Assassins controlled-acceptance plan
 
-Sneaky Assassins remains gated. The Mineplex Reborn repository does not contain an original map archive or the source town-NPC spawn group, so the Paper 26.3 port uses a generated market-town test arena with locally generated patrol anchors. NPC selection/cadence, safe destination checks and bribed-NPC recovery now follow the source rules; movement itself is velocity-steered rather than the original NMS Creature navigation. This is deliberately a test substitute, not authentic map parity.
+Sneaky Assassins is **READY_FOR_TEST** for controlled sessions in its generated market-town test arena. The Mineplex Reborn repository does not contain an original map archive or authored town-NPC spawn group. NPC selection/cadence, safe destination checks and bribed-NPC recovery follow the source rules, but patrol anchors are generated and movement is velocity-steered rather than the original NMS Creature navigation. This promotion is for mechanics testing only, not authentic map or navigation parity.
 
 ## Implemented mechanics to exercise
 
