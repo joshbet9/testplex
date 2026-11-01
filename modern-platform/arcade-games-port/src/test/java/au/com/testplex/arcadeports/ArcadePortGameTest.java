@@ -29,8 +29,8 @@ class ArcadePortGameTest {
                 "Sneaky Assassins has no archived map in Mineplex Reborn; do not invent one.");
         assertEquals(java.util.List.of("Castle Assault"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.CASTLE_ASSAULT));
         assertEquals(java.util.List.of("Heroes of GWEN"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.HEROES_OF_GWEN));
-        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.EVOLUTION).isEmpty(),
-                "Evolution has no legacy map archive folder and must not be given an invented one");
+        assertEquals(java.util.List.of("Evolution"), SourceMapCatalog.mapFoldersFor(ArcadePortGame.EVOLUTION),
+                "Evolution now has an authentic archive folder mapping; the ZIPs still need importing.");
         assertEquals(java.util.List.of("Draw My Thing"),
                 SourceMapCatalog.mapFoldersFor(ArcadePortGame.DRAW_MY_THING));
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS).isEmpty(),
@@ -725,7 +725,8 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DEATH_TAG));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGON_ESCAPE));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGONS));
-        assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.EVOLUTION));
+        assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.EVOLUTION),
+                "Mapping the original folder must fail closed on missing ZIPs, never generate a fake world.");
         assertFalse(SourceMapCatalog.hasMap(ArcadePortGame.CAMERA_SHY));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.SUPER_SPLOOR));
         assertTrue(SourceMapCatalog.hasMap(ArcadePortGame.DRAGONS));

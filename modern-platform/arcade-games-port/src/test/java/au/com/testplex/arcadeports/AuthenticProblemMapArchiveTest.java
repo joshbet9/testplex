@@ -40,9 +40,13 @@ final class AuthenticProblemMapArchiveTest {
         System.out.println("[map-audit] " + resource + " entries=" + names.size()
                 + " worldconfig=" + config.size() + " names=" + names.stream().limit(12).toList());
         System.out.println("[map-audit] " + resource + " metadata=" + config.stream()
-                .filter(s -> s.startsWith("MAP_NAME:") || s.startsWith("MIN_Y:")
-                        || s.startsWith("TEAM_NAME:") || s.startsWith("DATA_NAME:"))
-                .limit(16).toList());
+                .filter(s -> s.startsWith("MAP_NAME:") || s.startsWith("MIN_")
+                        || s.startsWith("MAX_") || s.startsWith("TEAM_NAME:")
+                        || s.startsWith("TEAM_SPAWNS:") || s.startsWith("DATA_NAME:")
+                        || s.startsWith("DATA_LOCS:"))
+                .map(s -> s.startsWith("TEAM_SPAWNS:") || s.startsWith("DATA_LOCS:")
+                        ? s.substring(0, Math.min(160, s.length())) : s)
+                .limit(24).toList());
         return new Inspection(names, config);
     }
 
