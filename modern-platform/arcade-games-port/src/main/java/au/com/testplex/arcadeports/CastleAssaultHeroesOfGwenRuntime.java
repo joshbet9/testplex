@@ -1678,8 +1678,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 1.1F);
         ItemStack bow = owner.getInventory().getItem(0);
         int power = bow == null ? 0 : bow.getEnchantmentLevel(Enchantment.ARROW_DAMAGE);
-        double baseDamage = ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE;
-        double damageAtCenter = baseDamage * 2.0D * (1.0D + Math.max(0, power) * 0.25D);
+        double damageAtCenter = ArcadePortRules.heroesOfGwenDevonTntArrowDamage(power);
         int ownerTeam = teams.getOrDefault(owner.getUniqueId(), -1);
         double radius = ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_EXPLOSION_RADIUS;
         for (Entity entity : world.getNearbyEntities(center, radius, radius, radius)) {
