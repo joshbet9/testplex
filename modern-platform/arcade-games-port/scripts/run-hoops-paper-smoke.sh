@@ -34,8 +34,20 @@ echo "[hoops-smoke] Fetching required FakePlayerPlugin $FPP_VERSION dependency."
 curl --fail --location --retry 3 --user-agent "$USER_AGENT" "$FPP_URL" -o "$FPP_TMP"
 unzip -tq "$FPP_TMP" >/dev/null
 fpp_descriptor="$(unzip -p "$FPP_TMP" plugin.yml)"
-grep -Fxq "name: FakePlayerPlugin" <<< "$fpp_descriptor"
-grep -Fxq "version: $FPP_VERSION" <<< "$fpp_descriptor"
+yaml_descriptor_value() {
+  local key="$1" descriptor="$2"
+  printf '%s\n' "$descriptor" | awk -F': *' -v key="$key" \
+    '$1 == key { gsub(/["\047\r]/, "", $2); sub(/[[:space:]]+$/, "", $2); print $2; exit }'
+}
+fpp_name="$(yaml_descriptor_value name "$fpp_descriptor")"
+fpp_version="$(yaml_descriptor_value version "$fpp_descriptor")"
+fpp_main="$(yaml_descriptor_value main "$fpp_descriptor")"
+[[ "$fpp_name" == "FakePlayerPlugin" && "$fpp_version" == "$FPP_VERSION" \
+   && "$fpp_main" == "me.bill.fakePlayerPlugin.FakePlayerPlugin" ]] || {
+  echo "Downloaded FakePlayerPlugin descriptor did not match pinned release $FPP_VERSION." >&2
+  printf '%s\n' "$fpp_descriptor" >&2
+  exit 1
+}
 cp "$FPP_TMP" "$SERVER_ROOT/plugins/FakePlayerPlugin.jar"
 cp "$ARCADE_JAR" "$SERVER_ROOT/plugins/ArcadeMechanicsModern.jar"
 cp "$SMOKE_PLUGIN_JAR" "$SERVER_ROOT/plugins/HoopsPaperSmoke.jar"
