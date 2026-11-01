@@ -36,7 +36,9 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS).isEmpty(),
                 "Master Builders uses generated plots rather than a fabricated source map");
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.CAMERA_SHY).isEmpty(),
-                "Camera Shy uses its dedicated procedural maze, not an invented legacy map archive");
+                "Snap uses its dedicated procedural maze, not an invented legacy map archive");
+        assertEquals("Snap", ArcadePortGame.CAMERA_SHY.displayName());
+        assertEquals(ArcadePortGame.CAMERA_SHY, ArcadePortGame.fromId("snap"));
     }
 
     @Test void selectedMapArchivePathsAreValidatedAgainstTheirGame() {
@@ -172,10 +174,10 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.SUPER_SPLOOR.id(), enabled),
                 "Super Sploor is promoted into the controlled READY_FOR_TEST queue.");
         assertTrue(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.CAMERA_SHY.id(), enabled),
-                "Camera Shy is promoted into the controlled READY_FOR_TEST queue.");
+                "Snap is promoted into the controlled READY_FOR_TEST queue.");
         assertFalse(ArcadePortRules.isArcadePortGameEnabled(ArcadePortGame.CAMERA_SHY.id(),
                 java.util.List.of("death-tag", "plexball", "spleef")),
-                "Camera Shy must remain gated when it is removed from the reviewed allow-list.");
+                "Snap must remain gated when it is removed from the reviewed allow-list.");
         assertNull(ArcadePortGame.fromId("snake"));
         assertEquals(ArcadePortGame.DRAW_MY_THING, ArcadePortGame.fromId("Draw My Thing"));
         assertEquals(ArcadePortGame.MASTER_BUILDERS, ArcadePortGame.fromId("master_builders"));
