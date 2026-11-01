@@ -2778,8 +2778,6 @@ public final class ArcadePortManager implements Listener {
         session.microBarrierActive = type == ArcadePortGame.MICRO_BATTLES;
         YamlConfiguration microCosmeticPreferences = type == ArcadePortGame.MICRO_BATTLES
                 ? loadMicroBattlesCosmeticPreferences() : null;
-        YamlConfiguration microCosmeticPreferences = type == ArcadePortGame.MICRO_BATTLES
-                ? loadMicroBattlesCosmeticPreferences() : null;
         SourceMapCatalog.MapData microSourceMap = sourceMapData.get(type.id());
         if (type == ArcadePortGame.MICRO_BATTLES) {
             session.microCrumbleMinX = microSourceMap == null ? -HALF_SIZE : microSourceMap.minX();
@@ -2956,11 +2954,6 @@ public final class ArcadePortManager implements Listener {
             }
             if (type == ArcadePortGame.EVOLUTION) {
                 UUID evolutionId = player.getUniqueId();
-                String savedEvolutionKit = plugin.getConfig().getString(
-                        "lobby-kit-preferences." + evolutionId + ".evolution", "standard-evolution");
-                String evolutionKit = evolutionKitPreferences.getOrDefault(evolutionId, savedEvolutionKit);
-                session.evolutionKits.put(evolutionId,
-                        "quick-evolver".equalsIgnoreCase(evolutionKit) ? "quick-evolver" : "standard-evolution");
                 String savedEvolutionKit = plugin.getConfig().getString(
                         "lobby-kit-preferences." + evolutionId + ".evolution", "standard-evolution");
                 String evolutionKit = evolutionKitPreferences.getOrDefault(evolutionId, savedEvolutionKit);
@@ -4016,9 +4009,6 @@ public final class ArcadePortManager implements Listener {
         String statsPath = localStatsPath(player.getUniqueId(), ArcadePortGame.GLADIATORS.id());
         plugin.getConfig().set(statsPath + "loser-bracket-wins",
                 plugin.getConfig().getInt(statsPath + "loser-bracket-wins", 0) + 1);
-        String statsPath = localStatsPath(player.getUniqueId(), ArcadePortGame.GLADIATORS.id());
-        plugin.getConfig().set(statsPath + "loser-bracket-wins",
-                plugin.getConfig().getInt(statsPath + "loser-bracket-wins", 0) + 1);
         plugin.saveConfig();
         player.sendMessage(ChatColor.LIGHT_PURPLE + "Silky Seconds — Loser Bracket Wins: " + wins);
     }
@@ -5041,16 +5031,6 @@ public final class ArcadePortManager implements Listener {
 
         boolean forcedAlpha = reason != null && reason.contains("forced by the time limit");
         UUID convertedPlayerId = player.getUniqueId();
-        UUID traitorId = session.deathTagLastTraitorHit.get(convertedPlayerId);
-        long traitorHitAt = session.deathTagLastTraitorHitAt.getOrDefault(convertedPlayerId, 0L);
-        if (!forcedAlpha && traitorId != null && System.currentTimeMillis() - traitorHitAt <= 8_000L
-                && "traitor".equals(session.deathTagRunnerKits.get(traitorId))) {
-            int assists = session.deathTagTraitorAssists.merge(traitorId, 1, Integer::sum);
-            Player traitor = session.players.get(traitorId);
-            if (assists >= 3 && traitor != null) awardCatalogAchievement(traitor, "death-tag", "gallows");
-        }
-        session.deathTagLastTraitorHit.remove(convertedPlayerId);
-        session.deathTagLastTraitorHitAt.remove(convertedPlayerId);
         UUID traitorId = session.deathTagLastTraitorHit.get(convertedPlayerId);
         long traitorHitAt = session.deathTagLastTraitorHitAt.getOrDefault(convertedPlayerId, 0L);
         if (!forcedAlpha && traitorId != null && System.currentTimeMillis() - traitorHitAt <= 8_000L
@@ -6877,9 +6857,6 @@ public final class ArcadePortManager implements Listener {
     private ChatColor microTeamChatColor(int team) {
         return switch (team) {
             case 0 -> ChatColor.RED;
-            case 1 -> ChatColor.AQUA;
-            case 2 -> ChatColor.GREEN;
-            default -> ChatColor.YELLOW;
             case 1 -> ChatColor.AQUA;
             case 2 -> ChatColor.GREEN;
             default -> ChatColor.YELLOW;
@@ -10073,11 +10050,6 @@ public final class ArcadePortManager implements Listener {
                 && dragonEscapeCourseDistance(session, ahead) - dragonEscapeCourseDistance(session, player) >= 40.0D) {
             session.dragonEscapeStratsEligible.add(id);
         }
-        List<Player> rankedBeforeWarp = dragonEscapeRaceOrder(session);
-        if (!rankedBeforeWarp.isEmpty() && rankedBeforeWarp.get(0).getUniqueId().equals(ahead.getUniqueId())
-                && dragonEscapeCourseDistance(session, ahead) - dragonEscapeCourseDistance(session, player) >= 40.0D) {
-            session.dragonEscapeStratsEligible.add(id);
-        }
         Location safeLocation = session.dragonEscapeSafeLocations.get(ahead.getUniqueId());
         if (safeLocation == null || safeLocation.getWorld() != session.world) {
             safeLocation = ahead.getLocation();
@@ -12487,9 +12459,6 @@ public final class ArcadePortManager implements Listener {
                 awardCatalogAchievement(killer, "bomb-lobbers", "technical");
             }
         }
-        if (session.type == ArcadePortGame.BACON_BRAWL && event.getEntity() instanceof Player baconPlayer
-                && session.players.containsKey(baconPlayer.getUniqueId())
-                && event.getCause() == EntityDamageEvent.DamageCause.STARVATION) session.baconStarvationDamaged.add(baconPlayer.getUniqueId());
         if ((session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN)
                 && session.alive.contains(player.getUniqueId())) {
             UUID victimId = player.getUniqueId();
@@ -12810,9 +12779,6 @@ public final class ArcadePortManager implements Listener {
                 UUID killerId = killer.getUniqueId();
                 session.scores.merge(killerId, 1, Integer::sum);
                 int lifeKills = session.evolutionLifeKills.merge(killerId, 1, Integer::sum);
-                int attackerMob = session.evolutionLevels.getOrDefault(killerId, 0);
-                int victimMob = session.evolutionLevels.getOrDefault(victimId, 0);
-                if (attackerMob != victimMob) session.evolutionSameMobOnly.remove(killerId);
                 int attackerMob = session.evolutionLevels.getOrDefault(killerId, 0);
                 int victimMob = session.evolutionLevels.getOrDefault(victimId, 0);
                 if (attackerMob != victimMob) session.evolutionSameMobOnly.remove(killerId);
@@ -13652,14 +13618,6 @@ public final class ArcadePortManager implements Listener {
         session.evolutionQuickEvolverAtAttempt.put(id, quickEvolver);
         long formChangeTicks = ArcadePortRules.evolutionFormChangeTicks(quickEvolver);
         long totalAnimationTicks = ArcadePortRules.evolutionTotalAnimationTicks(quickEvolver);
-        session.evolutionManualEvolved.add(id);
-        session.evolutionStartedAtMillis.put(id, System.currentTimeMillis());
-        session.evolutionLevelAtAttempt.put(id, session.evolutionLevels.getOrDefault(id, 0));
-        boolean quickEvolver = "quick-evolver".equals(
-                session.evolutionKits.getOrDefault(id, "standard-evolution"));
-        session.evolutionQuickEvolverAtAttempt.put(id, quickEvolver);
-        long formChangeTicks = ArcadePortRules.evolutionFormChangeTicks(quickEvolver);
-        long totalAnimationTicks = ArcadePortRules.evolutionTotalAnimationTicks(quickEvolver);
         session.evolutionCharge.remove(id);
         // Overkill tracks kills since the last successful transformation, not just this life.
         session.evolutionKillsAtAttempt.put(id, session.evolutionKillsSinceEvolution.getOrDefault(id, 0));
@@ -13684,9 +13642,6 @@ public final class ArcadePortManager implements Listener {
                 session.evolutionStartedAtMillis.remove(id);
                 session.evolutionLevelAtAttempt.remove(id);
                 session.evolutionQuickEvolverAtAttempt.remove(id);
-                session.evolutionStartedAtMillis.remove(id);
-                session.evolutionLevelAtAttempt.remove(id);
-                session.evolutionQuickEvolverAtAttempt.remove(id);
                 session.evolutionLockedLocations.remove(id);
                 session.evolutionKillsAtAttempt.remove(id);
                 cleanupEvolutionEggEffect(session, id);
@@ -13694,10 +13649,6 @@ public final class ArcadePortManager implements Listener {
             }
             int killsBeforeEvolution = session.evolutionKillsAtAttempt.getOrDefault(id, 0);
             session.evolutionKillsAtAttempt.remove(id);
-            int assistCredits = session.evolutionAssistCreditsSinceEvolution.getOrDefault(id, 0);
-            session.evolutionAssistOnlyEvolutions.put(id, killsBeforeEvolution == 0 && assistCredits > 0
-                    ? session.evolutionAssistOnlyEvolutions.getOrDefault(id, 0) + 1 : 0);
-            session.evolutionAssistCreditsSinceEvolution.put(id, 0);
             int assistCredits = session.evolutionAssistCreditsSinceEvolution.getOrDefault(id, 0);
             session.evolutionAssistOnlyEvolutions.put(id, killsBeforeEvolution == 0 && assistCredits > 0
                     ? session.evolutionAssistOnlyEvolutions.getOrDefault(id, 0) + 1 : 0);
@@ -19208,9 +19159,6 @@ public final class ArcadePortManager implements Listener {
         boolean spleefCompassLeftClick = session.type == ArcadePortGame.SPLEEF
                 && !session.alive.contains(event.getPlayer().getUniqueId())
                 && isSpleefTrackingCompass(event.getItem()) && event.getAction().isLeftClick();
-        boolean microCompassLeftClick = session.type == ArcadePortGame.MICRO_BATTLES
-                && !session.alive.contains(event.getPlayer().getUniqueId())
-                && isMicroTrackingCompass(event.getItem()) && event.getAction().isLeftClick();
         if (!event.getAction().isRightClick() && !bombLeftClick && !runnerLeftClick
                 && !baconNonRightClick && !dragonEscapeDisruptorLeftClick
                 && !microCompassLeftClick && !dragonsSparklerLeftClick && !spleefCompassLeftClick
@@ -19860,17 +19808,6 @@ public final class ArcadePortManager implements Listener {
                 session.milkPingerCandidates.add(otherId);
             }
         }
-        UUID drinkerId = player.getUniqueId();
-        session.milkBucketsDigested.merge(drinkerId, 1, Integer::sum);
-        if (player.isOnGround()) session.milkDrankGrounded.add(drinkerId);
-        else session.milkDrankAirborne.add(drinkerId);
-        int drinkerScore = session.scores.getOrDefault(drinkerId, 0);
-        for (UUID otherId : session.alive) {
-            if (otherId.equals(drinkerId) || session.teams.getOrDefault(otherId, 0) != 0) continue;
-            if (session.scores.getOrDefault(otherId, 0) == drinkerScore) {
-                session.milkPingerCandidates.add(otherId);
-            }
-        }
         incrementMilkCowScore(session, player, MilkCowRules.SCORE_PER_MILK, "Milk drunk");
         if (active != session) return;
         player.setHealth(Math.min(player.getMaxHealth(), player.getHealth() + 2.0D));
@@ -20437,19 +20374,6 @@ public final class ArcadePortManager implements Listener {
             session.milkTimesLed.merge(nextLeader, 1, Integer::sum);
         }
         session.milkCurrentLeader = nextLeader;
-        int bestOpponentScore = session.scores.entrySet().stream()
-                .filter(entry -> !entry.getKey().equals(id))
-                .mapToInt(Map.Entry::getValue).max().orElse(0);
-        if (bestOpponentScore - score >= 5) session.milkComebackCandidates.add(id);
-        int currentLeaderScore = session.scores.values().stream().mapToInt(Integer::intValue).max().orElse(0);
-        List<UUID> currentLeaders = session.scores.entrySet().stream()
-                .filter(entry -> entry.getValue() == currentLeaderScore)
-                .map(Map.Entry::getKey).toList();
-        UUID nextLeader = currentLeaders.size() == 1 ? currentLeaders.get(0) : null;
-        if (nextLeader != null && !nextLeader.equals(session.milkCurrentLeader)) {
-            session.milkTimesLed.merge(nextLeader, 1, Integer::sum);
-        }
-        session.milkCurrentLeader = nextLeader;
         player.sendMessage((change >= 0 ? ChatColor.GREEN : ChatColor.RED)
                 + reason + ": " + score + "/" + MilkCowRules.SCORE_TO_WIN);
         if (MilkCowRules.hasWon(score)) {
@@ -20593,14 +20517,6 @@ public final class ArcadePortManager implements Listener {
     private void damageMilkCowFarmer(Session session, Player target, Player attacker, double damage) {
         if (active != session || target == null || !session.alive.contains(target.getUniqueId())
                 || session.teams.getOrDefault(target.getUniqueId(), 0) != 0 || damage <= 0.0D) return;
-        UUID targetId = target.getUniqueId();
-        UUID attackerId = attacker == null ? null : attacker.getUniqueId();
-        long now = System.currentTimeMillis();
-        Map<UUID, Long> contributors = session.milkDamageAtByTarget.computeIfAbsent(
-                targetId, ignored -> new HashMap<>());
-        if (attackerId != null && session.teams.getOrDefault(attackerId, -1) == 1) {
-            contributors.put(attackerId, now);
-        }
         UUID targetId = target.getUniqueId();
         UUID attackerId = attacker == null ? null : attacker.getUniqueId();
         long now = System.currentTimeMillis();
@@ -22550,16 +22466,6 @@ public final class ArcadePortManager implements Listener {
                     && candidate.getLocation().distance(spawn) < 20.0D) closeTargets.add(candidateId);
         }
         session.bombCloseRangeTargets.put(bomb.getUniqueId(), closeTargets);
-        Set<UUID> closeTargets = new HashSet<>();
-        for (UUID candidateId : session.alive) {
-            if (candidateId.equals(ownerId)
-                    || !ArcadePortRules.areBombLobbersEnemies(session.teams.getOrDefault(ownerId, -1),
-                            session.teams.getOrDefault(candidateId, -2))) continue;
-            Player candidate = session.players.get(candidateId);
-            if (candidate != null && candidate.isOnline() && candidate.getWorld() == session.world
-                    && candidate.getLocation().distance(spawn) < 20.0D) closeTargets.add(candidateId);
-        }
-        session.bombCloseRangeTargets.put(bomb.getUniqueId(), closeTargets);
         session.bombCreatedAt.put(bomb.getUniqueId(), now);
         session.bombPrimed.remove(bomb.getUniqueId());
         return true;
@@ -23444,6 +23350,9 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, PlayerSnapshot> snapshots = new HashMap<>();
         final Set<UUID> alive = new HashSet<>();
         final Map<UUID, Integer> scores = new HashMap<>();
+        final Map<UUID, BaconBlastCombo> baconBlastCombosByVictim = new HashMap<>();
+        final Map<UUID, Integer> bombPostDeathKills = new HashMap<>();
+        final Set<UUID> bombPowerupClutchUsed = new HashSet<>();
         final List<UUID> drawTurnOrder = new ArrayList<>();
         final Map<UUID, Location> drawStartLocations = new HashMap<>();
         final Set<Block> drawCanvasBlocks = new HashSet<>();
