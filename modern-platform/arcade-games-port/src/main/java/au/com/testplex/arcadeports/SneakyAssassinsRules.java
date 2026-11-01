@@ -123,4 +123,9 @@ final class SneakyAssassinsRules {
     static int sourceNpcCount() {
         return 200;
     }
+
+    /** Town NPCs persist until killed or their entity disappears; never cull a live villager by timer. */
+    static boolean shouldPruneTownNpc(boolean entityExists, boolean validVillager) {
+        return !entityExists || !validVillager;
+    }
 }

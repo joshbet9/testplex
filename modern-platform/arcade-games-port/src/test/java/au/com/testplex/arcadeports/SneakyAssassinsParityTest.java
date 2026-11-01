@@ -51,6 +51,13 @@ class SneakyAssassinsParityTest {
         assertEquals(5, SneakyAssassinsRules.nextPowerUpCount(5));
     }
 
+    @Test void townNpcsRemainUntilMissingOrInvalidRatherThanBeingRandomlyCulled() {
+        assertEquals(200, SneakyAssassinsRules.sourceNpcCount());
+        assertFalse(SneakyAssassinsRules.shouldPruneTownNpc(true, true));
+        assertTrue(SneakyAssassinsRules.shouldPruneTownNpc(false, false));
+        assertTrue(SneakyAssassinsRules.shouldPruneTownNpc(true, false));
+    }
+
     @Test void matchesSourceTimingAndEffectRadii() {
         assertEquals(200, SneakyAssassinsRules.sourceNpcCount());
         assertEquals(60_000L, SneakyAssassinsRules.globalRevealCycleMillis());
