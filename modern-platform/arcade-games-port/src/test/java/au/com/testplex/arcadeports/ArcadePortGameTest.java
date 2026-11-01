@@ -434,17 +434,17 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.areBombLobbersEnemies(1, ArcadePortRules.opposingBombLobbersTeam(1)));
     }
 
-    @Test void bombLobbersPowerupUsesIndependentTeamLocalOneMinuteAverageTimers() {
+    @Test void bombLobbersPowerupUsesPairedOneMinuteAverageWaveAndTwoActiveDrops() {
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(1));
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(2));
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(4));
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(8));
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(12));
         assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(16));
-        assertEquals(1, ArcadePortRules.bombLobbersPowerupMaxActive(2));
+        assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(2));
         assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(6));
-        assertEquals(3, ArcadePortRules.bombLobbersPowerupMaxActive(10));
-        assertEquals(4, ArcadePortRules.bombLobbersPowerupMaxActive(16));
+        assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(10));
+        assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(16));
     }
 
     @Test void bombLobbersSuperAndFieryTntHaveDistinctBlastEffects() {
