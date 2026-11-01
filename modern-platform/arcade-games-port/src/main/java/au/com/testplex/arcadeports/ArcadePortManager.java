@@ -1180,7 +1180,7 @@ public final class ArcadePortManager implements Listener {
         if (player == null) return;
         String kit = ArcadePortRules.normalizeDragonsKit(requestedKit);
         if (kit == null) {
-            player.sendMessage(ChatColor.YELLOW + "Dragons kits: coward, marksman, pyrotechnic.");
+            player.sendMessage(ChatColor.YELLOW + "Dragons kits: coward, marksman, pyrotechnic, frost, glider, tamer.");
             return;
         }
         UUID id = player.getUniqueId();
