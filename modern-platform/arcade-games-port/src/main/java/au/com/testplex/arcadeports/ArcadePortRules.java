@@ -2666,6 +2666,9 @@ public final class ArcadePortRules {
     public static final int HEROES_OF_GWEN_PUMPKIN_KING_REGENERATION_AMPLIFIER = 1;
     public static final double HEROES_OF_GWEN_PUMPKIN_KING_DAMAGE_MULTIPLIER = 1.5D;
     public static final long HEROES_OF_GWEN_MONOCHROME_SKELETONS_DURATION_MILLIS = 30_000L;
+    public static final long HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS = 900_000L;
+    public static final double HEROES_OF_GWEN_OVERTIME_WITHER_SPEED = 2.0D;
+    public static final double HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED = 16.0D;
     public static final int HEROES_OF_GWEN_SMALL_HEALTH_POTION_HEAL_HP = 4;
     public static final int HEROES_OF_GWEN_LARGE_HEALTH_POTION_HEAL_HP = 8;
     public static final long HEROES_OF_GWEN_POWER_POTION_DURATION_MILLIS = 90_000L;
@@ -2929,6 +2932,26 @@ public final class ArcadePortRules {
     /** Source Wither warns its owning team at most once every 30 seconds; zero means never warned. */
     public static boolean heroesOfGwenWitherShouldInform(long now, long lastInformAt) {
         return now >= lastInformAt && now - lastInformAt >= 30_000L;
+    }
+
+    /** Source OvertimeManager starts after 15 minutes of Live play. */
+    public static boolean heroesOfGwenOvertimeHasStarted(long liveStartedAt, long now) {
+        return liveStartedAt > 0L && now >= liveStartedAt
+                && now - liveStartedAt >= HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS;
+    }
+
+    /** Source OvertimeAI follows only the first half of the ordered blue-to-red minion path. */
+    public static int heroesOfGwenOvertimePathLength(int fullPathSize) {
+        return Math.max(0, fullPathSize / 2);
+    }
+
+    /** Source OvertimeAI advances one lane point when it comes within four blocks. */
+    public static int heroesOfGwenOvertimeNextTargetIndex(int currentIndex, int pathSize,
+            double distanceSquaredToTarget) {
+        if (pathSize <= 0) return -1;
+        int bounded = Math.max(0, Math.min(currentIndex, pathSize - 1));
+        return distanceSquaredToTarget < HEROES_OF_GWEN_OVERTIME_PATH_ADVANCE_DISTANCE_SQUARED
+                && bounded < pathSize - 1 ? bounded + 1 : bounded;
     }
 
     /** Source MobaDirectAIMethod interprets speed as ticks per block, then divides by 20. */
