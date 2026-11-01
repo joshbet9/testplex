@@ -188,7 +188,7 @@ public final class MonsterMazePlugin {
 
         statusHeartbeatReporter.start();
         getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=commands-and-heartbeat-started");
-        getLogger().info("Monster Maze gameplay initialization completed; awaiting Testplex Arcade manager attachment.");
+        getLogger().info("Monster Maze gameplay managers initialised inside the shared Testplex Arcade runtime.");
         getLogger().info("Active map: " + mapManager.getActiveMap());
         getLogger().info("Mode: " + mode.id);
         getLogger().info("Run recording: " + recordRuns);
