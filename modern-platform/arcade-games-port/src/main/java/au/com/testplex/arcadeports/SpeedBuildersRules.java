@@ -167,7 +167,7 @@ public final class SpeedBuildersRules {
      */
     public static boolean blockMatches(Material expectedMaterial, String expectedData,
                                        Material actualMaterial, String actualData) {
-        if (expectedMaterial == null || actualMaterial == null || expectedMaterial.isAir()) return false;
+        if (expectedMaterial == null || actualMaterial == null || expectedMaterial == Material.AIR) return false;
         if (expectedMaterial != actualMaterial && !(isAnvil(expectedMaterial) && isAnvil(actualMaterial))) {
             return false;
         }
