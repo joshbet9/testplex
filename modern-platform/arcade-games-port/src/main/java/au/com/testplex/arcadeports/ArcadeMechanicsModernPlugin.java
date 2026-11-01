@@ -117,7 +117,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     /** Availability check that never interrupts an unrelated Arcade or Plexball match. */
     public boolean canStartSpeedBuilders() {
         return manager != null && manager.canStartExternalGame()
-                && (plexball == null || !plexball.isActive());
+                && (plexball == null || !plexball.isActive())
+                && (cameraShy == null || !cameraShy.isActive());
     }
 
     /** Refuse a Speed Builders start rather than stopping an unrelated running match. */
