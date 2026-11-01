@@ -361,7 +361,7 @@ public final class SpeedBuildersGame implements Listener {
         try {
             plugin.prepareForSpeedBuilders();
             standaloneSessionLockAcquired = true;
-            loadSourceTemplates();
+            loadSourceTemplates(participants.size());
             arena = ensureArena();
             buildArenaFloor();
             matchRoundLimit = Math.max(1, Math.min(templates.size(),
@@ -409,27 +409,34 @@ public final class SpeedBuildersGame implements Listener {
 
     /** Load the real Mineplex Reborn build definitions from the original Shroomland Lake map. */
     /** Load two independent copies of the authentic eight-plot map for up to sixteen builders. */
-    private void loadSourceTemplates() {
+    private void loadSourceTemplates(int participantCount) {
         arenaWorlds.clear();
         plotSpawns.clear();
         sourceWorld = loadArenaWorld(SOURCE_WORLD_NAME);
-        World mirrorWorld = loadArenaWorld(MIRROR_WORLD_NAME);
         arenaWorlds.add(sourceWorld);
-        arenaWorlds.add(mirrorWorld);
 
         SourceMapCatalog.MapData mapData = SourceMapCatalog.readResource(
                 plugin, "Speed Builders", SOURCE_MAP_RESOURCE, sourceWorld);
-        SourceMapCatalog.MapData mirrorData = SourceMapCatalog.readResource(
-                plugin, "Speed Builders", SOURCE_MAP_RESOURCE, mirrorWorld);
-        if (mapData == null || mirrorData == null) {
-            throw new IllegalStateException("The original Speed Builders map could not be loaded into both arena worlds.");
+        if (mapData == null) {
+            throw new IllegalStateException("The original Speed Builders source map could not be read.");
         }
 
-        List<Plot> allocatedPlots = new ArrayList<>(SpeedBuildersRules.MAX_PLAYERS);
+        int requiredArenas = SpeedBuildersRules.arenaCountForPlayers(participantCount);
+        List<Plot> allocatedPlots = new ArrayList<>(requiredArenas * SpeedBuildersRules.PLOTS_PER_ARENA);
         appendArenaPlots(mapData, sourceWorld, allocatedPlots);
-        appendArenaPlots(mirrorData, mirrorWorld, allocatedPlots);
-        if (allocatedPlots.size() != SpeedBuildersRules.MAX_PLAYERS) {
-            throw new IllegalStateException("Expected sixteen authored build plots across two maps; found "
+        if (requiredArenas > 1) {
+            World mirrorWorld = loadArenaWorld(MIRROR_WORLD_NAME);
+            arenaWorlds.add(mirrorWorld);
+            SourceMapCatalog.MapData mirrorData = SourceMapCatalog.readResource(
+                    plugin, "Speed Builders", SOURCE_MAP_RESOURCE, mirrorWorld);
+            if (mirrorData == null) {
+                throw new IllegalStateException("The mirrored Speed Builders map could not be read.");
+            }
+            appendArenaPlots(mirrorData, mirrorWorld, allocatedPlots);
+        }
+        if (allocatedPlots.size() != requiredArenas * SpeedBuildersRules.PLOTS_PER_ARENA) {
+            throw new IllegalStateException("Expected " + (requiredArenas * SpeedBuildersRules.PLOTS_PER_ARENA)
+                    + " authored build plots across " + requiredArenas + " arena(s); found "
                     + allocatedPlots.size() + ".");
         }
         playerPlots = List.copyOf(allocatedPlots);
