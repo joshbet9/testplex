@@ -25,8 +25,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
     private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of(
             "death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl",
-            "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy", "monster-maze", "snake", "draw-my-thing", "master-builders");
-    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-20-games-monster-maze-snake-draw-my-thing-master-builders-20261101-v5";
+            "castle-assault", "gladiators", "micro-battles", "milk-the-cow", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy", "monster-maze", "snake", "draw-my-thing", "master-builders");
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-22-games-castle-assault-milk-the-cow-20261101-v6";
 
     @Override
     public void onEnable() {
