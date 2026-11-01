@@ -176,6 +176,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, Long> larissaStormBlessingEndsAt = new HashMap<>();
     private final Map<UUID, Long> larissaStormBlessingNextHealAt = new HashMap<>();
     private final Map<UUID, List<Wolf>> bardolfWolves = new HashMap<>();
+    private final Map<UUID, UUID> bardolfWolfTargets = new HashMap<>();
     private final Map<UUID, Map<UUID, Long>> bardolfLastWolfAttackAt = new HashMap<>();
     private final Map<UUID, BardolfPounceState> bardolfPounces = new HashMap<>();
     private final Map<UUID, Long> bardolfFullMoonEndsAt = new HashMap<>();
@@ -3228,6 +3229,278 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS);
             }
         }
+    }
+
+
+    private List<Wolf> liveBardolfWolves(UUID ownerId) {
+        List<Wolf> pack = bardolfWolves.computeIfAbsent(ownerId, ignored -> new ArrayList<>());
+        pack.removeIf(wolf -> {
+            boolean stale = wolf == null || !wolf.isValid() || wolf.isDead();
+            if (stale && wolf != null) {
+                entities.remove(wolf);
+                bardolfWolfTargets.remove(wolf.getUniqueId());
+            }
+            return stale;
+        });
+        return pack;
+    }
+
+    private UUID bardolfOwnerId(Wolf wolf) {
+        if (wolf == null) return null;
+        String owner = wolf.getPersistentDataContainer().get(bardolfWolfOwnerKey, PersistentDataType.STRING);
+        if (owner == null) return null;
+        try {
+            return UUID.fromString(owner);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private int heroesOfGwenEntityTeam(Entity entity) {
+        if (entity instanceof Player player) return teams.getOrDefault(player.getUniqueId(), -1);
+        if (entity == null) return -1;
+        Integer minionTeam = heroesOfGwenMinionTeams.get(entity.getUniqueId());
+        if (minionTeam != null) return minionTeam;
+        TowerState tower = towerFor(entity);
+        if (tower != null) return tower.owner;
+        for (Map.Entry<Integer, Wither> entry : withers.entrySet()) {
+            if (entry.getValue().equals(entity)) return entry.getKey();
+        }
+        if (entity instanceof Wolf wolf) {
+            UUID ownerId = bardolfOwnerId(wolf);
+            if (ownerId != null) return teams.getOrDefault(ownerId, -1);
+        }
+        return -1;
+    }
+
+    private void summonBardolfWolf(Player player) {
+        UUID ownerId = player.getUniqueId();
+        if (bardolfFullMoonEndsAt.getOrDefault(ownerId, 0L) > System.currentTimeMillis()) {
+            player.sendActionBar(ChatColor.RED + "You cannot summon wolves during Full Moon.");
+            return;
+        }
+        List<Wolf> pack = liveBardolfWolves(ownerId);
+        if (pack.size() >= ArcadePortRules.HEROES_OF_GWEN_BARDOLF_MAX_WOLVES) {
+            player.sendActionBar(ChatColor.RED + "Your pack is already at its five-wolf limit.");
+            return;
+        }
+        if (!isHeroSkillReady(player, "bardolf.summon_wolf")) return;
+
+        Wolf wolf = world.spawn(player.getLocation(), Wolf.class);
+        var maxHealth = wolf.getAttribute(Attribute.MAX_HEALTH);
+        if (maxHealth != null) maxHealth.setBaseValue(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH);
+        wolf.setHealth(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH);
+        wolf.setTamed(true);
+        wolf.setOwner(player);
+        wolf.setCollarColor(teams.getOrDefault(ownerId, 0) == 0 ? DyeColor.RED : DyeColor.BLUE);
+        wolf.setRemoveWhenFarAway(false);
+        wolf.setCustomName(teamColour(teams.getOrDefault(ownerId, 0)) + player.getName() + "'s Wolf");
+        wolf.setCustomNameVisible(true);
+        wolf.getPersistentDataContainer().set(bardolfWolfOwnerKey, PersistentDataType.STRING, ownerId.toString());
+        pack.add(wolf);
+        entities.add(wolf);
+        setHeroSkillCooldown(player, "bardolf.summon_wolf",
+                ArcadePortRules.HEROES_OF_GWEN_BARDOLF_SUMMON_COOLDOWN_MILLIS);
+        player.playSound(player.getLocation(), Sound.ENTITY_WOLF_AMBIENT, 0.9F, 1.2F);
+        player.sendActionBar(ChatColor.GREEN + "Wolf summoned (" + pack.size() + "/"
+                + ArcadePortRules.HEROES_OF_GWEN_BARDOLF_MAX_WOLVES + ").");
+        updateBardolfSummonItem(player, pack.size());
+    }
+
+    private void updateBardolfSummonItem(Player player, int count) {
+        ItemStack item = player.getInventory().getItem(1);
+        if (item == null || !"bardolf.summon_wolf".equals(heroSkillId(item))) return;
+        item.setAmount(Math.max(1, Math.min(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_MAX_WOLVES, count)));
+    }
+
+    private void activateBardolfPounce(Player player) {
+        String skill = "bardolf.wolf_pounce";
+        if (!isHeroSkillReady(player, skill)) return;
+        UUID ownerId = player.getUniqueId();
+        Vector direction = player.getLocation().getDirection();
+        direction.setY(Math.max(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_MINIMUM_VERTICAL_VELOCITY,
+                direction.getY()));
+        direction.multiply(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_VELOCITY_MULTIPLIER);
+        Location target = player.getLocation().clone();
+        bardolfPounces.put(ownerId, new BardolfPounceState(target, direction,
+                System.currentTimeMillis() + ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_OVERRIDE_MILLIS));
+        player.setVelocity(direction.clone());
+        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_COOLDOWN_MILLIS);
+        player.playSound(player.getLocation(), Sound.ENTITY_WOLF_AMBIENT, 1.0F, 1.0F);
+        world.spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0.0D, 0.6D, 0.0D),
+                15, 0.5D, 0.5D, 0.5D, 0.1D);
+    }
+
+    private void activateBardolfFullMoon(Player player) {
+        UUID ownerId = player.getUniqueId();
+        long now = System.currentTimeMillis();
+        if (!isHeroSkillReady(player, "bardolf.full_moon")) return;
+        if (bardolfFullMoonEndsAt.containsKey(ownerId)) return;
+
+        List<Wolf> pack = liveBardolfWolves(ownerId);
+        float originalSpeed = player.getWalkSpeed();
+        bardolfOriginalWalkSpeeds.put(ownerId, originalSpeed);
+        double increase = pack.size() * ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_SPEED_PER_WOLF;
+        player.setWalkSpeed((float) Math.min(1.0D, originalSpeed + increase));
+        bardolfFullMoonEndsAt.put(ownerId,
+                now + ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_DURATION_MILLIS);
+        setHeroSkillCooldown(player, "bardolf.full_moon",
+                ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_REUSE_DELAY_MILLIS);
+        world.setTime(18_000L);
+        world.strikeLightningEffect(player.getLocation());
+
+        for (Wolf wolf : pack) {
+            var maxHealth = wolf.getAttribute(Attribute.MAX_HEALTH);
+            if (maxHealth != null) maxHealth.setBaseValue(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_WOLF_HEALTH);
+            wolf.setHealth(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_WOLF_HEALTH);
+            wolf.setTamed(false);
+            wolf.setAngry(true);
+            wolf.getWorld().playSound(wolf.getLocation(), Sound.ENTITY_WOLF_GROWL, 1.0F, 1.0F);
+        }
+        player.sendMessage(ChatColor.LIGHT_PURPLE + "Full Moon! Your living wolves empower your attacks.");
+    }
+
+    private void endBardolfFullMoon(UUID ownerId) {
+        Long end = bardolfFullMoonEndsAt.remove(ownerId);
+        if (end == null) return;
+        Player owner = players.get(ownerId);
+        Float originalSpeed = bardolfOriginalWalkSpeeds.remove(ownerId);
+        if (owner != null && owner.isOnline() && originalSpeed != null) {
+            owner.setWalkSpeed(originalSpeed);
+            ItemStack summon = owner.getInventory().getItem(1);
+            if (summon != null && "bardolf.summon_wolf".equals(heroSkillId(summon))) {
+                summon.setAmount(1);
+            }
+        }
+        for (Wolf wolf : new ArrayList<>(bardolfWolves.getOrDefault(ownerId, List.of()))) {
+            if (wolf != null && wolf.isValid()) wolf.remove();
+            if (wolf != null) {
+                entities.remove(wolf);
+                bardolfWolfTargets.remove(wolf.getUniqueId());
+            }
+        }
+        bardolfWolves.remove(ownerId);
+        bardolfLastWolfAttackAt.remove(ownerId);
+        bardolfPounces.remove(ownerId);
+        world.setTime(12_000L);
+    }
+
+    private void removeBardolfPack(UUID ownerId) {
+        if (ownerId == null) return;
+        if (bardolfFullMoonEndsAt.containsKey(ownerId)) {
+            Player owner = players.get(ownerId);
+            Float originalSpeed = bardolfOriginalWalkSpeeds.remove(ownerId);
+            if (owner != null && owner.isOnline() && originalSpeed != null) owner.setWalkSpeed(originalSpeed);
+            bardolfFullMoonEndsAt.remove(ownerId);
+            world.setTime(12_000L);
+        } else {
+            bardolfOriginalWalkSpeeds.remove(ownerId);
+        }
+        for (Wolf wolf : new ArrayList<>(bardolfWolves.getOrDefault(ownerId, List.of()))) {
+            if (wolf != null && wolf.isValid()) wolf.remove();
+            if (wolf != null) {
+                entities.remove(wolf);
+                bardolfWolfTargets.remove(wolf.getUniqueId());
+            }
+        }
+        bardolfWolves.remove(ownerId);
+        bardolfLastWolfAttackAt.remove(ownerId);
+        bardolfPounces.remove(ownerId);
+    }
+
+    private void updateBardolfWolves(long now) {
+        for (UUID ownerId : new ArrayList<>(bardolfWolves.keySet())) {
+            Player owner = players.get(ownerId);
+            if (owner == null || !owner.isOnline() || !activePlayers.contains(ownerId)
+                    || !"bardolf".equals(selectedHeroesOfGwen.get(ownerId))) {
+                removeBardolfPack(ownerId);
+                continue;
+            }
+            List<Wolf> pack = liveBardolfWolves(ownerId);
+            updateBardolfSummonItem(owner, pack.size());
+            if (pack.isEmpty()) {
+                bardolfWolfTargets.entrySet().removeIf(entry -> {
+                    Entity entity = Bukkit.getEntity(entry.getKey());
+                    return entity == null || !entity.isValid();
+                });
+                continue;
+            }
+
+            BardolfPounceState pounce = bardolfPounces.get(ownerId);
+            if (pounce != null && now >= pounce.expiresAt) {
+                bardolfPounces.remove(ownerId);
+                pounce = null;
+            }
+            boolean fullMoon = bardolfFullMoonEndsAt.getOrDefault(ownerId, 0L) > now;
+            for (Wolf wolf : pack) {
+                UUID wolfId = wolf.getUniqueId();
+                if (pounce != null && !pounce.leapedWolfIds.contains(wolfId)) {
+                    if (wolf.getLocation().distanceSquared(pounce.target) <=
+                            ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_TRIGGER_DISTANCE_SQUARED) {
+                        pounce.leapedWolfIds.add(wolfId);
+                        wolf.setVelocity(pounce.direction.clone());
+                        wolf.getWorld().playSound(wolf.getLocation(), Sound.ENTITY_WOLF_WHINE, 1.0F, 1.5F);
+                        continue;
+                    }
+                    moveBardolfWolf(wolf, pounce.target, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED);
+                    continue;
+                }
+
+                UUID targetId = bardolfWolfTargets.get(wolfId);
+                Entity targetEntity = targetId == null ? null : Bukkit.getEntity(targetId);
+                LivingEntity target = targetEntity instanceof LivingEntity living ? living : null;
+                int ownerTeam = teams.getOrDefault(ownerId, -1);
+                if (target == null || !target.isValid() || target.isDead()
+                        || (target instanceof Player targetPlayer && !activePlayers.contains(targetPlayer.getUniqueId()))
+                        || (heroesOfGwenEntityTeam(target) == ownerTeam)) {
+                    bardolfWolfTargets.remove(wolfId);
+                    target = null;
+                }
+
+                if (target != null) {
+                    moveBardolfWolf(wolf, target.getLocation(),
+                            fullMoon ? ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_ULTIMATE_SPEED
+                                    : ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED);
+                    if (wolf.getLocation().distanceSquared(target.getLocation())
+                            <= ArcadePortRules.HEROES_OF_GWEN_BARDOLF_ATTACK_DISTANCE_SQUARED) {
+                        Map<UUID, Long> lastAttacks = bardolfLastWolfAttackAt.computeIfAbsent(ownerId,
+                                ignored -> new HashMap<>());
+                        long nextAllowed = lastAttacks.getOrDefault(target.getUniqueId(), 0L);
+                        if (now >= nextAllowed) {
+                            lastAttacks.put(target.getUniqueId(),
+                                    now + ArcadePortRules.HEROES_OF_GWEN_BARDOLF_ATTACK_INTERVAL_MILLIS);
+                            target.damage(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_ATTACK_DAMAGE, owner);
+                        }
+                    }
+                    continue;
+                }
+
+                double ownerDistance = wolf.getLocation().distanceSquared(owner.getLocation());
+                if (ownerDistance > ArcadePortRules.HEROES_OF_GWEN_BARDOLF_OWNER_TELEPORT_DISTANCE_SQUARED) {
+                    wolf.teleport(owner.getLocation());
+                } else if (ownerDistance > ArcadePortRules.HEROES_OF_GWEN_BARDOLF_OWNER_FOLLOW_MIN_DISTANCE_SQUARED) {
+                    moveBardolfWolf(wolf, owner.getLocation(),
+                            fullMoon ? ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_ULTIMATE_SPEED
+                                    : ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_FOLLOW_SPEED);
+                }
+            }
+        }
+
+        for (UUID ownerId : new ArrayList<>(bardolfFullMoonEndsAt.keySet())) {
+            if (now >= bardolfFullMoonEndsAt.getOrDefault(ownerId, Long.MAX_VALUE)) endBardolfFullMoon(ownerId);
+        }
+    }
+
+    private void moveBardolfWolf(Wolf wolf, Location target, double sourceSpeed) {
+        Vector movement = target.toVector().subtract(wolf.getLocation().toVector());
+        if (movement.lengthSquared() <= 0.01D) return;
+        movement.setY(Math.max(-0.35D, Math.min(0.35D, movement.getY())));
+        if (movement.lengthSquared() <= 0.001D) return;
+        wolf.setVelocity(movement.normalize().multiply(sourceSpeed / 5.0D));
+    }
+
+    private void clearBardolfOwner(UUID ownerId) {
+        removeBardolfPack(ownerId);
     }
 
     private void markHeroProjectile(Projectile projectile, Player owner, String type) {
