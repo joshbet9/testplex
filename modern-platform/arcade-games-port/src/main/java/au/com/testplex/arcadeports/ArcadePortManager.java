@@ -248,6 +248,9 @@ public final class ArcadePortManager implements Listener {
     private final ModernArcadeLobby lobby;
     private final ModernArcadeLobbyRuntime lobbyRuntime;
     private MonsterMazePlugin monsterMazeModule;
+    private ArcadeGameModule monsterMazeLifecycle;
+    private final ArcadeGameModuleRegistry gameModules = new ArcadeGameModuleRegistry();
+    private boolean gameModulesInitialized;
     private CameraShyGame cameraShyModule;
 
     ArcadePortManager(ArcadeMechanicsModernPlugin plugin) {
@@ -293,21 +296,54 @@ public final class ArcadePortManager implements Listener {
         registerOptionalDragonEscapeGhostBridge();
     }
 
-    public void setMonsterMazeModule(MonsterMazePlugin module) {
-        if (module == null) throw new IllegalArgumentException("Monster Maze module is required.");
-        if (module.getHostPlugin() != plugin) {
-            throw new IllegalArgumentException("Monster Maze module belongs to a different Bukkit host.");
-        }
-        if (module.getGameManager() == null) {
-            throw new IllegalStateException("Monster Maze must finish initialization before Arcade attachment.");
-        }
-        this.monsterMazeModule = module;
+    /**
+     * Initializes the Arcade-owned game modules after the host plugin and shared manager
+     * have been assigned. This keeps failure cleanup inside the normal plugin shutdown path.
+     */
+    public void initializeGameModules() {
+        if (gameModulesInitialized) return;
+        initializeMonsterMazeGameModule();
+        gameModulesInitialized = true;
     }
 
-    /** True only after this manager has accepted the initialized embedded module instance. */
+    /**
+     * Registers Monster Maze as an Arcade-owned game module. Its gameplay engine remains
+     * game-specific, but it has no independent Bukkit/plugin lifecycle or readiness path.
+     */
+    private void initializeMonsterMazeGameModule() {
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=monster-maze-module-registration-start");
+        monsterMazeModule = new MonsterMazePlugin(plugin);
+        monsterMazeLifecycle = new MonsterMazeGameModuleAdapter(monsterMazeModule);
+        try {
+            gameModules.register(monsterMazeLifecycle);
+            if (!isMonsterMazeModuleRegistered(monsterMazeModule)) {
+                throw new IllegalStateException("Arcade module registry did not retain the initialized Monster Maze module.");
+            }
+            plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=monster-maze-module-registered map="
+                    + monsterMazeModule.getMapManager().getActiveMap());
+        } catch (RuntimeException | Error startupFailure) {
+            monsterMazeModule = null;
+            monsterMazeLifecycle = null;
+            throw new IllegalStateException(
+                    "Monster Maze could not be registered as part of the shared Arcade lifecycle.", startupFailure);
+        }
+    }
+
+    public MonsterMazePlugin getMonsterMazeModule() { return monsterMazeModule; }
+
+    /** True when the Arcade-owned module registry has completed Monster Maze initialization. */
+    public boolean isMonsterMazeModuleRegistered() {
+        return isMonsterMazeModuleRegistered(monsterMazeModule);
+    }
+
+    /** True only after this manager has initialized and registered the embedded module. */
     public boolean isMonsterMazeModuleRegistered(MonsterMazePlugin module) {
         return module != null
                 && monsterMazeModule == module
+                && monsterMazeLifecycle != null
+                && gameModules.isRegistered(ArcadePortGame.MONSTER_MAZE, monsterMazeLifecycle)
+                && gameModules.isRegistered(ArcadePortGame.MONSTER_MAZE_SPEED, monsterMazeLifecycle)
+                && gameModules.isRegistered(ArcadePortGame.MONSTER_MAZE_MODERN, monsterMazeLifecycle)
                 && module.getHostPlugin() == plugin
                 && module.getGameManager() != null;
     }
@@ -405,7 +441,8 @@ public final class ArcadePortManager implements Listener {
     }
 
     private boolean monsterMazeRunning() {
-        return monsterMazeModule != null && monsterMazeModule.isGameRunning();
+        ArcadeGameModule module = gameModules.get(ArcadePortGame.MONSTER_MAZE);
+        return module != null && module.isGameRunning();
     }
 
     public void selectLobbyGame(ArcadePortGame type) {
@@ -892,8 +929,9 @@ public final class ArcadePortManager implements Listener {
         }
         boolean explicitMonsterMazeKit = value.startsWith("monster-maze-");
         if (explicitMonsterMazeKit) value = value.substring("monster-maze-".length());
-        boolean monsterMazeLobby = "monster-maze".equals(
+        ArcadePortGame selectedLobbyGame = ArcadePortGame.fromId(
                 plugin.getConfig().getString("lobby-selected-game", "bacon-brawl"));
+        boolean monsterMazeLobby = selectedLobbyGame != null && selectedLobbyGame.isMonsterMaze();
         if (explicitMonsterMazeKit || monsterMazeLobby || monsterMazeRunning()) {
             me.monstermaze.kit.KitType mazeKit = me.monstermaze.kit.KitType.byName(value);
             if (mazeKit != null) {
@@ -1747,7 +1785,7 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
-        if (type == ArcadePortGame.MONSTER_MAZE && !isRotationCandidateAvailable(type)) {
+        if (type.isMonsterMaze() && !isRotationCandidateAvailable(type)) {
             player.sendMessage(ChatColor.RED + "Monster Maze is unavailable because its embedded module or selected map world is not ready.");
             return;
         }
@@ -1939,7 +1977,7 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
-        if (type == ArcadePortGame.MONSTER_MAZE && !isRotationCandidateAvailable(type)) {
+        if (type.isMonsterMaze() && !isRotationCandidateAvailable(type)) {
             sender.sendMessage(ChatColor.RED + "Monster Maze cannot start because its embedded module or selected map world is unavailable.");
             return;
         }
@@ -2205,7 +2243,7 @@ public final class ArcadePortManager implements Listener {
      */
     boolean isRotationCandidateAvailable(ArcadePortGame game) {
         if (game == null || !isGameEnabled(game)) return false;
-        if (game == ArcadePortGame.MONSTER_MAZE) {
+        if (game.isMonsterMaze()) {
             if (!isMonsterMazeModuleRegistered(monsterMazeModule)) return false;
             me.monstermaze.world.MapManager maps = monsterMazeModule.getMapManager();
             if (maps == null) return false;
@@ -2517,7 +2555,7 @@ public final class ArcadePortManager implements Listener {
             }
             boolean started = !startFailed && (active != null && active.type == type
                     && active.mixedArcadeVariant == mixedArcadeVariant
-                    || type == ArcadePortGame.MONSTER_MAZE && monsterMazeRunning());
+                    || type.isMonsterMaze() && monsterMazeRunning());
             if (!started) {
                 for (LinkedHashMap<UUID, Player> queue : queues.values()) {
                     for (UUID botId : insertedBotIds) queue.remove(botId);
@@ -2553,7 +2591,7 @@ public final class ArcadePortManager implements Listener {
                     + " is not cleared for in-game parity testing yet. Cleared game IDs: " + enabledGamesLabel() + ".");
             return;
         }
-        if (type == ArcadePortGame.MONSTER_MAZE && !isRotationCandidateAvailable(type)) {
+        if (type.isMonsterMaze() && !isRotationCandidateAvailable(type)) {
             sender.sendMessage(ChatColor.RED + "Monster Maze cannot start because its embedded module or selected map world is unavailable.");
             return;
         }
@@ -2660,13 +2698,20 @@ public final class ArcadePortManager implements Listener {
                     + session.alive.size() + " players.");
             return;
         }
-        if (type == ArcadePortGame.MONSTER_MAZE) {
+        if (type.isMonsterMaze()) {
             if (monsterMazeModule == null) {
                 sender.sendMessage(ChatColor.RED + "Monster Maze module is not loaded by Testplex Arcade.");
                 return;
             }
-            if (!monsterMazeModule.startTestplexGame(participants)) {
-                sender.sendMessage(ChatColor.RED + "Monster Maze could not start. Check its map and game status in the server log.");
+            me.monstermaze.game.MazeMode selectedMode = switch (type) {
+                case MONSTER_MAZE -> me.monstermaze.game.MazeMode.ORIGINAL;
+                case MONSTER_MAZE_SPEED -> me.monstermaze.game.MazeMode.SPEED;
+                case MONSTER_MAZE_MODERN -> me.monstermaze.game.MazeMode.MODERN;
+                default -> throw new IllegalStateException("Unexpected Monster Maze game identity: " + type.id());
+            };
+            if (!monsterMazeModule.startTestplexGame(participants, selectedMode, type)) {
+                sender.sendMessage(ChatColor.RED + type.displayName()
+                        + " could not start. Check its map and game status in the server log.");
                 return;
             }
             if (queue != null) queues.remove(selectedQueueKey);
@@ -2677,7 +2722,7 @@ public final class ArcadePortManager implements Listener {
                 pendingMixedArcadeVariant = false;
             }
             for (Player player : participants) {
-                if (player.isOnline()) player.sendMessage(ChatColor.AQUA + "Testplex has started Monster Maze.");
+                if (player.isOnline()) player.sendMessage(ChatColor.AQUA + "Testplex has started " + type.displayName() + ".");
             }
             return;
         }
@@ -12375,7 +12420,7 @@ public final class ArcadePortManager implements Listener {
             case PLEXBALL -> "Plexball | " + session.alive.size() + " active";
             // Monster Maze owns its own in-process GameManager session and does not
             // create an ArcadePortManager Session object.
-            case MONSTER_MAZE -> "Monster Maze";
+            case MONSTER_MAZE, MONSTER_MAZE_SPEED, MONSTER_MAZE_MODERN -> "Monster Maze";
         };
     }
 
@@ -16921,6 +16966,7 @@ public final class ArcadePortManager implements Listener {
                 && monsterMazeModule.getGameManager() != null) {
             monsterMazeModule.getGameManager().forceStop();
         }
+        if (monsterMazeModule != null) monsterMazeModule.clearActiveArcadeGame();
         if (!cameraShyWasActive) testPlayers.despawnSessionPlayers();
         // Camera Shy owns and has already released its own AFK roster when it was active.
         // Make the explicit Stop Game action authoritative: every participant from
@@ -16941,7 +16987,8 @@ public final class ArcadePortManager implements Listener {
         }
         String variant = active != null && active.mixedArcadeVariant ? " (Mixed Arcade)" : "";
         String game = active == null
-                ? (monsterMazeRunning() ? "Monster Maze (" + monsterMazeModule.getGameManager().getStage() + " stages reached)" : "idle")
+                ? (monsterMazeRunning() ? monsterMazeModule.getActiveArcadeGame().displayName()
+                        + " (" + monsterMazeModule.getGameManager().getStage() + " stages reached)" : "idle")
                 : active.type.displayName() + variant
                 + " (" + active.alive.size() + "/" + active.participantsAtStart + " alive)";
         int queued = queues.values().stream().mapToInt(Map::size).sum();
@@ -16956,6 +17003,15 @@ public final class ArcadePortManager implements Listener {
         manualStartType = null;
         clearLobbyCountdownStatus();
         stop("plugin shutdown");
+        try {
+            gameModules.shutdown();
+        } catch (RuntimeException shutdownFailure) {
+            plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                    "One or more Arcade-owned game modules failed during shutdown.", shutdownFailure);
+        } finally {
+            monsterMazeModule = null;
+            monsterMazeLifecycle = null;
+        }
         if (cameraShyModule != null) cameraShyModule.shutdown();
         testPlayers.shutdown();
         lobbyRuntime.shutdown();
