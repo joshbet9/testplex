@@ -2869,7 +2869,7 @@ public final class ArcadePortRules {
     public static final double HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_RANGE = 40.0D;
     public static final double HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP = 0.4D;
     public static final double HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS = 1.5D;
-    public static final double HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_COOLDOWN_MILLIS = 8_000L;
+    public static final long HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_COOLDOWN_MILLIS = 8_000L;
     public static final long HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_DURATION_MILLIS = 250L;
     public static final double HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_SPEED = 1.5D;
     public static final long HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DURATION_MILLIS = 10_000L;
