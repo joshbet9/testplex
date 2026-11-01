@@ -11,7 +11,6 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
 import org.bukkit.entity.EntityType;
-import org.bukkit.entity.ElderGuardian;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.LivingEntity;
@@ -80,14 +79,14 @@ import java.util.UUID;
  */
 public final class SpeedBuildersGame implements Listener {
     private static final String SOURCE_WORLD_NAME = "arcadeport_source_speedbuilders_v1";
+    private static final String MIRROR_WORLD_NAME = "arcadeport_source_speedbuilders_v2";
     private static final String SOURCE_MAP_RESOURCE = "source-maps/Speed Builders/SpeedBuilders_Shroomland_Lake.zip";
-    private static final int REVIEW_HEIGHT = 12;
     private static final int DEFAULT_MATCH_ROUNDS = 5;
     private static final int FINAL_RESULTS_SECONDS = 5;
     private static final long NORMAL_QUEUE_TICKS = 100L;
     private static final long QUICK_QUEUE_TICKS = 40L;
 
-    private enum Phase { IDLE, VIEWING, BUILDING, REVIEWING, INTERMISSION, RESULTS }
+    private enum Phase { IDLE, VIEWING, BUILDING, INTERMISSION, RESULTS }
 
     private final ArcadeMechanicsModernPlugin plugin;
     private final LinkedHashSet<UUID> queue = new LinkedHashSet<>();
@@ -95,17 +94,11 @@ public final class SpeedBuildersGame implements Listener {
     private final List<PlayerState> matchHistory = new ArrayList<>();
     private List<Template> templates = List.of();
     private final List<Template> unusedTemplates = new ArrayList<>();
-    private final List<Entity> reviewMobs = new ArrayList<>();
     private BukkitTask ticker;
     private World arena;
     private World sourceWorld;
+    private final List<World> arenaWorlds = new ArrayList<>();
     private List<Plot> playerPlots = List.of();
-    private List<Location> playerSpawns = List.of();
-    private Plot reviewPlot;
-    private ElderGuardian gwen;
-    private Location gwenLookTarget;
-    private long gwenLookUntilTick;
-    private UUID lastGwenLookTarget;
     private final Map<Plot, Location> plotSpawns = new LinkedHashMap<>();
     private Phase phase = Phase.IDLE;
     private long tick;
@@ -356,13 +349,11 @@ public final class SpeedBuildersGame implements Listener {
             switch (phase) {
                 case VIEWING -> beginBuildingPhase();
                 case BUILDING -> finishBuildingPhase();
-                case REVIEWING -> finishReviewPhase();
                 case INTERMISSION -> beginRound();
                 case RESULTS -> finishScoredMatch();
                 default -> { }
             }
         }
-        tickGwen();
         if (tick % 20L == 0L) refreshHud();
     }
 
@@ -373,7 +364,6 @@ public final class SpeedBuildersGame implements Listener {
             loadSourceTemplates();
             arena = ensureArena();
             buildArenaFloor();
-            spawnGwen();
             matchRoundLimit = Math.max(1, Math.min(templates.size(),
                     plugin.getConfig().getInt("speed-builders.match-rounds", DEFAULT_MATCH_ROUNDS)));
             players.clear();
@@ -411,75 +401,38 @@ public final class SpeedBuildersGame implements Listener {
             }
             players.clear();
             matchHistory.clear();
-            removeGwen();
-            phase = Phase.IDLE;
+                phase = Phase.IDLE;
             currentTemplate = null;
             releaseSessionLockAfterRestoration();
         }
     }
 
     /** Load the real Mineplex Reborn build definitions from the original Shroomland Lake map. */
+    /** Load two independent copies of the authentic eight-plot map for up to sixteen builders. */
     private void loadSourceTemplates() {
-        // Reinstall the archive before each match. This also repairs an interrupted prior
-        // run and prevents old player builds from contaminating the next game's source world.
-        sourceWorld = Bukkit.getWorld(SOURCE_WORLD_NAME);
-        if (!SourceMapCatalog.resetTestWorld(plugin, SOURCE_WORLD_NAME)) {
-            throw new IllegalStateException("Could not safely reset the isolated Speed Builders source-map world.");
-        }
-        sourceWorld = null;
-        if (!SourceMapCatalog.installResource(plugin, "Speed Builders", SOURCE_MAP_RESOURCE, SOURCE_WORLD_NAME)) {
-            throw new IllegalStateException("The original Speed Builders map archive could not be installed.");
-        }
-        sourceWorld = new WorldCreator(SOURCE_WORLD_NAME)
-                .environment(World.Environment.NORMAL)
-                .generateStructures(false)
-                .createWorld();
-        if (sourceWorld == null) {
-            throw new IllegalStateException("Paper could not load the isolated Speed Builders source map.");
-        }
-        sourceWorld.setGameRule(GameRule.DO_MOB_SPAWNING, false);
-        sourceWorld.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+        arenaWorlds.clear();
+        plotSpawns.clear();
+        sourceWorld = loadArenaWorld(SOURCE_WORLD_NAME);
+        World mirrorWorld = loadArenaWorld(MIRROR_WORLD_NAME);
+        arenaWorlds.add(sourceWorld);
+        arenaWorlds.add(mirrorWorld);
 
         SourceMapCatalog.MapData mapData = SourceMapCatalog.readResource(
                 plugin, "Speed Builders", SOURCE_MAP_RESOURCE, sourceWorld);
-        if (mapData == null) {
-            throw new IllegalStateException("The original Speed Builders WorldConfig.dat could not be read.");
-        }
-        List<Location> authoredPlots = mapData.dataLocations("YELLOW");
-        if (mapData.dataLocations("RED").isEmpty() || authoredPlots.size() < SpeedBuildersRules.MAX_PLAYERS) {
-            throw new IllegalStateException("The original Speed Builders map is missing its RED centre or eight YELLOW plots "
-                    + "(found " + authoredPlots.size() + ").");
+        SourceMapCatalog.MapData mirrorData = SourceMapCatalog.readResource(
+                plugin, "Speed Builders", SOURCE_MAP_RESOURCE, mirrorWorld);
+        if (mapData == null || mirrorData == null) {
+            throw new IllegalStateException("The original Speed Builders map could not be loaded into both arena worlds.");
         }
 
-        reviewPlot = createPlot(mapData.dataLocations("RED").getFirst());
-        playerPlots = authoredPlots.stream().limit(SpeedBuildersRules.MAX_PLAYERS)
-                .map(this::createPlot).toList();
-        playerSpawns = mapData.spawnLocations().stream().map(Location::clone).toList();
-        if (playerSpawns.isEmpty()) {
-            plugin.getLogger().warning("Original Speed Builders map has no TEAM_SPAWNS markers; using per-plot fallback spawns.");
+        List<Plot> allocatedPlots = new ArrayList<>(SpeedBuildersRules.MAX_PLAYERS);
+        appendArenaPlots(mapData, sourceWorld, allocatedPlots);
+        appendArenaPlots(mirrorData, mirrorWorld, allocatedPlots);
+        if (allocatedPlots.size() != SpeedBuildersRules.MAX_PLAYERS) {
+            throw new IllegalStateException("Expected sixteen authored build plots across two maps; found "
+                    + allocatedPlots.size() + ".");
         }
-        plotSpawns.clear();
-        List<Location> unusedSourceSpawns = new ArrayList<>(playerSpawns);
-        for (Plot plot : playerPlots) {
-            if (unusedSourceSpawns.isEmpty()) break;
-            Location plotCentre = new Location(sourceWorld, plot.centerX() + 0.5D,
-                    plot.baseY(), plot.centerZ() + 0.5D);
-            Location closest = unusedSourceSpawns.stream()
-                    .min(java.util.Comparator.comparingDouble(spawn -> spawn.distanceSquared(plotCentre)))
-                    .orElse(null);
-            if (closest != null) {
-                plotSpawns.put(plot, closest.clone());
-                unusedSourceSpawns.remove(closest);
-            }
-        }
-
-        if (mapData.hasBounds()) {
-            double centerX = (mapData.minX() + mapData.maxX()) / 2.0D;
-            double centerZ = (mapData.minZ() + mapData.maxZ()) / 2.0D;
-            double size = Math.max(mapData.maxX() - mapData.minX(), mapData.maxZ() - mapData.minZ()) + 16.0D;
-            sourceWorld.getWorldBorder().setCenter(centerX, centerZ);
-            sourceWorld.getWorldBorder().setSize(Math.max(32.0D, size));
-        }
+        playerPlots = List.copyOf(allocatedPlots);
 
         List<Template> loaded = new ArrayList<>();
         for (Map.Entry<String, List<Location>> entry : mapData.customLocationGroups().entrySet().stream()
@@ -530,9 +483,76 @@ public final class SpeedBuildersGame implements Listener {
             throw new IllegalStateException("No playable templates were found in the original Speed Builders map.");
         }
         templates = List.copyOf(loaded);
-        plugin.getLogger().info("Loaded " + templates.size() + " original Speed Builders templates from "
-                + mapData.mapName() + " with " + playerPlots.size() + " authored build plots and "
-                + playerSpawns.size() + " source team spawns.");
+        plugin.getLogger().info("Loaded " + templates.size() + " original Speed Builders templates across "
+                + arenaWorlds.size() + " mirrored arenas with " + playerPlots.size() + " authored build plots.");
+    }
+
+    private World loadArenaWorld(String worldName) {
+        if (!SourceMapCatalog.resetTestWorld(plugin, worldName)) {
+            throw new IllegalStateException("Could not safely reset Speed Builders arena world " + worldName + ".");
+        }
+        if (!SourceMapCatalog.installResource(plugin, "Speed Builders", SOURCE_MAP_RESOURCE, worldName)) {
+            throw new IllegalStateException("The original Speed Builders map archive could not be installed in " + worldName + ".");
+        }
+        World world = new WorldCreator(worldName)
+                .environment(World.Environment.NORMAL)
+                .generateStructures(false)
+                .createWorld();
+        if (world == null) {
+            throw new IllegalStateException("Paper could not load Speed Builders arena world " + worldName + ".");
+        }
+        world.setGameRule(GameRule.DO_MOB_SPAWNING, false);
+        world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+        world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
+        world.setGameRule(GameRule.DO_FIRE_TICK, false);
+        world.setGameRule(GameRule.RANDOM_TICK_SPEED, 0);
+        world.setTime(6000L);
+        world.setStorm(false);
+        world.setThundering(false);
+        world.setDifficulty(org.bukkit.Difficulty.PEACEFUL);
+        return world;
+    }
+
+    private void appendArenaPlots(SourceMapCatalog.MapData mapData, World world, List<Plot> target) {
+        List<Location> authoredPlots = mapData.dataLocations("YELLOW");
+        if (authoredPlots.size() < SpeedBuildersRules.PLOTS_PER_ARENA) {
+            throw new IllegalStateException("Speed Builders map " + world.getName()
+                    + " contains only " + authoredPlots.size() + " YELLOW plots; eight are required.");
+        }
+        List<Plot> arenaPlots = authoredPlots.stream()
+                .limit(SpeedBuildersRules.PLOTS_PER_ARENA)
+                .map(marker -> createPlot(world, marker))
+                .toList();
+        target.addAll(arenaPlots);
+
+        List<Location> availableSpawns = mapData.spawnLocations().stream()
+                .map(spawn -> new Location(world, spawn.getX(), spawn.getY(), spawn.getZ(),
+                        spawn.getYaw(), spawn.getPitch()))
+                .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
+        if (availableSpawns.isEmpty()) {
+            plugin.getLogger().warning("Speed Builders map " + world.getName()
+                    + " has no TEAM_SPAWNS markers; using per-plot fallback spawns.");
+        }
+        for (Plot plot : arenaPlots) {
+            if (availableSpawns.isEmpty()) break;
+            Location plotCentre = new Location(world, plot.centerX() + 0.5D,
+                    plot.baseY(), plot.centerZ() + 0.5D);
+            Location closest = availableSpawns.stream()
+                    .min(java.util.Comparator.comparingDouble(spawn -> spawn.distanceSquared(plotCentre)))
+                    .orElse(null);
+            if (closest != null) {
+                plotSpawns.put(plot, closest.clone());
+                availableSpawns.remove(closest);
+            }
+        }
+
+        if (mapData.hasBounds()) {
+            double centerX = (mapData.minX() + mapData.maxX()) / 2.0D;
+            double centerZ = (mapData.minZ() + mapData.maxZ()) / 2.0D;
+            double size = Math.max(mapData.maxX() - mapData.minX(), mapData.maxZ() - mapData.minZ()) + 16.0D;
+            world.getWorldBorder().setCenter(centerX, centerZ);
+            world.getWorldBorder().setSize(Math.max(32.0D, size));
+        }
     }
 
     private EntityType parseMobMarker(String marker) {
@@ -560,23 +580,23 @@ public final class SpeedBuildersGame implements Listener {
         return sourceWorld;
     }
 
-    private Plot createPlot(Location marker) {
+    private Plot createPlot(World world, Location marker) {
         Location origin = marker.clone().subtract(0.5D, 0.0D, 0.5D);
         List<GroundCell> originalGround = new ArrayList<>();
         for (int x = 0; x < SpeedBuildersRules.BUILD_WIDTH; x++) {
             for (int z = 0; z < SpeedBuildersRules.BUILD_WIDTH; z++) {
-                Block floor = sourceWorld.getBlockAt(origin.getBlockX() - 3 + x,
+                Block floor = world.getBlockAt(origin.getBlockX() - 3 + x,
                         origin.getBlockY() - 1, origin.getBlockZ() - 3 + z);
                 originalGround.add(new GroundCell(x, z, floor.getType(), floor.getBlockData().getAsString()));
             }
         }
-        return new Plot(origin.getBlockX(), origin.getBlockY(), origin.getBlockZ(), List.copyOf(originalGround));
+        return new Plot(world, origin.getBlockX(), origin.getBlockY(), origin.getBlockZ(), List.copyOf(originalGround));
     }
 
     private Location nearestSourceSpawn(Plot plot) {
         Location assigned = plotSpawns.get(plot);
         if (assigned != null) return assigned.clone();
-        return new Location(arena, plot.centerX() + 0.5D,
+        return new Location(plot.world(), plot.centerX() + 0.5D,
                 plot.baseY(), plot.centerZ() + 5.0D);
     }
 
@@ -600,8 +620,6 @@ public final class SpeedBuildersGame implements Listener {
             Collections.shuffle(unusedTemplates);
         }
         currentTemplate = unusedTemplates.removeFirst();
-        removeMobs(reviewMobs);
-        restorePlot(reviewPlot);
         round++;
         buildSeconds = currentTemplate.timing().buildSeconds(buildTimeTracker);
         // Reborn computes the next round's time before decrementing the tracker.
@@ -653,42 +671,9 @@ public final class SpeedBuildersGame implements Listener {
         refreshHud();
     }
 
+    /** Score every player's build automatically as soon as the build timer ends. */
     private void finishBuildingPhase() {
         if (phase != Phase.BUILDING) return;
-        phase = Phase.REVIEWING;
-        phaseDeadlineTick = tick + SpeedBuildersRules.REVIEW_SECONDS * 20L;
-        restorePlot(reviewPlot);
-        removeMobs(reviewMobs);
-        pasteTemplate(reviewPlot, currentTemplate);
-        spawnReviewMobs(currentTemplate);
-        List<PlayerState> builders = activePlayers();
-        for (int i = 0; i < builders.size(); i++) {
-            PlayerState state = builders.get(i);
-            state.score = score(state);
-            boolean wasAlreadyPerfect = state.perfect;
-            boolean perfectBuild = state.score == currentTemplate.expectedScore();
-            if (perfectBuild && !wasAlreadyPerfect) {
-                markPerfectBuild(state);
-            } else if (!perfectBuild) {
-                state.perfect = false;
-                state.perfectedEveryBuild = false;
-                state.roundBuildTimeTicks = 0L;
-                state.totalBuildTimeTicks = 0L;
-            }
-            state.player.getInventory().clear();
-            state.player.setGameMode(GameMode.SPECTATOR);
-            Location view = reviewViewLocation(i);
-            state.player.teleport(view);
-            state.player.sendTitle(ChatColor.GOLD + "JUDGING",
-                    ChatColor.YELLOW + "Your build: " + percent(state.score) + "%",
-                    0, 50, 10);
-        }
-        Bukkit.broadcastMessage(ChatColor.GOLD + "Time is up — Gwen is judging the builds.");
-        refreshHud();
-    }
-
-    private void finishReviewPhase() {
-        if (phase != Phase.REVIEWING) return;
         List<PlayerState> builders = activePlayers();
         if (builders.isEmpty()) {
             finishMatch(null, "No builders remain connected.");
@@ -696,21 +681,30 @@ public final class SpeedBuildersGame implements Listener {
         }
 
         for (PlayerState state : builders) {
+            state.score = score(state);
+            boolean perfectBuild = state.score == currentTemplate.expectedScore();
+            if (perfectBuild && !state.perfect) {
+                markPerfectBuild(state);
+            } else if (!perfectBuild) {
+                state.perfect = false;
+                state.perfectedEveryBuild = false;
+                state.roundBuildTimeTicks = 0L;
+                state.totalBuildTimeTicks = 0L;
+            }
             state.roundPoints = SpeedBuildersRules.roundPoints(
                     state.score, currentTemplate.expectedScore());
             state.totalPoints += state.roundPoints;
             state.player.sendMessage(ChatColor.GREEN + "Round " + round + ": "
-                    + state.roundPoints + "/100 accuracy points ("
+                    + state.roundPoints + "/100 accuracy ("
                     + state.score + "/" + currentTemplate.expectedScore()
                     + " matching pieces). Match total: " + state.totalPoints + " points.");
             state.player.sendTitle(ChatColor.GOLD + "ROUND " + round + " RESULT",
-                    ChatColor.YELLOW.toString() + state.roundPoints + "/100 points · "
-                            + state.totalPoints + " total", 0, 50, 10);
+                    ChatColor.YELLOW.toString() + state.roundPoints + "/100 accuracy · "
+                            + state.totalPoints + " total", 0, 45, 10);
         }
 
         Bukkit.broadcastMessage(ChatColor.YELLOW + "Round " + round + "/" + matchRoundLimit
-                + " complete. Every builder remains in the game.");
-        gwenLookTarget = null;
+                + " complete. Scores are calculated automatically; every builder remains in the game.");
         phase = round >= matchRoundLimit ? Phase.RESULTS : Phase.INTERMISSION;
         phaseDeadlineTick = tick + (phase == Phase.RESULTS
                 ? FINAL_RESULTS_SECONDS * 20L
@@ -720,7 +714,7 @@ public final class SpeedBuildersGame implements Listener {
 
     /** Arcade match end: accuracy first; only all-round perfect builds qualify for the time tie-break. */
     private void finishScoredMatch() {
-        if (phase != Phase.RESULTS && phase != Phase.INTERMISSION) return;
+        if (phase != Phase.RESULTS) return;
         List<PlayerState> builders = activePlayers();
         if (builders.isEmpty()) {
             finishMatch(null, "No builders remain connected.");
@@ -767,68 +761,6 @@ public final class SpeedBuildersGame implements Listener {
         return String.format(java.util.Locale.ROOT, "%.2fs", ticks * 0.05D);
     }
 
-    private void spawnGwen() {
-        removeGwen();
-        Location spawn = new Location(arena, reviewPlot.centerX() + 0.5D,
-                reviewPlot.baseY() + SpeedBuildersRules.BUILD_HEIGHT + 0.5D,
-                reviewPlot.centerZ() + 0.5D);
-        gwen = arena.spawn(spawn, ElderGuardian.class);
-        gwen.setAI(false);
-        gwen.setInvulnerable(true);
-        gwen.setSilent(true);
-        gwen.setGravity(false);
-        gwen.setPersistent(true);
-        gwen.setRemoveWhenFarAway(false);
-        gwen.setCustomName(ChatColor.AQUA + "Gwen the Guardian");
-        gwen.setCustomNameVisible(true);
-        gwenLookTarget = null;
-        gwenLookUntilTick = tick;
-        lastGwenLookTarget = null;
-    }
-
-    private void removeGwen() {
-        if (gwen != null && gwen.isValid()) gwen.remove();
-        gwen = null;
-        gwenLookTarget = null;
-        gwenLookUntilTick = 0L;
-        lastGwenLookTarget = null;
-    }
-
-    /** Gwen slowly looks between each active plot during building and judging. */
-    private void tickGwen() {
-        if (gwen == null || !gwen.isValid()) return;
-        if (phase == Phase.IDLE || phase == Phase.RESULTS) return;
-        if (gwenLookTarget == null || tick >= gwenLookUntilTick) {
-            List<PlayerState> candidates = activePlayers();
-            if (candidates.isEmpty()) return;
-            List<PlayerState> choices = candidates.stream()
-                    .filter(state -> candidates.size() == 1
-                            || !state.player.getUniqueId().equals(lastGwenLookTarget))
-                    .toList();
-            PlayerState selected = choices.get(
-                    java.util.concurrent.ThreadLocalRandom.current().nextInt(choices.size()));
-            gwenLookTarget = plotBuildMidpoint(selected.plot);
-            lastGwenLookTarget = selected.player.getUniqueId();
-            gwenLookUntilTick = tick + java.util.concurrent.ThreadLocalRandom.current().nextLong(80L, 161L);
-        }
-        faceGwen(gwenLookTarget);
-    }
-
-    private void faceGwen(Location target) {
-        if (gwen == null || !gwen.isValid() || target == null || target.getWorld() != arena) return;
-        Location facing = gwen.getLocation().clone();
-        Vector direction = target.toVector().subtract(gwen.getEyeLocation().toVector());
-        if (direction.lengthSquared() < 0.0001D) return;
-        facing.setDirection(direction);
-        gwen.teleport(facing);
-    }
-
-    private Location plotBuildMidpoint(Plot plot) {
-        return new Location(arena, plot.centerX() + 0.5D,
-                plot.baseY() + SpeedBuildersRules.BUILD_HEIGHT / 2.0D,
-                plot.centerZ() + 0.5D);
-    }
-
     private void finishMatch(Player winner, String reason) {
         Set<UUID> winnerIds = winner == null ? Set.of() : Set.of(winner.getUniqueId());
         finishMatchByIds(winnerIds, reason);
@@ -844,10 +776,8 @@ public final class SpeedBuildersGame implements Listener {
     private void finishMatchByIds(Set<UUID> winnerIds, String reason) {
         if (phase == Phase.IDLE) return;
         phase = Phase.IDLE;
-        removeMobs(reviewMobs);
         for (PlayerState state : players.values()) removeMobs(state.mobs);
         currentTemplate = null;
-        removeGwen();
         phaseDeadlineTick = 0L;
         queueDeadlineTick = -1L;
         queue.clear();
@@ -886,7 +816,6 @@ public final class SpeedBuildersGame implements Listener {
         }
         players.clear();
         matchHistory.clear();
-        restorePlot(reviewPlot);
         refreshHud();
         releaseSessionLockAfterRestoration();
     }
@@ -921,7 +850,7 @@ public final class SpeedBuildersGame implements Listener {
             int x = plot.centerX() - 3 + cell.x();
             int y = plot.baseY() + cell.y();
             int z = plot.centerZ() - 3 + cell.z();
-            Block block = arena.getBlockAt(x, y, z);
+            Block block = plot.world().getBlockAt(x, y, z);
             if (!block.getType().isAir()) {
                 actual.put(cell.coordinate(), new SpeedBuildersRules.BlockState(
                         block.getType(), block.getBlockData().getAsString()));
@@ -953,12 +882,12 @@ public final class SpeedBuildersGame implements Listener {
 
     private void pasteTemplate(Plot plot, Template template) {
         for (GroundCell cell : template.ground()) {
-            Block floor = arena.getBlockAt(plot.centerX() - 3 + cell.x(), plot.baseY() - 1,
+            Block floor = plot.world().getBlockAt(plot.centerX() - 3 + cell.x(), plot.baseY() - 1,
                     plot.centerZ() - 3 + cell.z());
             floor.setBlockData(Bukkit.createBlockData(cell.blockData()), false);
         }
         for (SpeedBuildersRules.Cell cell : template.cells()) {
-            Block block = arena.getBlockAt(plot.centerX() - 3 + cell.x(), plot.baseY() + cell.y(),
+            Block block = plot.world().getBlockAt(plot.centerX() - 3 + cell.x(), plot.baseY() + cell.y(),
                     plot.centerZ() - 3 + cell.z());
             if (cell.blockData().isBlank()) block.setType(cell.material(), false);
             else block.setBlockData(Bukkit.createBlockData(cell.blockData()), false);
@@ -971,7 +900,7 @@ public final class SpeedBuildersGame implements Listener {
 
     private void spawnTemplateMobs(PlayerState state, Plot plot, Template template) {
         for (MobCell mob : template.mobs()) {
-            Location location = new Location(arena,
+            Location location = new Location(plot.world(),
                     plot.centerX() - 3 + mob.x() + 0.5D,
                     plot.baseY() + mob.y(),
                     plot.centerZ() - 3 + mob.z() + 0.5D);
@@ -980,20 +909,9 @@ public final class SpeedBuildersGame implements Listener {
         }
     }
 
-    private void spawnReviewMobs(Template template) {
-        for (MobCell mob : template.mobs()) {
-            Location location = new Location(arena,
-                    reviewPlot.centerX() - 3 + mob.x() + 0.5D,
-                    reviewPlot.baseY() + mob.y(),
-                    reviewPlot.centerZ() - 3 + mob.z() + 0.5D);
-            Entity entity = spawnDisplayMob(location, mob.type());
-            if (entity != null) reviewMobs.add(entity);
-        }
-    }
-
     private Entity spawnDisplayMob(Location location, EntityType type) {
         try {
-            Entity entity = arena.spawnEntity(location, type);
+            Entity entity = location.getWorld().spawnEntity(location, type);
             entity.setGravity(false);
             entity.setInvulnerable(true);
             entity.setSilent(true);
@@ -1054,7 +972,7 @@ public final class SpeedBuildersGame implements Listener {
         for (int x = -3; x <= 3; x++) {
             for (int y = 0; y < SpeedBuildersRules.BUILD_HEIGHT; y++) {
                 for (int z = -3; z <= 3; z++) {
-                    arena.getBlockAt(plot.centerX() + x, plot.baseY() + y,
+                    plot.world().getBlockAt(plot.centerX() + x, plot.baseY() + y,
                             plot.centerZ() + z).setType(Material.AIR, false);
                 }
             }
@@ -1062,20 +980,23 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private void restorePlot(Plot plot) {
-        if (plot == null || arena == null) return;
+        if (plot == null || plot.world() == null) return;
         clearPlotBuildVolume(plot);
         for (GroundCell cell : plot.originalGround()) {
-            Block floor = arena.getBlockAt(plot.centerX() - 3 + cell.x(), plot.baseY() - 1,
+            Block floor = plot.world().getBlockAt(plot.centerX() - 3 + cell.x(), plot.baseY() - 1,
                     plot.centerZ() - 3 + cell.z());
             floor.setBlockData(Bukkit.createBlockData(cell.blockData()), false);
         }
     }
 
     private Plot plotFor(int index) {
-        if (index < 0 || index >= playerPlots.size()) {
+        int arenaIndex = SpeedBuildersRules.arenaIndexForPlayer(index);
+        int plotIndex = SpeedBuildersRules.plotIndexForPlayer(index);
+        int flattenedIndex = arenaIndex * SpeedBuildersRules.PLOTS_PER_ARENA + plotIndex;
+        if (flattenedIndex >= playerPlots.size()) {
             throw new IllegalArgumentException("No authored Speed Builders plot for player index " + index);
         }
-        return playerPlots.get(index);
+        return playerPlots.get(flattenedIndex);
     }
 
     private void preparePlayerForRound(PlayerState state) {
@@ -1094,7 +1015,7 @@ public final class SpeedBuildersGame implements Listener {
 
     private void teleportToPlot(PlayerState state) {
         Location spawn = nearestSourceSpawn(state.plot);
-        Location target = new Location(arena, state.plot.centerX() + 0.5D,
+        Location target = new Location(state.plot.world(), state.plot.centerX() + 0.5D,
                 state.plot.baseY(), state.plot.centerZ() + 0.5D);
         spawn.setDirection(target.toVector().subtract(spawn.toVector()));
         state.player.teleport(spawn);
@@ -1105,7 +1026,7 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private boolean isInBuildVolume(PlayerState state, org.bukkit.block.Block block) {
-        return block.getWorld() == arena
+        return block.getWorld() == state.plot.world()
                 && block.getX() >= state.plot.centerX() - 3
                 && block.getX() <= state.plot.centerX() + 3
                 && block.getY() >= state.plot.baseY()
@@ -1123,13 +1044,12 @@ public final class SpeedBuildersGame implements Listener {
             String phaseLabel = switch (phase) {
                 case VIEWING -> "MEMORISE";
                 case BUILDING -> "BUILD";
-                case REVIEWING -> "JUDGING";
-                case INTERMISSION -> "NEXT ROUND";
+                case INTERMISSION -> "ROUND RESULTS";
                 case RESULTS -> "FINAL RESULTS";
                 default -> "IDLE";
             };
             String buildName = currentTemplate == null ? "—" : currentTemplate.name();
-            String scoreLabel = phase == Phase.REVIEWING || phase == Phase.RESULTS ? percent(state.score) + "%" : "—";
+            String scoreLabel = phase == Phase.INTERMISSION || phase == Phase.RESULTS ? percent(state.score) + "%" : "—";
             state.player.sendActionBar(Component.text(phaseLabel + " | " + buildName
                     + " | Round " + round + "/" + matchRoundLimit + " | " + secondsLeft + "s | Score " + scoreLabel + " | Total " + state.totalPoints));
             drawScoreboard(state, phaseLabel, buildName, secondsLeft);
@@ -1147,7 +1067,7 @@ public final class SpeedBuildersGame implements Listener {
                 ChatColor.YELLOW + "Model: " + ChatColor.WHITE + buildName,
                 ChatColor.YELLOW + "Time: " + ChatColor.WHITE + secondsLeft + "s",
                 ChatColor.YELLOW + "Your score: " + ChatColor.WHITE
-                        + (phase == Phase.REVIEWING || phase == Phase.RESULTS ? percent(state.score) + "%" : "—"),
+                        + (phase == Phase.INTERMISSION || phase == Phase.RESULTS ? percent(state.score) + "%" : "—"),
                 ChatColor.YELLOW + "Round points: " + ChatColor.WHITE.toString() + state.roundPoints,
                 ChatColor.YELLOW + "Total points: " + ChatColor.WHITE.toString() + state.totalPoints,
                     ChatColor.YELLOW + "Perfect builds: " + ChatColor.WHITE + state.perfectBuilds,
@@ -1254,21 +1174,21 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private boolean isWithinPlot(Plot plot, Block block) {
-        return plot != null && block.getWorld() == arena
+        return plot != null && block.getWorld() == plot.world()
                 && block.getX() >= plot.centerX() - 3 && block.getX() <= plot.centerX() + 3
                 && block.getY() >= plot.baseY() - 1 && block.getY() <= plot.baseY() + 6
                 && block.getZ() >= plot.centerZ() - 3 && block.getZ() <= plot.centerZ() + 3;
     }
 
+    private boolean isArenaWorld(World world) {
+        return world != null && arenaWorlds.contains(world);
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onLiquidLeak(BlockFromToEvent event) {
-        if (event.getBlock().getWorld() != arena) return;
+        if (!isArenaWorld(event.getBlock().getWorld())) return;
         Block from = event.getBlock();
         Block to = event.getToBlock();
-        if (isWithinPlot(reviewPlot, from) != isWithinPlot(reviewPlot, to)) {
-            event.setCancelled(true);
-            return;
-        }
         for (Plot plot : playerPlots) {
             if (isWithinPlot(plot, from) != isWithinPlot(plot, to)) {
                 event.setCancelled(true);
@@ -1279,56 +1199,56 @@ public final class SpeedBuildersGame implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBuildPhysics(BlockPhysicsEvent event) {
-        if (event.getBlock().getWorld() == arena && !event.getBlock().isLiquid()) {
+        if (isArenaWorld(event.getBlock().getWorld()) && !event.getBlock().isLiquid()) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBuildGrowth(BlockGrowEvent event) {
-        if (event.getBlock().getWorld() == arena) event.setCancelled(true);
+        if (isArenaWorld(event.getBlock().getWorld())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBuildSpread(BlockSpreadEvent event) {
-        if (event.getBlock().getWorld() == arena || event.getSource().getWorld() == arena) {
+        if (isArenaWorld(event.getBlock().getWorld()) || isArenaWorld(event.getSource().getWorld())) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBuildForm(BlockFormEvent event) {
-        if (event.getBlock().getWorld() == arena) event.setCancelled(true);
+        if (isArenaWorld(event.getBlock().getWorld())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBuildFade(BlockFadeEvent event) {
-        if (event.getBlock().getWorld() == arena) event.setCancelled(true);
+        if (isArenaWorld(event.getBlock().getWorld())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBuildBurn(BlockBurnEvent event) {
-        if (event.getBlock().getWorld() == arena) event.setCancelled(true);
+        if (isArenaWorld(event.getBlock().getWorld())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBuildLeavesDecay(LeavesDecayEvent event) {
-        if (event.getBlock().getWorld() == arena) event.setCancelled(true);
+        if (isArenaWorld(event.getBlock().getWorld())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBuildStructureGrow(StructureGrowEvent event) {
-        if (event.getWorld() == arena) event.setCancelled(true);
+        if (isArenaWorld(event.getWorld())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBuildEntityChangeBlock(EntityChangeBlockEvent event) {
-        if (event.getBlock().getWorld() == arena) event.setCancelled(true);
+        if (isArenaWorld(event.getBlock().getWorld())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBuildCombust(EntityCombustEvent event) {
-        if (event.getEntity().getWorld() == arena) event.setCancelled(true);
+        if (isArenaWorld(event.getEntity().getWorld())) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -1360,7 +1280,7 @@ public final class SpeedBuildersGame implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockPlace(BlockPlaceEvent event) {
         PlayerState state = players.get(event.getPlayer().getUniqueId());
-        if (state == null || event.getBlockPlaced().getWorld() != arena) return;
+        if (state == null || event.getBlockPlaced().getWorld() != state.plot.world()) return;
         if (phase != Phase.BUILDING || state.perfect
                 || !isInBuildVolume(state, event.getBlockPlaced())) {
             event.setCancelled(true);
@@ -1389,7 +1309,7 @@ public final class SpeedBuildersGame implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
         PlayerState state = players.get(event.getPlayer().getUniqueId());
-        if (state == null || event.getBlock().getWorld() != arena) return;
+        if (state == null || event.getBlock().getWorld() != state.plot.world()) return;
         if (phase != Phase.BUILDING || state.perfect
                 || !isInBuildVolume(state, event.getBlock())) {
             event.setCancelled(true);
@@ -1428,18 +1348,6 @@ public final class SpeedBuildersGame implements Listener {
         if (otherHalf != null && otherHalf.getType() == material) otherHalf.setType(Material.AIR, false);
         state.blocksBroken++;
         Bukkit.getScheduler().runTask(plugin, () -> checkPerfectBuild(state));
-    }
-
-    private Location reviewViewLocation(int index) {
-        if (reviewPlot == null) return arena.getSpawnLocation();
-        int row = index / 4;
-        int column = index % 4;
-        double x = reviewPlot.centerX() + 0.5D + (column - 1.5D) * 2.0D;
-        double z = reviewPlot.centerZ() + 0.5D + (row - 1.5D) * 2.0D;
-        Location view = new Location(arena, x, reviewPlot.baseY() + REVIEW_HEIGHT, z);
-        view.setDirection(new org.bukkit.util.Vector(reviewPlot.centerX() + 0.5D - x, 0.0D,
-                reviewPlot.centerZ() + 0.5D - z));
-        return view;
     }
 
     private void recordBuildTime(PlayerState state, long elapsedTicks) {
@@ -1488,7 +1396,7 @@ public final class SpeedBuildersGame implements Listener {
         if (state == null ) return;
         Location to = event.getTo();
         if (to == null) return;
-        if (event.getFrom().getWorld() == arena && to.getWorld() != arena) {
+        if (event.getFrom().getWorld() == state.plot.world() && to.getWorld() != state.plot.world()) {
             event.setTo(event.getFrom());
             return;
         }
@@ -1520,7 +1428,7 @@ public final class SpeedBuildersGame implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onInventoryPickup(InventoryPickupItemEvent event) {
         if (event.getInventory().getLocation() != null
-                && event.getInventory().getLocation().getWorld() == arena) {
+                && isArenaWorld(event.getInventory().getLocation().getWorld())) {
             event.setCancelled(true);
         }
     }
@@ -1539,7 +1447,7 @@ public final class SpeedBuildersGame implements Listener {
         if (activePlayers().isEmpty()) finishMatch(null, "No builders remain connected.");
     }
 
-    private record Plot(int centerX, int baseY, int centerZ, List<GroundCell> originalGround) { }
+    private record Plot(World world, int centerX, int baseY, int centerZ, List<GroundCell> originalGround) { }
     private record GroundCell(int x, int z, Material material, String blockData) { }
 
     /** Durable pre-match player snapshot so disconnects and server restarts are safe. */
