@@ -97,6 +97,7 @@ final class SneakyAssassinsMechanics {
     private final Map<UUID, Location> npcPatrolTargets = new HashMap<>();
     private final Map<UUID, Location> npcLastMovementLocations = new HashMap<>();
     private final Map<UUID, Long> npcLastMovementAt = new HashMap<>();
+    private long nextTownNpcCullAt;
     private final Map<UUID, Item> revealerProjectiles = new HashMap<>();
     private final Map<UUID, UUID> revealerOwners = new HashMap<>();
     private final Map<UUID, Location> revealerLastLocations = new HashMap<>();
@@ -310,6 +311,7 @@ final class SneakyAssassinsMechanics {
         prepareNpcPatrolAnchors();
         for (int i = 0; i < SOURCE_NPC_COUNT; i++) spawnNpc();
         long now = System.currentTimeMillis();
+        nextTownNpcCullAt = 0L; // The source starts its 4-second NPC cull clock at Live.
         nextPowerUpAt = now + FIRST_POWERUP_DELAY_MILLIS;
         nextGlobalRevealAt = now + GLOBAL_REVEAL_INTERVAL_MILLIS;
         setupScoreboard();
@@ -325,6 +327,7 @@ final class SneakyAssassinsMechanics {
         updateDisguises(now);
         updateRevealCycle(now);
         updateNpcMovement(now);
+        updateTownNpcCull(now);
         updatePowerUps(now);
         updateMasterCompasses(now);
         if (now >= lastHudUpdateAt) {
@@ -688,6 +691,39 @@ final class SneakyAssassinsMechanics {
         Vector motion = direction.normalize().multiply(speed * 0.18D);
         motion.setY(Math.max(-0.05D, Math.min(0.12D, npc.getVelocity().getY())));
         npc.setVelocity(motion);
+    }
+
+    /**
+     * Reborn's NpcManager removes one random town villager every SLOW update
+     * (4 seconds) while Live. Match the gradual population reduction without
+     * touching player disguise proxies, which are not entries in npcIds.
+     */
+    private void updateTownNpcCull(long now) {
+        if (nextTownNpcCullAt == 0L) {
+            nextTownNpcCullAt = now + SneakyAssassinsRules.npcCullIntervalMillis();
+            return;
+        }
+        if (!SneakyAssassinsRules.shouldCullTownNpc(
+                true, now, nextTownNpcCullAt, npcIds.size())) return;
+        nextTownNpcCullAt = now + SneakyAssassinsRules.npcCullIntervalMillis();
+
+        List<UUID> candidates = npcIds.stream()
+                .filter(id -> Bukkit.getEntity(id) instanceof Villager npc && npc.isValid())
+                .toList();
+        if (candidates.isEmpty()) return;
+        UUID selected = candidates.get(ThreadLocalRandom.current().nextInt(candidates.size()));
+        Entity entity = Bukkit.getEntity(selected);
+        if (entity != null && entity.isValid()) {
+            entity.getWorld().spawnParticle(Particle.LARGE_SMOKE, entity.getLocation(),
+                    1, 0.0D, 0.0D, 0.0D, 0.0D);
+            entity.remove();
+        }
+        npcIds.remove(selected);
+        bribes.remove(selected);
+        npcNextAttackAt.remove(selected);
+        npcPatrolTargets.remove(selected);
+        npcLastMovementLocations.remove(selected);
+        npcLastMovementAt.remove(selected);
     }
 
     private Player nearestEnemy(Location location, Player owner) {
@@ -1131,6 +1167,9 @@ final class SneakyAssassinsMechanics {
         }
         bribes.remove(id);
         npcNextAttackAt.remove(id);
+        npcPatrolTargets.remove(id);
+        npcLastMovementLocations.remove(id);
+        npcLastMovementAt.remove(id);
     }
 
     void handleCombust(EntityCombustEvent event) {
@@ -1332,6 +1371,7 @@ final class SneakyAssassinsMechanics {
         npcPatrolTargets.clear();
         npcLastMovementLocations.clear();
         npcLastMovementAt.clear();
+        nextTownNpcCullAt = 0L;
         players.clear();
         hiddenViewers.clear();
         revealUntil.clear();
