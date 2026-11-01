@@ -52,15 +52,15 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void dragonsExposeServerVisibleFlareEffectChoices() {
+    void dragonsExposeServerVisibleSparklerCosmeticChoices() {
         GameDefinition dragons = new ArcadeCatalog().getGame("dragons");
-        CosmeticLineDefinition flares = dragons.getCosmeticLines().stream()
-                .filter(line -> line.getId().equals("flare-effects"))
+        CosmeticLineDefinition sparkler = dragons.getCosmeticLines().stream()
+                .filter(line -> line.getId().equals("sparkler-effects"))
                 .findFirst().orElseThrow();
-        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, flares.getSelectionMode());
-        assertEquals("classic", flares.getDefaultOptionId());
-        assertEquals(Set.of("classic", "ember", "frost", "ender", "solar", "aurora"),
-                new HashSet<>(flares.getOptions().stream().map(CosmeticOption::getId).toList()));
+        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, sparkler.getSelectionMode());
+        assertEquals("golden-thread", sparkler.getDefaultOptionId());
+        assertEquals(Set.of("golden-thread", "cinder-drift", "glacier-dust", "void-motes", "starlight", "prismatic"),
+                new HashSet<>(sparkler.getOptions().stream().map(CosmeticOption::getId).toList()));
     }
 
     @Test
