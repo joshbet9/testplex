@@ -17,14 +17,15 @@ class ArcadeRuntimeReadinessSignalTest {
 
     @TempDir Path pluginDataFolder;
 
-    @Test void publishesFullArcadeReadinessAfterIntegratedMonsterMazeRegistration() throws Exception {
+    @Test void publishesFullArcadeReadinessAfterIntegratedMonsterMazeAndWizardsRegistration() throws Exception {
         writeDeploymentIdentity();
 
-        assertTrue(ArcadeRuntimeReadinessSignal.publish(pluginDataFolder, INVOCATION_ID, 4312, true));
+        assertTrue(ArcadeRuntimeReadinessSignal.publish(pluginDataFolder, INVOCATION_ID, 4312, true, true));
         Properties signal = loadSignal();
         assertEquals("READY", signal.getProperty("status"));
         assertEquals("arcade-runtime", signal.getProperty("module"));
         assertEquals("READY", signal.getProperty("monster_maze"));
+        assertEquals("READY", signal.getProperty("wizards"));
         assertEquals("testplex-arcade", signal.getProperty("manager"));
         assertEquals(ModernArcadeLobby.WORLD_NAME, signal.getProperty("world"));
         assertEquals("100x100", signal.getProperty("plane"));
@@ -43,14 +44,21 @@ class ArcadeRuntimeReadinessSignalTest {
     @Test void refusesReadinessWhenIntegratedMonsterMazeIsNotRegistered() throws Exception {
         writeDeploymentIdentity();
         assertThrows(java.io.IOException.class,
-                () -> ArcadeRuntimeReadinessSignal.publish(pluginDataFolder, INVOCATION_ID, 4312, false));
+                () -> ArcadeRuntimeReadinessSignal.publish(pluginDataFolder, INVOCATION_ID, 4312, false, true));
+        assertFalse(Files.exists(pluginDataFolder.resolve(ArcadeRuntimeReadinessSignal.READINESS_FILE)));
+    }
+
+    @Test void refusesReadinessWhenIntegratedWizardsIsNotRegistered() throws Exception {
+        writeDeploymentIdentity();
+        assertThrows(java.io.IOException.class,
+                () -> ArcadeRuntimeReadinessSignal.publish(pluginDataFolder, INVOCATION_ID, 4312, true, false));
         assertFalse(Files.exists(pluginDataFolder.resolve(ArcadeRuntimeReadinessSignal.READINESS_FILE)));
     }
 
     @Test void rejectsInvalidInvocationIdentity() throws Exception {
         writeDeploymentIdentity();
         assertThrows(java.io.IOException.class,
-                () -> ArcadeRuntimeReadinessSignal.publish(pluginDataFolder, "invalid", 4312, true));
+                () -> ArcadeRuntimeReadinessSignal.publish(pluginDataFolder, "invalid", 4312, true, true));
         assertFalse(Files.exists(pluginDataFolder.resolve(ArcadeRuntimeReadinessSignal.READINESS_FILE)));
     }
 
