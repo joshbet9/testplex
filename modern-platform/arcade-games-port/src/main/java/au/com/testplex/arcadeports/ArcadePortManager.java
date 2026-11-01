@@ -2400,10 +2400,6 @@ public final class ArcadePortManager implements Listener {
                         microCosmeticPreferences, microId, "middle-glass-colour"));
                 session.microBorderColours.put(microId, microBattlesColourSelection(
                         microCosmeticPreferences, microId, "border-particle-colour"));
-                session.microGlassColours.put(microId, microBattlesColourSelection(
-                        microCosmeticPreferences, microId, "middle-glass-colour"));
-                session.microBorderColours.put(microId, microBattlesColourSelection(
-                        microCosmeticPreferences, microId, "border-particle-colour"));
             }
             if (type == ArcadePortGame.ONE_IN_THE_QUIVER) {
                 session.quiverKits.put(player.getUniqueId(), quiverKitPreferences.getOrDefault(player.getUniqueId(), "leaper"));
@@ -12632,10 +12628,6 @@ public final class ArcadePortManager implements Listener {
             recordDeathTagRewards(session);
         }
         recordLocalStats(session, winner, announceWinner);
-        if (session.type == ArcadePortGame.MICRO_BATTLES) {
-            removeAllMicroBorderWarnings(session);
-            for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
-        }
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             removeAllMicroBorderWarnings(session);
             for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
