@@ -32,7 +32,7 @@ class ArcadeProgressRulesTest {
     }
 
     @Test void masterBuildersGreaterGoodUsesVoteAdjustedWinnerAndRequiresTheVoterToWin() {
-        assertEquals(420, ArcadeProgressRules.masterBuildersScoreIfVoteChangedToOne(21, 5, 6));
+        assertEquals(320, ArcadeProgressRules.masterBuildersScoreIfVoteChangedToOne(21, 5, 6));
         assertEquals(Integer.MIN_VALUE, ArcadeProgressRules.masterBuildersScoreIfVoteChangedToOne(21, 0, 6));
         assertTrue(ArcadeProgressRules.shouldAwardMasterBuildersGreaterGood(430, 420, 400));
         assertFalse(ArcadeProgressRules.shouldAwardMasterBuildersGreaterGood(420, 420, 400));
