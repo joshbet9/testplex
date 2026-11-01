@@ -679,7 +679,7 @@ public final class SpeedBuildersGame implements Listener {
                     + state.score + "/" + currentTemplate.expectedScore()
                     + " matching pieces). Match total: " + state.totalPoints + ".");
             state.player.sendTitle(ChatColor.GOLD + "ROUND " + round + " RESULT",
-                    ChatColor.YELLOW + state.roundPoints + "/100 points · "
+                    ChatColor.YELLOW.toString() + state.roundPoints + "/100 points · "
                             + state.totalPoints + " total", 0, 50, 10);
         }
 
@@ -828,7 +828,7 @@ public final class SpeedBuildersGame implements Listener {
             if (player.isOnline()) {
                 if (winnerIds.contains(player.getUniqueId())) {
                     player.sendTitle(ChatColor.GOLD + "VICTORY!",
-                            ChatColor.YELLOW + state.totalPoints + " accuracy points", 5, 70, 15);
+                            ChatColor.YELLOW.toString() + state.totalPoints + " accuracy points", 5, 70, 15);
                 }
                 restoreAfterReturningToLobby(player, state.snapshot);
             }
@@ -891,6 +891,164 @@ public final class SpeedBuildersGame implements Listener {
             }
         }
         return blockScore + mobScore;
+    }
+
+    private int percent(int score) {
+        return currentTemplate == null || currentTemplate.expectedScore() == 0
+                ? 0 : (int) Math.round(score * 100.0D / currentTemplate.expectedScore());
+    }
+
+    private void pasteTemplate(Plot plot, Template template) {
+        for (GroundCell cell : template.ground()) {
+            Block floor = arena.getBlockAt(plot.centerX() - 3 + cell.x(), plot.baseY() - 1,
+                    plot.centerZ() - 3 + cell.z());
+            floor.setBlockData(Bukkit.createBlockData(cell.blockData()), false);
+        }
+        for (SpeedBuildersRules.Cell cell : template.cells()) {
+            Block block = arena.getBlockAt(plot.centerX() - 3 + cell.x(), plot.baseY() + cell.y(),
+                    plot.centerZ() - 3 + cell.z());
+            if (cell.blockData().isBlank()) block.setType(cell.material(), false);
+            else block.setBlockData(Bukkit.createBlockData(cell.blockData()), false);
+        }
+    }
+
+    private Material spawnEggMaterial(EntityType type) {
+        return type == null ? null : Material.matchMaterial(type.name() + "_SPAWN_EGG");
+    }
+
+    private void spawnTemplateMobs(PlayerState state, Plot plot, Template template) {
+        for (MobCell mob : template.mobs()) {
+            Location location = new Location(arena,
+                    plot.centerX() - 3 + mob.x() + 0.5D,
+                    plot.baseY() + mob.y(),
+                    plot.centerZ() - 3 + mob.z() + 0.5D);
+            Entity entity = spawnDisplayMob(location, mob.type());
+            if (entity != null) state.mobs.add(entity);
+        }
+    }
+
+    private void spawnReviewMobs(Template template) {
+        for (MobCell mob : template.mobs()) {
+            Location location = new Location(arena,
+                    reviewPlot.centerX() - 3 + mob.x() + 0.5D,
+                    reviewPlot.baseY() + mob.y(),
+                    reviewPlot.centerZ() - 3 + mob.z() + 0.5D);
+            Entity entity = spawnDisplayMob(location, mob.type());
+            if (entity != null) reviewMobs.add(entity);
+        }
+    }
+
+    private Entity spawnDisplayMob(Location location, EntityType type) {
+        try {
+            Entity entity = arena.spawnEntity(location, type);
+            entity.setGravity(false);
+            entity.setInvulnerable(true);
+            entity.setSilent(true);
+            entity.setPersistent(false);
+            if (entity instanceof LivingEntity living) living.setCollidable(false);
+            if (entity instanceof Mob mob) mob.setAI(false);
+            return entity;
+        } catch (RuntimeException spawnFailure) {
+            plugin.getLogger().warning("Could not spawn Speed Builders template mob " + type + ": "
+                    + spawnFailure.getMessage());
+            return null;
+        }
+    }
+
+    private void removeMobs(List<Entity> mobs) {
+        for (Entity entity : new ArrayList<>(mobs)) {
+            if (entity != null && entity.isValid()) entity.remove();
+        }
+        mobs.clear();
+    }
+
+    private void giveTemplateBlocks(Player player, Template template) {
+        Map<Material, Integer> counts = new EnumMap<>(Material.class);
+        boolean needsWaterBucket = false;
+        boolean needsLavaBucket = false;
+        for (SpeedBuildersRules.Cell cell : template.cells()) {
+            BlockData data = Bukkit.createBlockData(cell.blockData());
+            if (data instanceof Bisected bisected && bisected.getHalf() == Bisected.Half.TOP) continue;
+            if (data instanceof Bed bed && bed.getPart() == Bed.Part.HEAD) continue;
+            if (cell.material() == Material.WATER) {
+                needsWaterBucket = true;
+                continue;
+            }
+            if (cell.material() == Material.LAVA) {
+                needsLavaBucket = true;
+                continue;
+            }
+            counts.merge(cell.material(), 1, Integer::sum);
+        }
+        for (Map.Entry<Material, Integer> entry : counts.entrySet()) {
+            int remaining = entry.getValue();
+            while (remaining > 0) {
+                int stack = Math.min(64, remaining);
+                player.getInventory().addItem(new ItemStack(entry.getKey(), stack));
+                remaining -= stack;
+            }
+        }
+        if (needsWaterBucket) player.getInventory().addItem(new ItemStack(Material.WATER_BUCKET));
+        if (needsLavaBucket) player.getInventory().addItem(new ItemStack(Material.LAVA_BUCKET));
+        for (MobCell mob : template.mobs()) {
+            Material spawnEgg = spawnEggMaterial(mob.type());
+            if (spawnEgg != null) player.getInventory().addItem(new ItemStack(spawnEgg));
+        }
+    }
+
+    private void clearPlotBuildVolume(Plot plot) {
+        if (plot == null) return;
+        for (int x = -3; x <= 3; x++) {
+            for (int y = 0; y < SpeedBuildersRules.BUILD_HEIGHT; y++) {
+                for (int z = -3; z <= 3; z++) {
+                    arena.getBlockAt(plot.centerX() + x, plot.baseY() + y,
+                            plot.centerZ() + z).setType(Material.AIR, false);
+                }
+            }
+        }
+    }
+
+    private void restorePlot(Plot plot) {
+        if (plot == null || arena == null) return;
+        clearPlotBuildVolume(plot);
+        for (GroundCell cell : plot.originalGround()) {
+            Block floor = arena.getBlockAt(plot.centerX() - 3 + cell.x(), plot.baseY() - 1,
+                    plot.centerZ() - 3 + cell.z());
+            floor.setBlockData(Bukkit.createBlockData(cell.blockData()), false);
+        }
+    }
+
+    private Plot plotFor(int index) {
+        if (index < 0 || index >= playerPlots.size()) {
+            throw new IllegalArgumentException("No authored Speed Builders plot for player index " + index);
+        }
+        return playerPlots.get(index);
+    }
+
+    private void preparePlayerForRound(PlayerState state) {
+        Player player = state.player;
+        player.setGameMode(GameMode.SURVIVAL);
+        player.setAllowFlight(false);
+        player.setFlying(false);
+        player.getInventory().clear();
+        player.setHealth(player.getMaxHealth());
+        player.setFoodLevel(20);
+        player.setSaturation(20.0F);
+        player.setFireTicks(0);
+        player.setFallDistance(0.0F);
+        teleportToPlot(state);
+    }
+
+    private void teleportToPlot(PlayerState state) {
+        Location spawn = nearestSourceSpawn(state.plot);
+        Location target = new Location(arena, state.plot.centerX() + 0.5D,
+                state.plot.baseY(), state.plot.centerZ() + 0.5D);
+        spawn.setDirection(target.toVector().subtract(spawn.toVector()));
+        state.player.teleport(spawn);
+    }
+
+    private List<PlayerState> activePlayers() {
+        return players.values().stream().filter(state -> state.player.isOnline()).toList();
     }
 
     private boolean isInBuildVolume(PlayerState state, org.bukkit.block.Block block) {
