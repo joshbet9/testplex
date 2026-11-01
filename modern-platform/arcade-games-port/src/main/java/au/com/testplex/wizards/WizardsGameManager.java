@@ -95,7 +95,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     private static final List<String> WIZARDS_MAP_FOLDERS = List.of("Wizards", "Nano Wizards");
 
     private List<String> enabledWizardsMapFolders() {
-        return plugin.getConfig().getBoolean("wizards.include-nano-maps", false)
+        return plugin.getConfig().getBoolean("wizards.include-nano-maps", true)
                 ? WIZARDS_MAP_FOLDERS : List.of("Wizards");
     }
 
