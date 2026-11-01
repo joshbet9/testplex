@@ -2612,6 +2612,9 @@ public final class ArcadePortManager implements Listener {
             }
         }
         active = session;
+        if (type == ArcadePortGame.SKY_WARS) {
+            initializeSkyWarsMapResources(session, sourceMapData.get(type.id()));
+        }
         long now = System.currentTimeMillis();
         session.startedAt = now;
         session.prepareDurationMillis = ArcadeLobbyLifecycleRules.prepareSeconds(
@@ -5548,6 +5551,130 @@ public final class ArcadePortManager implements Listener {
         player.setAllowFlight(false);
         player.setFlying(false);
         player.updateInventory();
+    }
+
+    /**
+     * Reborn's SkyWars ParseData clears custom marker 19 sponges and converts
+     * custom marker 56 ore slots to stone. Prepare then generates diamond, iron
+     * and gravel veins independently around each authored player-island spawn.
+     */
+    private void initializeSkyWarsMapResources(Session session, SourceMapCatalog.MapData map) {
+        if (session == null || map == null || session.type != ArcadePortGame.SKY_WARS) return;
+
+        for (Location marker : map.customLocations("19")) {
+            marker.getBlock().setType(Material.AIR, false);
+        }
+
+        Set<Block> oreSlots = new java.util.LinkedHashSet<>();
+        for (Location marker : map.customLocations("56")) {
+            Block block = marker.getBlock();
+            block.setType(Material.STONE, false);
+            oreSlots.add(block);
+        }
+
+        List<Location> starts = map.spawnLocations();
+        if (starts.isEmpty()) starts = map.dataLocations("GREEN");
+        if (starts.isEmpty() || oreSlots.isEmpty()) return;
+
+        List<List<Block>> islandOreSlots = new ArrayList<>();
+        for (int i = 0; i < starts.size(); i++) islandOreSlots.add(new ArrayList<>());
+        for (Block slot : oreSlots) {
+            int nearestSpawn = -1;
+            double nearestDistanceSquared = Double.MAX_VALUE;
+            for (int i = 0; i < starts.size(); i++) {
+                Location spawn = starts.get(i);
+                double dx = slot.getX() + 0.5D - spawn.getX();
+                double dz = slot.getZ() + 0.5D - spawn.getZ();
+                double distanceSquared = dx * dx + dz * dz;
+                if (distanceSquared < nearestDistanceSquared) {
+                    nearestDistanceSquared = distanceSquared;
+                    nearestSpawn = i;
+                }
+            }
+            if (nearestSpawn >= 0 && nearestDistanceSquared
+                    <= SkyWarsMixedArcadeRules.ORE_ISLAND_RADIUS_BLOCKS
+                            * SkyWarsMixedArcadeRules.ORE_ISLAND_RADIUS_BLOCKS) {
+                islandOreSlots.get(nearestSpawn).add(slot);
+            }
+        }
+
+        int islandIndex = 0;
+        for (List<Block> slots : islandOreSlots) {
+            if (slots.isEmpty()) {
+                islandIndex++;
+                continue;
+            }
+            createSkyWarsOreVeins(session, slots,
+                    Material.DIAMOND_ORE, SkyWarsMixedArcadeRules.DIAMOND_VEINS_PER_ISLAND,
+                    SkyWarsMixedArcadeRules.DIAMOND_VEIN_SIZE, true);
+            createSkyWarsOreVeins(session, slots,
+                    Material.IRON_ORE, SkyWarsMixedArcadeRules.IRON_VEINS_PER_ISLAND,
+                    -1, true);
+            createSkyWarsOreVeins(session, slots,
+                    Material.GRAVEL, SkyWarsMixedArcadeRules.GRAVEL_VEINS_PER_ISLAND,
+                    -1, false);
+            islandIndex++;
+        }
+        plugin.getLogger().info("Prepared SkyWars source resources: cleared "
+                + map.customLocations("19").size() + " sponge marker(s), converted "
+                + oreSlots.size() + " ore slot(s), and distributed original ore veins across "
+                + islandOreSlots.size() + " authored island spawn(s).");
+    }
+
+    private void createSkyWarsOreVeins(Session session, List<Block> remainingSlots,
+            Material oreType, int veinCount, int fixedVeinSize, boolean allowAboveAir) {
+        for (int vein = 0; vein < veinCount && !remainingSlots.isEmpty(); vein++) {
+            int veinSize = fixedVeinSize >= 0 ? fixedVeinSize
+                    : SkyWarsMixedArcadeRules.randomVeinSize(ThreadLocalRandom.current().nextInt(3));
+            Block current = remainingSlots.get(ThreadLocalRandom.current().nextInt(remainingSlots.size()));
+            for (int step = 0; step < veinSize && current != null; step++) {
+                if (allowAboveAir || !current.getRelative(BlockFace.DOWN).getType().isAir()) {
+                    addSkyWarsOre(session, current, oreType);
+                }
+                remainingSlots.remove(current);
+                if (remainingSlots.isEmpty()) break;
+                Block previous = current;
+                current = remainingSlots.stream()
+                        .min(java.util.Comparator.comparingDouble(candidate ->
+                                candidate.getLocation().distanceSquared(previous.getLocation())))
+                        .orElse(null);
+            }
+        }
+    }
+
+    private void addSkyWarsOre(Session session, Block oreBlock, Material oreType) {
+        boolean hasNonOccludingNeighbour = false;
+        for (int dx = -1; dx <= 1 && !hasNonOccludingNeighbour; dx++) {
+            for (int dy = -1; dy <= 1 && !hasNonOccludingNeighbour; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dy == 0 && dz == 0) continue;
+                    if (!oreBlock.getRelative(dx, dy, dz).getType().isOccluding()) {
+                        hasNonOccludingNeighbour = true;
+                        break;
+                    }
+                }
+            }
+        }
+        if (SkyWarsMixedArcadeRules.shouldHideOre(hasNonOccludingNeighbour)) {
+            session.skyWarsHiddenOres.put(oreBlock, oreType);
+        } else {
+            oreBlock.setType(oreType, false);
+        }
+    }
+
+    /** Reveals the source OreHider's 26 neighbouring hidden ore blocks after a break/blast. */
+    private void revealSkyWarsOresAround(Session session, Block brokenBlock) {
+        if (session == null || brokenBlock == null || session.type != ArcadePortGame.SKY_WARS) return;
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    if (dx == 0 && dy == 0 && dz == 0) continue;
+                    Block neighbour = brokenBlock.getRelative(dx, dy, dz);
+                    Material hiddenOre = session.skyWarsHiddenOres.remove(neighbour);
+                    if (hiddenOre != null) neighbour.setType(hiddenOre, false);
+                }
+            }
+        }
     }
 
     private ItemStack skyWarsKitItem(Material material, String title, String lore, boolean glowing) {
@@ -13470,6 +13597,7 @@ public final class ArcadePortManager implements Listener {
         session.skyWarsIceBridgePaths.clear();
         session.skyWarsDirtProjectiles.clear();
         session.skyWarsGuardianHomes.clear();
+        session.skyWarsHiddenOres.clear();
         for (UUID playerId : new ArrayList<>(session.deathTagDisguises.keySet())) {
             removeDeathTagDisguise(session, playerId);
         }
@@ -18850,11 +18978,77 @@ public final class ArcadePortManager implements Listener {
         return material != null && ArcadePortRules.isQuiverBreakableGlassMaterial(material.name());
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSkyWarsBlockBurn(org.bukkit.event.block.BlockBurnEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.SKY_WARS
+                && event.getBlock().getWorld() == session.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSkyWarsLeavesDecay(org.bukkit.event.block.LeavesDecayEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.SKY_WARS
+                && event.getBlock().getWorld() == session.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSkyWarsBlockFade(org.bukkit.event.block.BlockFadeEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.SKY_WARS
+                && event.getBlock().getWorld() == session.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSkyWarsBlockSpread(org.bukkit.event.block.BlockSpreadEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.SKY_WARS
+                && event.getBlock().getWorld() == session.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSkyWarsEnchant(org.bukkit.event.enchantment.EnchantItemEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SKY_WARS
+                || event.getEnchanter().getWorld() != session.world) return;
+        if (event.getEnchantsToAdd().containsKey(org.bukkit.enchantments.Enchantment.FIRE_ASPECT)) {
+            event.getEnchanter().sendMessage(ChatColor.RED + "You cannot enchant with Fire Aspect.");
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.SKY_WARS
+                && session.alive.contains(event.getPlayer().getUniqueId())) {
+            Block broken = event.getBlock();
+            Material material = broken.getType();
+            event.setExpToDrop(0);
+            revealSkyWarsOresAround(session, broken);
+
+            Material bonusDrop = switch (material) {
+                case COBWEB -> Material.STRING;
+                case GRAVEL -> Material.FLINT;
+                case IRON_ORE -> Material.IRON_INGOT;
+                default -> null;
+            };
+            if (bonusDrop != null) {
+                int amount = switch (material) {
+                    case COBWEB -> 1 + ThreadLocalRandom.current().nextInt(2);
+                    case GRAVEL -> 1 + ThreadLocalRandom.current().nextInt(3);
+                    default -> 1;
+                };
+                event.setDropItems(false);
+                event.setCancelled(true);
+                broken.setType(Material.AIR, false);
+                broken.getWorld().dropItemNaturally(
+                        broken.getLocation().add(0.5D, 0.5D, 0.5D), new ItemStack(bonusDrop, amount));
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.DRAW_MY_THING) {
             event.setCancelled(true);
             return;
@@ -18961,6 +19155,16 @@ public final class ArcadePortManager implements Listener {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
         Session session = active;
         if (session == null || event.getBlock().getWorld() != session.world) return;
+        if (session.type == ArcadePortGame.SKY_WARS) {
+            SourceMapCatalog.MapData map = sourceMapData.get(session.type.id());
+            int mapMaxY = map != null && map.hasVerticalBounds() ? map.maxY() : session.world.getMaxHeight();
+            if (SkyWarsMixedArcadeRules.shouldBlockSkyWarsPlacement(
+                    event.getBlockPlaced().getType().name(), event.getBlockPlaced().getY(), mapMaxY)) {
+                event.setCancelled(true);
+                event.getPlayer().sendMessage(ChatColor.YELLOW + "You cannot place that block here or above the map height limit.");
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.SNEAKY_ASSASSINS) {
             event.setCancelled(true);
             return;
@@ -20833,6 +21037,11 @@ public final class ArcadePortManager implements Listener {
             skull.remove();
             return;
         }
+        if (session.type == ArcadePortGame.SKY_WARS) {
+            for (Block broken : new ArrayList<>(event.blockList())) {
+                revealSkyWarsOresAround(session, broken);
+            }
+        }
         if (!(event.getEntity() instanceof TNTPrimed bomb)) {
             event.blockList().clear();
             event.setCancelled(true);
@@ -21767,6 +21976,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> skyWarsLastTntThrowAt = new HashMap<>();
         final Map<UUID, UUID> skyWarsTntOwners = new HashMap<>();
         final Map<UUID, Location> skyWarsGuardianHomes = new HashMap<>();
+        final Map<Block, Material> skyWarsHiddenOres = new HashMap<>();
         ArmorStand skyWarsGeneratorHolder;
         UUID skyWarsGeneratorHolderId;
         Block skyWarsGeneratorBase;
