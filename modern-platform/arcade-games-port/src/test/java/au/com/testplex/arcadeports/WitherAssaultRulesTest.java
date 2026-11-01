@@ -35,6 +35,19 @@ final class WitherAssaultRulesTest {
     }
 
     @Test
+    void witherSwordClicksMatchTheSourceAbilityLayout() {
+        assertTrue(WitherAssaultRules.shouldLaunchSkull("golden_sword", true));
+        assertFalse(WitherAssaultRules.shouldLaunchSkull("golden_sword", false));
+        assertTrue(WitherAssaultRules.shouldLaunchMinions("diamond_sword", true));
+        assertFalse(WitherAssaultRules.shouldLaunchMinions("diamond_sword", false));
+        assertTrue(WitherAssaultRules.shouldStartFireStorm("golden_sword", true));
+        assertTrue(WitherAssaultRules.shouldStartFireStorm("diamond_sword", true));
+        assertFalse(WitherAssaultRules.shouldStartFireStorm("golden_sword", false));
+        assertFalse(WitherAssaultRules.shouldStartFireStorm("shield", true));
+        assertFalse(WitherAssaultRules.shouldStartFireStorm("compass", true));
+    }
+
+    @Test
     void archerAndEditorShareFletcherAndSmokeArrowButMedicDoesNot() {
         assertTrue(WitherAssaultRules.hasFletcher("archer"));
         assertTrue(WitherAssaultRules.hasFletcher("editor"));
