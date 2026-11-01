@@ -15,6 +15,13 @@ final class ArcadeLobbyLifecycleRules {
     /** Gameplay input is not accepted until the session's Prepare phase has ended. */
     static boolean gameplayInputAllowed(boolean liveStarted) { return liveStarted; }
 
+    /** Move an absolute game timestamp forward by time spent in the Prepare phase. */
+    static long shiftPausedTimestamp(long timestamp, long pausedMillis) {
+        if (timestamp <= 0L || pausedMillis <= 0L) return timestamp;
+        if (timestamp > Long.MAX_VALUE - pausedMillis) return Long.MAX_VALUE;
+        return timestamp + pausedMillis;
+    }
+
     static int prepareSeconds(int seconds) { return Math.max(3, Math.min(30, seconds)); }
     static int endPresentationSeconds(int seconds) { return Math.max(0, Math.min(30, seconds)); }
     static String countdownStatus(int seconds) { return "Starting in " + Math.max(0, seconds) + " Seconds"; }
