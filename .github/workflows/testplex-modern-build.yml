@@ -194,7 +194,7 @@ jobs:
           grep -Fxq "enabled: true" <<< "$snake_config"
           grep -Fxq "readiness-revision: snake-controlled-acceptance-20261101-v1" <<< "$snake_config"
           grep -Fq 'private static final boolean READY_FOR_TEST = true;' modern-platform/snake-port/src/main/java/au/com/testplex/snake/SnakeModernPlugin.java
-          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 28 Arcade catalogue games are packaged, and the 26-game controlled acceptance queue includes Speed Builders with its dedicated 16-player mechanics. CI compares all 420 original enabled map archives with the packaged JAR; Wither Assault and Sneaky Assassins are explicitly generated-arena test exceptions. Wizards remains a separate disabled module; Speed Builders Arcade and Hoops Remastered are tracked outside the enabled queue."
+          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, 28 Arcade catalogue games are packaged, and the 26-game controlled acceptance queue includes Speed Builders with its dedicated 16-player mechanics. CI compares all 420 original enabled map archives with the packaged JAR; Wither Assault and Sneaky Assassins are explicitly generated-arena test exceptions. Wizards remains a separate disabled module; Hoops Remastered remains outside the enabled queue. Speed Builders is manually queued through /arcadeport play speed-builders."
 
       - name: Validate independent deployment recovery and shell syntax
         shell: bash
