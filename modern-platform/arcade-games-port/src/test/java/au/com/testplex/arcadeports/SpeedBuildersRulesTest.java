@@ -119,6 +119,26 @@ class SpeedBuildersRulesTest {
     }
 
     @Test
+    void highestCumulativeScoreWinsAndTiedPlayersShareTheWin() {
+        assertEquals(List.of("builder-b", "builder-c"),
+                SpeedBuildersRules.highestScorers(Map.of(
+                        "builder-a", 280,
+                        "builder-b", 410,
+                        "builder-c", 410,
+                        "builder-d", 95)));
+        assertEquals(List.of("only"), SpeedBuildersRules.highestScorers(Map.of("only", 0)));
+        assertEquals(List.of(), SpeedBuildersRules.highestScorers(Map.of()));
+    }
+
+    @Test
+    void cumulativeWinnerCalculationRejectsMalformedScores() {
+        assertThrows(IllegalArgumentException.class,
+                () -> SpeedBuildersRules.highestScorers(Map.of("", 10)));
+        assertThrows(IllegalArgumentException.class,
+                () -> SpeedBuildersRules.highestScorers(Map.of("builder", -1)));
+    }
+
+    @Test
     void accuracyPointsAreNormalizedWithoutEliminatingLowScorers() {
         assertEquals(0, SpeedBuildersRules.roundPoints(0, 10));
         assertEquals(33, SpeedBuildersRules.roundPoints(1, 3));
