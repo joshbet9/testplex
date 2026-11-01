@@ -3903,6 +3903,206 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
+
+    private void activateDanaPulseHeal(Player player) {
+        String skill = "dana.pulse_heal";
+        if (!isHeroSkillReady(player, skill)) return;
+        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_COOLDOWN_MILLIS);
+        int team = teams.getOrDefault(player.getUniqueId(), -1);
+        double radius = ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_RADIUS;
+        for (Entity entity : world.getNearbyEntities(player.getLocation(), radius, radius, radius)) {
+            if (!(entity instanceof LivingEntity target) || !target.isValid() || target.isDead()
+                    || player.getLocation().distanceSquared(target.getLocation()) > radius * radius
+                    || heroesOfGwenEntityTeam(target) != team) continue;
+            var maximumHealth = target.getAttribute(Attribute.MAX_HEALTH);
+            if (maximumHealth == null) continue;
+            double amount = target.equals(player)
+                    ? ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_SELF
+                    : ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_ALLY;
+            target.setHealth(Math.min(maximumHealth.getValue(), target.getHealth() + amount));
+            world.spawnParticle(Particle.HAPPY_VILLAGER,
+                    target.getLocation().clone().add(0.0D, 1.0D, 0.0D),
+                    8, 0.45D, 0.5D, 0.45D, 0.06D);
+        }
+        player.playSound(player.getLocation(), Sound.BLOCK_BEACON_POWER_SELECT, 0.9F, 1.3F);
+        player.sendActionBar(ChatColor.GREEN + "Pulse Heal!");
+        for (int angle = 0; angle < 360; angle += 15) {
+            double radians = Math.toRadians(angle);
+            Location particle = player.getLocation().clone().add(
+                    Math.cos(radians) * radius, 0.5D, Math.sin(radians) * radius);
+            world.spawnParticle(Particle.HAPPY_VILLAGER, particle, 1, 0.0D, 0.0D, 0.0D, 0.02D);
+        }
+    }
+
+    private void activateDanaKnockUp(Player player) {
+        String skill = "dana.knock_up";
+        if (!isHeroSkillReady(player, skill)) return;
+        long now = System.currentTimeMillis();
+        danaKnockUpEndsAt.put(player.getUniqueId(),
+                now + ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_DURATION_MILLIS);
+        danaKnockUpNextHitAt.put(player.getUniqueId(), new HashMap<>());
+        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_COOLDOWN_MILLIS);
+        player.playSound(player.getLocation(), Sound.ENTITY_BLAZE_HURT, 1.5F, 0.4F);
+    }
+
+    private void beginDanaRally(Player player) {
+        UUID id = player.getUniqueId();
+        if (danaRallies.containsKey(id) || !isHeroSkillReady(player, "dana.rally")) return;
+        Vector leap = player.getLocation().getDirection();
+        leap.setY(ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_JUMP_VERTICAL_VELOCITY);
+        player.setVelocity(leap);
+        danaRallies.put(id, new DanaRallyState(System.currentTimeMillis()));
+        player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_ATTACK_SWEEP, 1.0F, 0.8F);
+        world.spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0.0D, 0.7D, 0.0D),
+                20, 0.5D, 0.5D, 0.5D, 0.08D);
+    }
+
+    private void landDanaRally(Player player, DanaRallyState state, long now) {
+        state.landed = true;
+        state.center = player.getLocation().clone();
+        state.endsAt = now + ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_BANNER_DURATION_MILLIS;
+        state.nextHealAt = now + 1_000L;
+        setHeroSkillCooldown(player, "dana.rally", ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_REUSE_DELAY_MILLIS);
+
+        Block bannerBlock = state.center.getBlock();
+        state.bannerBlock = bannerBlock;
+        state.originalBannerBlockData = bannerBlock.getBlockData().clone();
+        if (bannerBlock.isPassable()) {
+            bannerBlock.setType(teams.getOrDefault(player.getUniqueId(), 0) == 0
+                    ? Material.RED_BANNER : Material.BLUE_BANNER, false);
+            state.bannerPlaced = true;
+        }
+
+        int team = teams.getOrDefault(player.getUniqueId(), -1);
+        double damageRadius = ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE_RADIUS;
+        for (Entity entity : world.getNearbyEntities(state.center, damageRadius, damageRadius, damageRadius)) {
+            if (!(entity instanceof LivingEntity target) || target.equals(player)
+                    || !target.isValid() || target.isDead()
+                    || state.center.distanceSquared(target.getLocation()) > damageRadius * damageRadius
+                    || heroesOfGwenEntityTeam(target) == team) continue;
+            if (target instanceof Player targetPlayer && !activePlayers.contains(targetPlayer.getUniqueId())) continue;
+            TowerState tower = towerFor(target);
+            if (tower != null) {
+                if (tower.owner != team && canDamageMobaTower(tower, team)
+                        && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                    damageMobaTower(tower, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE, player);
+                }
+            } else {
+                target.damage(ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE, player);
+            }
+        }
+        player.sendMessage(ChatColor.GOLD + "Rally banner planted! Allies nearby are healed.");
+        player.playSound(state.center, Sound.BLOCK_BELL_USE, 1.0F, 1.2F);
+        world.spawnParticle(Particle.HAPPY_VILLAGER, state.center.clone().add(0.0D, 1.0D, 0.0D),
+                28, 1.0D, 0.7D, 1.0D, 0.08D);
+    }
+
+    private void updateDanaAbilities(long now) {
+        for (Map.Entry<UUID, Long> entry : new HashMap<>(danaKnockUpEndsAt).entrySet()) {
+            UUID id = entry.getKey();
+            Player player = players.get(id);
+            if (now >= entry.getValue() || player == null || !player.isOnline()
+                    || !activePlayers.contains(id) || !"dana".equals(selectedHeroesOfGwen.get(id))) {
+                if (player != null && player.isOnline()) player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+                danaKnockUpEndsAt.remove(id);
+                danaKnockUpNextHitAt.remove(id);
+                continue;
+            }
+
+            Vector direction = player.getLocation().getDirection();
+            direction.setY(0.0D);
+            if (direction.lengthSquared() > 0.001D) {
+                player.setVelocity(direction.normalize()
+                        .multiply(ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_SPEED));
+            }
+            world.spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0.0D, 1.0D, 0.0D),
+                    6, 0.5D, 0.35D, 0.5D, 0.04D);
+
+            Map<UUID, Long> nextHitAt = danaKnockUpNextHitAt.computeIfAbsent(id, ignored -> new HashMap<>());
+            double radius = ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_COLLISION_RADIUS;
+            int attackerTeam = teams.getOrDefault(id, -1);
+            for (Entity entity : world.getNearbyEntities(player.getLocation(), radius, radius, radius)) {
+                if (!(entity instanceof LivingEntity target) || target.equals(player)
+                        || !target.isValid() || target.isDead()
+                        || player.getLocation().distanceSquared(target.getLocation()) > radius * radius
+                        || heroesOfGwenEntityTeam(target) == attackerTeam
+                        || nextHitAt.getOrDefault(target.getUniqueId(), 0L) > now) continue;
+                if (target instanceof Player targetPlayer && !activePlayers.contains(targetPlayer.getUniqueId())) continue;
+                nextHitAt.put(target.getUniqueId(),
+                        now + ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_TARGET_RECHARGE_MILLIS);
+                if (target instanceof Player) {
+                    target.damage(ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_DAMAGE, player);
+                    target.setVelocity(new Vector(Math.random() / 2.0D - 0.25D,
+                            ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_LIFT,
+                            Math.random() / 2.0D - 0.25D));
+                } else {
+                    target.damage(ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_DAMAGE, player);
+                    target.setVelocity(new Vector(Math.random() - 0.5D,
+                            ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_LIFT,
+                            Math.random() - 0.5D));
+                }
+                target.getWorld().playSound(target.getLocation(), Sound.ENTITY_IRON_GOLEM_HURT, 1.0F, 0.5F);
+            }
+        }
+
+        for (Map.Entry<UUID, DanaRallyState> entry : new HashMap<>(danaRallies).entrySet()) {
+            UUID id = entry.getKey();
+            Player player = players.get(id);
+            DanaRallyState state = entry.getValue();
+            if (player == null || !player.isOnline() || !activePlayers.contains(id)
+                    || !"dana".equals(selectedHeroesOfGwen.get(id))) {
+                endDanaRally(id);
+                continue;
+            }
+            if (!state.landed) {
+                if (now - state.launchedAt >= ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_MINIMUM_FLIGHT_MILLIS
+                        && player.isOnGround()) {
+                    landDanaRally(player, state, now);
+                }
+                continue;
+            }
+            if (now >= state.endsAt) {
+                endDanaRally(id);
+                continue;
+            }
+            if (now >= state.nextHealAt) {
+                double radius = ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS;
+                int team = teams.getOrDefault(id, -1);
+                for (Player teammate : activeMatchPlayers()) {
+                    if (teams.getOrDefault(teammate.getUniqueId(), -2) != team
+                            || teammate.getLocation().distanceSquared(state.center) > radius * radius) continue;
+                    teammate.setHealth(Math.min(teammate.getMaxHealth(), teammate.getHealth()
+                            + ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_PER_SECOND));
+                    world.spawnParticle(Particle.HAPPY_VILLAGER,
+                            teammate.getLocation().clone().add(0.0D, 1.0D, 0.0D),
+                            4, 0.3D, 0.35D, 0.3D, 0.04D);
+                }
+                state.nextHealAt = now + 1_000L;
+            }
+            for (int angle = 0; angle < 360; angle += 30) {
+                double radians = Math.toRadians(angle);
+                Location particle = state.center.clone().add(
+                        Math.cos(radians) * ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS,
+                        0.35D, Math.sin(radians) * ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS);
+                world.spawnParticle(Particle.HAPPY_VILLAGER, particle, 1, 0.0D, 0.0D, 0.0D, 0.01D);
+            }
+        }
+    }
+
+    private void endDanaRally(UUID ownerId) {
+        DanaRallyState state = danaRallies.remove(ownerId);
+        if (state == null || !state.bannerPlaced || state.bannerBlock == null) return;
+        if (state.bannerBlock.getType() == Material.RED_BANNER || state.bannerBlock.getType() == Material.BLUE_BANNER) {
+            state.bannerBlock.setBlockData(state.originalBannerBlockData, false);
+        }
+    }
+
+    private void removeDanaState(UUID ownerId) {
+        danaKnockUpEndsAt.remove(ownerId);
+        danaKnockUpNextHitAt.remove(ownerId);
+        endDanaRally(ownerId);
+    }
+
     private void markHeroProjectile(Projectile projectile, Player owner, String type) {
         projectile.getPersistentDataContainer().set(heroProjectileTypeKey, PersistentDataType.STRING, type);
         projectile.getPersistentDataContainer().set(heroProjectileOwnerKey, PersistentDataType.STRING,
