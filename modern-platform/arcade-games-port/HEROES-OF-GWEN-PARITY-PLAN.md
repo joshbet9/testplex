@@ -100,3 +100,12 @@ The next source-documented Mage slice is implemented on branch feat/heroes-of-gw
 - Added deterministic rule tests for both abilities' documented range, height, cooldown, radius, duration and damage cadence.
 
 **Still incomplete for Anath:** Flame Wand basic-attack behaviour and Flame Dash exact movement/damage data are not present in the current accessible archive reference, so their slots are represented but not invented. The other six hero ability sets, source Wither movement/targeting, Pumpkin King sidequest and role-shop/passive verification also remain open. Heroes of Gwen stays `MECHANICS_IN_PROGRESS` and disabled.
+
+
+### Additional Hunter parity — Rowena and Fletcher
+
+- Add Rowena's documented hotbar layout: Bow, Light Arrows, Combat Slide, Bombardment, Fletched Arrows and Gold Shop.
+- Implement Fletcher passive with the archived per-hero limits: Rowena receives one arrow every 2 seconds (maximum 2); Devon receives one arrow every 3 seconds (maximum 3).
+- Add deterministic tests for both Hunter reload intervals and ammo caps.
+
+**Remaining:** Rowena's Light Arrows, Combat Slide and Bombardment effects still require their own mechanics references; those slots are shown but are not advertised as implemented.
