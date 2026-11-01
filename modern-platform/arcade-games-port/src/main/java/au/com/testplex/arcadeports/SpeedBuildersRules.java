@@ -238,6 +238,27 @@ public final class SpeedBuildersRules {
     }
 
     /**
+     * Returns all UUID/player keys with the highest cumulative score. Ties are shared wins.
+     * A missing roster produces no winner; malformed totals are rejected.
+     */
+    public static List<String> highestScorers(Map<String, Integer> totalScores) {
+        Objects.requireNonNull(totalScores, "totalScores");
+        if (totalScores.isEmpty()) return List.of();
+        for (Map.Entry<String, Integer> entry : totalScores.entrySet()) {
+            if (entry.getKey() == null || entry.getKey().isBlank()
+                    || entry.getValue() == null || entry.getValue() < 0) {
+                throw new IllegalArgumentException("Invalid Speed Builders cumulative score.");
+            }
+        }
+        int highest = totalScores.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+        return totalScores.entrySet().stream()
+                .filter(entry -> entry.getValue() == highest)
+                .map(Map.Entry::getKey)
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
+    }
+
+    /**
      * Converts a round's matched model pieces into a normalized 0–100 accuracy score.
      * All builders receive points; missing pieces reduce accuracy but never remove a player.
      */
