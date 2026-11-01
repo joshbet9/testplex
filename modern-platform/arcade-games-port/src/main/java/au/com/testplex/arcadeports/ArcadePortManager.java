@@ -6991,6 +6991,8 @@ public final class ArcadePortManager implements Listener {
             // Reborn checks water on FASTER and applies a separate 500ms Recharge to each player.
             for (Player player : new ArrayList<>(alivePlayers(session))) {
                 UUID id = player.getUniqueId();
+                // Tamer is piloting the dragon as a hidden spectator; its camera position is not a combatant.
+                if (session.dragonTamerControls.containsKey(id)) continue;
                 long nextDamageAt = session.dragonWaterDamageNextAt.getOrDefault(id, 0L);
                 if (now < nextDamageAt) continue;
                 session.dragonWaterDamageNextAt.put(id,
