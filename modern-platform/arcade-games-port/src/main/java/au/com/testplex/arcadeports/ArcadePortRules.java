@@ -2862,6 +2862,37 @@ public final class ArcadePortRules {
         return 0L;
     }
 
+    // Ivy — source values from SkillHook, SkillFloralLeap and SkillBoxingRing.
+    public static final long HEROES_OF_GWEN_IVY_VINE_PULL_COOLDOWN_MILLIS = 10_000L;
+    public static final double HEROES_OF_GWEN_IVY_VINE_PULL_RANGE = 9.0D;
+    public static final double HEROES_OF_GWEN_IVY_VINE_PULL_BEAM_STEP = 0.25D;
+    public static final double HEROES_OF_GWEN_IVY_VINE_PULL_HIT_RADIUS = 2.0D;
+    public static final double HEROES_OF_GWEN_IVY_VINE_PULL_STOP_DISTANCE_SQUARED = 4.0D;
+    public static final int HEROES_OF_GWEN_IVY_VINE_PULL_PLAYER_DAMAGE = 4;
+    public static final int HEROES_OF_GWEN_IVY_VINE_PULL_MINION_DAMAGE = 6;
+    public static final int HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_TICKS = 60;
+    public static final int HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_AMPLIFIER = 2;
+    public static final long HEROES_OF_GWEN_IVY_VINE_PULL_MAX_PULL_MILLIS = 8_000L;
+    public static final long HEROES_OF_GWEN_IVY_FLORAL_LEAP_COOLDOWN_MILLIS = 11_000L;
+    public static final double HEROES_OF_GWEN_IVY_FLORAL_LEAP_VERTICAL_VELOCITY = 1.2D;
+    public static final long HEROES_OF_GWEN_IVY_FLORAL_LEAP_MINIMUM_FLIGHT_MILLIS = 500L;
+    public static final long HEROES_OF_GWEN_IVY_FLORAL_LEAP_BED_DURATION_MILLIS = 5_000L;
+    public static final long HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_INTERVAL_MILLIS = 1_000L;
+    public static final double HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_RADIUS = 5.0D;
+    public static final int HEROES_OF_GWEN_IVY_FLORAL_LEAP_FLOWER_RADIUS = 3;
+    public static final int HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE = 2;
+    public static final int HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_TICKS = 50;
+    public static final int HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_AMPLIFIER = 2;
+    public static final long HEROES_OF_GWEN_IVY_THORN_WALL_COOLDOWN_MILLIS = 45_000L;
+    public static final long HEROES_OF_GWEN_IVY_THORN_WALL_DURATION_MILLIS = 5_000L;
+    public static final int HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS = 3;
+    public static final long HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_TICKS = 60L;
+    public static final int HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_AMPLIFIER = 1;
+    public static final long HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_MILLIS = 2_000L;
+    public static final long HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_RECHARGE_MILLIS = 2_000L;
+    public static final long HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE_RECHARGE_MILLIS = 900L;
+    public static final int HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE = 2;
+
     // Biff — source values from SkillLeash, SkillBiffDash and SkillWarHorse.
     public static final long HEROES_OF_GWEN_BIFF_TETHER_COOLDOWN_MILLIS = 12_000L;
     public static final long HEROES_OF_GWEN_BIFF_TETHER_ACTIVE_MILLIS = 5_000L;
