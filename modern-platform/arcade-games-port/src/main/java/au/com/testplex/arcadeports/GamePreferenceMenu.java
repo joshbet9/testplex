@@ -182,13 +182,8 @@ public final class GamePreferenceMenu implements Listener {
         for (String id : pool) {
             if (!cleared.contains(id)) continue;
             ArcadePortGame game = ArcadePortGame.fromId(id);
-            if (game == null || !seen.add(game.id())) continue;
-            if (SourceMapCatalog.hasMap(game)) {
-                String selectedResource = plugin.getConfig().getString("selected-maps." + game.id(),
-                        SourceMapCatalog.selectedResource(plugin, game));
-                if (selectedResource == null
-                        || !SourceMapCatalog.isInstalledResource(plugin, game, selectedResource)) continue;
-            }
+            if (game == null || !seen.add(game.id())
+                    || !manager.isRotationCandidateAvailable(game)) continue;
             games.add(game);
         }
         return games;
