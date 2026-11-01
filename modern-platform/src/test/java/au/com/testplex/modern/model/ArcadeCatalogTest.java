@@ -39,15 +39,15 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void castleAssaultAndHeroesOfGwenAppearInTheLobbyAsInProgress() {
+    void castleAssaultIsReadyWhileHeroesOfGwenRemainsInProgress() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         GameDefinition castleAssault = catalog.getGame("castle-assault");
         GameDefinition heroesOfGwen = catalog.getGame("heroes-of-gwen");
         assertNotNull(castleAssault);
         assertNotNull(heroesOfGwen);
-        assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, castleAssault.getPortStatus());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, castleAssault.getPortStatus());
         assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, heroesOfGwen.getPortStatus());
-        assertFalse(castleAssault.isReadyForTest());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, castleAssault.getPortStatus());
         assertFalse(heroesOfGwen.isReadyForTest());
     }
 
@@ -99,7 +99,7 @@ class ArcadeCatalogTest {
     @Test
     void explicitlyClearedGamesAreAvailableTogetherForInGameAcceptance() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "gladiators", "micro-battles", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy", "monster-maze", "snake", "draw-my-thing", "master-builders");
+        Set<String> readyIds = Set.of("death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl", "castle-assault", "gladiators", "micro-battles", "milk-the-cow", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy", "monster-maze", "snake", "draw-my-thing", "master-builders");
 
         for (GameDefinition game : catalog.getGames()) {
             if (readyIds.contains(game.getId())) {
@@ -115,8 +115,8 @@ class ArcadeCatalogTest {
         long readyForTest = catalog.getGames().stream().filter(GameDefinition::isReadyForTest).count();
         long inProgress = catalog.getGames().stream()
                 .filter(game -> game.getPortStatus() == GameDefinition.PortStatus.MECHANICS_IN_PROGRESS).count();
-        assertEquals(20, readyForTest);
-        assertEquals(7, inProgress);
+        assertEquals(22, readyForTest);
+        assertEquals(5, inProgress);
     }
 
     @Test
@@ -217,9 +217,16 @@ class ArcadeCatalogTest {
     }
 
     @Test
+    void newlyPromotedMapBackedGamesAreReadyForControlledAcceptance() {
+        ArcadeCatalog catalog = new ArcadeCatalog();
+        assertTrue(catalog.getGame("castle-assault").isReadyForTest());
+        assertTrue(catalog.getGame("milk-the-cow").isReadyForTest());
+    }
+
+    @Test
     void newlyIntegratedGamesRemainInProgressUntilAcceptance() {
         ArcadeCatalog catalog = new ArcadeCatalog();
-        for (String id : List.of("skywars", "milk-the-cow", "wither-assault")) {
+        for (String id : List.of("skywars", "wither-assault")) {
             GameDefinition game = catalog.getGame(id);
             assertNotNull(game, id);
             assertEquals(GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, game.getPortStatus(), id);

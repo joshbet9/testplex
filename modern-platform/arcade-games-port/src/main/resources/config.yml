@@ -1,13 +1,15 @@
 # The 27 shared Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
 # READY_FOR_TEST games are available together for the shared controlled test session.
-# The 20-game controlled queue includes the four newest promotions: Monster Maze, Snake, Draw My Thing and Master Builders.
+# The 22-game controlled queue includes Monster Maze, Snake, Draw My Thing, Master Builders, Castle Assault and Milk the Cow.
 enabled-games:
   - death-tag
   - one-in-the-quiver
   - bomb-lobbers
   - bacon-brawl
+  - castle-assault
   - gladiators
   - micro-battles
+  - milk-the-cow
   - paintball
   - plexball
   - spleef

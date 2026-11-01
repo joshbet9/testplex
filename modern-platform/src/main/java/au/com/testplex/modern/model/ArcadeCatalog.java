@@ -268,7 +268,7 @@ public final class ArcadeCatalog {
 
         register(game("castle-assault", "Castle Assault", "TNT",
                 "Destroy the enemy sentry crystals and defeat their King. Mixed Arcade doubles objective TNT spawns.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("castle-breach", "Castle Breach", "The enemy castle gates collapse around the winning team."),
                 win("kingfall", "Kingfall", "The defeated King falls as the winning banner rises."),
@@ -284,7 +284,7 @@ public final class ArcadeCatalog {
 
         register(game("milk-the-cow", "Milk the Cow", "MILK_BUCKET",
                 "Collect milk for your team, protect the herd and use Cow charge and body-slam abilities.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS, List.of(),
+                GameDefinition.PortStatus.READY_FOR_TEST, List.of(),
                 win("dairy-champion", "Dairy Champion", "The winning farmer is celebrated above the dairy arena")));
 
         register(game("wither-assault", "Wither Assault", "WITHER_SKELETON_SKULL",

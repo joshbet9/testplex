@@ -4,20 +4,20 @@ This plugin adds first-pass playable mechanics harnesses for the 17 Arcade games
 
 ## Current controlled acceptance queue
 
-The shared Paper 26.3 Testplex allow-list contains 20 games:
+The shared Paper 26.3 Testplex allow-list contains 22 games:
 
-Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Runner, Sheep Quest, Turf Wars, Snap (legacy ID `camera-shy`), Monster Maze, Snake, Draw My Thing and Master Builders.
+Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Runner, Sheep Quest, Turf Wars, Snap (legacy ID `camera-shy`), Monster Maze, Snake, Draw My Thing and Master Builders.
 
-`READY_FOR_TEST` means available for the isolated shared test session. It does not mean the game has passed live multiplayer or map-by-map acceptance. See the game-specific acceptance plans for the required checks. Evolution, Castle Assault, Heroes of Gwen, Milk the Cow, Wither Assault, SkyWars Mixed and Sneaky Assassins remain gated.
+`READY_FOR_TEST` means available for the isolated shared test session. It does not mean the game has passed live multiplayer or map-by-map acceptance. See the game-specific acceptance plans for the required checks. Evolution, Heroes of Gwen, Wither Assault, SkyWars Mixed and Sneaky Assassins remain gated.
 
-### Next readiness batch (PR #88)
+### Recent readiness work (PR #88 and the 22-game promotion)
 
 - **Milk the Cow**: the original BobsFarm archive is checked at package time for the WHITE/PINK/PURPLE animal spawn groups used by the runtime. The full multi-player play/score/role/achievement checklist is in `MILK-THE-COW-ACCEPTANCE-PLAN.md`.
 - **Castle Assault**: all 11 original maps are checked for King, crystal and objective-TNT markers. The live map-by-map objective and five-kit checklist is in `CASTLE-ASSAULT-ACCEPTANCE-PLAN.md`.
 - **Wither Assault**: Human Archer, Medic and Editor are now selectable and persisted; the round applies their loadouts, connects Wither Skull/minion/scent controls and revival potions, and tracks/restores Editor blocks. Source-map parity is unavailable and Archer Smoke Arrow / remaining passives and live acceptance are still outstanding. See `WITHER-ASSAULT-ACCEPTANCE-PLAN.md`.
 - **Sneaky Assassins**: removed a test-runtime bug that randomly deleted one of the 200 town NPCs every four seconds; only missing/invalid or killed NPCs now leave the roster. Its generated town and authored NPC movement remain stand-ins because the source archive and patrol paths are absent. See `SNEAKY-ASSASSINS-ACCEPTANCE-PLAN.md`.
 
-None of these four is promoted by PR #88. The allow-list remains exactly 20 until CI, packaged-map checks and the relevant in-game acceptance sessions are completed.
+Castle Assault and Milk the Cow are now included in the controlled acceptance queue after their original map archives, world bounds, objective/chest markers and gameplay prerequisites passed CI packaging tests. This promotion is for isolated test sessions only; live multiplayer and map-by-map acceptance are still outstanding. Wither Assault and Sneaky Assassins remain gated because source parity gaps and missing source-world data remain.
 
 ## SkyWars — fast Mixed Arcade FFA
 
@@ -64,12 +64,12 @@ Each game gets its own separate modern test world, so arena generation/destructi
 
 ## Castle Assault and Heroes of Gwen — Mixed Arcade ports in progress
 
-Two additional Reborn games and their original archived map collections are registered in the Paper 26.3 mechanics module. Both remain **disabled in `enabled-games`** until source parity and live-server acceptance are complete.
+Castle Assault and Heroes of Gwen are registered with their original archived map collections in the Paper 26.3 mechanics module. Castle Assault is now `READY_FOR_TEST` for controlled acceptance after all 11 map archives passed marker, bounds and chest checks; it has not yet passed live map-by-map acceptance. Heroes of Gwen remains **disabled in `enabled-games`** until its hero abilities, store passives and source parity are complete.
 
 - **Castle Assault** (`castle-assault`) uses the original RED/BLUE King markers, PINK/LIGHT_BLUE sentry crystal markers, BLACK objective TNT pads and BROWN chest locations. Standard objective TNT respawn is 60 seconds; **Castle Assault Mixed Arcade** (`castle-assault-mixed` or `mixed-castle-assault`) uses 30 seconds. The modern runtime includes the King/crystal objective, carried TNT with source-style timed/proximity/death detonation, thrown TNT, kill-driven objective damage, King cages, crystal bases, chest refills, team combat and respawns. The five source kits (Alchemist, Archer, Demolitionist, Fighter and Tank) can be selected with `/arcadeport kit <kit>`; source starter gear, shared opening buffs, per-kit kill-streak rewards and chest loot are ported. Archer ammunition replenishes one arrow every six seconds up to ten and its fletched arrows cannot be dropped or transferred. Demolitionist TNT replenishes one every ten seconds up to two, cannot be dropped or transferred, and receives the source radius bonus. Kit gear is unbreakable and protected from dropping; chest rods are unbreakable. TNT damage and knockback apply the source blast-protection EPF cap and strongest-armour-piece reduction. Remaining work is map-by-map setup validation and live acceptance.
 - **Heroes of Gwen** (`heroes-of-gwen`) reads the original MOBA tower, base and POINT beacon markers. The runtime has tower tiers/guardians, capture beacons, gold income, team respawns and the 114-entry source role-shop catalogue. The ten source heroes (Hattori, Devon, Anath, Dana, Biff, Larissa, Bardolf, Rowena, Ivy and Bob Ross) can be selected with `/arcadeport kit <hero>`; the selected hero routes the Gold Upgrades item to that hero's source role shop (Assassin, Hunter, Mage or Warrior). Hero selection and role-shop routing are implemented, but the generic combat loadout remains unchanged: hero skill activation, ammo regeneration and shop item passive effects are outstanding. The Wither now moves within its source team boundary toward the nearest valid enemy player, returns to base when no target is available, and uses the source four-second Earthquake cadence, radius falloff, knockback and non-damaging falling-block debris. The current target search is player-only; source targeting of other living entities/minions is still outstanding. **Heroes of Gwen Mixed Arcade** (`heroes-of-gwen-mixed` or `mixed-heroes-of-gwen`) removes the central `TOWER <team> 1` markers in the archived Heros Valley map while retaining base-side `TOWER <team> 2` markers, and halves every displayed and charged shop price. Exact beacon visuals, source progression unlocks, hero abilities/passives and map-by-map live validation remain outstanding.
 
-Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Unit tests cover Castle Assault kit and perk rules, blast protection, Heroes of Gwen's ten-hero role mapping and Wither movement/Earthquake falloff, the 60s/30s objective TNT delay, half-cost calculation, archive registration and the central tower filter. These do not certify live in-game parity. Keep Castle Assault and Heroes of Gwen disabled until the remaining mechanics are accepted on the 26.3 test server.
+Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Unit tests cover Castle Assault kit and perk rules, blast protection, Heroes of Gwen's ten-hero role mapping and Wither movement/Earthquake falloff, the 60s/30s objective TNT delay, half-cost calculation, archive registration and the central tower filter. These do not certify live in-game parity. Castle Assault remains limited to the controlled test queue while its maps and team objectives undergo human acceptance; keep Heroes of Gwen disabled until its remaining hero mechanics are implemented and verified.
 
 ## Commands
 
