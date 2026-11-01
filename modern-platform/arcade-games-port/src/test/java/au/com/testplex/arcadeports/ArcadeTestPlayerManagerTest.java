@@ -50,6 +50,14 @@ class ArcadeTestPlayerManagerTest {
     }
 
     @Test
+    void persistentProgressionExcludesTestPlayersAndMissingIds() {
+        assertTrue(ArcadeTestPlayerManager.shouldPersistProgression(UUID.randomUUID(), false));
+        assertFalse(ArcadeTestPlayerManager.shouldPersistProgression(UUID.randomUUID(), true));
+        assertFalse(ArcadeTestPlayerManager.shouldPersistProgression(null, false));
+        assertFalse(ArcadeTestPlayerManager.shouldPersistProgression(null, true));
+    }
+
+    @Test
     void teardownKicksOrphanedPlayersAndTimesOutStuckRespawns() {
         assertEquals(ArcadeTestPlayerManager.CleanupAction.KICK_ORPHAN,
                 ArcadeTestPlayerManager.cleanupAction(false, false, false, true, false, false));
