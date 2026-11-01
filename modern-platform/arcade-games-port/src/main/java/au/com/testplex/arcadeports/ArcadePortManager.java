@@ -1663,6 +1663,18 @@ public final class ArcadePortManager implements Listener {
         return lastAutomaticRotationGameId;
     }
 
+    /**
+     * Completes the common Arcade lifecycle for a game module hosted inside this
+     * manager. Natural Monster Maze completion returns its participants first,
+     * then enters the same preference vote as a native Arcade game.
+     */
+    void onExternalGameCompleted(ArcadePortGame game) {
+        if (game == null) return;
+        lastAutomaticRotationGameId = game.id();
+        if (active != null || monsterMazeRunning()) return;
+        beginAutomaticRotationVote();
+    }
+
     private List<Player> automaticRotationLobbyPlayers() {
         List<Player> eligible = new ArrayList<>();
         for (Player player : Bukkit.getOnlinePlayers()) {
