@@ -4,20 +4,20 @@ This plugin adds first-pass playable mechanics harnesses for the 17 Arcade games
 
 ## Current controlled acceptance queue
 
-The shared Paper 26.3 Testplex allow-list contains 20 games:
+The shared Paper 26.3 Testplex allow-list contains 22 games:
 
-Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battles, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Runner, Sheep Quest, Turf Wars, Snap (legacy ID `camera-shy`), Monster Maze, Snake, Draw My Thing and Master Builders.
+Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Runner, Sheep Quest, Turf Wars, Snap (legacy ID `camera-shy`), Monster Maze, Snake, Draw My Thing and Master Builders.
 
-`READY_FOR_TEST` means available for the isolated shared test session. It does not mean the game has passed live multiplayer or map-by-map acceptance. See the game-specific acceptance plans for the required checks. Evolution, Castle Assault, Heroes of Gwen, Milk the Cow, Wither Assault, SkyWars Mixed and Sneaky Assassins remain gated.
+`READY_FOR_TEST` means available for the isolated shared test session. It does not mean the game has passed live multiplayer or map-by-map acceptance. See the game-specific acceptance plans for the required checks. Evolution, Heroes of Gwen, Wither Assault, SkyWars Mixed and Sneaky Assassins remain gated.
 
-### Next readiness batch (PR #88)
+### Recent readiness work (PR #88 and the 22-game promotion)
 
 - **Milk the Cow**: the original BobsFarm archive is checked at package time for the WHITE/PINK/PURPLE animal spawn groups used by the runtime. The full multi-player play/score/role/achievement checklist is in `MILK-THE-COW-ACCEPTANCE-PLAN.md`.
 - **Castle Assault**: all 11 original maps are checked for King, crystal and objective-TNT markers. The live map-by-map objective and five-kit checklist is in `CASTLE-ASSAULT-ACCEPTANCE-PLAN.md`.
 - **Wither Assault**: Human Archer, Medic and Editor are now selectable and persisted; the round applies their loadouts, connects Wither Skull/minion/scent controls and revival potions, and tracks/restores Editor blocks. Source-map parity is unavailable and Archer Smoke Arrow / remaining passives and live acceptance are still outstanding. See `WITHER-ASSAULT-ACCEPTANCE-PLAN.md`.
 - **Sneaky Assassins**: removed a test-runtime bug that randomly deleted one of the 200 town NPCs every four seconds; only missing/invalid or killed NPCs now leave the roster. Its generated town and authored NPC movement remain stand-ins because the source archive and patrol paths are absent. See `SNEAKY-ASSASSINS-ACCEPTANCE-PLAN.md`.
 
-None of these four is promoted by PR #88. The allow-list remains exactly 20 until CI, packaged-map checks and the relevant in-game acceptance sessions are completed.
+Castle Assault and Milk the Cow are now included in the controlled acceptance queue after their original map archives, world bounds, objective/chest markers and gameplay prerequisites passed CI packaging tests. This promotion is for isolated test sessions only; live multiplayer and map-by-map acceptance are still outstanding. Wither Assault and Sneaky Assassins remain gated because source parity gaps and missing source-world data remain.
 
 ## SkyWars — fast Mixed Arcade FFA
 
