@@ -1876,6 +1876,15 @@ class ArcadePortGameTest {
         assertEquals(3.0D, ArcadePortRules.evolutionMeleeDamage(5));
     }
 
+    @Test void evolutionFallDamageMatchesTheFiveFormDesign() {
+        assertEquals(1.0D, ArcadePortRules.evolutionFallDamageMultiplier(0), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.evolutionFallDamageMultiplier(1), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.evolutionFallDamageMultiplier(2), 0.00001D);
+        assertEquals(0.5D, ArcadePortRules.evolutionFallDamageMultiplier(3), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.evolutionFallDamageMultiplier(4), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.evolutionFallDamageMultiplier(99), 0.00001D);
+    }
+
     @Test void evolutionPityClockDecreasesForKillsAndAssistsAndOverkillRequiresTwoKills() {
         assertEquals(90_000L, ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS);
         assertEquals(15_000L, ArcadePortRules.EVOLUTION_PITY_KILL_REDUCTION_MILLIS);
