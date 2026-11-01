@@ -48,7 +48,13 @@ class ArcadeLobbyKitCatalogueTest {
     @Test
     void gamesWithoutLobbyKitStationsExposeNoChoices() {
         assertTrue(ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.MILK_THE_COW, List.of()).isEmpty());
-        assertTrue(ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.WITHER_ASSAULT, List.of()).isEmpty());
         assertTrue(ArcadeLobbyKitCatalogue.forGame(null, List.of()).isEmpty());
+    }
+
+    @Test
+    void witherAssaultExposesItsThreeSourceHumanKits() {
+        assertEquals(List.of("archer", "medic", "editor"),
+                ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.WITHER_ASSAULT, List.of())
+                        .stream().map(choice -> choice.id).toList());
     }
 }
