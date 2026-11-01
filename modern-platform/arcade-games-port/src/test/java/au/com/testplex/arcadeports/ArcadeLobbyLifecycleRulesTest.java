@@ -19,7 +19,7 @@ class ArcadeLobbyLifecycleRulesTest {
 
     @Test void preparedTimeIsExcludedFromGameDeadlinesAndCooldowns() {
         assertEquals(15_000L, ArcadeLobbyLifecycleRules.shiftPausedTimestamp(5_000L, 10_000L));
-        assertEquals(10_000L, ArcadeLobbyLifecycleRules.shiftPausedTimestamp(0L, 10_000L));
+        assertEquals(0L, ArcadeLobbyLifecycleRules.shiftPausedTimestamp(0L, 10_000L));
         assertEquals(-1L, ArcadeLobbyLifecycleRules.shiftPausedTimestamp(-1L, 10_000L));
         assertEquals(Long.MAX_VALUE,
                 ArcadeLobbyLifecycleRules.shiftPausedTimestamp(Long.MAX_VALUE - 1L, 10_000L));

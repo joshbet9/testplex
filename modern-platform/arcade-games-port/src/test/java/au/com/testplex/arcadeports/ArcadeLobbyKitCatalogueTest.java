@@ -47,7 +47,8 @@ class ArcadeLobbyKitCatalogueTest {
 
     @Test
     void gamesWithoutLobbyKitStationsExposeNoChoices() {
-        assertTrue(ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.SHEEP_QUEST, List.of()).isEmpty());
+        assertTrue(ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.MILK_THE_COW, List.of()).isEmpty());
+        assertTrue(ArcadeLobbyKitCatalogue.forGame(ArcadePortGame.WITHER_ASSAULT, List.of()).isEmpty());
         assertTrue(ArcadeLobbyKitCatalogue.forGame(null, List.of()).isEmpty());
     }
 }
