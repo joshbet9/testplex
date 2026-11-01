@@ -1977,7 +1977,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 || !activePlayers.contains(player.getUniqueId())
                 || event.getNewEffect() == null
                 || event.getNewEffect().getType() != PotionEffectType.SLOWNESS) return;
-        if (heroesOfGwenOwnedStoreItemNames(player).contains("Swift Blade")) event.setCancelled(true);
+        if (heroesOfGwenOwnedStoreItemNames(player).stream()
+                .anyMatch(ArcadePortRules::heroesOfGwenStoreImmuneToSlowness)) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
