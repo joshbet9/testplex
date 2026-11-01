@@ -29,7 +29,7 @@ The lobby kit selector exposes the five legacy SkyWars kits: Ice (temporary brid
 
 Join with `/arcadeport join skywars-mixed`, quick-start with `/arcadeport play skywars-mixed`, or start the queued lobby with `/arcadeport start skywars-mixed`. Choose an installed map with `/arcadeport maps skywars`.
 
-SkyWars remains a manual-acceptance candidate, not a claim of complete 1.8 parity. The port still needs local Maven compilation and in-game validation, including all archived maps, loot rolls, each kit under combat, guardian pathing/death rewards, TNT damage and disconnect cleanup.
+SkyWars Mixed remains `MECHANICS_IN_PROGRESS`, not a claim of complete 1.8 parity. CI now checks that all 50 original SkyWars map archives are packaged unchanged and that every map retains player spawns, RED guardian points, the LIME TNT generator, and BROWN/GRAY/BLACK chest markers. Live validation remains required for map selection, loot rolls, all five kits under combat, guardian tether/death rewards, TNT timing/damage, crumble/border pacing, disconnect recovery and repeated-round cleanup. See `SKYWARS-MIXED-ACCEPTANCE-PLAN.md`.
 
 ## Camera Shy — spyglass photographic elimination
 
