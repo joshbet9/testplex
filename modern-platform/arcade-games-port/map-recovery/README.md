@@ -4,6 +4,10 @@ This is a **terrain recovery**, not a playable map import. The 28 untouched
 Nixuge ZIPs live under `update/map-recovery/nixuge/unconfigured/` and are
 intentionally excluded from `SourceMapCatalog` and the production plugin.
 Original hashes and URLs are tracked in `provenance.json`.
+The runtime also rejects any future Evolution or Gladiators source-map ZIP
+that does not contain a complete game-specific `WorldConfig.dat` marker set.
+This is a minimum metadata gate, **not** a replacement for terrain and human
+acceptance checks.
 
 ## What we have established
 
