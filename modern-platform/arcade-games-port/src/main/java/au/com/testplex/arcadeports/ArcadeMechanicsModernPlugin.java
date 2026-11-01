@@ -3,6 +3,8 @@ package au.com.testplex.arcadeports;
 import me.monstermaze.MonsterMazePlugin;
 import au.com.testplex.wizards.WizardsGameManager;
 import au.com.testplex.wizards.WizardsKit;
+import au.com.testplex.wizards.WizardsGameManager;
+import au.com.testplex.wizards.WizardsKit;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.command.Command;
@@ -22,6 +24,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private GamePreferenceMenu preferenceMenu;
     private CameraShyGame cameraShy;
     private SpeedBuildersGame speedBuilders;
+    private WizardsGameManager wizards;
     private MineplexCoreRankBridge mineplexCoreRankBridge;
     private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
 
@@ -81,6 +84,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         plexball = new PlexballGame(this);
         getServer().getPluginManager().registerEvents(plexball, this);
         mapMenu = new ArcadeMapSelectionMenu(this);
+        wizards = new WizardsGameManager(this);
+        getServer().getPluginManager().registerEvents(wizards, this);
         speedBuilders = new SpeedBuildersGame(this);
         getServer().getPluginManager().registerEvents(speedBuilders, this);
         preferenceMenu = new GamePreferenceMenu(this, manager);
@@ -219,6 +224,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         } catch (java.io.IOException exception) {
             getLogger().warning("Could not remove an Arcade runtime readiness record: " + exception.getMessage());
         }
+        if (wizards != null) wizards.shutdown();
         if (speedBuilders != null) speedBuilders.shutdown();
         if (manager != null) manager.shutdown();
         if (plexball != null) plexball.shutdown();
@@ -383,6 +389,24 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 || normalized.equals("mixed-skywars") || normalized.equals("mixed-sky-wars");
     }
 
+    private static boolean isWizardsId(String requested) {
+        if (requested == null) return false;
+        String normalized = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        return normalized.equals("wizards") || normalized.equals("wizard");
+    }
+
+    /**
+     * Wizards uses the same Testplex Arcade host and lobby but has its own
+     * match world. Do not pre-empt an active game; only allow hand-off once all
+     * other host-managed mechanics have returned their players.
+     */
+    public boolean prepareForWizards() {
+        return (manager == null || manager.canStartCameraShy())
+                && (plexball == null || !plexball.isActive())
+                && (cameraShy == null || !cameraShy.isActive())
+                && (speedBuilders == null || !speedBuilders.isActive());
+    }
+
     private static boolean isSpeedBuildersId(String requested) {
         if (requested == null) return false;
         String normalized = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
@@ -480,6 +504,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport " + sub + " <game-id>");
                     return true;
                 }
+                if (isWizardsId(args[1])) {
+                    if (wizards != null) wizards.queue(player, sub.equals("play"));
+                    return true;
+                }
                 if (isSpeedBuildersId(args[1])) {
                     if (speedBuilders != null) speedBuilders.queue(player, sub.equals("play"));
                     return true;
@@ -497,6 +525,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 if (args.length < 2) {
                     if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
                     if (speedBuilders != null) speedBuilders.leaveQueue(leavingPlayer);
+                    if (wizards != null) wizards.leave(leavingPlayer);
+                    return true;
+                }
+                if (isWizardsId(args[1])) {
+                    if (wizards != null) wizards.leave(leavingPlayer);
                     return true;
                 }
                 if (isSnapStatsArgument(args[1])) {
@@ -571,6 +604,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
                 if (args.length < 2) {
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport start <game-id>");
+                    return true;
+                }
+                if (isWizardsId(args[1])) {
+                    if (wizards != null) wizards.startQueued();
                     return true;
                 }
                 if (isSpeedBuildersId(args[1])) {
@@ -662,12 +699,14 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.GOLD + "Modern Arcade ports: " + ChatColor.WHITE + manager.status());
                 if (plexball != null) sender.sendMessage(ChatColor.GOLD + "Plexball: " + ChatColor.WHITE + plexball.status());
                 if (speedBuilders != null) sender.sendMessage(ChatColor.GOLD + "Speed Builders: " + ChatColor.WHITE + speedBuilders.status());
+                if (wizards != null) sender.sendMessage(ChatColor.GOLD + "Wizards: " + ChatColor.WHITE + wizards.status());
                 return true;
             case "stop":
                 if (!hasAdminAccess(sender)) {
                     sender.sendMessage(ChatColor.RED + "Operator permission required.");
                     return true;
                 }
+                if (wizards != null) wizards.stop("Stopped by an operator.");
                 if (speedBuilders != null) speedBuilders.stop("Stopped by an operator.");
                 manager.stop("Stopped by an operator.");
                 return true;

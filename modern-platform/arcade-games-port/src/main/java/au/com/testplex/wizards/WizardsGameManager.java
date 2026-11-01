@@ -383,7 +383,10 @@ public final class WizardsGameManager implements Listener {
             player.sendMessage(ChatColor.RED + "The Wizards queue is full (" + maximumPlayers + " players).");
             return;
         }
-        if (queue.isEmpty()) plugin.prepareForWizards();
+        if (queue.isEmpty() && !plugin.prepareForWizards()) {
+            player.sendMessage(ChatColor.RED + "Another Arcade game is still active. Finish it before queueing for Wizards.");
+            return;
+        }
         queue.put(player.getUniqueId(), player);
         selectedKits.putIfAbsent(player.getUniqueId(), defaultKit());
         long requestedDeadline = tick + (quickStart ? 40L : 100L);
@@ -480,7 +483,11 @@ public final class WizardsGameManager implements Listener {
 
         // The shared Arcade manager must return any previous game to the lobby
         // before Wizards snapshots player inventory, location and movement state.
-        plugin.prepareForWizards();
+        if (!plugin.prepareForWizards()) {
+            sender.sendMessage(ChatColor.RED + "Another Arcade game is still active. Wizards has kept its queue; retry /arcadeport start wizards after that match.");
+            queueDeadlineTick = tick + 20L;
+            return;
+        }
         queueDeadlineTick = -1L;
         refillChests();
         running = true;
