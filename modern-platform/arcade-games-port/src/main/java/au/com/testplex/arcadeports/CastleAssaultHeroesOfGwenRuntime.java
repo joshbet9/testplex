@@ -47,6 +47,7 @@ import org.bukkit.event.entity.EntityCombustEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.EntityShootBowEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
@@ -1911,6 +1912,40 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 }
             }
         }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onHeroesOfGwenStoreHitConditions(EntityDamageByEntityEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN
+                || !(event.getEntity() instanceof Player victim)
+                || !activePlayers.contains(victim.getUniqueId())) return;
+        Player attacker = resolveAttacker(event);
+        if (attacker == null || !activePlayers.contains(attacker.getUniqueId())
+                || teams.getOrDefault(attacker.getUniqueId(), -1)
+                        == teams.getOrDefault(victim.getUniqueId(), -2)) return;
+        Set<String> attackerItems = heroesOfGwenOwnedStoreItemNames(attacker);
+        if (event.getDamager() instanceof Arrow && attackerItems.contains("Bow of Pursuit")) {
+            attacker.addPotionEffect(new PotionEffect(PotionEffectType.SPEED,
+                    (int) (ArcadePortRules.heroesOfGwenStoreHitConditionDurationMillis("Bow of Pursuit") / 50L),
+                    ArcadePortRules.heroesOfGwenStoreHitConditionAmplifier("Bow of Pursuit"),
+                    true, true, true));
+        }
+        if (event.getDamager() instanceof Player && attackerItems.contains("Frostbound Sword")) {
+            victim.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                    (int) (ArcadePortRules.heroesOfGwenStoreHitConditionDurationMillis("Frostbound Sword") / 50L),
+                    ArcadePortRules.heroesOfGwenStoreHitConditionAmplifier("Frostbound Sword"),
+                    true, true, true));
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onHeroesOfGwenStoreConditionImmunity(EntityPotionEffectEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN
+                || !(event.getEntity() instanceof Player player)
+                || !activePlayers.contains(player.getUniqueId())
+                || event.getNewEffect() == null
+                || event.getNewEffect().getType() != PotionEffectType.SLOWNESS) return;
+        if (heroesOfGwenOwnedStoreItemNames(player).contains("Swift Blade")) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
