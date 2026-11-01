@@ -2650,6 +2650,28 @@ public final class ArcadePortRules {
     public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_RADIUS = 8.0D;
     public static final double HEROES_OF_GWEN_WITHER_EARTHQUAKE_DAMAGE = 4.0D;
 
+    // Source Moba Heroes Valley / Monochrome mid-match sidequests.
+    public static final long HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS = 300_000L;
+    public static final long HEROES_OF_GWEN_PUMPKIN_KING_RESPAWN_DELAY_MILLIS = 300_000L;
+    public static final long HEROES_OF_GWEN_PUMPKIN_KING_ATTACK_INTERVAL_MILLIS = 250L;
+    public static final int HEROES_OF_GWEN_PUMPKIN_KING_HEALTH = 100;
+    public static final double HEROES_OF_GWEN_PUMPKIN_KING_TARGET_SPEED = 5.0D;
+    public static final double HEROES_OF_GWEN_PUMPKIN_KING_HOME_SPEED = 3.0D;
+    public static final double HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_RANGE_SQUARED = 9.0D;
+    public static final int HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_DAMAGE = 6;
+    public static final double HEROES_OF_GWEN_PUMPKIN_KING_AREA_RADIUS = 2.0D;
+    public static final int HEROES_OF_GWEN_PUMPKIN_KING_AREA_DAMAGE = 2;
+    public static final int HEROES_OF_GWEN_PUMPKIN_KING_OUT_OF_COMBAT_HEAL = 2;
+    public static final long HEROES_OF_GWEN_PUMPKIN_KING_BUFF_DURATION_MILLIS = 60_000L;
+    public static final int HEROES_OF_GWEN_PUMPKIN_KING_REGENERATION_AMPLIFIER = 1;
+    public static final double HEROES_OF_GWEN_PUMPKIN_KING_DAMAGE_MULTIPLIER = 1.5D;
+    public static final long HEROES_OF_GWEN_MONOCHROME_SKELETONS_DURATION_MILLIS = 30_000L;
+
+    /** Return red/blue challenge winner, or -1 for a tie. */
+    public static int heroesOfGwenMonochromeWinner(int redKills, int blueKills) {
+        return redKills == blueKills ? -1 : redKills > blueKills ? 0 : 1;
+    }
+
     /** Source MobaAI targets hostile living entities inside its team boundary, not only players. */
     public static boolean heroesOfGwenWitherCanTarget(int ownerTeam, int targetTeam, boolean activeTarget) {
         return ownerTeam >= 0 && activeTarget && targetTeam != ownerTeam;
