@@ -26,8 +26,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private static final java.util.List<String> READY_FOR_TEST_GAME_IDS = java.util.List.of(
             "death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl",
             "castle-assault", "gladiators", "micro-battles", "milk-the-cow", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy", "monster-maze", "snake", "draw-my-thing", "master-builders",
-            "skywars", "wither-assault", "sneaky-assassins", "speed-builders");
-    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-26-games-plus-speed-builders-20261101-v8";
+            "skywars", "wither-assault", "sneaky-assassins", "speed-builders", "evolution");
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-27-games-plus-evolution-20261101-v9";
 
     @Override
     public void onEnable() {
