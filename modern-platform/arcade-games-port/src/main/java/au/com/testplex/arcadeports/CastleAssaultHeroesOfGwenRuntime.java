@@ -2401,13 +2401,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         .filter(witherEntry -> witherEntry.getValue().equals(wither))
                         .map(Map.Entry::getKey).findFirst().orElse(null);
                 if (enemyTeam != null && enemyTeam != ownerTeam
-                        && witherDamageable.getOrDefault(enemyTeam, false)) {
-                    if (wither.getHealth() <= damage) {
-                        finishHeroesOfGwen(ownerTeam, "enemy Wither defeated by Devon's TNT arrow");
-                        projectile.remove();
-                        return;
-                    }
-                    wither.setHealth(wither.getHealth() - damage);
+                        && damageHeroesOfGwenWither(owner, enemyTeam, damage,
+                                "enemy Wither defeated by Devon's TNT arrow")) {
+                    if (stopped) return;
+                    projectile.remove();
+                    return;
                 }
             } else {
                 damageHeroesOfGwenAbility(target, owner, damage);
@@ -2796,12 +2794,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         TowerState tower = towerFor(damaged);
         if (tower != null) {
+            double towerDamage = towerDamage;
             event.setCancelled(true);
             if (!(event instanceof EntityDamageByEntityEvent byEntity)) return;
             Integer minionTeam = heroesOfGwenMinionTeams.get(byEntity.getDamager().getUniqueId());
             if (minionTeam != null) {
                 if (minionTeam == tower.owner || !canDamageMobaTower(tower, minionTeam)) return;
-                damageMobaTower(tower, event.getFinalDamage(), null);
+                damageMobaTower(tower, towerDamage, null);
                 return;
             }
             Player attacker = resolveAttacker(byEntity);
@@ -2814,7 +2813,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 attacker.sendMessage(ChatColor.RED + "Destroy the enemy outer tower before attacking this tower.");
                 return;
             }
-            damageMobaTower(tower, event.getFinalDamage(), attacker);
+            damageMobaTower(tower, towerDamage, attacker);
             return;
         }
         for (Map.Entry<Integer, Wither> entry : withers.entrySet()) {
@@ -4079,19 +4078,17 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     Integer enemyTeam = withers.entrySet().stream()
                             .filter(witherEntry -> witherEntry.getValue().equals(wither))
                             .map(Map.Entry::getKey).findFirst().orElse(null);
-                    if (enemyTeam == null || enemyTeam == ownerTeam
-                            || !witherDamageable.getOrDefault(enemyTeam, false)) continue;
+                    if (enemyTeam == null || enemyTeam == ownerTeam) continue;
                     double damage = ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE;
-                    if (wither.getHealth() <= damage) {
-                        finishHeroesOfGwen(ownerTeam, "enemy Wither defeated by Anath's Flame Wand");
-                        removeAnathEmber(entityId);
-                        return;
+                    if (damageHeroesOfGwenWither(owner, enemyTeam, damage,
+                            "enemy Wither defeated by Anath's Flame Wand")) {
+                        if (stopped) return;
+                        wither.setFireTicks(Math.max(wither.getFireTicks(),
+                                ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS));
+                        hit = true;
+                        break;
                     }
-                    wither.setHealth(wither.getHealth() - damage);
-                    wither.setFireTicks(Math.max(wither.getFireTicks(),
-                            ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS));
-                    hit = true;
-                    break;
+                    continue;
                 }
             }
             if (hit) removeAnathEmber(entityId);
@@ -4146,15 +4143,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         Integer enemyTeam = withers.entrySet().stream()
                                 .filter(witherEntry -> witherEntry.getValue().equals(wither))
                                 .map(Map.Entry::getKey).findFirst().orElse(null);
-                        if (enemyTeam != null && enemyTeam != team
-                                && witherDamageable.getOrDefault(enemyTeam, false)) {
-                            double damage = ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE;
-                            if (wither.getHealth() <= damage) {
-                                finishHeroesOfGwen(team, "enemy Wither defeated by Anath's Burn Beam");
-                                anathBurnBeams.remove(ownerId);
-                                return;
-                            }
-                            wither.setHealth(wither.getHealth() - damage);
+                        if (enemyTeam != null && enemyTeam != team) {
+                            damageHeroesOfGwenWither(owner, enemyTeam,
+                                    ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE,
+                                    "enemy Wither defeated by Anath's Burn Beam");
+                            if (stopped) return;
                         }
                     } else {
                         damageHeroesOfGwenAbility(target, owner, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE);
@@ -4365,12 +4358,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             || !ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(
                                     entry.getValue().getLocation().distance(zone.center))) continue;
                     Wither wither = entry.getValue();
-                    if (wither.getHealth() <= ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE) {
-                        finishHeroesOfGwen(zone.team, "enemy Wither defeated by Meteor Shower");
-                        anathMeteorZones.remove(zone);
-                        return;
-                    }
-                    wither.setHealth(wither.getHealth() - ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE);
+                    damageHeroesOfGwenWither(owner, entry.getKey(),
+                            ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE,
+                            "enemy Wither defeated by Meteor Shower");
+                    if (stopped) return;
                 }
                 List<Player> candidates = activeMatchPlayers().stream()
                         .filter(target -> teams.getOrDefault(target.getUniqueId(), -1) != zone.team)
@@ -4432,14 +4423,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     Integer enemyTeam = withers.entrySet().stream()
                             .filter(witherEntry -> witherEntry.getValue().equals(wither))
                             .map(Map.Entry::getKey).findFirst().orElse(null);
-                    if (enemyTeam != null && enemyTeam != team
-                            && witherDamageable.getOrDefault(enemyTeam, false)) {
-                        double damage = ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE;
-                        if (wither.getHealth() <= damage) {
-                            finishHeroesOfGwen(team, "enemy Wither defeated by Hattori's Ninja Dash");
-                            return;
-                        }
-                        wither.setHealth(wither.getHealth() - damage);
+                    if (enemyTeam != null && enemyTeam != team) {
+                        damageHeroesOfGwenWither(player, enemyTeam,
+                                ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE,
+                                "enemy Wither defeated by Hattori's Ninja Dash");
+                        if (stopped) return;
                     }
                 } else {
                     damageHeroesOfGwenAbility(target, player, ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE);
@@ -4538,13 +4526,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     Integer enemyTeam = withers.entrySet().stream()
                             .filter(entry -> entry.getValue().equals(wither))
                             .map(Map.Entry::getKey).findFirst().orElse(null);
-                    if (enemyTeam != null && enemyTeam != team && witherDamageable.getOrDefault(enemyTeam, false)) {
-                        if (wither.getHealth() <= ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE) {
-                            finishHeroesOfGwen(team, "enemy Wither defeated by Larissa's Aqua Cannon");
-                            return;
-                        }
-                        wither.setHealth(wither.getHealth()
-                                - ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE);
+                    if (enemyTeam != null && enemyTeam != team
+                            && damageHeroesOfGwenWither(player, enemyTeam,
+                                    ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE,
+                                    "enemy Wither defeated by Larissa's Aqua Cannon")) {
                         hit = true;
                         break;
                     }
@@ -4645,14 +4630,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         Integer enemyTeam = withers.entrySet().stream()
                                 .filter(entry -> entry.getValue().equals(wither))
                                 .map(Map.Entry::getKey).findFirst().orElse(null);
-                        if (enemyTeam != null && enemyTeam != zone.team
-                                && witherDamageable.getOrDefault(enemyTeam, false)) {
-                            double damage = ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND;
-                            if (wither.getHealth() <= damage) {
-                                finishHeroesOfGwen(zone.team, "enemy Wither defeated by Larissa's Dancing Fountain");
-                                return;
-                            }
-                            wither.setHealth(wither.getHealth() - damage);
+                        if (enemyTeam != null && enemyTeam != zone.team) {
+                            damageHeroesOfGwenWither(owner, enemyTeam,
+                                    ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND,
+                                    "enemy Wither defeated by Larissa's Dancing Fountain");
+                            if (stopped) return;
                         }
                         continue;
                     }
@@ -5385,12 +5367,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     Integer enemyTeam = withers.entrySet().stream()
                             .filter(entry -> entry.getValue().equals(wither))
                             .map(Map.Entry::getKey).findFirst().orElse(null);
-                    if (enemyTeam != null && enemyTeam != team && witherDamageable.getOrDefault(enemyTeam, false)) {
-                        if (wither.getHealth() <= damage) {
-                            finishHeroesOfGwen(team, "enemy Wither defeated by Rowena's Light Arrow");
-                            return;
-                        }
-                        wither.setHealth(wither.getHealth() - damage);
+                    if (enemyTeam != null && enemyTeam != team) {
+                        damageHeroesOfGwenWither(player, enemyTeam, damage,
+                                "enemy Wither defeated by Rowena's Light Arrow");
+                        if (stopped) return;
                     }
                 } else {
                     damageHeroesOfGwenAbility(target, player, damage);
@@ -5439,13 +5419,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 Integer enemyTeam = withers.entrySet().stream()
                         .filter(entry -> entry.getValue().equals(wither))
                         .map(Map.Entry::getKey).findFirst().orElse(null);
-                if (enemyTeam != null && enemyTeam != team && witherDamageable.getOrDefault(enemyTeam, false)) {
-                    if (wither.getHealth() <= damage) {
-                        finishHeroesOfGwen(team, "enemy Wither defeated by Rowena's Bombardment");
-                        endRowenaBombardment(id, true);
-                        return;
-                    }
-                    wither.setHealth(wither.getHealth() - damage);
+                if (enemyTeam != null && enemyTeam != team) {
+                    damageHeroesOfGwenWither(player, enemyTeam, damage,
+                            "enemy Wither defeated by Rowena's Bombardment");
+                    if (stopped) return;
                 }
             } else {
                 damageHeroesOfGwenAbility(target, player, damage);
