@@ -35,7 +35,7 @@ final class LegacySourceMapMigrationTest {
         try (ZipInputStream zip = new ZipInputStream(resource)) {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
-                Path output = extracted.resolve(entry.getName()).normalize();
+                Path output = extracted.resolve(entry.getName().replace('\\', '/')).normalize();
                 assertTrue(output.startsWith(extracted), "Unsafe original archive entry: " + entry.getName());
                 if (entry.isDirectory()) Files.createDirectories(output);
                 else {
