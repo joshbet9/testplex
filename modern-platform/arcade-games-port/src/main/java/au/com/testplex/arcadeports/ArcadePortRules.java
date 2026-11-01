@@ -744,12 +744,12 @@ public final class ArcadePortRules {
         return material == Material.EMERALD;
     }
 
-    /** SoloGame awards one survival gem per ten seconds alive. */
+    /** Dragons awards one survival gem per ten seconds alive. */
     public static double dragonSurvivalGems(long survivedMillis) {
         return Math.max(0L, survivedMillis) / 10_000.0D;
     }
 
-    /** SoloGame end-of-round placement rewards, one-based. */
+    /** Dragons end-of-round placement rewards, one-based. */
     public static double dragonPlacementGemReward(int place) {
         return switch (place) {
             case 1 -> 20.0D;
@@ -760,7 +760,7 @@ public final class ArcadePortRules {
     }
 
     /** SoloGame sidebar: 0=all alive/dead names, 1=alive names, 2=alive/dead counts. */
-    public static int dragonsSoloScoreboardMode(int totalPlayers, int alivePlayers) {
+    public static int dragonsScoreboardMode(int totalPlayers, int alivePlayers) {
         if (totalPlayers < 15) return 0;
         if (alivePlayers < 16) return 1;
         return 2;
