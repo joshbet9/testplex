@@ -982,19 +982,14 @@ public final class ArcadePortRules {
         return ownerTeam >= 0 && targetTeam >= 0 && ownerTeam != targetTeam;
     }
 
-    /** More players in the match lobby produce more frequent power-up spawns. */
+    /** Paired side-specific power-up waves use a random interval averaging one minute. */
     public static long bombLobbersPowerupSpawnIntervalMillis(int lobbyPlayers) {
-        // Team-local random scheduling averages about once a minute.
         return 60_000L;
     }
 
-    /** Keep small matches readable while allowing more simultaneous drops in larger lobbies. */
+    /** Each wave retains at most one uncollected power-up per team, regardless of lobby size. */
     public static int bombLobbersPowerupMaxActive(int lobbyPlayers) {
-        int players = Math.max(1, lobbyPlayers);
-        if (players <= 4) return 1;
-        if (players <= 8) return 2;
-        if (players <= 12) return 3;
-        return 4;
+        return 2;
     }
 
     public static double bombLobbersExplosionRadius(String powerupType) {
