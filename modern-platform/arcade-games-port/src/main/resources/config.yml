@@ -1,6 +1,6 @@
-# The 30 Arcade catalogue entries are packaged in ArcadeMechanicsModern.jar.
+# The Arcade catalogue and controlled test queue grow as source-faithful games are promoted.
 # READY_FOR_TEST games are available together for the shared controlled test session.
-# The 30-ID controlled queue includes Heroes of Gwen, Evolution, Speed Builders, and all three selectable Monster Maze modes.
+# The 31-ID controlled queue includes Heroes of Gwen and Hoops Remastered alongside Evolution, Speed Builders, and all three selectable Monster Maze modes.
 enabled-games:
   - death-tag
   - one-in-the-quiver
@@ -32,6 +32,7 @@ enabled-games:
   - speed-builders
   - evolution
   - heroes-of-gwen
+  - hoops-remastered
 lobby-selected-game: death-tag
 
 # Base selection weights used by the Like/Dislike preference calculation.
