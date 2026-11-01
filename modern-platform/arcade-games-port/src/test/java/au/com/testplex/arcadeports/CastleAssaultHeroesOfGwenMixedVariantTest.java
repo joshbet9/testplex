@@ -588,6 +588,26 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void witherDamageRequiresActiveEnemyInsideBoundaryAndDestroyedTowers() {
+        assertTrue(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, 1, true, true, true, 1.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, 0, true, true, true, 1.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, 1, false, true, true, 1.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, 1, true, false, true, 1.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, 1, true, true, false, 1.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, 1, true, true, true, 0.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherCanTakeDamage(0, -1, true, true, true, 1.0D));
+    }
+
+    @Test
+    void witherDefenderWarningMatchesThirtySecondSourceThrottle() {
+        assertTrue(ArcadePortRules.heroesOfGwenWitherShouldInform(100_000L, 0L));
+        assertTrue(ArcadePortRules.heroesOfGwenWitherShouldInform(130_000L, 100_000L));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherShouldInform(129_999L, 100_000L));
+        assertFalse(ArcadePortRules.heroesOfGwenWitherShouldInform(100_000L, 101_000L));
+        assertTrue(ArcadePortRules.heroesOfGwenWitherShouldInform(1_000L, 0L));
+    }
+
+    @Test
     void witherTargetsHostileLivingEntitiesIncludingNeutralMobsButNotAlliesOrInactivePlayers() {
         assertTrue(ArcadePortRules.heroesOfGwenWitherCanTarget(0, 1, true));
         assertTrue(ArcadePortRules.heroesOfGwenWitherCanTarget(0, -1, true));
