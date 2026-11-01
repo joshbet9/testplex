@@ -30,7 +30,7 @@ jobs:
   build-modern-arcade:
     name: Build and test Paper 26.3 plugin
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -46,6 +46,15 @@ jobs:
             modern-platform/snake-port/pom.xml
             modern-platform/arcade-games-port/pom.xml
 
+      - name: Set up Node.js 24 for Minecraft 26.3 protocol clients
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Install pinned offline Minecraft 26.3 protocol client
+        run: |
+          npm install --prefix "$RUNNER_TEMP/wizards-protocol-client" --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "@wp2508/minecraft-protocol@1.69.5"
+
       - name: Build and run catalogue tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/pom.xml clean verify
 
@@ -54,6 +63,30 @@ jobs:
 
       - name: Build Arcade mechanics and the integrated Monster Maze module
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/arcade-games-port/pom.xml clean verify
+
+      - name: Build and run ephemeral Wizards Paper 26.3 source-map smoke harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          smoke_dir="modern-platform/arcade-games-port/src/test-runtime/wizards-paper-smoke"
+          mvn --batch-mode --no-transfer-progress -f "$smoke_dir/pom.xml" clean package
+          bash modern-platform/arcade-games-port/scripts/run-wizards-paper-smoke.sh \
+            modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar \
+            "$smoke_dir/target/WizardsPaperSmoke.jar" \
+            "$RUNNER_TEMP/wizards-paper-smoke" \
+            "$RUNNER_TEMP/wizards-protocol-client/node_modules"
+
+      - name: Upload Wizards Paper smoke results and server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wizards-paper-26.3-smoke-results
+          path: |
+            ${{ runner.temp }}/wizards-paper-smoke/plugins/WizardsPaperSmoke/results.tsv
+            ${{ runner.temp }}/wizards-paper-smoke/server.log
+            ${{ runner.temp }}/wizards-paper-smoke/client-bots.log
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Build the disabled Wizards 26.3 port and run spell-rule tests
         run: mvn --batch-mode --no-transfer-progress -f modern-platform/wizards-port/pom.xml clean verify
@@ -89,6 +122,10 @@ jobs:
           jar tf "$arcade_jar" | grep -Fxq "plugin.yml"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadePortManager.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsGameManager.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsRules.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsSpell.class"
+          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsKit.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/PlexballGame.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/PlexballRules.class"
           jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/CameraShyGame.class"
