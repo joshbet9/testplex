@@ -200,4 +200,37 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_DAMAGE_PER_WOLF, 0.00001D);
         assertEquals(0.05D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_SPEED_PER_WOLF, 0.00001D);
     }
+
+    @Test
+    void rowenaLightArrowsMatchesFivePiercingShotsAndDamageScaling() {
+        assertEquals(5, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_COUNT);
+        assertEquals(12_000L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROWS_COOLDOWN_MILLIS);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_TARGET_RECHARGE_MILLIS);
+        assertEquals(40.0D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_RANGE, 0.00001D);
+        assertEquals(0.4D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_STEP, 0.00001D);
+        assertEquals(1.5D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_LIGHT_ARROW_HIT_RADIUS, 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.heroesOfGwenRowenaLightArrowDamage(0), 0.00001D);
+        assertEquals(5.25D, ArcadePortRules.heroesOfGwenRowenaLightArrowDamage(1), 0.00001D);
+        assertEquals(6.5D, ArcadePortRules.heroesOfGwenRowenaLightArrowDamage(2), 0.00001D);
+    }
+
+    @Test
+    void rowenaCombatSlideMatchesSourceVelocityDurationAndCooldown() {
+        assertEquals(8_000L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_COOLDOWN_MILLIS);
+        assertEquals(250L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_DURATION_MILLIS);
+        assertEquals(1.5D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_COMBAT_SLIDE_SPEED, 0.00001D);
+    }
+
+    @Test
+    void rowenaBombardmentMatchesSourceFlightShotsAndExplosiveDamage() {
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DURATION_MILLIS);
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_COOLDOWN_MILLIS);
+        assertEquals(70_000L, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_REUSE_DELAY_MILLIS);
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_SHOTS);
+        assertEquals(15.0D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_ASCENT_BLOCKS, 0.00001D);
+        assertEquals(40.0D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_RANGE, 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_ROWENA_BOMBARDMENT_BLAST_RADIUS, 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.heroesOfGwenRowenaBombardmentDamage(0), 0.00001D);
+        assertEquals(12.5D, ArcadePortRules.heroesOfGwenRowenaBombardmentDamage(1), 0.00001D);
+    }
 }
