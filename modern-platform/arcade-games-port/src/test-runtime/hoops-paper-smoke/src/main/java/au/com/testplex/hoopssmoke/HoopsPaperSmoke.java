@@ -154,8 +154,14 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         require(testPlayers != null, "shared Arcade test-player manager is unavailable");
         require(Boolean.TRUE.equals(invoke(testPlayers, "isStartupCleanupComplete", new Class<?>[0])),
                 "fake-player startup cleanup has not completed");
-        require(Boolean.TRUE.equals(invoke(testPlayers, "isStartupCleanupSuccessful", new Class<?>[0])),
-                "fake-player startup cleanup was not verified");
+        int managedTestPlayers = ((Number) invoke(testPlayers, "activeCount", new Class<?>[0])).intValue();
+        require(managedTestPlayers == 0,
+                "disposable four-client fixture unexpectedly has " + managedTestPlayers + " managed fake player(s)");
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            require(!Boolean.TRUE.equals(invoke(testPlayers, "isTestPlayer",
+                    new Class<?>[] {Player.class}, online)),
+                    "disposable four-client fixture contains an online Testplex fake player: " + online.getName());
+        }
 
         Class<?> gameType = Class.forName("au.com.testplex.arcadeports.ArcadePortGame");
         Class<?> senderType = Class.forName("org.bukkit.command.CommandSender");
@@ -320,7 +326,20 @@ public final class HoopsPaperSmoke extends JavaPlugin {
                 + "|points=" + field(shot, "points") + "|dunk=" + field(shot, "dunk")
                 + "|aimMiss=" + shooter.getEyeLocation().getDirection().normalize()
                 + "|velocity=" + field(shot, "velocity"));
-        require(((Integer) field(shot, "points")) == 2, "eight-block release was not scored as two points");
+        double recordedReleaseDistance = ((Number) field(shot, "releaseDistance")).doubleValue();
+        int recordedPoints = ((Number) field(shot, "points")).intValue();
+        getLogger().info("HOOPS_SHOT_DIAGNOSTIC|team=" + team
+                + "|shooter=" + shooter.getName()
+                + "|location=" + shooter.getLocation()
+                + "|releaseDistance=" + recordedReleaseDistance
+                + "|points=" + recordedPoints
+                + "|velocity=" + shooter.getVelocity()
+                + "|onGround=" + shooter.isOnGround());
+        require(Math.abs(recordedReleaseDistance - 8.0D) < 0.05D,
+                "shot was not released eight blocks from its defending hoop: " + recordedReleaseDistance);
+        require(recordedPoints == 2,
+                "eight-block release was not scored as two points: distance=" + recordedReleaseDistance
+                        + ", points=" + recordedPoints);
         require(((Boolean) field(shot, "reboundEligible")), "missed-shot recovery was not enabled");
         require(passerId.equals(field(shot, "passerId")), "shot lost its pass/assist attribution");
         Location actualEye = shooter.getEyeLocation();
