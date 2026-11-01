@@ -45,7 +45,15 @@ class ArcadeProgressCatalogTest {
         assertTrue(hasAchievement("dragons", "win-three-in-a-row", "Win 3 in a row"));
         assertTrue(hasAchievement("dragons", "survive-five-minutes", "Survive 5 minutes"));
         assertTrue(hasAchievement("dragons", "no-damage-win", "Untouched"));
-        assertEquals(3, ArcadeProgressCatalog.achievements("dragons").size());
+        assertTrue(hasAchievement("dragons", "adept", "Adept"));
+        assertTrue(hasAchievement("dragons", "sharpshooter", "Sharpshooter"));
+        assertTrue(hasAchievement("dragons", "ultra", "Ultra"));
+        assertTrue(hasAchievement("dragons", "survivors-guilt", "Survivor’s Guilt"));
+        assertTrue(hasAchievement("dragons", "freefallin", "Freefallin’"));
+        assertTrue(hasAchievement("dragons", "dodgems", "Dodgems"));
+        assertTrue(hasAchievement("dragons", "sticks-and-stones", "Sticks and stones"));
+        assertTrue(hasAchievement("dragons", "mlg-pro", "MLG Pro"));
+        assertEquals(11, ArcadeProgressCatalog.achievements("dragons").size());
     }
 
     @Test
