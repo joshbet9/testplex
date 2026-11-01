@@ -487,12 +487,12 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                 if (queued.isOnline()) queued.sendMessage(ChatColor.GRAY + "Waiting for more wizards: "
                         + entrants.size() + "/" + minimum + " players.");
             }
-            return;
+            return false;
         }
         if (entrants.isEmpty()) {
             sender.sendMessage(ChatColor.RED + "Nobody is queued for Wizards.");
             queueDeadlineTick = -1L;
-            return;
+            return false;
         }
 
         String desiredMap = SourceMapCatalog.selectedResourceForFolders(plugin, "wizards", enabledWizardsMapFolders());
@@ -502,13 +502,13 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         if (arena == null) {
             sender.sendMessage(ChatColor.RED + "Wizards source map failed to load. No substitute arena will be started.");
             queueDeadlineTick = -1L;
-            return;
+            return false;
         }
         if (!sourceSpawnLocations.isEmpty() && entrants.size() > sourceSpawnLocations.size()) {
             sender.sendMessage(ChatColor.RED + "The selected map has only " + sourceSpawnLocations.size()
                     + " valid player spawns, but " + entrants.size() + " players are queued. Choose a larger map.");
             queueDeadlineTick = -1L;
-            return;
+            return false;
         }
         if (entrants.size() > maximum) entrants = new ArrayList<>(entrants.subList(0, maximum));
         // Source archives may carry stale world flags. Wizards is a PvP free-for-all;
