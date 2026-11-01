@@ -138,6 +138,8 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
     private BukkitTask tickTask;
     private boolean initialized;
     private boolean stopRequested;
+    /** True when the shared Arcade manager owns the active participant/session lifecycle. */
+    private boolean arcadeManaged;
     private boolean running;
     private long startedAt;
     private int tick;
@@ -188,6 +190,17 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         String selected = SourceMapCatalog.selectedResourceForFolders(
                 plugin, "wizards", enabledWizardsMapFolders());
         return selected != null && maps.stream().anyMatch(map -> selected.equals(map.resource()));
+    }
+
+    /** Prepare the exact selected source world before the Arcade manager captures its shared session. */
+    public World prepareArenaForArcade() {
+        if (!hasAvailableSelectedMap()) return null;
+        String desiredMap = SourceMapCatalog.selectedResourceForFolders(
+                plugin, "wizards", enabledWizardsMapFolders());
+        if (arena == null || !java.util.Objects.equals(activeMapResource, desiredMap)) {
+            arena = createArena();
+        }
+        return arena;
     }
 
     private World createArena() {
@@ -450,8 +463,11 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
 
     /** Start with participants already selected by ArcadePortManager's shared queue. */
     public boolean startFromArcadeLifecycle(List<Player> participants) {
-        if (participants == null) return false;
-        return start(plugin.getServer().getConsoleSender(), participants);
+        if (participants == null || prepareArenaForArcade() == null) return false;
+        arcadeManaged = true;
+        boolean started = start(plugin.getServer().getConsoleSender(), participants);
+        if (!started) arcadeManaged = false;
+        return started;
     }
 
     private boolean start(org.bukkit.command.CommandSender sender, List<Player> arcadeParticipants) {
@@ -538,7 +554,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         for (int i = 0; i < entrants.size(); i++) {
             Player player = entrants.get(i);
             UUID id = player.getUniqueId();
-            snapshots.put(id, PlayerSnapshot.capture(player));
+            if (!arcadeManaged) snapshots.put(id, PlayerSnapshot.capture(player));
             WizardsKit kit = selectedKits.getOrDefault(id, defaultKit());
             WizardState state = new WizardState(kit);
             states.put(id, state);
@@ -682,6 +698,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             WizardsProgressStore.increment(plugin.getConfig(), id, "spells-bound", state.spellsBound);
             plugin.saveConfig();
             removeManaBar(id);
+            if (arcadeManaged) plugin.returnWizardsParticipantToLobby(player);
             restoreTemporaryPlayer(player, id);
             player.sendMessage(ChatColor.YELLOW + "You left the Wizards round.");
             Bukkit.getScheduler().runTask(plugin, this::checkWinner);
@@ -699,6 +716,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
 
     public void stop(String reason) {
         if (!running && snapshots.isEmpty()) {
+            arcadeManaged = false;
             queue.clear();
             selectedKits.clear();
             queueDeadlineTick = -1L;
@@ -1713,6 +1731,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
             killerState.kills++;
         }
         state.alive = false;
+        plugin.markWizardsParticipantEliminated(player);
         dropDeathLoot(player, state);
         event.setKeepInventory(true);
         event.setKeepLevel(true);
@@ -1794,6 +1813,7 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         WizardState state = states.get(id);
         if (running && state != null && state.alive) {
             state.alive = false;
+            plugin.markWizardsParticipantEliminated(event.getPlayer());
             dropDeathLoot(event.getPlayer(), state);
             removeManaBar(id);
             Bukkit.getScheduler().runTaskLater(plugin, this::checkWinner, 2L);
@@ -2787,12 +2807,14 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
         ownedEntities.clear();
         spellDamageSources.clear();
 
-        for (Map.Entry<UUID, PlayerSnapshot> entry : snapshots.entrySet()) {
-            Player player = Bukkit.getPlayer(entry.getKey());
-            if (player != null && player.isOnline() && !player.isDead()) {
-                entry.getValue().restore(player);
-            } else {
-                pendingRestore.put(entry.getKey(), entry.getValue());
+        if (!arcadeManaged) {
+            for (Map.Entry<UUID, PlayerSnapshot> entry : snapshots.entrySet()) {
+                Player player = Bukkit.getPlayer(entry.getKey());
+                if (player != null && player.isOnline() && !player.isDead()) {
+                    entry.getValue().restore(player);
+                } else {
+                    pendingRestore.put(entry.getKey(), entry.getValue());
+                }
             }
         }
         snapshots.clear();
@@ -2814,7 +2836,9 @@ public final class WizardsGameManager implements Listener, ArcadeGameModule {
                     : Math.max(48.0D, Math.max(sourceMapData.width(), sourceMapData.depth()) + 8.0D);
             border.setSize(size);
         }
-        if (!stopRequested) plugin.onWizardsRoundCompleted();
+        boolean returnThroughArcade = arcadeManaged && !stopRequested;
+        arcadeManaged = false;
+        if (!stopRequested) plugin.onWizardsRoundCompleted(winner);
     }
 
     /** Persist match progress to the local-stats keys shared with the Arcade stats browser. */
