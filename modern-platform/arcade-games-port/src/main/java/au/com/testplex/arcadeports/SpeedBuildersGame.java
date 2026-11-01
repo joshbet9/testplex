@@ -11,6 +11,8 @@ import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Mob;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
 import org.bukkit.entity.Player;
@@ -19,8 +21,11 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
@@ -60,13 +65,15 @@ public final class SpeedBuildersGame implements Listener {
     private static final long NORMAL_QUEUE_TICKS = 100L;
     private static final long QUICK_QUEUE_TICKS = 40L;
 
-    private enum Phase { IDLE, VIEWING, BUILDING, REVIEWING, INTERMISSION }
+    private enum Phase { IDLE, VIEWING, BUILDING, REVIEWING, ELIMINATING, INTERMISSION }
 
     private final ArcadeMechanicsModernPlugin plugin;
     private final LinkedHashSet<UUID> queue = new LinkedHashSet<>();
     private final LinkedHashMap<UUID, PlayerState> players = new LinkedHashMap<>();
     private List<Template> templates = List.of();
     private final List<Template> unusedTemplates = new ArrayList<>();
+    private final List<PlayerState> pendingEliminations = new ArrayList<>();
+    private final List<Entity> reviewMobs = new ArrayList<>();
     private BukkitTask ticker;
     private World arena;
     private World sourceWorld;
@@ -195,6 +202,7 @@ public final class SpeedBuildersGame implements Listener {
                 case VIEWING -> beginBuildingPhase();
                 case BUILDING -> finishBuildingPhase();
                 case REVIEWING -> finishReviewPhase();
+                case ELIMINATING -> eliminateNextPlayer();
                 case INTERMISSION -> beginRound();
                 default -> { }
             }
@@ -393,6 +401,7 @@ public final class SpeedBuildersGame implements Listener {
             state.player.getInventory().clear();
             clearPlotBuildVolume(state.plot);
             pasteTemplate(state.plot, currentTemplate);
+            spawnTemplateMobs(state, state.plot, currentTemplate);
             teleportToPlot(state);
             state.player.sendTitle(ChatColor.GOLD + currentTemplate.name(),
                     ChatColor.YELLOW + "Memorise the model — " + SpeedBuildersRules.DEFAULT_VIEW_SECONDS + " seconds",
@@ -412,6 +421,7 @@ public final class SpeedBuildersGame implements Listener {
         phaseDeadlineTick = tick + buildSeconds * 20L;
         for (PlayerState state : alivePlayers()) {
             clearPlotBuildVolume(state.plot);
+            removeMobs(state.mobs);
             giveTemplateBlocks(state.player, currentTemplate);
             state.player.setGameMode(GameMode.SURVIVAL);
             state.player.sendTitle(ChatColor.GREEN + "BUILD!",
@@ -427,13 +437,17 @@ public final class SpeedBuildersGame implements Listener {
         if (phase != Phase.BUILDING) return;
         phase = Phase.REVIEWING;
         phaseDeadlineTick = tick + SpeedBuildersRules.REVIEW_SECONDS * 20L;
+        clearPlotBuildVolume(new Plot(0, 0));
+        removeMobs(reviewMobs);
+        pasteTemplate(new Plot(0, 0), currentTemplate);
+        spawnReviewMobs(currentTemplate);
         List<PlayerState> alive = alivePlayers();
         for (int i = 0; i < alive.size(); i++) {
             PlayerState state = alive.get(i);
-            state.score = score(state.plot);
-            state.empty = isPlotEmpty(state.plot);
+            state.score = score(state);
+            state.empty = isPlotEmpty(state);
             boolean wasAlreadyPerfect = state.perfect;
-            state.perfect = state.score == currentTemplate.cells().size();
+            state.perfect = state.score == currentTemplate.expectedScore();
             if (state.perfect && !wasAlreadyPerfect) state.perfectBuilds++;
             state.player.getInventory().clear();
             state.player.setGameMode(GameMode.SPECTATOR);
@@ -501,6 +515,8 @@ public final class SpeedBuildersGame implements Listener {
     private void finishMatch(Player winner, String reason) {
         if (phase == Phase.IDLE) return;
         phase = Phase.IDLE;
+        removeMobs(reviewMobs);
+        for (PlayerState state : players.values()) removeMobs(state.mobs);
         currentTemplate = null;
         phaseDeadlineTick = 0L;
         queueDeadlineTick = -1L;
@@ -548,8 +564,9 @@ public final class SpeedBuildersGame implements Listener {
         plugin.saveConfig();
     }
 
-    private int score(Plot plot) {
-        Map<SpeedBuildersRules.Coordinate, Material> actual = new LinkedHashMap<>();
+    private int score(PlayerState state) {
+        Plot plot = state.plot;
+        Map<SpeedBuildersRules.Coordinate, SpeedBuildersRules.BlockState> actual = new LinkedHashMap<>();
         for (SpeedBuildersRules.Cell cell : currentTemplate.cells()) {
             int x = plot.centerX() - 3 + cell.x();
             int y = FLOOR_Y + 1 + cell.y();
@@ -560,10 +577,28 @@ public final class SpeedBuildersGame implements Listener {
                         block.getType(), block.getBlockData().getAsString()));
             }
         }
-        return SpeedBuildersRules.scoreBlockStates(currentTemplate.cells(), actual);
+        int blockScore = SpeedBuildersRules.scoreBlockStates(currentTemplate.cells(), actual);
+        int mobScore = 0;
+        List<Entity> unmatched = new ArrayList<>(state.mobs);
+        for (MobCell expected : currentTemplate.mobs()) {
+            for (Entity entity : new ArrayList<>(unmatched)) {
+                Location location = entity.getLocation();
+                int x = location.getBlockX() - (plot.centerX() - 3);
+                int y = location.getBlockY() - (FLOOR_Y + 1);
+                int z = location.getBlockZ() - (plot.centerZ() - 3);
+                if (entity.getType() == expected.type() && x == expected.x() && y == expected.y() && z == expected.z()) {
+                    mobScore++;
+                    unmatched.remove(entity);
+                    break;
+                }
+            }
+        }
+        return blockScore + mobScore;
     }
 
-    private boolean isPlotEmpty(Plot plot) {
+    private boolean isPlotEmpty(PlayerState state) {
+        Plot plot = state.plot;
+        if (!state.mobs.isEmpty()) return false;
         for (int x = -3; x <= 3; x++) {
             for (int y = 0; y < SpeedBuildersRules.BUILD_HEIGHT; y++) {
                 for (int z = -3; z <= 3; z++) {
@@ -590,6 +625,54 @@ public final class SpeedBuildersGame implements Listener {
         }
     }
 
+    private Material spawnEggMaterial(EntityType type) {
+        return type == null ? null : Material.matchMaterial(type.name() + "_SPAWN_EGG");
+    }
+
+    private void spawnTemplateMobs(PlayerState state, Plot plot, Template template) {
+        for (MobCell mob : template.mobs()) {
+            Location location = new Location(arena,
+                    plot.centerX() - 3 + mob.x() + 0.5D,
+                    FLOOR_Y + 1 + mob.y(),
+                    plot.centerZ() - 3 + mob.z() + 0.5D);
+            Entity entity = spawnDisplayMob(location, mob.type());
+            if (entity != null) state.mobs.add(entity);
+        }
+    }
+
+    private void spawnReviewMobs(Template template) {
+        for (MobCell mob : template.mobs()) {
+            Location location = new Location(arena, mob.x() - 2.5D,
+                    FLOOR_Y + 1 + mob.y(), mob.z() - 2.5D);
+            Entity entity = spawnDisplayMob(location, mob.type());
+            if (entity != null) reviewMobs.add(entity);
+        }
+    }
+
+    private Entity spawnDisplayMob(Location location, EntityType type) {
+        try {
+            Entity entity = arena.spawnEntity(location, type);
+            entity.setGravity(false);
+            entity.setInvulnerable(true);
+            entity.setSilent(true);
+            entity.setPersistent(false);
+            entity.setCollidable(false);
+            if (entity instanceof Mob mob) mob.setAI(false);
+            return entity;
+        } catch (RuntimeException spawnFailure) {
+            plugin.getLogger().warning("Could not spawn Speed Builders template mob " + type + ": "
+                    + spawnFailure.getMessage());
+            return null;
+        }
+    }
+
+    private void removeMobs(List<Entity> mobs) {
+        for (Entity entity : new ArrayList<>(mobs)) {
+            if (entity != null && entity.isValid()) entity.remove();
+        }
+        mobs.clear();
+    }
+
     private void giveTemplateBlocks(Player player, Template template) {
         Map<Material, Integer> counts = new EnumMap<>(Material.class);
         for (SpeedBuildersRules.Cell cell : template.cells()) counts.merge(cell.material(), 1, Integer::sum);
@@ -600,6 +683,10 @@ public final class SpeedBuildersGame implements Listener {
                 player.getInventory().addItem(new ItemStack(entry.getKey(), stack));
                 remaining -= stack;
             }
+        }
+        for (MobCell mob : template.mobs()) {
+            Material spawnEgg = spawnEggMaterial(mob.type());
+            if (spawnEgg != null) player.getInventory().addItem(new ItemStack(spawnEgg));
         }
     }
 
@@ -715,6 +802,57 @@ public final class SpeedBuildersGame implements Listener {
             objective.getScore(entry).setScore(lines.size() - i);
         }
         state.player.setScoreboard(board);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSpawnEggUse(PlayerInteractEvent event) {
+        if (phase != Phase.BUILDING || event.getAction() != Action.RIGHT_CLICK_BLOCK
+                || event.getClickedBlock() == null || event.getItem() == null) return;
+        PlayerState state = players.get(event.getPlayer().getUniqueId());
+        if (state == null || state.eliminated || state.perfect) return;
+        String itemName = event.getItem().getType().name();
+        if (!itemName.endsWith("_SPAWN_EGG")) return;
+        String typeName = itemName.substring(0, itemName.length() - "_SPAWN_EGG".length());
+        EntityType type;
+        try {
+            type = EntityType.valueOf(typeName);
+        } catch (IllegalArgumentException invalidEgg) {
+            return;
+        }
+        if (currentTemplate.mobs().stream().noneMatch(mob -> mob.type() == type)) return;
+        Block target = event.getClickedBlock().getRelative(event.getBlockFace());
+        if (!isInBuildVolume(state, target)) {
+            event.setCancelled(true);
+            return;
+        }
+        event.setCancelled(true);
+        Location spawn = target.getLocation().add(0.5D, 0.0D, 0.5D);
+        Entity entity = spawnDisplayMob(spawn, type);
+        if (entity == null) return;
+        // A player-placed mob is hittable for removal, but never wanders away or damages anyone.
+        entity.setInvulnerable(false);
+        entity.setCollidable(true);
+        if (entity instanceof Mob mob) mob.setAI(false);
+        state.mobs.add(entity);
+        ItemStack held = event.getItem();
+        if (held.getAmount() <= 1) event.getPlayer().getInventory().setItemInMainHand(null);
+        else held.setAmount(held.getAmount() - 1);
+        Bukkit.getScheduler().runTask(plugin, () -> checkPerfectBuild(state));
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onTemplateMobHit(EntityDamageByEntityEvent event) {
+        if (phase != Phase.BUILDING || !(event.getDamager() instanceof Player player)) return;
+        PlayerState state = players.get(player.getUniqueId());
+        if (state == null || state.eliminated || state.perfect || !state.mobs.contains(event.getEntity())) return;
+        event.setCancelled(true);
+        Entity mob = event.getEntity();
+        state.mobs.remove(mob);
+        EntityType type = mob.getType();
+        mob.remove();
+        Material egg = spawnEggMaterial(type);
+        if (egg != null) player.getInventory().addItem(new ItemStack(egg));
+        Bukkit.getScheduler().runTask(plugin, () -> checkPerfectBuild(state));
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -966,6 +1104,7 @@ public final class SpeedBuildersGame implements Listener {
         private int score;
         private int perfectBuilds;
         private int blocksPlaced;
+        private final List<Entity> mobs = new ArrayList<>();
 
         private PlayerState(Player player, Plot plot) {
             this.player = player;
