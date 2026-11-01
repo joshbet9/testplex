@@ -1,14 +1,14 @@
 # Heroes of Gwen — source parity and acceptance plan
 
-**Catalogue status:** `MECHANICS_IN_PROGRESS`  
-**Enabled rotation:** No. This plan does not enable the game or mark it test-ready.  
+**Catalogue status:** `READY_FOR_TEST`  
+**Controlled Arcade queue:** Enabled as one `heroes-of-gwen` entry. No separate Standard/Mixed variant is exposed; automatic rotation remains operator-disabled.  
 **Maps present:** Heroes Valley and Tartarus source archives are included in the repository.
 
 ## Current implementation inventory
 
 The current Paper 26.3 runtime includes the nine canonical hero kits and their named active/passive ability handlers: Hattori, Bardolf, Anath, Larissa, Devon, Rowena, Dana, Biff and Ivy. The standard game packages the original Heroes Valley and Tartarus archives and reads team-base, tower, beacon, minion and Wither-boundary markers. The objective runtime includes lane minions, target-entry priority, tower gating, gold/capture income and Wither movement/earthquake handling.
 
-The match runtime contains map-specific sidequests: Pumpkin King on Heroes Valley (including untyped maps, which Reborn defaults to Heroes Valley) and the 30-second Wither Skeleton kill challenge on Monochrome. The four role-specific store catalogues, role-filtered purchases and Mixed Arcade half-price calculation are present. All 13 distinct `MobaItemEffect` types used by the original four role shops now have modern implementations: source enchantments/colours and consumables; role/slot purchase persistence; cooldown and ammo reductions; extra ammo/refund; movement speed/max health; HP5 and kill healing; ability/basic/melee damage; hit conditions and condition immunity. A line-by-line role-shop comparison found no source-price discrepancies; only expected 1.8-to-modern material-name aliases. Wither visuals still use a native Paper Wither rather than the original source 3×5 representation. The remaining blockers are visual/map/live multiplayer acceptance, not missing role-shop effect handlers.
+The match runtime contains map-specific sidequests: Pumpkin King on Heroes Valley (including untyped maps, which Reborn defaults to Heroes Valley) and the 30-second Wither Skeleton kill challenge on Monochrome. The four role-specific store catalogues and role-filtered purchases are present. All 13 distinct `MobaItemEffect` types used by the original four role shops now have modern implementations: source enchantments/colours and consumables; role/slot purchase persistence; cooldown and ammo reductions; extra ammo/refund; movement speed/max health; HP5 and kill healing; ability/basic/melee damage; hit conditions and condition immunity. A line-by-line role-shop comparison found no source-price discrepancies; only expected 1.8-to-modern material-name aliases. Wither visuals still use a native Paper Wither rather than the original source 3×5 representation. The remaining blockers are visual/map/live multiplayer acceptance, not missing role-shop effect handlers.
 
 ## Canonical hero/ability inventory
 
@@ -39,7 +39,7 @@ Reference: [Mineplex Wiki — Heroes of Gwen](https://mineplex.fandom.com/wiki/H
 - **Hero skills:** every hero must have its correct primary weapon, hotbar slot items, ability effect, target filters, cooldown, damage/healing, structure/minion interaction and death/reset behaviour.
 - **Role shops and passive effects:** verify all four role catalogues, item pricing, purchase effects, armour/passive bonuses, consumables and the mixed-variant half-price rule.
 - **Heroes Valley sidequest:** verify the Pumpkin King spawn/respawn timing, cave behaviour, damage, team reward (Regeneration II and Strength I for one minute) and death cancellation.
-- **Mixed Arcade:** preserve the intended mixed variant's middle-tower filtering and half-price shop behaviour without changing standard Heroes of Gwen map markers.
+- **Arcade-only scope:** expose one Heroes of Gwen entry and load the selected source map's objectives; do not expose a second Standard/Mixed variant.
 
 Reference: [Mineplex Wiki — Heroes of Gwen gameplay and classes](https://mineplex.fandom.com/wiki/Heroes_of_Gwen).
 
@@ -48,7 +48,7 @@ Reference: [Mineplex Wiki — Heroes of Gwen gameplay and classes](https://minep
 ### Runtime and lifecycle
 - [ ] Queue/start/stop, team assignment, player disconnect/rejoin, death/respawn and match cleanup.
 - [ ] No player can be assigned to two heroes on the same team or to a hero that is already occupied.
-- [ ] Standard and Mixed Arcade load the correct map variant and objectives.
+- [ ] The single Arcade entry loads the selected original source map and its corresponding objectives.
 
 ### Map and objectives
 - [ ] Both original maps load their source marker sets without missing or duplicated markers.
@@ -66,7 +66,7 @@ Reference: [Mineplex Wiki — Heroes of Gwen gameplay and classes](https://minep
 - [ ] Source ability-damage, basic-attack-damage and flat melee-damage shop modifiers are applied to the correct damage paths.
 - [ ] Verify each role item, source price, enchantment/colour, passive, purchase replacement and respawn restoration in-game.
 - [ ] Purchases deduct the correct gold exactly once; consumables do not refill or heal unexpectedly.
-- [ ] Mixed Arcade halves both displayed and charged prices without changing standard prices.
+- [ ] Store purchases display and charge the standard source prices, then restore the correct equipment and passive effects after respawn.
 
 ### Visuals and fairness
 - [ ] Beacon ownership, capture progress and team colours are readable at a distance.
@@ -74,7 +74,7 @@ Reference: [Mineplex Wiki — Heroes of Gwen gameplay and classes](https://minep
 - [ ] Objective damage cannot be dealt from outside the valid tower range.
 - [ ] No ability damages teammates, friendly structures or invalid targets unless the source explicitly allows it.
 
-**Enablement gate:** keep `heroes-of-gwen` at `MECHANICS_IN_PROGRESS` and outside `enabled-games` until automated tests, both-map acceptance and live multi-player testing pass. The hero kits, minion loop and source shop effect handlers are implemented; the remaining Wither/map presentation and live acceptance gaps are substantive, not cosmetic polish.
+**Enablement boundary:** `heroes-of-gwen` is `READY_FOR_TEST` and enabled as one Arcade entry. Automated tests passed; both source-map layouts, exact Wither source presentation/interaction and full multiplayer behaviour remain manual acceptance work. Do not treat controlled-test readiness as final source-parity sign-off.
 
 
 ## Modern Paper 26.3 implementation progress — lane minion slice
@@ -89,7 +89,7 @@ The first missing objective-runtime slice is now implemented on branch feat/hero
 - Passive income is corrected to 5 gold every 5 seconds; each owned capture point adds another 5 gold per interval, and capture awards 25 gold.
 - Added deterministic rule tests for the wave/economy constants and tower-entry priority.
 
-**Validation boundary:** the minion/economy implementation and deterministic tests are included in the successful combined Paper 26.3 build. It does not make Heroes of Gwen READY_FOR_TEST; Wither visual/source acceptance, both-map verification and live multiplayer acceptance remain open.
+**Validation boundary:** the minion/economy implementation and deterministic tests are included in the successful Paper 26.3 build. Wither visual/source acceptance, both-map verification and live multiplayer acceptance remain open for controlled testing.
 
 
 ## Modern Paper 26.3 implementation progress — Anath the Burnt
@@ -146,7 +146,7 @@ Bardolf's source kit is now implemented in the match-scoped runtime:
 - **Full Moon:** Nether Star drop-activated ultimate, 10-second active period and 60-second source cooldown restarted after the active period (70 seconds until reuse). Each living wolf adds one damage and 5% walk speed at activation; wolves are restored to 20 health, untamed and made angry, move faster, and are removed when the ultimate ends.
 - Pack entities and temporary effects are explicitly removed on player death, disconnect, hero change and runtime stop. Added deterministic tests for summon limits/health/cadence, pounce timing/vector and Full Moon values.
 
-**Validation boundary:** Bardolf and all other canonical hero kits are present in the current combined runtime. Run #4453 passed compilation and deterministic regression checks; this is not whole-game acceptance. Keep Heroes of Gwen MECHANICS_IN_PROGRESS and disabled until Wither source presentation, both-map checks and live multiplayer acceptance pass.
+**Validation boundary:** Bardolf and all other canonical hero kits are present in the current runtime. Run #4482 passed compilation and deterministic regression checks; this is not whole-game acceptance. Heroes of Gwen is enabled for controlled testing while Wither source presentation, both-map checks and live multiplayer acceptance remain open.
 
 
 ### Warrior parity — Dana, Biff and Ivy
@@ -184,20 +184,20 @@ Bardolf's source kit is now implemented in the match-scoped runtime:
 - **Infinity:** 7-second arrow-infinity/homing/Wither effect; 60-second source cooldown restarted after the active window. Homing uses the source 6-block target radius.
 - Regression tests cover TNT arrow count, radius, bow scaling, boost and ultimate timings.
 
-**Validation boundary:** these final Hattori/Devon mechanics and tests are in the current branch; the new combined Paper 26.3 build is pending.
+**Validation boundary:** these final Hattori/Devon mechanics and tests are in the current branch; Paper 26.3 build/test run #4482 passed.
 
-### Remaining blockers before enabling Heroes of Gwen
+### Remaining manual acceptance checks for Heroes of Gwen (already enabled for controlled testing)
 
-The active ability kits, lane minion loop and both sidequest paths now have implementation coverage, but the game is **not test-ready**. Remaining work is:
+The active ability kits, lane minion loop and both sidequest paths now have implementation coverage. The game is **test-ready for controlled in-game validation**; the following checks remain:
 
 - Role-store effect handlers are implemented for every distinct effect type used by the four source shops, including consumables, enchantments/colours, purchase persistence, cooldown/ammo modifiers, extra ammo/refunds, speed/health, HP5/kill healing, ability/basic/melee damage, hit conditions and immunity. A full comparison of the four archived role-shop catalogues against the modern `addStoreEntry` catalogue found no item-price discrepancies; the differences are only expected legacy-to-modern material enum aliases. Keep the in-game shop matrix on the acceptance checklist to verify actual UI, charging, replacement and effects in multiplayer.
-- Live-verify all four role catalogues against the source, including consumables, the audited standard prices, Mixed Arcade half-price display/charge, equipment replacement and respawn persistence.
+- Live-verify all four role catalogues against the source, including consumables, audited standard prices, equipment replacement and respawn persistence.
 - Compare the modern native Wither against the source custom boss representation and validate patrol boundary, target persistence, earthquake timing/falloff, tower protection and boss damage/death interactions on both maps.
 - Verify both source map archives (Heroes Valley and Tartarus) load all original markers correctly. In particular, confirm the Pumpkin King boundary/spawn on Heroes Valley and Monochrome map-type detection/challenge markers on the relevant Monochrome map.
 - Run multiplayer acceptance for every hero: hotbar selection, input mapping, cooldown/ammo feedback, player/minion/tower/Wither damage filters, friendly-fire, player death/respawn/quit and repeated match cleanup.
 - Validate all map objectives together: tower entry ordering, minion wave progression and armour upgrade, beacon capture/economy, Wither, and the map-specific sidequest.
 
-Keep the game at `MECHANICS_IN_PROGRESS` and outside `enabled-games` until automated checks, both-map acceptance and live multiplayer testing pass.
+Keep the game available in the controlled Arcade queue while these checks are completed. Record defects as follow-up fixes; do not claim final source parity until the manual acceptance passes.
 
 
 ### Wither source-target correction — current implementation slice
