@@ -150,3 +150,8 @@ The catalogue and renderer contract are covered by unit tests. Spleef, Dragon Es
 ## Wither Assault: smoother movement
 
 Wither flight speed follows a continuous altitude curve. Near the spawn height, an eased transition blends the source hover speed into the altitude-based curve, while a per-tick rate limit prevents sudden changes during climbs and descents.
+
+
+## Speed Builders — isolated source-map WIP
+
+Speed Builders now loads the original Reborn Shroomland Lake archive, the authored 7×7×7 template library and per-template ground states, the sixteen source player plots and the central judging plot. It includes source-style timer modifiers, block-state scoring exceptions, mob markers/spawn-egg reconstruction, plot-bounded building, instant demolition refunds, two-second sequential elimination staging, local stats and durable player-state snapshots. It is hosted by the shared Arcade mechanics plugin but remains outside the normal `READY_FOR_TEST` rotation. It has not yet passed the full Paper 26.3 build and live multiplayer/map acceptance; see [SPEED-BUILDERS-TEST-PLAN.md](SPEED-BUILDERS-TEST-PLAN.md). Test commands: `/arcadeport play speed-builders`, `/arcadeport join speed-builders`, `/arcadeport start speed-builders`, and `/stats speed-builders`.
