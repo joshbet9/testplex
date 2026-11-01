@@ -116,6 +116,7 @@ class SpeedBuildersRulesTest {
         assertEquals(22, timing.buildSeconds(40));
         assertEquals(12, SpeedBuildersRules.parseTemplateName("Flower time=12").buildSeconds(40));
         assertEquals(35, SpeedBuildersRules.parseTemplateName("Bridge time-5").buildSeconds(40));
+        assertEquals(5, SpeedBuildersRules.parseTemplateName("Tiny Model time*0").buildSeconds(40));
     }
 
     @Test
