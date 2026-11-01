@@ -14,7 +14,7 @@ Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiat
 
 - **Milk the Cow**: the original BobsFarm archive is checked at package time for the WHITE/PINK/PURPLE animal spawn groups used by the runtime. The full multi-player play/score/role/achievement checklist is in `MILK-THE-COW-ACCEPTANCE-PLAN.md`.
 - **Castle Assault**: all 11 original maps are checked for King, crystal and objective-TNT markers. The live map-by-map objective and five-kit checklist is in `CASTLE-ASSAULT-ACCEPTANCE-PLAN.md`.
-- **Wither Assault**: Human Archer, Medic and Editor are now selectable and persisted; the round applies their loadouts, connects Wither Skull/minion/scent controls and revival potions, tracks/restores Editor blocks, and implements Archer Smoke Arrow on direct impact and against every Wither inside the strict six-block proximity radius. Source-map parity, remaining source comparisons and live acceptance are still outstanding. See `WITHER-ASSAULT-ACCEPTANCE-PLAN.md`.
+- **Wither Assault**: Human Archer, Medic and Editor are selectable and persisted; Archer/Editor Smoke Arrows and Fletcher are wired, opening blindness no longer blocks Wither attacks, and Wither sword controls match the source (skull, three minions, XP-powered Fire Storm, scent). Revival potions and Editor block restoration are wired. Medic passives and authentic source-map archives remain outstanding; see `WITHER-ASSAULT-ACCEPTANCE-PLAN.md`.
 - **Sneaky Assassins**: mirrors the source town-NPC cadence (200 starting villagers, one randomly removed every four seconds during Live) and uses per-NPC 1-in-40/tick waypoint orders within a 16-block spawn window, with safe five-attempt offset selection and bribed-NPC stuck recovery. The generated town and velocity-steered patrol remain explicit test substitutes because the authentic source archive and NMS patrol data are absent. See `SNEAKY-ASSASSINS-ACCEPTANCE-PLAN.md`.
 
 Castle Assault and Milk the Cow are now included in the controlled acceptance queue after their original map archives, world bounds, objective/chest markers and gameplay prerequisites passed CI packaging tests. This promotion is for isolated test sessions only; live multiplayer and map-by-map acceptance are still outstanding.
@@ -164,11 +164,11 @@ Live acceptance still needs to check the three achievement thresholds, the 90-se
 The catalogue and renderer contract are covered by unit tests. Spleef, Dragon Escape, Dragons (Solo), Runner, Sheep Quest and Turf Wars are now `READY_FOR_TEST`, not gameplay-accepted; their source acceptance checklists are in `SPLEEF-ACCEPTANCE-PLAN.md`, `DRAGON-ESCAPE-ACCEPTANCE-PLAN.md`, `DRAGONS-ACCEPTANCE-PLAN.md`, `RUNNER-ACCEPTANCE-PLAN.md`, `SHEEP-QUEST-ACCEPTANCE-PLAN.md` and `TURF-WARS-ACCEPTANCE-PLAN.md`. Both `Speef` and `Super Spleef` source folders are one Spleef map catalogue (37 legacy archive files), not separate game modes. CI verifies that every enabled game's complete 1.8 map filename set is present in the packaged JAR; see [the global map parity register](LEGACY-MAP-PARITY.md).
 
 
-## Wither Assault: Smoke Arrow parity and remaining gates
+## Wither Assault: Human kits and remaining parity
 
-The controlled-port branch exposes the three source Human kits (Archer, Medic and Editor), persists each player's choice, provides the corresponding loadouts, connects Wither Skull/minion/scent abilities, and revives a downed Human with the custom Revival Potion. Editor blocks are tracked, temporarily removable, constrained by the four-block floor rule and restored at round teardown. See WITHER-ASSAULT-ACCEPTANCE-PLAN.md.
+The controlled-port branch exposes the three source Human kits (Archer, Medic and Editor), persists choices, registers Archer/Editor Smoke Arrows, applies Fletcher replenishment, allows Withers to attack during opening blindness, and maps the Wither swords/compass to Skull, Minions, Fire Storm and Scent. Revival potions and Editor block restoration are connected. See WITHER-ASSAULT-ACCEPTANCE-PLAN.md.
 
-This is not an enablement promotion. The source map archive is absent, the Human Archer Smoke Arrow and other kit passives still need source comparison, and map-specific achievements cannot be certified without the source map set.
+This is not an enablement promotion. Human Medic's Repair Master/Healing Hands, further source combat/movement comparisons and the original Industrial West, Labyrinth and Sky Ruins map archives remain outstanding.
 
 ## Wither Assault: smoother movement
 

@@ -55,4 +55,31 @@ final class WitherAssaultRulesTest {
         assertFalse(WitherAssaultRules.canEditorModifyBlock(76, 76.0D, true));
         assertFalse(WitherAssaultRules.canEditorModifyBlock(76, Double.NaN, false));
     }
+
+    @Test
+    void witherSwordClicksMatchTheSourceAbilityLayout() {
+        assertEquals(3, WitherAssaultRules.minionCount());
+        assertTrue(WitherAssaultRules.shouldLaunchSkull("golden_sword", true));
+        assertFalse(WitherAssaultRules.shouldLaunchSkull("golden_sword", false));
+        assertTrue(WitherAssaultRules.shouldLaunchMinions("diamond_sword", true));
+        assertFalse(WitherAssaultRules.shouldLaunchMinions("diamond_sword", false));
+        assertTrue(WitherAssaultRules.shouldStartFireStorm("golden_sword", true));
+        assertTrue(WitherAssaultRules.shouldStartFireStorm("diamond_sword", true));
+        assertFalse(WitherAssaultRules.shouldStartFireStorm("golden_sword", false));
+        assertFalse(WitherAssaultRules.shouldStartFireStorm("shield", true));
+        assertFalse(WitherAssaultRules.shouldStartFireStorm("compass", true));
+    }
+
+    @Test
+    void archerAndEditorShareFletcherAndSmokeArrowButMedicDoesNot() {
+        assertTrue(WitherAssaultRules.hasFletcher("archer"));
+        assertTrue(WitherAssaultRules.hasFletcher("editor"));
+        assertFalse(WitherAssaultRules.hasFletcher("medic"));
+        assertTrue(WitherAssaultRules.shouldTrackSmokeArrow(0, "archer", true, true));
+        assertTrue(WitherAssaultRules.shouldTrackSmokeArrow(0, "editor", true, true));
+        assertFalse(WitherAssaultRules.shouldTrackSmokeArrow(0, "medic", true, true));
+        assertFalse(WitherAssaultRules.shouldTrackSmokeArrow(1, "archer", true, true));
+        assertFalse(WitherAssaultRules.shouldTrackSmokeArrow(0, "editor", false, true));
+        assertFalse(WitherAssaultRules.shouldTrackSmokeArrow(0, "archer", true, false));
+    }
 }
