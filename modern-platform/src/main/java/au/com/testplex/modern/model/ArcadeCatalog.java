@@ -149,9 +149,9 @@ public final class ArcadeCatalog {
 
         register(monsterMazeGame("monster-maze", "Monster Maze (Original)",
                 "The original Monster Maze experience, recreated as faithfully as possible."));
-        register(monsterMazeGame("monster-maze-speed", "Monster Maze (Speed)",
+        register(monsterMazeModeGame("monster-maze-speed", "Monster Maze (Speed)",
                 "The Speed mode keeps the original timer and monster spawning with the Speed gameplay rules."));
-        register(monsterMazeGame("monster-maze-modern", "Monster Maze (Modern)",
+        register(monsterMazeModeGame("monster-maze-modern", "Monster Maze (Modern)",
                 "The Modern mode accelerates stages, increases monster counts and expands kit abilities."));
 
         register(game("one-in-the-quiver", "One in the Quiver", "ARROW", "Land the decisive bow shot with one arrow at a time.",
@@ -337,6 +337,14 @@ public final class ArcadeCatalog {
                 List.of(),
                 win("highest-accuracy", "Highest Accuracy",
                         "The builder with the highest cumulative model accuracy is announced as the winner.")));
+    }
+
+    /** Speed and Modern share Original's one player-facing Monster Maze cosmetics page. */
+    private static GameDefinition monsterMazeModeGame(String id, String name, String description) {
+        return game(id, name, "ROTTEN_FLESH", description,
+                GameDefinition.PortStatus.READY_FOR_TEST,
+                List.of(),
+                win("maze-blueprint", "Maze Blueprint", "A miniature maze trace forms above the winner."));
     }
 
     private static GameDefinition monsterMazeGame(String id, String name, String description) {
