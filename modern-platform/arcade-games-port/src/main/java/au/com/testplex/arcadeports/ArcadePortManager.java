@@ -20556,7 +20556,6 @@ public final class ArcadePortManager implements Listener {
         return false;
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     /**
      * Track every live Human Archer arrow for the source four-second Smoke Arrow
      * blind on direct impact or at the six-block proximity threshold.
@@ -20577,6 +20576,7 @@ public final class ArcadePortManager implements Listener {
         session.entities.add(arrow);
     }
 
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onWitherHumanMove(org.bukkit.event.player.PlayerMoveEvent event) {
         Session session = active;
         Player player = event.getPlayer();
