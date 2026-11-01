@@ -15,6 +15,10 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Mob;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
+
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.util.Vector;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -227,7 +231,7 @@ public final class SpeedBuildersGame implements Listener {
             for (int i = 0; i < participants.size(); i++) {
                 Player player = participants.get(i);
                 Plot plot = plotFor(i);
-                PlayerState state = new PlayerState(player, plot);
+                PlayerState state = new PlayerState(player, plot, plugin);
                 players.put(player.getUniqueId(), state);
                 preparePlayerForRound(state);
             }
@@ -1119,9 +1123,192 @@ public final class SpeedBuildersGame implements Listener {
 
     private record Plot(int centerX, int centerZ) { }
 
+    /** Durable pre-match player snapshot so disconnects and server restarts are safe. */
+    private static final class PlayerSnapshot {
+        private final Location location;
+        private final ItemStack[] contents;
+        private final ItemStack[] armor;
+        private final ItemStack offhand;
+        private final GameMode gameMode;
+        private final List<PotionEffect> effects;
+        private final float exp;
+        private final int level;
+        private final int food;
+        private final float saturation;
+        private final double health;
+        private final float walkSpeed;
+        private final float flySpeed;
+        private final boolean allowFlight;
+        private final boolean flying;
+        private final boolean invulnerable;
+        private final boolean collidable;
+        private final boolean glowing;
+        private final int heldSlot;
+        private final int fireTicks;
+        private final float fallDistance;
+        private final Vector velocity;
+        private final Scoreboard scoreboard;
+
+        private PlayerSnapshot(Player player) {
+            this.location = player.getLocation().clone();
+            this.contents = cloneItems(player.getInventory().getContents());
+            this.armor = cloneItems(player.getInventory().getArmorContents());
+            ItemStack hand = player.getInventory().getItemInOffHand();
+            this.offhand = hand == null ? null : hand.clone();
+            this.gameMode = player.getGameMode();
+            this.effects = new ArrayList<>(player.getActivePotionEffects());
+            this.exp = player.getExp();
+            this.level = player.getLevel();
+            this.food = player.getFoodLevel();
+            this.saturation = player.getSaturation();
+            this.health = player.getHealth();
+            this.walkSpeed = player.getWalkSpeed();
+            this.flySpeed = player.getFlySpeed();
+            this.allowFlight = player.getAllowFlight();
+            this.flying = player.isFlying();
+            this.invulnerable = player.isInvulnerable();
+            this.collidable = player.isCollidable();
+            this.glowing = player.isGlowing();
+            this.heldSlot = player.getInventory().getHeldItemSlot();
+            this.fireTicks = player.getFireTicks();
+            this.fallDistance = player.getFallDistance();
+            this.velocity = player.getVelocity().clone();
+            this.scoreboard = player.getScoreboard();
+        }
+
+        private PlayerSnapshot(ConfigurationSection section) {
+            Object savedLocation = section.get("location");
+            this.location = savedLocation instanceof Location saved ? saved.clone() : null;
+            this.contents = readItems(section.getList("contents"));
+            this.armor = readItems(section.getList("armor"));
+            Object savedOffhand = section.get("offhand");
+            this.offhand = savedOffhand instanceof ItemStack item ? item.clone() : null;
+            GameMode savedMode;
+            try {
+                savedMode = GameMode.valueOf(section.getString("game-mode", GameMode.SURVIVAL.name()));
+            } catch (IllegalArgumentException invalidMode) {
+                savedMode = GameMode.SURVIVAL;
+            }
+            this.gameMode = savedMode;
+            List<PotionEffect> savedEffects = new ArrayList<>();
+            for (Object value : section.getList("effects", List.of())) {
+                if (value instanceof PotionEffect effect) savedEffects.add(effect);
+            }
+            this.effects = savedEffects;
+            this.exp = (float) section.getDouble("exp", 0.0D);
+            this.level = section.getInt("level", 0);
+            this.food = section.getInt("food", 20);
+            this.saturation = (float) section.getDouble("saturation", 20.0D);
+            this.health = section.getDouble("health", 20.0D);
+            this.walkSpeed = (float) section.getDouble("walk-speed", 0.2D);
+            this.flySpeed = (float) section.getDouble("fly-speed", 0.1D);
+            this.allowFlight = section.getBoolean("allow-flight");
+            this.flying = section.getBoolean("flying");
+            this.invulnerable = section.getBoolean("invulnerable");
+            this.collidable = section.getBoolean("collidable", true);
+            this.glowing = section.getBoolean("glowing", false);
+            this.heldSlot = section.getInt("held-slot", 0);
+            this.fireTicks = section.getInt("fire-ticks", 0);
+            this.fallDistance = (float) section.getDouble("fall-distance", 0.0D);
+            Object savedVelocity = section.get("velocity");
+            this.velocity = savedVelocity instanceof Vector saved ? saved.clone() : new Vector();
+            this.scoreboard = null;
+        }
+
+        private void persist(ArcadeMechanicsModernPlugin plugin, UUID playerId) {
+            String path = "speed-builders-pending-restores." + playerId;
+            plugin.getConfig().set(path, null);
+            ConfigurationSection section = plugin.getConfig().createSection(path);
+            section.set("location", location);
+            section.set("contents", java.util.Arrays.asList(cloneItems(contents)));
+            section.set("armor", java.util.Arrays.asList(cloneItems(armor)));
+            section.set("offhand", offhand == null ? null : offhand.clone());
+            section.set("game-mode", gameMode.name());
+            section.set("effects", new ArrayList<>(effects));
+            section.set("exp", exp);
+            section.set("level", level);
+            section.set("food", food);
+            section.set("saturation", saturation);
+            section.set("health", health);
+            section.set("walk-speed", walkSpeed);
+            section.set("fly-speed", flySpeed);
+            section.set("allow-flight", allowFlight);
+            section.set("flying", flying);
+            section.set("invulnerable", invulnerable);
+            section.set("collidable", collidable);
+            section.set("glowing", glowing);
+            section.set("held-slot", heldSlot);
+            section.set("fire-ticks", fireTicks);
+            section.set("fall-distance", fallDistance);
+            section.set("velocity", velocity.clone());
+            plugin.saveConfig();
+        }
+
+        private void restore(Player player) {
+            if (player == null || !player.isOnline()) return;
+            player.leaveVehicle();
+            if (location != null && location.getWorld() != null) player.teleport(location);
+            player.getInventory().clear();
+            player.getInventory().setContents(cloneItems(contents));
+            player.getInventory().setArmorContents(cloneItems(armor));
+            player.getInventory().setItemInOffHand(offhand == null ? null : offhand.clone());
+            player.getInventory().setHeldItemSlot(Math.max(0, Math.min(8, heldSlot)));
+            for (PotionEffect effect : new ArrayList<>(player.getActivePotionEffects())) {
+                player.removePotionEffect(effect.getType());
+            }
+            for (PotionEffect effect : effects) player.addPotionEffect(effect);
+            player.setGameMode(gameMode);
+            player.setExp(exp);
+            player.setLevel(level);
+            player.setFoodLevel(food);
+            player.setSaturation(saturation);
+            player.setWalkSpeed(walkSpeed);
+            player.setFlySpeed(flySpeed);
+            player.setInvulnerable(invulnerable);
+            player.setCollidable(collidable);
+            player.setGlowing(glowing);
+            player.setAllowFlight(allowFlight);
+            if (allowFlight) player.setFlying(flying);
+            double safeHealth = Math.max(1.0D, Math.min(health, player.getMaxHealth()));
+            player.setHealth(safeHealth);
+            player.setFireTicks(Math.max(0, fireTicks));
+            player.setFallDistance(Math.max(0.0F, fallDistance));
+            player.setVelocity(velocity.clone());
+            if (scoreboard != null) player.setScoreboard(scoreboard);
+        }
+
+        private static ItemStack[] cloneItems(ItemStack[] source) {
+            ItemStack[] result = new ItemStack[source.length];
+            for (int i = 0; i < source.length; i++) result[i] = source[i] == null ? null : source[i].clone();
+            return result;
+        }
+
+        private static ItemStack[] readItems(List<?> values) {
+            if (values == null) return new ItemStack[0];
+            ItemStack[] result = new ItemStack[values.size()];
+            for (int i = 0; i < values.size(); i++) {
+                Object value = values.get(i);
+                if (value instanceof ItemStack item) result[i] = item.clone();
+                else if (value instanceof Map<?, ?> serialized) {
+                    Map<String, Object> data = new LinkedHashMap<>();
+                    for (Map.Entry<?, ?> entry : serialized.entrySet()) {
+                        if (entry.getKey() instanceof String key) data.put(key, entry.getValue());
+                    }
+                    try {
+                        result[i] = ItemStack.deserialize(data);
+                    } catch (RuntimeException ignored) {
+                        result[i] = null;
+                    }
+                }
+            }
+            return result;
+        }
+    }
+
     private static final class PlayerState {
         private final Player player;
         private final Plot plot;
+        private final PlayerSnapshot snapshot;
         private boolean eliminated;
         private boolean perfect;
         private boolean empty;
@@ -1130,9 +1317,11 @@ public final class SpeedBuildersGame implements Listener {
         private int blocksPlaced;
         private final List<Entity> mobs = new ArrayList<>();
 
-        private PlayerState(Player player, Plot plot) {
+        private PlayerState(Player player, Plot plot, ArcadeMechanicsModernPlugin plugin) {
             this.player = player;
             this.plot = plot;
+            this.snapshot = new PlayerSnapshot(player);
+            this.snapshot.persist(plugin, player.getUniqueId());
         }
     }
 
