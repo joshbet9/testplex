@@ -170,4 +170,34 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS);
         assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_PER_SECOND);
     }
+
+    @Test
+    void bardolfSummonWolfMatchesTheArchivedPackLimitHealthAndCooldown() {
+        assertEquals(5, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_MAX_WOLVES);
+        assertEquals(8.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_HEALTH, 0.00001D);
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_SUMMON_COOLDOWN_MILLIS);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_ATTACK_INTERVAL_MILLIS);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_ATTACK_DAMAGE, 0.00001D);
+        assertEquals(9.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_ATTACK_DISTANCE_SQUARED, 0.00001D);
+        assertEquals(100.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_OWNER_TELEPORT_DISTANCE_SQUARED, 0.00001D);
+    }
+
+    @Test
+    void bardolfWolfPounceMatchesTheCoordinatedLeapTimingAndVector() {
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_COOLDOWN_MILLIS);
+        assertEquals(6_500L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_OVERRIDE_MILLIS);
+        assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_TRIGGER_DISTANCE_SQUARED, 0.00001D);
+        assertEquals(1.5D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_VELOCITY_MULTIPLIER, 0.00001D);
+        assertEquals(0.8D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_POUNCE_MINIMUM_VERTICAL_VELOCITY, 0.00001D);
+    }
+
+    @Test
+    void bardolfFullMoonMatchesItsActiveDurationBuffsAndCooldownRestart() {
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_DURATION_MILLIS);
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_COOLDOWN_MILLIS);
+        assertEquals(70_000L, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_REUSE_DELAY_MILLIS);
+        assertEquals(20.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_WOLF_HEALTH, 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_DAMAGE_PER_WOLF, 0.00001D);
+        assertEquals(0.05D, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_FULL_MOON_SPEED_PER_WOLF, 0.00001D);
+    }
 }
