@@ -1095,8 +1095,8 @@ public final class SpeedBuildersGame implements Listener {
                 ChatColor.YELLOW + "Time: " + ChatColor.WHITE + secondsLeft + "s",
                 ChatColor.YELLOW + "Your score: " + ChatColor.WHITE
                         + (phase == Phase.REVIEWING || phase == Phase.RESULTS ? percent(state.score) + "%" : "—"),
-                ChatColor.YELLOW + "Round points: " + ChatColor.WHITE + state.roundPoints,
-                ChatColor.YELLOW + "Total points: " + ChatColor.WHITE + state.totalPoints,
+                ChatColor.YELLOW + "Round points: " + ChatColor.WHITE.toString() + state.roundPoints,
+                ChatColor.YELLOW + "Total points: " + ChatColor.WHITE.toString() + state.totalPoints,
                 ChatColor.YELLOW + "Perfect builds: " + ChatColor.WHITE + state.perfectBuilds,
                 ChatColor.YELLOW + "Builders: " + ChatColor.WHITE + activePlayers().size()
         );
