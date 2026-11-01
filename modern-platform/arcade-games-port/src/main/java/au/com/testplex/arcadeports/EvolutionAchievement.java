@@ -4,7 +4,9 @@ import java.util.UUID;
 
 /** Evolution achievements in the isolated modern test server. */
 public enum EvolutionAchievement {
-    OVERKILL("overkill", "Overkill", "Get 2 kills before each evolution.");
+    OVERKILL("overkill", "Overkill", "Get 2 kills before each evolution."),
+    WRONG_KIT_CHAMP("wrong-kit-champ", "Wrong Kit Champ",
+            "Lose while your final standard evolution is still transforming and Quick Evolver would have finished it in time.");
 
     private final String slug;
     private final String displayName;

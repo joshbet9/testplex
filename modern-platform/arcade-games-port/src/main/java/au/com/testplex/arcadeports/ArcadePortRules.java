@@ -1406,6 +1406,24 @@ public final class ArcadePortRules {
     public static final long EVOLUTION_RESPAWN_TICKS = 80L;
     public static final long EVOLUTION_FORM_CHANGE_TICKS = 44L;
     public static final long EVOLUTION_TOTAL_ANIMATION_TICKS = 140L;
+    public static final double EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER = 0.75D;
+    public static double evolutionChargePerTick(int killsThisLife, boolean quickEvolver) {
+        double normal = evolutionChargePerTick(killsThisLife);
+        return quickEvolver ? normal / EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER : normal;
+    }
+    public static long evolutionFormChangeTicks(boolean quickEvolver) {
+        return quickEvolver ? (long) Math.ceil(EVOLUTION_FORM_CHANGE_TICKS * EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER)
+                : EVOLUTION_FORM_CHANGE_TICKS;
+    }
+    public static long evolutionTotalAnimationTicks(boolean quickEvolver) {
+        return quickEvolver ? (long) Math.ceil(EVOLUTION_TOTAL_ANIMATION_TICKS * EVOLUTION_QUICK_EVOLVER_TIME_MULTIPLIER)
+                : EVOLUTION_TOTAL_ANIMATION_TICKS;
+    }
+    public static boolean shouldAwardEvolutionWrongKitChamp(int attemptedLevel, boolean quickEvolverSelected,
+            boolean currentlyEvolving, long elapsedTicks) {
+        return !quickEvolverSelected && currentlyEvolving && attemptedLevel == EVOLUTION_WIN_LEVEL - 1
+                && elapsedTicks >= evolutionFormChangeTicks(true) && elapsedTicks < EVOLUTION_FORM_CHANGE_TICKS;
+    }
     public static final int EVOLUTION_OVERKILL_KILLS_PER_EVOLUTION = 2;
     public static final long EVOLUTION_PITY_CLOCK_MILLIS = 90_000L;
     public static final long EVOLUTION_PITY_KILL_REDUCTION_MILLIS = 15_000L;
