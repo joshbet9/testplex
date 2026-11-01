@@ -80,16 +80,23 @@ The similarly named Balloon Town, Sky Ship and Voyage files are distinct origina
 - [ ] **Coward:** leather armour and iron axe; Leap uses source 1.2 horizontal / 1.0 vertical parameters and an eight-second cooldown. Verify grounded/airborne vector handling and no stale recharge after death or kit changes.
 - [ ] **Marksman:** chainmail armour and bow; starts with one arrow, replenishes up to four at four-second intervals, and Barrage charges six arrows with a one-second initial charge and 200 ms firing cadence. The modern 50 ms server fire processing must not produce duplicate arrows or bypass the source charge timing.
 - [ ] **Pyrotechnic:** gold armour; first Sparkler charge after 25 seconds, capped at two, with the source five-second lifetime. Sparks attract only dragons within 48 blocks; low or submerged sparkler items are ignored for targeting.
-- [ ] All three kits are selectable from the common lobby pedestal and `/arcadeport kit dragons-<kit>`; kit changes lock at match start and do not duplicate kit gear after respawn/reconnect.
+- [ ] **Frost:** right-click the Snowball ability to create the forward Ice Bridge. Verify the 25-second cooldown, safe placement only on eligible air/snow surfaces, bounded path length, six-second temporary blocks, and restoration on expiry, death, kit change and round cleanup.
+- [ ] **Glider:** right-click the Feather to activate Elytra gliding for 3.5 seconds, with a 15-second cooldown. The player's original chestplate must be restored exactly once on expiry, death, disconnect, kit change and round cleanup; no temporary Elytra may be kept, dropped or duplicated.
+- [ ] **Tamer:** right-click the End Crystal to take control of an available dragon for 15 seconds, with a 90-second cooldown. Verify dragon selection, camera/control movement, player return location and game mode restoration, and safe release if the dragon or player becomes invalid.
+- [ ] All six kits are selectable from the common lobby pedestal and `/arcadeport kit dragons-<kit>`; kit changes lock at match start and do not duplicate kit gear or temporary ability state after respawn/reconnect.
 
-### Dragon Flare (modern test-queue extension)
+### Community achievements
 
-- [ ] Coward receives one flare charge, Marksman three and Pyrotechnic two. Charges cannot be dropped, moved to containers or transferred to another player.
-- [ ] A flare protects a 24-block horizontal radius and a 24-block vertical envelope for six seconds. Check the exact boundary and just-outside values.
-- [ ] Existing dragons retarget immediately when entering the protected area; future target selection and contact checks also respect the flare.
-- [ ] Sparkler attraction does not pull a dragon into a protected location.
-- [ ] Test all six server-visible effects (Classic, Ember, Frost, Ender, Solar and Aurora) from another player and spectator. Effects must not change protection, charge consumption or target physics.
-- [ ] Verify a second charge cannot extend or duplicate the active state unless that is the explicitly implemented rule; expiry and re-use feedback must be consistent.
+- [ ] **Win 3 in a row:** award only after the player's third consecutive Dragons win; a non-win breaks the streak and a single win must not award it.
+- [ ] **Survive 5 minutes:** award once when the player survives five full minutes of Live gameplay; Prepare time and spectator time do not count.
+- [ ] **Win without taking damage:** award only to a round winner who took no damage during that match, including dragon contact and environmental damage; a damage event must disqualify the award even if the player later heals.
+- [ ] Achievement progress persists across rounds and reconnects without double-awarding a completed achievement.
+
+### Removed Flare mechanics
+
+- [ ] Dragon Flares are removed entirely: no Flare kit, charge item, protection radius, six-second protection state or visual-effect variants remain.
+- [ ] The old `flare` kit name is rejected; it must not silently select another kit or grant a substitute ability.
+- [ ] Sparkler attraction and dragon target/contact logic operate without any Flare protection exception.
 
 ### Spectators, stats and cleanup
 
@@ -98,10 +105,10 @@ The similarly named Balloon Town, Sky Ship and Voyage files are distinct origina
 - [ ] Track the source Sparklez stat for Pyrotechnic throws. Local survival-time and placement reward values remain Testplex-only ledger entries; no production Mineplex gem API or backend write is permitted.
 - [ ] Fake test-player fixtures exercise attacks, dragon targeting, contact and spectator transitions but never earn persistent personal stats or rewards.
 - [ ] Check scoreboards, damage counters, kit displays, participant snapshots and original locations are restored when a match finishes or is stopped.
-- [ ] No dragons, sparkler entities, flare protection, scheduled tasks, target references, world items, cooldown state or temporary effects survive a session reset.
+- [ ] No dragons, sparkler entities, Frost bridge blocks, temporary Glider equipment, Tamer control state, scheduled tasks, target references, world items, cooldown state or temporary effects survive a session reset.
 
 ## Controlled-queue acceptance gate
 
 Dragons (Solo) is enabled for combined controlled testing because its source implementation, regression coverage and exact 40-map packaging comparison are present in the Paper 26.3 build. This is **not** a claim that live gameplay has already been accepted.
 
-Before calling Dragons gameplay-accepted, load all 40 maps, verify RED-marker dragon spawns and run the kit, target/contact, flare, spectator and cleanup scenarios above on the isolated live server. Fix each observed defect and rerun affected tests. The separate legacy Dragons Teams variant remains excluded from the catalogue and test commands unless it receives its own port and acceptance work.
+Before calling Dragons gameplay-accepted, load all 40 maps, verify RED-marker dragon spawns and run all six kits, the three community achievements, target/contact, spectator and cleanup scenarios above on the isolated live server. Fix each observed defect and rerun affected tests. The separate legacy Dragons Teams variant remains excluded from the catalogue and test commands unless it receives its own port and acceptance work.
