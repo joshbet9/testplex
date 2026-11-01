@@ -19,7 +19,7 @@ game-preferences:
     vote-seconds: 60
     avoid-consecutive-games: true
     # This may be narrowed by Game Panel > Edit Game Rotation, but cannot
-    # include a game outside enabled-games or without its selected map archive bundled.
+    # include a game outside enabled-games or without its selected map asset available.
     enabled-games:
       - death-tag
       - one-in-the-quiver
