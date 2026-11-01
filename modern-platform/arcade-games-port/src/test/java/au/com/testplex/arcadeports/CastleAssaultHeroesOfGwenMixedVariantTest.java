@@ -434,6 +434,17 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesOfGwenStoreDamageModifiersStackInTheirOwnDamageFamilies() {
+        assertEquals(12.0D, ArcadePortRules.heroesOfGwenStoreAbilityDamage(
+                10.0D, List.of("Adept's Cap", "Adept's Chestplate", "Ninja's Mask")), 0.00001D);
+        assertEquals(11.6D, ArcadePortRules.heroesOfGwenStoreBasicAttackDamage(
+                10.0D, List.of("Battle Mage Cap", "Battle Mage Chestplate", "Battle Mage Boots")), 0.00001D);
+        assertEquals(11.0D, ArcadePortRules.heroesOfGwenStoreMeleeDamage(
+                10.0D, List.of("Urchin's Chestcloth")), 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.heroesOfGwenStoreMeleeDamage(10.0D, List.of("Ninja's Mask")), 0.00001D);
+    }
+
+    @Test
     void heroesOfGwenStoreHitConditionsMatchSourceBowAndSwordEffects() {
         assertEquals("SPEED", ArcadePortRules.heroesOfGwenStoreHitCondition("Bow of Pursuit"));
         assertEquals(3_000L, ArcadePortRules.heroesOfGwenStoreHitConditionDurationMillis("Bow of Pursuit"));
