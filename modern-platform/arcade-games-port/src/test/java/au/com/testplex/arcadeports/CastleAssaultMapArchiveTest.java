@@ -40,6 +40,7 @@ final class CastleAssaultMapArchiveTest {
 
             assertNotNull(map, resource + " must include a readable WorldConfig.dat");
             assertFalse(map.mapName().isBlank(), resource + " must retain its source map identity");
+            assertTrue(map.hasBounds(), resource + " must retain the source world bounds");
             assertFalse(map.dataLocations("RED").isEmpty(), resource + " needs the Red King marker");
             assertFalse(map.dataLocations("BLUE").isEmpty(), resource + " needs the Blue King marker");
             assertTrue(map.dataLocations("PINK").size() >= 2,
@@ -48,6 +49,8 @@ final class CastleAssaultMapArchiveTest {
                     resource + " needs two Blue sentry crystal markers");
             assertFalse(map.dataLocations("BLACK").isEmpty(),
                     resource + " needs at least one objective TNT spawn");
+            assertFalse(map.dataLocations("BROWN").isEmpty(),
+                    resource + " needs at least one source chest marker");
         }
     }
 
