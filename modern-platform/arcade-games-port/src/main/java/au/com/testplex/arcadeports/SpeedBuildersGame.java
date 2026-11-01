@@ -60,7 +60,7 @@ import java.util.UUID;
  */
 public final class SpeedBuildersGame implements Listener {
     private static final String ARENA_WORLD_NAME = "testplex_speedbuilders_arena_v1";
-    private static final String SOURCE_WORLD_NAME = "testplex_speedbuilders_source_v1";
+    private static final String SOURCE_WORLD_NAME = "arcadeport_source_speedbuilders_v1";
     private static final String SOURCE_MAP_RESOURCE = "source-maps/Speed Builders/SpeedBuilders_Shroomland_Lake.zip";
     private static final int FLOOR_Y = 65;
     private static final int PLOT_SPACING = 18;
@@ -86,6 +86,7 @@ public final class SpeedBuildersGame implements Listener {
     private long queueDeadlineTick = -1L;
     private long phaseDeadlineTick;
     private int round;
+    private int buildTimeTracker = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
     private int buildSeconds = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
     private Template currentTemplate;
     private String stopReason = "";
@@ -156,14 +157,16 @@ public final class SpeedBuildersGame implements Listener {
             if (player != null && player.isOnline()) participants.add(player);
             if (participants.size() == SpeedBuildersRules.MAX_PLAYERS) break;
         }
-        queue.clear();
-        queueDeadlineTick = -1L;
+        queue.removeIf(id -> Bukkit.getPlayer(id) == null || !Bukkit.getPlayer(id).isOnline());
         if (participants.size() < SpeedBuildersRules.MIN_PLAYERS) {
             for (Player player : participants) {
-                player.sendMessage(ChatColor.RED + "Speed Builders needs at least two players to start.");
+                player.sendMessage(ChatColor.YELLOW + "Speed Builders is waiting for another player; your queue place is retained.");
             }
+            queueDeadlineTick = queue.isEmpty() ? -1L : tick + NORMAL_QUEUE_TICKS;
             return;
         }
+        queue.clear();
+        queueDeadlineTick = -1L;
         startMatch(participants);
     }
 
@@ -261,6 +264,7 @@ public final class SpeedBuildersGame implements Listener {
             buildArenaFloor();
             players.clear();
             round = 0;
+            buildTimeTracker = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
             buildSeconds = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
             unusedTemplates.clear();
             unusedTemplates.addAll(templates);
@@ -433,8 +437,8 @@ public final class SpeedBuildersGame implements Listener {
         }
         currentTemplate = unusedTemplates.removeFirst();
         round++;
-        if (round > 1) buildSeconds = Math.max(1, buildSeconds - 1);
-        buildSeconds = currentTemplate.timing().buildSeconds(buildSeconds);
+        if (round > 1) buildTimeTracker = Math.max(1, buildTimeTracker - 1);
+        buildSeconds = currentTemplate.timing().buildSeconds(buildTimeTracker);
         phase = Phase.VIEWING;
         phaseDeadlineTick = tick + SpeedBuildersRules.DEFAULT_VIEW_SECONDS * 20L;
 
@@ -599,6 +603,7 @@ public final class SpeedBuildersGame implements Listener {
         persistMatchProgress(winner);
         for (PlayerState state : new ArrayList<>(players.values())) {
             Player player = state.player;
+            clearPlotBuildVolume(state.plot);
             if (player.isOnline()) {
                 if (winner != null && winner.getUniqueId().equals(player.getUniqueId())) {
                     player.sendTitle(ChatColor.GOLD + "VICTORY!", ChatColor.YELLOW + "Speed Builders champion",
@@ -837,11 +842,12 @@ public final class SpeedBuildersGame implements Listener {
                 case VIEWING -> "MEMORISE";
                 case BUILDING -> "BUILD";
                 case REVIEWING -> "JUDGING";
+                case ELIMINATING -> "ELIMINATING";
                 case INTERMISSION -> "NEXT ROUND";
                 default -> "IDLE";
             };
             String buildName = currentTemplate == null ? "—" : currentTemplate.name();
-            String scoreLabel = phase == Phase.REVIEWING ? percent(state.score) + "%" : "—";
+            String scoreLabel = phase == Phase.REVIEWING || phase == Phase.ELIMINATING ? percent(state.score) + "%" : "—";
             state.player.sendActionBar(Component.text(phaseLabel + " | " + buildName
                     + " | Round " + round + " | " + secondsLeft + "s | Score " + scoreLabel));
             drawScoreboard(state, phaseLabel, buildName, secondsLeft);
@@ -859,7 +865,7 @@ public final class SpeedBuildersGame implements Listener {
                 ChatColor.YELLOW + "Model: " + ChatColor.WHITE + buildName,
                 ChatColor.YELLOW + "Time: " + ChatColor.WHITE + secondsLeft + "s",
                 ChatColor.YELLOW + "Your score: " + ChatColor.WHITE
-                        + (phase == Phase.REVIEWING ? percent(state.score) + "%" : "—"),
+                        + (phase == Phase.REVIEWING || phase == Phase.ELIMINATING ? percent(state.score) + "%" : "—"),
                 ChatColor.YELLOW + "Perfect builds: " + ChatColor.WHITE + state.perfectBuilds,
                 ChatColor.YELLOW + "Builders left: " + ChatColor.WHITE + alivePlayers().size()
         );
@@ -998,6 +1004,7 @@ public final class SpeedBuildersGame implements Listener {
         queueDeadlineTick = queue.size() < SpeedBuildersRules.MIN_PLAYERS ? -1L : queueDeadlineTick;
         PlayerState removed = players.remove(id);
         if (removed == null || phase == Phase.IDLE) return;
+        pendingEliminations.remove(removed);
         persistPlayerProgress(removed);
         removeMobs(removed.mobs);
         if (alivePlayers().size() <= 1) {
