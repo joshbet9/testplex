@@ -441,7 +441,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
         }
 
-        prepareHeroesOfGwenOvertimePath();
+        if (!prepareHeroesOfGwenOvertimePath()) return false;
 
         int found = 0;
         for (Map.Entry<String, List<Location>> group : map.customLocationGroups().entrySet()) {
@@ -743,15 +743,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         for (BossBar bar : witherTeamBars.values()) bar.removePlayer(player);
     }
 
-    private void prepareHeroesOfGwenOvertimePath() {
+    private boolean prepareHeroesOfGwenOvertimePath() {
         Location start = first(map.dataLocations("WHITE"));
         List<Location> remaining = new ArrayList<>(map.dataLocations("BROWN").stream()
                 .map(Location::clone).toList());
         if (start == null || remaining.size() < 2) {
-            plugin.getLogger().warning("Heroes of Gwen map " + map.mapName()
-                    + " is missing WHITE/BROWN minion-lane path markers; overtime Wither movement cannot be prepared.");
+            plugin.getLogger().severe("Heroes of Gwen map " + map.mapName()
+                    + " is missing its WHITE minion-path start or at least two BROWN lane markers.");
             heroesOfGwenOvertimePathBlueToRed = List.of();
-            return;
+            return false;
         }
         Location cursor = start.clone();
         List<Location> ordered = new ArrayList<>(remaining.size());
@@ -770,11 +770,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             // Source getPath(true) reverses the blue-to-red path for the RED team.
             if (team == 0) java.util.Collections.reverse(teamPath);
             int pathLength = ArcadePortRules.heroesOfGwenOvertimePathLength(teamPath.size());
-            if (pathLength > 0) {
-                heroesOfGwenOvertimePaths.put(team,
-                        List.copyOf(teamPath.subList(0, pathLength)));
+            if (pathLength <= 0) {
+                plugin.getLogger().severe("Heroes of Gwen map " + map.mapName()
+                        + " does not provide enough lane markers for both overtime Withers.");
+                return false;
             }
+            heroesOfGwenOvertimePaths.put(team, List.copyOf(teamPath.subList(0, pathLength)));
         }
+        return heroesOfGwenOvertimePaths.size() == 2;
     }
 
     private void updateHeroesOfGwenOvertime(long now) {
