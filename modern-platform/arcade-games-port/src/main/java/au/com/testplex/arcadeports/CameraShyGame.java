@@ -730,12 +730,12 @@ public final class CameraShyGame implements Listener {
             return;
         }
 
-        broadcastMatch(ChatColor.GOLD + "" + ChatColor.BOLD + "CAMERA SHY"
+        broadcastMatch(ChatColor.GOLD + "" + ChatColor.BOLD + "SNAP"
                 + ChatColor.YELLOW + " — photograph your opponents five times to eliminate them!");
         for (UUID id : humans) {
             Player player = Bukkit.getPlayer(id);
             if (player != null) {
-                player.sendTitle(ChatColor.GOLD + "CAMERA SHY",
+                player.sendTitle(ChatColor.GOLD + "SNAP",
                         ChatColor.YELLOW + "Right-click to scope • Press F to take a photo", 5, 60, 10);
                 player.sendMessage(ChatColor.GRAY + "Hold your spyglass to aim. Press " + ChatColor.AQUA + "F"
                         + ChatColor.GRAY + " to take the photograph.");
@@ -765,7 +765,7 @@ public final class CameraShyGame implements Listener {
             player.removePotionEffect(effect.getType());
         }
         giveKit(player);
-        BossBar bar = Bukkit.createBossBar(ChatColor.GOLD + "CAMERA SHY", BarColor.YELLOW, BarStyle.SEGMENTED_10);
+        BossBar bar = Bukkit.createBossBar(ChatColor.GOLD + "SNAP", BarColor.YELLOW, BarStyle.SEGMENTED_10);
         bar.addPlayer(player);
         bar.setVisible(true);
         bossBars.put(player.getUniqueId(), bar);
@@ -874,7 +874,7 @@ public final class CameraShyGame implements Listener {
             if (player == null || !player.isOnline()) continue;
             BossBar bar = bossBars.get(id);
             if (bar != null) {
-                bar.setTitle(ChatColor.GOLD + "CAMERA SHY " + ChatColor.WHITE + time
+                bar.setTitle(ChatColor.GOLD + "SNAP " + ChatColor.WHITE + time
                         + ChatColor.GRAY + " | " + ChatColor.RED + exposures.getOrDefault(id, 0) + "/5");
                 bar.setProgress(Math.max(0.0D, Math.min(1.0D, (double) (endsAt - now)
                         / (CameraShyRules.MATCH_SECONDS * 1_000.0D))));
@@ -1690,7 +1690,7 @@ public final class CameraShyGame implements Listener {
                 .count();
 
         viewer.sendMessage(ChatColor.DARK_GRAY + "----------------------------------------");
-        viewer.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "CAMERA SHY STATS"
+        viewer.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "SNAP STATS"
                 + ChatColor.GRAY + " — " + ChatColor.WHITE + subject.getName());
         viewer.sendMessage(ChatColor.YELLOW + "Games: " + ChatColor.WHITE + games
                 + ChatColor.GRAY + "  |  " + ChatColor.YELLOW + "Wins: " + ChatColor.WHITE + wins);
