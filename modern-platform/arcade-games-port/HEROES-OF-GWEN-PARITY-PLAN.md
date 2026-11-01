@@ -6,9 +6,9 @@
 
 ## Current implementation inventory
 
-The current Paper 26.3 runtime has a mixed-variant implementation built around the original map markers. The merged port work registers the Heroes of Gwen catalogue entry, imports the original Heroes Valley and Tartarus archives, handles base/tower/beacon markers, implements tower pressure and a Wither objective, adds capture-point ownership/gold handling, and provides four role-specific shop catalogues.
+The current Paper 26.3 runtime includes the nine canonical hero kits and all named active/passive ability handlers: Hattori, Bardolf, Anath, Larissa, Devon, Rowena, Dana, Biff and Ivy. The standard game uses the original Heroes Valley and Tartarus map archives and reads their team-base, tower, beacon, minion and Wither-boundary markers. The merged objective work includes lane minions, tower target priority, tower gating, team gold, capture points and Wither movement/earthquake handling.
 
-The current explicit skill dispatcher contains six hero skills: Hattori's Shuriken, Ninja Dash and Ender Blade; Devon's TNT Infusion, Hunters Boost and Infinity. Other named hero kits still fall through to the generic “abilities are still being ported” loadout/skill path. The existing merged PR also explicitly leaves role abilities, item passive effects, full Wither movement/attacks and detailed beacon visuals for in-game comparison.
+The match runtime also contains both map-specific sidequest implementations: Pumpkin King on Heroes Valley (including untyped maps, which Reborn defaults to Heroes Valley) and the 30-second Wither Skeleton kill challenge on Monochrome. The four role-specific store catalogues, role-filtered purchases and Mixed Arcade half-price calculation are present. **The store's source item enchantments/passive effects are not yet fully ported**: purchases currently award plain named equipment/items and do not yet apply every source MobaItemEffect. Wither visuals also remain a native Paper Wither rather than the original source representation. Neither of those gaps is considered accepted.
 
 ## Canonical hero/ability inventory
 
@@ -104,13 +104,11 @@ Deterministic rule tests now cover the Flame Wand fire rate, ammo capacity/reloa
 **Validation boundary:** the full Anath integration build and updated tests are running on this branch. No deployment or in-game acceptance is claimed yet.
 
 
-### Additional Hunter parity — Rowena and Fletcher
+### Hunter parity — Rowena and Fletcher
 
-- Add Rowena's documented hotbar layout: Bow, Light Arrows, Combat Slide, Bombardment, Fletched Arrows and Gold Shop.
-- Implement Fletcher passive with the archived per-hero limits: Rowena receives one arrow every 2 seconds (maximum 2); Devon receives one arrow every 3 seconds (maximum 3).
-- Add deterministic tests for both Hunter reload intervals and ammo caps.
+Rowena's hotbar and active effects are implemented in the current branch: five Light Arrows (block-passing beam), ground Combat Slide and three-shot Bombardment. Fletcher reloads one arrow every 2 seconds for Rowena (maximum 2) and every 3 seconds for Devon (maximum 3). Reload state resets when the hero changes. Deterministic tests cover the cadence and caps.
 
-**Remaining:** Rowena's Light Arrows, Combat Slide and Bombardment effects still require their own mechanics references; those slots are shown but are not advertised as implemented.
+**Acceptance still required:** verify arrow hit registration, damage scaling with purchased bows, slide movement/grounding, Bombardment lift and shot input, and client-visible cooldown/ammo feedback in live multiplayer.
 
 
 ### Mage parity — Larissa
@@ -188,15 +186,16 @@ Bardolf's source kit is now implemented in the match-scoped runtime:
 
 ### Remaining blockers before enabling Heroes of Gwen
 
-The hero kit source ports do not by themselves make the game ready. The following acceptance work remains:
+The active ability kits, lane minion loop and both sidequest paths now have implementation coverage, but the game is **not test-ready**. Remaining work is:
 
-- Verify all nine hero selections, loadouts, cooldown indicators, purchases and respawns in-game.
-- Wither patrol, target acquisition, attacks and return-home behaviour still need source comparison and acceptance.
-- Verify capture points, shops, role passives/upgrades, purchase charging and Mixed Arcade price scaling.
-- Complete both source maps (Heroes Valley and Heroes Ruins) with real players, then run multi-player ability/team/friendly-fire tests.
-- Confirm objective lifecycle, team spawns, minion waves and second-tower minion upgrade together with the final hero kit.
+- Port source shop item definitions fully: exact enchantments, coloured gear, effect descriptions and all role-specific `MobaItemEffect` behaviours (cooldown/ammo reduction, ability/basic-attack damage, healing/regen, kill effects, speed/health, hit effects and condition immunity). The current purchase flow charges once and equips items, but it does not implement those effects.
+- Verify the four role catalogues against the source, including consumables, exact standard prices and Mixed Arcade half-price display/charge. The current tests cover the price helper, not the full purchase/effect matrix.
+- Compare the modern native Wither against the source custom boss representation and validate patrol boundary, target persistence, earthquake timing/falloff, tower protection and boss damage/death interactions on both maps.
+- Verify both source map archives (Heroes Valley and Tartarus) load all original markers correctly. In particular, confirm the Pumpkin King boundary/spawn on Heroes Valley and Monochrome map-type detection/challenge markers on the relevant Monochrome map.
+- Run multiplayer acceptance for every hero: hotbar selection, input mapping, cooldown/ammo feedback, player/minion/tower/Wither damage filters, friendly-fire, player death/respawn/quit and repeated match cleanup.
+- Validate all map objectives together: tower entry ordering, minion wave progression and armour upgrade, beacon capture/economy, Wither, and the map-specific sidequest.
 
-Keep the game at `MECHANICS_IN_PROGRESS` and outside `enabled-games` until the remaining automated, both-map and multiplayer acceptance gates pass.
+Keep the game at `MECHANICS_IN_PROGRESS` and outside `enabled-games` until automated checks, both-map acceptance and live multiplayer testing pass.
 
 
 ### Wither source-target correction — current implementation slice
@@ -209,3 +208,15 @@ The modern runtime now follows the original `MobaAI` target contract more closel
 - Added deterministic target-filter and direct-movement-step tests.
 
 **Validation boundary:** this is a source-parity correction, not Wither acceptance. The Wither is still represented by a native Paper Wither rather than the original disguised 3×5 ArmorStand, and patrol, boundary, boss/tower damage interactions and both-map behaviour still require live comparison.
+
+
+### Map-specific mid-match sidequests — current implementation slice
+
+The current branch now contains separate source-map sidequest paths, matching the map-type selection in Reborn's `Moba.java`:
+
+- **Heroes Valley (and untyped MOBA maps):** Reborn's default map type is Heroes Valley. The Pumpkin King uses the first `BLACK` spawn marker and the `GRAY` boundary. It spawns after five minutes of Live play, has 100 health, targets living entities inside its boundary, uses source target/home speeds, deals 6 direct damage at the source three-block squared-distance threshold and 2 area damage/knockback in a two-block radius, heals 2 while out of combat, and respawns five minutes after death. The killer's team receives the source one-minute Regeneration II and 1.5× damage buff.
+- **Monochrome:** after five minutes, Wither Skeletons spawn at every `BLACK` marker. The event runs for 30 seconds; the team with more kills receives the same Pumpkin King buff, while a tie gives neither team a buff. Skeletons do not drop loot/XP and cannot burn.
+- The source attack cadence is `UpdateType.FAST` (500 ms), confirmed from the archived updater enum. The regression test asserts 500 ms.
+- Added tests for source timing, boss combat values and Monochrome winner/draw rules.
+
+**Validation boundary:** latest Paper 26.3 run #4413 passed. This confirms compilation and deterministic rules tests, not live sidequest acceptance. The 3×5 custom boss visual/representation and its source presentation effects still need comparison; Heroes of Gwen remains gated.
