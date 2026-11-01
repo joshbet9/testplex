@@ -179,7 +179,8 @@ public final class SpeedBuildersRules {
             return samePropertiesExcept(expected, actual, Set.of("damage"));
         }
         if (isEndPortalFrame(expectedMaterial)) {
-            return samePropertiesExcept(expected, actual, Set.of("eye"));
+            // Reborn's 1.8 rule ignores frame facing but still requires the same eye state.
+            return Objects.equals(expected.get("eye"), actual.get("eye"));
         }
         if (isSapling(expectedMaterial)) {
             return samePropertiesExcept(expected, actual, Set.of("stage"));
