@@ -2844,6 +2844,21 @@ public final class ArcadePortRules {
 
 
 
+    // Heroes of Gwen: source-derived lane minion and economy timings.
+    public static final long HEROES_OF_GWEN_MINION_WAVE_INTERVAL_MILLIS = 10_000L;
+    public static final int HEROES_OF_GWEN_MINIONS_PER_WAVE = 6;
+    public static final long HEROES_OF_GWEN_MINION_TARGET_UPDATE_MILLIS = 1_000L;
+    public static final double HEROES_OF_GWEN_MINION_TARGET_RANGE_SQUARED = 576.0D;
+    public static final long HEROES_OF_GWEN_GOLD_INTERVAL_MILLIS = 5_000L;
+    public static final int HEROES_OF_GWEN_BASE_GOLD_PER_INTERVAL = 5;
+    public static final int HEROES_OF_GWEN_CAPTURE_POINT_GOLD_PER_INTERVAL = 5;
+    public static final int HEROES_OF_GWEN_CAPTURE_POINT_REWARD_GOLD = 25;
+
+    /** Tower targets the earliest entrant; minions win equal-entry ties. */
+    public static boolean heroesOfGwenTowerTargetsPlayer(long playerEnteredAt, long minionEnteredAt) {
+        return playerEnteredAt > 0L && (minionEnteredAt <= 0L || playerEnteredAt < minionEnteredAt);
+    }
+
     // Additional source-derived Micro Battles achievements and contribution rules.
     public static boolean shouldAwardMicroBattlesAnnihilation(int killsThisGame) {
         return killsThisGame == MICRO_BATTLES_ANNIHILATION_KILLS;

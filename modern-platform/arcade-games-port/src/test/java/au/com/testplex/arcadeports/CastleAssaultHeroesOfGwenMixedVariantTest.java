@@ -73,6 +73,27 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertEquals(1, data.customLocations("TOWER RED 1").size());
     }
 
+
+    @Test
+    void heroesOfGwenMinionWavesAndGoldMatchTheOriginalCadence() {
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_MINION_WAVE_INTERVAL_MILLIS);
+        assertEquals(6, ArcadePortRules.HEROES_OF_GWEN_MINIONS_PER_WAVE);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_MINION_TARGET_UPDATE_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_GOLD_INTERVAL_MILLIS);
+        assertEquals(5, ArcadePortRules.HEROES_OF_GWEN_BASE_GOLD_PER_INTERVAL);
+        assertEquals(5, ArcadePortRules.HEROES_OF_GWEN_CAPTURE_POINT_GOLD_PER_INTERVAL);
+        assertEquals(25, ArcadePortRules.HEROES_OF_GWEN_CAPTURE_POINT_REWARD_GOLD);
+    }
+
+    @Test
+    void heroesOfGwenTowersOnlyPreferAnEarlierPlayerEntryOverMinions() {
+        assertTrue(ArcadePortRules.heroesOfGwenTowerTargetsPlayer(100L, 200L));
+        assertFalse(ArcadePortRules.heroesOfGwenTowerTargetsPlayer(200L, 100L));
+        assertFalse(ArcadePortRules.heroesOfGwenTowerTargetsPlayer(100L, 100L));
+        assertTrue(ArcadePortRules.heroesOfGwenTowerTargetsPlayer(100L, 0L));
+        assertFalse(ArcadePortRules.heroesOfGwenTowerTargetsPlayer(0L, 100L));
+    }
+
     @Test
     void bothGamesResolveTheirOriginalSourceMapFoldersAndIds() {
         assertEquals(ArcadePortGame.CASTLE_ASSAULT, ArcadePortGame.fromId("castle-assault"));
