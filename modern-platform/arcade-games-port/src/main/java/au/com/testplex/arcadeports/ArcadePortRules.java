@@ -2671,6 +2671,32 @@ public final class ArcadePortRules {
     public static final long HEROES_OF_GWEN_POWER_POTION_DURATION_MILLIS = 90_000L;
     public static final long HEROES_OF_GWEN_SPEED_POTION_DURATION_MILLIS = 180_000L;
 
+    /** Original role-store equipment enchantment family by display name. */
+    public static String heroesOfGwenStoreEnchantment(String itemName) {
+        if (itemName == null) return "";
+        return switch (itemName) {
+            case "Hunter's Bow", "Elven Bow", "Eagle's Bow", "Bow of Pursuit",
+                    "Vampiric Bow", "Bow of Renewal" -> "POWER";
+            case "Pumpkin King's Blade" -> "SHARPNESS";
+            case "Archer's Bane", "Superior Archer's Bane" -> "PROJECTILE_PROTECTION";
+            case "Brawler's Plate", "Superior Brawler's Plate" -> "PROTECTION";
+            default -> "";
+        };
+    }
+
+    /** Original role-store enchantment level; zero means no base enchantment. */
+    public static int heroesOfGwenStoreEnchantmentLevel(String itemName) {
+        if (itemName == null) return 0;
+        return switch (itemName) {
+            case "Hunter's Bow", "Vampiric Bow", "Bow of Renewal", "Archer's Bane",
+                    "Brawler's Plate" -> 1;
+            case "Elven Bow", "Bow of Pursuit", "Pumpkin King's Blade",
+                    "Superior Archer's Bane", "Superior Brawler's Plate" -> 2;
+            case "Eagle's Bow" -> 3;
+            default -> 0;
+        };
+    }
+
     /** Return red/blue challenge winner, or -1 for a tie. */
     public static int heroesOfGwenMonochromeWinner(int redKills, int blueKills) {
         return redKills == blueKills ? -1 : redKills > blueKills ? 0 : 1;
