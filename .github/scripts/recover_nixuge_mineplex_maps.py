@@ -53,7 +53,7 @@ def validate(payload: bytes) -> dict:
             def member(base):
                 return any(name == base or name.endswith("/" + base) for name in files)
             def terrain(name):
-                return bool(re.search(r"(^|/)region/r\\.-?\\d+\\.-?\\d+\\.mca$", name, re.I))
+                return bool(re.search(r"(^|/)region/r\.-?\d+\.-?\d+\.mca$", name, re.I))
             has_level = member("level.dat")
             has_regions = any(terrain(name) for name in files)
             has_config = member("WorldConfig.dat")
@@ -119,16 +119,36 @@ def main() -> int:
             recovered.append({"game": game, "name": name, "status": "already-present-in-1.8-source",
                               "path": str(existing.relative_to(ROOT))})
             continue
+        if game == "Evolution" and name == "Twin Peaks 2.0":
+            # The same-named original 1.8 world is already held under Quiver.
+            # Do not replace it with an external version whose identity/markers
+            # we cannot yet verify; the Nixuge direct link also returns 404.
+            shared = ROOT / "update/maps/One in the Quiver/Quiver_Twin Peaks 2.0.zip"
+            if not shared.is_file() or shared.stat().st_size < 1024:
+                errors.append({"game": game, "name": name,
+                               "error": "Shared original map candidate disappeared"})
+            else:
+                recovered.append({"game": game, "name": name,
+                                  "status": "same-named-source-map-in-quiver-needs-evolution-metadata",
+                                  "path": str(shared.relative_to(ROOT))})
+            continue
         url = inventory["download_base"] + "/" + game.lower() + "/" + source_file
         try:
-            payload = fetch(url)
+            cached = destination(game, name, False)
+            configured = destination(game, name, True)
+            if cached.is_file():
+                payload = cached.read_bytes()
+            elif configured.is_file():
+                payload = configured.read_bytes()
+            else:
+                payload = fetch(url)
             details = validate(payload)
             target = destination(game, name, details["has_reborn_worldconfig"]
                                  and details["has_level_dat"] and details["has_regions"])
             if target.exists():
                 if hashlib.sha256(target.read_bytes()).hexdigest() != hashlib.sha256(payload).hexdigest():
                     raise ValueError(f"Existing recovered file differs from Nixuge original: {target}")
-                status = "existing-identical"
+                status = "already-verified-configured" if details["has_reborn_worldconfig"] else "already-verified-unconfigured"
             else:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(payload)
