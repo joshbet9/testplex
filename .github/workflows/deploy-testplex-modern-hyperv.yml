@@ -165,6 +165,15 @@ jobs:
             unzip -tq "$source_jar" >/dev/null
             cp "$source_jar" "$stage_dir/$jar"
           done
+          maps_archive="$(find "$source_dir" -type f -name WizardsSourceMaps.tar.gz -print -quit)"
+          [[ -n "$maps_archive" && -s "$maps_archive" ]] || { echo "The verified build artifact is missing WizardsSourceMaps.tar.gz." >&2; exit 1; }
+          map_count="$(tar -tzf "$maps_archive" | grep -Ei '\.zip$' | wc -l | tr -d ' ')"
+          [[ "$map_count" == "20" ]] || { echo "Wizards deployment payload must contain exactly 20 map ZIPs; found $map_count." >&2; exit 1; }
+          for folder in "Wizards" "Nano Wizards"; do
+            folder_count="$(tar -tzf "$maps_archive" | grep -E "^$folder/.*\.zip$" | wc -l | tr -d ' ')"
+            [[ "$folder_count" == "10" ]] || { echo "Wizards map payload has $folder_count ZIPs in $folder; expected 10." >&2; exit 1; }
+          done
+          cp "$maps_archive" "$stage_dir/WizardsSourceMaps.tar.gz"
           recovery_helper="$GITHUB_WORKSPACE/deployment-source/.github/testplex-modern-recovery.sh"
           test -s "$recovery_helper" || { echo "Independent modern recovery helper is missing." >&2; exit 1; }
           cp "$recovery_helper" "$stage_dir/testplex-modern-recovery.sh"
@@ -181,7 +190,7 @@ jobs:
             -C "$map_root" mm_void mm_volcano mm_colombia mm_sandycoast mm_siberian mm_swampland mm_tesorohundido
           printf '%s\n' "$map_source_sha" > "$stage_dir/MonsterMazeMapsSource.txt"
           tar -tzf "$stage_dir/MonsterMazeMaps.tar.gz" >/dev/null
-          (cd "$stage_dir" && sha256sum *.jar MonsterMazeMaps.tar.gz MonsterMazeMapsSource.txt testplex-modern-recovery.sh > SHA256SUMS)
+          (cd "$stage_dir" && sha256sum *.jar MonsterMazeMaps.tar.gz WizardsSourceMaps.tar.gz MonsterMazeMapsSource.txt testplex-modern-recovery.sh > SHA256SUMS)
           echo "stage_dir=$stage_dir" >> "$GITHUB_OUTPUT"
           echo "Verified four Testplex Modern JARs ($SOURCE_SHA), with Monster Maze bundled in ArcadeMechanicsModern, and seven source worlds ($map_source_sha)"
 
@@ -346,6 +355,7 @@ jobs:
             printf 'put "%s" "%s"\n' "$STAGE_DIR/TestplexModernArcade.jar" "TestplexModernArcade.jar"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/SnakeModern.jar" "SnakeModern.jar"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/WizardsModern.jar" "WizardsModern.jar"
+            printf 'put "%s" "%s"\n' "$STAGE_DIR/WizardsSourceMaps.tar.gz" "WizardsSourceMaps.tar.gz"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/MonsterMazeMapsSource.txt" "MonsterMazeMapsSource.txt"
             printf 'put "%s" "%s"\n' "$STAGE_DIR/testplex-modern-recovery.sh" "testplex-modern-recovery.sh"
             for file in "${world_chunks[@]}" "${arcade_chunks[@]}"; do
@@ -558,6 +568,11 @@ jobs:
           fi
           prior_files=""; worlds_before=""; snapshot_items=()
           for item in paper.jar server.properties eula.txt .testplex-modern-deployed-build .testplex-paper-build .testplex-mm-source-maps .testplex-plugin-sha256sums .testplex-modern-sandbox; do
+            if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
+              snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
+            fi
+          done
+          for item in "update/maps/Wizards" "update/maps/Nano Wizards"; do
             if [[ "$SERVER_DIR_EXISTS" == true ]] && sudo -n test -e "$SERVER_DIR/$item"; then
               snapshot_items+=("$item"); prior_files="${prior_files:+$prior_files,}$item"
             fi
@@ -862,6 +877,35 @@ jobs:
           fi
           echo "Installed Monster Maze map source commit $(cat "$UPLOAD_DIR/MonsterMazeMapsSource.txt")."
 
+          # Install both original Wizards pools into the external source-map directory
+          # consumed by ArcadeMechanicsModern. Existing map folders were snapshotted
+          # above, so the standard deployment recovery helper can restore them.
+          WIZARDS_MAP_STAGE="$UPLOAD_DIR/wizards-map-stage"
+          sudo -n rm -rf -- "$WIZARDS_MAP_STAGE"
+          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$WIZARDS_MAP_STAGE"
+          sudo -n tar -xzf "$UPLOAD_DIR/WizardsSourceMaps.tar.gz" -C "$WIZARDS_MAP_STAGE"
+          for folder in "Wizards" "Nano Wizards"; do
+            [[ "$(sudo -n find "$WIZARDS_MAP_STAGE/$folder" -maxdepth 1 -type f -iname '*.zip' | wc -l | tr -d ' ')" == "10" ]] || {
+              echo "Extracted Wizards map pool is incomplete: ${folder}." >&2
+              rollback
+              exit 1
+            }
+            while IFS= read -r archive; do
+              sudo -n unzip -tq "$archive" >/dev/null || {
+                echo "Extracted Wizards archive failed CRC validation: $archive." >&2
+                rollback
+                exit 1
+              }
+            done < <(sudo -n find "$WIZARDS_MAP_STAGE/$folder" -maxdepth 1 -type f -iname '*.zip' -print)
+          done
+          sudo -n install -d -m 0750 -o monstermaze -g monstermaze "$SERVER_DIR/update/maps"
+          for folder in "Wizards" "Nano Wizards"; do
+            sudo -n rm -rf -- "$SERVER_DIR/update/maps/$folder"
+            sudo -n cp -a "$WIZARDS_MAP_STAGE/$folder" "$SERVER_DIR/update/maps/$folder"
+            sudo -n chown -R monstermaze:monstermaze "$SERVER_DIR/update/maps/$folder"
+          done
+          echo "Installed 20 original Wizards/Nano Wizards map archives under $SERVER_DIR/update/maps."
+
           echo "[deploy] restarting testplex-modern.service (90 second limit)."
           if ! timeout --foreground --signal=TERM 90s sudo -n systemctl restart testplex-modern.service; then
             rollback
@@ -903,6 +947,7 @@ jobs:
                sudo -n grep -Fxq 'status=READY' "$readiness_file" &&
                sudo -n grep -Fxq 'module=arcade-runtime' "$readiness_file" &&
                sudo -n grep -Fxq 'monster_maze=READY' "$readiness_file" &&
+               sudo -n grep -Fxq 'wizards=READY' "$readiness_file" &&
                sudo -n grep -Fxq 'manager=testplex-arcade' "$readiness_file" &&
                sudo -n grep -Fxq 'world=testplex_arcade_lobby_v1' "$readiness_file" &&
                sudo -n grep -Fxq 'plane=100x100' "$readiness_file" &&
@@ -976,11 +1021,11 @@ jobs:
           sudo -n chown monstermaze:monstermaze "$SERVER_DIR" "$SERVER_DIR/plugins"
 
           echo "[deploy] Verified Testplex Arcade runtime readiness identity:"
-          sudo -n awk -F= '$1 ~ /^(status|module|manager|world|plane|floor_y|monster_maze|source_sha|invocation_id|process_id)$/ { print }' "$readiness_file"
+          sudo -n awk -F= '$1 ~ /^(status|module|manager|world|plane|floor_y|monster_maze|wizards|source_sha|invocation_id|process_id)$/ { print }' "$readiness_file"
           sudo -n grep -F 'TESTPLEX_ARCADE_RUNTIME_READY' "$SERVER_DIR/logs/latest.log" | tail -n 1 || true
 
           sudo -n /usr/local/sbin/testplex-modern-recovery --locked set-phase DEPLOYMENT_VERIFIED
-          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and the 25-game controlled acceptance queue, including integrated Monster Maze, SkyWars Mixed, Wither Assault and Sneaky Assassins; CI verifies all 50 original SkyWars maps, while Wither Assault and Sneaky Assassins are explicitly generated-arena mechanics-test ports without authentic source maps; Castle Assault and BobsFarm archive checks remain enforced; the single Arcade runtime readiness check and Snake source-map startup are required deployment gates; Wizards, Speed Builders Arcade and Hoops Remastered remain disabled/outside the queue; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
+          echo "Modern Paper 26.3 is ready with the Testplex Arcade 100x100 lobby and 31 enabled Arcade selections representing 29 distinct titles (the three Monster Maze modes count as one title); Evolution remains catalogued but disabled pending separate source-map clearance. Heroes of Gwen, Hoops Remastered and Wizards each have one Arcade entry; Wizards/Nano Wizards original maps are installed from the verified 20-archive deployment payload and readiness requires wizards=READY. The separate WizardsModern plugin remains installed but disabled. CI verifies all original source-map archives and Paper acceptance for the newly promoted games; deployed source SHA $BUILD_SHA; Paper stable build $paper_build; backup $BACKUP_DIR."
           echo "On successful deployment, testplex-reborn.service remains stopped if it was active during preflight; a failed deployment restores services that were active before preflight. Separate Monster Maze project services/data were not modified."
           REMOTE_DEPLOY
 

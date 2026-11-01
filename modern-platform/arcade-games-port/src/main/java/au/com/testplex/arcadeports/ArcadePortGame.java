@@ -37,6 +37,7 @@ public enum ArcadePortGame {
     SKY_WARS("skywars", "SkyWars", Material.END_STONE_BRICKS, 0),
     MILK_THE_COW("milk-the-cow", "Milk the Cow", Material.GRASS_BLOCK, 0, true),
     WITHER_ASSAULT("wither-assault", "Wither Assault", Material.STONE_BRICKS, 0, true),
+    WIZARDS("wizards", "Wizards", Material.ENCHANTING_TABLE, 0),
     CAMERA_SHY("camera-shy", "Snap", Material.SPYGLASS, 0);
 
     private final String id;

@@ -27,6 +27,19 @@ class ArcadeGameModuleRegistryTest {
     }
 
     @Test
+    void registersWizardsAsOneNormalArcadeGameModule() {
+        ArcadeGameModuleRegistry registry = new ArcadeGameModuleRegistry();
+        FakeModule wizards = new FakeModule(ArcadePortGame.WIZARDS, new ArrayList<>());
+
+        registry.register(wizards);
+
+        assertEquals(List.of("init:wizards"), wizards.events);
+        assertSame(wizards, registry.get(ArcadePortGame.WIZARDS));
+        assertTrue(registry.isRegistered(ArcadePortGame.WIZARDS, wizards));
+        assertEquals(List.of(ArcadePortGame.WIZARDS), registry.registeredGames());
+    }
+
+    @Test
     void rejectsDuplicateGameRegistrationWithoutInitializingTheSecondModule() {
         ArcadeGameModuleRegistry registry = new ArcadeGameModuleRegistry();
         List<String> events = new ArrayList<>();
