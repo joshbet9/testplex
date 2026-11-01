@@ -84,10 +84,16 @@ public final class SourceMapCatalog {
      * the repository makes it available without another hand-written Java entry.
      */
     private static List<String> bundledMapResources(JavaPlugin plugin, ArcadePortGame game) {
-        return bundledMapResources(plugin, mapFoldersFor(game), game == null ? "Arcade" : game.displayName());
+        return bundledMapResources(plugin, mapFoldersFor(game),
+                game == null ? "Arcade" : game.displayName(), game);
     }
 
     private static List<String> bundledMapResources(JavaPlugin plugin, List<String> mapFolders, String label) {
+        return bundledMapResources(plugin, mapFolders, label, null);
+    }
+
+    private static List<String> bundledMapResources(JavaPlugin plugin, List<String> mapFolders,
+            String label, ArcadePortGame game) {
         List<String> prefixes = mapFolders == null ? List.of() : mapFolders.stream()
                 .filter(folder -> folder != null && !folder.isBlank())
                 .map(folder -> "source-maps/" + folder + "/")
