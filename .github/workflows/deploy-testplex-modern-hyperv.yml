@@ -220,6 +220,13 @@ jobs:
             active="$(sudo -n systemctl is-active "$unit" 2>/dev/null || true)"
             enabled="$(sudo -n systemctl is-enabled "$unit" 2>/dev/null || true)"
             if [[ "$active" == unknown && "$enabled" == not-found ]]; then active=inactive; fi
+            # systemd reports a failed unit as "failed", not "inactive". It is
+            # definitively not running; tolerate this only for the legacy Reborn
+            # unit, which this deployment never replaces or restarts.
+            if [[ "$unit" == testplex-reborn.service && "$active" == failed ]]; then
+              echo "Legacy Reborn unit is failed/stopped; leaving it untouched and continuing modern preflight."
+              active=inactive
+            fi
             [[ "$active" == active || "$active" == inactive ]] || {
               echo "Cannot safely establish $unit active state ($active); refusing deployment." >&2
               exit 1
@@ -519,6 +526,9 @@ jobs:
           reborn_active_state="$(sudo -n systemctl is-active testplex-reborn.service 2>/dev/null || true)"
           reborn_enabled_state="$(sudo -n systemctl is-enabled testplex-reborn.service 2>/dev/null || true)"
           if [[ "$reborn_active_state" == unknown && "$reborn_enabled_state" == not-found ]]; then reborn_active_state=inactive; fi
+          # A failed legacy unit is not running. Preserve it as-is; only record
+          # whether it was active so rollback never starts a previously failed unit.
+          if [[ "$reborn_active_state" == failed ]]; then reborn_active_state=inactive; fi
           case "$active_state" in active) MODERN_WAS_ACTIVE=true ;; inactive) MODERN_WAS_ACTIVE=false ;; *) echo "Cannot establish prior Modern active state." >&2; exit 1 ;; esac
           case "$reborn_active_state" in active) REBORN_WAS_ACTIVE=true ;; inactive) REBORN_WAS_ACTIVE=false ;; *) echo "Cannot establish prior Reborn active state." >&2; exit 1 ;; esac
           case "$previous_enabled" in enabled|disabled|masked|static|indirect|not-found) ;; *) echo "Cannot establish Modern unit enablement state ($previous_enabled)." >&2; exit 1 ;; esac
