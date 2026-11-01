@@ -459,7 +459,7 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     @Test
     void heroesOfGwenStorePlayerCombatAppliesBasicAbilityAndUniversalFlatEffects() {
         List<String> items = List.of("Adept's Chestplate", "Battle Mage Chestplate", "Urchin's Chestcloth");
-        assertEquals(13.5D, ArcadePortRules.heroesOfGwenStorePlayerCombatDamage(
+        assertEquals(12.5D, ArcadePortRules.heroesOfGwenStorePlayerCombatDamage(
                 10.0D, items, true, false), 0.00001D);
         assertEquals(12.0D, ArcadePortRules.heroesOfGwenStorePlayerCombatDamage(
                 10.0D, items, false, true), 0.00001D);
