@@ -310,6 +310,11 @@ public final class ArcadePortManager implements Listener {
         return testPlayers.isTestPlayer(player);
     }
 
+    /** Identifies a server-side fake Player by id for standalone game modules. */
+    public boolean isTestPlayer(UUID playerId) {
+        return testPlayers.isTestPlayer(playerId);
+    }
+
     /** Called after Monster Maze returns its roster; only despawn when the embedded module is truly idle. */
     public void cleanupTestPlayersIfNoGameIsRunning() {
         if (active == null && !monsterMazeRunning()) testPlayers.despawnSessionPlayers();
@@ -2808,6 +2813,7 @@ public final class ArcadePortManager implements Listener {
                 session.evolutionLevels.put(evolutionId, 0);
                 session.evolutionLifeKills.put(evolutionId, 0);
                 session.evolutionKillsSinceEvolution.put(evolutionId, 0);
+                session.evolutionSameMobOnly.add(evolutionId);
                 session.evolutionPityUntil.put(evolutionId,
                         System.currentTimeMillis() + ArcadePortRules.EVOLUTION_PITY_CLOCK_MILLIS);
                 session.evolutionOverkillEligible.add(evolutionId);
@@ -2842,12 +2848,14 @@ public final class ArcadePortManager implements Listener {
                 UUID baconId = player.getUniqueId();
                 session.baconKits.put(baconId, baconKitPreferences.getOrDefault(baconId, "el-muchacho-pigo"));
                 session.baconMeters.put(baconId, 0);
+                session.baconGoatStyEligible.add(baconId);
             }
             if (type == ArcadePortGame.BOMB_LOBBERS) {
-                session.bombLobbersKits.put(player.getUniqueId(),
-                        bombLobbersKitPreferences.getOrDefault(player.getUniqueId(), "jumper"));
-                session.bombPitchLevels.put(player.getUniqueId(), 2);
-                session.bombDoubleJumpAvailable.add(player.getUniqueId());
+                UUID bombId = player.getUniqueId();
+                session.bombLobbersKits.put(bombId, bombLobbersKitPreferences.getOrDefault(bombId, "jumper"));
+                session.bombPitchLevels.put(bombId, 2);
+                session.bombDoubleJumpAvailable.add(bombId);
+                session.bombPowerupClutchEligible.add(bombId);
             }
             if (type == ArcadePortGame.MICRO_BATTLES) {
                 UUID microId = player.getUniqueId();
@@ -2939,6 +2947,10 @@ public final class ArcadePortManager implements Listener {
                 player.setWalkSpeed(0.0F);
             }
             session.lastLocations.put(player.getUniqueId(), spawn.clone());
+            if (type == ArcadePortGame.DEATH_TAG) {
+                session.deathTagStatueArea.put(player.getUniqueId(), deathTagStatueArea(spawn));
+                session.deathTagStatueSince.put(player.getUniqueId(), now);
+            }
             if (type == ArcadePortGame.MICRO_BATTLES) {
                 UUID microId = player.getUniqueId();
                 Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -3829,6 +3841,9 @@ public final class ArcadePortManager implements Listener {
         String path = ArcadePortRules.gladiatorsMilestoneConfigKey(player.getUniqueId());
         int wins = plugin.getConfig().getInt(path, 0) + 1;
         plugin.getConfig().set(path, wins);
+        String statsPath = localStatsPath(player.getUniqueId(), ArcadePortGame.GLADIATORS.id());
+        plugin.getConfig().set(statsPath + "loser-bracket-wins",
+                plugin.getConfig().getInt(statsPath + "loser-bracket-wins", 0) + 1);
         plugin.saveConfig();
         player.sendMessage(ChatColor.LIGHT_PURPLE + "Silky Seconds — Loser Bracket Wins: " + wins);
     }
@@ -3836,6 +3851,17 @@ public final class ArcadePortManager implements Listener {
     private void recordGladiatorsWinnerAchievements(Session session, Player winner) {
         GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
         UUID id = winner.getUniqueId();
+        if (session.gladiatorLosses.getOrDefault(id, 0) > 0) {
+            if (session.gladiatorLostRoundOneClose.contains(id)) {
+                awardCatalogAchievement(winner, "gladiators", "silky-seconds");
+            }
+            if (session.gladiatorLostRoundOneAfterTenDamage.contains(id)) {
+                awardCatalogAchievement(winner, "gladiators", "comeback-kid");
+            }
+        }
+        if (mode != null && mode.hasClassicRangedTools() && !session.gladiatorUsedRod.contains(id)) {
+            awardCatalogAchievement(winner, "gladiators", "man-of-integrity");
+        }
         if (ArcadePortRules.shouldAwardGladiatorsNoBowOrRodWin(mode != null && mode.hasClassicRangedTools(),
                 session.gladiatorUsedBow.contains(id), session.gladiatorUsedRod.contains(id))) {
             awardGladiatorsAchievement(winner, "are-you-not-entertained", "Are you not entertained?");
@@ -4082,6 +4108,15 @@ public final class ArcadePortManager implements Listener {
             return;
         }
 
+        session.gladiatorRoundDamageTaken.remove(firstId);
+        session.gladiatorRoundDamageTaken.remove(secondId);
+        session.gladiatorLethalMargin.remove(firstId);
+        session.gladiatorLethalMargin.remove(secondId);
+        session.gladiatorBoutArrowsUsed.remove(firstId);
+        session.gladiatorBoutArrowsUsed.remove(secondId);
+        session.gladiatorBoutPotionsUsed.remove(firstId);
+        session.gladiatorBoutPotionsUsed.remove(secondId);
+
         int matchTier = bracket == GLADIATOR_BRACKET_LOSERS
                 ? session.gladiatorLoserRound
                 : bracket == GLADIATOR_BRACKET_FINAL ? 3 : session.gladiatorRound;
@@ -4153,6 +4188,8 @@ public final class ArcadePortManager implements Listener {
             }
             player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
             giveGladiatorKit(session, player, matchTier);
+            session.gladiatorInitialArrows.put(player.getUniqueId(), inventoryCount(player, Material.ARROW));
+            session.gladiatorInitialPotions.put(player.getUniqueId(), inventoryCountNamed(player, gladiatorPotionKey));
             session.lastLocations.put(player.getUniqueId(), spawn.clone());
             String bracketName = bracket == GLADIATOR_BRACKET_WINNERS ? "Winners bracket"
                     : bracket == GLADIATOR_BRACKET_LOSERS ? "Loser's bracket" : "Grand final";
@@ -4807,6 +4844,16 @@ public final class ArcadePortManager implements Listener {
 
         boolean forcedAlpha = reason != null && reason.contains("forced by the time limit");
         UUID convertedPlayerId = player.getUniqueId();
+        UUID traitorId = session.deathTagLastTraitorHit.get(convertedPlayerId);
+        long traitorHitAt = session.deathTagLastTraitorHitAt.getOrDefault(convertedPlayerId, 0L);
+        if (!forcedAlpha && traitorId != null && System.currentTimeMillis() - traitorHitAt <= 8_000L
+                && "traitor".equals(session.deathTagRunnerKits.get(traitorId))) {
+            int assists = session.deathTagTraitorAssists.merge(traitorId, 1, Integer::sum);
+            Player traitor = session.players.get(traitorId);
+            if (assists >= 3 && traitor != null) awardCatalogAchievement(traitor, "death-tag", "gallows");
+        }
+        session.deathTagLastTraitorHit.remove(convertedPlayerId);
+        session.deathTagLastTraitorHitAt.remove(convertedPlayerId);
         if (!forcedAlpha) session.deathTagDeathsByPlayer.merge(convertedPlayerId, 1, Integer::sum);
         // Legacy GetKillsGems pays 4 for a Runner kill and 0 for a Chaser kill.
         if (!forcedAlpha && killer != null && session.tagged.contains(killer.getUniqueId())) {
@@ -5564,6 +5611,9 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "Leap ready in "
                     + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s.");
             return;
+        }
+        if (!player.isOnGround() && player.getFallDistance() > 3.0F) {
+            // Leap is the Dragons kit's only fall-cancel ability in this implementation.
         }
         session.dragonLeapReadyAt.put(id, now + ArcadePortRules.DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS);
         Entity leapEntity = player.getVehicle() instanceof Horse ? player.getVehicle() : player;
@@ -8597,6 +8647,7 @@ public final class ArcadePortManager implements Listener {
             }
             default: {
                 session.baconSlamPowerPercent.put(id, charge);
+                if (!player.isOnGround()) session.baconSlamRecoveryAttempts.add(id);
                 double launchScale = 0.5D + charge / 200.0D;
                 Vector leap = player.getLocation().getDirection().normalize().multiply(1.2D * launchScale);
                 leap.setY(ArcadePortRules.baconBrawlBodySlamLaunchY(
@@ -8653,12 +8704,15 @@ public final class ArcadePortManager implements Listener {
             target.sendActionBar(ChatColor.RED + "" + ChatColor.BOLD + "BRUTUS GUARD BROKEN!");
             target.playSound(target.getLocation(), Sound.ITEM_SHIELD_BREAK, 0.9F, 0.8F);
         }
+        boolean attackerCloaked = session.baconCloakUntil.getOrDefault(attackerId, 0L) > now;
         if (session.baconCloakUntil.containsKey(attackerId)) {
             endBaconCloak(session, attackerId, attacker);
         }
         session.baconLastDamager.put(targetId, attackerId);
         session.baconLastDamagedAt.put(targetId, now);
         session.baconLastHitSource.put(targetId, source);
+        session.baconLastHitBackstab.put(targetId, backstab);
+        session.baconLastHitCloaked.put(targetId, attackerCloaked);
 
         double timingMultiplier = 1.0D;
         boolean normalTimedHit = "melee".equals(source) || "projectile hit".equals(source);
@@ -9397,6 +9451,11 @@ public final class ArcadePortManager implements Listener {
             player.sendMessage(ChatColor.YELLOW + "There is no player ahead of you to warp to.");
             return;
         }
+        List<Player> rankedBeforeWarp = dragonEscapeRaceOrder(session);
+        if (!rankedBeforeWarp.isEmpty() && rankedBeforeWarp.get(0).getUniqueId().equals(ahead.getUniqueId())
+                && dragonEscapeCourseDistance(session, ahead) - dragonEscapeCourseDistance(session, player) >= 40.0D) {
+            session.dragonEscapeStratsEligible.add(id);
+        }
         Location safeLocation = session.dragonEscapeSafeLocations.get(ahead.getUniqueId());
         if (safeLocation == null || safeLocation.getWorld() != session.world) {
             safeLocation = ahead.getLocation();
@@ -9629,6 +9688,8 @@ public final class ArcadePortManager implements Listener {
         mine.remove();
         target.setVelocity(new Vector(0.0D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y, 0.0D));
         target.setFallDistance(0.0F);
+        session.dragonEscapeMineLaunchedBy.put(target.getUniqueId(), ownerId);
+        session.dragonEscapeMineLaunchedAt.put(target.getUniqueId(), System.currentTimeMillis());
         target.playEffect(EntityEffect.HURT);
         target.setSprinting(false);
         target.getWorld().playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1.0F, 2.0F);
@@ -9920,9 +9981,15 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void recordDragonEscapeFinish(Session session, Player player, long now) {
-        if (session == null || player == null || testPlayers.isTestPlayer(player)
-                || session.dragonEscapeMapResource == null) return;
+        if (session == null || player == null || testPlayers.isTestPlayer(player)) return;
         UUID id = player.getUniqueId();
+        if (session.dragonEscapeCompleted.add(id)) {
+            String statsPath = localStatsPath(id, ArcadePortGame.DRAGON_ESCAPE.id());
+            plugin.getConfig().set(statsPath + "course-completes",
+                    plugin.getConfig().getInt(statsPath + "course-completes", 0) + 1);
+            plugin.saveConfig();
+        }
+        if (session.dragonEscapeMapResource == null) return;
         long elapsed = Math.max(1L, now - session.startedAt);
         Map<Integer, Long> splits = session.dragonEscapeRunSplitMillis.computeIfAbsent(id, ignored -> new HashMap<>());
         splits.putIfAbsent(0, 0L);
@@ -9930,6 +9997,9 @@ public final class ArcadePortManager implements Listener {
         String path = dragonEscapePbPath(id, session.dragonEscapeMapResource);
         if (path.isEmpty()) return;
         long existing = plugin.getConfig().getLong(path + "time-ms", -1L);
+        if (existing > 0L && Math.abs(existing - elapsed) <= 50L) {
+            awardCatalogAchievement(player, "dragon-escape", "twinning-this-halloween");
+        }
         if (existing > 0L && existing <= elapsed) return;
         Location finishLocation = player.getLocation().clone();
         List<DragonEscapeGhostFrame> ghostFrames = session.dragonEscapeRunGhostFrames
@@ -11564,6 +11634,16 @@ public final class ArcadePortManager implements Listener {
         return amount;
     }
 
+    private int inventoryCountNamed(Player player, NamespacedKey key) {
+        int count = 0;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item == null || !item.hasItemMeta()
+                    || !item.getItemMeta().getPersistentDataContainer().has(key, PersistentDataType.BYTE)) continue;
+            count += item.getAmount();
+        }
+        return count;
+    }
+
     private void checkRoundEnd(Session session) {
         if (active != session) return;
         if (session.type == ArcadePortGame.PLEXBALL) {
@@ -11713,6 +11793,29 @@ public final class ArcadePortManager implements Listener {
 
     private void eliminate(Session session, Player player, Player killer, String reason) {
         if (active != session || player == null) return;
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE && reason != null
+                && reason.toLowerCase(java.util.Locale.ROOT).contains("fell")) {
+            UUID victimId = player.getUniqueId();
+            UUID mineOwnerId = session.dragonEscapeMineLaunchedBy.remove(victimId);
+            long launchedAt = session.dragonEscapeMineLaunchedAt.getOrDefault(victimId, 0L);
+            session.dragonEscapeMineLaunchedAt.remove(victimId);
+            if (mineOwnerId != null && System.currentTimeMillis() - launchedAt <= 12_000L) {
+                int mineKills = session.dragonEscapeDisruptorKills.merge(mineOwnerId, 1, Integer::sum);
+                Player mineOwner = session.players.get(mineOwnerId);
+                if (mineKills >= 3 && mineOwner != null) {
+                    awardCatalogAchievement(mineOwner, "dragon-escape", "ragebaiter");
+                }
+            }
+        }
+        if (session.type == ArcadePortGame.BOMB_LOBBERS && killer != null) {
+            Set<UUID> closeRangeOwners = session.bombCloseRangeOwnersByVictim.remove(player.getUniqueId());
+            if (closeRangeOwners != null && closeRangeOwners.contains(killer.getUniqueId())) {
+                awardCatalogAchievement(killer, "bomb-lobbers", "technical");
+            }
+        }
+        if (session.type == ArcadePortGame.BACON_BRAWL && event.getEntity() instanceof Player baconPlayer
+                && session.players.containsKey(baconPlayer.getUniqueId())
+                && event.getCause() == EntityDamageEvent.DamageCause.STARVATION) session.baconStarvationDamaged.add(baconPlayer.getUniqueId());
         if ((session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN)
                 && session.alive.contains(player.getUniqueId())) {
             UUID victimId = player.getUniqueId();
@@ -11774,6 +11877,21 @@ public final class ArcadePortManager implements Listener {
                 }
             }
             String lastHitSource = session.baconLastHitSource.get(playerId);
+            if (killer != null) {
+                String kit = session.baconKits.getOrDefault(killer.getUniqueId(), "el-muchacho-pigo");
+                boolean cloakedBackstab = "pig".equals(kit)
+                        && "melee".equals(lastHitSource)
+                        && session.baconLastHitBackstab.getOrDefault(playerId, false)
+                        && session.baconLastHitCloaked.getOrDefault(playerId, false);
+                if (!cloakedBackstab) session.baconGoatStyEligible.remove(killer.getUniqueId());
+                if ("mama-piggles".equals(kit) && "bacon-blast".equals(lastHitSource)) {
+                    int blastKills = session.baconBlastKills.merge(killer.getUniqueId(), 1, Integer::sum);
+                    if (blastKills >= 4) awardCatalogAchievement(killer, "bacon-brawl", "mama-camera");
+                }
+                if (session.baconSlamRecoveryAttempts.contains(playerId) && !player.isOnGround()) {
+                    awardCatalogAchievement(killer, "bacon-brawl", "got-em");
+                }
+            }
             if (killer != null && "body-slam".equals(lastHitSource)) {
                 UUID killerId = killer.getUniqueId();
                 int slamKills = session.baconBodySlamKills.merge(killerId, 1, Integer::sum);
@@ -11787,6 +11905,9 @@ public final class ArcadePortManager implements Listener {
             session.baconLastDamager.remove(playerId);
             session.baconLastDamagedAt.remove(playerId);
             session.baconLastHitSource.remove(playerId);
+            session.baconLastHitBackstab.remove(playerId);
+            session.baconLastHitCloaked.remove(playerId);
+            session.baconSlamRecoveryAttempts.remove(playerId);
             removeBaconBabyPig(session, playerId);
             removeBaconPlayerPig(session, playerId);
             session.baconSlams.remove(playerId);
@@ -11978,6 +12099,9 @@ public final class ArcadePortManager implements Listener {
                 UUID killerId = killer.getUniqueId();
                 session.scores.merge(killerId, 1, Integer::sum);
                 int lifeKills = session.evolutionLifeKills.merge(killerId, 1, Integer::sum);
+                int attackerMob = session.evolutionLevels.getOrDefault(killerId, 0);
+                int victimMob = session.evolutionLevels.getOrDefault(victimId, 0);
+                if (attackerMob != victimMob) session.evolutionSameMobOnly.remove(killerId);
                 int killsSinceEvolution = ArcadePortRules.nextEvolutionOverkillKillCount(
                         session.evolutionKillsSinceEvolution.getOrDefault(killerId, 0));
                 session.evolutionKillsSinceEvolution.put(killerId, killsSinceEvolution);
@@ -12052,6 +12176,11 @@ public final class ArcadePortManager implements Listener {
         if (killer != null && session.scores.containsKey(killer.getUniqueId())) {
             int kills = session.scores.merge(killer.getUniqueId(), 1, Integer::sum);
             if (session.type == ArcadePortGame.MICRO_BATTLES
+                    && "worker".equals(session.microKits.getOrDefault(killer.getUniqueId(), "archer"))
+                    && killer.getInventory().getItemInMainHand().getType() == Material.STONE_SHOVEL) {
+                awardCatalogAchievement(killer, "micro-battles", "gravedigger");
+            }
+            if (session.type == ArcadePortGame.MICRO_BATTLES
                     && !testPlayers.isTestPlayer(killer)
                     && ArcadePortRules.shouldAwardMicroBattlesAnnihilation(kills)) {
                 UUID killerId = killer.getUniqueId();
@@ -12089,7 +12218,9 @@ public final class ArcadePortManager implements Listener {
                 attackerPair != null && session.gladiatorResolvedPairs.contains(attackerPair))) return;
         if (target.getNoDamageTicks() > 0) return;
         target.setNoDamageTicks(projectile ? 8 : 10);
+        session.gladiatorRoundDamageTaken.merge(targetId, damage, Double::sum);
         if (target.getHealth() <= damage) {
+            session.gladiatorLethalMargin.put(targetId, target.getHealth() - damage);
             target.getWorld().playSound(target.getLocation(),
                     projectile ? Sound.ENTITY_ARROW_HIT_PLAYER : Sound.ENTITY_PLAYER_ATTACK_STRONG,
                     0.9F, 0.9F);
@@ -12119,9 +12250,12 @@ public final class ArcadePortManager implements Listener {
         if (System.currentTimeMillis() < fightStartsAt || target.getNoDamageTicks() > 0) return;
         target.setNoDamageTicks(10);
         if (target.getHealth() <= damage) {
+            session.gladiatorRoundDamageTaken.merge(target.getUniqueId(), damage, Double::sum);
+            session.gladiatorLethalMargin.put(target.getUniqueId(), target.getHealth() - damage);
             eliminate(session, target, null, reason);
             return;
         }
+        session.gladiatorRoundDamageTaken.merge(target.getUniqueId(), damage, Double::sum);
         target.setHealth(target.getHealth() - damage);
         target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.8F, 0.85F);
         target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
@@ -12147,6 +12281,26 @@ public final class ArcadePortManager implements Listener {
         boolean creditedPlayerKill = killer != null && killer.isOnline()
                 && killer.getUniqueId().equals(opponentId);
         if (!creditedPlayerKill) killer = opponent;
+        if (killer != null && opponent != null) {
+            UUID winnerId = killer.getUniqueId();
+            GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
+            if (mode == null) mode = GladiatorsMode.RODLESS;
+            boolean exhaustedResources = switch (mode) {
+                case RODLESS -> session.gladiatorInitialArrows.getOrDefault(victimId, 0) > 0
+                        && session.gladiatorBoutArrowsUsed.getOrDefault(victimId, 0)
+                                >= session.gladiatorInitialArrows.getOrDefault(victimId, 0);
+                case POT -> session.gladiatorInitialPotions.getOrDefault(victimId, 0) > 0
+                        && session.gladiatorBoutPotionsUsed.getOrDefault(victimId, 0)
+                                >= session.gladiatorInitialPotions.getOrDefault(victimId, 0);
+                default -> false;
+            };
+            int winnerUsed = mode == GladiatorsMode.RODLESS
+                    ? session.gladiatorBoutArrowsUsed.getOrDefault(winnerId, 0)
+                    : session.gladiatorBoutPotionsUsed.getOrDefault(winnerId, 0);
+            if (exhaustedResources && winnerUsed == 0) {
+                awardCatalogAchievement(killer, "gladiators", "who-do-you-think-you-are");
+            }
+        }
         if (killer == null || !killer.isOnline()) {
             session.alive.remove(victimId);
             session.gladiatorPairs.remove(victimId);
@@ -12171,6 +12325,16 @@ public final class ArcadePortManager implements Listener {
         }
 
         int losses = session.gladiatorLosses.merge(victimId, 1, Integer::sum);
+        if (bracket == GLADIATOR_BRACKET_WINNERS && losses == 1) {
+            if (session.gladiatorLethalMargin.getOrDefault(victimId, Double.POSITIVE_INFINITY) <= 1.0D) {
+                session.gladiatorLostRoundOneClose.add(victimId);
+            }
+            if (session.gladiatorRoundDamageTaken.getOrDefault(victimId, 0.0D) >= 10.0D) {
+                session.gladiatorLostRoundOneAfterTenDamage.add(victimId);
+            }
+        }
+        session.gladiatorLethalMargin.remove(victimId);
+        session.gladiatorRoundDamageTaken.remove(victimId);
         victim.leaveVehicle();
         victim.setGameMode(GameMode.SPECTATOR);
         victim.getInventory().clear();
@@ -12615,6 +12779,7 @@ public final class ArcadePortManager implements Listener {
                     || !session.players.containsKey(contributorId)) continue;
             reduceEvolutionPity(session, contributorId,
                     ArcadePortRules.EVOLUTION_PITY_ASSIST_REDUCTION_MILLIS, now);
+            session.evolutionAssistCreditsSinceEvolution.merge(contributorId, 1, Integer::sum);
             Player contributor = session.players.get(contributorId);
             if (contributor != null && contributor.isOnline()) {
                 contributor.sendMessage(ChatColor.GREEN + "Evolution assist! Your pity timer was reduced by 7.5 seconds.");
@@ -12724,6 +12889,7 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         if (active != session || !session.alive.contains(id)
                 || !session.evolutionAvailable.remove(id) || !session.evolving.add(id)) return;
+        session.evolutionManualEvolved.add(id);
         session.evolutionStartedAtMillis.put(id, System.currentTimeMillis());
         session.evolutionLevelAtAttempt.put(id, session.evolutionLevels.getOrDefault(id, 0));
         boolean quickEvolver = "quick-evolver".equals(
@@ -12762,6 +12928,10 @@ public final class ArcadePortManager implements Listener {
             }
             int killsBeforeEvolution = session.evolutionKillsAtAttempt.getOrDefault(id, 0);
             session.evolutionKillsAtAttempt.remove(id);
+            int assistCredits = session.evolutionAssistCreditsSinceEvolution.getOrDefault(id, 0);
+            session.evolutionAssistOnlyEvolutions.put(id, killsBeforeEvolution == 0 && assistCredits > 0
+                    ? session.evolutionAssistOnlyEvolutions.getOrDefault(id, 0) + 1 : 0);
+            session.evolutionAssistCreditsSinceEvolution.put(id, 0);
             session.evolutionKillsSinceEvolution.put(id, 0);
             if (!ArcadePortRules.evolutionOverkillRequirementMet(killsBeforeEvolution)) {
                 session.evolutionOverkillEligible.remove(id);
@@ -12915,6 +13085,8 @@ public final class ArcadePortManager implements Listener {
                         long lastUse = session.deathTagTraitorKnockbackAt.getOrDefault(cooldownKey, 0L);
                         if (ArcadePortRules.deathTagTraitorKnockbackReady(now, lastUse)) {
                             session.deathTagTraitorKnockbackAt.put(cooldownKey, now);
+                            session.deathTagLastTraitorHit.put(target.getUniqueId(), attacker.getUniqueId());
+                            session.deathTagLastTraitorHitAt.put(target.getUniqueId(), now);
                             Vector knockbackDirection = target.getLocation().toVector().subtract(attacker.getLocation().toVector());
                             double multiplier = ArcadePortRules.deathTagKnockbackMultiplier(
                                     session.alphaChasers.contains(target.getUniqueId()));
@@ -13493,6 +13665,14 @@ public final class ArcadePortManager implements Listener {
             recordDeathTagRewards(session);
         }
         if (session.type != ArcadePortGame.PLEXBALL) recordLocalStats(session, winner, announceWinner);
+        if (announceWinner && session.type == ArcadePortGame.MICRO_BATTLES) {
+            for (Map.Entry<UUID, Integer> assists : session.microAssists.entrySet()) {
+                if (assists.getValue() >= 8) {
+                    Player contributor = session.players.get(assists.getKey());
+                    if (contributor != null) awardCatalogAchievement(contributor, "micro-battles", "mosh-pit-playroom");
+                }
+            }
+        }
         if (announceWinner && session.type == ArcadePortGame.DRAW_MY_THING && winner != null) {
             UUID winnerId = winner.getUniqueId();
             int expectedGuessRounds = Math.max(0, session.participantsAtStart - 1);
@@ -13551,6 +13731,16 @@ public final class ArcadePortManager implements Listener {
         }
         if (announceWinner && session.type == ArcadePortGame.GLADIATORS && winner != null) {
             recordGladiatorsWinnerAchievements(session, winner);
+        }
+        if (announceWinner && winner != null && session.type == ArcadePortGame.DRAGON_ESCAPE) recordDragonEscapeAchievements(session, winner);
+        if (announceWinner && winner != null && session.type == ArcadePortGame.EVOLUTION) recordEvolutionAchievements(session, winner);
+        if (announceWinner && winner != null && session.type == ArcadePortGame.DRAGON_ESCAPE) {
+            recordDragonEscapeAchievements(session, winner);
+        }
+        if (announceWinner && winner != null && session.type == ArcadePortGame.DRAGONS) {
+        }
+        if (announceWinner && winner != null && session.type == ArcadePortGame.EVOLUTION) {
+            recordEvolutionAchievements(session, winner);
         }
         if (announceWinner && session.type == ArcadePortGame.SHEEP_QUEST) {
             recordSheepQuestRewards(session, winner);
@@ -13833,11 +14023,31 @@ public final class ArcadePortManager implements Listener {
                     ArcadePortRules.baconBrawlAchievementConfigKey(id, "raw-pork"),
                     "Raw Pork — won Bacon Brawl without using an ability.");
         }
+        if (session.baconStarvationDamaged.contains(id)) {
+            awardCatalogAchievement(winner, "bacon-brawl", "hamished");
+        }
+        if ("pig".equals(session.baconKits.getOrDefault(id, ""))
+                && session.baconGoatStyEligible.contains(id)
+                && session.scores.getOrDefault(id, 0) > 0) {
+            awardCatalogAchievement(winner, "bacon-brawl", "goat-sty");
+        }
+        if (session.scores.getOrDefault(id, 0) == 0) {
+            awardCatalogAchievement(winner, "bacon-brawl", "pork-on-fork");
+        }
     }
 
     private void recordBombLobbersDamage(Session session, Player target, UUID sourceId, long now) {
+        recordBombLobbersDamage(session, target, sourceId, now, null);
+    }
+
+    private void recordBombLobbersDamage(Session session, Player target, UUID sourceId, long now, UUID bombId) {
         if (session == null || target == null || sourceId == null || sourceId.equals(target.getUniqueId())
                 || !session.players.containsKey(sourceId)) return;
+        if (bombId != null && session.bombCloseRangeTargets.getOrDefault(bombId, Set.of())
+                .contains(target.getUniqueId())) {
+            session.bombCloseRangeOwnersByVictim.computeIfAbsent(target.getUniqueId(), ignored -> new HashSet<>())
+                    .add(sourceId);
+        }
         UUID targetId = target.getUniqueId();
         int sourceTeam = session.teams.getOrDefault(sourceId, -1);
         int targetTeam = session.teams.getOrDefault(targetId, -2);
@@ -13893,6 +14103,13 @@ public final class ArcadePortManager implements Listener {
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             UUID id = entry.getKey();
             Player player = entry.getValue();
+            if (session.scores.getOrDefault(id, 0) >= 3
+                    && !session.bombImmediateImpactThrowers.contains(id)) {
+                awardCatalogAchievement(player, "bomb-lobbers", "wonderkid");
+            }
+            if (session.bombJumpCounts.getOrDefault(id, 0) >= 100) {
+                awardCatalogAchievement(player, "bomb-lobbers", "calma");
+            }
             if (ArcadePortRules.shouldAwardBombLobbersUltimateKiller(session.scores.getOrDefault(id, 0))) {
                 awardBombLobbersAchievement(player, BombLobbersAchievement.ULTIMATE_KILLER.configKey(id),
                         "Ultimate Killer — 5 kills in one game.");
@@ -13918,6 +14135,11 @@ public final class ArcadePortManager implements Listener {
                     && session.bombMvpPressurePlayers.contains(winnerId)) {
                 awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.THE_MVP.configKey(winnerId),
                         "The MVP — won after surviving alone against at least 3 opponents.");
+            }
+            if (bombLobbersAliveTeammates(session, winnerId) == 1
+                    && session.bombMvpPressurePlayers.contains(winnerId)
+                    && session.bombPowerupClutchEligible.contains(winnerId)) {
+                awardCatalogAchievement(winningPlayer, "bomb-lobbers", "over-9000");
             }
             if ("armorer".equals(session.bombLobbersKits.getOrDefault(winnerId, "jumper"))) {
                 awardBombLobbersAchievement(winningPlayer, BombLobbersAchievement.BLAST_PROOF.configKey(winnerId),
@@ -13957,6 +14179,47 @@ public final class ArcadePortManager implements Listener {
                 && ArcadePortRules.isEvolutionWinnerLevel(session.evolutionLevels.getOrDefault(id, 0))) {
             awardEvolutionAchievement(winner, EvolutionAchievement.OVERKILL.configKey(id),
                     "Overkill — got 2 kills before each evolution.");
+        }
+        if (!session.evolutionManualEvolved.contains(id)) {
+            awardCatalogAchievement(winner, "evolution", "mercy-rule");
+        }
+        if (session.evolutionSameMobOnly.contains(id)) {
+            awardCatalogAchievement(winner, "evolution", "objection");
+        }
+        if (session.evolutionChickenGolemKillers.contains(id)) {
+            awardCatalogAchievement(winner, "evolution", "turns-tabled");
+        }
+        if (session.evolutionAssistOnlyEvolutions.getOrDefault(id, 0) >= 3) {
+            awardCatalogAchievement(winner, "evolution", "try-again");
+        }
+    }
+
+    private void recordDragonEscapeAchievements(Session session, Player winner) {
+        UUID id = winner.getUniqueId();
+        if (session.dragonEscapeStratsEligible.contains(id)) {
+            awardCatalogAchievement(winner, "dragon-escape", "strats");
+        }
+        if ("digger".equals(session.dragonEscapeKits.getOrDefault(id, "jumper"))
+                && session.dragonEscapeDiggerUsesRemaining.getOrDefault(id,
+                        ArcadePortRules.DRAGON_ESCAPE_DIGGER_MAX_USES) == 0
+                && !session.dragonEscapeDiggerRanThroughBrokenBlock.contains(id)) {
+            awardCatalogAchievement(winner, "dragon-escape", "learn-to-code");
+        }
+    }
+
+        UUID id = winner.getUniqueId();
+            awardCatalogAchievement(winner, "dragons", "survivors-guilt");
+        }
+            awardCatalogAchievement(winner, "dragons", "freefallin");
+        }
+            awardCatalogAchievement(winner, "dragons", "sticks-and-stones");
+        }
+                && System.currentTimeMillis() - session.startedAt >= 60_000L) {
+            awardCatalogAchievement(winner, "dragons", "dodgems");
+        }
+            awardCatalogAchievement(winner, "dragons", "mlg-pro");
+        }
+            awardCatalogAchievement(winner, "dragons", "ultra");
         }
     }
 
@@ -14018,6 +14281,26 @@ public final class ArcadePortManager implements Listener {
         plugin.saveConfig();
     }
 
+    private void awardCatalogAchievement(Player player, String gameId, String achievementId) {
+        awardCatalogAchievement(player == null ? null : player.getUniqueId(), player, gameId, achievementId);
+    }
+
+    private void awardCatalogAchievement(UUID playerId, String gameId, String achievementId) {
+        awardCatalogAchievement(playerId, playerId == null ? null : Bukkit.getPlayer(playerId), gameId, achievementId);
+    }
+
+    private void awardCatalogAchievement(UUID playerId, Player player, String gameId, String achievementId) {
+        if (!ArcadeTestPlayerManager.shouldPersistProgression(playerId, testPlayers.isTestPlayer(playerId))) return;
+        String key = arcadeAchievementConfigKey(playerId, gameId, achievementId);
+        if (key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        if (player != null && player.isOnline()) player.sendMessage(ChatColor.GOLD + "Achievement unlocked: "
+                + ArcadeProgressCatalog.achievements(gameId).stream()
+                        .filter(achievement -> achievement.id().equals(achievementId))
+                        .map(ArcadeProgressCatalog.Achievement::name).findFirst().orElse(achievementId));
+        plugin.saveConfig();
+    }
+
     private void awardBombLobbersAchievement(Player player, String key, String description) {
         if (player == null || testPlayers.isTestPlayer(player)
                 || key == null || key.isBlank() || plugin.getConfig().getBoolean(key, false)) return;
@@ -14049,6 +14332,10 @@ public final class ArcadePortManager implements Listener {
         return "local-stats." + playerId + "." + gameId + ".";
     }
 
+    private String deathTagStatueArea(Location location) {
+        return Math.floorDiv(location.getBlockX(), 5) + ":" + Math.floorDiv(location.getBlockZ(), 5);
+    }
+
     /** Receives completed rounds from the standalone SnakeModern game so /stats stays unified. */
     public void recordSnakeStats(UUID playerId, boolean won, int kills, boolean knockedOut,
                                  int lifetimeKills, int lifetimeSlimes, int bestTailLength,
@@ -14077,6 +14364,40 @@ public final class ArcadePortManager implements Listener {
                     achievements != null && achievements.contains(achievement));
         }
         plugin.saveConfig();
+    }
+
+    public void recordMonsterMazeFirstSafePad(UUID playerId) {
+        if (!ArcadeTestPlayerManager.shouldPersistProgression(playerId, testPlayers.isTestPlayer(playerId))) return;
+        String path = localStatsPath(playerId, "monster-maze");
+        plugin.getConfig().set(path + "first-safe-pads",
+                plugin.getConfig().getInt(path + "first-safe-pads", 0) + 1);
+        plugin.saveConfig();
+    }
+
+    public void recordMonsterMazeHighestStage(UUID playerId, int stage) {
+        if (!ArcadeTestPlayerManager.shouldPersistProgression(playerId, testPlayers.isTestPlayer(playerId))
+                || stage < 0) return;
+        String path = localStatsPath(playerId, "monster-maze");
+        plugin.getConfig().set(path + "highest-stage",
+                Math.max(plugin.getConfig().getInt(path + "highest-stage", 0), stage));
+        plugin.saveConfig();
+    }
+
+    public void recordMonsterMazeWin(UUID playerId, int stage) {
+        if (!ArcadeTestPlayerManager.shouldPersistProgression(playerId, testPlayers.isTestPlayer(playerId))) return;
+        String path = localStatsPath(playerId, "monster-maze");
+        plugin.getConfig().set(path + "wins", plugin.getConfig().getInt(path + "wins", 0) + 1);
+        plugin.getConfig().set(path + "highest-stage",
+                Math.max(plugin.getConfig().getInt(path + "highest-stage", 0), stage));
+        plugin.saveConfig();
+    }
+
+    public void recordMonsterMazeAchievement(UUID playerId, String achievementId) {
+        if (ArcadeTestPlayerManager.shouldPersistProgression(playerId, testPlayers.isTestPlayer(playerId))
+                && ArcadeProgressCatalog.achievements("monster-maze").stream()
+                .anyMatch(achievement -> achievement.id().equals(achievementId))) {
+            awardCatalogAchievement(playerId, "monster-maze", achievementId);
+        }
     }
 
     /**
@@ -14138,6 +14459,9 @@ public final class ArcadePortManager implements Listener {
         double amount = ArcadePortRules.dragonSurvivalGems(Math.max(0L, outAt - session.startedAt));
         if (amount <= 0.0D) return;
         String path = localStatsPath(playerId, "dragons");
+        plugin.getConfig().set(path + "survival-millis",
+                plugin.getConfig().getLong(path + "survival-millis", 0L)
+                        + Math.max(0L, outAt - session.startedAt));
         plugin.getConfig().set(path + "survival-gems",
                 plugin.getConfig().getDouble(path + "survival-gems", 0.0D) + amount);
         plugin.saveConfig();
@@ -14293,7 +14617,7 @@ public final class ArcadePortManager implements Listener {
         int winningTeam = winnerId == null ? -1 : session.teams.getOrDefault(winnerId, -1);
         for (Map.Entry<UUID, Player> entry : session.players.entrySet()) {
             UUID id = entry.getKey();
-            if (testPlayers.isTestPlayer(id)) continue;
+            if (!ArcadeTestPlayerManager.shouldPersistProgression(id, testPlayers.isTestPlayer(id))) continue;
             String path = localStatsPath(id, session.type.id());
             if (session.type == ArcadePortGame.DRAGONS) {
                 double totalLocalGems = plugin.getConfig().getDouble(path + "test-gems", 0.0D)
@@ -14313,6 +14637,8 @@ public final class ArcadePortManager implements Listener {
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean paintballWinner = session.type == ArcadePortGame.PAINTBALL
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
+            boolean deathTagWinner = session.type == ArcadePortGame.DEATH_TAG && winnerId != null
+                    && session.tagged.contains(id) == session.tagged.contains(winnerId);
             boolean superSploorWinner = session.type == ArcadePortGame.SUPER_SPLOOR
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean milkCowWinner = session.type == ArcadePortGame.MILK_THE_COW
@@ -14320,7 +14646,7 @@ public final class ArcadePortManager implements Listener {
             boolean witherAssaultWinner = session.type == ArcadePortGame.WITHER_ASSAULT
                     && winningTeam >= 0 && session.teams.getOrDefault(id, -2) == winningTeam;
             boolean won = winnerId != null && (winnerId.equals(id) || turfWarsWinner || paintballWinner
-                    || superSploorWinner || milkCowWinner || witherAssaultWinner
+                    || deathTagWinner || superSploorWinner || milkCowWinner || witherAssaultWinner
                     || ((session.type == ArcadePortGame.BOMB_LOBBERS
                             || session.type == ArcadePortGame.MICRO_BATTLES)
                         && session.alive.contains(id)
@@ -14342,6 +14668,12 @@ public final class ArcadePortManager implements Listener {
             if (won) {
                 plugin.getConfig().set(path + "wins",
                         plugin.getConfig().getInt(path + "wins", 0) + 1);
+                if (session.type == ArcadePortGame.DEATH_TAG) {
+                    String roleWins = session.tagged.contains(id) ? "chaser-wins" : "runner-wins";
+                    plugin.getConfig().set(path + roleWins, plugin.getConfig().getInt(path + roleWins, 0) + 1);
+                    long statueSince = session.deathTagStatueSince.getOrDefault(id, Long.MAX_VALUE);
+                    if (System.currentTimeMillis() - statueSince >= 180_000L) awardCatalogAchievement(entry.getValue(), "death-tag", "statue");
+                }
                 if (session.type == ArcadePortGame.MILK_THE_COW) {
                     String roleWins = session.teams.getOrDefault(id, 0) == 1 ? "cow-wins" : "human-wins";
                     plugin.getConfig().set(path + roleWins,
@@ -14377,6 +14709,13 @@ public final class ArcadePortManager implements Listener {
                         + session.witherKillsByPlayer.getOrDefault(id, 0));
                 plugin.getConfig().set(path + "revives", plugin.getConfig().getInt(path + "revives", 0)
                         + session.witherRevivesByPlayer.getOrDefault(id, 0));
+            }
+            if (java.util.Set.of("bacon-brawl", "bomb-lobbers", "evolution", "gladiators", "micro-battles").contains(session.type.id())) {
+                plugin.getConfig().set(path + "kills", plugin.getConfig().getInt(path + "kills", 0) + score);
+            }
+            if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
+                long travelled = Math.max(0L, Math.round(session.dragonEscapeBlocksTravelled.getOrDefault(id, 0.0D)));
+                plugin.getConfig().set(path + "blocks-travelled", plugin.getConfig().getLong(path + "blocks-travelled", 0L) + travelled);
             }
             if (session.type == ArcadePortGame.RUNNER) {
                 int marathonDistance = (int) Math.round(session.runnerMarathonDistance.getOrDefault(id, 0.0D));
@@ -14443,7 +14782,7 @@ public final class ArcadePortManager implements Listener {
         plugin.saveConfig();
     }
 
-    private enum StatsPage { ROOT, ARCADE, CATEGORY, GAME, DRAGON_ESCAPE_MAPS, DRAGON_ESCAPE_COLOURS }
+    private enum StatsPage { ROOT, ARCADE, CATEGORY, GAME, MILESTONES, DRAGON_ESCAPE_MAPS, DRAGON_ESCAPE_COLOURS }
 
     private static final class SkyWarsCompassMenuHolder implements InventoryHolder {
         private final UUID ownerId;
@@ -14767,6 +15106,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void openStatsGame(Player viewer, UUID targetId, String targetName, String gameId) {
+        openStatsGame(viewer, targetId, targetName, gameId, false);
+    }
+
+    private void openStatsGame(Player viewer, UUID targetId, String targetName, String gameId, boolean milestones) {
         if (gameId == null) return;
         String displayName = statsGameName(gameId);
         String path = localStatsPath(targetId, gameId);
@@ -14774,8 +15117,13 @@ public final class ArcadePortManager implements Listener {
         int wins = plugin.getConfig().getInt(path + "wins", 0);
         int score = plugin.getConfig().getInt(path + "score", 0);
         int knockouts = plugin.getConfig().getInt(path + "knockouts", 0);
-        Inventory inventory = createStatsInventory(StatsPage.GAME, targetId, targetName, displayName, gameId);
-        if ("camera-shy".equals(gameId)) {
+        Inventory inventory = createStatsInventory(milestones ? StatsPage.MILESTONES : StatsPage.GAME,
+                targetId, targetName, milestones ? displayName + " Milestones" : displayName, gameId);
+        if (milestones) {
+            renderGameMilestones(inventory, targetId, gameId);
+        } else if (!ArcadeProgressCatalog.achievements(gameId).isEmpty()) {
+            renderGameAchievements(inventory, targetId, gameId);
+        } else if ("camera-shy".equals(gameId)) {
             int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16, 19, 20, 21,
                     23, 24, 25, 28, 29, 30, 31, 32, 33, 34};
             List<CameraShyProgressCatalog.Achievement> achievements = CameraShyProgressCatalog.achievements();
@@ -15125,9 +15473,88 @@ public final class ArcadePortManager implements Listener {
                 gameStatsLore(targetId, gameId, false)));
         inventory.setItem(4, statsItem(Material.RED_BED, ChatColor.GRAY + "↩ Go Back", List.of(),
                 "back-arcade", null, null));
+        if (milestones) {
+            inventory.setItem(45, statsItem(Material.BOOK, ChatColor.LIGHT_PURPLE + "Achievements",
+                    List.of(" ", ChatColor.GRAY + "Return to this game's achievements."),
+                    "open-game-achievements", null, gameId));
+        } else if (!ArcadeProgressCatalog.milestones(gameId).isEmpty()) {
+            inventory.setItem(45, statsItem(Material.NETHER_STAR, ChatColor.LIGHT_PURPLE + "Milestones",
+                    List.of(" ", ChatColor.GRAY + "Track long-term progress across " + displayName + "."),
+                    "open-game-milestones", null, gameId));
+        }
         inventory.setItem(49, statsItem(Material.BARRIER, ChatColor.RED + "Close", List.of(),
                 "close", null, null));
         viewer.openInventory(inventory);
+    }
+
+    private void renderGameAchievements(Inventory inventory, UUID targetId, String gameId) {
+        List<ArcadeProgressCatalog.Achievement> achievements = ArcadeProgressCatalog.achievements(gameId);
+        int slot = 10;
+        for (ArcadeProgressCatalog.Achievement achievement : achievements) {
+            String key = arcadeAchievementConfigKey(targetId, gameId, achievement.id());
+            boolean unlocked = plugin.getConfig().getBoolean(key, false);
+            List<String> lore = List.of(" ", ChatColor.GRAY + achievement.requirement(), " ",
+                    unlocked ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked",
+                    ChatColor.DARK_GRAY + "Progress is saved locally on this Testplex server.");
+            inventory.setItem(slot++, statsItem(unlocked ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                    (unlocked ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + achievement.name(),
+                    lore, "noop", null, null));
+        }
+    }
+
+    private void renderGameMilestones(Inventory inventory, UUID targetId, String gameId) {
+        List<ArcadeProgressCatalog.Milestone> milestones = ArcadeProgressCatalog.milestones(gameId);
+        int slot = 20 - milestones.size() / 2;
+        for (ArcadeProgressCatalog.Milestone milestone : milestones) {
+            long value = milestone.value(plugin.getConfig(), targetId, gameId);
+            long[] stages = milestone.stages();
+            int completed = 0;
+            for (long stage : stages) if (value >= stage) completed++;
+            long next = completed < stages.length ? stages[completed] : milestone.maximum();
+            List<String> lore = new ArrayList<>();
+            lore.add(" ");
+            lore.add(ChatColor.GRAY + "Progress: " + ChatColor.WHITE + formatMilestoneValue(value, milestone.unit())
+                    + ChatColor.GRAY + " / " + ChatColor.WHITE + formatMilestoneValue(milestone.maximum(), milestone.unit()));
+            lore.add(ChatColor.LIGHT_PURPLE + "Stages completed: " + completed + "/" + stages.length);
+            if (completed < stages.length) {
+                lore.add(ChatColor.YELLOW + "Next stage: " + ChatColor.WHITE + formatMilestoneValue(next, milestone.unit()));
+                lore.add(milestoneProgressBar(value, next));
+            } else {
+                lore.add(ChatColor.GREEN + "Milestone maxed out!");
+                lore.add(ChatColor.GREEN + "▰▰▰▰▰▰▰▰▰▰");
+            }
+            lore.add(" ");
+            lore.add(ChatColor.DARK_GRAY + "Stages: " + java.util.Arrays.stream(stages)
+                    .mapToObj(stage -> formatMilestoneValue(stage, milestone.unit()))
+                    .collect(java.util.stream.Collectors.joining(" → ")));
+            inventory.setItem(slot++, statsItem(completed == stages.length ? Material.NETHER_STAR : Material.AMETHYST_SHARD,
+                    (completed == stages.length ? ChatColor.GREEN : ChatColor.LIGHT_PURPLE) + milestone.name(),
+                    lore, "noop", null, null));
+        }
+    }
+
+    private String formatMilestoneValue(long value, String unit) {
+        if ("milliseconds".equals(unit)) {
+            long minutes = value / 60_000L;
+            return (minutes / 60L) + "h " + (minutes % 60L) + "m";
+        }
+        return String.format(java.util.Locale.ROOT, "%,d %s", value, unit);
+    }
+
+    private String milestoneProgressBar(long current, long target) {
+        int filled = target <= 0 ? 10 : (int) Math.min(10L, Math.max(0L, current * 10L / target));
+        return ChatColor.LIGHT_PURPLE + "▰".repeat(filled) + ChatColor.DARK_GRAY + "▱".repeat(10 - filled);
+    }
+
+    private String arcadeAchievementConfigKey(UUID playerId, String gameId, String achievementId) {
+        return switch (gameId) {
+            case "bacon-brawl" -> ArcadePortRules.baconBrawlAchievementConfigKey(playerId, achievementId);
+            case "bomb-lobbers" -> ArcadePortRules.bombLobbersAchievementConfigKey(playerId, achievementId);
+            case "micro-battles" -> ArcadePortRules.microBattlesAchievementConfigKey(playerId, achievementId);
+            case "gladiators" -> ArcadePortRules.gladiatorsAchievementConfigKey(playerId, achievementId);
+            case "evolution" -> "local-achievements." + playerId + ".evolution." + achievementId;
+            default -> "local-achievements." + playerId + "." + gameId + "." + achievementId;
+        };
     }
 
     private void openSuperSploorMilestones(Player viewer, UUID targetId, String targetName) {
@@ -15562,11 +15989,11 @@ public final class ArcadePortManager implements Listener {
         Session session = active;
         Player player = event.getPlayer();
         UUID playerId = player.getUniqueId();
-        if (session == null || session.type != ArcadePortGame.RUNNER
-                || !session.players.containsKey(playerId)
+        if (session == null || !session.players.containsKey(playerId)
                 || !session.alive.contains(playerId)
                 || player.getWorld() != session.world) return;
-        session.runnerJumpCounts.merge(playerId, 1, Integer::sum);
+        if (session.type == ArcadePortGame.RUNNER) session.runnerJumpCounts.merge(playerId, 1, Integer::sum);
+        if (session.type == ArcadePortGame.BOMB_LOBBERS) session.bombJumpCounts.merge(playerId, 1, Integer::sum);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -15606,6 +16033,12 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.type == ArcadePortGame.DEATH_TAG && session.alive.contains(playerId)
+                && event.getTo().getWorld() == session.world) {
+            String currentArea = deathTagStatueArea(event.getTo());
+            String priorArea = session.deathTagStatueArea.put(playerId, currentArea);
+            if (priorArea == null || !priorArea.equals(currentArea)) session.deathTagStatueSince.put(playerId, System.currentTimeMillis());
+        }
         if (session.type == ArcadePortGame.EVOLUTION && session.evolving.contains(playerId)) {
             Location locked = session.evolutionLockedLocations.get(playerId);
             if (locked != null) {
@@ -15617,6 +16050,24 @@ public final class ArcadePortManager implements Listener {
             return;
         }
         if (!isInsideSession(session, event.getTo())) return;
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE && session.alive.contains(playerId)
+                && !(event instanceof PlayerTeleportEvent)
+                && event.getFrom().getWorld() == session.world && event.getTo().getWorld() == session.world) {
+            double segment = event.getFrom().distance(event.getTo());
+            if (Double.isFinite(segment) && segment <= 8.0D) {
+                session.dragonEscapeBlocksTravelled.merge(player.getUniqueId(), segment, Double::sum);
+            }
+        }
+        if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                && "digger".equals(session.dragonEscapeKits.getOrDefault(playerId, "jumper"))) {
+            Block feet = event.getTo().getBlock();
+            Block head = feet.getRelative(0, 1, 0);
+            UUID feetOwner = session.dragonEscapeTunnelOwners.get(feet);
+            UUID headOwner = session.dragonEscapeTunnelOwners.get(head);
+            if (playerId.equals(feetOwner) || playerId.equals(headOwner)) {
+                session.dragonEscapeDiggerRanThroughBrokenBlock.add(playerId);
+            }
+        }
         if (session.type == ArcadePortGame.MICRO_BATTLES && session.alive.contains(player.getUniqueId())) {
             int team = session.teams.getOrDefault(player.getUniqueId(), -1);
             if (team >= 0 && team < 4) {
@@ -16703,7 +17154,9 @@ public final class ArcadePortManager implements Listener {
             double damage = ArcadePortRules.dragonFallDamageAfterReduction(rawDamage);
             if (damage > 0.0D) {
                 if (dragonPlayer.getHealth() <= damage) eliminate(session, dragonPlayer, null, "fell");
-                else dragonPlayer.setHealth(dragonPlayer.getHealth() - damage);
+                else {
+                    dragonPlayer.setHealth(dragonPlayer.getHealth() - damage);
+                }
             }
             return;
         }
@@ -19576,6 +20029,8 @@ public final class ArcadePortManager implements Listener {
                 case "open-category" -> openStatsCategory(player, holder.targetId, holder.targetName,
                         category == null ? "global" : category);
                 case "open-game" -> openStatsGame(player, holder.targetId, holder.targetName, gameId);
+                case "open-game-achievements" -> openStatsGame(player, holder.targetId, holder.targetName, gameId, false);
+                case "open-game-milestones" -> openStatsGame(player, holder.targetId, holder.targetName, gameId, true);
                 case "open-super-sploor-milestones" ->
                         openSuperSploorMilestones(player, holder.targetId, holder.targetName);
                 case "back-super-sploor" ->
@@ -20300,7 +20755,7 @@ public final class ArcadePortManager implements Listener {
                 if (ArcadePortRules.bombLobbersTntIgnites(directHitPowerup)) target.setFireTicks(100);
                 if (directHitDamage > 0.0D) {
                     session.bombPlayersDamaged.add(target.getUniqueId());
-                    recordBombLobbersDamage(session, target, ownerId, now);
+                    recordBombLobbersDamage(session, target, ownerId, now, bombId);
                     if (!testPlayers.isTestPlayer(ownerId)) {
                         String directHitsPath = localStatsPath(ownerId, "bomb-lobbers") + "direct-hits";
                         plugin.getConfig().set(directHitsPath, plugin.getConfig().getInt(directHitsPath, 0) + 1);
@@ -20328,6 +20783,10 @@ public final class ArcadePortManager implements Listener {
             long age = Math.max(0L, now - createdAt);
             boolean touchingSolid = isBombTouchingAnyBlock(bomb);
             if (ArcadePortRules.shouldPrimeBombLobbersBomb(age, touchingSolid)) {
+                if (touchingSolid && age < ArcadePortRules.BOMB_LOBBERS_MAX_FLIGHT_MILLIS) {
+                    UUID impactOwner = session.bombOwners.get(bombId);
+                    if (impactOwner != null) session.bombImmediateImpactThrowers.add(impactOwner);
+                }
                 session.bombPrimed.add(bombId);
                 bomb.setFuseTicks(0);
                 continue;
@@ -20599,6 +21058,9 @@ public final class ArcadePortManager implements Listener {
         if (held == null || held.getType() != Material.TNT) return false;
         String powerupType = bombLobbersPowerupType(held);
         if (powerupType == null) powerupType = "normal";
+        if (session.bombMvpPressurePlayers.contains(ownerId) && "normal".equals(powerupType)) {
+            session.bombPowerupClutchEligible.remove(ownerId);
+        }
         session.bombLastThrowAt.put(ownerId, now);
         if (!testPlayers.isTestPlayer(ownerId)) {
             String throwsPath = localStatsPath(ownerId, "bomb-lobbers") + "thrown";
@@ -20620,6 +21082,16 @@ public final class ArcadePortManager implements Listener {
         session.bombOwners.put(bomb.getUniqueId(), ownerId);
         session.bombPowerTypes.put(bomb.getUniqueId(), powerupType);
         session.bombLastLocations.put(bomb.getUniqueId(), spawn.clone());
+        Set<UUID> closeTargets = new HashSet<>();
+        for (UUID candidateId : session.alive) {
+            if (candidateId.equals(ownerId)
+                    || !ArcadePortRules.areBombLobbersEnemies(session.teams.getOrDefault(ownerId, -1),
+                            session.teams.getOrDefault(candidateId, -2))) continue;
+            Player candidate = session.players.get(candidateId);
+            if (candidate != null && candidate.isOnline() && candidate.getWorld() == session.world
+                    && candidate.getLocation().distance(spawn) < 20.0D) closeTargets.add(candidateId);
+        }
+        session.bombCloseRangeTargets.put(bomb.getUniqueId(), closeTargets);
         session.bombCreatedAt.put(bomb.getUniqueId(), now);
         session.bombPrimed.remove(bomb.getUniqueId());
         return true;
@@ -21040,7 +21512,7 @@ public final class ArcadePortManager implements Listener {
                 }
                 if (blastDamage > 0.0D) {
                     session.bombPlayersDamaged.add(target.getUniqueId());
-                    recordBombLobbersDamage(session, target, ownerId, System.currentTimeMillis());
+                    recordBombLobbersDamage(session, target, ownerId, System.currentTimeMillis(), bombId);
                     if (target.getHealth() <= blastDamage) {
                         if (bombLobbersBlast && owner != null && owner.isOnline()
                                 && session.players.containsKey(ownerId) && !target.getUniqueId().equals(ownerId)) {
@@ -21524,7 +21996,21 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> evolutionPityUntil = new HashMap<>();
         final Map<UUID, Map<UUID, Long>> evolutionDamageContributors = new HashMap<>();
         final Map<UUID, Integer> evolutionKillsAtAttempt = new HashMap<>();
+        final Set<UUID> evolutionManualEvolved = new HashSet<>();
+        final Set<UUID> evolutionSameMobOnly = new HashSet<>();
+        final Set<UUID> evolutionChickenGolemKillers = new HashSet<>();
+        final Map<UUID, Integer> evolutionAssistCreditsSinceEvolution = new HashMap<>();
+        final Map<UUID, Integer> evolutionAssistOnlyEvolutions = new HashMap<>();
+        final Map<UUID, Integer> evolutionLastKillMob = new HashMap<>();
         final Set<UUID> evolutionOverkillEligible = new HashSet<>();
+        final Set<UUID> dragonEscapeStratsEligible = new HashSet<>();
+        final Set<UUID> dragonEscapeDiggerRanThroughBrokenBlock = new HashSet<>();
+        final Map<UUID, Integer> dragonEscapeDisruptorKills = new HashMap<>();
+        final Map<UUID, UUID> dragonEscapeMineLaunchedBy = new HashMap<>();
+        final Map<UUID, Long> dragonEscapeMineLaunchedAt = new HashMap<>();
+        final Set<UUID> dragonEscapeMineKillers = new HashSet<>();
+        final Set<UUID> dragonLeapUsed = new HashSet<>();
+        final Set<UUID> dragonNonLeapFallCancel = new HashSet<>();
         final Map<UUID, BlockDisplay> evolutionEggDisplays = new HashMap<>();
         final Map<UUID, String> evolutionEggVariants = new HashMap<>();
         final Map<UUID, Long> evolutionEggNextParticleAt = new HashMap<>();
@@ -21553,6 +22039,16 @@ public final class ArcadePortManager implements Listener {
         final List<UUID> gladiatorLoserQueue = new ArrayList<>();
         final Set<UUID> gladiatorUsedBow = new HashSet<>();
         final Set<UUID> gladiatorUsedRod = new HashSet<>();
+        final Map<UUID, Double> gladiatorRoundDamageTaken = new HashMap<>();
+        final Map<UUID, Double> gladiatorLethalMargin = new HashMap<>();
+        final Map<UUID, Integer> gladiatorArrowsUsed = new HashMap<>();
+        final Map<UUID, Integer> gladiatorPotionsUsed = new HashMap<>();
+        final Map<UUID, Integer> gladiatorBoutArrowsUsed = new HashMap<>();
+        final Map<UUID, Integer> gladiatorBoutPotionsUsed = new HashMap<>();
+        final Map<UUID, Integer> gladiatorInitialArrows = new HashMap<>();
+        final Map<UUID, Integer> gladiatorInitialPotions = new HashMap<>();
+        final Set<UUID> gladiatorLostRoundOneClose = new HashSet<>();
+        final Set<UUID> gladiatorLostRoundOneAfterTenDamage = new HashSet<>();
         final Map<UUID, String> gladiatorVotes = new HashMap<>();
         int gladiatorRound = -1;
         int gladiatorLoserRound = -1;
@@ -21635,6 +22131,11 @@ public final class ArcadePortManager implements Listener {
         final List<UUID> deathTagRunnerPlacementOrder = new ArrayList<>();
         boolean deathTagRewardsAwarded;
         final Map<UUID, Integer> deathTagDeathsByPlayer = new HashMap<>();
+        final Map<UUID, Integer> deathTagTraitorAssists = new HashMap<>();
+        final Map<UUID, UUID> deathTagLastTraitorHit = new HashMap<>();
+        final Map<UUID, Long> deathTagLastTraitorHitAt = new HashMap<>();
+        final Map<UUID, String> deathTagStatueArea = new HashMap<>();
+        final Map<UUID, Long> deathTagStatueSince = new HashMap<>();
         final Map<UUID, Long> deathTagLastArrowAt = new HashMap<>();
         final Map<UUID, Long> deathTagSoloChaserHitReadyAt = new HashMap<>();
         final Set<UUID> deathTagFletchedArrows = new HashSet<>();
@@ -21654,6 +22155,12 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Long> baconLastSwingAt = new HashMap<>();
         final Map<UUID, Long> baconHitFeedbackUntil = new HashMap<>();
         final Map<UUID, String> baconLastHitSource = new HashMap<>();
+        final Map<UUID, Boolean> baconLastHitBackstab = new HashMap<>();
+        final Map<UUID, Boolean> baconLastHitCloaked = new HashMap<>();
+        final Map<UUID, Integer> baconBlastKills = new HashMap<>();
+        final Set<UUID> baconGoatStyEligible = new HashSet<>();
+        final Set<UUID> baconStarvationDamaged = new HashSet<>();
+        final Set<UUID> baconSlamRecoveryAttempts = new HashSet<>();
         final Map<UUID, UUID> baconBabyPigs = new HashMap<>();
         final Map<UUID, Item> baconBlastItems = new HashMap<>();
         final Set<UUID> baconHandledProjectiles = new HashSet<>();
@@ -21717,6 +22224,11 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> bombPitchLevels = new HashMap<>();
         final Set<UUID> bombDoubleJumpAvailable = new HashSet<>();
         final Set<UUID> bombDoubleJumpUsed = new HashSet<>();
+        final Map<UUID, Integer> bombJumpCounts = new HashMap<>();
+        final Set<UUID> bombImmediateImpactThrowers = new HashSet<>();
+        final Set<UUID> bombPowerupClutchEligible = new HashSet<>();
+        final Map<UUID, Set<UUID>> bombCloseRangeTargets = new HashMap<>();
+        final Map<UUID, Set<UUID>> bombCloseRangeOwnersByVictim = new HashMap<>();
         final Set<UUID> bombMvpPressurePlayers = new HashSet<>();
         final Set<UUID> bombPlayersDamaged = new HashSet<>();
         final Map<UUID, Map<UUID, Long>> bombDamageContributors = new HashMap<>();
@@ -21864,6 +22376,8 @@ public final class ArcadePortManager implements Listener {
         long dragonEscapeNextScoreUpdateAt;
         final Map<UUID, Integer> dragonEscapePlayerProgress = new HashMap<>();
         final Map<UUID, Double> dragonEscapePlayerRankScores = new HashMap<>();
+        final Map<UUID, Double> dragonEscapeBlocksTravelled = new HashMap<>();
+        final Set<UUID> dragonEscapeCompleted = new HashSet<>();
         Scoreboard dragonEscapeScoreboard;
         Objective dragonEscapeScoreboardObjective;
         final List<Team> dragonEscapeScoreboardTeams = new ArrayList<>();
