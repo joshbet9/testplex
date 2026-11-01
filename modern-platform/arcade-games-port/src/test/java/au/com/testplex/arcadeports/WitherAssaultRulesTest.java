@@ -33,4 +33,17 @@ final class WitherAssaultRulesTest {
         assertFalse(WitherAssaultRules.canEditorModifyBlock(76, 76.0D, true));
         assertFalse(WitherAssaultRules.canEditorModifyBlock(76, Double.NaN, false));
     }
+
+    @Test
+    void archerAndEditorShareFletcherAndSmokeArrowButMedicDoesNot() {
+        assertTrue(WitherAssaultRules.hasFletcher("archer"));
+        assertTrue(WitherAssaultRules.hasFletcher("editor"));
+        assertFalse(WitherAssaultRules.hasFletcher("medic"));
+        assertTrue(WitherAssaultRules.shouldTrackSmokeArrow(0, "archer", true, true));
+        assertTrue(WitherAssaultRules.shouldTrackSmokeArrow(0, "editor", true, true));
+        assertFalse(WitherAssaultRules.shouldTrackSmokeArrow(0, "medic", true, true));
+        assertFalse(WitherAssaultRules.shouldTrackSmokeArrow(1, "archer", true, true));
+        assertFalse(WitherAssaultRules.shouldTrackSmokeArrow(0, "editor", false, true));
+        assertFalse(WitherAssaultRules.shouldTrackSmokeArrow(0, "archer", true, false));
+    }
 }
