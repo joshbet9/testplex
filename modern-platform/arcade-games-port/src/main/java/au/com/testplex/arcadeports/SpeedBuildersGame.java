@@ -13,6 +13,9 @@ import org.bukkit.block.Sign;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Mob;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.block.data.Bisected;
+import org.bukkit.block.data.type.Bed;
 import org.bukkit.WorldCreator;
 import org.bukkit.WorldType;
 
@@ -87,6 +90,8 @@ public final class SpeedBuildersGame implements Listener {
     private long phaseDeadlineTick;
     private int round;
     private int buildTimeTracker = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
+    private long buildPhaseStartedTick;
+    private boolean firstPerfectBuildAwarded;
     private int buildSeconds = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
     private Template currentTemplate;
     private String stopReason = "";
@@ -418,7 +423,8 @@ public final class SpeedBuildersGame implements Listener {
         }
         for (int x = -5; x <= 5; x++) {
             for (int z = -5; z <= 5; z++) {
-                arena.getBlockAt(x, REVIEW_Y - 2, z).setType(Material.POLISHED_ANDESITE, false);
+                arena.getBlockAt(x, FLOOR_Y, z).setType(
+                    Math.abs(x) == 5 || Math.abs(z) == 5 ? Material.POLISHED_BLACKSTONE : Material.POLISHED_ANDESITE, false);
             }
         }
         arena.getWorldBorder().setCenter(0.0D, 0.0D);
@@ -436,6 +442,8 @@ public final class SpeedBuildersGame implements Listener {
             Collections.shuffle(unusedTemplates);
         }
         currentTemplate = unusedTemplates.removeFirst();
+        removeMobs(reviewMobs);
+        clearPlotBuildVolume(new Plot(0, 0));
         round++;
         if (round > 1) buildTimeTracker = Math.max(1, buildTimeTracker - 1);
         buildSeconds = currentTemplate.timing().buildSeconds(buildTimeTracker);
@@ -468,6 +476,7 @@ public final class SpeedBuildersGame implements Listener {
             return;
         }
         phase = Phase.BUILDING;
+        buildPhaseStartedTick = tick;
         phaseDeadlineTick = tick + buildSeconds * 20L;
         for (PlayerState state : alivePlayers()) {
             clearPlotBuildVolume(state.plot);
@@ -601,6 +610,13 @@ public final class SpeedBuildersGame implements Listener {
             Bukkit.broadcastMessage(ChatColor.YELLOW + "Speed Builders ended. " + stopReason);
         }
         persistMatchProgress(winner);
+        for (PlayerState state : players.values()) {
+            if (round > 0 && state.perfectBuilds == round) {
+                SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(),
+                        "perfectionist-wins", 1L);
+            }
+        }
+        if (!players.isEmpty()) plugin.saveConfig();
         for (PlayerState state : new ArrayList<>(players.values())) {
             Player player = state.player;
             clearPlotBuildVolume(state.plot);
@@ -634,7 +650,8 @@ public final class SpeedBuildersGame implements Listener {
     private void persistPlayerProgress(PlayerState state) {
         UUID playerId = state.player.getUniqueId();
         SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-placed", state.blocksPlaced);
-        SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "perfect-builds", state.perfectBuilds);
+        SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-broken", state.blocksBroken);
+        SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "mobs-built", state.mobsBuilt);
         plugin.saveConfig();
     }
 
@@ -909,9 +926,18 @@ public final class SpeedBuildersGame implements Listener {
         entity.setCollidable(true);
         if (entity instanceof Mob mob) mob.setAI(false);
         state.mobs.add(entity);
-        ItemStack held = event.getItem();
-        if (held.getAmount() <= 1) event.getPlayer().getInventory().setItemInMainHand(null);
-        else held.setAmount(held.getAmount() - 1);
+        ItemStack held = event.getHand() == EquipmentSlot.OFF_HAND
+                ? event.getPlayer().getInventory().getItemInOffHand()
+                : event.getPlayer().getInventory().getItemInMainHand();
+        if (held != null) {
+            if (held.getAmount() <= 1) {
+                if (event.getHand() == EquipmentSlot.OFF_HAND) event.getPlayer().getInventory().setItemInOffHand(null);
+                else event.getPlayer().getInventory().setItemInMainHand(null);
+            } else held.setAmount(held.getAmount() - 1);
+        }
+        state.mobsBuilt++;
+        SpeedBuildersProgressStore.increment(plugin.getConfig(), event.getPlayer().getUniqueId(), "mobs-built", 1L);
+        plugin.saveConfig();
         Bukkit.getScheduler().runTask(plugin, () -> checkPerfectBuild(state));
     }
 
@@ -951,7 +977,39 @@ public final class SpeedBuildersGame implements Listener {
         if (phase != Phase.BUILDING || state.eliminated || state.perfect
                 || !isInBuildVolume(state, event.getBlock())) {
             event.setCancelled(true);
+            return;
         }
+
+        // Reborn runs InstaBreak=true: remove the clicked block immediately and refund its item.
+        event.setCancelled(true);
+        Block block = event.getBlock();
+        Material material = block.getType();
+        ItemStack tool = event.getPlayer().getInventory().getItemInMainHand();
+        if (tool == null) tool = new ItemStack(Material.AIR);
+        if (material == Material.AIR) return;
+
+        List<ItemStack> drops = new ArrayList<>(block.getDrops(tool));
+        boolean upperHalf = false;
+        Block otherHalf = null;
+        if (block.getBlockData() instanceof Bisected bisected) {
+            upperHalf = bisected.getHalf() == Bisected.Half.TOP;
+            otherHalf = block.getRelative(upperHalf ? org.bukkit.block.BlockFace.DOWN : org.bukkit.block.BlockFace.UP);
+        } else if (block.getBlockData() instanceof Bed bed) {
+            otherHalf = block.getRelative(bed.getPart() == Bed.Part.HEAD
+                    ? bed.getFacing().getOppositeFace() : bed.getFacing());
+        }
+        if (upperHalf) drops.clear();
+        for (ItemStack drop : drops) {
+            if (drop != null && drop.getType() != Material.AIR && drop.getAmount() > 0) {
+                event.getPlayer().getInventory().addItem(drop);
+            }
+        }
+        block.setType(Material.AIR, false);
+        if (otherHalf != null && otherHalf.getType() == material) otherHalf.setType(Material.AIR, false);
+        state.blocksBroken++;
+        SpeedBuildersProgressStore.increment(plugin.getConfig(), event.getPlayer().getUniqueId(), "blocks-broken", 1L);
+        plugin.saveConfig();
+        Bukkit.getScheduler().runTask(plugin, () -> checkPerfectBuild(state));
     }
 
     private void checkPerfectBuild(PlayerState state) {
@@ -960,6 +1018,16 @@ public final class SpeedBuildersGame implements Listener {
         if (score == currentTemplate.expectedScore()) {
             state.perfect = true;
             state.perfectBuilds++;
+            long elapsedMillis = Math.max(0L, tick - buildPhaseStartedTick) * 50L;
+            SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "perfect-builds", 1L);
+            if (!firstPerfectBuildAwarded) {
+                firstPerfectBuildAwarded = true;
+                SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "perfect-first", 1L);
+            }
+            if (elapsedMillis < 10_000L) {
+                SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "speediest-builderizer", 1L);
+            }
+            plugin.saveConfig();
             state.player.getInventory().clear();
             state.player.sendTitle(ChatColor.GREEN + "PERFECT BUILD!",
                     ChatColor.YELLOW + "You've recreated every block.",
@@ -1364,6 +1432,8 @@ public final class SpeedBuildersGame implements Listener {
         private int score;
         private int perfectBuilds;
         private int blocksPlaced;
+        private int blocksBroken;
+        private int mobsBuilt;
         private final List<Entity> mobs = new ArrayList<>();
 
         private PlayerState(Player player, Plot plot, ArcadeMechanicsModernPlugin plugin) {
