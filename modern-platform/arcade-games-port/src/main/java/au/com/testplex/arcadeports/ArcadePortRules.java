@@ -2938,6 +2938,26 @@ public final class ArcadePortRules {
     public static final double HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE = 2.0D;
     public static final double HEROES_OF_GWEN_ANATH_METEOR_FIREBALL_DAMAGE = 20.0D;
 
+    public static final double HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE = 5.0D;
+    public static final double HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL = 0.25D;
+
+    /** Mirrors MobaUtil.scaleDamageWithBow(item, 0) in the archived Java source. */
+    public static double heroesOfGwenRowenaBowDamage(int powerLevel) {
+        return HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE
+                * (1.0D + Math.max(0, powerLevel) * HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL);
+    }
+
+    /** Light Arrows use scaled bow damage minus one point. */
+    public static double heroesOfGwenRowenaLightArrowDamage(int powerLevel) {
+        return heroesOfGwenRowenaBowDamage(powerLevel) - 1.0D;
+    }
+
+    /** Bombardment multiplies the same scaled bow damage by two. */
+    public static double heroesOfGwenRowenaBombardmentDamage(int powerLevel) {
+        return heroesOfGwenRowenaBowDamage(powerLevel)
+                * HEROES_OF_GWEN_ROWENA_BOMBARDMENT_DAMAGE_FACTOR;
+    }
+
     public static boolean heroesOfGwenAnathMeteorContainsDistance(double distance) {
         return Double.isFinite(distance) && distance >= 0.0D
                 && distance <= HEROES_OF_GWEN_ANATH_METEOR_RADIUS;
