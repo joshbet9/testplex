@@ -40,7 +40,7 @@ public final class ArcadeMapSelectionMenu implements Listener {
             player.sendMessage(ChatColor.RED + "Operator permission required to change the selected map.");
             return;
         }
-        if (game == ArcadePortGame.MONSTER_MAZE) {
+        if (game != null && game.isMonsterMaze()) {
             openMonsterMazeMapSelection(player, 0);
             return;
         }
@@ -188,12 +188,12 @@ public final class ArcadeMapSelectionMenu implements Listener {
             player.performCommand("setgame");
         } else if ("previous-page".equals(action) || "next-page".equals(action)) {
             Integer page = meta.getPersistentDataContainer().get(pageKey, PersistentDataType.INTEGER);
-            if (game == ArcadePortGame.MONSTER_MAZE && page != null) {
+            if (game != null && game.isMonsterMaze() && page != null) {
                 openMonsterMazeMapSelection(player, page);
             } else if (game != null && page != null) {
                 openMapSelection(player, game, page);
             }
-        } else if ("select-map".equals(action) && game == ArcadePortGame.MONSTER_MAZE && resource != null
+        } else if ("select-map".equals(action) && game != null && game.isMonsterMaze() && resource != null
                 && arcade.getMonsterMazeModule() != null) {
             me.monstermaze.MonsterMazePlugin module = arcade.getMonsterMazeModule();
             if (!module.getMapManager().setActiveMap(resource)) {
@@ -207,9 +207,9 @@ public final class ArcadeMapSelectionMenu implements Listener {
             }
             module.getGameManager().setCenter(center);
             module.getGameManager().getMonsterManager().setMobType(module.getMapManager().activeMob());
-            player.performCommand("arcadeport lobby monster-maze");
+            player.performCommand("arcadeport lobby " + game.id());
             player.sendMessage(ChatColor.GREEN + "Selected Monster Maze map "
-                    + resource.replace('-', ' ') + " for Testplex Arcade.");
+                    + resource.replace('-', ' ') + " for " + game.displayName() + ".");
             player.performCommand("setgame");
         } else if ("select-map".equals(action) && game != null && resource != null
                 && SourceMapCatalog.mapsFor(plugin, game).stream()
