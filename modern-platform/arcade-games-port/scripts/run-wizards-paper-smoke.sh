@@ -118,7 +118,9 @@ trap cleanup EXIT
 echo "[wizards-smoke] Starting disposable Paper 26.3 build $paper_build."
 (
   cd "$SERVER_ROOT"
-  exec java -Xms1G -Xmx4G -jar "$paper_jar" --nogui < "$console_fifo"
+  # Three real protocol clients exercise the same shared Arcade lifecycle here;
+  # production still defaults to the 16-player FakePlayerPlugin roster.
+  exec java -Dtestplex.arcade.acceptance-target-roster-size=3 -Xms1G -Xmx4G -jar "$paper_jar" --nogui < "$console_fifo"
 ) > "$server_log" 2>&1 &
 SERVER_PID=$!
 
