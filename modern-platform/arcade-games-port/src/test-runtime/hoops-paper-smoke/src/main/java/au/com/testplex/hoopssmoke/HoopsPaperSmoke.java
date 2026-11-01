@@ -138,13 +138,33 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         getLogger().info("HOOPS_SMOKE|QUEUED|players=4|format=2v2");
     }
 
-    private void queueAndStart() {
+    private void queueAndStart() throws Exception {
         for (Player player : players) {
             require(Bukkit.dispatchCommand(player, "arcadeport join hoops-remastered"),
                     player.getName() + " could not join Hoops queue");
         }
-        require(Bukkit.dispatchCommand(owner, "arcadeport start hoops-remastered"),
-                "owner could not force-start Hoops");
+
+        // The public /start path pads normal acceptance matches to 16 players
+        // through FakePlayerPlugin. This disposable smoke fixture needs exactly
+        // four real clients, so use the manager's already-validated internal
+        // start after proving startup fake-player cleanup completed. Queue
+        // membership, snapshots, team assignment, game lifecycle and finish
+        // still run through ArcadePortManager.
+        Object testPlayers = field(manager, "testPlayers");
+        require(testPlayers != null, "shared Arcade test-player manager is unavailable");
+        require(Boolean.TRUE.equals(invoke(testPlayers, "isStartupCleanupComplete", new Class<?>[0])),
+                "fake-player startup cleanup has not completed");
+        require(Boolean.TRUE.equals(invoke(testPlayers, "isStartupCleanupSuccessful", new Class<?>[0])),
+                "fake-player startup cleanup was not verified");
+
+        Class<?> gameType = Class.forName("au.com.testplex.arcadeports.ArcadePortGame");
+        Class<?> senderType = Class.forName("org.bukkit.command.CommandSender");
+        Object hoopsGame = java.util.Arrays.stream(gameType.getEnumConstants())
+                .filter(value -> "HOOPS_REMASTERED".equals(String.valueOf(value)))
+                .findFirst().orElseThrow(() -> new IllegalStateException("Hoops Remastered is missing from ArcadePortGame"));
+        invoke(manager, "startQueuedInternal",
+                new Class<?>[] {gameType, Player.class, senderType, boolean.class},
+                hoopsGame, owner, owner, false);
     }
 
     private void waitForMatch() throws Exception {
