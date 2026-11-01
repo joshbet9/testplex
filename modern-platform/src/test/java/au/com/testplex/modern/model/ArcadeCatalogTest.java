@@ -52,15 +52,20 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void dragonsExposeServerVisibleFlareEffectChoices() {
+    void dragonsUsePyroAndSparklerCosmeticsWithoutDragonFlares() {
         GameDefinition dragons = new ArcadeCatalog().getGame("dragons");
-        CosmeticLineDefinition flares = dragons.getCosmeticLines().stream()
-                .filter(line -> line.getId().equals("flare-effects"))
+        assertNotNull(dragons);
+        assertTrue(dragons.getCosmeticLines().stream()
+                .anyMatch(line -> line.getId().equals("pyro-signature")));
+        CosmeticLineDefinition sparklers = dragons.getCosmeticLines().stream()
+                .filter(line -> line.getId().equals("sparkler-effects"))
                 .findFirst().orElseThrow();
-        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, flares.getSelectionMode());
-        assertEquals("classic", flares.getDefaultOptionId());
-        assertEquals(Set.of("classic", "ember", "frost", "ender", "solar", "aurora"),
-                new HashSet<>(flares.getOptions().stream().map(CosmeticOption::getId).toList()));
+        assertEquals(CosmeticLineDefinition.SelectionMode.SINGLE, sparklers.getSelectionMode());
+        assertEquals("golden-thread", sparklers.getDefaultOptionId());
+        assertEquals(Set.of("golden-thread", "cinder-drift", "glacier-dust", "void-motes", "starlight", "prismatic"),
+                new HashSet<>(sparklers.getOptions().stream().map(CosmeticOption::getId).toList()));
+        assertFalse(dragons.getCosmeticLines().stream()
+                .anyMatch(line -> line.getId().equals("flare-effects")));
     }
 
     @Test
@@ -159,7 +164,7 @@ class ArcadeCatalogTest {
     void cameraShyIsCataloguedForControlledSpyglassEliminationTesting() {
         GameDefinition game = new ArcadeCatalog().getGame("camera-shy");
         assertNotNull(game);
-        assertEquals("Camera Shy", game.getName());
+        assertEquals("Snap", game.getName());
         assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
         assertTrue(game.isReadyForTest());
         assertTrue(game.getDescription().contains("five exposures"));
