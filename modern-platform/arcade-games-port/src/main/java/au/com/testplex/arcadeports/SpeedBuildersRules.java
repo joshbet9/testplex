@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /** Deterministic source-parity rules for the Paper 26.3 Speed Builders port. */
 public final class SpeedBuildersRules {
