@@ -10,6 +10,15 @@ Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battl
 
 `READY_FOR_TEST` means available for the isolated shared test session. It does not mean the game has passed live multiplayer or map-by-map acceptance. See the game-specific acceptance plans for the required checks. Evolution, Castle Assault, Heroes of Gwen, Milk the Cow, Wither Assault, SkyWars Mixed and Sneaky Assassins remain gated.
 
+### Next readiness batch (PR #88)
+
+- **Milk the Cow**: the original BobsFarm archive is checked at package time for the WHITE/PINK/PURPLE animal spawn groups used by the runtime. The full multi-player play/score/role/achievement checklist is in `MILK-THE-COW-ACCEPTANCE-PLAN.md`.
+- **Castle Assault**: all 11 original maps are checked for King, crystal and objective-TNT markers. The live map-by-map objective and five-kit checklist is in `CASTLE-ASSAULT-ACCEPTANCE-PLAN.md`.
+- **Wither Assault**: Human Archer, Medic and Editor are now selectable and persisted; the round applies their loadouts, connects Wither Skull/minion/scent controls and revival potions, and tracks/restores Editor blocks. Source-map parity is unavailable and Archer Smoke Arrow / remaining passives and live acceptance are still outstanding. See `WITHER-ASSAULT-ACCEPTANCE-PLAN.md`.
+- **Sneaky Assassins**: removed a test-runtime bug that randomly deleted one of the 200 town NPCs every four seconds; only missing/invalid or killed NPCs now leave the roster. Its generated town and authored NPC movement remain stand-ins because the source archive and patrol paths are absent. See `SNEAKY-ASSASSINS-ACCEPTANCE-PLAN.md`.
+
+None of these four is promoted by PR #88. The allow-list remains exactly 20 until CI, packaged-map checks and the relevant in-game acceptance sessions are completed.
+
 ## SkyWars — fast Mixed Arcade FFA
 
 SkyWars is registered as the isolated `skywars-mixed` variant for Paper 26.3. It uses the archived 1.8 SkyWars maps and authored player-island spawns, and accepts up to 16 players without modifying the legacy Solo SkyWars or Team SkyWars classes.
