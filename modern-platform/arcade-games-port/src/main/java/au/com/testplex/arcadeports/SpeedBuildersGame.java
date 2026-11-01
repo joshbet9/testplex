@@ -3,14 +3,17 @@ package au.com.testplex.arcadeports;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.Color;
 import org.bukkit.GameMode;
 import org.bukkit.GameRule;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Particle;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.block.Sign;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.ElderGuardian;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Mob;
 import org.bukkit.entity.LivingEntity;
@@ -73,7 +76,7 @@ import java.util.UUID;
 /**
  * Source-mapped Speed Builders mechanics hosted by ArcadeMechanicsModern.
  *
- * Templates, the 16 player plots, central judging plot, spawn points and
+ * Templates, the eight active builder plots, central judging plot, spawn points and
  * per-template ground layers are read from the archived Reborn Shroomland Lake
  * map. The module remains an isolated WIP test entry, not a rotation-enabled game.
  */
@@ -100,6 +103,11 @@ public final class SpeedBuildersGame implements Listener {
     private List<Plot> playerPlots = List.of();
     private List<Location> playerSpawns = List.of();
     private Plot reviewPlot;
+    private ElderGuardian gwen;
+    private PlayerState eliminationTarget;
+    private Location gwenLookTarget;
+    private long gwenLookUntilTick;
+    private UUID lastGwenLookTarget;
     private final Map<Plot, Location> plotSpawns = new LinkedHashMap<>();
     private Phase phase = Phase.IDLE;
     private long tick;
@@ -335,11 +343,15 @@ public final class SpeedBuildersGame implements Listener {
                 case VIEWING -> beginBuildingPhase();
                 case BUILDING -> finishBuildingPhase();
                 case REVIEWING -> finishReviewPhase();
-                case ELIMINATING -> eliminateNextPlayer();
+                case ELIMINATING -> {
+                    if (eliminationTarget == null) eliminateNextPlayer();
+                    else completeElimination();
+                }
                 case INTERMISSION -> beginRound();
                 default -> { }
             }
         }
+        tickGwen();
         if (tick % 20L == 0L) refreshHud();
     }
 
@@ -349,6 +361,7 @@ public final class SpeedBuildersGame implements Listener {
             loadSourceTemplates();
             arena = ensureArena();
             buildArenaFloor();
+            spawnGwen();
             players.clear();
             matchHistory.clear();
             round = 0;
@@ -385,6 +398,7 @@ public final class SpeedBuildersGame implements Listener {
             }
             players.clear();
             matchHistory.clear();
+            removeGwen();
             phase = Phase.IDLE;
             currentTemplate = null;
         }
@@ -419,7 +433,7 @@ public final class SpeedBuildersGame implements Listener {
         }
         List<Location> authoredPlots = mapData.dataLocations("YELLOW");
         if (mapData.dataLocations("RED").isEmpty() || authoredPlots.size() < SpeedBuildersRules.MAX_PLAYERS) {
-            throw new IllegalStateException("The original Speed Builders map is missing its RED centre or 16 YELLOW plots "
+            throw new IllegalStateException("The original Speed Builders map is missing its RED centre or eight YELLOW plots "
                     + "(found " + authoredPlots.size() + ").");
         }
 
@@ -553,7 +567,7 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private void buildArenaFloor() {
-        // The authentic map already contains all sixteen yellow build plots and the red judge display.
+        // The authentic map already contains all eight authored yellow build plots and the red judge display.
         // Preserve its architecture; only the per-round BuildData ground layer is replaced.
     }
 
@@ -686,7 +700,10 @@ public final class SpeedBuildersGame implements Listener {
         refreshHud();
     }
 
-    /** Reborn eliminates one lowest/empty build at a time, with a two-second gap. */
+    /**
+     * Begins the source-style judgement: Gwen fixes her gaze on one plot and holds
+     * the guardian beam for five seconds before the build is destroyed.
+     */
     private void eliminateNextPlayer() {
         if (phase != Phase.ELIMINATING) return;
         if (pendingEliminations.isEmpty()) {
@@ -700,21 +717,164 @@ public final class SpeedBuildersGame implements Listener {
             }
             return;
         }
-        PlayerState eliminated = pendingEliminations.removeFirst();
+
+        PlayerState next = pendingEliminations.getFirst();
+        eliminationTarget = next;
+        gwenLookTarget = plotBuildTarget(next.plot);
+        next.player.sendTitle(ChatColor.RED + "GWEN IS JUDGING",
+                ChatColor.YELLOW + "Her gaze has fixed on your build...", 0, 100, 10);
+        Bukkit.broadcastMessage(ChatColor.RED + next.player.getName()
+                + ChatColor.YELLOW + " has been judged by Gwen.");
+        phaseDeadlineTick = tick + SpeedBuildersRules.JUDGE_BEAM_HOLD_TICKS;
+        refreshHud();
+    }
+
+    /** Completes the five-second beam, explosion and Guardian transition. */
+    private void completeElimination() {
+        PlayerState eliminated = eliminationTarget;
+        if (eliminated == null) {
+            phaseDeadlineTick = tick + 1L;
+            return;
+        }
+        eliminationTarget = null;
+        pendingEliminations.remove(eliminated);
+        gwenLookTarget = null;
+
+        Location blast = plotBuildMidpoint(eliminated.plot);
+        arena.spawnParticle(Particle.EXPLOSION_EMITTER, blast, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+        arena.spawnParticle(Particle.CLOUD, blast, 24, 1.2D, 1.0D, 1.2D, 0.04D);
+        arena.playSound(blast, org.bukkit.Sound.ENTITY_GENERIC_EXPLODE, 1.0F, 0.9F);
+
         eliminated.eliminated = true;
         removeMobs(eliminated.mobs);
         restorePlot(eliminated.plot);
-        eliminated.player.sendTitle(ChatColor.RED + "ELIMINATED",
-                ChatColor.YELLOW + "You scored " + percent(eliminated.score) + "%", 0, 50, 10);
-        eliminated.player.sendMessage(ChatColor.RED + "You have been eliminated from Speed Builders.");
-        eliminated.player.setGameMode(GameMode.SPECTATOR);
-        eliminated.player.teleport(reviewViewLocation(0));
+        if (eliminated.player.isOnline()) {
+            eliminated.player.sendTitle(ChatColor.RED + "ELIMINATED",
+                    ChatColor.YELLOW + "You scored " + percent(eliminated.score) + "%", 0, 50, 10);
+            eliminated.player.sendMessage(ChatColor.RED + "You have been eliminated from Speed Builders.");
+            eliminated.player.setGameMode(GameMode.SPECTATOR);
+            eliminated.player.teleport(reviewViewLocation(0));
+        }
         Bukkit.broadcastMessage(ChatColor.RED + eliminated.player.getName()
                 + ChatColor.YELLOW + " was eliminated. " + alivePlayers().size() + " builder(s) remain.");
-        phaseDeadlineTick = tick + (pendingEliminations.isEmpty()
-                ? SpeedBuildersRules.INTERMISSION_SECONDS * 20L
-                : SpeedBuildersRules.ELIMINATION_INTERVAL_SECONDS * 20L);
+
+        List<PlayerState> remaining = alivePlayers();
+        if (remaining.size() <= 1) {
+            finishMatch(remaining.isEmpty() ? null : remaining.getFirst().player,
+                    "The last builder standing wins.");
+        } else if (pendingEliminations.isEmpty()) {
+            phase = Phase.INTERMISSION;
+            phaseDeadlineTick = tick + SpeedBuildersRules.INTERMISSION_SECONDS * 20L;
+        } else {
+            // Reborn waits two seconds after the previous build explodes before Gwen
+            // selects the next lowest/empty plot.
+            phaseDeadlineTick = tick + SpeedBuildersRules.ELIMINATION_INTERVAL_TICKS;
+        }
         refreshHud();
+    }
+
+    private void spawnGwen() {
+        removeGwen();
+        Location spawn = new Location(arena, reviewPlot.centerX() + 0.5D,
+                reviewPlot.baseY() + SpeedBuildersRules.BUILD_HEIGHT + 0.5D,
+                reviewPlot.centerZ() + 0.5D);
+        gwen = arena.spawn(spawn, ElderGuardian.class);
+        gwen.setAI(false);
+        gwen.setInvulnerable(true);
+        gwen.setSilent(true);
+        gwen.setGravity(false);
+        gwen.setPersistent(true);
+        gwen.setRemoveWhenFarAway(false);
+        gwen.setCustomName(ChatColor.AQUA + "Gwen the Guardian");
+        gwen.setCustomNameVisible(true);
+        gwen.setTarget(null);
+        gwenLookTarget = null;
+        gwenLookUntilTick = tick;
+        lastGwenLookTarget = null;
+    }
+
+    private void removeGwen() {
+        if (gwen != null && gwen.isValid()) {
+            gwen.setTarget(null);
+            gwen.remove();
+        }
+        gwen = null;
+        eliminationTarget = null;
+        gwenLookTarget = null;
+        gwenLookUntilTick = 0L;
+        lastGwenLookTarget = null;
+    }
+
+    /** Gwen looks from builder to builder, just as the original moving look-stand did. */
+    private void tickGwen() {
+        if (gwen == null || !gwen.isValid()) return;
+        if (phase == Phase.ELIMINATING && eliminationTarget != null) {
+            Location target = plotBuildTarget(eliminationTarget.plot);
+            faceGwen(target);
+            drawGwenBeam(target);
+            return;
+        }
+
+        if (gwenLookTarget == null || tick >= gwenLookUntilTick) {
+            List<PlayerState> candidates = alivePlayers();
+            if (candidates.isEmpty()) {
+                double angle = tick / 10.0D;
+                Location orbit = gwen.getLocation().clone().add(-Math.sin(angle) * 12.0D, 0.0D,
+                        Math.cos(angle) * 12.0D);
+                gwenLookTarget = orbit;
+            } else {
+                List<PlayerState> choices = candidates.stream()
+                        .filter(state -> candidates.size() == 1
+                                || !state.player.getUniqueId().equals(lastGwenLookTarget))
+                        .toList();
+                PlayerState selected = choices.get(
+                        java.util.concurrent.ThreadLocalRandom.current().nextInt(choices.size()));
+                Location midpoint = plotBuildMidpoint(selected.plot);
+                Vector direction = midpoint.toVector().subtract(gwen.getEyeLocation().toVector());
+                if (direction.lengthSquared() > 0.0001D) direction.normalize().multiply(5.0D);
+                gwenLookTarget = midpoint.subtract(direction);
+                lastGwenLookTarget = selected.player.getUniqueId();
+            }
+            gwenLookUntilTick = tick + java.util.concurrent.ThreadLocalRandom.current().nextLong(80L, 161L);
+        }
+        faceGwen(gwenLookTarget);
+    }
+
+    private void faceGwen(Location target) {
+        if (gwen == null || !gwen.isValid() || target == null || target.getWorld() != arena) return;
+        Location facing = gwen.getLocation().clone();
+        Vector direction = target.toVector().subtract(gwen.getEyeLocation().toVector());
+        if (direction.lengthSquared() < 0.0001D) return;
+        facing.setDirection(direction);
+        gwen.teleport(facing);
+    }
+
+    /** A cyan particle beam makes the guardian's locked-on judgement visible on modern clients. */
+    private void drawGwenBeam(Location target) {
+        if (gwen == null || !gwen.isValid() || target == null) return;
+        Location start = gwen.getEyeLocation();
+        Vector delta = target.toVector().subtract(start.toVector());
+        double distance = delta.length();
+        if (distance < 0.25D) return;
+        int points = Math.max(1, (int) Math.ceil(distance * 3.0D));
+        Vector step = delta.multiply(1.0D / points);
+        Particle.DustOptions dust = new Particle.DustOptions(Color.fromRGB(90, 225, 255), 1.25F);
+        Location point = start.clone();
+        for (int i = 0; i <= points; i++) {
+            arena.spawnParticle(Particle.DUST, point, 1, 0.0D, 0.0D, 0.0D, 0.0D, dust);
+            point.add(step);
+        }
+    }
+
+    private Location plotBuildTarget(Plot plot) {
+        return new Location(arena, plot.centerX() + 0.5D, plot.baseY() + 0.25D,
+                plot.centerZ() + 0.5D);
+    }
+
+    private Location plotBuildMidpoint(Plot plot) {
+        return new Location(arena, plot.centerX() + 0.5D,
+                plot.baseY() + SpeedBuildersRules.BUILD_HEIGHT / 2.0D,
+                plot.centerZ() + 0.5D);
     }
 
     private void finishMatch(Player winner, String reason) {
@@ -723,6 +883,7 @@ public final class SpeedBuildersGame implements Listener {
         removeMobs(reviewMobs);
         for (PlayerState state : players.values()) removeMobs(state.mobs);
         currentTemplate = null;
+        removeGwen();
         phaseDeadlineTick = 0L;
         queueDeadlineTick = -1L;
         queue.clear();
@@ -1409,6 +1570,11 @@ public final class SpeedBuildersGame implements Listener {
         PlayerState removed = players.remove(id);
         if (removed == null || phase == Phase.IDLE) return;
         pendingEliminations.remove(removed);
+        if (eliminationTarget == removed) {
+            eliminationTarget = null;
+            gwenLookTarget = null;
+            phaseDeadlineTick = tick + 1L;
+        }
         persistPlayerProgress(removed);
         removeMobs(removed.mobs);
         restorePlot(removed.plot);
