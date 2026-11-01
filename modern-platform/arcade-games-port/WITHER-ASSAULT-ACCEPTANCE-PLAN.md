@@ -1,6 +1,6 @@
 # Wither Assault readiness and acceptance plan
 
-Wither Assault remains outside the 22-game enabled queue, but is **READY_FOR_TEST** for isolated controlled mechanics sessions using a generated arena. The original Industrial West, Labyrinth and Sky Ruins archives are not present in the repository, so the generated layout is not authentic source-map parity. The source kit names are Human Archer, Human Medic and Human Editor.
+Wither Assault is included in the 25-game controlled **READY_FOR_TEST** queue for isolated mechanics sessions using a generated arena. The original Industrial West, Labyrinth and Sky Ruins archives are not present in the repository, so the generated layout is not authentic source-map parity. The source kit names are Human Archer, Human Medic and Human Editor.
 
 ## Implemented in this readiness pass
 
