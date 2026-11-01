@@ -60,7 +60,8 @@ public class PauseCommand implements CommandExecutor, Listener {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!hasPermission(sender)) {
-            sender.sendMessage(ChatColor.RED + "You cannot use /pause outside solo mode.");
+            sender.sendMessage(ChatColor.RED
+                    + "Only Testplex admins can pause shared rounds; standalone solo runs may be paused by their sole player.");
             return true;
         }
 
@@ -78,7 +79,8 @@ public class PauseCommand implements CommandExecutor, Listener {
     }
 
     private boolean hasPermission(CommandSender sender) {
-        if (sender.hasPermission(ADMIN_PERMISSION)) return true;
+        if (plugin.getHostPlugin().hasAdminAccess(sender)
+                || sender.hasPermission(ADMIN_PERMISSION)) return true;
         // In a standalone one-player run, the sole participant may pause their own game.
         // The embedded Testplex Arcade module never lets a player pause a shared round.
         if (!plugin.isSoloMode() || game.isTestplexManagedRound()
