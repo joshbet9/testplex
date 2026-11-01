@@ -139,6 +139,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final NamespacedKey biffHorseOwnerKey;
     private final Map<Integer, KingState> kings = new HashMap<>();
     private final Map<UUID, Integer> playerGold = new HashMap<>();
+    /** Tracked source-store equipment, partitioned by role and equipment category. */
+    private final Map<UUID, Map<String, Map<String, ItemStack>>> heroesOfGwenPurchasedEquipment = new HashMap<>();
     private final Map<UUID, ItemStack> carriedTntOldHelmet = new HashMap<>();
     private final Map<Integer, List<TowerState>> towers = new HashMap<>();
     private final Map<UUID, Integer> heroesOfGwenMinionTeams = new HashMap<>();
@@ -2716,6 +2718,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
         }
         reward.setItemMeta(rewardMeta);
+        String equipmentSlot = heroesOfGwenEquipmentSlot(reward);
+        if (equipmentSlot != null) {
+            rememberHeroesOfGwenPurchasedEquipment(player, entry.role, equipmentSlot, reward);
+        }
         String materialName = entry.material.name();
         if (materialName.endsWith("_HELMET") || materialName.endsWith("_CHESTPLATE")
                 || materialName.endsWith("_LEGGINGS") || materialName.endsWith("_BOOTS")) {
@@ -2739,6 +2745,48 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         else if (name.endsWith("_LEGGINGS")) player.getInventory().setLeggings(item);
         else if (name.endsWith("_BOOTS")) player.getInventory().setBoots(item);
         else player.getInventory().addItem(item);
+    }
+
+    private String heroesOfGwenEquipmentSlot(ItemStack item) {
+        if (item == null) return null;
+        String name = item.getType().name();
+        if (name.endsWith("_HELMET")) return "helmet";
+        if (name.endsWith("_CHESTPLATE")) return "chestplate";
+        if (name.endsWith("_LEGGINGS")) return "leggings";
+        if (name.endsWith("_BOOTS")) return "boots";
+        if (name.endsWith("_SWORD") || item.getType() == Material.BOW) return "weapon";
+        return null;
+    }
+
+    private void rememberHeroesOfGwenPurchasedEquipment(
+            Player player, String role, String slot, ItemStack item) {
+        if (player == null || role == null || slot == null || item == null) return;
+        heroesOfGwenPurchasedEquipment
+                .computeIfAbsent(player.getUniqueId(), ignored -> new HashMap<>())
+                .computeIfAbsent(role, ignored -> new HashMap<>())
+                .put(slot, item.clone());
+    }
+
+    private void restoreHeroesOfGwenPurchasedEquipment(Player player) {
+        if (player == null || !player.isOnline()) return;
+        String hero = selectedHeroesOfGwen.get(player.getUniqueId());
+        String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
+        if (role == null) return;
+        Map<String, Map<String, ItemStack>> byRole =
+                heroesOfGwenPurchasedEquipment.get(player.getUniqueId());
+        if (byRole == null) return;
+        Map<String, ItemStack> equipment = byRole.get(role);
+        if (equipment == null) return;
+        for (Map.Entry<String, ItemStack> entry : equipment.entrySet()) {
+            ItemStack item = entry.getValue() == null ? null : entry.getValue().clone();
+            if (item == null) continue;
+            switch (entry.getKey()) {
+                case "weapon" -> player.getInventory().setItem(0, item);
+                case "helmet", "chestplate", "leggings", "boots" -> equip(player, item);
+                default -> { }
+            }
+        }
+        player.updateInventory();
     }
 
     private void addGold(Player player, int amount, String reason) {
@@ -2883,8 +2931,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     void onPlayerRespawned(Player player) {
-        if (player != null && player.isOnline() && players.containsKey(player.getUniqueId())) {
-            activePlayers.add(player.getUniqueId());
+        if (player == null || !player.isOnline() || !players.containsKey(player.getUniqueId())) return;
+        activePlayers.add(player.getUniqueId());
+        if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            restoreHeroesOfGwenPurchasedEquipment(player);
         }
     }
 
@@ -3341,6 +3391,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         "Hero abilities for this hero are still being ported."));
             }
         }
+        restoreHeroesOfGwenPurchasedEquipment(player);
         player.updateInventory();
     }
 
@@ -5682,6 +5733,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         castleArcherNextArrowAt.clear();
         castleDemolitionistNextTntAt.clear();
         selectedHeroesOfGwen.clear();
+        heroesOfGwenPurchasedEquipment.clear();
         heroesOfGwenKills.clear();
         heroesOfGwenRoleKills.clear();
         heroesOfGwenCounterpartOnly.clear();
