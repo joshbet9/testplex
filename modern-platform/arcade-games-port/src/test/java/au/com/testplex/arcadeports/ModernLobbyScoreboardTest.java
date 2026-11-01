@@ -118,8 +118,8 @@ class ModernLobbyScoreboardTest {
         assertEquals("None", ModernLobbyScoreboard.formatKitName(""));
         assertEquals(ChatColor.YELLOW + "El Muchacho Pigo",
                 ModernLobbyScoreboard.formatKitDisplayName("bacon-brawl", "el-muchacho-pigo"));
-        assertEquals(ChatColor.WHITE + "Chris P Bacon",
+        assertEquals(ChatColor.LIGHT_PURPLE + "Chris P. Bacon",
                 ModernLobbyScoreboard.formatKitDisplayName("bacon-brawl", "chris-p-bacon"),
-                "A stale preference for a removed kit must not retain its achievement colour.");
+                "The restored achievement kit must show its purple unlock-tier colour.");
     }
 }
