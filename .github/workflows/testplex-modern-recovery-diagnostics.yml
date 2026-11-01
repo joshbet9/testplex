@@ -84,10 +84,31 @@ jobs:
           run_bounded 8 df -h / /var/tmp
           run_bounded 8 df -i / /var/tmp
 
+          # Capture runtime evidence before inspecting transaction archives or manifests.
+          # A busy or memory-starved VM must not lose the most useful Paper diagnostics
+          # because a later metadata read blocks on storage.
+          echo "=== Early modern service and process snapshot ==="
+          run_bounded 8 systemctl show testplex-modern.service --property=LoadState,ActiveState,SubState,Result,MainPID,InvocationID,ExecMainStatus,NRestarts
+          run_bounded 8 systemctl show testplex-reborn.service --property=ActiveState,SubState,MainPID,Result
+          run_bounded 8 ss -ltn
+          run_bounded 8 sh -c 'ps -eo pid,ppid,stat,%mem,%cpu,rss,etime,args --sort=-rss | head -n 24'
+          run_bounded 8 cat /proc/pressure/memory
+          run_bounded 8 cat /proc/pressure/io
+          run_bounded 8 cat /sys/fs/cgroup/memory.current
+          run_bounded 8 cat /sys/fs/cgroup/memory.max
+          echo "=== Early Paper log tail ==="
+          run_bounded 10 tail -n 180 "$SERVER_DIR/logs/latest.log"
+          echo "=== Early Arcade and Monster Maze startup markers ==="
+          run_bounded 10 sh -c "grep -i -E 'TESTPLEX_ARCADE_BOOTSTRAP|TESTPLEX_MONSTER_MAZE_BOOTSTRAP|TESTPLEX_ARCADE_MODULE_READY|Monster Maze|MonsterMaze|SEVERE|Exception|Caused by:|OutOfMemory|Could not|Failed' '$SERVER_DIR/logs/latest.log' | tail -n 180"
+          echo "=== Early modern service journal ==="
+          run_bounded 12 journalctl -u testplex-modern.service -n 160 --no-pager -o short-iso
+          echo "=== Early kernel OOM indicators ==="
+          run_bounded 10 sh -c "dmesg -T 2>/dev/null | grep -i -E 'out of memory|oom|killed process|java' | tail -n 40"
+
           echo "=== Modern transaction journal ==="
           BACKUP_DIR=""
           if [[ -f "$MANIFEST" ]]; then
-            sed -n '1,100p' "$MANIFEST"
+            run_bounded 8 sed -n '1,100p' "$MANIFEST"
             BACKUP_DIR="$(sed -n 's/^backup_dir=//p' "$MANIFEST" | head -n 1)"
           else
             echo "No current transaction manifest exists."
