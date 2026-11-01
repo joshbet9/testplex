@@ -19,6 +19,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     private ArcadeMapSelectionMenu mapMenu;
     private GamePreferenceMenu preferenceMenu;
     private CameraShyGame cameraShy;
+    private MineplexCoreRankBridge mineplexCoreRankBridge;
     private final MonsterMazeRegistrationReadiness monsterMazeReadiness = new MonsterMazeRegistrationReadiness();
 
     // Keep aligned with ArcadeCatalog's READY_FOR_TEST statuses.
@@ -29,6 +30,13 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     @Override
     public void onEnable() {
+        mineplexCoreRankBridge = MineplexCoreRankBridge.connect(this, this::refreshRankScoreboard)
+                .orElse(null);
+        if (mineplexCoreRankBridge != null) {
+            getLogger().info("Connected to Mineplex Hub/CoreClient: authoritative primary ranks and inherited ADMIN access are enabled.");
+        } else {
+            getLogger().info("Mineplex Hub/CoreClient is unavailable; isolated Testplex rank overrides remain active.");
+        }
         saveDefaultConfig();
 
         // Replace the previous broad acceptance list once, then enforce the reviewed
@@ -124,6 +132,19 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
     public ArcadePortManager getArcadePortManager() { return manager; }
     public PlexballGame getPlexballGame() { return plexball; }
+
+    /** Returns null when the optional Mineplex CoreClient service is not available or not loaded for this player. */
+    String mineplexRankId(Player player) {
+        return mineplexCoreRankBridge == null || player == null
+                ? null : mineplexCoreRankBridge.rankId(player).orElse(null);
+    }
+
+    private void refreshRankScoreboard(Player player) {
+        if (player != null && player.isOnline()
+                && ModernArcadeLobby.WORLD_NAME.equals(player.getWorld().getName())) {
+            new ModernLobbyScoreboard(this).apply(player);
+        }
+    }
 
     /**
      * Whether a cleared game has the required bundled map archive to enter the
@@ -253,6 +274,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     public boolean hasAdminAccess(CommandSender sender) {
         if (sender.isOp() || sender.hasPermission("testplex.arcadeports.admin")) return true;
         if (!(sender instanceof Player player)) return false;
+        if (mineplexCoreRankBridge != null
+                && mineplexCoreRankBridge.hasAdminAccess(player).orElse(false)) return true;
 
         // Keep the repository owner and sandbox operator aligned with the Game Panel.
         if (isConfiguredOwner(player)) {

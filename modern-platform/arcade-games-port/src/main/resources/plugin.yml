@@ -5,6 +5,7 @@ api-version: '26.3'
 author: Testplex
 description: Controlled Arcade game implementations for Paper 26.3
 softdepend:
+  - Hub
   - TestplexModernArcade
   - packetevents
   - FakePlayerPlugin

@@ -170,6 +170,10 @@ public final class ModernLobbyScoreboard {
     }
 
     static String rankId(JavaPlugin plugin, Player player) {
+        if (plugin instanceof ArcadeMechanicsModernPlugin arcade) {
+            String authoritative = arcade.mineplexRankId(player);
+            if (authoritative != null) return authoritative;
+        }
         String configured = plugin.getConfig().getString("lobby-scoreboard.ranks." + player.getUniqueId(), "");
         if (configured != null && !configured.isBlank()) {
             String value = configured.trim().toLowerCase(Locale.ROOT);
