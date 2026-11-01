@@ -77,6 +77,7 @@ function connect(username) {
 
     const acknowledgedTeleports = new Set();
     let pendingServerPosition = null;
+    let lastKnownPosition = null;
     let pendingPositionTimer = null;
     function acknowledgeServerPosition(packet, reason) {
       if (!packet || !Number.isFinite(Number(packet.teleportId))) return;
@@ -97,24 +98,37 @@ function connect(username) {
         const latestTeleportId = Number(latest.teleportId);
         if (acknowledgedTeleports.has(latestTeleportId)) return;
         try {
-          client.write('teleport_confirm', { teleportId: latestTeleportId });
-          client.write('position_look', {
-            x: Number(latest.x), y: Number(latest.y), z: Number(latest.z),
-            yaw: Number(latest.yaw || 0), pitch: Number(latest.pitch || 0),
-            // Protocol 777 (Minecraft 26.3) requires the structured MovementFlags value; preserve its bitmask and per-axis flags.
-            flags: latest.flags || {
-              _value: 0,
-              x: false, y: false, z: false,
-              yaw: false, pitch: false,
-              dx: false, dy: false, dz: false, yawDelta: false,
-            },
-            onGround: false,
-            hasHorizontalCollision: false,
+          // Protocol 777 changed the serverbound teleport acknowledgement:
+          // teleport_confirm now echoes the resolved position and rotation.
+          // Its position packet flags are relative-to-current, so resolve them
+          // before acknowledging and before sending the mandatory movement echo.
+          const relative = latest.flags || {};
+          const prior = lastKnownPosition || { x: 0, y: 0, z: 0, yaw: 0, pitch: 0 };
+          const resolved = {
+            x: Boolean(relative.x) ? prior.x + Number(latest.x) : Number(latest.x),
+            y: Boolean(relative.y) ? prior.y + Number(latest.y) : Number(latest.y),
+            z: Boolean(relative.z) ? prior.z + Number(latest.z) : Number(latest.z),
+            yaw: Boolean(relative.yaw) ? prior.yaw + Number(latest.yaw || 0) : Number(latest.yaw || 0),
+            pitch: Boolean(relative.pitch) ? prior.pitch + Number(latest.pitch || 0) : Number(latest.pitch || 0),
+          };
+          client.write('teleport_confirm', {
+            teleportId: latestTeleportId,
+            x: resolved.x, y: resolved.y, z: resolved.z,
+            yaw: resolved.yaw, pitch: resolved.pitch,
           });
+          client.write('position_look', {
+            x: resolved.x, y: resolved.y, z: resolved.z,
+            yaw: resolved.yaw, pitch: resolved.pitch,
+            // Serverbound MovementFlags is a separate 8-bit field, not the
+            // clientbound PositionUpdateRelatives bitset (x/y/z/yaw/pitch).
+            flags: { onGround: false, hasHorizontalCollision: false },
+          });
+          lastKnownPosition = resolved;
           acknowledgedTeleports.add(latestTeleportId);
           log('BOT_TELEPORT_ACK|PASS|' + username + '|id=' + latestTeleportId
-            + '|reason=' + pending.reason + '|pos=' + latest.x + ',' + latest.y + ',' + latest.z
-            + '|flags=' + JSON.stringify(latest.flags || {}));
+            + '|reason=' + pending.reason + '|pos=' + resolved.x + ',' + resolved.y + ',' + resolved.z
+            + '|rotation=' + resolved.yaw + ',' + resolved.pitch
+            + '|relativeFlags=' + JSON.stringify(relative));
           log('BOT_TICK_END|PASS|' + username + '|after-position');
           sendPlayerLoaded('teleport-' + latestTeleportId);
         } catch (error) {
