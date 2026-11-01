@@ -140,4 +140,33 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertTrue(SourceMapCatalog.resourcePathBelongsToGame(ArcadePortGame.HEROES_OF_GWEN,
                 "source-maps/Heroes of GWEN/HOG_Heros_Valley.zip"));
     }
+
+    @Test
+    void larissaAquaCannonUsesSourceDamageRangeAndWaterStoneReload() {
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE);
+        assertEquals(10.0D, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_RANGE, 0.00001D);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_INTERVAL_MILLIS);
+        assertEquals(3_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS);
+        assertEquals(64, ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_CAPACITY);
+    }
+
+    @Test
+    void larissaDancingFountainMatchesSourceAreaDurationHealingAndDamage() {
+        assertEquals(14_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_COOLDOWN_MILLIS);
+        assertEquals(6_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DURATION_MILLIS);
+        assertEquals(3.0D, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_RADIUS, 0.00001D);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_PULSE_INTERVAL_MILLIS);
+        assertEquals(4, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND);
+    }
+
+    @Test
+    void larissaWaterDashAndStormBlessingMatchSourceDurationsAndCooldowns() {
+        assertEquals(600L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_DASH_DURATION_MILLIS);
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_DASH_COOLDOWN_MILLIS);
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS);
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_COOLDOWN_MILLIS);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_INTERVAL_MILLIS);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_HEAL_PER_SECOND);
+    }
 }
