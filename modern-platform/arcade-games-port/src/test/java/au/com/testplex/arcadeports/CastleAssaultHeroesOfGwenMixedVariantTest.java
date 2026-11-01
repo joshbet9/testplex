@@ -466,6 +466,10 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertEquals(0, ArcadePortRules.heroesOfGwenStoreHitConditionAmplifier("Frostbound Sword"));
         assertEquals("", ArcadePortRules.heroesOfGwenStoreHitCondition("Swift Blade"));
         assertEquals(0L, ArcadePortRules.heroesOfGwenStoreHitConditionDurationMillis("Swift Blade"));
+        assertTrue(ArcadePortRules.heroesOfGwenStoreImmuneToSlowness("Stone Sword"));
+        assertTrue(ArcadePortRules.heroesOfGwenStoreImmuneToSlowness("Frostbound Sword"));
+        assertTrue(ArcadePortRules.heroesOfGwenStoreImmuneToSlowness("Swift Blade"));
+        assertFalse(ArcadePortRules.heroesOfGwenStoreImmuneToSlowness("Knight's Blade"));
     }
 
     @Test
