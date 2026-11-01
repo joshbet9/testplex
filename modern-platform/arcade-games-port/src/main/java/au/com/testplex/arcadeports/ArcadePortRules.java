@@ -2813,6 +2813,12 @@ public final class ArcadePortRules {
         return "Leather Cap of Holding".equals(itemName) ? 1 : 0;
     }
 
+    public static boolean heroesOfGwenStoreImmuneToSlowness(String itemName) {
+        return "Stone Sword".equals(itemName)
+                || "Frostbound Sword".equals(itemName)
+                || "Swift Blade".equals(itemName);
+    }
+
     public static String heroesOfGwenStoreHitCondition(String itemName) {
         if ("Bow of Pursuit".equals(itemName)) return "SPEED";
         if ("Frostbound Sword".equals(itemName)) return "SLOWNESS";
