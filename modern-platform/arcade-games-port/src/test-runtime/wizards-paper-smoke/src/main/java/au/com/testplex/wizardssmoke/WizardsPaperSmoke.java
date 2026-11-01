@@ -195,8 +195,9 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                     if (gameplayTicks >= 5 && paperDamageReady(rival)) {
                         runGenericDamageProbe();
                     } else if (gameplayTicks >= 100) {
-                        failAndShutdown("Paper client is not damage-ready after teleport/load handshake: "
-                                + nmsDamageState(rival));
+                        failAndShutdown("GAMEPLAY_FAIL", "lifecycle",
+                                new IllegalStateException("Paper client is not damage-ready after teleport/load handshake: "
+                                        + nmsDamageState(rival)));
                     }
                 }
                 case 5 -> { if (gameplayTicks >= 5) runAttributedDamageProbe(); }
