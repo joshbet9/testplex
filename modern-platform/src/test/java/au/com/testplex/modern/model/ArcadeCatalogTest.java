@@ -156,10 +156,10 @@ class ArcadeCatalogTest {
     }
 
     @Test
-    void cameraShyIsCataloguedForControlledSpyglassEliminationTesting() {
+    void snapIsCataloguedForControlledSpyglassEliminationTesting() {
         GameDefinition game = new ArcadeCatalog().getGame("camera-shy");
         assertNotNull(game);
-        assertEquals("Camera Shy", game.getName());
+        assertEquals("Snap", game.getName());
         assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
         assertTrue(game.isReadyForTest());
         assertTrue(game.getDescription().contains("five exposures"));
