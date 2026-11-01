@@ -95,6 +95,29 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void anathBurnBeamMatchesTheArchivedRangeHeightDamageAndCooldown() {
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS);
+        assertEquals(20.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE, 0.00001D);
+        assertEquals(10.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_HEIGHT, 0.00001D);
+        assertEquals(14.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE, 0.00001D);
+    }
+
+    @Test
+    void anathMeteorShowerMatchesItsDocumentedAreaDurationAndDamageCadence() {
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_COOLDOWN_MILLIS);
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_DURATION_MILLIS);
+        assertEquals(10.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_RADIUS, 0.00001D);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_BURN_INTERVAL_MILLIS);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_BURN_DAMAGE, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE, 0.00001D);
+        assertEquals(20.0D, ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_FIREBALL_DAMAGE, 0.00001D);
+        assertTrue(ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(0.0D));
+        assertTrue(ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(10.0D));
+        assertFalse(ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(10.01D));
+        assertFalse(ArcadePortRules.heroesOfGwenAnathMeteorContainsDistance(Double.NaN));
+    }
+
+    @Test
     void bothGamesResolveTheirOriginalSourceMapFoldersAndIds() {
         assertEquals(ArcadePortGame.CASTLE_ASSAULT, ArcadePortGame.fromId("castle-assault"));
         assertEquals(ArcadePortGame.HEROES_OF_GWEN, ArcadePortGame.fromId("Heroes of Gwen"));
