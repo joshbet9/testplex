@@ -474,8 +474,24 @@ public final class SourceMapCatalog {
 
         Path region = dimensions.resolve("region");
         if (!Files.isDirectory(region)) {
+            Path legacy = root.resolve("region");
+            String rootEntries;
+            try (Stream<Path> entries = Files.list(root)) {
+                rootEntries = entries.map(entry -> entry.getFileName().toString()).sorted()
+                        .limit(30).collect(java.util.stream.Collectors.joining(", "));
+            }
+            String modernEntries = "(dimension root missing)";
+            if (Files.isDirectory(dimensions)) {
+                try (Stream<Path> entries = Files.list(dimensions)) {
+                    modernEntries = entries.map(entry -> entry.getFileName().toString()).sorted()
+                            .limit(20).collect(java.util.stream.Collectors.joining(", "));
+                }
+            }
             throw new IOException("Archived map has no region directory at " + region
-                    + " (expected legacy region/ to be moved into Paper 26.3 dimension layout).");
+                    + " (legacyExists=" + Files.exists(legacy) + ", convertedExists="
+                    + Files.exists(region) + ", rootEntries=[" + rootEntries
+                    + "], dimensionEntries=[" + modernEntries
+                    + "]). Expected original region/ to migrate into the Paper 26.3 dimension layout.");
         }
         try (Stream<Path> files = Files.list(region)) {
             if (files.noneMatch(path -> Files.isRegularFile(path)
@@ -578,6 +594,15 @@ public final class SourceMapCatalog {
             }
 
             Path archiveRoot = locateMapRoot(staging);
+            if (archiveRoot != null) {
+                // Deliberately log the source before moving it: Caged In passed ZIP
+                // integrity tests but failed only in the live Paper installer.
+                plugin.getLogger().info("Original map extraction " + resource
+                        + ": root=" + archiveRoot + ", hasRegion="
+                        + Files.isDirectory(archiveRoot.resolve("region"))
+                        + ", hasDimensionRegion=" + Files.isDirectory(archiveRoot.resolve(
+                                "dimensions/minecraft/overworld/region")));
+            }
             if (archiveRoot == null) {
                 String entries;
                 try (Stream<Path> paths = Files.list(staging)) {
