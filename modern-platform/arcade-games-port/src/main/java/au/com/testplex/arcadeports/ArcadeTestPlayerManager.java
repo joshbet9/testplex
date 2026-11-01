@@ -85,7 +85,15 @@ final class ArcadeTestPlayerManager {
     }
 
     static int additionalPlayersNeeded(int humanPlayers) {
-        return Math.max(0, TARGET_ROSTER_SIZE - Math.max(0, humanPlayers));
+        // Only disposable Paper gameplay harnesses set this JVM property. Real
+        // deployments retain the full 16-player test roster by default.
+        return additionalPlayersNeeded(humanPlayers,
+                Integer.getInteger("testplex.arcade.acceptance-target-roster-size", TARGET_ROSTER_SIZE));
+    }
+
+    static int additionalPlayersNeeded(int humanPlayers, int targetRosterSize) {
+        int clampedTarget = Math.max(1, Math.min(TARGET_ROSTER_SIZE, targetRosterSize));
+        return Math.max(0, clampedTarget - Math.max(0, humanPlayers));
     }
 
     static boolean canFitHumanPlayers(int humanPlayers) {
