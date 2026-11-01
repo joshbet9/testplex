@@ -113,7 +113,9 @@ import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.ItemSpawnEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.entity.PotionSplashEvent;
+import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.Listener;
@@ -4459,6 +4461,10 @@ public final class ArcadePortManager implements Listener {
 
     private void giveGladiatorKit(Session session, Player player, int requestedTier) {
         int tier = Math.max(0, Math.min(3, requestedTier));
+    }
+
+    private void giveGladiatorKit(Session session, Player player, int requestedTier) {
+        int tier = Math.max(0, Math.min(3, requestedTier));
         Material sword = switch (tier) {
             case 1 -> Material.STONE_SWORD;
             case 2 -> Material.IRON_SWORD;
@@ -4524,68 +4530,13 @@ public final class ArcadePortManager implements Listener {
         editor.setItemMeta(editorMeta);
         player.getInventory().setItem(8, editor);
         applyGladiatorHotbarLayout(player);
+        ItemStack editor = namedItem(Material.CHEST, "Hotbar Editor", "Right-click to rearrange your duel hotbar.");
+        ItemMeta editorMeta = editor.getItemMeta();
+        editorMeta.getPersistentDataContainer().set(gladiatorHotbarKey, PersistentDataType.BYTE, (byte) 1);
+        editor.setItemMeta(editorMeta);
+        player.getInventory().setItem(8, editor);
+        applyGladiatorHotbarLayout(player);
         player.updateInventory();
-    }
-
-    private void updateGladiators(Session session, long now) {
-        if (active != session) return;
-        if (session.gladiatorVotingEndsAt > 0L) {
-            long onlineVoters = session.players.values().stream()
-                    .filter(player -> player != null && player.isOnline()).count();
-            if (session.gladiatorVotes.size() >= onlineVoters
-                    || now >= session.gladiatorVotingEndsAt) resolveGladiatorVote(session);
-            return;
-        }
-        for (Integer pair : new ArrayList<>(session.gladiatorPairBrackets.keySet())) {
-            if (active != session) return;
-            if (session.gladiatorResolvedPairs.contains(pair)) continue;
-            long nextPoison = session.gladiatorNextPoisonAtByPair.getOrDefault(pair, Long.MAX_VALUE);
-            if (now < nextPoison) continue;
-            session.gladiatorNextPoisonAtByPair.put(pair, now + ArcadePortRules.GLADIATOR_POISON_INTERVAL_MILLIS);
-            long roundStarted = session.gladiatorRoundStartedAtByPair.getOrDefault(pair, now);
-            List<Player> fighters = session.gladiatorPairs.entrySet().stream()
-                    .filter(entry -> entry.getValue().equals(pair) && session.alive.contains(entry.getKey()))
-                    .map(entry -> session.players.get(entry.getKey()))
-                    .filter(player -> player != null && player.isOnline()).toList();
-            if (!ArcadePortRules.shouldGladiatorPoison(now, roundStarted, false, fighters.size())) continue;
-            for (Player player : fighters) {
-                if (player.getHealth() <= ArcadePortRules.GLADIATOR_POISON_DAMAGE) {
-                    eliminate(session, player, null, "was defeated by arena poison");
-                    break;
-                }
-                player.setHealth(player.getHealth() - ArcadePortRules.GLADIATOR_POISON_DAMAGE);
-                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.7F, 0.7F);
-                player.sendActionBar(ChatColor.RED + "POISON! Keep fighting!");
-            }
-        }
-        progressGladiators(session);
-    }
-
-    private Location islandSpawn(int index) {
-        World world = worlds.get(ArcadePortGame.MICRO_BATTLES.id());
-        double angle = 2.0D * Math.PI * Math.floorMod(index, 8) / 8.0D;
-        return new Location(world, Math.cos(angle) * 13.0D, 64.0D, Math.sin(angle) * 13.0D, (float)(angle * 180.0D / Math.PI + 90.0F), 0.0F);
-    }
-
-    private Location microTeamCenter(Session session, int team) {
-        SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
-        if (mapData != null) {
-            List<Location> markers = mapData.teamSpawnLocationsForTeam(team, 4);
-            if (!markers.isEmpty()) {
-                double x = 0.0D, y = 0.0D, z = 0.0D;
-                for (Location marker : markers) {
-                    x += marker.getX();
-                    y += marker.getY();
-                    z += marker.getZ();
-                }
-                return new Location(session.world, x / markers.size(), y / markers.size(), z / markers.size());
-            }
-        }
-        return islandSpawn(team * 2);
-    }
-
-    private Location microTeamSpawn(int team, int slot, int slots) {
-        Location center = islandSpawn(team * 2);
         if (slots > 1) {
             double angle = 2.0D * Math.PI * slot / slots;
             center.add(Math.cos(angle) * 1.4D, 0.0D, Math.sin(angle) * 1.4D);
@@ -12114,6 +12065,9 @@ public final class ArcadePortManager implements Listener {
                         .filter(pair -> !session.gladiatorResolvedPairs.contains(pair)).count();
                 yield tier + " | " + session.gladiatorMode + " | W " + session.gladiatorWinnerQueue.size()
                         + " / L " + session.gladiatorLoserQueue.size() + " | fights " + matches;
+                        .filter(pair -> !session.gladiatorResolvedPairs.contains(pair)).count();
+                yield tier + " | " + session.gladiatorMode + " | W " + session.gladiatorWinnerQueue.size()
+                        + " / L " + session.gladiatorLoserQueue.size() + " | fights " + matches;
             }
             case MICRO_BATTLES -> "team " + (session.teams.getOrDefault(id, 0) + 1) + "/4";
             case ONE_IN_THE_QUIVER -> "kills " + scoreFor(session, id) + "/20";
@@ -12557,6 +12511,10 @@ public final class ArcadePortManager implements Listener {
                 && session.alive.contains(player.getUniqueId())) {
             makeDeathTagChaser(session, player, reason, killer);
             checkRoundEnd(session);
+            return;
+        }
+        if (session.type == ArcadePortGame.GLADIATORS) {
+            handleGladiatorElimination(session, player, killer, reason);
             return;
         }
         if (session.type == ArcadePortGame.GLADIATORS) {
@@ -13664,6 +13622,8 @@ public final class ArcadePortManager implements Listener {
             long fightStartsAt = attackerPair == null ? Long.MAX_VALUE
                     : session.gladiatorFightStartsAtByPair.getOrDefault(attackerPair, Long.MAX_VALUE);
             if (!ArcadePortRules.canGladiatorsFight(System.currentTimeMillis(), fightStartsAt,
+                    : session.gladiatorFightStartsAtByPair.getOrDefault(attackerPair, Long.MAX_VALUE);
+            if (!ArcadePortRules.canGladiatorsFight(System.currentTimeMillis(), fightStartsAt,
                     attackerPair == null ? -1 : attackerPair,
                     targetPair == null ? -2 : targetPair,
                     attackerPair != null && session.gladiatorResolvedPairs.contains(attackerPair))) return;
@@ -14129,6 +14089,11 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void hitProjectile(Session session, Projectile projectile, Player shooter, Player target) {
+        if (session.type == ArcadePortGame.GLADIATORS) {
+            // Native projectile damage is handled once in onDamage so armor and protection
+            // reductions are preserved; the impact callback must not apply a second hit.
+            return;
+        }
         if (session.type == ArcadePortGame.GLADIATORS) {
             // Native projectile damage is handled once in onDamage so armor and protection
             // reductions are preserved; the impact callback must not apply a second hit.
@@ -16222,6 +16187,45 @@ public final class ArcadePortManager implements Listener {
                         List.of(" ", ChatColor.GRAY + "Recorded by this local test server: " + ChatColor.WHITE + value),
                         "noop", null, null));
             }
+        } else if ("gladiators".equals(gameId)) {
+            String[] ids = {"are-you-not-entertained", "not-even-close"};
+            String[] names = {"Are you not entertained?", "Not even close."};
+            String[] requirements = {
+                    "Win a game without using a bow or a rod in a ruleset where one is available.",
+                    "Win a duel with half a heart remaining."
+            };
+            int[] slots = {10, 12};
+            int unlocked = 0;
+            for (int i = 0; i < ids.length; i++) {
+                boolean earned = plugin.getConfig().getBoolean(
+                        ArcadePortRules.gladiatorsAchievementConfigKey(targetId, ids[i]), false);
+                if (earned) unlocked++;
+                inventory.setItem(slots[i], statsItem(
+                        earned ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (earned ? ChatColor.GREEN + "✓ " : ChatColor.RED + "○ ") + names[i],
+                        List.of(" ", ChatColor.GRAY + requirements[i], " ",
+                                earned ? ChatColor.GREEN + "Achievement unlocked" : ChatColor.RED + "Not yet unlocked"),
+                        "noop", null, null));
+            }
+            String milestonePath = ArcadePortRules.gladiatorsMilestoneConfigKey(targetId);
+            int bracketWins = plugin.getConfig().getInt(milestonePath, 0);
+            inventory.setItem(14, statsItem(Material.GOLD_INGOT,
+                    ChatColor.LIGHT_PURPLE + "Silky Seconds — Loser Bracket Wins",
+                    List.of(" ", ChatColor.GRAY + "Loser-bracket duel victories: " + ChatColor.WHITE + bracketWins,
+                            ChatColor.GRAY + "Every victory in the loser's bracket increases this milestone.",
+                            " ", ChatColor.DARK_GRAY + "Milestone progress is saved per player."),
+                    "noop", null, null));
+            int[] statSlots = {29, 30, 31, 32};
+            int[] values = {played, wins, score, knockouts};
+            String[] labels = {"Games Played", "Wins", "Score / Kills", "Knockouts"};
+            for (int i = 0; i < values.length; i++) {
+                int value = values[i];
+                inventory.setItem(statSlots[i], statsItem(
+                        value > 0 ? Material.EXPERIENCE_BOTTLE : Material.GLASS_BOTTLE,
+                        (value > 0 ? ChatColor.GREEN : ChatColor.RED) + labels[i],
+                        List.of(" ", ChatColor.GRAY + "Recorded by this local test server: " + ChatColor.WHITE + value),
+                        "noop", null, null));
+            }
         } else if ("bomb-lobbers".equals(gameId)) {
             int[] achievementSlots = {10, 11, 12, 13, 14, 15, 16, 17, 18};
             BombLobbersAchievement[] achievements = BombLobbersAchievement.values();
@@ -16765,6 +16769,15 @@ public final class ArcadePortManager implements Listener {
             lore.add(ChatColor.LIGHT_PURPLE + "Silky Seconds: " + ChatColor.WHITE
                     + plugin.getConfig().getInt(ArcadePortRules.gladiatorsMilestoneConfigKey(targetId), 0)
                     + " loser-bracket wins");
+        } else if ("gladiators".equals(gameId)) {
+            long unlocked = java.util.stream.Stream.of("are-you-not-entertained", "not-even-close")
+                    .filter(id -> plugin.getConfig().getBoolean(
+                            ArcadePortRules.gladiatorsAchievementConfigKey(targetId, id), false))
+                    .count();
+            lore.add(ChatColor.YELLOW + "Achievements: " + ChatColor.WHITE + unlocked + "/2");
+            lore.add(ChatColor.LIGHT_PURPLE + "Silky Seconds: " + ChatColor.WHITE
+                    + plugin.getConfig().getInt(ArcadePortRules.gladiatorsMilestoneConfigKey(targetId), 0)
+                    + " loser-bracket wins");
         } else if ("bomb-lobbers".equals(gameId)) {
             lore.add(ChatColor.GRAY + "TNT thrown: " + plugin.getConfig().getInt(path + "thrown", 0));
             lore.add(ChatColor.GRAY + "Direct hits: " + plugin.getConfig().getInt(path + "direct-hits", 0));
@@ -16895,6 +16908,7 @@ public final class ArcadePortManager implements Listener {
         }
         queues.clear();
         gladiatorLobbyVotes.clear();
+        gladiatorLobbyVotes.clear();
         plugin.getLogger().info("Modern Arcade ports reset: " + reason);
     }
 
@@ -16946,6 +16960,27 @@ public final class ArcadePortManager implements Listener {
     private void checkPlayerArena(Session session, Player player) {
         if (!session.alive.contains(player.getUniqueId())) return;
         Location location = player.getLocation();
+        if (session.type == ArcadePortGame.GLADIATORS) {
+            Integer pair = session.gladiatorPairs.get(player.getUniqueId());
+            if (pair == null) return;
+            int bracket = session.gladiatorPairBrackets.getOrDefault(pair, GLADIATOR_BRACKET_WINNERS);
+            if (bracket == GLADIATOR_BRACKET_LOSERS) {
+                Location center = session.gladiatorArenaCentersByPair.get(pair);
+                if (center != null && ArcadePortRules.isOutsideGladiatorsLoserArena(
+                        location.getX(), location.getZ(), center.getX(), center.getZ())) {
+                    eliminate(session, player, null, "left the loser's bracket arena");
+                    return;
+                }
+            } else {
+                SourceMapCatalog.MapData gladiatorMap = sourceMapData.get(session.type.id());
+                if (gladiatorMap != null && gladiatorMap.hasBounds()
+                        && ArcadePortRules.isOutsideGladiatorsSourceMap(location.getX(), location.getZ(),
+                                gladiatorMap.minX(), gladiatorMap.maxX(), gladiatorMap.minZ(), gladiatorMap.maxZ())) {
+                    eliminate(session, player, null, "left the Gladiators arena");
+                    return;
+                }
+            }
+        }
         if (session.type == ArcadePortGame.GLADIATORS) {
             Integer pair = session.gladiatorPairs.get(player.getUniqueId());
             if (pair == null) return;
@@ -18263,6 +18298,24 @@ public final class ArcadePortManager implements Listener {
             }
             return;
         }
+        if (session.type == ArcadePortGame.GLADIATORS
+                && event.getEntity() instanceof Player gladiatorTarget
+                && session.players.containsKey(gladiatorTarget.getUniqueId())) {
+            double finalDamage = event.getFinalDamage();
+            event.setCancelled(true);
+            if (event instanceof EntityDamageByEntityEvent gladiatorDamage) {
+                Entity damager = gladiatorDamage.getDamager();
+                Player attacker = damager instanceof Player direct ? direct
+                        : damager instanceof Projectile projectile
+                            && projectile.getShooter() instanceof Player shooter ? shooter : null;
+                if (attacker != null && session.alive.contains(attacker.getUniqueId())
+                        && session.alive.contains(gladiatorTarget.getUniqueId())) {
+                    applyGladiatorDamage(session, attacker, gladiatorTarget,
+                            finalDamage, damager instanceof Projectile);
+                }
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.DEATH_TAG) {
             Player disguiseOwner = deathTagDisguiseOwner(session, event.getEntity());
             if (disguiseOwner != null) {
@@ -18649,6 +18702,59 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onGladiatorFishing(PlayerFishEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
+        Session session = active;
+        Player player = event.getPlayer();
+        if (session == null || session.type != ArcadePortGame.GLADIATORS
+                || player.getWorld() != session.world || event.getState() != PlayerFishEvent.State.FISHING) return;
+        Integer pair = session.gladiatorPairs.get(player.getUniqueId());
+        GladiatorsMode mode = GladiatorsMode.fromId(session.gladiatorMode);
+        long fightStartsAt = pair == null ? Long.MAX_VALUE
+                : session.gladiatorFightStartsAtByPair.getOrDefault(pair, Long.MAX_VALUE);
+        if (!session.alive.contains(player.getUniqueId()) || pair == null
+                || mode == null || !mode.rodAvailable()) {
+            event.setCancelled(true);
+            return;
+        }
+        if (System.currentTimeMillis() < fightStartsAt) {
+            event.setCancelled(true);
+            player.sendMessage(ChatColor.YELLOW + "Your duel has not started yet.");
+            return;
+        }
+        if (!event.isCancelled()) session.gladiatorUsedRod.add(player.getUniqueId());
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onGladiatorPotionSplash(PotionSplashEvent event) {
+        Session session = active;
+        ThrownPotion potion = event.getPotion();
+        if (session == null || session.type != ArcadePortGame.GLADIATORS
+                || !(potion.getShooter() instanceof Player shooter)
+                || shooter.getWorld() != session.world) return;
+        ItemStack thrownItem = potion.getItem();
+        if (thrownItem == null || !thrownItem.hasItemMeta()
+                || !thrownItem.getItemMeta().getPersistentDataContainer()
+                        .has(gladiatorPotionKey, PersistentDataType.BYTE)) return;
+        Integer pair = session.gladiatorPairs.get(shooter.getUniqueId());
+        if (pair == null || session.gladiatorResolvedPairs.contains(pair)) return;
+        event.setCancelled(true);
+        Location splash = potion.getLocation();
+        for (Entity entity : splash.getWorld().getNearbyEntities(splash, 4.0D, 4.0D, 4.0D)) {
+            if (!(entity instanceof Player target) || !session.alive.contains(target.getUniqueId())
+                    || !Integer.valueOf(pair).equals(session.gladiatorPairs.get(target.getUniqueId()))) continue;
+            double distance = splash.distance(target.getLocation());
+            double intensity = Math.max(0.0D, 1.0D - distance / 4.0D);
+            double healing = 4.0D * intensity;
+            if (healing <= 0.0D) continue;
+            target.setHealth(Math.min(target.getMaxHealth(), target.getHealth() + healing));
+            target.getWorld().spawnParticle(Particle.HEART,
+                    target.getLocation().clone().add(0.0D, 1.0D, 0.0D), 6,
+                    0.3D, 0.4D, 0.3D, 0.02D);
+            target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 0.35F, 1.6F);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onGladiatorFishing(PlayerFishEvent event) {
         Session session = active;
         Player player = event.getPlayer();
         if (session == null || session.type != ArcadePortGame.GLADIATORS
@@ -19273,6 +19379,12 @@ public final class ArcadePortManager implements Listener {
             session.sheepArcherLastChargeAt.putIfAbsent(id, System.currentTimeMillis());
         }
         if (event.isCancelled()) {
+            boolean forceGladiatorHotbar = session.type == ArcadePortGame.GLADIATORS
+                    && event.getAction().isRightClick() && heldItem != null && heldItem.hasItemMeta()
+                    && heldItem.getItemMeta().getPersistentDataContainer()
+                            .has(gladiatorHotbarKey, PersistentDataType.BYTE)
+                    && session.alive.contains(player.getUniqueId())
+                    && session.gladiatorPairs.containsKey(player.getUniqueId());
             boolean forceGladiatorHotbar = session.type == ArcadePortGame.GLADIATORS
                     && event.getAction().isRightClick() && heldItem != null && heldItem.hasItemMeta()
                     && heldItem.getItemMeta().getPersistentDataContainer()
@@ -21340,6 +21452,13 @@ public final class ArcadePortManager implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onGladiatorMenuDrag(InventoryDragEvent event) {
+        if (event.getView().getTopInventory().getHolder() instanceof GladiatorMenuHolder) {
+            event.setCancelled(true);
+        }
+    }
+
     private void cacheBombLobbersTeamSpawnCentres(Session session) {
         session.bombTeamSpawnCentres.clear();
 
@@ -22882,6 +23001,7 @@ public final class ArcadePortManager implements Listener {
             }
             lobbyRuntime.refreshDisplays();
         }
+        gladiatorLobbyVotes.remove(id);
         Session session = active;
         if (session == null || !session.players.containsKey(id)) return;
         Player player = event.getPlayer();
@@ -22962,10 +23082,6 @@ public final class ArcadePortManager implements Listener {
             removeDeathTagDisguise(session, id);
             session.deathTagSoloChaserHitReadyAt.remove(id);
         }
-        session.respawning.remove(id);
-        session.baconCompassMenuTargets.remove(id);
-        session.players.remove(id);
-        session.snapshots.remove(id);
         applySessionTeamTabTeams(session);
         checkRoundEnd(session);
     }
@@ -23385,11 +23501,14 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, String> gladiatorVotes = new HashMap<>();
         int gladiatorRound = -1;
         int gladiatorLoserRound = -1;
+        int gladiatorLoserRound = -1;
         int gladiatorPairCount;
         int gladiatorNextPairId;
         int gladiatorWinnerArenaCursor;
         int gladiatorLoserArenaCursor;
         long gladiatorVotingEndsAt;
+        boolean gladiatorWinnerBracketStarted;
+        String gladiatorMode = "rodless";
         boolean gladiatorWinnerBracketStarted;
         String gladiatorMode = "rodless";
         final Map<UUID, Integer> teams = new HashMap<>();
