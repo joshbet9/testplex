@@ -434,6 +434,18 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesOfGwenStoreTracksOnlyReplaceableEquipmentCategories() {
+        assertEquals("helmet", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("IRON_HELMET"));
+        assertEquals("chestplate", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("LEATHER_CHESTPLATE"));
+        assertEquals("leggings", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("DIAMOND_LEGGINGS"));
+        assertEquals("boots", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("CHAINMAIL_BOOTS"));
+        assertEquals("weapon", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("GOLDEN_SWORD"));
+        assertEquals("weapon", ArcadePortRules.heroesOfGwenStoreEquipmentSlot("BOW"));
+        assertNull(ArcadePortRules.heroesOfGwenStoreEquipmentSlot("POTION"));
+        assertNull(ArcadePortRules.heroesOfGwenStoreEquipmentSlot("ENDER_PEARL"));
+    }
+
+    @Test
     void heroesOfGwenRoleStoreUsesOriginalEnchantmentFamiliesAndLevels() {
         assertEquals("POWER", ArcadePortRules.heroesOfGwenStoreEnchantment("Hunter's Bow"));
         assertEquals(1, ArcadePortRules.heroesOfGwenStoreEnchantmentLevel("Hunter's Bow"));
