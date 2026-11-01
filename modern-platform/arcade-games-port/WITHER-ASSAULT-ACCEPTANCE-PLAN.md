@@ -1,21 +1,24 @@
 # Wither Assault readiness and acceptance plan
 
-Wither Assault remains MECHANICS_IN_PROGRESS. The Mineplex Reborn source archive is absent from this repository, so Testplex uses an isolated generated arena; a generated layout is not a claim of authentic map parity. The source kit names are Human Archer, Human Medic and Human Editor.
+Wither Assault remains MECHANICS_IN_PROGRESS. The Mineplex Reborn repository does not contain the original Industrial West, Labyrinth or Sky Ruins world archives, so Testplex uses an isolated generated arena. A generated layout is not authentic source-map parity. The source kit names are Human Archer, Human Medic and Human Editor.
 
 ## Implemented in this readiness pass
 
-- Human kit choices are exposed in the lobby and saved as per-player preferences.
-- Match loadouts now apply Archer, Medic and Editor inventories and team-coloured armour; the Wither receives its Wither Skull, minion, scent and shield/Fire Storm controls.
-- Existing Wither Skull, minion and scent routines are connected to the Wither player's items, respecting the 15-second opening protection.
-- The custom Revival Potion now revives a nearby downed Human when its splash reaches their Wither-out marker.
-- Editor blocks are tracked, can be temporarily removed by right-click for two seconds, obey the four-block floor limit and cannot be broken directly under another player. Placed blocks are restored to their original state at round end.
+- Human Archer, Medic and Editor are selectable in the lobby and saved per player.
+- Human loadouts and team-coloured leather armour are applied at round start. Human Archer and Editor receive bows; both have Fletcher replenishment to a four-arrow cap.
+- Archer and Editor bow shots are tracked as Smoke Arrows. Hitting or approaching a Wither with a Smoke Arrow applies the source four-second Blindness effect.
+- Human Medic receives the source 45-second Revival Potion refill behaviour when out of potions.
+- The Wither is blinded for its opening 15 seconds but can still move and attack during that time.
+- Wither controls now match the source item layout: Gold Sword left-click launches Wither Skull; Diamond Sword left-click launches three Wither Minions; right-click either sword starts the XP-bar-powered Fire Storm; Compass right-click uses Smell Humans.
+- The custom Revival Potion splash event revives a nearby downed Human at their Wither-out marker.
+- Editor blocks are tracked, temporarily removed for two seconds by any Human right-click, constrained by the four-block floor rule and protected from breaking directly under another player. Editor-placed blocks are restored at round end.
 
 ## Still required before enabling
 
-1. Port and validate the source Human Archer Smoke Arrow and the remaining Human/Medic/Editor passives and ability timing.
-2. Compare Wither flight, immunity, Fire Storm, Wither Skull, minions, scent, down/revive and all role loadouts against Reborn source behaviour.
-3. Replace the generated arena only when authentic archived map data becomes available; until then validate the test arena separately and do not describe it as source-map parity.
-4. Add meaningful gameplay award paths for Eye Candy and SPLIT UP!, and map-tracked wins for Wither World and It's a man's world only if the source map set is available.
-5. Run repeatable multi-human and Wither-vs-Human sessions, then test disconnects, conversions, cleanup and lobby restoration.
+1. Implement and validate the Human Medic's Repair Master and Healing Hands behaviours; the refill and revival potion paths alone do not complete the Medic kit.
+2. Compare Wither Skull proximity/damage scaling, Wither movement/slowdown near the ground, terrain destruction, Wither immunity and minion damage/targeting against the source.
+3. Obtain and package the original Industrial West, Labyrinth and Sky Ruins archives, or explicitly continue treating the generated arena as a non-source test harness. Do not describe the generated arena as authentic.
+4. Exercise Editor placement, breaking, pickup, the under-player restriction and two-second removal with multiple Humans; verify no map state leaks between rounds.
+5. Run repeated human-vs-wither sessions with real clients, including down/revive, void falls, disconnects, role rebalance, scoreboard, rewards and full lobby restoration.
 
-The unit tests cover kit normalization and Editor block boundaries; live Paper 26.3 acceptance is still outstanding.
+The custom Wither achievement triggers in Testplex are local extensions; the original game reference does not list native achievements. The unit tests cover Human kit IDs, Editor boundaries, Archer/Editor Smoke Arrow registration rules and Wither sword ability controls. Live Paper 26.3 acceptance is still outstanding.
