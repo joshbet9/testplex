@@ -16883,8 +16883,8 @@ public final class ArcadePortManager implements Listener {
         counted.add("snake");
         total += plugin.getConfig().getInt(localStatsPath(targetId, "monster-maze") + metric, 0);
         total += plugin.getConfig().getInt(localStatsPath(targetId, "snake") + metric, 0);
-        for (String[] definition : ARCADE_STATS_GAMES) {
-            String gameId = definition[0];
+        for (ArcadeGameDirectory.Game definition : ARCADE_STATS_GAMES) {
+            String gameId = definition.id();
             if (counted.add(gameId)) {
                 total += plugin.getConfig().getInt(localStatsPath(targetId, gameId) + metric, 0);
             }
