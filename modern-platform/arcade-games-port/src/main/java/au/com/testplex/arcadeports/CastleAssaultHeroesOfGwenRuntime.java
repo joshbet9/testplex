@@ -3227,10 +3227,31 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             heroInfinityEndsAt.remove(entry.getKey());
             heroInfinityOriginalEnchant.remove(entry.getKey());
         }
+        updateLarissaAbilities(now);
+        updateLarissaFountains(now);
         for (UUID id : new ArrayList<>(activePlayers)) {
             Player player = players.get(id);
             if (player == null || !player.isOnline()) continue;
             String hunterHero = selectedHeroesOfGwen.get(id);
+            if ("larissa".equals(hunterHero)) {
+                long nextWaterStone = heroAmmoNextAt.getOrDefault(id,
+                        now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS);
+                if (now >= nextWaterStone) {
+                    ItemStack waterStone = player.getInventory().getItem(7);
+                    int amount = waterStone != null && waterStone.getType() == Material.BLUE_DYE
+                            && waterStone.hasItemMeta() && waterStone.getItemMeta().hasDisplayName()
+                            && waterStone.getItemMeta().getDisplayName().contains("Water Stone")
+                            ? waterStone.getAmount() : 0;
+                    if (amount < ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_CAPACITY) {
+                        if (amount <= 0) {
+                            player.getInventory().setItem(7, namedItem(Material.BLUE_DYE,
+                                    ChatColor.AQUA + "Water Stone", "Aqua Cannon ammunition."));
+                        } else waterStone.setAmount(amount + 1);
+                        player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.45F, 1.5F);
+                    }
+                    heroAmmoNextAt.put(id, now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS);
+                }
+            }
             int fletcherCapacity = ArcadePortRules.heroesOfGwenFletcherMaxArrows(hunterHero);
             long fletcherReload = ArcadePortRules.heroesOfGwenFletcherReloadMillis(hunterHero);
             if (fletcherCapacity > 0 && fletcherReload > 0L) {
@@ -3360,6 +3381,23 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             this.colour = colour;
             this.center = center;
             this.wool = wool;
+        }
+    }
+
+    private static final class LarissaFountainZone {
+        final UUID ownerId;
+        final int team;
+        final Location center;
+        final long expiresAt;
+        long nextPulseAt;
+        long nextVisualAt;
+        LarissaFountainZone(UUID ownerId, int team, Location center, long expiresAt, long now) {
+            this.ownerId = ownerId;
+            this.team = team;
+            this.center = center.clone();
+            this.expiresAt = expiresAt;
+            this.nextPulseAt = now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_PULSE_INTERVAL_MILLIS;
+            this.nextVisualAt = now;
         }
     }
 
