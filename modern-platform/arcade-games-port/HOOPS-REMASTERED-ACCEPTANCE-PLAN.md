@@ -1,5 +1,7 @@
 # Hoops Remastered — Paper 26.3 acceptance plan
 
+**Catalogue status:** READY_FOR_TEST. Hoops Remastered is available as one manually selectable Arcade game in the controlled test queue. Automatic rotation remains disabled until the live court-feel and gameplay checklist below is accepted.
+
 ## Match format
 - 2–16 players (up to 8v8), balanced RED / BLUE teams, one isolated court per session.
 - Match ends when one team reaches 21 points, or when five minutes elapse. First to 21 wins immediately (no win-by-two). If the five-minute buzzer finds the score tied, the match enters sudden-death overtime and the next basket wins.
@@ -44,4 +46,4 @@
 
 Hoops Remastered uses only the target server's built-in Paper API and vanilla Minecraft assets. It requires no resource pack, PacketEvents, ProtocolLib or other extra runtime plugin.
 
-Hoops Remastered remains disabled from normal rotation until the live checklist is accepted.
+Hoops Remastered is enabled for controlled Arcade testing. Keep it out of automatic rotation until the live checklist is accepted; the successful four-client Paper 26.3 smoke validates the shared lifecycle and consecutive-match restoration, not final basketball feel or source parity.
