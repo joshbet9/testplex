@@ -77,6 +77,33 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
         Bukkit.getScheduler().runTask(this, this::runAll);
     }
 
+    // Instrument all event-priority phases in the disposable harness. A generic damage
+    // probe succeeds, but a caster-attributed probe is cancelled by a later listener.
+    // This traces the cancellation stage without changing any production PvP policy.
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void traceDamageLowest(EntityDamageEvent event) { traceAttributedDamage("LOWEST", event); }
+
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = false)
+    public void traceDamageLow(EntityDamageEvent event) { traceAttributedDamage("LOW", event); }
+
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = false)
+    public void traceDamageNormal(EntityDamageEvent event) { traceAttributedDamage("NORMAL", event); }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = false)
+    public void traceDamageHigh(EntityDamageEvent event) { traceAttributedDamage("HIGH", event); }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void traceDamageHighest(EntityDamageEvent event) { traceAttributedDamage("HIGHEST", event); }
+
+    private void traceAttributedDamage(String priority, EntityDamageEvent event) {
+        if (rival == null || !rival.equals(event.getEntity())
+                || !(event instanceof EntityDamageByEntityEvent)) return;
+        getLogger().info("WIZARDS_DAMAGE_PHASE|" + priority
+                + "|cancelled=" + event.isCancelled()
+                + "|damage=" + event.getDamage()
+                + "|final=" + event.getFinalDamage());
+    }
+
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = false)
     public void observeWizardsDamage(EntityDamageEvent event) {
         if (rival == null || !rival.equals(event.getEntity())) return;
