@@ -474,7 +474,7 @@ public final class SpeedBuildersGame implements Listener {
         }
         currentTemplate = unusedTemplates.removeFirst();
         removeMobs(reviewMobs);
-        restorePlot(reviewPlot)
+        restorePlot(reviewPlot);
         round++;
         if (round > 1) buildTimeTracker = Math.max(1, buildTimeTracker - 1);
         buildSeconds = currentTemplate.timing().buildSeconds(buildTimeTracker);
@@ -488,7 +488,7 @@ public final class SpeedBuildersGame implements Listener {
             state.player.setGameMode(GameMode.SURVIVAL);
             state.player.getInventory().clear();
             removeMobs(state.mobs);
-            clearPlotBuildVolume(state.plot);
+            restorePlot(state.plot);
             pasteTemplate(state.plot, currentTemplate);
             spawnTemplateMobs(state, state.plot, currentTemplate);
             teleportToPlot(state);
@@ -514,6 +514,7 @@ public final class SpeedBuildersGame implements Listener {
             removeMobs(state.mobs);
             giveTemplateBlocks(state.player, currentTemplate);
             state.player.setGameMode(GameMode.SURVIVAL);
+            if (state.player.isOnGround()) state.player.setAllowFlight(true);
             state.player.sendTitle(ChatColor.GREEN + "BUILD!",
                     ChatColor.YELLOW.toString() + buildSeconds + " seconds — recreate the model",
                     0, 30, 5);
@@ -527,7 +528,7 @@ public final class SpeedBuildersGame implements Listener {
         if (phase != Phase.BUILDING) return;
         phase = Phase.REVIEWING;
         phaseDeadlineTick = tick + SpeedBuildersRules.REVIEW_SECONDS * 20L;
-        restorePlot(reviewPlot)
+        restorePlot(reviewPlot);
         removeMobs(reviewMobs);
         pasteTemplate(reviewPlot, currentTemplate);
         spawnReviewMobs(currentTemplate);
@@ -541,11 +542,7 @@ public final class SpeedBuildersGame implements Listener {
             if (state.perfect && !wasAlreadyPerfect) state.perfectBuilds++;
             state.player.getInventory().clear();
             state.player.setGameMode(GameMode.SPECTATOR);
-            Location view = new Location(arena,
-                    (i % 4) * 2.0D - 3.0D + 0.5D,
-                    REVIEW_Y,
-                    (i / 4) * 2.0D - 3.0D + 0.5D,
-                    0.0F, 20.0F);
+            Location view = reviewViewLocation(i);
             state.player.teleport(view);
             state.player.sendTitle(ChatColor.GOLD + "JUDGING",
                     ChatColor.YELLOW + "Your build: " + percent(state.score) + "%",
@@ -609,12 +606,12 @@ public final class SpeedBuildersGame implements Listener {
         PlayerState eliminated = pendingEliminations.removeFirst();
         eliminated.eliminated = true;
         removeMobs(eliminated.mobs);
-        clearPlotBuildVolume(eliminated.plot);
+        restorePlot(eliminated.plot);
         eliminated.player.sendTitle(ChatColor.RED + "ELIMINATED",
                 ChatColor.YELLOW + "You scored " + percent(eliminated.score) + "%", 0, 50, 10);
         eliminated.player.sendMessage(ChatColor.RED + "You have been eliminated from Speed Builders.");
         eliminated.player.setGameMode(GameMode.SPECTATOR);
-        eliminated.player.teleport(new Location(arena, 0.5D, REVIEW_Y, 0.5D, 0.0F, 30.0F));
+        eliminated.player.teleport(reviewViewLocation(0));
         Bukkit.broadcastMessage(ChatColor.RED + eliminated.player.getName()
                 + ChatColor.YELLOW + " was eliminated. " + alivePlayers().size() + " builder(s) remain.");
         phaseDeadlineTick = tick + (pendingEliminations.isEmpty()
@@ -650,7 +647,7 @@ public final class SpeedBuildersGame implements Listener {
         if (!players.isEmpty()) plugin.saveConfig();
         for (PlayerState state : new ArrayList<>(players.values())) {
             Player player = state.player;
-            clearPlotBuildVolume(state.plot);
+            restorePlot(state.plot);
             if (player.isOnline()) {
                 if (winner != null && winner.getUniqueId().equals(player.getUniqueId())) {
                     player.sendTitle(ChatColor.GOLD + "VICTORY!", ChatColor.YELLOW + "Speed Builders champion",
@@ -661,7 +658,7 @@ public final class SpeedBuildersGame implements Listener {
         }
         players.clear();
         pendingEliminations.clear();
-        restorePlot(reviewPlot)
+        restorePlot(reviewPlot);
         refreshHud();
     }
 
@@ -772,7 +769,7 @@ public final class SpeedBuildersGame implements Listener {
     private void spawnReviewMobs(Template template) {
         for (MobCell mob : template.mobs()) {
             Location location = new Location(arena, mob.x() - 2.5D,
-                    plot.baseY() + mob.y(), mob.z() - 2.5D);
+                    reviewPlot.baseY() + mob.y(), reviewPlot.centerZ() - 3 + mob.z() + 0.5D);
             Entity entity = spawnDisplayMob(location, mob.type());
             if (entity != null) reviewMobs.add(entity);
         }
@@ -819,15 +816,6 @@ public final class SpeedBuildersGame implements Listener {
         }
     }
 
-    private void clearPlot(Plot plot) {
-        clearPlotBuildVolume(plot);
-        for (int x = -PLOT_MARGIN; x <= PLOT_MARGIN; x++) {
-            for (int z = -PLOT_MARGIN; z <= PLOT_MARGIN; z++) {
-                arena.getBlockAt(plot.centerX() + x, FLOOR_Y, plot.centerZ() + z).setType(Material.AIR, false);
-            }
-        }
-    }
-
     private void clearPlotBuildVolume(Plot plot) {
         if (plot == null) return;
         for (int x = -3; x <= 3; x++) {
@@ -860,6 +848,8 @@ public final class SpeedBuildersGame implements Listener {
     private void preparePlayerForRound(PlayerState state) {
         Player player = state.player;
         player.setGameMode(GameMode.SURVIVAL);
+        player.setAllowFlight(false);
+        player.setFlying(false);
         player.getInventory().clear();
         player.setHealth(player.getMaxHealth());
         player.setFoodLevel(20);
@@ -882,21 +872,15 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private boolean isInsidePlot(PlayerState state, Location location) {
-        return location.getWorld() == arena
-                && location.getX() >= state.plot.centerX() - PLOT_MARGIN + 0.1D
-                && location.getX() <= state.plot.centerX() + PLOT_MARGIN + 0.9D
-                && location.getZ() >= state.plot.centerZ() - PLOT_MARGIN + 0.1D
-                && location.getZ() <= state.plot.centerZ() + PLOT_MARGIN + 0.9D
-                && location.getY() >= FLOOR_Y
-                && location.getY() <= FLOOR_Y + 20.0D;
+        return location.getWorld() == arena;
     }
 
     private boolean isInBuildVolume(PlayerState state, org.bukkit.block.Block block) {
         return block.getWorld() == arena
                 && block.getX() >= state.plot.centerX() - 3
                 && block.getX() <= state.plot.centerX() + 3
-                && block.getY() >= FLOOR_Y + 1
-                && block.getY() <= FLOOR_Y + SpeedBuildersRules.BUILD_HEIGHT
+                && block.getY() >= state.plot.baseY()
+                && block.getY() <= state.plot.baseY() + SpeedBuildersRules.BUILD_HEIGHT - 1
                 && block.getZ() >= state.plot.centerZ() - 3
                 && block.getZ() <= state.plot.centerZ() + 3;
     }
@@ -1060,6 +1044,18 @@ public final class SpeedBuildersGame implements Listener {
         Bukkit.getScheduler().runTask(plugin, () -> checkPerfectBuild(state));
     }
 
+    private Location reviewViewLocation(int index) {
+        if (reviewPlot == null) return arena.getSpawnLocation();
+        int row = index / 4;
+        int column = index % 4;
+        double x = reviewPlot.centerX() + 0.5D + (column - 1.5D) * 2.0D;
+        double z = reviewPlot.centerZ() + 0.5D + (row - 1.5D) * 2.0D;
+        Location view = new Location(arena, x, reviewPlot.baseY() + REVIEW_HEIGHT, z);
+        view.setDirection(new org.bukkit.util.Vector(reviewPlot.centerX() + 0.5D - x, 0.0D,
+                reviewPlot.centerZ() + 0.5D - z));
+        return view;
+    }
+
     private void checkPerfectBuild(PlayerState state) {
         if (phase != Phase.BUILDING || state.eliminated || state.perfect || !state.player.isOnline()) return;
         int score = score(state);
@@ -1075,7 +1071,6 @@ public final class SpeedBuildersGame implements Listener {
                 SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "speediest-builderizer", 1L);
             }
             plugin.saveConfig();
-            state.player.getInventory().clear();
             state.player.sendTitle(ChatColor.GREEN + "PERFECT BUILD!",
                     ChatColor.YELLOW + "You've recreated every block.",
                     0, 40, 10);
@@ -1122,170 +1117,15 @@ public final class SpeedBuildersGame implements Listener {
         pendingEliminations.remove(removed);
         persistPlayerProgress(removed);
         removeMobs(removed.mobs);
+        restorePlot(removed.plot);
         if (alivePlayers().size() <= 1) {
             List<PlayerState> alive = alivePlayers();
             finishMatch(alive.isEmpty() ? null : alive.getFirst().player, "The last builder standing wins.");
         }
     }
 
-    private static List<Template> defaultTemplates() {
-        List<Template> result = new ArrayList<>();
-        result.add(house());
-        result.add(tree());
-        result.add(rocket());
-        result.add(flower());
-        result.add(pyramid());
-        result.add(mushroom());
-        result.add(snowman());
-        result.add(bridge());
-        result.add(crown());
-        result.add(fountain());
-        return result;
-    }
-
-    private static Template house() {
-        TemplateBuilder b = new TemplateBuilder("house", "Tiny House");
-        for (int x = 1; x <= 5; x++) for (int z = 1; z <= 5; z++) b.add(x, 0, z, Material.OAK_PLANKS);
-        for (int y = 1; y <= 2; y++) {
-            for (int p = 1; p <= 5; p++) {
-                b.add(p, y, 1, Material.OAK_PLANKS);
-                b.add(p, y, 5, Material.OAK_PLANKS);
-                b.add(1, y, p, Material.OAK_PLANKS);
-                b.add(5, y, p, Material.OAK_PLANKS);
-            }
-        }
-        b.add(3, 1, 1, Material.GLASS);
-        b.add(2, 1, 5, Material.GLASS);
-        for (int x = 1; x <= 5; x++) for (int z = 1; z <= 5; z++) {
-            if (x == 1 || x == 5 || z == 1 || z == 5) b.add(x, 3, z, Material.BRICKS);
-        }
-        b.add(3, 4, 3, Material.BRICKS);
-        return b.build();
-    }
-
-    private static Template tree() {
-        TemplateBuilder b = new TemplateBuilder("tree", "Oak Tree");
-        for (int y = 0; y <= 3; y++) b.add(3, y, 3, Material.OAK_LOG);
-        for (int x = 1; x <= 5; x++) for (int z = 1; z <= 5; z++) {
-            b.add(x, 3, z, Material.OAK_LEAVES);
-            if (x >= 2 && x <= 4 && z >= 2 && z <= 4) b.add(x, 4, z, Material.OAK_LEAVES);
-        }
-        b.add(3, 5, 3, Material.OAK_LEAVES);
-        for (int y = 0; y <= 3; y++) b.add(3, y, 3, Material.OAK_LOG);
-        return b.build();
-    }
-
-    private static Template rocket() {
-        TemplateBuilder b = new TemplateBuilder("rocket", "Rocket");
-        for (int y = 1; y <= 4; y++) {
-            for (int x = 2; x <= 4; x++) {
-                for (int z = 2; z <= 4; z++) {
-                    if (x == 2 || x == 4 || z == 2 || z == 4) b.add(x, y, z, Material.IRON_BLOCK);
-                }
-            }
-        }
-        for (int x = 2; x <= 4; x++) for (int z = 2; z <= 4; z++) b.add(x, 0, z, Material.IRON_BLOCK);
-        for (int x = 2; x <= 4; x++) for (int z = 2; z <= 4; z++) b.add(x, 5, z, Material.RED_WOOL);
-        b.add(3, 6, 3, Material.RED_WOOL);
-        b.add(3, 3, 2, Material.GLASS);
-        return b.build();
-    }
-
-    private static Template flower() {
-        TemplateBuilder b = new TemplateBuilder("flower", "Flower");
-        for (int y = 0; y <= 4; y++) b.add(3, y, 3, Material.GREEN_WOOL);
-        b.add(3, 5, 3, Material.YELLOW_WOOL);
-        b.add(2, 5, 3, Material.RED_WOOL);
-        b.add(4, 5, 3, Material.RED_WOOL);
-        b.add(3, 5, 2, Material.RED_WOOL);
-        b.add(3, 5, 4, Material.RED_WOOL);
-        b.add(2, 3, 3, Material.GREEN_WOOL);
-        b.add(4, 2, 3, Material.GREEN_WOOL);
-        return b.build();
-    }
-
-    private static Template pyramid() {
-        TemplateBuilder b = new TemplateBuilder("pyramid", "Pyramid");
-        for (int layer = 0; layer < 4; layer++) {
-            int min = layer;
-            int max = 6 - layer;
-            for (int x = min; x <= max; x++) for (int z = min; z <= max; z++) {
-                b.add(x, layer, z, Material.SANDSTONE);
-            }
-        }
-        return b.build();
-    }
-
-    private static Template mushroom() {
-        TemplateBuilder b = new TemplateBuilder("mushroom", "Mushroom");
-        for (int y = 0; y <= 3; y++) b.add(3, y, 3, Material.BIRCH_PLANKS);
-        for (int x = 1; x <= 5; x++) for (int z = 1; z <= 5; z++) {
-            if (x == 1 || x == 5 || z == 1 || z == 5 || (x == 3 && z == 3)) {
-                b.add(x, 4, z, Material.RED_WOOL);
-            }
-        }
-        b.add(2, 4, 2, Material.WHITE_WOOL);
-        b.add(4, 4, 4, Material.WHITE_WOOL);
-        return b.build();
-    }
-
-    private static Template snowman() {
-        TemplateBuilder b = new TemplateBuilder("snowman", "Snowman");
-        for (int x = 2; x <= 4; x++) for (int z = 2; z <= 4; z++) {
-            b.add(x, 0, z, Material.SNOW_BLOCK);
-            b.add(x, 1, z, Material.SNOW_BLOCK);
-        }
-        b.add(3, 2, 3, Material.SNOW_BLOCK);
-        b.add(3, 3, 3, Material.SNOW_BLOCK);
-        b.add(3, 4, 3, Material.CARVED_PUMPKIN);
-        b.add(2, 3, 3, Material.OAK_FENCE);
-        b.add(4, 3, 3, Material.OAK_FENCE);
-        return b.build();
-    }
-
-    private static Template bridge() {
-        TemplateBuilder b = new TemplateBuilder("bridge", "Stone Bridge");
-        for (int x = 0; x <= 6; x++) {
-            for (int z = 2; z <= 4; z++) b.add(x, 0, z, Material.STONE_BRICKS);
-            b.add(x, 1, 2, Material.STONE_BRICK_WALL);
-            b.add(x, 1, 4, Material.STONE_BRICK_WALL);
-        }
-        return b.build();
-    }
-
-    private static Template crown() {
-        TemplateBuilder b = new TemplateBuilder("crown", "Golden Crown");
-        for (int x = 1; x <= 5; x++) for (int z = 1; z <= 5; z++) {
-            if (x == 1 || x == 5 || z == 1 || z == 5) b.add(x, 0, z, Material.GOLD_BLOCK);
-        }
-        for (int x = 1; x <= 5; x++) {
-            b.add(x, 1, 1, Material.GOLD_BLOCK);
-            b.add(x, 1, 5, Material.GOLD_BLOCK);
-        }
-        b.add(1, 2, 1, Material.GOLD_BLOCK);
-        b.add(3, 2, 1, Material.GOLD_BLOCK);
-        b.add(5, 2, 1, Material.GOLD_BLOCK);
-        b.add(3, 2, 3, Material.DIAMOND_BLOCK);
-        b.add(1, 2, 5, Material.GOLD_BLOCK);
-        b.add(5, 2, 5, Material.GOLD_BLOCK);
-        return b.build();
-    }
-
-    private static Template fountain() {
-        TemplateBuilder b = new TemplateBuilder("fountain", "Fountain");
-        for (int x = 1; x <= 5; x++) for (int z = 1; z <= 5; z++) {
-            if (x == 1 || x == 5 || z == 1 || z == 5) b.add(x, 0, z, Material.QUARTZ_BLOCK);
-        }
-        for (int y = 1; y <= 4; y++) b.add(3, y, 3, Material.QUARTZ_BLOCK);
-        b.add(3, 5, 3, Material.SEA_LANTERN);
-        b.add(2, 4, 3, Material.LIGHT_BLUE_STAINED_GLASS);
-        b.add(4, 4, 3, Material.LIGHT_BLUE_STAINED_GLASS);
-        b.add(3, 4, 2, Material.LIGHT_BLUE_STAINED_GLASS);
-        b.add(3, 4, 4, Material.LIGHT_BLUE_STAINED_GLASS);
-        return b.build();
-    }
-
-    private record Plot(int centerX, int centerZ) { }
+    private record Plot(int centerX, int baseY, int centerZ, List<GroundCell> originalGround) { }
+    private record GroundCell(int x, int z, Material material, String blockData) { }
 
     /** Durable pre-match player snapshot so disconnects and server restarts are safe. */
     private static final class PlayerSnapshot {
@@ -1492,10 +1332,8 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private record Template(String id, String name, List<SpeedBuildersRules.Cell> cells,
-                            List<MobCell> mobs, SpeedBuildersRules.TemplateTiming timing) {
-        private Template(String id, String name, List<SpeedBuildersRules.Cell> cells) {
-            this(id, name, cells, List.of(), new SpeedBuildersRules.TemplateTiming(name, 0, 0, 1.0D, null));
-        }
+                            List<MobCell> mobs, List<GroundCell> ground,
+                            SpeedBuildersRules.TemplateTiming timing) {
         private int expectedScore() { return cells.size() + mobs.size(); }
     }
 
