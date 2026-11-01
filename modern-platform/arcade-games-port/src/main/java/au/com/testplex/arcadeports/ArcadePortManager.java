@@ -2701,6 +2701,9 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (participants.size() == 1) announce(session, ChatColor.GRAY + "Solo test mode: the run will remain available for practice until the timer ends or you reset it.");
+        // All initial spawns/teleports are complete. Prepare now freezes participant
+        // movement as well as gameplay input until the Live transition.
+        session.startupComplete = true;
         session.tickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> tick(session), 1L, 1L);
         sender.sendMessage(ChatColor.GREEN + "Started " + type.displayName() + " with " + participants.size() + (participants.size() == 1 ? " player." : " players."));
     }
@@ -14272,6 +14275,20 @@ public final class ArcadePortManager implements Listener {
         Player player = event.getPlayer();
         UUID playerId = player.getUniqueId();
         if (!session.players.containsKey(playerId) || event.getTo() == null) return;
+        if (!session.liveStarted) {
+            // Do not cancel the initial spawn teleports while setup is running.
+            // After setup completes, freeze position until the round enters Live.
+            if (session.startupComplete) {
+                Location from = event.getFrom();
+                Location to = event.getTo();
+                if (from.getWorld() != to.getWorld()
+                        || from.getX() != to.getX() || from.getY() != to.getY()
+                        || from.getZ() != to.getZ()) {
+                    event.setTo(from);
+                }
+            }
+            return;
+        }
         if (session.type == ArcadePortGame.EVOLUTION && session.evolving.contains(playerId)) {
             Location locked = session.evolutionLockedLocations.get(playerId);
             if (locked != null) {
@@ -19653,6 +19670,15 @@ public final class ArcadePortManager implements Listener {
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareTeleport(PlayerTeleportEvent event) {
+        Session session = active;
+        if (session != null && session.startupComplete && !session.liveStarted
+                && session.players.containsKey(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onPreparePlayerInteract(PlayerInteractEvent event) {
         cancelPrepareAction(event.getPlayer(), event);
     }
@@ -20282,6 +20308,7 @@ public final class ArcadePortManager implements Listener {
         long prepareDurationMillis;
         int lastPrepareSecond = -1;
         boolean liveStarted;
+        boolean startupComplete;
          boolean microBarrierActive;
         final boolean mixedArcadeVariant;
         CastleAssaultHeroesOfGwenRuntime variantRuntime;
