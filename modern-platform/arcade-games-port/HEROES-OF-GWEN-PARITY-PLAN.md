@@ -88,3 +88,15 @@ The first missing objective-runtime slice is now implemented on branch feat/hero
 - Added deterministic rule tests for the wave/economy constants and tower-entry priority.
 
 **Validation boundary:** this slice is awaiting the Paper 26.3 CI run. It does not make Heroes of Gwen READY_FOR_TEST; seven hero ability sets, Wither/source parity, the Heroes Valley sidequest, shops/passives, both-map checks and live multiplayer acceptance remain open.
+
+
+## Modern Paper 26.3 implementation progress — Anath the Burnt
+
+The next source-documented Mage slice is implemented on branch feat/heroes-of-gwen-anath-abilities-batch1-20261101:
+
+- Register Anath's source hotbar layout: Flame Wand, Fire Charge (Burn Beam), Feather (Flame Dash), Nether Star (Meteor Shower), Embers and Gold Shop.
+- **Burn Beam:** ten-block-high flame/lava wall, 20-block forward range, approximately 14 damage to enemy players, instantly defeats enemy minions, damages the enemy Wither, and does not damage tower structures. Uses the archived 10-second cooldown.
+- **Meteor Shower:** throws the netherrack marker; on landing it creates a team-coloured 10-block radius zone for 7 seconds. It applies the documented 1 HP burn pulse every 0.5 seconds, an additional 2 damage each second, and falling fireballs that can deal up to 20 damage on impact. It also damages an enemy Wither while leaving Wither fire-immune.
+- Added deterministic rule tests for both abilities' documented range, height, cooldown, radius, duration and damage cadence.
+
+**Still incomplete for Anath:** Flame Wand basic-attack behaviour and Flame Dash exact movement/damage data are not present in the current accessible archive reference, so their slots are represented but not invented. The other six hero ability sets, source Wither movement/targeting, Pumpkin King sidequest and role-shop/passive verification also remain open. Heroes of Gwen stays `MECHANICS_IN_PROGRESS` and disabled.
