@@ -92,14 +92,16 @@ The first missing objective-runtime slice is now implemented on branch feat/hero
 
 ## Modern Paper 26.3 implementation progress — Anath the Burnt
 
-The next source-documented Mage slice is implemented on branch feat/heroes-of-gwen-anath-abilities-batch1-20261101:
+Anath's complete four-slot source kit is now represented in the match-scoped runtime:
 
-- Register Anath's source hotbar layout: Flame Wand, Fire Charge (Burn Beam), Feather (Flame Dash), Nether Star (Meteor Shower), Embers and Gold Shop.
-- **Burn Beam:** ten-block-high flame/lava wall, 20-block forward range, approximately 14 damage to enemy players, instantly defeats enemy minions, damages the enemy Wither, and does not damage tower structures. Uses the archived 10-second cooldown.
-- **Meteor Shower:** throws the netherrack marker; on landing it creates a team-coloured 10-block radius zone for 7 seconds. It applies the documented 1 HP burn pulse every 0.5 seconds, an additional 2 damage each second, and falling fireballs that can deal up to 20 damage on impact. It also damages an enemy Wither while leaving Wither fire-immune.
-- Added deterministic rule tests for both abilities' documented range, height, cooldown, radius, duration and damage cadence.
+- **Flame Wand:** Blaze Rod primary, four Embers, one Ember replenished per second, 500 ms firing interval, 1.25 projectile speed, 5 damage and 3 seconds of fire on hit. The ember item is match-owned, cannot be picked up and is removed on hit, timeout, disconnect, hero change or runtime stop.
+- **Burn Beam:** the original horizontal beam advances 9 blocks in 0.2-block increments, three increments per tick. It passes through blocks, reaches 2 blocks around the beam path, applies 11 damage and uses the source 2-second per-target recharge. Ability cooldown is 9 seconds.
+- **Flame Dash:** 600 ms horizontal movement at the source velocity, stopping at the end. The trail appears after the source 10-tick delay and each fire block is restored after 5 seconds. Ability cooldown is 12 seconds.
+- **Meteor Shower:** retained as the netherrack marker / area effect already present in the runtime.
 
-**Still incomplete for Anath:** Flame Wand basic-attack behaviour and Flame Dash exact movement/damage data are not present in the current accessible archive reference, so their slots are represented but not invented. The other six hero ability sets, source Wither movement/targeting, Pumpkin King sidequest and role-shop/passive verification also remain open. Heroes of Gwen stays `MECHANICS_IN_PROGRESS` and disabled.
+Deterministic rule tests now cover the Flame Wand fire rate, ammo capacity/reload, damage and speed; Burn Beam range, step size, hit radius, damage, per-target recharge and tick rate; and Flame Dash movement and fire-trail timings.
+
+**Validation boundary:** the full Anath integration build and updated tests are running on this branch. No deployment or in-game acceptance is claimed yet.
 
 
 ### Additional Hunter parity — Rowena and Fletcher
@@ -113,18 +115,28 @@ The next source-documented Mage slice is implemented on branch feat/heroes-of-gw
 
 ### Mage parity — Larissa
 
-Larissa's four-slot kit is now ported from the archived Java implementation into the same match-scoped Heroes of Gwen runtime:
+Larissa's four-slot kit is ported from the archived Java implementation into the same match-scoped Heroes of Gwen runtime:
 
-- **Aqua Cannon:** Diamond Hoe primary weapon, 10-block water beam, first opposing target hit, 3 damage, 500 ms fire interval; consumes one Water Stone and replenishes one every 3 seconds (source cap 64). Eligible opposing towers can be hit by the beam while the player is inside the tower's 10-block damage radius.
-- **Dancing Fountain:** Water Bucket projectile; on collision it creates a 3-block radius field for 6 seconds. Every second it heals allied players/minions by 4 HP and damages opposing players/minions by 2 HP. Cooldown 14 seconds.
-- **Water Dash:** horizontal look-direction movement for 600 ms, with velocity stopped at the end. Supports click and sneak activation. Cooldown 10 seconds.
-- **Storm's Blessing:** Drop-item ultimate; grants Speed I to the team for 7 seconds and heals active teammates by 2 HP each second. The reuse delay accounts for the 7-second active period before the source's 60-second cooldown restarts.
-- Added deterministic tests for source attack damage/range, Water Stone cadence/cap, fountain radius/duration/healing/damage and the dash/ultimate timings.
+- **Aqua Cannon:** Diamond Hoe primary, 10-block water beam, 3 damage and a 500 ms fire interval; consumes one Water Stone and replenishes one every 3 seconds (source capacity 64).
+- **Dancing Fountain:** Water Bucket projectile; on collision it creates a 3-block radius field for 6 seconds. Each second it heals allied players/minions by 4 HP and damages opposing players/minions by 2 HP. Cooldown 14 seconds.
+- **Water Dash:** horizontal look-direction movement for 600 ms. Cooldown 10 seconds.
+- **Storm's Blessing:** drop-activated ultimate; grants team Speed I and heals active teammates by 2 HP per second for 7 seconds, with source cooldown restarting after the active window.
+- Regression tests cover source damage, range, ammo cadence/cap, field duration/radius/effects, dash and ultimate timings.
 
-**Validation boundary:** the source-value tests are added, but the Paper 26.3 workflow still needs to compile and pass this update. This is a mechanics slice, not whole-game acceptance: Bardolf, Rowena's three active abilities, Warrior kits, Anath's Flame Wand/Flame Dash, Wither source parity, Pumpkin King, shops/passives, and both-map/multi-player acceptance remain open. Heroes of Gwen must stay `MECHANICS_IN_PROGRESS` and disabled until those gates pass.
+**Validation boundary:** Larissa's mechanics and source-value tests were included in a passing Paper 26.3 build on this branch. In-game interaction and balance acceptance remain outstanding.
 
 
 ### Assassin parity — Bardolf
+
+Bardolf's source kit is implemented in the match-scoped runtime:
+
+- **Summon Wolf:** five-wolf cap, 8 health per wolf and 5-second summon cooldown. Wolves are owned by Bardolf, follow him, return if more than 10 blocks away and attack the enemy he last damaged.
+- **Wolf attacks:** 1 damage with a 500 ms per-target recharge. Allied players cannot damage their team's wolves; wolf deaths produce no drops or experience.
+- **Wolf Pounce:** 7-second cooldown. Bardolf leaps in his look direction and redirects the pack to leap from his take-off point.
+- **Full Moon:** 10-second active period, with the 60-second source cooldown restarting after the active period. Each living wolf adds 1 damage and 5% movement speed; wolves are healed and strengthened, then removed at the end.
+- Pack entities/effects are removed on death, disconnect, hero change and runtime stop. Regression tests cover summon, pounce and ultimate source values.
+
+**Validation boundary:** Bardolf's full implementation and tests passed Paper 26.3 CI. In-game multiplayer acceptance remains outstanding.
 
 Bardolf's source kit is now implemented in the match-scoped runtime:
 
@@ -135,3 +147,36 @@ Bardolf's source kit is now implemented in the match-scoped runtime:
 - Pack entities and temporary effects are explicitly removed on player death, disconnect, hero change and runtime stop. Added deterministic tests for summon limits/health/cadence, pounce timing/vector and Full Moon values.
 
 **Validation boundary:** the first post-Bardolf build is running now. This is not whole-game acceptance: Rowena's three active abilities, all three Warrior kits, Anath's Flame Wand/Flame Dash, source Wither patrol/target parity, Pumpkin King sidequest, role shops/passives, both-map checks and live multiplayer acceptance remain outstanding. Keep Heroes of Gwen MECHANICS_IN_PROGRESS and disabled until those checks pass.
+
+
+### Warrior parity — Dana, Biff and Ivy
+
+**Dana**
+- **Pulse Heal:** heals Dana for 2 HP and allied players/minions for 4 HP within a 7-block radius; 8-second cooldown.
+- **Knock Up:** horizontal dash for 600 ms; enemy players take 12 damage and enemies/minions take 8 damage with source launch effects; 10-second cooldown.
+- **Rally:** jump, then plant a team banner on landing. The landing deals 7 damage within 3 blocks; the 7-second banner heals allies by 3 HP per second within 5 blocks. Source reuse timing is preserved.
+- Regression tests cover the archived heal, dash/collision and banner values. Dana's mechanics/tests passed Paper 26.3 CI.
+
+**Biff**
+- **Tether:** hooks enemy heroes within 8 blocks, applies the source slow and pulls them toward Biff; tether lasts 5 seconds and uses the 12-second cooldown after its active period.
+- **Battle Leap:** upward leap; on landing, enemies within 5 blocks take 4 damage and are knocked upward. 11-second cooldown.
+- **Cavalry Charge:** summons an armoured mount for 6 seconds; enemies within 5 blocks are hit for 4 damage and rooted. Horse ownership, no-drop handling and cleanup are match-scoped.
+- Regression tests cover tether, leap and cavalry timings/effects. Biff's full implementation/tests passed Paper 26.3 CI.
+
+**Ivy**
+- **Vine Pull:** 9-block beam; enemy heroes take 4 damage and are pulled toward Ivy; minions take 6 damage. 10-second cooldown.
+- **Floral Leap:** leap and create a 5-second flower bed; enemies within 5 blocks take 2 damage and are slowed each second.
+- **Thorn Wall:** 5-second square wall; allies regenerate while enemies are rooted or damaged. Block data is saved and restored without leaving temporary blocks behind.
+- Regression tests cover the archived beam, leap, field and wall timings/effects. Ivy's mechanics and tests compile in the successful pre-Anath Paper 26.3 snapshot; the latest combined Anath build remains the current validation run.
+
+### Remaining blockers before enabling Heroes of Gwen
+
+The hero ability slices above do not by themselves make the game ready. The following acceptance work remains:
+
+- Confirm source parity for Hattori and Devon and verify all nine hero selections/loadouts in-game.
+- Wither patrol, target acquisition, attacks and return-home behaviour need source comparison and acceptance.
+- Verify capture points, shops, role passives/upgrades, purchase charging and Mixed Arcade price scaling.
+- Complete both source maps (Heroes Valley and Heroes Ruins) with real players, then run multi-player ability/team/friendly-fire tests.
+- Confirm objective lifecycle, team spawns, minion waves and second-tower minion upgrade together with the final hero kit.
+
+Keep the game at `MECHANICS_IN_PROGRESS` and outside `enabled-games` until the remaining automated, both-map and multiplayer acceptance gates pass.
