@@ -155,6 +155,12 @@ Live acceptance still needs to check the three achievement thresholds, the 90-se
 The catalogue and renderer contract are covered by unit tests. Spleef, Dragon Escape, Dragons (Solo), Runner, Sheep Quest and Turf Wars are now `READY_FOR_TEST`, not gameplay-accepted; their source acceptance checklists are in `SPLEEF-ACCEPTANCE-PLAN.md`, `DRAGON-ESCAPE-ACCEPTANCE-PLAN.md`, `DRAGONS-ACCEPTANCE-PLAN.md`, `RUNNER-ACCEPTANCE-PLAN.md`, `SHEEP-QUEST-ACCEPTANCE-PLAN.md` and `TURF-WARS-ACCEPTANCE-PLAN.md`. Both `Speef` and `Super Spleef` source folders are one Spleef map catalogue (37 legacy archive files), not separate game modes. CI verifies that every enabled game's complete 1.8 map filename set is present in the packaged JAR; see [the global map parity register](LEGACY-MAP-PARITY.md).
 
 
+## Wither Assault: Human kits and remaining parity
+
+The controlled-port branch exposes the three source Human kits (Archer, Medic and Editor), persists each player's choice, provides the corresponding loadouts, connects Wither Skull/minion/scent abilities, and revives a downed Human with the custom Revival Potion. Editor blocks are tracked, temporarily removable, constrained by the four-block floor rule and restored at round teardown. See WITHER-ASSAULT-ACCEPTANCE-PLAN.md.
+
+This is not an enablement promotion. The source map archive is absent, the Human Archer Smoke Arrow and other kit passives still need source comparison, and map-specific achievements cannot be certified without the source map set.
+
 ## Wither Assault: smoother movement
 
 Wither flight speed follows a continuous altitude curve. Near the spawn height, an eased transition blends the source hover speed into the altitude-based curve, while a per-tick rate limit prevents sudden changes during climbs and descents.
