@@ -93,6 +93,10 @@ final class SneakyAssassinsMechanics {
     private final Map<UUID, Long> bribeReadyAt = new HashMap<>();
     private final Map<UUID, Bribe> bribes = new HashMap<>();
     private final Map<UUID, Long> npcNextAttackAt = new HashMap<>();
+    private final List<Location> npcPatrolAnchors = new ArrayList<>();
+    private final Map<UUID, Location> npcPatrolTargets = new HashMap<>();
+    private final Map<UUID, Location> npcLastMovementLocations = new HashMap<>();
+    private final Map<UUID, Long> npcLastMovementAt = new HashMap<>();
     private final Map<UUID, Item> revealerProjectiles = new HashMap<>();
     private final Map<UUID, UUID> revealerOwners = new HashMap<>();
     private final Map<UUID, Location> revealerLastLocations = new HashMap<>();
@@ -303,6 +307,7 @@ final class SneakyAssassinsMechanics {
             powerUpCounts.put(player.getUniqueId(), 0);
             setDisguised(player);
         }
+        prepareNpcPatrolAnchors();
         for (int i = 0; i < SOURCE_NPC_COUNT; i++) spawnNpc();
         long now = System.currentTimeMillis();
         nextPowerUpAt = now + FIRST_POWERUP_DELAY_MILLIS;
@@ -539,6 +544,51 @@ final class SneakyAssassinsMechanics {
         npcIds.add(npc.getUniqueId());
     }
 
+    /**
+     * The source reads nearby locations from the town's team-zero spawn group.
+     * The real archive is absent in this port, so build deterministic waypoints
+     * from clear, supported cells in the isolated procedural town.
+     */
+    private void prepareNpcPatrolAnchors() {
+        npcPatrolAnchors.clear();
+        for (int x = -20; x <= 20; x += 2) {
+            for (int z = -20; z <= 20; z += 2) {
+                // Match the four procedural house footprints; NPC patrol points stay on the lanes.
+                if ((Math.abs(x) >= 8 && Math.abs(x) <= 16)
+                        && (Math.abs(z) >= 8 && Math.abs(z) <= 16)) continue;
+                Location candidate = new Location(world, x + 0.5D, 64.0D, z + 0.5D);
+                if (isSafeNpcPatrolDestination(candidate)) npcPatrolAnchors.add(candidate);
+            }
+        }
+    }
+
+    private boolean isSafeNpcPatrolDestination(Location location) {
+        if (world == null || location == null || location.getWorld() != world) return false;
+        Block floor = location.getBlock().getRelative(0, -1, 0);
+        Block feet = location.getBlock();
+        Block head = feet.getRelative(0, 1, 0);
+        return SneakyAssassinsRules.isSafeNpcPatrolDestination(
+                floor.getType().isSolid(), floor.isLiquid(), feet.isPassable(), head.isPassable());
+    }
+
+    /** Reborn picks one nearby town spawn, then tries at most five random 5x5 offsets. */
+    private Location nextNpcPatrolTarget(Location npcLocation) {
+        List<Location> nearby = npcPatrolAnchors.stream()
+                .filter(anchor -> SneakyAssassinsRules.isNpcPatrolAnchorNearby(
+                        npcLocation.getX(), npcLocation.getZ(), anchor.getX(), anchor.getZ()))
+                .toList();
+        if (nearby.isEmpty()) return null;
+
+        Location anchor = nearby.get(ThreadLocalRandom.current().nextInt(nearby.size()));
+        for (int attempt = 0; attempt < 5; attempt++) {
+            int dx = ThreadLocalRandom.current().nextInt(5) - 2;
+            int dz = ThreadLocalRandom.current().nextInt(5) - 2;
+            Location candidate = anchor.clone().add(dx, 0.0D, dz);
+            if (isSafeNpcPatrolDestination(candidate)) return candidate;
+        }
+        return anchor.clone();
+    }
+
     private Location randomSafeTownLocation() {
         for (int attempt = 0; attempt < 80; attempt++) {
             int x = ThreadLocalRandom.current().nextInt(-20, 21);
@@ -560,13 +610,21 @@ final class SneakyAssassinsMechanics {
                 npcIds.remove(id);
                 bribes.remove(id);
                 npcNextAttackAt.remove(id);
+                npcPatrolTargets.remove(id);
+                npcLastMovementLocations.remove(id);
+                npcLastMovementAt.remove(id);
                 continue;
             }
+
             Villager npc = (Villager) entity;
             Bribe bribe = bribes.get(id);
             if (bribe != null) {
                 Player target = nearestEnemy(npc.getLocation(), bribe.owner);
-                if (target == null) continue;
+                if (target == null) {
+                    npcPatrolTargets.remove(id);
+                    continue;
+                }
+
                 Vector direction = target.getLocation().toVector().subtract(npc.getLocation().toVector());
                 double distance = direction.length();
                 if (distance <= 1.5D) {
@@ -577,18 +635,59 @@ final class SneakyAssassinsMechanics {
                         npc.getWorld().playSound(npc.getLocation(), Sound.ENTITY_VILLAGER_NO, 0.7F, 0.8F);
                     }
                 } else if (distance > 0.001D) {
-                    Vector motion = direction.normalize().multiply(0.22D);
-                    motion.setY(Math.max(-0.05D, Math.min(0.22D, npc.getVelocity().getY())));
-                    npc.setVelocity(motion);
+                    moveNpcTowards(npc, target.getLocation(), 0.8D, now, true);
                 }
                 continue;
             }
-            if (tick % 40 == 0) {
-                double angle = ThreadLocalRandom.current().nextDouble(0.0D, Math.PI * 2.0D);
-                Vector motion = new Vector(Math.cos(angle) * 0.13D, 0.0D, Math.sin(angle) * 0.13D);
-                npc.setVelocity(motion);
+
+            Location patrolTarget = npcPatrolTargets.get(id);
+            if (patrolTarget == null || npc.getLocation().distanceSquared(patrolTarget) < 1.0D
+                    || SneakyAssassinsRules.shouldIssueNpcPatrolOrder(
+                            ThreadLocalRandom.current().nextInt(40))) {
+                patrolTarget = nextNpcPatrolTarget(npc.getLocation());
+                if (patrolTarget == null) {
+                    npcPatrolTargets.remove(id);
+                    continue;
+                }
+                npcPatrolTargets.put(id, patrolTarget);
+            }
+            moveNpcTowards(npc, patrolTarget, 0.7D, now, false);
+        }
+    }
+
+    /**
+     * A velocity-steered path approximation for the generated test town. The
+     * source uses the NMS Creature navigation API after its goal selectors have
+     * been cleared; the modern harness has no equivalent archived patrol points
+     * or NMS navigation shim, so it steers toward the selected safe waypoint.
+     */
+    private void moveNpcTowards(Villager npc, Location target, double speed, long now, boolean recoverIfStuck) {
+        UUID id = npc.getUniqueId();
+        Location current = npc.getLocation();
+        if (recoverIfStuck) {
+            Location last = npcLastMovementLocations.get(id);
+            long lastMovedAt = npcLastMovementAt.getOrDefault(id, now);
+            if (last == null || current.distanceSquared(last) > 2.25D) {
+                npcLastMovementLocations.put(id, current.clone());
+                npcLastMovementAt.put(id, now);
+            } else if (SneakyAssassinsRules.shouldRecoverBribedNpc(now, lastMovedAt)) {
+                Vector recovery = target.toVector().subtract(current.toVector());
+                recovery.setY(0.0D);
+                if (recovery.lengthSquared() < 0.001D) recovery = new Vector(1.0D, 0.0D, 0.0D);
+                recovery.normalize().multiply(0.3D).setY(0.3D);
+                npc.setVelocity(recovery);
+                npcLastMovementLocations.put(id, current.clone());
+                npcLastMovementAt.put(id, now);
+                return;
             }
         }
+
+        Vector direction = target.toVector().subtract(current.toVector());
+        direction.setY(0.0D);
+        if (direction.lengthSquared() < 0.001D) return;
+        Vector motion = direction.normalize().multiply(speed * 0.18D);
+        motion.setY(Math.max(-0.05D, Math.min(0.12D, npc.getVelocity().getY())));
+        npc.setVelocity(motion);
     }
 
     private Player nearestEnemy(Location location, Player owner) {
@@ -1229,6 +1328,10 @@ final class SneakyAssassinsMechanics {
         npcIds.clear();
         bribes.clear();
         npcNextAttackAt.clear();
+        npcPatrolAnchors.clear();
+        npcPatrolTargets.clear();
+        npcLastMovementLocations.clear();
+        npcLastMovementAt.clear();
         players.clear();
         hiddenViewers.clear();
         revealUntil.clear();
