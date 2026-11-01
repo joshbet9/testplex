@@ -4213,7 +4213,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (owner == null || !owner.isOnline() || target == null || !target.isOnline()
                 || !activePlayers.contains(target.getUniqueId())
                 || teams.getOrDefault(owner.getUniqueId(), -1) == teams.getOrDefault(target.getUniqueId(), -2)) return;
-        target.damage(damage, owner);
+        damageHeroesOfGwenAbility(target, owner, damage);
     }
 
 
@@ -5265,7 +5265,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     wither.setHealth(wither.getHealth() - damage);
                 }
             } else {
-                target.damage(damage, player);
+                damageHeroesOfGwenAbility(target, player, damage);
             }
         }
         state.shotsRemaining--;
@@ -5427,7 +5427,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     damageMobaTower(tower, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE, player);
                 }
             } else {
-                target.damage(ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE, player);
+                damageHeroesOfGwenAbility(target, player, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE);
             }
         }
         player.sendMessage(ChatColor.GOLD + "Rally banner planted! Allies nearby are healed.");
