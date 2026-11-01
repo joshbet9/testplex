@@ -36,7 +36,9 @@ class ArcadePortGameTest {
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.MASTER_BUILDERS).isEmpty(),
                 "Master Builders uses generated plots rather than a fabricated source map");
         assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.CAMERA_SHY).isEmpty(),
-                "Camera Shy uses its dedicated procedural maze, not an invented legacy map archive");
+                "Snap uses its dedicated procedural maze, not an invented legacy map archive");
+        assertEquals("Snap", ArcadePortGame.CAMERA_SHY.displayName());
+        assertEquals(ArcadePortGame.CAMERA_SHY, ArcadePortGame.fromId("snap"));
     }
 
     @Test void selectedMapArchivePathsAreValidatedAgainstTheirGame() {
