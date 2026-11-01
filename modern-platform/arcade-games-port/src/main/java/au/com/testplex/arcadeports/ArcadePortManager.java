@@ -17091,6 +17091,7 @@ public final class ArcadePortManager implements Listener {
         if (withers.isEmpty() && !humans.isEmpty() && session.participantsAtStart > 1) {
             Player promoted = humans.get(ThreadLocalRandom.current().nextInt(humans.size()));
             session.teams.put(promoted.getUniqueId(), 1);
+            applySessionTeamTabTeams(session);
             promoted.teleport(witherAssaultSpawn(session, promoted));
             giveKit(session, promoted);
             withers = List.of(promoted);
@@ -17273,6 +17274,7 @@ public final class ArcadePortManager implements Listener {
         if (active != session || player == null || !player.isOnline()) return;
         UUID id = player.getUniqueId();
         session.teams.put(id, 1);
+        applySessionTeamTabTeams(session);
         session.milkDoubleJumpUsed.remove(id);
         player.setAllowFlight(false);
         player.setFlying(false);
@@ -19595,6 +19597,7 @@ public final class ArcadePortManager implements Listener {
         session.baconCompassMenuTargets.remove(id);
         session.players.remove(id);
         session.snapshots.remove(id);
+        applySessionTeamTabTeams(session);
         checkRoundEnd(session);
     }
 
@@ -19639,17 +19642,7 @@ public final class ArcadePortManager implements Listener {
         });
     }
 
-    /**
-     * Shared Prepare-phase gate. Game-specific handlers remain focused on mechanics;
-     * this gate rejects all player-originated gameplay input until Live begins.
-     */
-    /**
-     * Timed state is constructed before Prepare completes, while event handlers and
-     * the game tick are intentionally paused. Shift every timestamp-bearing session
-     * field once at the Live boundary so initial delays/cooldowns retain their full
-     * configured duration. Maps whose values are timestamps (including nested
-     * contributor maps) are adjusted as well.
-     */
+    /** Shared Prepare-phase gate for player-originated gameplay input. */
     private boolean isPreparingParticipant(Player player) {
         Session session = active;
         return player != null && session != null
