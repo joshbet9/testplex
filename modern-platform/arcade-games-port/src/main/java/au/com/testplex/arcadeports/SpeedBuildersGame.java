@@ -99,6 +99,7 @@ public final class SpeedBuildersGame implements Listener {
     private List<Plot> playerPlots = List.of();
     private List<Location> playerSpawns = List.of();
     private Plot reviewPlot;
+    private final Map<Plot, Location> plotSpawns = new LinkedHashMap<>();
     private Phase phase = Phase.IDLE;
     private long tick;
     private long queueDeadlineTick = -1L;
@@ -428,6 +429,20 @@ public final class SpeedBuildersGame implements Listener {
         if (playerSpawns.isEmpty()) {
             plugin.getLogger().warning("Original Speed Builders map has no TEAM_SPAWNS markers; using per-plot fallback spawns.");
         }
+        plotSpawns.clear();
+        List<Location> unusedSourceSpawns = new ArrayList<>(playerSpawns);
+        for (Plot plot : playerPlots) {
+            if (unusedSourceSpawns.isEmpty()) break;
+            Location plotCentre = new Location(sourceWorld, plot.centerX() + 0.5D,
+                    plot.baseY(), plot.centerZ() + 0.5D);
+            Location closest = unusedSourceSpawns.stream()
+                    .min(java.util.Comparator.comparingDouble(spawn -> spawn.distanceSquared(plotCentre)))
+                    .orElse(null);
+            if (closest != null) {
+                plotSpawns.put(plot, closest.clone());
+                unusedSourceSpawns.remove(closest);
+            }
+        }
 
         if (mapData.hasBounds()) {
             double centerX = (mapData.minX() + mapData.maxX()) / 2.0D;
@@ -530,12 +545,10 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     private Location nearestSourceSpawn(Plot plot) {
-        Location centre = new Location(arena, plot.centerX() + 0.5D,
-                plot.baseY(), plot.centerZ() + 0.5D);
-        return playerSpawns.stream()
-                .min(java.util.Comparator.comparingDouble(spawn -> spawn.distanceSquared(centre)))
-                .map(Location::clone)
-                .orElse(centre.add(0.0D, 0.0D, 5.0D));
+        Location assigned = plotSpawns.get(plot);
+        if (assigned != null) return assigned.clone();
+        return new Location(arena, plot.centerX() + 0.5D,
+                plot.baseY(), plot.centerZ() + 5.0D);
     }
 
     private void buildArenaFloor() {
