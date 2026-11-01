@@ -2747,9 +2747,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     applyAnathMeteorPlayerDamage(owner, target,
                             ArcadePortRules.HEROES_OF_GWEN_ANATH_METEOR_BURN_DAMAGE);
                     if (!activePlayers.contains(target.getUniqueId())) continue;
-                    Vector knockback = target.getLocation().toVector().subtract(zone.center.toVector());
-                    if (knockback.lengthSquared() > 0.001D) {
-                        target.setVelocity(knockback.normalize().multiply(0.12D).setY(0.05D));
+                    if (owner.getGameMode() == org.bukkit.GameMode.SURVIVAL) {
+                        Vector knockback = target.getLocation().toVector().subtract(zone.center.toVector());
+                        if (knockback.lengthSquared() > 0.001D) {
+                            target.setVelocity(knockback.normalize().multiply(0.12D).setY(0.05D));
+                        }
                     }
                 }
                 for (Mob minion : liveHeroesOfGwenMinions()) {
