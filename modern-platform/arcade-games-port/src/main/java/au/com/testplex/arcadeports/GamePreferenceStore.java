@@ -39,6 +39,19 @@ public final class GamePreferenceStore {
         }
     }
 
+    /** A lobby voter is eligible only after recording at least one Like/Dislike. */
+    public boolean hasConfiguredPreferences(UUID playerId) {
+        if (playerId == null) return false;
+        var section = data.getConfigurationSection("players." + playerId);
+        if (section == null) return false;
+        for (String gameId : section.getKeys(false)) {
+            String value = data.getString("players." + playerId + "." + gameId);
+            if (Preference.LIKE.name().equalsIgnoreCase(value)
+                    || Preference.DISLIKE.name().equalsIgnoreCase(value)) return true;
+        }
+        return false;
+    }
+
     public void setPreference(UUID playerId, String gameId, Preference preference) {
         if (playerId == null || gameId == null || gameId.isBlank() || preference == null) {
             throw new IllegalArgumentException("Player, game and preference are required.");

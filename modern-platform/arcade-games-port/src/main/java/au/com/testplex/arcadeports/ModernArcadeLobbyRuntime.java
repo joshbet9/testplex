@@ -202,6 +202,14 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         for (Entity entity : new ArrayList<>(teamNpcs)) if (entity != null && entity.isValid()) entity.remove();
         teamNpcs.clear();
         if (world == null) return;
+        // The in-memory lists can be empty after reload while tagged entities remain.
+        // Remove old kit/team NPC identities before rebuilding the selected game's pads.
+        for (Entity entity : new ArrayList<>(world.getEntities())) {
+            if (entity.getPersistentDataContainer().has(kitNpcKey, PersistentDataType.STRING)
+                    || entity.getPersistentDataContainer().has(teamNpcKey, PersistentDataType.STRING)) {
+                entity.remove();
+            }
+        }
 
         List<ArcadeLobbyKitCatalogue.KitChoice> choices = kitChoicesFor(selectedGame);
         clearKitAndQueuePedestalAreas(world);
@@ -227,15 +235,15 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         for (int i = 0; i < choices.size(); i++) {
             ArcadeLobbyKitCatalogue.KitChoice choice = choices.get(i);
             int centerZ = pedestals.get(i).centerZ;
-            Location at = new Location(world, KIT_PEDESTAL_X + 0.5D,
-                    ModernArcadeLobby.FLOOR_Y + 2.5D, centerZ + 0.5D);
+            Location at = new Location(world, KIT_PEDESTAL_X,
+                    ModernArcadeLobby.FLOOR_Y + 2.5D, centerZ);
             at.setYaw(-90.0F);
             kitNpcs.add(spawnKitNpc(world, at, choice));
         }
         if (teamCount > 0) {
             for (int team = 0; team < teamCount; team++) {
-                Location at = new Location(world, QUEUE_PEDESTAL_X + 0.5D,
-                        ModernArcadeLobby.FLOOR_Y + 2.5D, teamCentres[team] + 0.5D);
+                Location at = new Location(world, QUEUE_PEDESTAL_X,
+                        ModernArcadeLobby.FLOOR_Y + 2.5D, teamCentres[team]);
                 at.setYaw(90.0F);
                 Sheep sheep = world.spawn(at, Sheep.class);
                 sheep.setColor(teamDyes[team]);
@@ -244,8 +252,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
                 teamNpcs.add(sheep);
             }
         } else {
-            Location at = new Location(world, QUEUE_PEDESTAL_X + 0.5D,
-                    ModernArcadeLobby.FLOOR_Y + 2.5D, 0.5D);
+            Location at = new Location(world, QUEUE_PEDESTAL_X,
+                    ModernArcadeLobby.FLOOR_Y + 2.5D, 0.0D);
             at.setYaw(90.0F);
             Sheep queue = world.spawn(at, Sheep.class);
             String queueName = selectedGame.lobbyRolesAssignedAutomatically()
@@ -281,6 +289,9 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         npc.setCanPickupItems(false);
         npc.setRotation(at.getYaw(), 0.0F);
         if (npc instanceof Mob mob) mob.setAI(false);
+        if (npc instanceof Zombie zombie) zombie.setShouldBurnInDay(false);
+        npc.setFireTicks(0);
+        npc.setVisualFire(false);
         if (npc instanceof Sheep sheep && choice.entityColor != null) {
             sheep.setColor(choice.entityColor);
         }
@@ -536,14 +547,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         String bot = entity.getPersistentDataContainer().get(botKey, PersistentDataType.STRING);
         if (kit != null) {
             e.setCancelled(true);
-            if ("none".equals(kit)) { openKitMenu(e.getPlayer()); return; }
-            Player player = e.getPlayer();
-            manager.selectKit(player, kit);
-            plugin.getConfig().set("lobby-kit-preferences." + player.getUniqueId() + "." + selectedGame.id(), kit);
-            plugin.saveConfig();
-            lobby.refreshPlayerScoreboard(player);
-            player.sendMessage(ChatColor.GREEN + "Selected " + kit.replace('-', ' ')
-                    + " for " + selectedGame.displayName() + ".");
+            openKitMenu(e.getPlayer());
             return;
         }
         if (queue != null) {
@@ -644,7 +648,13 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         if(KIT_TITLE.equals(title)){
             if(action!=null&&action.startsWith("kit:")){
                 String kit=action.substring(4);manager.selectKit(p,kit);
-                plugin.getConfig().set("lobby-kit-preferences."+p.getUniqueId()+"."+selectedGame.id(),kit);plugin.saveConfig();lobby.refreshPlayerScoreboard(p);p.closeInventory();
+                plugin.getConfig().set("lobby-kit-preferences."+p.getUniqueId()+"."+selectedGame.id(),kit);
+                plugin.saveConfig();
+                lobby.refreshPlayerScoreboard(p);
+                p.playSound(p.getLocation(), Sound.BLOCK_NOTE_BLOCK_PLING, 1.0F, 1.5F);
+                p.sendMessage(ChatColor.GREEN + "Selected " + kit.replace('-', ' ')
+                        + " for " + selectedGame.displayName() + ".");
+                p.closeInventory();
             }else if(e.getSlot()==22)p.closeInventory();
         } else if (QUEUE_TITLE.equals(title)) {
             if (action != null && action.startsWith("team:")) {
@@ -805,6 +815,7 @@ public final class ModernArcadeLobbyRuntime implements Listener {
 
     private void tick(){
         refreshDisplays();World world=lobby.ensureWorld();
+        clearLobbyNpcFire();
         for (Entity e : new ArrayList<>(showcase)) {
             if (e == null || !e.isValid() || e.getWorld() != world) continue;
             String value = e.getPersistentDataContainer().get(themeKey, PersistentDataType.STRING);
@@ -815,6 +826,37 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         // No persistent or lobby-wide test bots are ticked here. Match players are
         // created by ArcadeTestPlayerManager and destroyed when their round ends.
     }
+    private void clearLobbyNpcFire() {
+        for (Entity entity : new ArrayList<>(kitNpcs)) {
+            if (entity != null && entity.isValid() && entity.getFireTicks() > 0) {
+                entity.setFireTicks(0);
+                entity.setVisualFire(false);
+            }
+        }
+        for (Entity entity : new ArrayList<>(teamNpcs)) {
+            if (entity != null && entity.isValid() && entity.getFireTicks() > 0) {
+                entity.setFireTicks(0);
+                entity.setVisualFire(false);
+            }
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onLobbyNpcEnvironmentalDamage(EntityDamageEvent event) {
+        Entity entity = event.getEntity();
+        if (!entity.getPersistentDataContainer().has(kitNpcKey, PersistentDataType.STRING)
+                && !entity.getPersistentDataContainer().has(teamNpcKey, PersistentDataType.STRING)) return;
+        EntityDamageEvent.DamageCause cause = event.getCause();
+        if (cause == EntityDamageEvent.DamageCause.FIRE
+                || cause == EntityDamageEvent.DamageCause.FIRE_TICK
+                || cause == EntityDamageEvent.DamageCause.LAVA
+                || cause == EntityDamageEvent.DamageCause.HOT_FLOOR) {
+            event.setCancelled(true);
+            entity.setFireTicks(0);
+            entity.setVisualFire(false);
+        }
+    }
+
     private void tickBot(Bot b,long now,World lobbyWorld){
         Entity e=b.actor;if(!(e instanceof LivingEntity actor)||!e.isValid()){Location at=b.actorLocation==null?lobby.spawnLocation().add(0,-3,8):b.actorLocation.clone();spawnBotEntity(b,at,b.inGame);return;}
         // Re-assert collisionless, non-AI target state every tick; game logic drives movement/knockback.
@@ -932,6 +974,25 @@ public final class ModernArcadeLobbyRuntime implements Listener {
     public void onBotAttackSwing(PlayerAnimationEvent event) {
         if (!"ARM_SWING".equals(event.getAnimationType().name())) return;
         registerBotHitFromSwing(event.getPlayer());
+        registerLobbyNpcMenuFromSwing(event.getPlayer());
+    }
+
+    /** Left-clicking a kit or queue NPC opens its normal selection menu. */
+    private void registerLobbyNpcMenuFromSwing(Player player) {
+        if (player == null || !player.isOnline() || !lobby.isLobbyWorld(player.getWorld())) return;
+        Location eye = player.getEyeLocation();
+        Vector direction = eye.getDirection().normalize();
+        var ray = player.getWorld().rayTraceEntities(eye, direction, 4.25D, 0.9D,
+                candidate -> candidate instanceof LivingEntity
+                        && (candidate.getPersistentDataContainer().has(kitNpcKey, PersistentDataType.STRING)
+                        || candidate.getPersistentDataContainer().has(teamNpcKey, PersistentDataType.STRING)));
+        if (ray == null || ray.getHitEntity() == null || !player.hasLineOfSight(ray.getHitEntity())) return;
+        Entity target = ray.getHitEntity();
+        if (target.getPersistentDataContainer().has(kitNpcKey, PersistentDataType.STRING)) {
+            openKitMenu(player);
+        } else if (target.getPersistentDataContainer().has(teamNpcKey, PersistentDataType.STRING)) {
+            openQueueMenu(player);
+        }
     }
 
     @EventHandler(priority=EventPriority.MONITOR,ignoreCancelled=false)

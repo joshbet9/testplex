@@ -49,7 +49,7 @@ public final class ModernLobbyScoreboard {
         if (playerCapacity < 1) playerCapacity = Math.max(1, Bukkit.getMaxPlayers());
 
         String selectedGameId = plugin.getConfig().getString("lobby-selected-game", "death-tag");
-        if (selectedGameId == null || selectedGameId.isBlank()) selectedGameId = "death-tag";
+        String gameName = formatGameName(selectedGameId);
         String selectedKitId = plugin.getConfig().getString(
                 "lobby-kit-preferences." + player.getUniqueId() + "." + selectedGameId, "None");
         String kitName = formatKitName(selectedKitId);
@@ -60,14 +60,13 @@ public final class ModernLobbyScoreboard {
 
         List<String> lines = sidebarLines(
                 formatPlayerCount(currentPlayers, playerCapacity),
+                gameName,
                 kitName,
                 gems,
                 serverName
         );
         int score = lines.size();
-        for (String line : lines) {
-            sidebar.getScore(line).setScore(score--);
-        }
+        for (String line : lines) sidebar.getScore(line).setScore(score--);
         applyLobbyTabTeams(scoreboard);
         player.setScoreboard(scoreboard);
     }
@@ -98,6 +97,7 @@ public final class ModernLobbyScoreboard {
      */
     static List<String> sidebarLines(
             String players,
+            String game,
             String kit,
             String gems,
             String server) {
@@ -106,12 +106,15 @@ public final class ModernLobbyScoreboard {
                 ChatColor.YELLOW.toString() + ChatColor.BOLD + "Players",
                 ChatColor.WHITE + players,
                 spacer(1),
+                ChatColor.AQUA.toString() + ChatColor.BOLD + "Game",
+                ChatColor.WHITE + game,
+                spacer(2),
                 ChatColor.GOLD.toString() + ChatColor.BOLD + "Kit",
                 ChatColor.WHITE + kit,
-                spacer(2),
+                spacer(3),
                 ChatColor.GREEN.toString() + ChatColor.BOLD + "Gems",
                 ChatColor.WHITE + gems,
-                spacer(3),
+                spacer(4),
                 ChatColor.AQUA.toString() + ChatColor.BOLD + "Server",
                 ChatColor.WHITE + server
         );
@@ -121,6 +124,16 @@ public final class ModernLobbyScoreboard {
         int safeCapacity = Math.max(1, capacity);
         long safeCurrent = Math.max(0L, current);
         return safeCurrent + "/" + safeCapacity;
+    }
+
+    static String formatGameName(String gameId) {
+        if (gameId == null || gameId.isBlank()) return "None";
+        if (gameId.startsWith("monster-maze")) return "Monster Maze";
+        ArcadePortGame arcadeGame = ArcadePortGame.fromId(gameId);
+        if (arcadeGame != null) return arcadeGame.isMonsterMaze()
+                ? "Monster Maze" : arcadeGame.displayName();
+        ArcadeGameDirectory.Game directoryGame = ArcadeGameDirectory.find(gameId);
+        return directoryGame == null ? titleCase(gameId) : directoryGame.name();
     }
 
     static String formatKitName(String kitId) {
@@ -238,7 +251,8 @@ public final class ModernLobbyScoreboard {
             case 0 -> ChatColor.BLACK + " ";
             case 1 -> ChatColor.DARK_GRAY + " ";
             case 2 -> ChatColor.GRAY + " ";
-            default -> ChatColor.WHITE + " ";
+            case 3 -> ChatColor.WHITE + " ";
+            default -> ChatColor.DARK_AQUA + " ";
         };
     }
 

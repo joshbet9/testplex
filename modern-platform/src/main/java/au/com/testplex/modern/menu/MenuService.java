@@ -95,7 +95,11 @@ public final class MenuService implements Listener {
     }
 
     private void panelButton(Inventory inventory, int slot, Material material, String label, String action) {
-        ItemStack item = makeItem(material, label, List.of(ChatColor.GRAY + "Click to open."));
+        List<String> lore = "Start Game".equals(label)
+                ? List.of(ChatColor.GRAY + "Click to start after the lobby countdown.",
+                        ChatColor.YELLOW + "Shift-click to start immediately.")
+                : List.of(ChatColor.GRAY + "Click to open.");
+        ItemStack item = makeItem(material, label, lore);
         mark(item, action, null, null, null);
         inventory.setItem(slot, item);
     }
@@ -294,7 +298,11 @@ public final class MenuService implements Listener {
                             ChatColor.YELLOW + "Players rate games in /gamepreferences.")));
 
             List<GameDefinition> clearedGames = catalog.getGames().stream()
-                    .filter(game -> cleared.contains(game.getId())).toList();
+                    .filter(game -> cleared.contains(game.getId()))
+                    .filter(game -> !isMonsterMazeModeAlias(game))
+                    .sorted(java.util.Comparator.comparing(GameDefinition::getName,
+                            String.CASE_INSENSITIVE_ORDER))
+                    .toList();
             int[] slots = {10, 12, 14, 16, 19, 21, 23, 25, 28, 30, 32, 34, 37, 39, 41, 43};
             int pageCount = Math.max(1, (clearedGames.size() + slots.length - 1) / slots.length);
             int page = Math.max(0, Math.min(requestedPage, pageCount - 1));
@@ -839,9 +847,11 @@ public final class MenuService implements Listener {
                     player.sendMessage(ChatColor.RED + "Operator permission required to start a game.");
                 } else {
                     String selectedGame = plugin.getConfig().getString("game-panel.selected-game", "death-tag");
+                    boolean immediate = event.getClick().isShiftClick();
                     player.closeInventory();
                     try {
-                        boolean handled = player.performCommand("arcadeport start " + selectedGame);
+                        boolean handled = player.performCommand("arcadeport start " + selectedGame
+                                + (immediate ? " immediate" : ""));
                         if (!handled) {
                             player.sendMessage(ChatColor.RED + "The Start Game command was not handled. "
                                     + "Check that ArcadeMechanicsModern is enabled and see the server logs.");
