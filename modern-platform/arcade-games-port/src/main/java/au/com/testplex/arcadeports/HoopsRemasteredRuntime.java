@@ -502,7 +502,8 @@ public final class HoopsRemasteredRuntime implements Listener {
             return;
         }
         Block nextBlock = current.world.getBlockAt(ball.location);
-        if (!nextBlock.isPassable() && ball.location.getY() > FLOOR_Y + 1.0D) {
+        boolean openRimHardware = ball.mode == BallMode.SHOT && isOpenRimHardware(ball, nextBlock);
+        if (!nextBlock.isPassable() && !openRimHardware && ball.location.getY() > FLOOR_Y + 1.0D) {
             ball.location.subtract(ball.velocity);
             ball.velocity.setX(-ball.velocity.getX() * 0.45D);
             ball.velocity.setZ(-ball.velocity.getZ() * 0.45D);
@@ -593,6 +594,21 @@ public final class HoopsRemasteredRuntime implements Listener {
             givePossession(current, player, false);
             return;
         }
+    }
+
+    /**
+     * Iron bars and chains are visual rim/net details. Their Minecraft block
+     * collision shape must not veto the server-authoritative ball trajectory
+     * through the open scoring cylinder.
+     */
+    private boolean isOpenRimHardware(Ball ball, Block block) {
+        Material type = block.getType();
+        if (type != Material.IRON_BARS && type != Material.IRON_CHAIN) return false;
+        double hoopX = ball.defendingTeam == 0 ? LEFT_HOOP_X : RIGHT_HOOP_X;
+        return Math.abs(block.getX() - hoopX) <= 1
+                && Math.abs(block.getZ()) <= 1
+                && block.getY() >= FLOOR_Y + 2
+                && block.getY() <= FLOOR_Y + 3;
     }
 
     private boolean crossesHoop(Ball ball, Location from, Location to) {
