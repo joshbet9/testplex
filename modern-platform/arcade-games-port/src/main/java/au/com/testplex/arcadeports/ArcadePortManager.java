@@ -6261,22 +6261,16 @@ public final class ArcadePortManager implements Listener {
     private void useDragonsLeap(Session session, Player player, long now) {
         UUID id = player.getUniqueId();
         long readyAt = session.dragonLeapReadyAt.getOrDefault(id, 0L);
-        if (now < readyAt) {
-            player.sendMessage(ChatColor.YELLOW + "Leap ready in "
-                    + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s.");
-            return;
-        }
-        if (!player.isOnGround() && player.getFallDistance() > 3.0F) {
-            // Leap is the Dragons kit's only fall-cancel ability in this implementation.
-        }
+        if (now < readyAt) return;
         session.dragonLeapReadyAt.put(id, now + ArcadePortRules.DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS);
+        player.setCooldown(Material.IRON_AXE,
+                (int) Math.ceil(ArcadePortRules.DRAGONS_COWARD_LEAP_COOLDOWN_MILLIS / 50.0D));
         Entity leapEntity = player.getVehicle() instanceof Horse ? player.getVehicle() : player;
         leapEntity.setVelocity(ArcadePortRules.dragonsLeapVelocity(
                 leapEntity.getLocation().getDirection(), leapEntity.isOnGround()));
         leapEntity.setFallDistance(0.0F);
         player.setFallDistance(0.0F);
         player.playEffect(player.getLocation(), Effect.BLAZE_SHOOT, 8);
-        player.sendMessage(ChatColor.YELLOW + "Skill: " + ChatColor.GREEN + "You used Leap.");
     }
 
     private boolean isDragonFrostPlacementSafe(Session session, Block block, UUID exemptPlayerId) {
@@ -6346,11 +6340,7 @@ public final class ArcadePortManager implements Listener {
     private void activateDragonFrostBridge(Session session, Player player, long now) {
         UUID id = player.getUniqueId();
         long readyAt = session.dragonFrostReadyAt.getOrDefault(id, 0L);
-        if (now < readyAt) {
-            player.sendMessage(ChatColor.YELLOW + "Ice Bridge ready in "
-                    + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s.");
-            return;
-        }
+        if (now < readyAt) return;
 
         Location launch = player.getLocation().clone().add(0.0D, 1.0D, 0.0D);
         if (!launch.getBlock().isPassable()
@@ -6372,17 +6362,18 @@ public final class ArcadePortManager implements Listener {
         session.dragonFrostBridgePaths.put(id, path);
         session.dragonFrostBridgePathIndexes.put(id, 0);
         session.dragonFrostReadyAt.put(id, now + ArcadePortRules.DRAGONS_FROST_COOLDOWN_MILLIS);
+        player.setCooldown(Material.SNOWBALL,
+                (int) Math.ceil(ArcadePortRules.DRAGONS_FROST_COOLDOWN_MILLIS / 50.0D));
         player.getWorld().playSound(player.getLocation(), Sound.BLOCK_GLASS_PLACE, 0.9F, 1.5F);
         player.getWorld().spawnParticle(Particle.SNOWFLAKE,
                 player.getLocation().clone().add(0.0D, 0.3D, 0.0D), 14, 0.3D, 0.15D, 0.3D, 0.03D);
-        player.sendMessage(ChatColor.AQUA + "Ice Bridge! Your temporary three-lane path is forming.");
+        // Bridge particles and recharge overlay provide feedback.
     }
 
     private void activateDragonGlider(Session session, Player player, long now) {
         UUID id = player.getUniqueId();
         long readyAt = session.dragonGliderReadyAt.getOrDefault(id, 0L);
-        if (now < readyAt) { player.sendMessage(ChatColor.YELLOW + "Glide ready in " + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s."); return; }
-        if (session.dragonGliderUntil.containsKey(id)) { player.sendMessage(ChatColor.YELLOW + "You are already gliding."); return; }
+        if (now < readyAt || session.dragonGliderUntil.containsKey(id)) return;
         ItemStack chestplate = player.getInventory().getChestplate();
         session.dragonGliderOriginalChestplates.put(id, chestplate == null ? new ItemStack(Material.AIR) : chestplate.clone());
         player.getInventory().setChestplate(namedItem(Material.ELYTRA, "Temporary Glider", "Temporary movement ability; restored automatically."));
@@ -6392,8 +6383,10 @@ public final class ArcadePortManager implements Listener {
         player.setVelocity(glide); player.setGliding(true);
         session.dragonGliderUntil.put(id, now + ArcadePortRules.DRAGONS_GLIDER_DURATION_MILLIS);
         session.dragonGliderReadyAt.put(id, now + ArcadePortRules.DRAGONS_GLIDER_COOLDOWN_MILLIS);
+        player.setCooldown(Material.FEATHER,
+                (int) Math.ceil(ArcadePortRules.DRAGONS_GLIDER_COOLDOWN_MILLIS / 50.0D));
         player.playSound(player.getLocation(), Sound.ITEM_ELYTRA_FLYING, 0.9F, 1.15F);
-        player.sendMessage(ChatColor.AQUA + "Glider activated for 3.5 seconds.");
+        // The Elytra animation and recharge overlay provide feedback.
     }
 
     private void endDragonGlider(Session session, UUID playerId) {
@@ -6403,14 +6396,14 @@ public final class ArcadePortManager implements Listener {
         if (player == null || !player.isOnline()) return;
         player.setGliding(false);
         if (original != null) player.getInventory().setChestplate(original.getType().isAir() ? null : original);
-        if (session.alive.contains(playerId)) player.sendMessage(ChatColor.GRAY + "Your glide has ended.");
+        // Chestplate restoration and stopped gliding provide expiry feedback.
     }
 
     private void activateDragonTamer(Session session, Player player, long now) {
         UUID playerId = player.getUniqueId();
         if (session.dragonTamerControls.containsKey(playerId)) { player.sendMessage(ChatColor.YELLOW + "You are already controlling a dragon."); return; }
         long readyAt = session.dragonTamerReadyAt.getOrDefault(playerId, 0L);
-        if (now < readyAt) { player.sendMessage(ChatColor.YELLOW + "Tamer ready in " + Math.max(1L, (readyAt - now + 999L) / 1000L) + "s."); return; }
+        if (now < readyAt) return;
         EnderDragon dragon = session.entities.stream().filter(e -> e instanceof EnderDragon && e.isValid() && !e.isDead())
                 .map(e -> (EnderDragon) e).filter(e -> !session.dragonTamerByDragon.containsKey(e.getUniqueId()))
                 .min(java.util.Comparator.comparingDouble(e -> e.getLocation().distanceSquared(player.getLocation()))).orElse(null);
@@ -6420,6 +6413,8 @@ public final class ArcadePortManager implements Listener {
         session.dragonTamerControls.put(playerId, control);
         session.dragonTamerByDragon.put(dragon.getUniqueId(), playerId);
         session.dragonTamerReadyAt.put(playerId, now + ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS);
+        player.setCooldown(Material.END_CRYSTAL,
+                (int) Math.ceil(ArcadePortRules.DRAGONS_TAMER_COOLDOWN_MILLIS / 50.0D));
         session.dragonTargetPlayers.remove(dragon.getUniqueId()); session.dragonTargetLocations.remove(dragon.getUniqueId());
         player.setGameMode(GameMode.SPECTATOR); player.setSpectatorTarget(dragon);
         player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 0.9F, 1.2F);
@@ -10505,6 +10500,8 @@ public final class ArcadePortManager implements Listener {
         // subject to the normal pickup event; it is not a primed explosive.
         Item mine = session.world.dropItem(player.getEyeLocation(), new ItemStack(Material.TNT));
         mine.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+        // Keep the TNT item visible for the whole 40-tick arming period.
+        mine.setPickupDelay(40);
         session.entities.add(mine);
         session.dragonEscapeMineOwners.put(mine.getUniqueId(), player.getUniqueId());
         player.playSound(player.getLocation(), Sound.ENTITY_TNT_PRIMED, 0.8F, 1.15F);
@@ -10633,8 +10630,6 @@ public final class ArcadePortManager implements Listener {
         mine.remove();
         target.setVelocity(new Vector(0.0D, ArcadePortRules.DRAGON_ESCAPE_DISRUPTOR_LAUNCH_Y, 0.0D));
         target.setFallDistance(0.0F);
-        session.dragonEscapeMineLaunchedBy.put(target.getUniqueId(), ownerId);
-        session.dragonEscapeMineLaunchedAt.put(target.getUniqueId(), System.currentTimeMillis());
         session.dragonEscapeMineLaunchedBy.put(target.getUniqueId(), ownerId);
         session.dragonEscapeMineLaunchedAt.put(target.getUniqueId(), System.currentTimeMillis());
         target.playEffect(EntityEffect.HURT);
@@ -10940,13 +10935,6 @@ public final class ArcadePortManager implements Listener {
             plugin.saveConfig();
         }
         if (session.dragonEscapeMapResource == null) return;
-        if (session.dragonEscapeCompleted.add(id)) {
-            String statsPath = localStatsPath(id, ArcadePortGame.DRAGON_ESCAPE.id());
-            plugin.getConfig().set(statsPath + "course-completes",
-                    plugin.getConfig().getInt(statsPath + "course-completes", 0) + 1);
-            plugin.saveConfig();
-        }
-        if (session.dragonEscapeMapResource == null) return;
         long elapsed = Math.max(1L, now - session.startedAt);
         Map<Integer, Long> splits = session.dragonEscapeRunSplitMillis.computeIfAbsent(id, ignored -> new HashMap<>());
         splits.putIfAbsent(0, 0L);
@@ -10954,9 +10942,6 @@ public final class ArcadePortManager implements Listener {
         String path = dragonEscapePbPath(id, session.dragonEscapeMapResource);
         if (path.isEmpty()) return;
         long existing = plugin.getConfig().getLong(path + "time-ms", -1L);
-        if (existing > 0L && Math.abs(existing - elapsed) <= 50L) {
-            awardCatalogAchievement(player, "dragon-escape", "twinning-this-halloween");
-        }
         if (existing > 0L && Math.abs(existing - elapsed) <= 50L) {
             awardCatalogAchievement(player, "dragon-escape", "twinning-this-halloween");
         }
@@ -12484,7 +12469,8 @@ public final class ArcadePortManager implements Listener {
                 continue;
             }
             if (session.type == ArcadePortGame.BOMB_LOBBERS
-                    || session.type == ArcadePortGame.DEATH_TAG) continue;
+                    || session.type == ArcadePortGame.DEATH_TAG
+                    || session.type == ArcadePortGame.DRAGONS) continue;
             int score = session.scores.getOrDefault(id, 0);
             String specific = gameStatusText(session, p);
             String timeText = session.type == ArcadePortGame.DRAGON_ESCAPE
@@ -18519,10 +18505,13 @@ public final class ArcadePortManager implements Listener {
             event.setCancelled(true);
             double damage = ArcadePortRules.dragonFallDamageAfterReduction(rawDamage);
             if (damage > 0.0D) {
+                dragonPlayer.playEffect(EntityEffect.HURT);
+                dragonPlayer.playSound(dragonPlayer.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.8F);
+                dragonPlayer.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                        dragonPlayer.getLocation().clone().add(0.0D, 1.0D, 0.0D),
+                        6, 0.25D, 0.3D, 0.25D, 0.03D);
                 if (dragonPlayer.getHealth() <= damage) eliminate(session, dragonPlayer, null, "fell");
-                else {
-                    dragonPlayer.setHealth(dragonPlayer.getHealth() - damage);
-                }
+                else dragonPlayer.setHealth(dragonPlayer.getHealth() - damage);
             }
             return;
         }
@@ -18614,6 +18603,22 @@ public final class ArcadePortManager implements Listener {
                 return;
             }
             event.setCancelled(true);
+            if (session.type == ArcadePortGame.DRAGON_ESCAPE
+                    && session.alive.contains(target.getUniqueId())
+                    && event.getCause() == EntityDamageEvent.DamageCause.FALL) {
+                // Preserve vanilla fall damage while the shared handler cancels the
+                // native event to keep all Arcade damage in one consistent path.
+                if (incomingDamage > 0.0D) {
+                    target.playEffect(EntityEffect.HURT);
+                    target.playSound(target.getLocation(), Sound.ENTITY_PLAYER_HURT, 0.9F, 0.85F);
+                    target.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                            target.getLocation().clone().add(0.0D, 1.0D, 0.0D),
+                            5, 0.25D, 0.3D, 0.25D, 0.02D);
+                    if (target.getHealth() <= incomingDamage) eliminate(session, target, null, "fell");
+                    else target.setHealth(target.getHealth() - incomingDamage);
+                }
+                return;
+            }
             if (session.type == ArcadePortGame.SPLEEF) {
                 if (event instanceof EntityDamageByEntityEvent spleefDamage) {
                     Entity damager = spleefDamage.getDamager();
@@ -19630,8 +19635,13 @@ public final class ArcadePortManager implements Listener {
             boolean forceMicroCompass = session.type == ArcadePortGame.MICRO_BATTLES
                     && !session.alive.contains(player.getUniqueId()) && isMicroTrackingCompass(heldItem)
                     && (event.getAction().isRightClick() || event.getAction().isLeftClick());
+            // Paper may pre-cancel block clicks; live kit abilities must still activate
+            // whenever the player right-clicks, whether targeting air or blocks.
+            boolean forceSharedAbility = event.getAction().isRightClick()
+                    && session.alive.contains(player.getUniqueId())
+                    && shouldRouteRightClickAbility(session, player, heldItem);
             if (!forceGladiatorHotbar && !forceBaconAbility && !forceBombControlClick
-                    && !forceSpleefCompass && !forceMicroCompass
+                    && !forceSpleefCompass && !forceMicroCompass && !forceSharedAbility
                     && !forceWitherBlast && !forceWitherMinionOrScent) return;
         }
         if (session.type == ArcadePortGame.GLADIATORS
