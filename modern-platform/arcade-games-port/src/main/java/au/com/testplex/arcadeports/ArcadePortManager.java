@@ -1711,13 +1711,18 @@ public final class ArcadePortManager implements Listener {
 
     /**
      * Single authoritative eligibility check shared by the automatic selector,
-     * player-facing likelihoods and the Game Panel. This validates the approved
-     * game, embedded module registration and bundled selected-map archive.
+     * player-facing likelihoods and the Game Panel. It validates the approved game,
+     * registered embedded modules and the selected map's archive or physical world.
      */
     boolean isRotationCandidateAvailable(ArcadePortGame game) {
         if (game == null || !isGameEnabled(game)) return false;
-        if (game == ArcadePortGame.MONSTER_MAZE
-                && !isMonsterMazeModuleRegistered(monsterMazeModule)) return false;
+        if (game == ArcadePortGame.MONSTER_MAZE) {
+            if (!isMonsterMazeModuleRegistered(monsterMazeModule)) return false;
+            me.monstermaze.world.MapManager maps = monsterMazeModule.getMapManager();
+            if (maps == null) return false;
+            String activeMap = maps.getActiveMap();
+            return maps.isKnown(activeMap) && maps.isAvailable(activeMap);
+        }
         if (!SourceMapCatalog.hasMap(game)) return true;
         String selectedResource = plugin.getConfig().getString("selected-maps." + game.id(),
                 SourceMapCatalog.selectedResource(plugin, game));
