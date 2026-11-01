@@ -150,7 +150,7 @@ class ArcadePortGameTest {
 
 
     @Test void exposesTheMechanicsGamesAndIntegratedModules() {
-        assertEquals(26, ArcadePortGame.values().length);
+        assertEquals(27, ArcadePortGame.values().length);
         Set<String> ids = new HashSet<>();
         for (ArcadePortGame game : ArcadePortGame.values()) {
             assertTrue(ids.add(game.id()), "duplicate game id: " + game.id());
@@ -2740,4 +2740,13 @@ class ArcadePortGameTest {
         assertEquals(1, ArcadePortRules.turfWarsTimeoutLeader(-1, 4, 5));
         assertEquals(-1, ArcadePortRules.turfWarsTimeoutLeader(-1, 5, 5));
     }
+
+    @Test void hoopsRemasteredHasItsOwnIdAndGeneratedCourt() {
+        assertEquals(ArcadePortGame.HOOPS_REMASTERED, ArcadePortGame.fromId("hoops-remastered"));
+        assertEquals(ArcadePortGame.HOOPS_REMASTERED, ArcadePortGame.fromId("Hoops Remastered"));
+        assertEquals("Hoops Remastered", ArcadePortGame.HOOPS_REMASTERED.displayName());
+        assertEquals(2, ArcadePortManager.teamCountForGame(ArcadePortGame.HOOPS_REMASTERED));
+        assertTrue(SourceMapCatalog.mapFoldersFor(ArcadePortGame.HOOPS_REMASTERED).isEmpty());
+    }
+
 }

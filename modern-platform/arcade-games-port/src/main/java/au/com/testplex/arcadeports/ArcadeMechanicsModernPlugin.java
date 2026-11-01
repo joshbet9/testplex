@@ -212,6 +212,12 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             });
         }
     }
+
+    /** Disposable Paper smoke harness only: clear stale shared test state before its controlled match. */
+    public void prepareForHoops() {
+        if (manager == null) throw new IllegalStateException("Shared Arcade manager is not ready.");
+        manager.stop("Hoops Remastered disposable acceptance harness reset.");
+    }
     /** Called only after a natural Testplex-managed Monster Maze round completion. */
     public void onMonsterMazeRoundCompleted() {
         if (manager != null) manager.onExternalGameCompleted(ArcadePortGame.MONSTER_MAZE);
