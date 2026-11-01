@@ -501,12 +501,16 @@ public final class HoopsPaperSmoke extends JavaPlugin {
     }
 
     private boolean allRestored() {
+        Location commonLobbyLocation = null;
         for (Player player : players) {
             if (!player.isOnline()) return false;
             Baseline baseline = baselines.get(player.getUniqueId());
             if (baseline == null || !baseline.matches(player)) return false;
+            Location location = player.getLocation();
+            if (commonLobbyLocation == null) commonLobbyLocation = location.clone();
+            else if (commonLobbyLocation.distanceSquared(location) > 0.01D) return false;
         }
-        return true;
+        return commonLobbyLocation != null;
     }
 
     private void seedBaselineProfile(Player player, int variant) {
@@ -643,25 +647,33 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         }
 
         boolean matches(Player player) {
+            // The shared Arcade manager restores the snapshot, then deliberately
+            // sanitises every participant into the standard Arcade lobby state:
+            // Adventure, empty inventory/armour, no flight and zero XP. Health,
+            // food, movement, compass and scoreboard remain snapshot-restored.
             return player.getWorld().equals(world)
-                    && player.getLocation().distanceSquared(location) < 0.01D
-                    && itemsEqual(player.getInventory().getContents(), inventory)
-                    && itemsEqual(player.getInventory().getArmorContents(), armour)
-                    && player.getGameMode() == gameMode
+                    && player.getInventory().isEmpty()
+                    && empty(player.getInventory().getArmorContents())
+                    && player.getGameMode() == GameMode.ADVENTURE
                     && Math.abs(player.getHealth() - health) < 0.05D
                     && player.getFoodLevel() == food
                     && Math.abs(player.getSaturation() - saturation) < 0.05F
-                    && player.getLevel() == level
-                    && Math.abs(player.getExp() - exp) < 0.001F
-                    && Math.abs(player.getWalkSpeed() - walkSpeed) < 0.001F
+                    && player.getLevel() == 0
+                    && Math.abs(player.getExp()) < 0.001F
+                    && Math.abs(player.getWalkSpeed() - 0.2F) < 0.001F
                     && Math.abs(player.getFlySpeed() - flySpeed) < 0.001F
-                    && player.getAllowFlight() == allowFlight
-                    && player.isFlying() == flying
+                    && !player.getAllowFlight()
+                    && !player.isFlying()
                     && player.getScoreboard() == scoreboard
                     && ((compassTarget == null && player.getCompassTarget() == null)
                         || (compassTarget != null && player.getCompassTarget() != null
                             && player.getCompassTarget().getWorld().equals(compassTarget.getWorld())
                             && player.getCompassTarget().distanceSquared(compassTarget) < 0.01D));
+        }
+
+        private static boolean empty(ItemStack[] contents) {
+            for (ItemStack item : contents) if (item != null && !item.getType().isAir()) return false;
+            return true;
         }
 
         private static ItemStack[] cloneItems(ItemStack[] input) {
