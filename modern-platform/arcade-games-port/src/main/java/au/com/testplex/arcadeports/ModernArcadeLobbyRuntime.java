@@ -581,7 +581,10 @@ public final class ModernArcadeLobbyRuntime implements Listener {
         int teamCount = ArcadePortManager.teamCountForGame(selectedGame);
         int selectedTeam = manager.lobbyTeamPreference(p, selectedGame, teamCount);
         inv.setItem(4, item(Material.PORKCHOP, ChatColor.GOLD + selectedGame.displayName(),
-                ChatColor.GRAY + (teamCount > 0 ? "Choose a team, then join the queue." : "Free-for-all: no team is required."),
+                ChatColor.GRAY + (teamCount > 0 ? "Choose a team, then join the queue."
+                        : selectedGame.lobbyRolesAssignedAutomatically()
+                                ? "Your match role is assigned automatically."
+                                : "Free-for-all: no team is required."),
                 ChatColor.GRAY + "Players queued: " + manager.queuedCount(selectedGame)));
         if (teamCount > 0) {
             Material[] dyes = {Material.RED_DYE, Material.BLUE_DYE, Material.GREEN_DYE, Material.YELLOW_DYE};
