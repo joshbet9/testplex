@@ -89,6 +89,7 @@ public final class SpeedBuildersGame implements Listener {
     private final ArcadeMechanicsModernPlugin plugin;
     private final LinkedHashSet<UUID> queue = new LinkedHashSet<>();
     private final LinkedHashMap<UUID, PlayerState> players = new LinkedHashMap<>();
+    private final List<PlayerState> matchHistory = new ArrayList<>();
     private List<Template> templates = List.of();
     private final List<Template> unusedTemplates = new ArrayList<>();
     private final List<PlayerState> pendingEliminations = new ArrayList<>();
@@ -275,6 +276,18 @@ public final class SpeedBuildersGame implements Listener {
 
     private void restoreAfterReturningToLobby(Player player, PlayerSnapshot snapshot) {
         if (player == null || snapshot == null || !player.isOnline()) return;
+        if (shuttingDown) {
+            try {
+                snapshot.restore(player);
+                plugin.getConfig().set("speed-builders-pending-restores." + player.getUniqueId(), null);
+                plugin.saveConfig();
+            } catch (RuntimeException failure) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                        "Speed Builders could not synchronously restore player state during shutdown for "
+                                + player.getUniqueId(), failure);
+            }
+            return;
+        }
         plugin.returnPlayerToArcadeLobby(player);
         Runnable restore = () -> {
             if (!player.isOnline()) return;
@@ -329,6 +342,7 @@ public final class SpeedBuildersGame implements Listener {
             arena = ensureArena();
             buildArenaFloor();
             players.clear();
+            matchHistory.clear();
             round = 0;
             buildTimeTracker = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
             buildSeconds = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
@@ -344,6 +358,7 @@ public final class SpeedBuildersGame implements Listener {
                 Plot plot = plotFor(i);
                 PlayerState state = new PlayerState(player, plot, plugin);
                 players.put(player.getUniqueId(), state);
+                matchHistory.add(state);
                 preparePlayerForRound(state);
             }
             Bukkit.broadcastMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "SPEED BUILDERS");
@@ -361,6 +376,7 @@ public final class SpeedBuildersGame implements Listener {
                 }
             }
             players.clear();
+            matchHistory.clear();
             phase = Phase.IDLE;
             currentTemplate = null;
         }
@@ -699,7 +715,7 @@ public final class SpeedBuildersGame implements Listener {
             Bukkit.broadcastMessage(ChatColor.YELLOW + "Speed Builders ended. " + stopReason);
         }
         persistMatchProgress(winner);
-        for (PlayerState state : players.values()) {
+        for (PlayerState state : matchHistory) {
             if (round > 0 && state.perfectBuilds == round) {
                 SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(),
                         "perfectionist-wins", 1L);
@@ -718,6 +734,7 @@ public final class SpeedBuildersGame implements Listener {
             }
         }
         players.clear();
+        matchHistory.clear();
         pendingEliminations.clear();
         restorePlot(reviewPlot);
         refreshHud();
@@ -744,9 +761,6 @@ public final class SpeedBuildersGame implements Listener {
         SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "blocks-broken", state.blocksBroken);
         SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "mobs-built", state.mobsBuilt);
         SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "perfect-builds", state.perfectBuilds);
-        if (round > 0 && state.perfectBuilds == round) {
-            SpeedBuildersProgressStore.increment(plugin.getConfig(), playerId, "perfectionist-wins", 1L);
-        }
         plugin.saveConfig();
     }
 
