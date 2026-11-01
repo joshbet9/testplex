@@ -5262,8 +5262,11 @@ public final class ArcadePortManager implements Listener {
         else session.alphaChasers.remove(player.getUniqueId());
         awardDeathTagKill(session, killer);
         if (player.isOnline()) {
-            // Source forced promotions change the player's role in place. Natural conversions
-            // likewise remain at the runner's death location, as in DeathTag.RespawnPlayer().
+            // Preserve in-place conversion on safe ground, but do not strand a new
+            // Chaser in lava, void or a blocked source-map marker.
+            if (!isSafeDeathTagRespawnSpawn(player.getLocation())) {
+                player.teleport(deathTagChaserRespawnSpawn(session, player));
+            }
             player.setGameMode(GameMode.ADVENTURE);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
@@ -5334,6 +5337,39 @@ public final class ArcadePortManager implements Listener {
                 && !isDeathTagRespawnHazard(ground.getType());
     }
 
+    /**
+     * Legacy map spawn markers sometimes point into decorative blocks or stand
+     * one or two blocks above/below their actual platform. Only reuse existing,
+     * collision-free terrain; never build a substitute arena for Death Tag.
+     */
+    private Location findSafeDeathTagSpawnNearby(Location base) {
+        if (base == null || base.getWorld() == null) return null;
+        World world = base.getWorld();
+        int centreX = base.getBlockX();
+        int centreY = base.getBlockY();
+        int centreZ = base.getBlockZ();
+        for (int radius = 0; radius <= 8; radius++) {
+            for (int dx = -radius; dx <= radius; dx++) {
+                for (int dz = -radius; dz <= radius; dz++) {
+                    if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
+                    // Prefer the authored elevation, then nearby lower/upper platforms.
+                    for (int offset = 0; offset <= 8; offset++) {
+                        for (int sign = 1; sign >= -1; sign -= 2) {
+                            if (offset == 0 && sign == -1) continue;
+                            int y = centreY + offset * sign;
+                            if (y < world.getMinHeight() + 1 || y > world.getMaxHeight() - 2) continue;
+                            Location candidate = new Location(world,
+                                    centreX + dx + 0.5D, y, centreZ + dz + 0.5D,
+                                    base.getYaw(), base.getPitch());
+                            if (isSafeDeathTagRespawnSpawn(candidate)) return candidate;
+                        }
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
     private Location deathTagChaserRespawnSpawn(Session session, Player player) {
         SourceMapCatalog.MapData mapData = sourceMapData.get(session.type.id());
         if (mapData != null && !mapData.spawnLocations().isEmpty()) {
@@ -5348,23 +5384,22 @@ public final class ArcadePortManager implements Listener {
                                         candidate.distanceSquared(other.getLocation())).min()
                                         .orElse(Double.POSITIVE_INFINITY))).orElseThrow().clone();
             }
-            // Source map spawn markers can overlap decorative blocks; search nearby safe floor.
+            // Resolve invalid legacy marker heights against actual source terrain.
             for (Location base : mapData.spawnLocations()) {
-                for (int radius = 0; radius <= 4; radius++) {
-                    for (int dx = -radius; dx <= radius; dx++) {
-                        for (int dz = -radius; dz <= radius; dz++) {
-                            if (Math.max(Math.abs(dx), Math.abs(dz)) != radius) continue;
-                            for (int dy = 0; dy <= 3; dy++) {
-                                Location candidate = base.clone().add(dx, dy, dz);
-                                if (isSafeDeathTagRespawnSpawn(candidate)) return candidate;
-                            }
-                        }
-                    }
-                }
+                Location nearby = findSafeDeathTagSpawnNearby(base);
+                if (nearby != null) return nearby;
             }
         }
         Location fallback = spawnFor(session, player);
-        return isSafeDeathTagRespawnSpawn(fallback) ? fallback : player.getLocation().clone();
+        if (isSafeDeathTagRespawnSpawn(fallback)) return fallback;
+        Location nearbyFallback = findSafeDeathTagSpawnNearby(fallback);
+        if (nearbyFallback != null) return nearbyFallback;
+        if (isSafeDeathTagRespawnSpawn(player.getLocation())) return player.getLocation().clone();
+        Location nearbyPlayer = findSafeDeathTagSpawnNearby(player.getLocation());
+        if (nearbyPlayer != null) return nearbyPlayer;
+        // Do not silently reuse a known hazardous death position without diagnostics.
+        plugin.getLogger().severe("Death Tag has no safe Chaser respawn near its source markers or active players.");
+        return fallback;
     }
 
     private void respawnDeathTagChaser(Session session, Player player) {
