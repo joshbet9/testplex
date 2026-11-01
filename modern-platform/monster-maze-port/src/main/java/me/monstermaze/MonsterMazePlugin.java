@@ -22,7 +22,6 @@ import me.monstermaze.world.MapWorldSafetyListener;
 import me.monstermaze.world.SoloPBCommandListener;
 import me.monstermaze.util.MobThemeManager;
 import org.bukkit.Bukkit;
-import org.bukkit.Location;
 import org.bukkit.Server;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.configuration.file.FileConfiguration;
@@ -40,12 +39,11 @@ import java.util.logging.Level;
 import java.util.Objects;
 
 /**
- * Monster Maze's Testplex game-module facade.
+ * In-process Monster Maze gameplay runtime owned by Testplex Arcade.
  *
- * This is deliberately not a JavaPlugin. Testplex's ArcadeMechanicsModernPlugin
- * owns Bukkit's plugin lifecycle, player join flow, commands, queues and game
- * selection. Monster Maze keeps its gameplay managers and private configuration
- * namespace, but it is loaded and started by the Testplex Arcade manager.
+ * This is not a Bukkit plugin or a separate integration. ArcadeMechanicsModernPlugin
+ * owns the only Bukkit lifecycle, player join flow, commands, queues, sessions and
+ * game selection; this class holds Monster Maze's gameplay managers and config.
  */
 public final class MonsterMazePlugin {
     private static MonsterMazePlugin instance;
@@ -135,16 +133,17 @@ public final class MonsterMazePlugin {
         getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=mode-resources-ready");
 
         this.mobThemeManager = new MobThemeManager(this);
-        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=map-world-load-start map=" + mapManager.getActiveMap());
-        Location mapCenter = mapManager.defaultCenter();
-        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=map-world-load-finished map="
-                + mapManager.getActiveMap() + " world=" + (mapCenter == null ? "unavailable" : mapCenter.getWorld().getName()));
-        if (mapCenter == null) {
-            getLogger().warning("No active Monster Maze source map is available yet; the module will remain idle until a map can be loaded.");
-        }
+
+        // Do not synchronously load a complete source world during Paper's plugin
+        // enable phase. Monster Maze is a built-in Arcade game: its manager and
+        // commands must be ready with the shared runtime, while the physical map
+        // is loaded lazily when the first round is actually requested. GameManager
+        // already resolves MapManager.defaultCenter() from startGame() when no
+        // explicit arena centre has been selected.
+        getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=map-world-loading-deferred map="
+                + mapManager.getActiveMap());
         this.gameManager = new GameManager(this);
         getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=game-manager-created");
-        if (mapCenter != null) this.gameManager.setCenter(mapCenter);
         this.gameManager.getMonsterManager().setMobType(mapManager.activeMob());
         this.monsterEntityListener = new MonsterEntityListener(this, gameManager);
         getLogger().info("TESTPLEX_MONSTER_MAZE_BOOTSTRAP phase=gameplay-listeners-created");
