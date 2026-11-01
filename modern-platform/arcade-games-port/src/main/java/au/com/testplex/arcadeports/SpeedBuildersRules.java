@@ -238,36 +238,52 @@ public final class SpeedBuildersRules {
     }
 
     /**
-     * Highest cumulative accuracy wins. A tie on accuracy is broken by the lowest
-     * cumulative build time across all rounds. Exact ties on both remain shared wins.
+     * Highest cumulative accuracy wins. Only players who perfected every build are
+     * eligible for the cumulative-time tie-break. If no top-scoring player is eligible,
+     * the accuracy tie remains shared. Exact time ties also remain shared.
+     *
+     * @param cumulativeBuildTicks times for all-round perfect players only; may be a subset
+     *                             of the scoring roster
      */
     public static List<String> winnersByScoreThenBuildTime(
             Map<String, Integer> totalScores, Map<String, Long> cumulativeBuildTicks) {
         Objects.requireNonNull(totalScores, "totalScores");
         Objects.requireNonNull(cumulativeBuildTicks, "cumulativeBuildTicks");
-        if (!totalScores.keySet().equals(cumulativeBuildTicks.keySet())) {
-            throw new IllegalArgumentException("Score and build-time rosters must match.");
+        if (!totalScores.keySet().containsAll(cumulativeBuildTicks.keySet())) {
+            throw new IllegalArgumentException("Build-time roster must be a subset of the scoring roster.");
         }
         if (totalScores.isEmpty()) return List.of();
 
         for (Map.Entry<String, Integer> entry : totalScores.entrySet()) {
-            Long buildTicks = cumulativeBuildTicks.get(entry.getKey());
             if (entry.getKey() == null || entry.getKey().isBlank()
-                    || entry.getValue() == null || entry.getValue() < 0
-                    || buildTicks == null || buildTicks < 0L) {
-                throw new IllegalArgumentException("Invalid Speed Builders score or cumulative build time.");
+                    || entry.getValue() == null || entry.getValue() < 0) {
+                throw new IllegalArgumentException("Invalid Speed Builders score.");
+            }
+        }
+        for (Map.Entry<String, Long> entry : cumulativeBuildTicks.entrySet()) {
+            if (entry.getKey() == null || entry.getKey().isBlank()
+                    || entry.getValue() == null || entry.getValue() < 0L) {
+                throw new IllegalArgumentException("Invalid eligible Speed Builders build time.");
             }
         }
 
         int highestScore = totalScores.values().stream().mapToInt(Integer::intValue).max().orElse(0);
-        long fastestBuildTime = totalScores.entrySet().stream()
+        List<String> topScorers = totalScores.entrySet().stream()
                 .filter(entry -> entry.getValue() == highestScore)
-                .mapToLong(entry -> cumulativeBuildTicks.get(entry.getKey()))
-                .min().orElseThrow();
-        return totalScores.entrySet().stream()
-                .filter(entry -> entry.getValue() == highestScore
-                        && cumulativeBuildTicks.get(entry.getKey()) == fastestBuildTime)
                 .map(Map.Entry::getKey)
+                .toList();
+        List<String> eligibleTopScorers = topScorers.stream()
+                .filter(cumulativeBuildTicks::containsKey)
+                .toList();
+        if (eligibleTopScorers.isEmpty()) {
+            return topScorers.stream().sorted(String.CASE_INSENSITIVE_ORDER).toList();
+        }
+
+        long fastestBuildTime = eligibleTopScorers.stream()
+                .mapToLong(cumulativeBuildTicks::get)
+                .min().orElseThrow();
+        return eligibleTopScorers.stream()
+                .filter(id -> cumulativeBuildTicks.get(id) == fastestBuildTime)
                 .sorted(String.CASE_INSENSITIVE_ORDER)
                 .toList();
     }
