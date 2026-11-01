@@ -3,6 +3,706 @@
   "source_commit": "25769ad922824befd327cea37919fc0b4ed64b56",
   "recovered": [
     {
+      "game": "Evolution",
+      "name": "Revelation",
+      "id": 2001,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/evolution/revelation.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Evolution/Evolution_Revelation.zip",
+      "sha256": "9a3d30e8990cf5e3b6ace42676e838634641bbd335c33a9865cfc75a5c87e1ed",
+      "bytes": 548146,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 2742897
+    },
+    {
+      "game": "Evolution",
+      "name": "Guardian Island",
+      "id": 2002,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/evolution/guardianisland.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Evolution/Evolution_Guardian_Island.zip",
+      "sha256": "a367c380f96f266233b4c8ccea758f5d37aa2e13301f5eabd36a61aaebdee30e",
+      "bytes": 374107,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 3201657
+    },
+    {
+      "game": "Evolution",
+      "name": "Winterhold",
+      "id": 2003,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/evolution/winterhold.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Evolution/Evolution_Winterhold.zip",
+      "sha256": "c763c5c15492150ea95107dd8b15c04dd07ac107771dff4173b31af40419ee2d",
+      "bytes": 238944,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 1522296
+    },
+    {
+      "game": "Evolution",
+      "name": "Oasis",
+      "id": 2004,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/evolution/oasis.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Evolution/Evolution_Oasis.zip",
+      "sha256": "c4eb3865414a623e13b54ea835a25a97c491ccf579c4659eb66186da90dc62b0",
+      "bytes": 181842,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 633464
+    },
+    {
+      "game": "Evolution",
+      "name": "Tropics",
+      "id": 2005,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/evolution/tropics.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Evolution/Evolution_Tropics.zip",
+      "sha256": "9c610972c0a64660cce66d2fb05867d8c96778f822ed5e6305b0f859f6c56d1c",
+      "bytes": 252003,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 2456174
+    },
+    {
+      "game": "Evolution",
+      "name": "Bonzai",
+      "id": 2006,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/evolution/bonzai.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Evolution/Evolution_Bonzai.zip",
+      "sha256": "5265620c7faf0acbbb88fb20faed4cbcf116f5515eaab3224c4666e34c9e937e",
+      "bytes": 197454,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 2230925
+    },
+    {
+      "game": "Gladiators",
+      "name": "Tribal Battleground",
+      "id": 2100,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/tribalbattleground.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Tribal_Battleground.zip",
+      "sha256": "6a48c4e95b49233bfef084833bd00631e6076a8f5c31aeba6390e5996592dd54",
+      "bytes": 260856,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 895625
+    },
+    {
+      "game": "Gladiators",
+      "name": "Bliss",
+      "id": 2101,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/bliss.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Bliss.zip",
+      "sha256": "09fecf5a9b45af05286005d38f211154687981872dd032002793cd3dc368dd62",
+      "bytes": 132296,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 780907
+    },
+    {
+      "game": "Gladiators",
+      "name": "Fierce Desert",
+      "id": 2102,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/fiercedesert.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Fierce_Desert.zip",
+      "sha256": "7297bc5d656961429d397313a35ced92bc3c014a93be74027deb118832b2c75a",
+      "bytes": 208365,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 944756
+    },
+    {
+      "game": "Gladiators",
+      "name": "Alberwood Creek",
+      "id": 2103,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/alberwoodcreek.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Alberwood_Creek.zip",
+      "sha256": "1d76b5b5f2658e9e9bc4857f4bbca8c37f3069278e26e4703d9cc5fd529f57db",
+      "bytes": 459623,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 858748
+    },
+    {
+      "game": "Gladiators",
+      "name": "Autumn Kingdom",
+      "id": 2104,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/autumnkingdom.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Autumn_Kingdom.zip",
+      "sha256": "c7677437b1ade6256f700c368481acb9b189d1fee9d234753041b2bb3cecd616",
+      "bytes": 250824,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 580262
+    },
+    {
+      "game": "Gladiators",
+      "name": "Tropics",
+      "id": 2105,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/tropics.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Tropics.zip",
+      "sha256": "8b0c09147cb8874c8a6eb327307fc847877a223a79d2589c30919cbe9b48bd44",
+      "bytes": 321908,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 862906
+    },
+    {
+      "game": "Gladiators",
+      "name": "Cherry Bomb",
+      "id": 2106,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/cherrybomb.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Cherry_Bomb.zip",
+      "sha256": "5cb761d7023c9a07cbc94e0e911227a79147c029aa9fea119ba7433cbe5b4d9b",
+      "bytes": 313813,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 891481
+    },
+    {
+      "game": "Gladiators",
+      "name": "Mythical Forests",
+      "id": 2107,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/mythicalforests.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Mythical_Forests.zip",
+      "sha256": "55c5a50f2f95f523a7d6c69794fb9f71603c32360ca9e7deef76950ecf4a6ab1",
+      "bytes": 365596,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 4266697
+    },
+    {
+      "game": "Gladiators",
+      "name": "Choco Valley",
+      "id": 2108,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/chocovalley.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Choco_Valley.zip",
+      "sha256": "ced0c214a458f0e1ea8b616f94ccda000c2567ca96298b3dfd2c58bd6af67e92",
+      "bytes": 222992,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 895632
+    },
+    {
+      "game": "Gladiators",
+      "name": "Under the Sea",
+      "id": 2109,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/underthesea.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Under_the_Sea.zip",
+      "sha256": "c573ce7c60b7417fc4f60d9f3e01379f67fe376b210f2f5957b3105c0e67e519",
+      "bytes": 336132,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 686720
+    },
+    {
+      "game": "Gladiators",
+      "name": "Urban",
+      "id": 2110,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/urban.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Urban.zip",
+      "sha256": "22706e80fdf2939e04503dec7bc71cbda00f74c8330b3a5af6100612add69897",
+      "bytes": 219927,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 666475
+    },
+    {
+      "game": "Gladiators",
+      "name": "Clockwork",
+      "id": 2111,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/clockwork.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Clockwork.zip",
+      "sha256": "a6abc38d8fce34da1c7d268294658385a886b1facb9e39e76ab56cd726aa5360",
+      "bytes": 251532,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 2091621
+    },
+    {
+      "game": "Gladiators",
+      "name": "Savanna",
+      "id": 2112,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/savanna.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Savanna.zip",
+      "sha256": "5e3d7f6f17f6dc89bc948c3de736787783a6b17ccf3cc7ef7be42eca9b35e668",
+      "bytes": 381880,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 2279553
+    },
+    {
+      "game": "Gladiators",
+      "name": "Ethereal Caverns",
+      "id": 2113,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/etherealcaverns.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Ethereal_Caverns.zip",
+      "sha256": "423ea222a0a5c70cf3b82b84bd48bfa0f441433c6c0b8f1d8a9173957d88af3c",
+      "bytes": 567220,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 1075900
+    },
+    {
+      "game": "Gladiators",
+      "name": "Castaway Cove",
+      "id": 2114,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/castawaycove.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Castaway_Cove.zip",
+      "sha256": "2dd53db44df5d1b8a3353cb28c12cb572dd4cfb438424111b5f1f7913b75df90",
+      "bytes": 601110,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 3975826
+    },
+    {
+      "game": "Gladiators",
+      "name": "Primitive",
+      "id": 2115,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/primitive.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Primitive.zip",
+      "sha256": "c7434c66f52a546dd1605bc1a2aa6f40e68646d71de9c356ebdb73aa263cc6b4",
+      "bytes": 382015,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 887403
+    },
+    {
+      "game": "Gladiators",
+      "name": "Harmony",
+      "id": 2116,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/harmony.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Harmony.zip",
+      "sha256": "67d44e4520242af6cb7508e4cccdfd2717fcfb9fb2895e2ebeea0a5525186bc2",
+      "bytes": 614216,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 4164178
+    },
+    {
+      "game": "Gladiators",
+      "name": "Flushed Away",
+      "id": 2117,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/flushedaway.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Flushed_Away.zip",
+      "sha256": "22bb0f28a7345114aa6a0b018ad13dfffa73d2f23642479a4fb2543065cb191d",
+      "bytes": 237256,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 2517650
+    },
+    {
+      "game": "Gladiators",
+      "name": "Cosmos",
+      "id": 2118,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/cosmos.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Cosmos.zip",
+      "sha256": "747d9b8c6a39e9d60dcfdbea6632e244618411a314e09c4d84c9f555d3aa7aff",
+      "bytes": 286589,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 838299
+    },
+    {
+      "game": "Gladiators",
+      "name": "OutLaw",
+      "id": 2119,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/outlaw.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_OutLaw.zip",
+      "sha256": "fd9e2286161ac156ee3f205e495218cc857401aeeb4d2a2c57a174363d9b2232",
+      "bytes": 588915,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 2738841
+    },
+    {
+      "game": "Gladiators",
+      "name": "Planet Douglas",
+      "id": 2120,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/planetdouglas.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_Planet_Douglas.zip",
+      "sha256": "68ca2ba2dc3525641e991eb1a0b88ddb1fa42c6965200fe5da70d5154d559081",
+      "bytes": 207252,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 1743481
+    },
+    {
+      "game": "Gladiators",
+      "name": "The Shire",
+      "id": 2121,
+      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/theshire.zip",
+      "path": "update/map-recovery/nixuge/unconfigured/Gladiators/Gladiators_The_Shire.zip",
+      "sha256": "876140052d79e0557e2b1a19d848a9d5fbcd720e30b8e4d96f0c8ed9a0ccfc1c",
+      "bytes": 275447,
+      "status": "raw-archive-layout-review",
+      "has_level_dat": true,
+      "has_regions": false,
+      "has_reborn_worldconfig": false,
+      "entries": 8,
+      "sample_entries": [
+        "region/r.0.-1.mca",
+        "region/r.-1.0.mca",
+        "region/r.0.0.mca",
+        "region/r.-1.-1.mca",
+        "session.lock",
+        "WorldDownloader.txt",
+        "playerdata/5be633d8-bc5a-4bfc-82c6-01af20c8479f.dat",
+        "level.dat"
+      ],
+      "uncompressed_bytes": 2050651
+    },
+    {
       "game": "Gladiators",
       "name": "Caged In",
       "status": "already-present-in-1.8-source",
@@ -15,174 +715,6 @@
       "name": "Twin Peaks 2.0",
       "url": "https://maps.nixuge.me/static/mineplex/zip/evolution/twinpeaks20.zip",
       "error": "Cannot fetch original archive: HTTP Error 404: Not Found"
-    },
-    {
-      "game": "Evolution",
-      "name": "Revelation",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/evolution/revelation.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Evolution",
-      "name": "Guardian Island",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/evolution/guardianisland.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Evolution",
-      "name": "Winterhold",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/evolution/winterhold.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Evolution",
-      "name": "Oasis",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/evolution/oasis.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Evolution",
-      "name": "Tropics",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/evolution/tropics.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Evolution",
-      "name": "Bonzai",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/evolution/bonzai.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Tribal Battleground",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/tribalbattleground.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Bliss",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/bliss.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Fierce Desert",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/fiercedesert.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Alberwood Creek",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/alberwoodcreek.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Autumn Kingdom",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/autumnkingdom.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Tropics",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/tropics.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Cherry Bomb",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/cherrybomb.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Mythical Forests",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/mythicalforests.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Choco Valley",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/chocovalley.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Under the Sea",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/underthesea.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Urban",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/urban.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Clockwork",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/clockwork.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Savanna",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/savanna.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Ethereal Caverns",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/etherealcaverns.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Castaway Cove",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/castawaycove.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Primitive",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/primitive.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Harmony",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/harmony.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Flushed Away",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/flushedaway.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Cosmos",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/cosmos.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "OutLaw",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/outlaw.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "Planet Douglas",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/planetdouglas.zip",
-      "error": "Missing original level.dat or Anvil region files"
-    },
-    {
-      "game": "Gladiators",
-      "name": "The Shire",
-      "url": "https://maps.nixuge.me/static/mineplex/zip/gladiators/theshire.zip",
-      "error": "Missing original level.dat or Anvil region files"
     }
   ]
 }
