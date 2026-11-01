@@ -41,12 +41,37 @@ function connect(username) {
       }
     }, 90_000);
 
+    function sendPlayerLoaded(reason) {
+      try {
+        // Vanilla sends the empty player_loaded packet once its terrain-loading
+        // screen closes. Paper keeps ServerPlayer invulnerable until this
+        // acknowledgement (or its 60-tick timeout), so protocol clients must
+        // send it explicitly after login and every respawn/world reload.
+        client.write('player_loaded', {});
+        log('BOT_PLAYER_LOADED|PASS|' + username + '|reason=' + reason);
+      } catch (error) {
+        log('BOT_PLAYER_LOADED|FAIL|' + username + '|reason=' + reason + '|' + String(error));
+      }
+    }
+
     client.once('login', () => {
       loggedIn = true;
       settled = true;
       clearTimeout(timeout);
       log('BOT_LOGIN|PASS|' + username + '|protocol=' + client.protocolVersion);
+      sendPlayerLoaded('login');
       resolve(client);
+    });
+
+    // Cross-world arena teleports and death respawns restart Paper's client
+    // load state. Mirror the vanilla client acknowledgement after each one.
+    client.on('respawn', () => {
+      setImmediate(() => sendPlayerLoaded('respawn'));
+    });
+    client.on('packet', (_data, meta) => {
+      if (meta && meta.state === 'play' && meta.name === 'respawn') {
+        setImmediate(() => sendPlayerLoaded('respawn-packet'));
+      }
     });
 
     let respawnPending = false;
