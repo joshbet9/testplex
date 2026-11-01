@@ -29,8 +29,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             "death-tag", "one-in-the-quiver", "bomb-lobbers", "bacon-brawl",
             "castle-assault", "gladiators", "micro-battles", "milk-the-cow", "paintball", "plexball", "spleef", "super-sploor", "dragon-escape", "dragons", "runner", "sheep-quest", "turf-wars", "camera-shy",
             "monster-maze", "monster-maze-speed", "monster-maze-modern", "snake", "draw-my-thing", "master-builders",
-            "skywars", "wither-assault", "sneaky-assassins", "speed-builders", "evolution", "heroes-of-gwen", "hoops-remastered");
-    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-31-selectable-ids-20261101-v12";
+            "skywars", "wither-assault", "sneaky-assassins", "speed-builders", "evolution", "heroes-of-gwen", "hoops-remastered", "wizards");
+    private static final String PLAYABLE_GAMES_REVISION = "shared-acceptance-queue-32-selectable-ids-20261101-v13";
 
     @Override
     public void onEnable() {
@@ -205,13 +205,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 completedGame != null && completedGame.isMonsterMaze() ? completedGame : ArcadePortGame.MONSTER_MAZE);
     }
 
-    /** Stop existing Arcade owners before Wizards captures shared player snapshots. */
-    public void prepareForWizards() {
-        if (speedBuilders != null) speedBuilders.stop("Wizards is taking over the shared Arcade test session.");
-        if (plexball != null) plexball.stopForArcadeLifecycle("Wizards is taking over the shared Arcade test session.");
-        if (cameraShy != null) cameraShy.stop("Wizards is taking over the shared Arcade test session.");
-        if (manager != null) manager.stop("Wizards is taking over the shared Arcade test session.");
-    }
+    public WizardsGameManager getWizardsGameManager() { return wizards; }
 
     public void stopMonsterMazeRound(String reason) {
         if (manager != null) manager.stop(reason == null ? "Monster Maze stopped" : reason);
@@ -228,16 +222,16 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         } catch (java.io.IOException exception) {
             getLogger().warning("Could not remove the Arcade runtime readiness record: " + exception.getMessage());
         }
-        if (wizards != null) wizards.shutdown();
-        if (speedBuilders != null) speedBuilders.shutdown();
         if (manager != null) manager.shutdown();
+        else if (wizards != null) wizards.shutdown();
+        if (speedBuilders != null) speedBuilders.shutdown();
         if (plexball != null) plexball.shutdown();
     }
 
     private void publishArcadeRuntimeReadiness() {
-        if (manager == null || !manager.isMonsterMazeModuleRegistered()) {
+        if (manager == null || !manager.isMonsterMazeModuleRegistered() || !manager.isWizardsModuleRegistered()) {
             throw new IllegalStateException(
-                    "The shared Arcade runtime cannot be marked ready without its integrated Monster Maze game.");
+                    "The shared Arcade runtime cannot be marked ready without its integrated Monster Maze and Wizards game modules.");
         }
         try {
             java.nio.file.Path identityPath = getDataFolder().toPath()
@@ -501,15 +495,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     if (speedBuilders != null) speedBuilders.queue(player, sub.equals("play"));
                     return true;
                 }
-                if (isWizardsId(args[1])) {
-                    if (wizards != null) wizards.queue(player, sub.equals("play"));
-                    else sender.sendMessage(ChatColor.RED + "Wizards is unavailable in this Arcade runtime.");
-                    return true;
-                }
-                if (wizards != null && wizards.isSessionBusy()) {
-                    sender.sendMessage(ChatColor.RED + "Wizards currently owns the shared Arcade test session.");
-                    return true;
-                }
                 ArcadePortGame mixedJoinGame = mixedArcadeGameFromId(args[1]);
                 boolean mixedArcadeVariant = mixedJoinGame != null;
                 ArcadePortGame requestedGame = mixedArcadeVariant ? mixedJoinGame : ArcadePortGame.fromId(args[1]);
@@ -523,7 +508,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 if (args.length < 2) {
                     if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
                     if (speedBuilders != null) speedBuilders.leaveQueue(leavingPlayer);
-                    if (wizards != null) wizards.leave(leavingPlayer);
                     return true;
                 }
                 if (isSnapStatsArgument(args[1])) {
@@ -532,10 +516,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 }
                 if (isSpeedBuildersId(args[1])) {
                     if (speedBuilders != null) speedBuilders.leaveQueue(leavingPlayer);
-                    return true;
-                }
-                if (isWizardsId(args[1])) {
-                    if (wizards != null) wizards.leave(leavingPlayer);
                     return true;
                 }
                 ArcadePortGame leavingGame = ArcadePortGame.fromId(args[1]);
@@ -592,8 +572,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport maps <game-id>");
                     return true;
                 }
-                if (isWizardsId(args[1])) mapMenu.openWizardsMapSelection(player);
-                else mapMenu.openMapSelection(player, ArcadePortGame.fromId(args[1]));
+                mapMenu.openMapSelection(player, ArcadePortGame.fromId(args[1]));
                 return true;
             case "start":
                 if (!hasAdminAccess(sender)) {
@@ -610,18 +589,6 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                         return true;
                     }
                     if (speedBuilders != null) speedBuilders.startQueued();
-                    return true;
-                }
-                if (isWizardsId(args[1])) {
-                    if (!hasAdminAccess(sender)) {
-                        sender.sendMessage(ChatColor.RED + "Operator permission required to force-start Wizards.");
-                        return true;
-                    }
-                    if (wizards != null) wizards.startQueued();
-                    return true;
-                }
-                if (wizards != null && wizards.isSessionBusy()) {
-                    sender.sendMessage(ChatColor.RED + "Wizards currently owns the shared Arcade test session.");
                     return true;
                 }
                 if ("plexball".equalsIgnoreCase(args[1])) {
@@ -705,14 +672,12 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.GOLD + "Modern Arcade ports: " + ChatColor.WHITE + manager.status());
                 if (plexball != null) sender.sendMessage(ChatColor.GOLD + "Plexball: " + ChatColor.WHITE + plexball.status());
                 if (speedBuilders != null) sender.sendMessage(ChatColor.GOLD + "Speed Builders: " + ChatColor.WHITE + speedBuilders.status());
-                if (wizards != null) sender.sendMessage(ChatColor.GOLD + "Wizards: " + ChatColor.WHITE + wizards.status());
                 return true;
             case "stop":
                 if (!hasAdminAccess(sender)) {
                     sender.sendMessage(ChatColor.RED + "Operator permission required.");
                     return true;
                 }
-                if (wizards != null) wizards.stop("Wizards test stopped by an operator.");
                 if (speedBuilders != null) speedBuilders.stop("Stopped by an operator.");
                 manager.stop("Stopped by an operator.");
                 return true;
@@ -721,11 +686,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/stats [player]" + ChatColor.GRAY + " — open the shared local Arcade achievements, milestones and game stats menu");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play speed-builders" + ChatColor.GRAY + " — queue for an isolated Speed Builders match");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start speed-builders" + ChatColor.GRAY + " — operator start of the Speed Builders queue");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport play wizards" + ChatColor.GRAY + " — quick-start the Wizards queue");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport join wizards" + ChatColor.GRAY + " — join the Wizards queue");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport leave wizards" + ChatColor.GRAY + " — leave the Wizards queue or round");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit wizards <kit>" + ChatColor.GRAY + " — choose the Wizard, Mage, Sorcerer, Mystic or Witch Doctor kit");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport start wizards" + ChatColor.GRAY + " — operator start of the Wizards queue");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>" + ChatColor.GRAY + " — quick solo test; starts after a short join window");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play plexball" + ChatColor.GRAY + " — queue for Plexball");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport join plexball" + ChatColor.GRAY + " — join the Plexball queue");
