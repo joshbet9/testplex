@@ -109,7 +109,7 @@ final class ArcadeLobbyKitCatalogue {
                             Unlock.GEM, Skeleton.class, Material.BOW),
                     choice("brute", "Brute", Material.IRON_SWORD,
                             Unlock.GEM, Zombie.class, Material.IRON_SWORD));
-            case MONSTER_MAZE -> List.of(
+            case MONSTER_MAZE, MONSTER_MAZE_SPEED, MONSTER_MAZE_MODERN -> List.of(
                     choice("jumper", "Jumper", Material.FEATHER,
                             Unlock.FREE, Skeleton.class, Material.FEATHER),
                     choice("slowball", "Slowballer", Material.SNOWBALL,
