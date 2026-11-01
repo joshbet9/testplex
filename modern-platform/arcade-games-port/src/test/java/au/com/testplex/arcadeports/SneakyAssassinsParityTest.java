@@ -51,8 +51,13 @@ class SneakyAssassinsParityTest {
         assertEquals(5, SneakyAssassinsRules.nextPowerUpCount(5));
     }
 
-    @Test void townNpcsRemainUntilMissingOrInvalidRatherThanBeingRandomlyCulled() {
+    @Test void sourceStartsTwoHundredTownNpcsAndCullsOneEveryFourSecondsDuringLive() {
         assertEquals(200, SneakyAssassinsRules.sourceNpcCount());
+        assertEquals(4_000L, SneakyAssassinsRules.npcCullIntervalMillis());
+        assertFalse(SneakyAssassinsRules.shouldCullTownNpc(false, 5_000L, 4_000L, 200));
+        assertFalse(SneakyAssassinsRules.shouldCullTownNpc(true, 3_999L, 4_000L, 200));
+        assertFalse(SneakyAssassinsRules.shouldCullTownNpc(true, 4_000L, 4_000L, 0));
+        assertTrue(SneakyAssassinsRules.shouldCullTownNpc(true, 4_000L, 4_000L, 200));
         assertFalse(SneakyAssassinsRules.shouldPruneTownNpc(true, true));
         assertTrue(SneakyAssassinsRules.shouldPruneTownNpc(false, false));
         assertTrue(SneakyAssassinsRules.shouldPruneTownNpc(true, false));
