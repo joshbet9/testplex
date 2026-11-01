@@ -2903,8 +2903,9 @@ public final class ArcadePortManager implements Listener {
                     + session.runnerMapPaletteCounts.size() + " colour families.");
         }
         if (type == ArcadePortGame.BOMB_LOBBERS) {
+            long firstPowerupWaveAt = now + nextBombLobbersPowerupDelayMillis();
             for (int team = 0; team < 2; team++) {
-                session.bombNextPowerupSpawnAtByTeam.put(team, now + nextBombLobbersPowerupDelayMillis());
+                session.bombNextPowerupSpawnAtByTeam.put(team, firstPowerupWaveAt);
             }
         }
         session.endsAt = (type == ArcadePortGame.BACON_BRAWL
@@ -22266,7 +22267,7 @@ public final class ArcadePortManager implements Listener {
     }
 
     private long nextBombLobbersPowerupDelayMillis() {
-        // Independent timers per team, uniformly random between 20 and 100 seconds.
+        // One paired Red/Blue drop wave at a uniformly random 20-100 second interval (60-second mean).
         return ThreadLocalRandom.current().nextLong(20_000L, 100_001L);
     }
 
@@ -22281,19 +22282,18 @@ public final class ArcadePortManager implements Listener {
             }
         }
         if (bombLobbersOnlineMatchPlayers(session) <= 0) return;
+        long nextWaveAt = session.bombNextPowerupSpawnAtByTeam.computeIfAbsent(
+                0, ignored -> now + nextBombLobbersPowerupDelayMillis());
+        if (now < nextWaveAt) return;
 
         String[] choices = {"wind-charge", "super-tnt", "fiery-tnt", "speed-boost"};
+        int spawned = 0;
+        int onlyTeam = -1;
         for (int team = 0; team < 2; team++) {
             boolean alreadyDropped = session.bombPowerupTeamByDrop.containsValue(team);
             if (alreadyDropped) continue;
-            long nextSpawn = session.bombNextPowerupSpawnAtByTeam.computeIfAbsent(
-                    team, ignored -> now + nextBombLobbersPowerupDelayMillis());
-            if (now < nextSpawn) continue;
             Location spawn = findBombLobbersPowerupSpawn(session, team);
-            if (spawn == null) {
-                session.bombNextPowerupSpawnAtByTeam.put(team, now + 10_000L);
-                continue;
-            }
+            if (spawn == null) continue;
             String powerup = choices[ThreadLocalRandom.current().nextInt(choices.length)];
             Item drop = session.world.dropItem(spawn, createBombLobbersPowerupStack(powerup));
             drop.setVelocity(new Vector(0.0D, 0.04D, 0.0D));
@@ -22311,10 +22311,20 @@ public final class ArcadePortManager implements Listener {
             session.world.spawnParticle(Particle.END_ROD, spawn.clone().add(0.0D, 0.6D, 0.0D),
                     8, 0.25D, 0.35D, 0.25D, 0.02D);
             session.world.playSound(spawn, Sound.BLOCK_NOTE_BLOCK_PLING, 0.9F, 1.6F);
-            String teamName = team == 0 ? ChatColor.RED + "Red" : ChatColor.BLUE + "Blue";
-            announce(session, teamName + ChatColor.AQUA + " team: a " + ChatColor.GOLD
-                    + bombLobbersPowerupName(powerup) + ChatColor.AQUA + " power-up has spawned!");
-            session.bombNextPowerupSpawnAtByTeam.put(team, now + nextBombLobbersPowerupDelayMillis());
+            spawned++;
+            onlyTeam = team;
+        }
+        // Both sides share one unpredictable wave clock, not two frequent announcements.
+        long nextWave = now + (spawned == 0 ? 10_000L : nextBombLobbersPowerupDelayMillis());
+        for (int team = 0; team < 2; team++) {
+            session.bombNextPowerupSpawnAtByTeam.put(team, nextWave);
+        }
+        if (spawned == 2) {
+            announce(session, ChatColor.AQUA + "Random power-ups have appeared on both team sides!");
+        } else if (spawned == 1) {
+            announce(session, ChatColor.AQUA + "A random power-up appeared on the "
+                    + (onlyTeam == 0 ? ChatColor.RED + "Red" : ChatColor.BLUE + "Blue")
+                    + ChatColor.AQUA + " side!");
         }
     }
 
