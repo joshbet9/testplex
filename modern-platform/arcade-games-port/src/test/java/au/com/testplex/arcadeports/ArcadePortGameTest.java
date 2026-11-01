@@ -316,10 +316,74 @@ class ArcadePortGameTest {
     }
 
     @Test void microBattlesVerticalMapScanIncludesSourceMaximumY() {
+        assertEquals(3.0D, ArcadePortRules.microBattlesDistanceToBorder(7.0D, 0.0D, 0.0D, 0.0D, 20.0D), 0.00001D);
+        assertTrue(ArcadePortRules.shouldShowMicroBattlesBorderParticles(7.0D, 0.0D, 0.0D, 0.0D, 20.0D));
+        assertTrue(ArcadePortRules.shouldShowMicroBattlesBorderParticles(-9.5D, 0.0D, 0.0D, 0.0D, 20.0D));
+        assertFalse(ArcadePortRules.shouldShowMicroBattlesBorderParticles(6.99D, 0.0D, 0.0D, 0.0D, 20.0D));
+        assertFalse(ArcadePortRules.shouldShowMicroBattlesBorderParticles(10.01D, 0.0D, 0.0D, 0.0D, 20.0D));
+        assertFalse(ArcadePortRules.shouldShowMicroBattlesBorderParticles(Double.NaN, 0.0D, 0.0D, 0.0D, 20.0D));
+        assertTrue(Double.isNaN(ArcadePortRules.microBattlesDistanceToBorder(0.0D, 0.0D, 0.0D, 0.0D, 0.0D)));
+    }
+
+    @Test void microBattlesPersonalGlassAndSharedBorderColoursResolveTheSameSixteenChoices() {
+        for (String colour : java.util.List.of("white", "orange", "magenta", "light-blue", "yellow", "lime",
+                "pink", "gray", "light-gray", "cyan", "purple", "blue", "brown", "green", "red", "black")) {
+            assertNotNull(ArcadePortRules.microBattlesGlassMaterial(colour), colour);
+            assertNotNull(ArcadePortRules.microBattlesParticleColour(colour), colour);
+            assertEquals(colour, ArcadePortRules.normalizeMicroBattlesColour(colour));
+        }
+        assertEquals(Material.LIGHT_BLUE_STAINED_GLASS, ArcadePortRules.microBattlesGlassMaterial("unknown"));
+        assertEquals("light-blue", ArcadePortRules.normalizeMicroBattlesColour("aqua"));
+        assertEquals("light-gray", ArcadePortRules.normalizeMicroBattlesColour("silver"));
+        assertNull(ArcadePortRules.normalizeMicroBattlesColour("not-a-colour"));
+    }
+
+    @Test void microBattlesTimeoutConsidersAllFourTeamsAndReturnsDraws() {
+        assertEquals(2, ArcadePortRules.microBattlesTimeoutTeam(
+                new int[] {1, 1, 2, 0}, new int[] {99, 99, 0, 99}));
+        assertEquals(3, ArcadePortRules.microBattlesTimeoutTeam(
+                new int[] {1, 1, 1, 1}, new int[] {4, 2, 3, 5}));
+        assertEquals(1, ArcadePortRules.microBattlesTimeoutTeam(
+                new int[] {2, 2, 1, 0}, new int[] {4, 7, 99, 99}));
+        assertEquals(-1, ArcadePortRules.microBattlesTimeoutTeam(
+                new int[] {1, 1, 0, 0}, new int[] {4, 4, 99, 99}));
+        assertEquals(-1, ArcadePortRules.microBattlesTimeoutTeam(
+                new int[] {0, 0, 0, 0}, new int[] {0, 0, 0, 0}));
+        assertEquals(-1, ArcadePortRules.microBattlesTimeoutTeam(
+                new int[] {1, 2}, new int[] {1}));
+    }
+
+    @Test void microBattlesAnnihilationMatchesEightKillSourceTracker() {
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesAnnihilation(0));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesAnnihilation(7));
+        assertTrue(ArcadePortRules.shouldAwardMicroBattlesAnnihilation(8));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesAnnihilation(9));
+
+        java.util.UUID playerId = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
+        assertEquals("test-achievements.micro-battles." + playerId + ".annihilation",
+                MicroBattlesAchievement.ANNIHILATION.configKey(playerId));
+        assertEquals("", ArcadePortRules.microBattlesAchievementConfigKey(null, "annihilation"));
+        assertEquals("", ArcadePortRules.microBattlesAchievementConfigKey(playerId, "Invalid Slug"));
+    }
+
+    @Test void microBattlesLastTwoMissionOnlyTriggersWithExactlyTwoAliveTeams() {
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesLastTwo(0));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesLastTwo(1));
+        assertTrue(ArcadePortRules.shouldAwardMicroBattlesLastTwo(2));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesLastTwo(3));
+        assertFalse(ArcadePortRules.shouldAwardMicroBattlesLastTwo(4));
+
+        java.util.UUID playerId = java.util.UUID.fromString("00000000-0000-0000-0000-000000000002");
+        assertEquals("test-achievements.micro-battles." + playerId + ".last-two",
+                MicroBattlesAchievement.LAST_TWO.configKey(playerId));
+    }
+
+    @Test void microBattlesVerticalMapScanIncludesSourceMaximumY() {
         assertFalse(ArcadePortRules.isMicroCrumbleScanComplete(95, 96));
         assertFalse(ArcadePortRules.isMicroCrumbleScanComplete(96, 96));
         assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(97, 96));
         assertFalse(ArcadePortRules.isMicroCrumbleScanComplete(0, 0));
+        assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(1, 0));
         assertTrue(ArcadePortRules.isMicroCrumbleScanComplete(1, 0));
     }
 
@@ -2601,6 +2665,24 @@ class ArcadePortGameTest {
     @Test void microBattlesDamageMatchesRebornRawDamageIronSkinAndArmour() {
         assertEquals(3.0D, ArcadePortRules.microBattlesMeleeDamage("WOODEN_SWORD"), 0.00001D);
         assertEquals(4.0D, ArcadePortRules.microBattlesMeleeDamage("STONE_SWORD"), 0.00001D);
+        assertEquals(7.0D, ArcadePortRules.microBattlesMeleeDamage("DIAMOND_SWORD"), 0.00001D);
+        assertEquals(6.0D, ArcadePortRules.microBattlesMeleeDamage("GOLDEN_SWORD"), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.microBattlesMeleeDamage("STONE_SHOVEL"), 0.00001D);
+        assertEquals(3.0D, ArcadePortRules.microBattlesArrowDamage(1.0D), 0.00001D);
+        assertEquals(4.5D, ArcadePortRules.microBattlesArrowDamage(1.5D), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.microBattlesArrowDamage(Double.NaN), 0.00001D);
+        assertEquals(2.5D, ArcadePortRules.microBattlesDamageAfterIronSkin(3.0D, true), 0.00001D);
+        assertEquals(3.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(3.0D, false), 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.microBattlesDamageAfterIronSkin(1.0D, true), 0.00001D);
+        assertEquals(2.16D, ArcadePortRules.microBattlesDamageAfterArmour(3.0D, 7.0D, false), 0.00001D);
+        assertEquals(1.8D, ArcadePortRules.microBattlesDamageAfterArmour(2.5D, 7.0D, false), 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.microBattlesDamageAfterArmour(5.0D, 7.0D, true), 0.00001D);
+        assertEquals(5.0D, ArcadePortRules.microBattlesDamageAfterArmour(5.0D, 0.0D, false), 0.00001D);
+        assertTrue(ArcadePortRules.isMicroBattlesCombatContributionFresh(10_000L, 9_999L));
+        assertFalse(ArcadePortRules.isMicroBattlesCombatContributionFresh(25_000L, 10_000L));
+    }
+
+    @Test void microBattlesUsesMinimumHunger() {
         assertEquals(7.0D, ArcadePortRules.microBattlesMeleeDamage("DIAMOND_SWORD"), 0.00001D);
         assertEquals(6.0D, ArcadePortRules.microBattlesMeleeDamage("GOLDEN_SWORD"), 0.00001D);
         assertEquals(1.0D, ArcadePortRules.microBattlesMeleeDamage("STONE_SHOVEL"), 0.00001D);
