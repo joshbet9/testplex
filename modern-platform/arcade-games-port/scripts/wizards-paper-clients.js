@@ -66,8 +66,9 @@ function connect(username) {
         // Paper clears ServerPlayer.isChangingDimension on this movement path;
         // until then it rejects all ordinary damage sources.
         client.write('teleport_confirm', { teleportId });
-        client.write('position', {
+        client.write('position_look', {
           x: Number(packet.x), y: Number(packet.y), z: Number(packet.z),
+          yaw: Number(packet.yaw || 0), pitch: Number(packet.pitch || 0),
           flags: { onGround: false, hasHorizontalCollision: false },
         });
         log('BOT_TELEPORT_ACK|PASS|' + username + '|id=' + teleportId
