@@ -5267,7 +5267,12 @@ public final class ArcadePortManager implements Listener {
         if (session.alive.contains(playerId)) {
             player.setGameMode(control.previousGameMode() == GameMode.SPECTATOR ? GameMode.ADVENTURE : control.previousGameMode());
             Location safe = safeDragonTamerReturnLocation(control.returnLocation());
-            player.teleport(safe == null ? session.world.getSpawnLocation() : safe);
+            if (safe == null) safe = safeDragonTamerReturnLocation(session.world.getSpawnLocation());
+            if (safe == null) {
+                plugin.getLogger().severe("No safe supporting block could be found for Tamer return in " + session.world.getName());
+                safe = session.world.getSpawnLocation();
+            }
+            player.teleport(safe);
             player.setFallDistance(0.0F); player.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
             player.sendMessage(ChatColor.LIGHT_PURPLE + message);
         }
