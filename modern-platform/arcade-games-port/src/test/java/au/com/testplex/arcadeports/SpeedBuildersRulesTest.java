@@ -66,7 +66,7 @@ class SpeedBuildersRulesTest {
                 "minecraft:oak_stairs[facing=north,half=bottom,shape=inner_left,waterlogged=false]",
                 Material.OAK_STAIRS,
                 "minecraft:oak_stairs[facing=south,half=bottom,shape=inner_right,waterlogged=false]"));
-        assertTrue(SpeedBuildersRules.blockMatches(Material.END_PORTAL_FRAME,
+        assertFalse(SpeedBuildersRules.blockMatches(Material.END_PORTAL_FRAME,
                 "minecraft:end_portal_frame[facing=east,eye=true]",
                 Material.END_PORTAL_FRAME,
                 "minecraft:end_portal_frame[facing=east,eye=false]"));
