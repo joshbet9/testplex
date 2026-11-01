@@ -10,7 +10,7 @@ This is an implementation milestone, not a readiness or live-acceptance claim. T
 
 - Uses `update/maps/Speed Builders/SpeedBuilders_Shroomland_Lake.zip`, packaged from the shared source-map resource tree by Maven.
 - Imports the map into a reserved, isolated Paper world and reads its embedded `WorldConfig.dat`.
-- Uses the source `YELLOW` data markers for up to 16 player plots and the `RED` marker for the central judging display.
+- Uses the source `YELLOW` data markers for up to eight player plots and the `RED` marker for the central judging display.
 - Uses the archived `TEAM_SPAWNS` as the source spawn locations, choosing the closest source spawn to each assigned plot.
 - Enumerates the original custom-location groups as the template library; there is no generated demo-template fallback. A missing archive, invalid marker layout or empty template set fails the match setup safely.
 - Retains each template's original 7×7 ground layer and 7×7×7 block volume, modern block-state strings, mob markers, display name and `time+N`, `time-N`, `time=N`, `time*X` modifiers.
@@ -18,7 +18,7 @@ This is an implementation milestone, not a readiness or live-acceptance claim. T
 
 ## Implemented mechanics
 
-- Queues 2–16 online players. Quick start and standard queue have separate join windows; an undersized queue is retained rather than starting a one-player match.
+- Queues 2–8 online builders. Quick start and standard queue have separate join windows; an undersized queue is retained rather than starting a one-player match.
 - Ten-second model viewing, then the source-derived build timer starting at 40 seconds. The base timer decreases by one second after each subsequent round's duration is calculated, with source template modifiers clamped to 5–60 seconds.
 - The model's block palette and spawn eggs are issued at build start. Multiblock palette entries are deduplicated; water/lava templates receive buckets.
 - Players can build anywhere inside their own 7×7×7 volume. They are not restricted to only the materials present in the model. Door/bed companion blocks must also remain inside the plot.
