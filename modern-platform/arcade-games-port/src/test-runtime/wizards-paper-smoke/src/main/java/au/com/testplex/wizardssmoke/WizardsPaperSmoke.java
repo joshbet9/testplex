@@ -670,8 +670,16 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 player.getName() + " game mode was not restored");
         require(Boolean.TRUE.equals(readMarkedInvulnerability(player)) == baseline.invulnerable(),
                 player.getName() + " lobby invulnerability was not restored");
-        require(player.getScoreboard() == baseline.scoreboard(),
-                player.getName() + " scoreboard was not restored");
+        // The shared lobby deliberately rebuilds its scoreboard on lifecycle
+        // status changes; its object identity cannot match a pregame snapshot.
+        // Assert that the live player has the proper Testplex lobby sidebar.
+        org.bukkit.scoreboard.Objective restoredSidebar = player.getScoreboard()
+                .getObjective(DisplaySlot.SIDEBAR);
+        require(restoredSidebar != null && "testplex_lobby".equals(restoredSidebar.getName()),
+                player.getName() + " did not regain the Testplex lobby scoreboard"
+                        + " (actual=" + (restoredSidebar == null ? "none" : restoredSidebar.getName())
+                        + ", before=" + (baseline.scoreboard().getObjective(DisplaySlot.SIDEBAR) == null
+                                ? "none" : baseline.scoreboard().getObjective(DisplaySlot.SIDEBAR).getName()) + ")");
         require(Math.abs(player.getHealth() - baseline.health()) < 0.01D,
                 player.getName() + " health was not restored");
         require(Math.abs(player.getAbsorptionAmount() - baseline.absorption()) < 0.01D,
