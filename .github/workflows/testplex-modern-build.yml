@@ -126,223 +126,19 @@ jobs:
         run: |
           set -euo pipefail
           map_root="$RUNNER_TEMP/wizards-paper-smoke/update/maps"
+          verify_root="$RUNNER_TEMP/wizards-source-map-verify"
           for folder in "Wizards" "Nano Wizards"; do
-            count="$(find "$map_root/$folder" -maxdepth 1 -type f -iname '*.zip' | wc -l | tr -d ' ')"
-            [[ "$count" == 10 ]] || { echo "Expected 10 source archives in $folder; found $count." >&2; exit 1; }
+            count="$(find "$map_root/$folder" -maxdepth 1 -type f -name "*.zip" | wc -l | tr -d " ")"
+            [[ "$count" == "10" ]] || { echo "Expected 10 source archives in $folder; found $count." >&2; exit 1; }
           done
-          mkdir -p modern-platform/target
+          mkdir -p modern-platform/target "$verify_root"
           tar -czf modern-platform/target/WizardsSourceMaps.tar.gz -C "$map_root" "Wizards" "Nano Wizards"
+          tar -xzf modern-platform/target/WizardsSourceMaps.tar.gz -C "$verify_root"
+          for folder in "Wizards" "Nano Wizards"; do
+            count="$(find "$verify_root/$folder" -maxdepth 1 -type f -name "*.zip" | wc -l | tr -d " ")"
+            [[ "$count" == "10" ]] || { echo "Packaged source archive count is wrong for $folder: $count." >&2; exit 1; }
+          done
           tar -tzf modern-platform/target/WizardsSourceMaps.tar.gz >/dev/null
-          archive_count="$(tar -tzf modern-platform/target/WizardsSourceMaps.tar.gz | grep -Ei '\.zip
-        run: mvn --batch-mode --no-transfer-progress -f modern-platform/wizards-port/pom.xml clean verify
-
-      - name: Verify modern plugin metadata and packaged classes
-        shell: bash
-        run: |
-          set -euo pipefail
-          jar_file="modern-platform/target/TestplexModernArcade.jar"
-          snake_jar="modern-platform/snake-port/target/SnakeModern.jar"
-          arcade_jar="modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar"
-          test -s "$jar_file"
-          test -s "$snake_jar"
-          test -s "$arcade_jar"
-          wizards_jar="modern-platform/wizards-port/target/WizardsModern.jar"
-          test -s "$wizards_jar"
-          jar tf "$wizards_jar" | grep -Fxq "plugin.yml"
-          jar tf "$wizards_jar" | grep -Fxq "au/com/testplex/wizards/WizardsModernPlugin.class"
-          unzip -p "$wizards_jar" plugin.yml | grep -Fxq "name: WizardsModern"
-          unzip -p "$wizards_jar" config.yml | grep -Fxq "enabled: false"
-          jar tf "$jar_file" | grep -Fxq "plugin.yml"
-          jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/TestplexModernArcade.class"
-          jar tf "$jar_file" | grep -Fxq "au/com/testplex/modern/model/ArcadeCatalog.class"
-          unzip -p "$jar_file" plugin.yml | grep -Fxq "api-version: '26.3'"
-          jar tf "$snake_jar" | grep -Fxq "plugin.yml"
-          jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeModernPlugin.class"
-          jar tf "$snake_jar" | grep -Fxq "au/com/testplex/snake/SnakeRules.class"
-          for snake_map in Snake_Pit.zip Snake_Volcanic.zip Snake_WinterBabylon.zip; do
-            jar tf "$snake_jar" | grep -Fxq "source-maps/Snake/$snake_map"
-          done
-          unzip -p "$snake_jar" plugin.yml | grep -Fxq "name: SnakeModern"
-          unzip -p "$snake_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
-          jar tf "$arcade_jar" | grep -Fxq "plugin.yml"
-          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadeMechanicsModernPlugin.class"
-          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/ArcadePortManager.class"
-          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsGameManager.class"
-          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsRules.class"
-          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsSpell.class"
-          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/wizards/WizardsKit.class"
-          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/PlexballGame.class"
-          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/PlexballRules.class"
-          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/CameraShyGame.class"
-          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/CameraShyRules.class"
-          jar tf "$arcade_jar" | grep -Fxq "au/com/testplex/arcadeports/CameraShyProgressCatalog.class"
-          jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/MonsterMazePlugin.class"
-          jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/game/GameManager.class"
-          jar tf "$arcade_jar" | grep -Fxq "monster-maze/maps.yml"
-          jar tf "$arcade_jar" | grep -Fxq "monster-maze/config.yml"
-          ! jar tf "$arcade_jar" | grep -Fxq "monster-maze/plugin.yml"
-          ! jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/MonsterMazeStandalonePlugin.class"
-          ! jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/game/LobbyListener.class"
-          ! jar tf "$arcade_jar" | grep -Fxq "me/monstermaze/world/VoidWorldManager.class"
-          unzip -p "$arcade_jar" plugin.yml | grep -Fxq "name: ArcadeMechanicsModern"
-          unzip -p "$arcade_jar" plugin.yml | grep -Fxq "api-version: '26.3'"
-          unzip -p "$arcade_jar" plugin.yml | grep -Fxq "  - FakePlayerPlugin"
-          ! unzip -p "$arcade_jar" plugin.yml | grep -Eq '^  games:'
-          jar tf "$arcade_jar" | grep -Fxq "source-maps/Draw My Thing/Draw_Stadium.zip"
-          jar tf "$arcade_jar" | grep -Fxq "maps/spleef.zip"
-          jar tf "$arcade_jar" | grep -Fxq "maps/dragons.zip"
-          jar tf "$arcade_jar" | grep -Fxq "maps/runner.zip"
-
-          arcade_config="$(unzip -p "$arcade_jar" config.yml)"
-          enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config" | paste -sd, -)"
-          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,castle-assault,gladiators,micro-battles,milk-the-cow,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy,monster-maze,monster-maze-speed,monster-maze-modern,snake,draw-my-thing,master-builders,skywars,wither-assault,sneaky-assassins,speed-builders,evolution,heroes-of-gwen,hoops-remastered,wizards" ]] || {
-            echo "Only the explicitly reviewed acceptance queue may be enabled. Found: [$enabled_ids]" >&2
-            exit 1
-          }
-
-          # Every enabled game must ship every individual 1.8 Testplex map archive.
-          # Super Paintball and Super Spleef are legacy rename folders for the same
-          # Paintball and Spleef games, so their maps are included in the same catalogs.
-          verify_source_map_folder() {
-            local folder="$1"
-            local expected_file actual_file
-            expected_file="$(mktemp)"
-            actual_file="$(mktemp)"
-            find "update/maps/$folder" -maxdepth 1 -type f -iname "*.zip" -printf "%f\\n" | LC_ALL=C sort > "$expected_file"
-            jar tf "$arcade_jar" | sed -n "s#^source-maps/$folder/##p" | grep -i "\\.zip$" | LC_ALL=C sort > "$actual_file" || true
-            if ! diff -u "$expected_file" "$actual_file"; then
-              echo "Modern plugin map assets do not exactly match update/maps/$folder." >&2
-              rm -f "$expected_file" "$actual_file"
-              return 1
-            fi
-            local count
-            count="$(wc -l < "$expected_file" | tr -d " ")"
-            echo "Verified $count original map archives: $folder"
-            rm -f "$expected_file" "$actual_file"
-          }
-          # Resolve map folders from the actual enabled-game allow-list. Every enabled
-          # game with legacy maps must have an explicit mapping; Plexball, Snap and
-          # Master Builders use modern/generated arenas. Wither Assault and Sneaky
-          # Assassins are explicitly mechanics-test-only generated arenas with no
-          # authentic source map bundle. Super Sploor uses the original Sploor folder.
-          IFS=, read -r -a enabled_game_array <<< "$enabled_ids"
-          for game_id in "${enabled_game_array[@]}"; do
-            case "$game_id" in
-              death-tag) map_folders=("Death Tag") ;;
-              one-in-the-quiver) map_folders=("One in the Quiver") ;;
-              bomb-lobbers) map_folders=("Bomb Lobbers") ;;
-              bacon-brawl) map_folders=("Bacon Brawl") ;;
-              castle-assault) map_folders=("Castle Assault") ;;
-              heroes-of-gwen) map_folders=("Heroes of GWEN") ;;
-              hoops-remastered) map_folders=(); echo "Hoops Remastered uses its generated isolated court; no legacy source map archives are required." ;;
-              gladiators) map_folders=("Gladiators") ;;
-              micro-battles) map_folders=("Micro Battle") ;;
-              milk-the-cow) map_folders=("Milk the Cow") ;;
-              paintball) map_folders=("Paintball" "Super Paintball") ;;
-              plexball) map_folders=(); echo "Plexball uses its modern arena; no legacy 1.8 map archive folder exists." ;;
-              super-sploor) map_folders=("Sploor") ;;
-              dragon-escape) map_folders=("Dragon Escape") ;;
-              dragons) map_folders=("Dragons") ;;
-              runner) map_folders=("Runner") ;;
-              sheep-quest) map_folders=("Sheep Quest") ;;
-              turf-wars) map_folders=("Turf Wars") ;;
-              camera-shy) map_folders=(); echo "Snap uses its procedural modern maze; no legacy 1.8 map archive folder exists." ;;
-              spleef) map_folders=("Speef" "Super Spleef") ;;
-              monster-maze|monster-maze-speed|monster-maze-modern) map_folders=(); echo "Monster Maze uses its dedicated bundled source worlds; deployment readiness verifies its embedded Arcade registration." ;;
-              snake) map_folders=(); echo "Snake's three original map archives are packaged and checked in SnakeModern.jar." ;;
-              draw-my-thing) map_folders=("Draw My Thing") ;;
-              master-builders) map_folders=(); echo "Master Builders uses generated isolated build plots; no legacy map archive folder exists." ;;
-              skywars) map_folders=("Skywars") ;;
-              wither-assault) map_folders=(); echo "Wither Assault uses a generated arena; original Industrial West, Labyrinth and Sky Ruins archives are absent." ;;
-              sneaky-assassins) map_folders=(); echo "Sneaky Assassins uses a generated town; original map and NPC patrol-route archives are absent." ;;
-              speed-builders) map_folders=("Speed Builders") ;;
-              evolution) map_folders=(); echo "Evolution uses its generated test arena; no legacy source map archive folder exists." ;;
-              *) echo "No legacy map parity policy is defined for enabled game [$game_id]." >&2; exit 1 ;;
-            esac
-            for map_folder in "${map_folders[@]}"; do
-              verify_source_map_folder "$map_folder"
-            done
-          done
-          jar tf "$arcade_jar" | grep -Fxq "maps/bomb-lobbers.zip"
-          jar tf "$arcade_jar" | grep -Fxq "maps/bacon-brawl.zip"
-          jar tf "$arcade_jar" | grep -Fxq "maps/gladiators.zip"
-          jar tf "$arcade_jar" | grep -Fxq "maps/micro-battles.zip"
-          jar tf "$arcade_jar" | grep -Fxq "maps/paintball.zip"
-
-          # Guard the deployment path against the real standalone source artifact name.
-          deploy_workflow=".github/workflows/deploy-testplex-modern-hyperv.yml"
-          grep -Fq 'plugins/MonsterMazeStandalone' "$deploy_workflow"
-          grep -Fq 'MonsterMazeStandalone' "$deploy_workflow"
-          grep -Fq 'me.monstermaze.MonsterMazePlugin' "$deploy_workflow"
-          grep -Fq 'retired-monster-maze-plugins' "$deploy_workflow"
-          snake_config="$(unzip -p "$snake_jar" config.yml)"
-          grep -Fxq "enabled: true" <<< "$snake_config"
-          grep -Fxq "readiness-revision: snake-controlled-acceptance-20261101-v1" <<< "$snake_config"
-          grep -Fq 'private static final boolean READY_FOR_TEST = true;' modern-platform/snake-port/src/main/java/au/com/testplex/snake/SnakeModernPlugin.java
-          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, and all 32 controlled Arcade IDs are packaged and READY_FOR_TEST. The queue represents 30 distinct titles because Monster Maze (Original), Monster Maze (Speed) and Monster Maze (Modern) are selectable modes of one title; Heroes of Gwen, Hoops Remastered and Wizards each appear once. CI compares all 422 enabled source-map archives with the packaged JAR, including both Heroes of GWEN maps; Evolution, Wither Assault, Sneaky Assassins and Hoops Remastered use dedicated generated arenas. Wizards source maps are separately validated in the 20-map Paper import harness. Speed Builders is manually queued through /arcadeport play speed-builders."
-
-      - name: Validate independent deployment recovery and shell syntax
-        shell: bash
-        run: |
-          set -euo pipefail
-          chmod 0755 .github/testplex-modern-recovery.sh
-          bash -n .github/testplex-modern-recovery.sh
-          bash -n .github/testplex-modern-recovery-test.sh
-          bash .github/testplex-modern-recovery-test.sh
-
-          # Parse the actual remote deployment transaction shell without running it.
-          deploy_workflow=".github/workflows/deploy-testplex-modern-hyperv.yml"
-          awk "/<<'REMOTE_DEPLOY'/ { active=1; next } active && /^REMOTE_DEPLOY$/ { exit } active { print }" \
-            "$deploy_workflow" > "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
-          test -s "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
-          bash -n "$RUNNER_TEMP/testplex-modern-remote-deploy.sh"
-          grep -Fq 'FPP_VERSION="2.1.7"' "$deploy_workflow"
-          grep -Fq 'versions/$FPP_VERSION/PAPER/fake-player-plugin-$FPP_VERSION.jar' "$deploy_workflow"
-          git diff --check
-
-      - name: Upload modern plugin artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: testplex-modern-paper-26.3
-          path: |
-            modern-platform/target/TestplexModernArcade.jar
-            modern-platform/snake-port/target/SnakeModern.jar
-            modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar
-            modern-platform/wizards-port/target/WizardsModern.jar
-            modern-platform/target/WizardsSourceMaps.tar.gz
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Write build summary
-        if: always()
-        shell: bash
-        run: |
-          {
-            echo "## Testplex Modern Paper 26.3"
-            echo
-            echo "- Runtime/API baseline: Java 25 / Paper 26.3"
-            echo "- Separate from legacy Java 8 build and deployment"
-            echo "- Catalogue: 32 Arcade selectable IDs (32 READY_FOR_TEST, 0 MECHANICS_IN_PROGRESS); 30 distinct titles because Monster Maze has three selectable modes"
-            echo "- Built artifacts: TestplexModernArcade.jar, SnakeModern.jar, ArcadeMechanicsModern.jar and WizardsModern.jar (Monster Maze is compiled into the Testplex-owned Arcade module)"
-            echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
-            echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
-            echo "- Gameplay ports: all 32 catalogue IDs are READY_FOR_TEST, including one Heroes of Gwen Arcade entry, one Hoops Remastered entry and one Wizards Arcade entry; 30 distinct titles are represented because Monster Maze (Original), Monster Maze (Speed) and Monster Maze (Modern) are separate selectable modes of one title"
-            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Evolution, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze (Original), Monster Maze (Speed), Monster Maze (Modern), Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault, Sneaky Assassins, Speed Builders, Heroes of Gwen, Hoops Remastered and Wizards"
-            echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  deploy-modern-test-server:
-    name: Deploy successful integration build to isolated Paper 26.3 VM
-    # The workflow trigger already filters pushes by modern-platform/workflow paths. Do not re-check head_commit file lists here: merge-push payloads can omit those arrays.
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feat/testplex-modern-26.3-platform' }}
-    needs: build-modern-arcade
-    uses: ./.github/workflows/deploy-testplex-modern-hyperv.yml
-    with:
-      deploy_to_modern_test_server: true
-      source_run_id: ${{ format('{0}', github.run_id) }}
-    secrets: inherit
- | wc -l | tr -d ' ')"
-          [[ "$archive_count" == 20 ]] || { echo "Packaged Wizards source archive count is $archive_count, expected 20." >&2; exit 1; }
           sha256sum modern-platform/target/WizardsSourceMaps.tar.gz
 
       - name: Build the disabled Wizards 26.3 port and run spell-rule tests
@@ -407,7 +203,7 @@ jobs:
 
           arcade_config="$(unzip -p "$arcade_jar" config.yml)"
           enabled_ids="$(awk '/^enabled-games:/{in_list=1;next} in_list && /^[^ ]/{exit} in_list && /^  - /{print $2}' <<< "$arcade_config" | paste -sd, -)"
-          [[ "$enabled_ids" == "death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,castle-assault,gladiators,micro-battles,milk-the-cow,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy,monster-maze,monster-maze-speed,monster-maze-modern,snake,draw-my-thing,master-builders,skywars,wither-assault,sneaky-assassins,speed-builders,evolution,heroes-of-gwen,hoops-remastered,wizards" ]] || {
+death-tag,one-in-the-quiver,bomb-lobbers,bacon-brawl,castle-assault,gladiators,micro-battles,milk-the-cow,paintball,plexball,spleef,super-sploor,dragon-escape,dragons,runner,sheep-quest,turf-wars,camera-shy,monster-maze,monster-maze-speed,monster-maze-modern,snake,draw-my-thing,master-builders,skywars,wither-assault,sneaky-assassins,speed-builders,evolution,heroes-of-gwen,hoops-remastered,wizards
             echo "Only the explicitly reviewed acceptance queue may be enabled. Found: [$enabled_ids]" >&2
             exit 1
           }
@@ -447,6 +243,7 @@ jobs:
               castle-assault) map_folders=("Castle Assault") ;;
               heroes-of-gwen) map_folders=("Heroes of GWEN") ;;
               hoops-remastered) map_folders=(); echo "Hoops Remastered uses its generated isolated court; no legacy source map archives are required." ;;
+              wizards) map_folders=(); echo "Wizards and Nano Wizards source archives are imported and packaged by the dedicated 20-map Paper 26.3 harness." ;;
               gladiators) map_folders=("Gladiators") ;;
               micro-battles) map_folders=("Micro Battle") ;;
               milk-the-cow) map_folders=("Milk the Cow") ;;
@@ -491,7 +288,7 @@ jobs:
           grep -Fxq "enabled: true" <<< "$snake_config"
           grep -Fxq "readiness-revision: snake-controlled-acceptance-20261101-v1" <<< "$snake_config"
           grep -Fq 'private static final boolean READY_FOR_TEST = true;' modern-platform/snake-port/src/main/java/au/com/testplex/snake/SnakeModernPlugin.java
-          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, and all 32 controlled Arcade IDs are packaged and READY_FOR_TEST. The queue represents 30 distinct titles because Monster Maze (Original), Monster Maze (Speed) and Monster Maze (Modern) are selectable modes of one title; Heroes of Gwen, Hoops Remastered and Wizards each appear once. CI compares all 422 enabled source-map archives with the packaged JAR, including both Heroes of GWEN maps; Evolution, Wither Assault, Sneaky Assassins and Hoops Remastered use dedicated generated arenas. Wizards source maps are separately validated in the 20-map Paper import harness. Speed Builders is manually queued through /arcadeport play speed-builders."
+          echo "All four modern Paper 26.3 Bukkit plugins verified; Monster Maze has no standalone plugin/lobby payload, deployment retires the actual standalone descriptor, and all 32 controlled Arcade IDs are packaged and READY_FOR_TEST, representing 30 distinct titles because Monster Maze has three selectable modes. Heroes of Gwen, Hoops Remastered and Wizards each appear once as Arcade games. CI verifies all 422 bundled original map archives, including both Heroes of GWEN maps; the 20 Wizards/Nano Wizards archives are separately imported in Paper 26.3 and packaged for isolated deployment. Evolution, Wither Assault, Sneaky Assassins and Hoops Remastered use dedicated generated arenas. Speed Builders is manually queued through /arcadeport play speed-builders."
 
       - name: Validate independent deployment recovery and shell syntax
         shell: bash
@@ -521,6 +318,7 @@ jobs:
             modern-platform/snake-port/target/SnakeModern.jar
             modern-platform/arcade-games-port/target/ArcadeMechanicsModern.jar
             modern-platform/wizards-port/target/WizardsModern.jar
+            modern-platform/target/WizardsSourceMaps.tar.gz
           if-no-files-found: error
           retention-days: 14
 
