@@ -2532,7 +2532,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         "Water Dash", "Dash horizontally for 600 ms. Click or sneak to activate. 10-second cooldown.");
                 giveHeroesOfGwenSkillItem(player, 3, "larissa.storm_blessing", Material.NETHER_STAR,
                         "Storm's Blessing", "Heal all teammates by 2 HP/s and grant Speed I for 7 seconds. Drop to activate; 60-second cooldown.");
-                player.getInventory().setItem(7, namedItem(Material.BLUE_DYE,
+                player.getInventory().setItem(7, namedItem(Material.LAPIS_LAZULI,
                         ChatColor.AQUA + "Water Stone", "Aqua Cannon ammunition; one charge replenishes every 3 seconds."));
                 heroAmmoNextAt.put(id, System.currentTimeMillis()
                         + ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS);
@@ -2948,7 +2948,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String skill = "larissa.aqua_cannon";
         if (!isHeroSkillReady(player, skill)) return;
         ItemStack ammo = player.getInventory().getItem(7);
-        if (ammo == null || ammo.getType() != Material.BLUE_DYE || ammo.getAmount() < 1) {
+        if (ammo == null || ammo.getType() != Material.LAPIS_LAZULI || ammo.getAmount() < 1) {
             player.sendActionBar(ChatColor.RED + "Aqua Cannon needs a Water Stone charge.");
             return;
         }
@@ -3055,7 +3055,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String skill = "larissa.storm_blessing";
         if (!isHeroSkillReady(player, skill)) return;
         long now = System.currentTimeMillis();
-        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_COOLDOWN_MILLIS);
+        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_REUSE_DELAY_MILLIS);
         long endsAt = now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_STORM_BLESSING_DURATION_MILLIS;
         larissaStormBlessingEndsAt.put(player.getUniqueId(), endsAt);
         larissaStormBlessingNextHealAt.put(player.getUniqueId(),
@@ -3238,13 +3238,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         now + ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_RELOAD_MILLIS);
                 if (now >= nextWaterStone) {
                     ItemStack waterStone = player.getInventory().getItem(7);
-                    int amount = waterStone != null && waterStone.getType() == Material.BLUE_DYE
+                    int amount = waterStone != null && waterStone.getType() == Material.LAPIS_LAZULI
                             && waterStone.hasItemMeta() && waterStone.getItemMeta().hasDisplayName()
                             && waterStone.getItemMeta().getDisplayName().contains("Water Stone")
                             ? waterStone.getAmount() : 0;
                     if (amount < ArcadePortRules.HEROES_OF_GWEN_LARISSA_WATER_AMMO_CAPACITY) {
                         if (amount <= 0) {
-                            player.getInventory().setItem(7, namedItem(Material.BLUE_DYE,
+                            player.getInventory().setItem(7, namedItem(Material.LAPIS_LAZULI,
                                     ChatColor.AQUA + "Water Stone", "Aqua Cannon ammunition."));
                         } else waterStone.setAmount(amount + 1);
                         player.playSound(player.getLocation(), Sound.ENTITY_ITEM_PICKUP, 0.45F, 1.5F);
