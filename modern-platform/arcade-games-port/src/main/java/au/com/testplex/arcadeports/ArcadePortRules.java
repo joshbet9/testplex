@@ -1497,6 +1497,18 @@ public final class ArcadePortRules {
         return Math.min(0.022D, 0.012D + 0.003D * extraKills);
     }
 
+    public static final long BACON_BLAST_KILL_COMBO_WINDOW_MILLIS = BACON_FALL_KILL_CREDIT_WINDOW_MILLIS;
+
+    public static boolean shouldCountMamaCameraBlastKill(boolean mamaPiggles,
+            boolean directBlastKill, java.util.UUID killerId, java.util.UUID comboOwnerId,
+            long nowMillis, long lastComboHitAtMillis) {
+        if (!mamaPiggles) return false;
+        if (directBlastKill) return true;
+        return killerId != null && killerId.equals(comboOwnerId)
+                && lastComboHitAtMillis > 0L && nowMillis >= lastComboHitAtMillis
+                && nowMillis - lastComboHitAtMillis <= BACON_BLAST_KILL_COMBO_WINDOW_MILLIS;
+    }
+
     public static long evolutionPityRemainingMillis(long pityDeadline, long now) {
         return Math.max(0L, pityDeadline - now);
     }
