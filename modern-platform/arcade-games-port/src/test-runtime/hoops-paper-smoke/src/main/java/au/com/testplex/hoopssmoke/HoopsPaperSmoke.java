@@ -315,6 +315,11 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         Object shot = field(firstMatch, "ball");
         require(shot != null && "SHOT".equals(String.valueOf(field(shot, "mode"))),
                 "right-click shooting did not create a shot trajectory");
+        getLogger().info("HOOPS_SHOT_DIAGNOSTIC|launch|team=" + team + "|release=" + shooter.getLocation()
+                + "|hoopX=" + hoopX + "|releaseDistance=" + field(shot, "releaseDistance")
+                + "|points=" + field(shot, "points") + "|dunk=" + field(shot, "dunk")
+                + "|aimMiss=" + shooter.getEyeLocation().getDirection().normalize()
+                + "|velocity=" + field(shot, "velocity"));
         require(((Integer) field(shot, "points")) == 2, "eight-block release was not scored as two points");
         require(((Boolean) field(shot, "reboundEligible")), "missed-shot recovery was not enabled");
         require(passerId.equals(field(shot, "passerId")), "shot lost its pass/assist attribution");
