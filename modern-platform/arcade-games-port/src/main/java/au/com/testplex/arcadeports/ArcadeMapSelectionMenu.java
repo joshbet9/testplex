@@ -40,6 +40,10 @@ public final class ArcadeMapSelectionMenu implements Listener {
             player.sendMessage(ChatColor.RED + "Operator permission required to change the selected map.");
             return;
         }
+        if (game == ArcadePortGame.WIZARDS) {
+            openWizardsMapSelection(player);
+            return;
+        }
         if (game != null && game.isMonsterMaze()) {
             openMonsterMazeMapSelection(player, game, 0);
             return;
