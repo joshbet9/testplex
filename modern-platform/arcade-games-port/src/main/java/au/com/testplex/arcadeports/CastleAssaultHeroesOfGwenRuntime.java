@@ -660,6 +660,49 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         witherNextEarthquakeAt.put(team, System.currentTimeMillis() + ArcadePortRules.HEROES_OF_GWEN_WITHER_EARTHQUAKE_INTERVAL_MILLIS);
     }
 
+    /**
+     * All player-originated Wither damage, including hero skills, passes through
+     * the source WitherBoss territory and both-towers-destroyed checks.
+     */
+    private boolean damageHeroesOfGwenWither(Player attacker, int ownerTeam, double damage, String reason) {
+        if (attacker == null || !attacker.isOnline() || !activePlayers.contains(attacker.getUniqueId())
+                || teams.getOrDefault(attacker.getUniqueId(), -1) != 1 - ownerTeam) return false;
+        if (!isInsideWitherBoundary(ownerTeam, attacker.getLocation())) {
+            attacker.sendMessage(ChatColor.RED + "You must enter your enemy Wither's territory to attack it.");
+            return false;
+        }
+        if (!Boolean.TRUE.equals(witherDamageable.get(ownerTeam))) {
+            attacker.sendMessage(ChatColor.RED + "Destroy both enemy towers before attacking the Wither.");
+            return false;
+        }
+        if (damage <= 0.0D) return false;
+        Wither wither = withers.get(ownerTeam);
+        if (wither == null || !wither.isValid() || wither.isDead()) return false;
+
+        long now = System.currentTimeMillis();
+        long lastInform = witherLastInformAt.getOrDefault(ownerTeam, 0L);
+        if (ArcadePortRules.heroesOfGwenWitherShouldInform(now, lastInform)) {
+            witherLastInformAt.put(ownerTeam, now);
+            for (Player defender : activeMatchPlayers()) {
+                if (teams.getOrDefault(defender.getUniqueId(), -1) != ownerTeam) continue;
+                defender.playSound(defender.getLocation(), Sound.BLOCK_ANVIL_LAND, 1.0F, 0.5F);
+                defender.sendMessage(ChatColor.RED + "Your Wither is under attack!");
+            }
+        }
+        wither.playEffect(org.bukkit.EntityEffect.HURT);
+        if (wither.getHealth() <= damage) {
+            heroesOfGwenFinalObjectiveHits.computeIfAbsent(attacker.getUniqueId(), ignored -> new HashSet<>())
+                    .add("boss:" + ownerTeam);
+            int winningTeam = 1 - ownerTeam;
+            announce(ChatColor.GOLD + teamName(winningTeam) + " destroyed the enemy Wither!");
+            finishHeroesOfGwen(winningTeam, reason);
+        } else {
+            wither.setHealth(wither.getHealth() - damage);
+            updateWitherTeamHud(ownerTeam, wither, now, true);
+        }
+        return true;
+    }
+
     private void updateWitherTeamHud(int team, Wither wither, long now) {
         updateWitherTeamHud(team, wither, now, false);
     }
@@ -2779,52 +2822,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             Wither wither = entry.getValue();
             if (!wither.equals(damaged)) continue;
 
-            // Capture the post-armour amount before cancelling vanilla damage.
-            // Reading getFinalDamage() after setCancelled(true) can yield zero.
+            // Capture post-armour damage before cancelling vanilla Wither behaviour.
             double damage = event.getFinalDamage();
             event.setCancelled(true);
             if (!(event instanceof EntityDamageByEntityEvent byEntity)) return;
-            Player attacker = resolveAttacker(byEntity);
             if (event.getCause() == EntityDamageEvent.DamageCause.FIRE
-                    || event.getCause() == EntityDamageEvent.DamageCause.FIRE_TICK
-                    || attacker == null) return;
-            boolean activeAttacker = activePlayers.contains(attacker.getUniqueId());
-            boolean enemyAttacker = teams.getOrDefault(attacker.getUniqueId(), -1);
-            boolean insideBoundary = isInsideWitherBoundary(ownerTeam, attacker.getLocation());
-            boolean damageable = Boolean.TRUE.equals(witherDamageable.get(ownerTeam));
-            if (!activeAttacker || enemyAttacker == ownerTeam) return;
-            if (!insideBoundary) {
-                attacker.sendMessage(ChatColor.RED + "You must enter your enemy Wither's territory to attack it.");
-                return;
-            }
-            if (!damageable) {
-                attacker.sendMessage(ChatColor.RED + "Destroy both enemy towers before attacking the Wither.");
-                return;
-            }
-            if (!ArcadePortRules.heroesOfGwenWitherCanTakeDamage(
-                    ownerTeam, enemyAttacker, activeAttacker, insideBoundary, damageable, damage)) return;
-
-            long now = System.currentTimeMillis();
-            long lastInform = witherLastInformAt.getOrDefault(ownerTeam, 0L);
-            if (ArcadePortRules.heroesOfGwenWitherShouldInform(now, lastInform)) {
-                witherLastInformAt.put(ownerTeam, now);
-                for (Player defender : activeMatchPlayers()) {
-                    if (teams.getOrDefault(defender.getUniqueId(), -1) != ownerTeam) continue;
-                    defender.playSound(defender.getLocation(), Sound.BLOCK_ANVIL_LAND, 1.0F, 0.5F);
-                    defender.sendMessage(ChatColor.RED + "Your Wither is under attack!");
-                }
-            }
-            wither.playEffect(org.bukkit.EntityEffect.HURT);
-            if (wither.getHealth() <= damage) {
-                heroesOfGwenFinalObjectiveHits.computeIfAbsent(attacker.getUniqueId(), ignored -> new HashSet<>())
-                        .add("boss:" + ownerTeam);
-                int winnerTeam = 1 - ownerTeam;
-                announce(ChatColor.GOLD + teamName(winnerTeam) + " destroyed the enemy Wither!");
-                finishHeroesOfGwen(winnerTeam, "enemy Wither defeated");
-            } else {
-                wither.setHealth(wither.getHealth() - damage);
-                updateWitherTeamHud(ownerTeam, wither, now, true);
-            }
+                    || event.getCause() == EntityDamageEvent.DamageCause.FIRE_TICK) return;
+            Player attacker = resolveAttacker(byEntity);
+            damageHeroesOfGwenWither(attacker, ownerTeam, damage, "enemy Wither defeated");
             return;
         }
     }
