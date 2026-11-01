@@ -22150,7 +22150,9 @@ public final class ArcadePortManager implements Listener {
         int spawned = 0;
         int onlyTeam = -1;
         for (int team = 0; team < 2; team++) {
-            boolean teamHasDrop = session.bombPowerupTeams.values().stream().anyMatch(value -> value == team);
+            final int selectedTeam = team;
+            boolean teamHasDrop = session.bombPowerupTeams.values().stream()
+                    .anyMatch(value -> value == selectedTeam);
             if (teamHasDrop) continue;
 
             Location spawn = findBombLobbersPowerupSpawn(session, team);
