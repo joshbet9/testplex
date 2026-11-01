@@ -61,9 +61,9 @@ class CameraShyRulesTest {
     }
 
     @Test
-    void statsRoutingPreservesPlexballDefaultAndRequiresExplicitSnapSelection() {
-        assertTrue(CameraShyRules.routesToPlexballStats(null));
-        assertTrue(CameraShyRules.routesToPlexballStats(new String[0]));
+    void bareStatsUsesSharedRootAndPlexballRequiresExplicitSelection() {
+        assertFalse(CameraShyRules.routesToPlexballStats(null));
+        assertFalse(CameraShyRules.routesToPlexballStats(new String[0]));
         assertTrue(CameraShyRules.routesToPlexballStats(new String[] {"plexball"}));
         assertTrue(CameraShyRules.routesToPlexballStats(new String[] {"PLEXBALL"}));
         assertFalse(CameraShyRules.routesToPlexballStats(new String[] {"snap"}));
