@@ -191,7 +191,14 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 case 1 -> verifyLiveRoundAndEliminateFirstOpponent();
                 case 2 -> verifySpectatorAndEliminateFinalOpponent();
                 case 3 -> verifyPlayerRestorationAndFinish();
-                case 4 -> { if (gameplayTicks >= 5) runGenericDamageProbe(); }
+                case 4 -> {
+                    if (gameplayTicks >= 5 && paperDamageReady(rival)) {
+                        runGenericDamageProbe();
+                    } else if (gameplayTicks >= 100) {
+                        failAndShutdown("Paper client is not damage-ready after teleport/load handshake: "
+                                + nmsDamageState(rival));
+                    }
+                }
                 case 5 -> { if (gameplayTicks >= 5) runAttributedDamageProbe(); }
                 case 6 -> { if (gameplayTicks >= 5) runRainbowBeamAcceptance(); }
                 default -> failAndShutdown("GAMEPLAY_FAIL", "lifecycle",
@@ -667,6 +674,17 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
      * project's shared Bukkit compile surface does not. Reflect rather than
      * compiling against a version-specific getter.
      */
+    private static boolean paperDamageReady(Player player) {
+        try {
+            Object handle = player.getClass().getMethod("getHandle").invoke(player);
+            Object connection = invokeNoArgs(handle, "connection");
+            return Boolean.TRUE.equals(invokeNoArgs(connection, "hasClientLoaded"))
+                    && !Boolean.TRUE.equals(invokeNoArgs(handle, "isChangingDimension"));
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
     private static String nmsDamageState(Player player) {
         String[] names = {"damageCooldownTime", "lastHurt", "invulnerableDuration", "invulnerableTime", "hurtTime",
                 "invulnerable", "removed"};
