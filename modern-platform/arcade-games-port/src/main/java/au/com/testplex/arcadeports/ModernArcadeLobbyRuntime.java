@@ -165,8 +165,8 @@ public final class ModernArcadeLobbyRuntime implements Listener {
             display(world, "team-display", ChatColor.GOLD + "ROLES ASSIGNED AUTOMATICALLY"
                     + ChatColor.WHITE + " | Queued: " + manager.queuedCount(selectedGame));
         } else {
-            String queueLabel = selectedGame == ArcadePortGame.PLEXBALL ? "INDIVIDUAL QUEUE" : "FREE FOR ALL";
-            display(world, "team-display", ChatColor.BLUE + queueLabel
+            String queueDisplayLabel = selectedGame == ArcadePortGame.PLEXBALL ? "INDIVIDUAL QUEUE" : "FREE FOR ALL";
+            display(world, "team-display", ChatColor.BLUE + queueDisplayLabel
                     + ChatColor.WHITE + " | Queued: " + manager.queuedCount(selectedGame)
                     + ChatColor.GRAY + " | Test Players: created on Start Game");
         }

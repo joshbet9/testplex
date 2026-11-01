@@ -194,7 +194,6 @@ public final class ArcadeMapSelectionMenu implements Listener {
                 openMapSelection(player, game, page);
             }
         } else if ("select-map".equals(action) && game == ArcadePortGame.MONSTER_MAZE && resource != null
-                && plugin instanceof ArcadeMechanicsModernPlugin arcade
                 && arcade.getMonsterMazeModule() != null) {
             me.monstermaze.MonsterMazePlugin module = arcade.getMonsterMazeModule();
             if (!module.getMapManager().setActiveMap(resource)) {
