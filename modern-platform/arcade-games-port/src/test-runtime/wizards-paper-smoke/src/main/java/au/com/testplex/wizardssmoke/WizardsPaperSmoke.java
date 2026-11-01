@@ -287,7 +287,16 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 "actual Wizards round is not using the selected source world");
         require(gameplayArena.getPVP(), "the live Wizards arena did not enable PvP");
         require(states.size() == 3, "expected three active wizard states, found " + states.size());
-        require(snapshots.size() == 3, "player snapshots were not captured for all three clients");
+        // Wizards participates in the shared Arcade lifecycle. The host session,
+        // not WizardsGameManager's legacy standalone map, owns restore snapshots.
+        Object sharedManager = field(arcade, "manager");
+        Object sharedSession = field(sharedManager, "active");
+        require(sharedSession != null, "Wizards started without a shared Arcade session");
+        @SuppressWarnings("unchecked")
+        Map<Object, Object> sharedSnapshots = (Map<Object, Object>) field(sharedSession, "snapshots");
+        require(sharedSnapshots.size() == 3,
+                "shared Arcade session captured " + sharedSnapshots.size() + " snapshots, expected three");
+        require(snapshots.isEmpty(), "Wizards duplicated player snapshots outside the shared lifecycle");
         require(chests.size() >= 8, "live round has fewer than eight loot chests");
 
         validateLivePlayer(owner, states, "MAGE");
@@ -333,7 +342,7 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
                 + "|manaCost=15|projectiles=" + manaBoltsAfter.size() + "|cooldown=5");
 
         getLogger().info("WIZARDS_GAMEPLAY_SMOKE|ROUND_STARTED|players=3|map=" + GAMEPLAY_MAP
-                + "|chests=" + chests.size() + "|snapshotCount=" + snapshots.size());
+                + "|chests=" + chests.size() + "|snapshotCount=" + sharedSnapshots.size());
         // Let spawn protection and Paper's internal damage cooldown expire naturally.
         gameplayStage = 4;
         gameplayTicks = 0;
