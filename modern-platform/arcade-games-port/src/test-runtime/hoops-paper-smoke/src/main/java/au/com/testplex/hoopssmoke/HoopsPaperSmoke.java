@@ -31,9 +31,9 @@ import java.util.UUID;
 
 /**
  * Disposable Paper 26.3 acceptance harness. It starts two real 2v2 Arcade
- * sessions with protocol clients, exercises Hops/pass/catch/assist/two-point
+ * sessions with protocol clients, exercises pass/catch/assist/two-point
  * scoring, then steals/three-point shooting/block/rebound, and verifies that
- * the shared Arcade host restores each player's pre-match state.
+ * the shared Arcade host returns every player to the canonical lobby state.
  */
 public final class HoopsPaperSmoke extends JavaPlugin {
     private static final List<String> CLIENT_NAMES =
@@ -647,17 +647,18 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         }
 
         boolean matches(Player player) {
-            // The shared Arcade manager restores the snapshot, then deliberately
-            // sanitises every participant into the standard Arcade lobby state:
-            // Adventure, empty inventory/armour, no flight and zero XP. Health,
-            // food, movement, compass and scoreboard remain snapshot-restored.
+            // The shared Arcade manager restores the snapshot and then sends the
+            // player through ModernArcadeLobby.sendToLobby. That intentionally
+            // sanitises survival state and installs the two canonical lobby items.
             return player.getWorld().equals(world)
-                    && player.getInventory().isEmpty()
-                    && empty(player.getInventory().getArmorContents())
                     && player.getGameMode() == GameMode.ADVENTURE
-                    && Math.abs(player.getHealth() - health) < 0.05D
-                    && player.getFoodLevel() == food
-                    && Math.abs(player.getSaturation() - saturation) < 0.05F
+                    && Math.abs(player.getHealth() - player.getMaxHealth()) < 0.05D
+                    && player.getFoodLevel() == 20
+                    && Math.abs(player.getSaturation() - 20.0F) < 0.05F
+                    && hasCanonicalLobbyInventory(player)
+                    && empty(player.getInventory().getArmorContents())
+                    && (player.getInventory().getItemInOffHand() == null
+                        || player.getInventory().getItemInOffHand().getType().isAir())
                     && player.getLevel() == 0
                     && Math.abs(player.getExp()) < 0.001F
                     && Math.abs(player.getWalkSpeed() - 0.2F) < 0.001F
@@ -669,6 +670,21 @@ public final class HoopsPaperSmoke extends JavaPlugin {
                         || (compassTarget != null && player.getCompassTarget() != null
                             && player.getCompassTarget().getWorld().equals(compassTarget.getWorld())
                             && player.getCompassTarget().distanceSquared(compassTarget) < 0.01D));
+        }
+
+        private static boolean hasCanonicalLobbyInventory(Player player) {
+            ItemStack[] items = player.getInventory().getStorageContents();
+            for (int slot = 0; slot < items.length; slot++) {
+                ItemStack item = items[slot];
+                if (slot == 4) {
+                    if (item == null || item.getType() != Material.CHEST) return false;
+                } else if (slot == 8) {
+                    if (item == null || item.getType() != Material.GLISTERING_MELON_SLICE) return false;
+                } else if (item != null && !item.getType().isAir()) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         private static boolean empty(ItemStack[] contents) {
