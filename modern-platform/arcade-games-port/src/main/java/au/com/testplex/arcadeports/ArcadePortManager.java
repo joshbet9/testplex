@@ -1686,6 +1686,22 @@ public final class ArcadePortManager implements Listener {
         return eligible;
     }
 
+    /**
+     * Single authoritative eligibility check shared by the automatic selector,
+     * player-facing likelihoods and the Game Panel. This validates the approved
+     * game, embedded module registration and bundled selected-map archive.
+     */
+    boolean isRotationCandidateAvailable(ArcadePortGame game) {
+        if (game == null || !isGameEnabled(game)) return false;
+        if (game == ArcadePortGame.MONSTER_MAZE
+                && !isMonsterMazeModuleRegistered(monsterMazeModule)) return false;
+        if (!SourceMapCatalog.hasMap(game)) return true;
+        String selectedResource = plugin.getConfig().getString("selected-maps." + game.id(),
+                SourceMapCatalog.selectedResource(plugin, game));
+        return selectedResource != null
+                && SourceMapCatalog.isInstalledResource(plugin, game, selectedResource);
+    }
+
     private List<ArcadePortGame> automaticRotationCandidates() {
         List<ArcadePortGame> candidates = new ArrayList<>();
         Set<String> seen = new HashSet<>();
@@ -1699,13 +1715,7 @@ public final class ArcadePortManager implements Listener {
             // READY_FOR_TEST allow-list enforced by ArcadeMechanicsModernPlugin.
             if (!clearedGames.contains(id)) continue;
             ArcadePortGame game = ArcadePortGame.fromId(id);
-            if (game == null || !isGameEnabled(game) || !seen.add(game.id())) continue;
-            if (SourceMapCatalog.hasMap(game)) {
-                String selectedResource = plugin.getConfig().getString("selected-maps." + game.id(),
-                        SourceMapCatalog.selectedResource(plugin, game));
-                if (selectedResource == null
-                        || !SourceMapCatalog.isInstalledResource(plugin, game, selectedResource)) continue;
-            }
+            if (game == null || !seen.add(game.id()) || !isRotationCandidateAvailable(game)) continue;
             candidates.add(game);
         }
         return candidates;
