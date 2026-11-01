@@ -20,7 +20,7 @@ public final class SpeedBuildersRules {
     public static final int MIN_BUILD_SECONDS = 5;
     public static final int MAX_BUILD_SECONDS = 60;
     public static final int REVIEW_SECONDS = 10;
-    public static final int ELIMINATION_INTERVAL_SECONDS = 5;
+    public static final int ELIMINATION_INTERVAL_SECONDS = 2;
     public static final int INTERMISSION_SECONDS = 3;
 
     private SpeedBuildersRules() { }
