@@ -583,7 +583,7 @@ public final class SourceMapCatalog {
                         String entryName = entry.getName().replace('\\', '/');
                         if (entryName.isBlank() || entryName.startsWith("/")
                                 || entryName.matches("(?i)^[a-z]:.*")
-                                || entryName.indexOf('\\0') >= 0) {
+                                || entryName.indexOf((char) 0) >= 0) {
                             throw new IOException("Unsafe archive entry: " + entry.getName());
                         }
                         Path output = staging.resolve(entryName).normalize();
