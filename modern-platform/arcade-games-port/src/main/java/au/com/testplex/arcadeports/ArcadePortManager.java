@@ -6731,7 +6731,7 @@ public final class ArcadePortManager implements Listener {
             long prepareElapsed = Math.max(0L, now - session.startedAt);
             shiftSessionTimestamps(session, prepareElapsed);
             session.startedAt = now;
-            session.ticks = 0L;
+            session.ticks = 0;
             if (session.endsAt > 0L) {
                 session.endsAt = ArcadeLobbyLifecycleRules.shiftPausedTimestamp(session.endsAt, prepareElapsed);
             }
