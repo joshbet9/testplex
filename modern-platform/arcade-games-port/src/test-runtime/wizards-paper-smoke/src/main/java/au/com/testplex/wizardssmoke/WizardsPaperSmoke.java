@@ -696,6 +696,9 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
             result.append(",handle.isCreative=").append(invokeNoArgs(handle, "isCreative"));
             result.append(",handle.isChangingDimension=").append(invokeNoArgs(handle, "isChangingDimension"));
             result.append(",handle.isInvulnerable=").append(invokeNoArgs(handle, "isInvulnerable"));
+            Object connection = invokeNoArgs(handle, "connection");
+            result.append(",connection.hasClientLoaded=")
+                    .append(connection == null ? "null" : invokeNoArgs(connection, "hasClientLoaded"));
             Object damageSources = handle.getClass().getMethod("damageSources").invoke(handle);
             Object generic = damageSources.getClass().getMethod("generic").invoke(damageSources);
             Object level = handle.getClass().getMethod("level").invoke(handle);
