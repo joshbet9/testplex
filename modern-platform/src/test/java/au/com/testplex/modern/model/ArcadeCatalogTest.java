@@ -11,7 +11,7 @@ class ArcadeCatalogTest {
     void registersAllTwentyEightArcadeGames() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         assertEquals(28, catalog.size());
-        assertEquals(27, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
+        assertEquals(28, new HashSet<>(catalog.getGames().stream().map(GameDefinition::getId).toList()).size());
     }
 
     @Test
