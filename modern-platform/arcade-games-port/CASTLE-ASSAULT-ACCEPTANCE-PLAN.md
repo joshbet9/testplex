@@ -1,6 +1,6 @@
 # Castle Assault controlled-acceptance plan
 
-Castle Assault stays disabled until each original archive and its objective layout works in a real Paper 26.3 session. The archive-level test covers the complete 11-map set and verifies the King, crystal and objective-TNT marker groups; it does not replace a map-by-map play test.
+Castle Assault is now READY_FOR_TEST in the shared controlled queue. The archive-level test covers all 11 original maps, including source identity, bounds, King and crystal markers, objective TNT and chest markers. This packaging gate makes the game available for isolated in-game testing; it does not replace a map-by-map play test.
 
 ## Required map pass
 
@@ -10,4 +10,4 @@ Castle Assault stays disabled until each original archive and its objective layo
 4. Exercise objective TNT pickup, carry, throw, proximity/death detonation and respawn timing in both standard (60 seconds) and Mixed Arcade (30 seconds) modes.
 5. Exercise Alchemist, Archer, Demolitionist, Fighter and Tank loadouts, item replenishment, team gear protections, kills, disconnects, respawns and repeated round teardown.
 
-The 11-map marker test is a packaging gate. Live two-team acceptance remains outstanding; passing CI alone must not promote this game to production readiness.
+The 11-map marker test is a packaging gate. Live two-team and map-by-map acceptance remains outstanding; READY_FOR_TEST means the game is available for controlled testing, not production readiness.
