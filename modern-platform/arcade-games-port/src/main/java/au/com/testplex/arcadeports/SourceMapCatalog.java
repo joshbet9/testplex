@@ -57,7 +57,7 @@ public final class SourceMapCatalog {
             case DEATH_TAG -> List.of("Death Tag");
             case DRAGON_ESCAPE -> List.of("Dragon Escape");
             case DRAGONS -> List.of("Dragons");
-            case EVOLUTION -> List.of();
+            case EVOLUTION -> List.of("Evolution");
             case GLADIATORS -> List.of("Gladiators");
             case HEROES_OF_GWEN -> List.of("Heroes of GWEN");
             case MICRO_BATTLES -> List.of("Micro Battle");
