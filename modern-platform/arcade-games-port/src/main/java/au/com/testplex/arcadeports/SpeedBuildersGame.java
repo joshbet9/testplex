@@ -693,7 +693,7 @@ public final class SpeedBuildersGame implements Listener {
         refreshHud();
     }
 
-    /** Highest cumulative accuracy score wins; equal top scores are shared wins. */
+    /** Arcade match end: highest cumulative accuracy wins; tied top scores share the win. */
     private void finishScoredMatch() {
         if (phase != Phase.RESULTS && phase != Phase.INTERMISSION) return;
         List<PlayerState> builders = activePlayers();
