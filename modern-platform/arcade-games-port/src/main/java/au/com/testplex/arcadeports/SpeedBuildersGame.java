@@ -132,7 +132,7 @@ public final class SpeedBuildersGame implements Listener {
 
     public String status() {
         if (phase == Phase.IDLE) return "queue=" + queue.size();
-        return phase.name() + " round=" + round + " builders=" + activePlayers().size()
+        return phase.name() + " round=" + round + "/" + matchRoundLimit + " builders=" + activePlayers().size()
                 + " templates=" + templates.size()
                 + " build=" + (currentTemplate == null ? "none" : currentTemplate.name());
     }
@@ -834,6 +834,7 @@ public final class SpeedBuildersGame implements Listener {
             }
         }
         players.clear();
+        matchHistory.clear();
         restorePlot(reviewPlot);
         refreshHud();
     }
