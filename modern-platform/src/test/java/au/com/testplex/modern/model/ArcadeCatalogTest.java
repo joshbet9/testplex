@@ -24,7 +24,9 @@ class ArcadeCatalogTest {
             GameDefinition game = catalog.getGame(id);
             assertNotNull(game);
             assertTrue(game.isReadyForTest(), id + " must use the standard ready-game selection flow");
-            assertEquals(2, game.getCosmeticLines().size());
+            if ("monster-maze".equals(id)) assertEquals(2, game.getCosmeticLines().size());
+            else assertTrue(game.getCosmeticLines().isEmpty(),
+                    "Speed and Modern must reuse the single Monster Maze cosmetics page");
         }
     }
 
@@ -32,7 +34,7 @@ class ArcadeCatalogTest {
     void eachGameHasItsOwnCosmeticLinesAndWinEffects() {
         ArcadeCatalog catalog = new ArcadeCatalog();
         for (GameDefinition game : catalog.getGames()) {
-            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen", "milk-the-cow", "wither-assault", "plexball", "super-sploor", "camera-shy", "speed-builders").contains(game.getId());
+            boolean gameplayFirstPort = Set.of("draw-my-thing", "master-builders", "sneaky-assassins", "castle-assault", "heroes-of-gwen", "milk-the-cow", "wither-assault", "plexball", "super-sploor", "camera-shy", "speed-builders", "monster-maze-speed", "monster-maze-modern").contains(game.getId());
             assertEquals(gameplayFirstPort, game.getCosmeticLines().isEmpty(),
                     game.getId() + " cosmetic lines should remain optional during this gameplay-first port");
             assertTrue(game.getWinEffects().size() >= (gameplayFirstPort ? 1 : 3),
