@@ -9,13 +9,21 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SnakeModernPlugin extends JavaPlugin implements CommandExecutor {
     private SnakeGameManager game;
-    private static final boolean READY_FOR_TEST = false;
+    private static final boolean READY_FOR_TEST = true;
+    private static final String READINESS_REVISION = "snake-controlled-acceptance-20261101-v1";
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
+        // One-time migration: an existing VM config may still contain enabled=false
+        // from the period when Snake was deliberately held behind the readiness gate.
+        if (!READINESS_REVISION.equals(getConfig().getString("readiness-revision", ""))) {
+            getConfig().set("enabled", READY_FOR_TEST);
+            getConfig().set("readiness-revision", READINESS_REVISION);
+            saveConfig();
+        }
         if (!READY_FOR_TEST || !getConfig().getBoolean("enabled", false)) {
-            getLogger().info("SnakeModern is installed but disabled; it is not cleared for in-game testing yet.");
+            getLogger().info("SnakeModern is disabled by its local configuration; it is not available for this test session.");
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
