@@ -319,17 +319,17 @@ public final class MenuService implements Listener {
                     ChatColor.RED + "No games cleared for acceptance",
                     List.of(ChatColor.GRAY + "The reviewed 26.3 acceptance allow-list is empty.")));
             if (page > 0) {
-                ItemStack previous = makeItem(Material.ARROW, ChatColor.YELLOW + "Previous Page");
+                ItemStack previous = makeItem(Material.ARROW, ChatColor.YELLOW + "Previous Page", List.of());
                 mark(previous, "panel-rotation-status-page", null, null, String.valueOf(page - 1));
                 inventory.setItem(46, previous);
             }
             if (page + 1 < pageCount) {
-                ItemStack next = makeItem(Material.ARROW, ChatColor.YELLOW + "Next Page");
+                ItemStack next = makeItem(Material.ARROW, ChatColor.YELLOW + "Next Page", List.of());
                 mark(next, "panel-rotation-status-page", null, null, String.valueOf(page + 1));
                 inventory.setItem(52, next);
             }
             inventory.setItem(48, makeItem(Material.MAP, ChatColor.AQUA + "Page " + (page + 1) + "/" + pageCount,
-                    List.of(ChatColor.GRAY + clearedGames.size() + " cleared game(s) in this status list.")));
+                    List.of(ChatColor.GRAY.toString() + clearedGames.size() + " cleared game(s) in this status list.")));
         }
         inventory.setItem(45, backItem("Go Back", "back-panel", null));
         inventory.setItem(49, makeItem(Material.WRITABLE_BOOK, ChatColor.AQUA + "How voting works",
@@ -418,7 +418,7 @@ public final class MenuService implements Listener {
             inventory.setItem(45, previous);
         }
         inventory.setItem(49, makeItem(Material.MAP, ChatColor.AQUA + "Page " + (page + 1) + "/" + pageCount,
-                List.of(ChatColor.GRAY + catalog.getGames().size() + " games in the catalogue.",
+                List.of(ChatColor.GRAY.toString() + catalog.getGames().size() + " games in the catalogue.",
                         ChatColor.GRAY + (rotation ? "Toggle games in the shared preference rotation pool."
                                 : "Select any game to inspect its lobby integration."))));
         if (page + 1 < pageCount) {
