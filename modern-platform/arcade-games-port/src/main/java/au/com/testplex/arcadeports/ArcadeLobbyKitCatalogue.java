@@ -96,6 +96,13 @@ final class ArcadeLobbyKitCatalogue {
                             Unlock.FREE, Zombie.class, Material.STONE_PICKAXE),
                     choice("micro-fighter", "Fighter", Material.IRON_SWORD,
                             Unlock.FREE, Zombie.class, Material.WOODEN_SWORD));
+            case SHEEP_QUEST -> List.of(
+                    choice("beserker", "Berserker", Material.RABBIT_FOOT,
+                            Unlock.FREE, Zombie.class, Material.IRON_AXE),
+                    choice("archer", "Archer", Material.BOW,
+                            Unlock.GEM, Skeleton.class, Material.BOW),
+                    choice("brute", "Brute", Material.IRON_SWORD,
+                            Unlock.GEM, Zombie.class, Material.IRON_SWORD));
             case MONSTER_MAZE -> List.of(
                     choice("jumper", "Jumper", Material.FEATHER,
                             Unlock.FREE, Skeleton.class, Material.FEATHER),
