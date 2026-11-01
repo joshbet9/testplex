@@ -22,6 +22,7 @@ import org.bukkit.entity.Mob;
 import org.bukkit.entity.EnderCrystal;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.FallingBlock;
+import org.bukkit.entity.Horse;
 import org.bukkit.entity.Item;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -131,6 +132,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final NamespacedKey heroProjectileOwnerKey;
     private final NamespacedKey bardolfWolfOwnerKey;
     private final NamespacedKey rowenaBombardmentItemKey;
+    private final NamespacedKey biffHorseOwnerKey;
     private final Map<Integer, KingState> kings = new HashMap<>();
     private final Map<UUID, Integer> playerGold = new HashMap<>();
     private final Map<UUID, ItemStack> carriedTntOldHelmet = new HashMap<>();
@@ -190,6 +192,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, Long> danaKnockUpEndsAt = new HashMap<>();
     private final Map<UUID, Map<UUID, Long>> danaKnockUpNextHitAt = new HashMap<>();
     private final Map<UUID, DanaRallyState> danaRallies = new HashMap<>();
+    private final Map<UUID, List<BiffTetherTarget>> biffTetherTargets = new HashMap<>();
+    private final Map<UUID, Long> biffBattleLeapStartedAt = new HashMap<>();
+    private final Map<UUID, BiffHorseState> biffHorses = new HashMap<>();
     private final List<StoreEntry> storeEntries = new ArrayList<>();
     private final Map<UUID, StoreHolder> openStores = new HashMap<>();
 
@@ -239,6 +244,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         this.heroProjectileOwnerKey = new NamespacedKey(plugin, "heroes-gwen-projectile-owner");
         this.bardolfWolfOwnerKey = new NamespacedKey(plugin, "heroes-gwen-bardolf-owner");
         this.rowenaBombardmentItemKey = new NamespacedKey(plugin, "heroes-gwen-rowena-bombardment-active");
+        this.biffHorseOwnerKey = new NamespacedKey(plugin, "heroes-gwen-biff-horse-owner");
         for (Player player : participants) {
             this.players.put(player.getUniqueId(), player);
             this.activePlayers.add(player.getUniqueId());
@@ -1301,7 +1307,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         String id = heroSkillId(dropped);
         if (id == null || !Set.of("hattori.ender_blade", "devon.infinity",
                 "anath.burn_beam", "anath.meteor_shower", "larissa.storm_blessing",
-                "bardolf.full_moon", "rowena.bombardment", "dana.rally").contains(id)) return;
+                "bardolf.full_moon", "rowena.bombardment", "dana.rally", "biff.cavalry_charge").contains(id)) return;
         event.setCancelled(true);
         activateHeroesOfGwenSkill(player, id);
     }
@@ -1335,6 +1341,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             ItemStack skill = player.getInventory().getItem(2);
             if ("dana.knock_up".equals(heroSkillId(skill))) {
                 activateHeroesOfGwenSkill(player, "dana.knock_up");
+            }
+        } else if ("biff".equals(hero)) {
+            ItemStack skill = player.getInventory().getItem(2);
+            if ("biff.battle_leap".equals(heroSkillId(skill))) {
+                activateHeroesOfGwenSkill(player, "biff.battle_leap");
             }
         }
     }
@@ -2679,6 +2690,16 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 player.getInventory().setItem(7, namedItem(Material.BLAZE_POWDER,
                         ChatColor.GOLD + "Embers", "Anath mage resource."));
             }
+            case "biff" -> {
+                player.getInventory().setItem(0, namedItem(Material.WOODEN_SWORD,
+                        ChatColor.GREEN + "Sword", "Biff's basic melee weapon."));
+                giveHeroesOfGwenSkillItem(player, 1, "biff.tether", Material.LEAD,
+                        "Tether", "Hook nearby enemy heroes within 8 blocks, slow and pull them toward you. 5-second active tether; 12-second cooldown after it ends.");
+                giveHeroesOfGwenSkillItem(player, 2, "biff.battle_leap", Material.FEATHER,
+                        "Battle Leap", "Leap upward; on landing damage and knock up enemies within 5 blocks. Click or sneak. 11-second cooldown.");
+                giveHeroesOfGwenSkillItem(player, 3, "biff.cavalry_charge", Material.NETHER_STAR,
+                        "Cavalry Charge", "Mount an armoured horse for 6 seconds; nearby enemies take 4 damage and are rooted. Drop to activate; 45-second cooldown after the initial 5.5-second active window.");
+            }
             case "dana" -> {
                 player.getInventory().setItem(0, namedItem(Material.WOODEN_SWORD,
                         ChatColor.GREEN + "Sword", "Dana's basic melee weapon."));
@@ -2863,6 +2884,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             case "dana.pulse_heal" -> activateDanaPulseHeal(player);
             case "dana.knock_up" -> activateDanaKnockUp(player);
             case "dana.rally" -> beginDanaRally(player);
+            case "biff.tether" -> activateBiffTether(player);
+            case "biff.battle_leap" -> activateBiffBattleLeap(player);
+            case "biff.cavalry_charge" -> activateBiffCavalryCharge(player);
             default -> player.sendMessage(ChatColor.YELLOW + "That hero ability is not yet available.");
         }
     }
