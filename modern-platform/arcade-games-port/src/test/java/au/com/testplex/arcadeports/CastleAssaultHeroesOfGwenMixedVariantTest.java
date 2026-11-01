@@ -411,6 +411,33 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesValleyAndMonochromeSidequestsMatchSourceTimingAndCombatValues() {
+        assertEquals(300_000L, ArcadePortRules.HEROES_OF_GWEN_SIDEQUEST_INITIAL_DELAY_MILLIS);
+        assertEquals(300_000L, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_RESPAWN_DELAY_MILLIS);
+        assertEquals(250L, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_ATTACK_INTERVAL_MILLIS);
+        assertEquals(100, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HEALTH);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_TARGET_SPEED, 0.00001D);
+        assertEquals(3.0D, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_HOME_SPEED, 0.00001D);
+        assertEquals(9.0D, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_RANGE_SQUARED, 0.00001D);
+        assertEquals(6, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DIRECT_DAMAGE);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_AREA_RADIUS, 0.00001D);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_AREA_DAMAGE);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_OUT_OF_COMBAT_HEAL);
+        assertEquals(60_000L, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_BUFF_DURATION_MILLIS);
+        assertEquals(1, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_REGENERATION_AMPLIFIER);
+        assertEquals(1.5D, ArcadePortRules.HEROES_OF_GWEN_PUMPKIN_KING_DAMAGE_MULTIPLIER, 0.00001D);
+        assertEquals(30_000L, ArcadePortRules.HEROES_OF_GWEN_MONOCHROME_SKELETONS_DURATION_MILLIS);
+    }
+
+    @Test
+    void monochromeSidequestAwardsOnlyTheHigherScoringTeam() {
+        assertEquals(0, ArcadePortRules.heroesOfGwenMonochromeWinner(3, 2));
+        assertEquals(1, ArcadePortRules.heroesOfGwenMonochromeWinner(1, 4));
+        assertEquals(-1, ArcadePortRules.heroesOfGwenMonochromeWinner(2, 2));
+        assertEquals(-1, ArcadePortRules.heroesOfGwenMonochromeWinner(0, 0));
+    }
+
+    @Test
     void witherTargetsHostileLivingEntitiesIncludingNeutralMobsButNotAlliesOrInactivePlayers() {
         assertTrue(ArcadePortRules.heroesOfGwenWitherCanTarget(0, 1, true));
         assertTrue(ArcadePortRules.heroesOfGwenWitherCanTarget(0, -1, true));
