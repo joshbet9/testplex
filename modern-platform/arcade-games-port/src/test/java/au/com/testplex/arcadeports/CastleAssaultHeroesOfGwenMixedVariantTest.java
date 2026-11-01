@@ -337,4 +337,45 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DAMAGE, 0.00001D);
         assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_JUMP_STRENGTH, 0.00001D);
     }
+
+    @Test
+    void ivyVinePullMatchesSourceBeamRangeDamageAndSlowValues() {
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_COOLDOWN_MILLIS);
+        assertEquals(9.0D, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_RANGE, 0.00001D);
+        assertEquals(0.25D, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_BEAM_STEP, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_HIT_RADIUS, 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_STOP_DISTANCE_SQUARED, 0.00001D);
+        assertEquals(4, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_PLAYER_DAMAGE);
+        assertEquals(6, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_MINION_DAMAGE);
+        assertEquals(60, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_TICKS);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_AMPLIFIER);
+        assertEquals(8_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_MAX_PULL_MILLIS);
+    }
+
+    @Test
+    void ivyFloralLeapMatchesSourceLandingDamageFlowerBedAndCooldown() {
+        assertEquals(11_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_COOLDOWN_MILLIS);
+        assertEquals(1.2D, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_VERTICAL_VELOCITY, 0.00001D);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_MINIMUM_FLIGHT_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_BED_DURATION_MILLIS);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_INTERVAL_MILLIS);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_RADIUS, 0.00001D);
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_FLOWER_RADIUS);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE);
+        assertEquals(50, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_TICKS);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_AMPLIFIER);
+    }
+
+    @Test
+    void ivyThornWallMatchesSourceDurationAreaSupportAndEnemyEffects() {
+        assertEquals(45_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_COOLDOWN_MILLIS);
+        assertEquals(5_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_DURATION_MILLIS);
+        assertEquals(3, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_BLOCK_RADIUS);
+        assertEquals(60L, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_TICKS);
+        assertEquals(1, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ALLY_REGEN_AMPLIFIER);
+        assertEquals(2_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_MILLIS);
+        assertEquals(2_000L, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_ROOT_RECHARGE_MILLIS);
+        assertEquals(900L, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE_RECHARGE_MILLIS);
+        assertEquals(2, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE);
+    }
 }
