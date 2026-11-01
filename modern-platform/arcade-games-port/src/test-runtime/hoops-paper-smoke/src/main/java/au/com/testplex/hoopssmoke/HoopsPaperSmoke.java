@@ -132,6 +132,66 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         getLogger().info("MAP_SMOKE|PASS|gladiators|Caged In|spawns=" + spawns.size()
                 + "|first=" + spawns.getFirst());
         require(Bukkit.unloadWorld(world, false), "Gladiators disposable world failed unload");
+        verifyOriginalDragonEscapeMapInPaper(arcadePlugin, catalog,
+                "DragonEscape_Through Hell.zip", "through_hell", 0);
+        verifyOriginalDragonEscapeMapInPaper(arcadePlugin, catalog,
+                "DragonEscape_Steve's Swamp.zip", "steves_swamp", 31);
+    }
+
+    /** Proves that Paper imports actual Dragon Escape terrain and the GREEN team
+     * starts are supported by real blocks, independently of speed DATA_LOCS. */
+    private void verifyOriginalDragonEscapeMapInPaper(JavaPlugin arcadePlugin,
+            Class<?> catalog, String archiveName, String worldSuffix, int expectedMinY)
+            throws Exception {
+        String resource = "source-maps/Dragon Escape/" + archiveName;
+        String worldName = "arcadeport_source_dragon_escape_" + worldSuffix + "_smoke";
+        boolean installed = (Boolean) catalog.getMethod("installResource",
+                JavaPlugin.class, String.class, String.class, String.class)
+                .invoke(null, arcadePlugin, "Dragon Escape", resource, worldName);
+        require(installed, "Dragon Escape " + archiveName + " failed archive install");
+        World world = new WorldCreator(worldName).environment(World.Environment.NORMAL)
+                .generateStructures(false).createWorld();
+        require(world != null, "Dragon Escape " + archiveName + " failed Paper world import");
+        Object metadata = catalog.getMethod("readResource",
+                JavaPlugin.class, String.class, String.class, World.class)
+                .invoke(null, arcadePlugin, "Dragon Escape", resource, world);
+        require(metadata != null, "Dragon Escape " + archiveName + " has no source metadata");
+        int minY = ((Number) metadata.getClass().getMethod("minY").invoke(metadata)).intValue();
+        require(minY == expectedMinY, "Dragon Escape " + archiveName
+                + " wrong authentic lower bound: " + minY + " vs " + expectedMinY);
+        @SuppressWarnings("unchecked")
+        List<Location> starts = (List<Location>) metadata.getClass()
+                .getMethod("teamSpawnLocationsForName", String.class).invoke(metadata, "Green");
+        require(!starts.isEmpty(), "Dragon Escape " + archiveName + " missing GREEN team starts");
+        @SuppressWarnings("unchecked")
+        List<Location> douglas = (List<Location>) metadata.getClass()
+                .getMethod("dataLocations", String.class).invoke(metadata, "RED");
+        @SuppressWarnings("unchecked")
+        List<Location> route = (List<Location>) metadata.getClass()
+                .getMethod("dataLocations", String.class).invoke(metadata, "BLACK");
+        require(!douglas.isEmpty() && !route.isEmpty(),
+                "Dragon Escape " + archiveName + " missing Douglas RED/BLACK route");
+        int validStarts = 0;
+        for (Location start : starts) {
+            boolean onTerrain = false;
+            for (int dy = 1; dy <= 8; dy++) {
+                if (start.getBlockY() - dy < world.getMinHeight()) break;
+                Material under = world.getBlockAt(start.getBlockX(), start.getBlockY() - dy,
+                        start.getBlockZ()).getType();
+                if (under.isSolid() || under == Material.WATER) {
+                    onTerrain = true;
+                    break;
+                }
+            }
+            if (onTerrain) validStarts++;
+        }
+        require(validStarts > 0, "Dragon Escape " + archiveName
+                + " imported but all GREEN team starts are over missing/void terrain");
+        getLogger().info("MAP_SMOKE|PASS|dragon-escape|" + archiveName
+                + "|greenStarts=" + starts.size() + "|supportedStarts=" + validStarts
+                + "|minY=" + minY + "|first=" + starts.getFirst());
+        require(Bukkit.unloadWorld(world, false),
+                "Dragon Escape " + archiveName + " disposable world failed unload");
     }
 
     private void waitForClientsAndStartFirstMatch() throws Exception {
