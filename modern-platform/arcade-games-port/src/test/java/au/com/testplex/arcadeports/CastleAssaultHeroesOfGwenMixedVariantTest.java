@@ -434,6 +434,16 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesOfGwenAbilityHealingUsesSourceAbilityDamageAndRecipientHp5() {
+        assertEquals(126.0D, ArcadePortRules.heroesOfGwenStoreAbilityHeal(
+                100.0D, List.of("Adept's Cap"), List.of("Urchin's Cap")), 0.00001D);
+        assertEquals(105.0D, ArcadePortRules.heroesOfGwenStoreAbilityHeal(
+                100.0D, List.of("Adept's Cap"), List.of()), 0.00001D);
+        assertEquals(120.0D, ArcadePortRules.heroesOfGwenStoreAbilityHeal(
+                100.0D, List.of(), List.of("Urchin's Cap")), 0.00001D);
+    }
+
+    @Test
     void heroesOfGwenStoreDamageModifiersStackInTheirOwnDamageFamilies() {
         assertEquals(12.0D, ArcadePortRules.heroesOfGwenStoreAbilityDamage(
                 10.0D, List.of("Adept's Cap", "Adept's Chestplate", "Ninja's Mask")), 0.00001D);
