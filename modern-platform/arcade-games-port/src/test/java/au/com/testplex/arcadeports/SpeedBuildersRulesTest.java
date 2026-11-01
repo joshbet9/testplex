@@ -70,10 +70,14 @@ class SpeedBuildersRulesTest {
                 "minecraft:end_portal_frame[facing=east,eye=true]",
                 Material.END_PORTAL_FRAME,
                 "minecraft:end_portal_frame[facing=east,eye=false]"));
-        assertFalse(SpeedBuildersRules.blockMatches(Material.END_PORTAL_FRAME,
+        assertTrue(SpeedBuildersRules.blockMatches(Material.END_PORTAL_FRAME,
                 "minecraft:end_portal_frame[facing=east,eye=true]",
                 Material.END_PORTAL_FRAME,
                 "minecraft:end_portal_frame[facing=west,eye=true]"));
+        assertFalse(SpeedBuildersRules.blockMatches(Material.END_PORTAL_FRAME,
+                "minecraft:end_portal_frame[facing=east,eye=true]",
+                Material.END_PORTAL_FRAME,
+                "minecraft:end_portal_frame[facing=west,eye=false]"));
         assertTrue(SpeedBuildersRules.blockMatches(Material.OAK_LEAVES,
                 "minecraft:oak_leaves[distance=7,persistent=false]",
                 Material.OAK_LEAVES,
