@@ -136,13 +136,34 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         getLogger().info("HOOPS_SMOKE|QUEUED|players=4|format=2v2");
     }
 
-    private void queueAndStart() {
+    private void queueAndStart() throws Exception {
         for (Player player : players) {
             require(Bukkit.dispatchCommand(player, "arcadeport join hoops-remastered"),
                     player.getName() + " could not join Hoops queue");
         }
-        require(Bukkit.dispatchCommand(owner, "arcadeport start hoops-remastered"),
-                "owner could not force-start Hoops");
+
+        // The public /start path deliberately pads ordinary acceptance matches
+        // to the shared 16-player FakePlayerPlugin test roster. This harness is
+        // explicitly a four-real-client 2v2 test, so use the same shared manager's
+        // internal start after checking that its startup fake-player cleanup is
+        // complete. The real queue, snapshots, team assignment and finish path
+        // remain owned by ArcadePortManager; only automatic roster padding is
+        // bypassed for this disposable four-client fixture.
+        Object testPlayers = field(manager, "testPlayers");
+        require(testPlayers != null, "shared Arcade test-player manager is unavailable");
+        require(Boolean.TRUE.equals(invoke(testPlayers, "isStartupCleanupComplete", new Class<?>[0])),
+                "fake-player startup cleanup has not completed");
+        require(Boolean.TRUE.equals(invoke(testPlayers, "isStartupCleanupSuccessful", new Class<?>[0])),
+                "fake-player startup cleanup was not verified");
+
+        Class<?> gameType = Class.forName("au.com.testplex.arcadeports.ArcadePortGame");
+        Class<?> senderType = Class.forName("org.bukkit.command.CommandSender");
+        Object hoopsGame = java.util.Arrays.stream(gameType.getEnumConstants())
+                .filter(value -> "HOOPS_REMASTERED".equals(String.valueOf(value)))
+                .findFirst().orElseThrow(() -> new IllegalStateException("Hoops Remastered is missing from ArcadePortGame"));
+        invoke(manager, "startQueuedInternal",
+                new Class<?>[] {gameType, Player.class, senderType, boolean.class},
+                hoopsGame, owner, owner, false);
     }
 
     private void waitForMatch() throws Exception {
@@ -160,8 +181,16 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         if (firstMatch == null) return;
         World world = (World) field(firstMatch, "world");
         require(world != null, "Hoops did not create an isolated arena world");
-        require(field(firstMatch, "players") instanceof Map<?, ?> roster && roster.size() == 4,
-                "Hoops roster does not contain all four clients");
+        Object rawRoster = field(firstMatch, "players");
+        require(rawRoster instanceof Map<?, ?>, "Hoops roster is not a player map");
+        Map<?, ?> roster = (Map<?, ?>) rawRoster;
+        List<String> missingPlayers = players.stream()
+                .filter(player -> !roster.containsKey(player.getUniqueId()))
+                .map(Player::getName)
+                .toList();
+        require(roster.size() == players.size() && missingPlayers.isEmpty(),
+                "Hoops roster must contain exactly the four real clients; roster-size=" + roster.size()
+                        + ", missing=" + String.join(",", missingPlayers));
         @SuppressWarnings("unchecked")
         Map<UUID, Integer> teams = (Map<UUID, Integer>) field(firstMatch, "teams");
         int[] teamCounts = new int[2];
