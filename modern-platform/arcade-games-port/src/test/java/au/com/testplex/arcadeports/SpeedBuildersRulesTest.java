@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -120,40 +119,14 @@ class SpeedBuildersRulesTest {
     }
 
     @Test
-    void gwenJudgementAndSequentialEliminationUseSourceTimings() {
-        assertEquals(100L, SpeedBuildersRules.JUDGE_BEAM_HOLD_TICKS);
-        assertEquals(40L, SpeedBuildersRules.ELIMINATION_INTERVAL_TICKS);
-        assertEquals(10, SpeedBuildersRules.REVIEW_SECONDS);
+    void accuracyPointsAreNormalizedWithoutEliminatingLowScorers() {
+        assertEquals(0, SpeedBuildersRules.roundPoints(0, 10));
+        assertEquals(33, SpeedBuildersRules.roundPoints(1, 3));
+        assertEquals(67, SpeedBuildersRules.roundPoints(2, 3));
+        assertEquals(100, SpeedBuildersRules.roundPoints(10, 10));
+        assertEquals(0, SpeedBuildersRules.roundPoints(0, 0));
+        assertThrows(IllegalArgumentException.class, () -> SpeedBuildersRules.roundPoints(-1, 10));
+        assertThrows(IllegalArgumentException.class, () -> SpeedBuildersRules.roundPoints(11, 10));
     }
 
-    @Test
-    void emptyPlotsAreEliminatedAndAUniqueLowestBuildIsRemoved() {
-        var scores = List.of(
-                new SpeedBuildersRules.PlayerScore("empty", 0, 10, true),
-                new SpeedBuildersRules.PlayerScore("low", 2, 10, false),
-                new SpeedBuildersRules.PlayerScore("high", 8, 10, false));
-        assertEquals(Set.of("empty"), SpeedBuildersRules.eliminationCandidates(scores));
-    }
-
-    @Test
-    void uniqueLowestNonEmptyBuildIsEliminated() {
-        var scores = List.of(
-                new SpeedBuildersRules.PlayerScore("low", 2, 10, false),
-                new SpeedBuildersRules.PlayerScore("middle", 5, 10, false),
-                new SpeedBuildersRules.PlayerScore("high", 8, 10, false));
-        assertEquals(Set.of("low"), SpeedBuildersRules.eliminationCandidates(scores));
-    }
-
-    @Test
-    void fullTieAndAllPerfectRoundDoNotEliminatePlayers() {
-        var tied = List.of(
-                new SpeedBuildersRules.PlayerScore("one", 5, 10, false),
-                new SpeedBuildersRules.PlayerScore("two", 5, 10, false),
-                new SpeedBuildersRules.PlayerScore("three", 5, 10, false));
-        var perfect = List.of(
-                new SpeedBuildersRules.PlayerScore("one", 10, 10, false),
-                new SpeedBuildersRules.PlayerScore("two", 10, 10, false));
-        assertTrue(SpeedBuildersRules.eliminationCandidates(tied).isEmpty());
-        assertTrue(SpeedBuildersRules.eliminationCandidates(perfect).isEmpty());
-    }
 }
