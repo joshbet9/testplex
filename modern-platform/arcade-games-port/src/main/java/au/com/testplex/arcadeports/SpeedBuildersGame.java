@@ -620,6 +620,8 @@ public final class SpeedBuildersGame implements Listener {
         buildPhaseStartedTick = tick;
         phaseDeadlineTick = tick + buildSeconds * 20L;
         for (PlayerState state : activePlayers()) {
+            state.roundBuildTimeTicks = 0L;
+            state.buildTimeRecorded = false;
             clearPlotBuildVolume(state.plot);
             removeMobs(state.mobs);
             giveTemplateBlocks(state.player, currentTemplate);
@@ -649,7 +651,10 @@ public final class SpeedBuildersGame implements Listener {
             boolean wasAlreadyPerfect = state.perfect;
             boolean perfectBuild = state.score == currentTemplate.expectedScore();
             if (perfectBuild && !wasAlreadyPerfect) markPerfectBuild(state);
-            else state.perfect = perfectBuild;
+            else {
+                state.perfect = perfectBuild;
+                recordBuildTime(state, Math.max(0L, tick - buildPhaseStartedTick));
+            }
             state.player.getInventory().clear();
             state.player.setGameMode(GameMode.SPECTATOR);
             Location view = reviewViewLocation(i);
@@ -693,7 +698,7 @@ public final class SpeedBuildersGame implements Listener {
         refreshHud();
     }
 
-    /** Arcade match end: highest cumulative accuracy wins; tied top scores share the win. */
+    /** Arcade match end: accuracy first, cumulative build time as the tie-breaker. */
     private void finishScoredMatch() {
         if (phase != Phase.RESULTS && phase != Phase.INTERMISSION) return;
         List<PlayerState> builders = activePlayers();
@@ -701,9 +706,15 @@ public final class SpeedBuildersGame implements Listener {
             finishMatch(null, "No builders remain connected.");
             return;
         }
-        Map<String, Integer> totals = builders.stream().collect(java.util.stream.Collectors.toMap(
-                state -> state.player.getUniqueId().toString(), state -> state.totalPoints));
-        Set<String> winnerIds = new LinkedHashSet<>(SpeedBuildersRules.highestScorers(totals));
+        Map<String, Integer> totals = new LinkedHashMap<>();
+        Map<String, Long> buildTimes = new LinkedHashMap<>();
+        for (PlayerState state : builders) {
+            String id = state.player.getUniqueId().toString();
+            totals.put(id, state.totalPoints);
+            buildTimes.put(id, state.totalBuildTimeTicks);
+        }
+        Set<String> winnerIds = new LinkedHashSet<>(
+                SpeedBuildersRules.winnersByScoreThenBuildTime(totals, buildTimes));
         List<PlayerState> winners = builders.stream()
                 .filter(state -> winnerIds.contains(state.player.getUniqueId().toString()))
                 .sorted(java.util.Comparator.comparing(state -> state.player.getName(),
@@ -711,11 +722,18 @@ public final class SpeedBuildersGame implements Listener {
                 .toList();
         String scoreboard = builders.stream()
                 .sorted(java.util.Comparator.comparingInt((PlayerState state) -> state.totalPoints).reversed()
+                        .thenComparingLong(state -> state.totalBuildTimeTicks)
                         .thenComparing(state -> state.player.getName(), String.CASE_INSENSITIVE_ORDER))
-                .map(state -> state.player.getName() + " " + state.totalPoints)
+                .map(state -> state.player.getName() + " " + state.totalPoints + " pts / "
+                        + formatBuildTime(state.totalBuildTimeTicks))
                 .collect(java.util.stream.Collectors.joining(ChatColor.GRAY + " · " + ChatColor.WHITE));
-        Bukkit.broadcastMessage(ChatColor.GOLD + "Final Speed Builders scores: " + ChatColor.WHITE + scoreboard);
-        finishMatchWithWinners(winners, "Highest cumulative accuracy score after " + round + " rounds.");
+        Bukkit.broadcastMessage(ChatColor.GOLD + "Final Speed Builders scores (accuracy, then cumulative build time): "
+                + ChatColor.WHITE + scoreboard);
+        finishMatchWithWinners(winners, "Highest cumulative accuracy; fastest cumulative build time breaks score ties.");
+    }
+
+    private String formatBuildTime(long ticks) {
+        return String.format(java.util.Locale.ROOT, "%.2fs", ticks * 0.05D);
     }
 
     private void spawnGwen() {
@@ -1100,6 +1118,7 @@ public final class SpeedBuildersGame implements Listener {
                         + (phase == Phase.REVIEWING || phase == Phase.RESULTS ? percent(state.score) + "%" : "—"),
                 ChatColor.YELLOW + "Round points: " + ChatColor.WHITE.toString() + state.roundPoints,
                 ChatColor.YELLOW + "Total points: " + ChatColor.WHITE.toString() + state.totalPoints,
+                ChatColor.YELLOW + "Build time: " + ChatColor.WHITE + formatBuildTime(state.totalBuildTimeTicks),
                 ChatColor.YELLOW + "Perfect builds: " + ChatColor.WHITE + state.perfectBuilds,
                 ChatColor.YELLOW + "Builders: " + ChatColor.WHITE + activePlayers().size()
         );
@@ -1392,11 +1411,19 @@ public final class SpeedBuildersGame implements Listener {
         return view;
     }
 
+    private void recordBuildTime(PlayerState state, long elapsedTicks) {
+        if (state.buildTimeRecorded) return;
+        state.roundBuildTimeTicks = Math.max(0L, elapsedTicks);
+        state.totalBuildTimeTicks += state.roundBuildTimeTicks;
+        state.buildTimeRecorded = true;
+    }
+
     private void markPerfectBuild(PlayerState state) {
         if (state.perfect || !state.player.isOnline()) return;
+        recordBuildTime(state, Math.max(0L, tick - buildPhaseStartedTick));
         state.perfect = true;
         state.perfectBuilds++;
-        long elapsedMillis = Math.max(0L, tick - buildPhaseStartedTick) * 50L;
+        long elapsedMillis = state.roundBuildTimeTicks * 50L;
         if (!firstPerfectBuildAwarded) {
             firstPerfectBuildAwarded = true;
             SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "perfect-first", 1L);
@@ -1674,6 +1701,9 @@ public final class SpeedBuildersGame implements Listener {
         private int score;
         private int roundPoints;
         private int totalPoints;
+        private long roundBuildTimeTicks;
+        private long totalBuildTimeTicks;
+        private boolean buildTimeRecorded;
         private int perfectBuilds;
         private int blocksPlaced;
         private int blocksBroken;
