@@ -1487,6 +1487,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             removeBardolfPack(event.getEntity().getUniqueId());
             removeRowenaState(event.getEntity().getUniqueId());
             removeDanaState(event.getEntity().getUniqueId());
+            removeIvyState(event.getEntity().getUniqueId());
         }
     }
 
@@ -1497,6 +1498,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             removeBardolfPack(event.getPlayer().getUniqueId());
             removeRowenaState(event.getPlayer().getUniqueId());
             removeDanaState(event.getPlayer().getUniqueId());
+            removeIvyState(event.getPlayer().getUniqueId());
         }
     }
 
@@ -2668,6 +2670,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (!hero.equals(previous) && "rowena".equals(previous)) removeRowenaState(player.getUniqueId());
         if (!hero.equals(previous) && "dana".equals(previous)) removeDanaState(player.getUniqueId());
         if (!hero.equals(previous) && "biff".equals(previous)) removeBiffState(player.getUniqueId());
+        if (!hero.equals(previous) && "ivy".equals(previous)) removeIvyState(player.getUniqueId());
         if (!hero.equals(previous) && previous != null) {
             int team = teams.getOrDefault(player.getUniqueId(), -1);
             boolean ownTowerLost = towers.getOrDefault(team, List.of()).stream().anyMatch(tower -> tower.dead);
@@ -4691,6 +4694,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         updateBardolfWolves(now);
         updateDanaAbilities(now);
         updateBiffAbilities(now);
+        updateIvyAbilities(now);
         updateRowenaAbilities(now);
         for (Map.Entry<UUID, BardolfPounceState> entry : new HashMap<>(bardolfPounces).entrySet()) {
             if (now >= entry.getValue().expiresAt) bardolfPounces.remove(entry.getKey());
@@ -4775,6 +4779,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         for (UUID id : new ArrayList<>(rowenaBombardments.keySet())) endRowenaBombardment(id, false);
         for (UUID id : new ArrayList<>(danaRallies.keySet())) endDanaRally(id);
         for (UUID id : new ArrayList<>(biffHorses.keySet())) removeBiffHorse(id);
+        for (UUID id : new ArrayList<>(ivyHooks.keySet())) removeIvyState(id);
+        for (UUID id : new ArrayList<>(ivyFloralLeaps.keySet())) removeIvyState(id);
+        for (UUID id : new ArrayList<>(ivyThornWalls.keySet())) removeIvyState(id);
         for (Entity entity : new ArrayList<>(entities)) if (entity != null && entity.isValid()) entity.remove();
         for (Map.Entry<Block, BlockData> block : changedBlocks.entrySet()) {
             if (block.getKey() != null && block.getKey().getWorld() == world) block.getKey().setBlockData(block.getValue(), false);
@@ -4823,6 +4830,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         biffTetherTargets.clear();
         biffBattleLeapStartedAt.clear();
         biffHorses.clear();
+        ivyHooks.clear();
+        ivyFloralLeaps.clear();
+        ivyThornWalls.clear();
         castleAssaultPlayerKits.clear();
         castleArcherNextArrowAt.clear();
         castleDemolitionistNextTntAt.clear();
@@ -4866,6 +4876,45 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             this.colour = colour;
             this.center = center;
             this.wool = wool;
+        }
+    }
+
+    private static final class IvyHookState {
+        final Location origin;
+        final Vector direction;
+        final long startedAt;
+        final Set<UUID> hitEntities = new HashSet<>();
+        double distance;
+        UUID targetId;
+        boolean firstPull;
+        IvyHookState(Location origin, Vector direction, long startedAt) {
+            this.origin = origin.clone();
+            this.direction = direction.clone();
+            this.startedAt = startedAt;
+        }
+    }
+
+    private static final class IvyFloralLeapState {
+        final long launchedAt;
+        boolean landed;
+        Location center;
+        long endsAt;
+        long nextDamageAt;
+        final Map<Block, BlockData> flowerBlocks = new HashMap<>();
+        final Map<Block, Material> flowerMaterials = new HashMap<>();
+        IvyFloralLeapState(long launchedAt) { this.launchedAt = launchedAt; }
+    }
+
+    private static final class IvyThornWallState {
+        final Location center;
+        final long endsAt;
+        final Map<Block, BlockData> originalBlocks = new HashMap<>();
+        final Map<Block, Material> placedMaterials = new HashMap<>();
+        final Map<UUID, Long> nextRootAt = new HashMap<>();
+        final Map<UUID, Long> nextDamageAt = new HashMap<>();
+        IvyThornWallState(Location center, long endsAt) {
+            this.center = center.clone();
+            this.endsAt = endsAt;
         }
     }
 
