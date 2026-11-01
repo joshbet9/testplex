@@ -188,7 +188,7 @@ Bardolf's source kit is now implemented in the match-scoped runtime:
 
 The active ability kits, lane minion loop and both sidequest paths now have implementation coverage, but the game is **not test-ready**. Remaining work is:
 
-- Port source shop item definitions fully: exact enchantments, coloured gear, effect descriptions and all role-specific `MobaItemEffect` behaviours (cooldown/ammo reduction, ability/basic-attack damage, healing/regen, kill effects, speed/health, hit effects and condition immunity). The current purchase flow charges once and equips items, but it does not implement those effects.
+- Complete the role-store item-effect engine. Consumable potion effects, source equipment enchantments and leather colour families are now implemented. Persistent `MobaItemEffect` behaviours still outstanding include cooldown/ammo reductions, ability/basic-attack damage, healing/regen, kill effects, hit effects, speed/health and condition immunity.
 - Verify the four role catalogues against the source, including consumables, exact standard prices and Mixed Arcade half-price display/charge. The current tests cover the price helper, not the full purchase/effect matrix.
 - Compare the modern native Wither against the source custom boss representation and validate patrol boundary, target persistence, earthquake timing/falloff, tower protection and boss damage/death interactions on both maps.
 - Verify both source map archives (Heroes Valley and Tartarus) load all original markers correctly. In particular, confirm the Pumpkin King boundary/spawn on Heroes Valley and Monochrome map-type detection/challenge markers on the relevant Monochrome map.
@@ -223,6 +223,18 @@ The shared role-shop consumables now execute their archived effects when purchas
 The effects are attached to real potion metadata, rather than merely granting named water potions. Regression assertions cover the source healing amounts and durations. The mixed variant still calculates the half-price charge through the existing shared cost helper.
 
 **Remaining shop work:** source equipment enchantments and persistent item passives are not fully implemented. This slice does not claim the role shops are accepted.
+
+### Role-store equipment presentation — current implementation slice
+
+The purchased base equipment now restores the source's unbreakable flag, leather colour variants and item enchantments:
+
+- Hunter bows: Power I/II/III as defined by the original bow.
+- Assassin Pumpkin King's Blade: Sharpness II.
+- Warrior Archer's Bane: Projectile Protection I/II; Brawler's Plate: Protection I.
+- Mage and Hunter leather items restore their source colour families (Adept/ability-damage, Focused/cooldown, Battle Mage/basic damage, Nimble Fingers, Vampiric).
+- The four Superior Brawler's Plate entries remain excluded because the source shop has them commented out.
+
+The source item-effect engine is still incomplete: persistent cooldown/ammo reductions, bonus damage/healing, speed/health, kill-on-heal, hit effects and condition immunity still need to be applied to the player rather than just represented in gear. Regression tests cover the enchantment family/level map.
 
 ### Map-specific mid-match sidequests — current implementation slice
 
