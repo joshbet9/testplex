@@ -2844,6 +2844,24 @@ public final class ArcadePortRules {
 
 
 
+    // Fletcher passive — source values for the two Heroes of Gwen Hunters.
+    public static final int HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS = 3;
+    public static final long HEROES_OF_GWEN_DEVON_FLETCHER_RELOAD_MILLIS = 3_000L;
+    public static final int HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS = 2;
+    public static final long HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS = 2_000L;
+
+    public static int heroesOfGwenFletcherMaxArrows(String hero) {
+        if ("devon".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_DEVON_FLETCHER_MAX_ARROWS;
+        if ("rowena".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_ROWENA_FLETCHER_MAX_ARROWS;
+        return 0;
+    }
+
+    public static long heroesOfGwenFletcherReloadMillis(String hero) {
+        if ("devon".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_DEVON_FLETCHER_RELOAD_MILLIS;
+        if ("rowena".equalsIgnoreCase(hero)) return HEROES_OF_GWEN_ROWENA_FLETCHER_RELOAD_MILLIS;
+        return 0L;
+    }
+
     // Anath the Burnt — values from the archived Heroes of Gwen ability references.
     public static final long HEROES_OF_GWEN_ANATH_BURN_BEAM_COOLDOWN_MILLIS = 10_000L;
     public static final double HEROES_OF_GWEN_ANATH_BURN_BEAM_RANGE = 20.0D;
