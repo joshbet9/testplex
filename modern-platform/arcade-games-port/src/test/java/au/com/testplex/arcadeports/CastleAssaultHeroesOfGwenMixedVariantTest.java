@@ -233,4 +233,38 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
         assertEquals(10.0D, ArcadePortRules.heroesOfGwenRowenaBombardmentDamage(0), 0.00001D);
         assertEquals(12.5D, ArcadePortRules.heroesOfGwenRowenaBombardmentDamage(1), 0.00001D);
     }
+
+    @Test
+    void danaPulseHealMatchesSourceRadiusCooldownAndHealingValues() {
+        assertEquals(8_000L, ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_COOLDOWN_MILLIS);
+        assertEquals(7.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_RADIUS, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_SELF, 0.00001D);
+        assertEquals(4.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_PULSE_HEAL_ALLY, 0.00001D);
+    }
+
+    @Test
+    void danaKnockUpMatchesSourceDashAndCollisionValues() {
+        assertEquals(10_000L, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_COOLDOWN_MILLIS);
+        assertEquals(600L, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_DURATION_MILLIS);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_SPEED, 0.00001D);
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_COLLISION_RADIUS, 0.00001D);
+        assertEquals(500L, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_TARGET_RECHARGE_MILLIS);
+        assertEquals(12.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_DAMAGE, 0.00001D);
+        assertEquals(8.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_DAMAGE, 0.00001D);
+        assertEquals(1.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_LIFT, 0.00001D);
+        assertEquals(0.5D, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_LIFT, 0.00001D);
+    }
+
+    @Test
+    void danaRallyMatchesSourceLeapLandingAndBannerTimings() {
+        assertEquals(40_000L, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_COOLDOWN_MILLIS);
+        assertEquals(47_000L, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_REUSE_DELAY_MILLIS);
+        assertEquals(1.5D, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_JUMP_VERTICAL_VELOCITY, 0.00001D);
+        assertEquals(1_000L, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_MINIMUM_FLIGHT_MILLIS);
+        assertEquals(7_000L, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_BANNER_DURATION_MILLIS);
+        assertEquals(5.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_RADIUS, 0.00001D);
+        assertEquals(3.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_HEAL_PER_SECOND, 0.00001D);
+        assertEquals(3.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE_RADIUS, 0.00001D);
+        assertEquals(7.0D, ArcadePortRules.HEROES_OF_GWEN_DANA_RALLY_LANDING_DAMAGE, 0.00001D);
+    }
 }
