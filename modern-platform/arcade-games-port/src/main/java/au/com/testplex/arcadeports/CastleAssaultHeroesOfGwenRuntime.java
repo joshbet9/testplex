@@ -1506,6 +1506,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             removeRowenaState(event.getEntity().getUniqueId());
             removeDanaState(event.getEntity().getUniqueId());
             removeIvyState(event.getEntity().getUniqueId());
+            removeAnathState(event.getEntity().getUniqueId());
         }
     }
 
@@ -1517,6 +1518,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             removeRowenaState(event.getPlayer().getUniqueId());
             removeDanaState(event.getPlayer().getUniqueId());
             removeIvyState(event.getPlayer().getUniqueId());
+            removeAnathState(event.getPlayer().getUniqueId());
         }
     }
 
@@ -1552,6 +1554,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (pack != null) pack.removeIf(existing -> existing == null || existing.getUniqueId().equals(wolf.getUniqueId()));
         bardolfWolfTargets.remove(wolf.getUniqueId());
         entities.remove(wolf);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onHeroesOfGwenAnathEmberPickup(EntityPickupItemEvent event) {
+        if (game == ArcadePortGame.HEROES_OF_GWEN
+                && anathFlameEmbers.containsKey(event.getItem().getUniqueId())) {
+            event.setCancelled(true);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -2689,6 +2699,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (!hero.equals(previous) && "dana".equals(previous)) removeDanaState(player.getUniqueId());
         if (!hero.equals(previous) && "biff".equals(previous)) removeBiffState(player.getUniqueId());
         if (!hero.equals(previous) && "ivy".equals(previous)) removeIvyState(player.getUniqueId());
+        if (!hero.equals(previous) && "anath".equals(previous)) removeAnathState(player.getUniqueId());
         if (!hero.equals(previous) && previous != null) {
             int team = teams.getOrDefault(player.getUniqueId(), -1);
             boolean ownTowerLost = towers.getOrDefault(team, List.of()).stream().anyMatch(tower -> tower.dead);
@@ -2708,6 +2719,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         heroEnderBladeOriginalSword.remove(id);
         heroInfinityEndsAt.remove(id);
         heroInfinityOriginalEnchant.remove(id);
+        anathBurnBeams.remove(id);
+        anathBurnBeamNextHitAt.remove(id);
+        anathFlameDashEndsAt.remove(id);
         larissaWaterDashEndsAt.remove(id);
         larissaStormBlessingEndsAt.remove(id);
         larissaStormBlessingNextHealAt.remove(id);
@@ -4953,6 +4967,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             heroInfinityEndsAt.remove(entry.getKey());
             heroInfinityOriginalEnchant.remove(entry.getKey());
         }
+        updateAnathAbilities(now);
         updateLarissaAbilities(now);
         updateLarissaFountains(now);
         updateBardolfWolves(now);
@@ -5042,6 +5057,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         for (UUID id : new ArrayList<>(rowenaBombardments.keySet())) endRowenaBombardment(id, false);
         for (UUID id : new ArrayList<>(danaRallies.keySet())) endDanaRally(id);
+        for (UUID id : new ArrayList<>(anathFlameEmbers.keySet())) removeAnathEmber(id);
+        for (Map.Entry<Block, AnathFireTrailState> entry : new HashMap<>(anathFireTrailBlocks).entrySet()) {
+            if (entry.getValue().placed && entry.getKey().getType() == Material.FIRE) {
+                entry.getKey().setBlockData(entry.getValue().originalData, false);
+            }
+        }
+        anathFireTrailBlocks.clear();
         for (UUID id : new ArrayList<>(biffHorses.keySet())) removeBiffHorse(id);
         for (UUID id : new ArrayList<>(ivyHooks.keySet())) removeIvyState(id);
         for (UUID id : new ArrayList<>(ivyFloralLeaps.keySet())) removeIvyState(id);
@@ -5074,6 +5096,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         heroInfinityEndsAt.clear();
         heroInfinityOriginalEnchant.clear();
         anathMeteorZones.clear();
+        anathFlameDashEndsAt.clear();
+        anathBurnBeams.clear();
+        anathFlameEmbers.clear();
+        anathBurnBeamNextHitAt.clear();
+        anathFireTrailBlocks.clear();
         larissaFountainZones.clear();
         larissaWaterDashEndsAt.clear();
         larissaStormBlessingEndsAt.clear();
@@ -5238,6 +5265,42 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             this.target = target.clone();
             this.direction = direction.clone();
             this.expiresAt = expiresAt;
+        }
+    }
+
+    private static final class AnathFlameEmberState {
+        final UUID ownerId;
+        final Location origin;
+        final Vector direction;
+        final long expiresAt;
+        AnathFlameEmberState(UUID ownerId, Location origin, Vector direction, long expiresAt) {
+            this.ownerId = ownerId;
+            this.origin = origin.clone();
+            this.direction = direction.clone();
+            this.expiresAt = expiresAt;
+        }
+    }
+
+    private static final class AnathBurnBeamState {
+        final Location origin;
+        final Vector direction;
+        final long startedAt;
+        double distance;
+        AnathBurnBeamState(Location origin, Vector direction, long startedAt) {
+            this.origin = origin.clone();
+            this.direction = direction.clone();
+            this.startedAt = startedAt;
+        }
+    }
+
+    private static final class AnathFireTrailState {
+        final BlockData originalData;
+        final long placeAt;
+        long expiresAt;
+        boolean placed;
+        AnathFireTrailState(BlockData originalData, long placeAt) {
+            this.originalData = originalData.clone();
+            this.placeAt = placeAt;
         }
     }
 
