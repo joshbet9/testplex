@@ -1320,7 +1320,8 @@ public final class ArcadePortRules {
     /** Canonical kit IDs mirror the official names; old test aliases remain accepted. */
     public static String normalizeBaconBrawlKit(String requested) {
         if (requested == null) return null;
-        String value = requested.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
+        String value = requested.toLowerCase(java.util.Locale.ROOT)
+                .replace(".", "").replace('_', '-').replace(' ', '-');
         return switch (value) {
             case "el-muchacho-pigo", "muchacho", "body-slam", "pigo" -> "el-muchacho-pigo";
             case "mama", "mama-pig", "mama-piggles" -> "mama-piggles";
