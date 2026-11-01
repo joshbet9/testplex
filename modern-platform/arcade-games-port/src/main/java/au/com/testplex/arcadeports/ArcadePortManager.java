@@ -664,6 +664,10 @@ public final class ArcadePortManager implements Listener {
 
     public void selectKit(Player player, String requestedKit) {
         if (player == null || requestedKit == null) return;
+        if (isPreparingParticipant(player)) {
+            player.sendMessage(ChatColor.YELLOW + "Kit changes are locked until the round begins.");
+            return;
+        }
         String value = requestedKit.toLowerCase(java.util.Locale.ROOT).replace('_', '-').replace(' ', '-');
         String catalogueKitId = value.startsWith("monster-maze-")
                 ? value.substring("monster-maze-".length()) : value;
@@ -17713,6 +17717,8 @@ public final class ArcadePortManager implements Listener {
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onDeathTagContainerOpen(InventoryOpenEvent event) {
+        if (event.getPlayer() instanceof Player preparePlayer
+                && cancelPrepareAction(preparePlayer, event)) return;
         Session session = active;
         if (session == null || session.type != ArcadePortGame.DEATH_TAG
                 || !(event.getPlayer() instanceof Player player)
@@ -19703,6 +19709,11 @@ public final class ArcadePortManager implements Listener {
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
     public void onPrepareProjectileLaunch(ProjectileLaunchEvent event) {
         cancelPrepareAction(playerShooter(event.getEntity()), event);
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
+    public void onPrepareInventoryOpen(InventoryOpenEvent event) {
+        if (event.getPlayer() instanceof Player player) cancelPrepareAction(player, event);
     }
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = false)
