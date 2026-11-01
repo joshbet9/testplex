@@ -6726,6 +6726,7 @@ public final class ArcadePortManager implements Listener {
             }
             if (session.variantRuntime != null) {
                 session.variantRuntime.shiftPrepareTimers(prepareElapsed);
+                session.variantRuntime.startLive();
             }
             session.startedAt = now;
             session.ticks = 0;
