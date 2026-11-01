@@ -89,6 +89,7 @@ public final class SpeedBuildersGame implements Listener {
     private int buildSeconds = SpeedBuildersRules.DEFAULT_BUILD_SECONDS;
     private Template currentTemplate;
     private String stopReason = "";
+    private boolean shuttingDown;
 
     SpeedBuildersGame(ArcadeMechanicsModernPlugin plugin) {
         this.plugin = plugin;
@@ -177,12 +178,50 @@ public final class SpeedBuildersGame implements Listener {
     }
 
     public void shutdown() {
+        shuttingDown = true;
         stop("Arcade mechanics plugin is shutting down.");
         if (ticker != null) {
             ticker.cancel();
             ticker = null;
         }
         queue.clear();
+    }
+
+    /** Restore a pending Speed Builders snapshot after reconnect or an unclean server stop. */
+    public boolean restorePendingSnapshot(Player player) {
+        if (player == null || !player.isOnline()) return false;
+        String path = "speed-builders-pending-restores." + player.getUniqueId();
+        ConfigurationSection section = plugin.getConfig().getConfigurationSection(path);
+        if (section == null) return false;
+        try {
+            PlayerSnapshot snapshot = new PlayerSnapshot(section);
+            restoreAfterReturningToLobby(player, snapshot);
+            return true;
+        } catch (RuntimeException failure) {
+            plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                    "Could not restore Speed Builders player snapshot for " + player.getUniqueId(), failure);
+            return false;
+        }
+    }
+
+    private void restoreAfterReturningToLobby(Player player, PlayerSnapshot snapshot) {
+        if (player == null || snapshot == null || !player.isOnline()) return;
+        plugin.returnPlayerToArcadeLobby(player);
+        Runnable restore = () -> {
+            if (!player.isOnline()) return;
+            try {
+                snapshot.restore(player);
+                String path = "speed-builders-pending-restores." + player.getUniqueId();
+                plugin.getConfig().set(path, null);
+                plugin.saveConfig();
+            } catch (RuntimeException failure) {
+                plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                        "Speed Builders could not restore pre-match state for " + player.getUniqueId()
+                                + "; the pending snapshot is retained for retry.", failure);
+            }
+        };
+        if (shuttingDown || !plugin.isEnabled()) restore.run();
+        else Bukkit.getScheduler().runTask(plugin, restore);
     }
 
     private void announceQueue() {
@@ -244,7 +283,7 @@ public final class SpeedBuildersGame implements Listener {
             for (Player player : participants) {
                 if (player.isOnline()) {
                     player.sendMessage(ChatColor.RED + "Speed Builders could not start: " + failure.getMessage());
-                    plugin.returnPlayerToArcadeLobby(player);
+                    restoreAfterReturningToLobby(player, state.snapshot);
                 }
             }
             players.clear();
@@ -563,7 +602,7 @@ public final class SpeedBuildersGame implements Listener {
                     player.sendTitle(ChatColor.GOLD + "VICTORY!", ChatColor.YELLOW + "Speed Builders champion",
                             5, 70, 15);
                 }
-                plugin.returnPlayerToArcadeLobby(player);
+                restoreAfterReturningToLobby(player, state.snapshot);
             }
         }
         players.clear();
@@ -958,6 +997,7 @@ public final class SpeedBuildersGame implements Listener {
         PlayerState removed = players.remove(id);
         if (removed == null || phase == Phase.IDLE) return;
         persistPlayerProgress(removed);
+        removeMobs(removed.mobs);
         if (alivePlayers().size() <= 1) {
             List<PlayerState> alive = alivePlayers();
             finishMatch(alive.isEmpty() ? null : alive.getFirst().player, "The last builder standing wins.");
