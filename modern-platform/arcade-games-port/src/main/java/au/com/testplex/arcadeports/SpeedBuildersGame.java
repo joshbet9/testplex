@@ -1219,8 +1219,7 @@ public final class SpeedBuildersGame implements Listener {
         PlayerState state = players.get(event.getPlayer().getUniqueId());
         if (state == null || event.getBlockPlaced().getWorld() != arena) return;
         if (phase != Phase.BUILDING || state.eliminated || state.perfect
-                || !isInBuildVolume(state, event.getBlockPlaced())
-                || currentTemplate.cells().stream().noneMatch(cell -> cell.material() == event.getBlockPlaced().getType())) {
+                || !isInBuildVolume(state, event.getBlockPlaced())) {
             event.setCancelled(true);
             return;
         }
@@ -1262,7 +1261,8 @@ public final class SpeedBuildersGame implements Listener {
         if (tool == null) tool = new ItemStack(Material.AIR);
         if (material == Material.AIR) return;
 
-        List<ItemStack> drops = new ArrayList<>(block.getDrops(tool));
+        // Reborn returns dismantled build pieces to the palette regardless of tool tier.
+        List<ItemStack> drops = new ArrayList<>();
         boolean upperHalf = false;
         Block otherHalf = null;
         if (block.getBlockData() instanceof Bisected bisected) {
@@ -1272,6 +1272,10 @@ public final class SpeedBuildersGame implements Listener {
             upperHalf = bed.getPart() == Bed.Part.HEAD;
             otherHalf = block.getRelative(bed.getPart() == Bed.Part.HEAD
                     ? bed.getFacing().getOppositeFace() : bed.getFacing());
+        }
+        if (!upperHalf && material != Material.WATER && material != Material.LAVA
+                && material != Material.AIR) {
+            drops.add(new ItemStack(material));
         }
         if (upperHalf) drops.clear();
         for (ItemStack drop : drops) {
@@ -1310,6 +1314,8 @@ public final class SpeedBuildersGame implements Listener {
             SpeedBuildersProgressStore.increment(plugin.getConfig(), state.player.getUniqueId(), "speediest-builderizer", 1L);
         }
         plugin.saveConfig();
+        Bukkit.broadcastMessage(ChatColor.GOLD + state.player.getName()
+                + ChatColor.YELLOW + " got a perfect build in " + (elapsedMillis / 1_000L) + " seconds!");
         state.player.sendTitle(ChatColor.GREEN + "PERFECT BUILD!",
                 ChatColor.YELLOW + "You've recreated every block.",
                 0, 40, 10);
