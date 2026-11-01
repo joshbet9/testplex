@@ -31,6 +31,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     @Override
     public void onEnable() {
+        getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=onEnable-start java="
+                + System.getProperty("java.version") + " invocation-id-present="
+                + (System.getenv("INVOCATION_ID") != null));
         mineplexCoreRankBridge = MineplexCoreRankBridge.connect(this, this::refreshRankScoreboard)
                 .orElse(null);
         if (mineplexCoreRankBridge != null) {
@@ -72,7 +75,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
         // Bring up Testplex's shared lobby before any optional game module. A failure
         // in Monster Maze must not leave players in the unrelated survival world.
+        getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=arcade-manager-construction-start");
         manager = new ArcadePortManager(this);
+        getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=arcade-manager-construction-complete");
         cameraShy = new CameraShyGame(this, manager);
         manager.setCameraShyModule(cameraShy);
         getServer().getPluginManager().registerEvents(cameraShy, this);
@@ -86,7 +91,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         getCommand("stats").setExecutor(this);
         getCommand("arcadeport").setExecutor(this);
         getCommand("gamepreferences").setExecutor(this);
+        getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=commands-and-menus-registered");
         publishArcadeRuntimeReadiness();
+        getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=arcade-readiness-published");
 
         // Monster Maze is embedded in this Arcade host and is part of the controlled
         // acceptance queue. Startup remains isolated from the shared lobby; the
@@ -206,6 +213,12 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
 
     private void publishArcadeRuntimeReadiness() {
         try {
+            java.nio.file.Path identityPath = getDataFolder().toPath()
+                    .resolve(ArcadeRuntimeReadinessSignal.IDENTITY_FILE);
+            getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=readiness-publish-start data-folder="
+                    + getDataFolder() + " identity-file-exists=" + java.nio.file.Files.isRegularFile(identityPath)
+                    + " deployed-sha-present=" + (System.getenv("TESTPLEX_DEPLOYED_BUILD_SHA") != null)
+                    + " invocation-id-present=" + (System.getenv("INVOCATION_ID") != null));
             boolean deploymentSignal = ArcadeRuntimeReadinessSignal.publish(
                     getDataFolder().toPath(), System.getenv("INVOCATION_ID"), ProcessHandle.current().pid());
             getLogger().info("TESTPLEX_ARCADE_LOBBY_READY world=" + ModernArcadeLobby.WORLD_NAME
