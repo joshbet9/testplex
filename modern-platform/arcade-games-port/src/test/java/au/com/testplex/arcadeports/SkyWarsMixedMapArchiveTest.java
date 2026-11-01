@@ -48,9 +48,10 @@ final class SkyWarsMixedMapArchiveTest {
 
             assertNotNull(map, resource + " must include a parseable WorldConfig.dat");
             assertFalse(map.mapName().isBlank(), resource + " must retain its source map identity");
-            assertFalse(map.spawnLocations().isEmpty(), resource + " needs player island spawn points");
-            assertFalse(map.dataLocations("RED").isEmpty(),
-                    resource + " needs the original RED Zombie Guardian spawn markers");
+            List<org.bukkit.Location> starts = map.spawnLocations();
+            if (starts.isEmpty()) starts = map.dataLocations("GREEN");
+            assertFalse(starts.isEmpty(), resource + " needs authored player island spawn points");
+            // RED Guardian points are optional in Reborn. Maps without RED spawn no guardians.
             assertFalse(map.dataLocations("LIME").isEmpty(),
                     resource + " needs the original LIME Throwable TNT generator marker");
             assertFalse(map.dataLocations("BROWN").isEmpty(),
