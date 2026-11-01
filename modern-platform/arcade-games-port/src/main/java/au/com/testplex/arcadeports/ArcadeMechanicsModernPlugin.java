@@ -212,6 +212,11 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             });
         }
     }
+    /** Stop any previous Arcade session before the disposable Hoops harness takes ownership. */
+    public void prepareForHoops() {
+        if (manager != null) manager.stop("Hoops Remastered is taking over the shared Arcade test session.");
+    }
+
     /** Called only after a natural Testplex-managed Monster Maze round completion. */
     public void onMonsterMazeRoundCompleted() {
         if (manager != null) manager.onExternalGameCompleted(ArcadePortGame.MONSTER_MAZE);

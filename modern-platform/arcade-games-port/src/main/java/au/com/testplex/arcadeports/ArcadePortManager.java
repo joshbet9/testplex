@@ -187,6 +187,7 @@ public final class ArcadePortManager implements Listener {
     private final ArcadeTestPlayerManager testPlayers;
     private boolean testPlayerStartPending;
     private final SneakyAssassinsMechanics sneakyAssassins;
+    private final HoopsRemasteredRuntime hoops;
     private final Map<String, LinkedHashMap<UUID, Player>> queues = new HashMap<>();
     private final Map<String, World> worlds = new HashMap<>();
     private final Set<String> sourceMapWorlds = new HashSet<>();
@@ -257,6 +258,12 @@ public final class ArcadePortManager implements Listener {
         this.testPlayers = new ArcadeTestPlayerManager(plugin);
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=test-player-manager-ready");
         this.sneakyAssassins = new SneakyAssassinsMechanics(plugin, testPlayers::isTestPlayer);
+        this.hoops = new HoopsRemasteredRuntime(plugin, (winner, announceWinner) -> {
+            Session hoopsSession = active;
+            if (hoopsSession != null && hoopsSession.type == ArcadePortGame.HOOPS_REMASTERED) {
+                ArcadePortManager.this.finish(hoopsSession, winner, announceWinner);
+            }
+        });
         plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=sneaky-assassins-mechanics-ready");
         this.statsActionKey = new NamespacedKey(plugin, "stats-action");
         this.statsCategoryKey = new NamespacedKey(plugin, "stats-category");
@@ -275,6 +282,7 @@ public final class ArcadePortManager implements Listener {
         }
         Bukkit.getPluginManager().registerEvents(this, plugin);
         Bukkit.getPluginManager().registerEvents(lobby, plugin);
+        Bukkit.getPluginManager().registerEvents(hoops, plugin);
         plugin.getLogger().info("TESTPLEX_ARCADE_LOBBY_READY world=" + ModernArcadeLobby.WORLD_NAME
                 + " bounds=-50..49 floor-y=" + ModernArcadeLobby.FLOOR_Y);
         this.lobbyRuntime = new ModernArcadeLobbyRuntime(plugin, this, lobby);
@@ -2583,6 +2591,11 @@ public final class ArcadePortManager implements Listener {
                     + requestedId + " or /arcadeport play " + requestedId + ".");
             return;
         }
+        if (type == ArcadePortGame.HOOPS_REMASTERED
+                && !HoopsRemasteredRules.supportsPlayerCount(participants.size())) {
+            sender.sendMessage(ChatColor.RED + "Hoops Remastered supports 2–16 players (8 per team).");
+            return;
+        }
         if (type == ArcadePortGame.PLEXBALL) {
             if (!PlexballRules.hasValidPlayerCount(participants.size())) {
                 sender.sendMessage(ChatColor.RED + "Plexball requires between "
@@ -2829,6 +2842,7 @@ public final class ArcadePortManager implements Listener {
                 || type == ArcadePortGame.DRAW_MY_THING
                 || type == ArcadePortGame.MASTER_BUILDERS
                 || type == ArcadePortGame.GLADIATORS || type == ArcadePortGame.SUPER_SPLOOR
+                || type == ArcadePortGame.HOOPS_REMASTERED
                 ? 0L : now + (type == ArcadePortGame.SHEEP_QUEST ? ArcadePortRules.SHEEP_QUEST_ROUND_MILLIS
                 : type == ArcadePortGame.GLADIATORS ? 0L
                 : type == ArcadePortGame.BOMB_LOBBERS ? ArcadePortRules.BOMB_LOBBERS_ROUND_MILLIS
@@ -3558,6 +3572,10 @@ public final class ArcadePortManager implements Listener {
     }
 
     private void buildArena(ArcadePortGame type, World world) {
+        if (type == ArcadePortGame.HOOPS_REMASTERED) {
+            HoopsRemasteredRuntime.buildCourt(world);
+            return;
+        }
         if (type == ArcadePortGame.SNEAKY_ASSASSINS) {
             sneakyAssassins.buildArena(world);
             return;
@@ -3627,6 +3645,9 @@ public final class ArcadePortManager implements Listener {
     }
 
     private List<Location> spawnLocations(ArcadePortGame type, int count) {
+        if (type == ArcadePortGame.HOOPS_REMASTERED) {
+            return HoopsRemasteredRuntime.spawnLocations(worlds.get(type.id()), count);
+        }
         if (type == ArcadePortGame.MASTER_BUILDERS) {
             List<Location> locations = new ArrayList<>();
             World world = worlds.get(type.id());
@@ -8272,6 +8293,16 @@ public final class ArcadePortManager implements Listener {
             }
             setLobbyLifecycleStatus("In Progress...");
             announce(session, ChatColor.GREEN + session.type.displayName() + " is now in progress!");
+            if (session.type == ArcadePortGame.HOOPS_REMASTERED) {
+                try {
+                    hoops.start(session.world, new ArrayList<>(session.players.values()), session.teams);
+                } catch (RuntimeException failure) {
+                    plugin.getLogger().log(java.util.logging.Level.SEVERE,
+                            "Hoops Remastered failed at the shared Live transition.", failure);
+                    finish(session, null, false);
+                    return;
+                }
+            }
         }
         updateSourceWaterDamage(session, now);
         boolean sheepQuestUpdatedBeforeTimeout = false;
@@ -12337,6 +12368,9 @@ public final class ArcadePortManager implements Listener {
                     : "guesses " + Math.max(0, DRAW_MY_THING_MAX_GUESSES - session.drawGuessAttempts.getOrDefault(id, 0)) + "/10";
             case MASTER_BUILDERS -> session.masterBuilderPhase == MasterBuildersPhase.BUILDING
                     ? "building | " + session.masterBuilderTheme : "review | " + session.masterBuilderTheme;
+            case HOOPS_REMASTERED -> "basketball | "
+                    + (session.teams.getOrDefault(id, 0) == 0 ? "RED" : "BLUE")
+                    + " | " + scoreFor(session, id) + " pts";
             case CAMERA_SHY -> "Camera Shy runs in its dedicated match controller";
             case PLEXBALL -> "Plexball | " + session.alive.size() + " active";
             // Monster Maze owns its own in-process GameManager session and does not
@@ -12381,7 +12415,8 @@ public final class ArcadePortManager implements Listener {
         }
         if (session.type == ArcadePortGame.SUPER_SPLOOR
                 || session.type == ArcadePortGame.DRAW_MY_THING
-                || session.type == ArcadePortGame.MASTER_BUILDERS) return;
+                || session.type == ArcadePortGame.MASTER_BUILDERS
+                || session.type == ArcadePortGame.HOOPS_REMASTERED) return;
         // Castle Assault and Heroes of Gwen end through their objective controllers, not last-player rules.
         if (session.type == ArcadePortGame.CASTLE_ASSAULT || session.type == ArcadePortGame.HEROES_OF_GWEN) {
             if (session.alive.isEmpty() && session.respawning.isEmpty()) finish(session, null, true);
@@ -14506,6 +14541,7 @@ public final class ArcadePortManager implements Listener {
 
     private void finish(Session session, Player winner, boolean announceWinner) {
         if (active != session) return;
+        if (session.type == ArcadePortGame.HOOPS_REMASTERED) hoops.onManagerFinish();
         if (session.type == ArcadePortGame.SUPER_SPLOOR) {
             session.superSploorPlayerStats = superSploor.snapshotStats();
             session.superSploorTerritory = superSploor.snapshotTerritory();
@@ -14675,6 +14711,11 @@ public final class ArcadePortManager implements Listener {
                 } else {
                     announce(session, ChatColor.YELLOW + "Bacon Brawl ended with no pig left standing.");
                 }
+            } else if (session.type == ArcadePortGame.HOOPS_REMASTERED && winner != null) {
+                int winningTeam = session.teams.getOrDefault(winner.getUniqueId(), -1);
+                ChatColor colour = winningTeam == 0 ? ChatColor.RED : ChatColor.AQUA;
+                announce(session, colour + (winningTeam == 0 ? "RED" : "BLUE")
+                        + ChatColor.GOLD + " team wins Hoops Remastered!");
             } else if (session.type == ArcadePortGame.SUPER_SPLOOR) {
                 if (winner == null) {
                     announce(session, ChatColor.YELLOW + "Super Sploor ended in a draw.");
@@ -15500,7 +15541,7 @@ public final class ArcadePortManager implements Listener {
 
 
     private void recordLocalStats(Session session, Player winner, boolean completed) {
-        if (!completed) return;
+        if (!completed || session.type == ArcadePortGame.HOOPS_REMASTERED) return;
         if (session.type == ArcadePortGame.DRAGONS && winner != null && !testPlayers.isTestPlayer(winner)) {
             awardDragonEndGems(session, winner);
         }
@@ -16875,6 +16916,7 @@ public final class ArcadePortManager implements Listener {
             plugin.getPlexballGame().stopForArcadeLifecycle(reason);
         }
         if (stopping != null) finish(stopping, null, false);
+        else hoops.shutdown();
         if (monsterMazeRunning() && monsterMazeModule != null
                 && monsterMazeModule.getGameManager() != null) {
             monsterMazeModule.getGameManager().forceStop();
@@ -24072,6 +24114,8 @@ public final class ArcadePortManager implements Listener {
         final int food;
         final float saturation;
         final float walkSpeed;
+        final float flySpeed;
+        final Location compassTarget;
         final boolean collidable;
         final boolean invulnerable;
         final Scoreboard scoreboard;
@@ -24094,6 +24138,9 @@ public final class ArcadePortManager implements Listener {
             food = p.getFoodLevel();
             saturation = p.getSaturation();
             walkSpeed = p.getWalkSpeed();
+            flySpeed = p.getFlySpeed();
+            Location currentCompassTarget = p.getCompassTarget();
+            compassTarget = currentCompassTarget == null ? null : currentCompassTarget.clone();
             collidable = p.isCollidable();
             invulnerable = p.isInvulnerable();
             scoreboard = p.getScoreboard();
@@ -24115,6 +24162,8 @@ public final class ArcadePortManager implements Listener {
             p.setFoodLevel(food);
             p.setSaturation(saturation);
             p.setWalkSpeed(walkSpeed);
+            p.setFlySpeed(flySpeed);
+            p.setCompassTarget(compassTarget == null ? null : compassTarget.clone());
             p.setCollidable(collidable);
             p.setInvulnerable(invulnerable);
             p.setScoreboard(scoreboard);
