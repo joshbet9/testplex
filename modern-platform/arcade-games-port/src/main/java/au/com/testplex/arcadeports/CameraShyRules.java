@@ -64,10 +64,9 @@ public final class CameraShyRules {
         return firstId.compareTo(secondId);
     }
 
-    /** Keep the existing default /stats route for Plexball; Snap is explicitly selected. */
+    /** Plexball has a dedicated page only when explicitly requested; bare /stats stays on the shared root menu. */
     public static boolean routesToPlexballStats(String[] args) {
-        return args == null || args.length == 0
-                || (args.length == 1 && "plexball".equalsIgnoreCase(args[0]));
+        return args != null && args.length == 1 && "plexball".equalsIgnoreCase(args[0]);
     }
 
     public static boolean eliminatedAt(int exposures) {
