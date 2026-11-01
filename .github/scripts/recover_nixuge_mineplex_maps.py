@@ -57,8 +57,12 @@ def validate(payload: bytes) -> dict:
             has_level = member("level.dat")
             has_regions = any(terrain(name) for name in files)
             has_config = member("WorldConfig.dat")
+            # Preserve the original ZIP even if it is a different WDL/backup
+            # layout. Keep it out of update/maps until WorldConfig and terrain
+            # are verified. Never claim that a format-unknown ZIP is playable.
             if not (has_level and has_regions):
-                raise ValueError("Missing original level.dat or Anvil region files")
+                print(f"[layout] Missing world root; level={has_level}, regions={has_regions}, "
+                      f"sample={files[:18]}", flush=True)
             # A world needs its original Reborn metadata (spawns, bounds, kit markers)
             # before SourceMapCatalog can safely include it in the playable map list.
             if has_config:
@@ -69,6 +73,7 @@ def validate(payload: bytes) -> dict:
                               ("TEAM_SPAWNS:" in config or "DATA_LOCS:" in config))
             return {"has_level_dat": has_level, "has_regions": has_regions,
                     "has_reborn_worldconfig": has_config, "entries": len(files),
+                    "sample_entries": files[:25],
                     "uncompressed_bytes": total_size}
     except BadZipFile as exc:
         raise ValueError("Not a valid ZIP file") from exc
@@ -118,7 +123,8 @@ def main() -> int:
         try:
             payload = fetch(url)
             details = validate(payload)
-            target = destination(game, name, details["has_reborn_worldconfig"])
+            target = destination(game, name, details["has_reborn_worldconfig"]
+                                 and details["has_level_dat"] and details["has_regions"])
             if target.exists():
                 if hashlib.sha256(target.read_bytes()).hexdigest() != hashlib.sha256(payload).hexdigest():
                     raise ValueError(f"Existing recovered file differs from Nixuge original: {target}")
@@ -126,7 +132,12 @@ def main() -> int:
             else:
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(payload)
-                status = "configured-source-map" if details["has_reborn_worldconfig"] else "raw-world-needs-metadata"
+                if not details["has_level_dat"] or not details["has_regions"]:
+                    status = "raw-archive-layout-review"
+                elif not details["has_reborn_worldconfig"]:
+                    status = "raw-world-needs-reborn-metadata"
+                else:
+                    status = "configured-source-map"
             info = {"game": game, "name": name, "id": map_data["id"],
                     "url": url, "path": str(target.relative_to(ROOT)),
                     "sha256": hashlib.sha256(payload).hexdigest(), "bytes": len(payload),
