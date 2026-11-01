@@ -49,7 +49,14 @@ final class LegacySourceMapMigrationTest {
         Path world = SourceMapCatalog.locateMapRoot(extracted);
         assertNotNull(world, "No unambiguous original world metadata for " + archive);
         Path sourceRegion = world.resolve("region");
-        assertTrue(Files.isDirectory(sourceRegion), "Original map has no pre-26.1 terrain regions");
+        String extractedPaths;
+        try (var stream = Files.walk(extracted)) {
+            extractedPaths = stream.map(p -> extracted.relativize(p).toString())
+                    .sorted().limit(30).toList().toString();
+        }
+        assertTrue(Files.isDirectory(sourceRegion), "Original map has no pre-26.1 terrain regions;"
+                + " chosenRoot=" + world + ", rootRegion=" + sourceRegion
+                + ", extracted=" + extractedPaths);
         List<String> expected;
         try (var files = Files.list(sourceRegion)) {
             expected = files.filter(p -> p.getFileName().toString().endsWith(".mca"))
