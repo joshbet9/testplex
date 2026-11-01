@@ -188,7 +188,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             if (player.isOnline() && manager != null) {
                 // Session fake players must remain in the game lifecycle that just admitted them.
                 if (manager.isTestPlayer(player)) return;
-                // A Camera Shy disconnect must restore the captured pre-match snapshot
+                // A Snap disconnect must restore the captured pre-match snapshot
                 // instead of leaving the temporary spyglass/kit inventory on reconnect.
                 boolean restoredCameraShy = cameraShy != null && cameraShy.restorePendingSnapshot(player);
                 if (!restoredCameraShy) manager.returnPlayerToLobby(player);
@@ -262,22 +262,22 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             return true;
         }
         if (cameraShy == null) {
-            viewer.sendMessage(ChatColor.RED + "Camera Shy progression is unavailable.");
+            viewer.sendMessage(ChatColor.RED + "Snap progression is unavailable.");
             return true;
         }
 
         Player subject = viewer;
         int index = 0;
-        if (args.length > 0 && !"camera-shy".equalsIgnoreCase(args[0])) {
+        if (args.length > 0 && !isSnapStatsArgument(args[0])) {
             subject = Bukkit.getPlayerExact(args[0]);
             if (subject == null) {
                 viewer.sendMessage(ChatColor.RED + "That player is not online.");
-                viewer.sendMessage(ChatColor.YELLOW + "Usage: /stats [player] [camera-shy] [page]");
+                viewer.sendMessage(ChatColor.YELLOW + "Usage: /stats [player] [snap] [page]");
                 return true;
             }
             index = 1;
         }
-        if (args.length > index && "camera-shy".equalsIgnoreCase(args[index])) index++;
+        if (args.length > index && isSnapStatsArgument(args[index])) index++;
 
         int page = 1;
         if (args.length > index) {
@@ -290,7 +290,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
             }
         }
         if (args.length > index + 1 || page < 1 || page > CameraShyProgressCatalog.pageCount()) {
-            viewer.sendMessage(ChatColor.YELLOW + "Usage: /stats [player] [camera-shy] [page 1-"
+            viewer.sendMessage(ChatColor.YELLOW + "Usage: /stats [player] [snap] [page 1-"
                     + CameraShyProgressCatalog.pageCount() + "]");
             return true;
         }
@@ -339,7 +339,7 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                     if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
                     return true;
                 }
-                if ("camera-shy".equalsIgnoreCase(args[1])) {
+                if (isSnapStatsArgument(args[1])) {
                     if (cameraShy != null) cameraShy.leaveQueue(leavingPlayer);
                     return true;
                 }
@@ -485,9 +485,9 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport start <game-id>" + ChatColor.GRAY + " — start a queued test now");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport play <game-id>-mixed" + ChatColor.GRAY
                         + " — Mixed Arcade variants: Turf Wars, Castle Assault and Heroes of Gwen");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport lobby camera-shy" + ChatColor.GRAY + " — select Camera Shy and show its five lobby kit choices");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a game kit; Camera Shy IDs: camera-shy-smoke-artist, camera-shy-decoy, camera-shy-runner, camera-shy-spotter, camera-shy-understudy");
-                sender.sendMessage(ChatColor.YELLOW + "/arcadeport leave" + ChatColor.GRAY + " — leave the Camera Shy queue");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport lobby snap" + ChatColor.GRAY + " — select Snap and show its five lobby kit choices");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport kit <kit-id>" + ChatColor.GRAY + " — choose a game kit; Snap IDs: camera-shy-smoke-artist, camera-shy-decoy, camera-shy-runner, camera-shy-spotter, camera-shy-understudy");
+                sender.sendMessage(ChatColor.YELLOW + "/arcadeport leave" + ChatColor.GRAY + " — leave the Snap queue");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport ghost <on|off|toggle>" + ChatColor.GRAY + " — show or hide your Dragon Escape PB ghost");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport dragoncolor <colour>" + ChatColor.GRAY + " — set your Dragon Escape leader beacon colour");
                 sender.sendMessage(ChatColor.YELLOW + "/arcadeport status" + ChatColor.GRAY + " — active game and queue counts");
