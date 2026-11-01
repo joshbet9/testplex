@@ -48,6 +48,7 @@ import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerToggleSneakEvent;
@@ -129,6 +130,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final NamespacedKey heroProjectileTypeKey;
     private final NamespacedKey heroProjectileOwnerKey;
     private final NamespacedKey bardolfWolfOwnerKey;
+    private final NamespacedKey rowenaBombardmentItemKey;
     private final Map<Integer, KingState> kings = new HashMap<>();
     private final Map<UUID, Integer> playerGold = new HashMap<>();
     private final Map<UUID, ItemStack> carriedTntOldHelmet = new HashMap<>();
@@ -181,6 +183,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, BardolfPounceState> bardolfPounces = new HashMap<>();
     private final Map<UUID, Long> bardolfFullMoonEndsAt = new HashMap<>();
     private final Map<UUID, Float> bardolfOriginalWalkSpeeds = new HashMap<>();
+    private final Map<UUID, Integer> rowenaLightArrowsRemaining = new HashMap<>();
+    private final Map<UUID, Map<UUID, Long>> rowenaLightArrowNextHitAt = new HashMap<>();
+    private final Map<UUID, Long> rowenaCombatSlideEndsAt = new HashMap<>();
+    private final Map<UUID, RowenaBombardmentState> rowenaBombardments = new HashMap<>();
     private final List<StoreEntry> storeEntries = new ArrayList<>();
     private final Map<UUID, StoreHolder> openStores = new HashMap<>();
 
@@ -229,6 +235,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         this.heroProjectileTypeKey = new NamespacedKey(plugin, "heroes-gwen-projectile-type");
         this.heroProjectileOwnerKey = new NamespacedKey(plugin, "heroes-gwen-projectile-owner");
         this.bardolfWolfOwnerKey = new NamespacedKey(plugin, "heroes-gwen-bardolf-owner");
+        this.rowenaBombardmentItemKey = new NamespacedKey(plugin, "heroes-gwen-rowena-bombardment-active");
         for (Player player : participants) {
             this.players.put(player.getUniqueId(), player);
             this.activePlayers.add(player.getUniqueId());
