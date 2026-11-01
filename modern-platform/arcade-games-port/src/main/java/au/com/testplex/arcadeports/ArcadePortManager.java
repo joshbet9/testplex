@@ -13302,7 +13302,9 @@ public final class ArcadePortManager implements Listener {
         plugin.getConfig().set(path + "lifetime-kills", Math.max(0, lifetimeKills));
         plugin.getConfig().set(path + "lifetime-slimes", Math.max(0, lifetimeSlimes));
         plugin.getConfig().set(path + "best-tail-length", Math.max(0, bestTailLength));
-        for (String achievement : List.of("Cannibal", "ChooChoo", "SlimySheep")) {
+        for (String achievement : List.of("Cannibal", "ChooChoo", "SlimySheep",
+                "dont-want-none", "resilience-snakeified", "busted",
+                "one-of-the-ogs", "flawless", "bots-everywhere")) {
             plugin.getConfig().set(path + "achievements." + achievement,
                     achievements != null && achievements.contains(achievement));
         }
@@ -14053,14 +14055,24 @@ public final class ArcadePortManager implements Listener {
                         lore, "noop", null, null));
             }
         } else if ("snake".equals(gameId)) {
-            String[] ids = {"Cannibal", "ChooChoo", "SlimySheep"};
-            String[] names = {"Cannibal", "Choo Choo", "Slimy Sheep"};
+            String[] ids = {"Cannibal", "ChooChoo", "SlimySheep",
+                    "dont-want-none", "resilience-snakeified", "busted",
+                    "one-of-the-ogs", "flawless", "bots-everywhere"};
+            String[] names = {"Cannibal", "Choo Choo", "Slimy Sheep",
+                    "Don't want none", "Resilience Snakeified", "Busted",
+                    "One of the OGs", "Flawless", "Bots Everywhere!"};
             String[] requirements = {
                     "Get six kills in one Snake game.",
                     "Grow your tail to at least 60 sheep segments.",
-                    "Eat 20 green slime pickups in one Snake game."
+                    "Eat 20 green slime pickups in one Snake game.",
+                    "Win a game without getting a kill.",
+                    "Win after being hit by a 10-second Magma Cube nerf.",
+                    "Roll the same Magma Cube nerf 3 times in a row.",
+                    "Win a game without using an ability.",
+                    "Win with every kill earned while an ability is active.",
+                    "Win while staying within 10 blocks of the map edge throughout the game."
             };
-            int[] achievementSlots = {10, 12, 14};
+            int[] achievementSlots = {9, 10, 11, 12, 13, 14, 15, 16, 17};
             for (int i = 0; i < ids.length; i++) {
                 boolean unlocked = plugin.getConfig().getBoolean(path + "achievements." + ids[i], false);
                 inventory.setItem(achievementSlots[i], statsItem(
