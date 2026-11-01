@@ -20,6 +20,11 @@ import java.util.Set;
 final class SessionTimestampShifter {
     private static final Set<String> EXCLUDED_FIELDS = Set.of(
             "startedat", "endsat", "prepareendsat");
+    // Timestamp maps whose identifiers describe their gameplay purpose rather than
+    // a time suffix. Their values are epoch timestamps, not durations or sequence IDs.
+    private static final Set<String> TIMESTAMP_MAP_FIELDS = Set.of(
+            "baconSlams", "bombDamageContributors", "evolutionDamageContributors",
+            "microCombatContributors", "runnerBlocks");
 
     private SessionTimestampShifter() {
     }
@@ -64,7 +69,8 @@ final class SessionTimestampShifter {
                     field.setLong(target,
                             ArcadeLobbyLifecycleRules.shiftPausedTimestamp(timestamp, pausedMillis));
                 } else if (value instanceof Map<?, ?> map) {
-                    shiftMap(map, pausedMillis, isTimestampField(name),
+                    shiftMap(map, pausedMillis,
+                            isTimestampField(name) || TIMESTAMP_MAP_FIELDS.contains(field.getName()),
                             ownerClass, failures, visited, fieldPath);
                 } else if (value instanceof Collection<?> collection) {
                     shiftCollection(collection, pausedMillis, ownerClass, failures, visited, fieldPath);
