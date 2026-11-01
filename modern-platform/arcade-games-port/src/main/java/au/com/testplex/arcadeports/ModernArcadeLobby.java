@@ -85,6 +85,8 @@ public final class ModernArcadeLobby implements Listener {
 
     public World ensureWorld() {
         if (lobbyWorld != null) return lobbyWorld;
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-world-ensure-start cached=false loaded="
+                + (Bukkit.getWorld(WORLD_NAME) != null));
         World world = Bukkit.getWorld(WORLD_NAME);
         if (world == null) {
             WorldCreator creator = new WorldCreator(WORLD_NAME);
@@ -92,7 +94,9 @@ public final class ModernArcadeLobby implements Listener {
             creator.generator(new VoidLobbyChunkGenerator());
             creator.generateStructures(false);
             creator.environment(World.Environment.NORMAL);
+            plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-world-create-start name=" + WORLD_NAME);
             world = creator.createWorld();
+            plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-world-create-finished success=" + (world != null));
         }
         if (world == null) {
             throw new IllegalStateException("Could not create the isolated modern Arcade lobby world '"
@@ -112,8 +116,12 @@ public final class ModernArcadeLobby implements Listener {
         world.getWorldBorder().setSize(100.0D);
         world.getWorldBorder().setDamageAmount(0.0D);
 
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-plane-build-start");
         ensurePlane(world);
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-plane-build-complete");
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-datapoints-build-start");
         ensureDatapoints(world);
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-datapoints-build-complete");
         plugin.getLogger().info("TESTPLEX_ARCADE_LOBBY_READY world=" + WORLD_NAME
                 + " plane=100x100 floor-y=" + FLOOR_Y + " spawn=" + SPAWN_X + "," + SPAWN_Y + "," + SPAWN_Z);
         return world;
@@ -272,12 +280,15 @@ public final class ModernArcadeLobby implements Listener {
         plugin.getLogger().info("Generating the legacy 100x100 Testplex lobby plane at Y=" + FLOOR_Y + ".");
         int minChunk = Math.floorDiv(PLANE_MIN, 16);
         int maxChunk = Math.floorDiv(PLANE_MAX_EXCLUSIVE - 1, 16);
+        int chunksGenerated = 0;
         for (int chunkX = minChunk; chunkX <= maxChunk; chunkX++) {
             for (int chunkZ = minChunk; chunkZ <= maxChunk; chunkZ++) {
                 // New chunks are populated directly by VoidLobbyChunkGenerator.
                 world.getChunkAt(chunkX, chunkZ);
+                chunksGenerated++;
             }
         }
+        plugin.getLogger().info("TESTPLEX_ARCADE_BOOTSTRAP phase=lobby-chunks-ready count=" + chunksGenerated);
 
         // Repair an older world created by the previous empty generator. New worlds
         // should already be complete from ChunkData, making this fallback unnecessary.
