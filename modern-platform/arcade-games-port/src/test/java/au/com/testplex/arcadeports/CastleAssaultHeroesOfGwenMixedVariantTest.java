@@ -609,6 +609,22 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesOfGwenOvertimeStartsAtFifteenMinutesAndMovesWitherAlongFirstHalfOfLane() {
+        assertEquals(900_000L, ArcadePortRules.HEROES_OF_GWEN_OVERTIME_DELAY_MILLIS);
+        assertFalse(ArcadePortRules.heroesOfGwenOvertimeHasStarted(100_000L, 999_999L));
+        assertTrue(ArcadePortRules.heroesOfGwenOvertimeHasStarted(100_000L, 1_000_000L));
+        assertFalse(ArcadePortRules.heroesOfGwenOvertimeHasStarted(100_000L, 99_999L));
+        assertEquals(2.0D, ArcadePortRules.HEROES_OF_GWEN_OVERTIME_WITHER_SPEED, 0.00001D);
+        assertEquals(5, ArcadePortRules.heroesOfGwenOvertimePathLength(10));
+        assertEquals(4, ArcadePortRules.heroesOfGwenOvertimePathLength(9));
+        assertEquals(0, ArcadePortRules.heroesOfGwenOvertimePathLength(1));
+        assertEquals(1, ArcadePortRules.heroesOfGwenOvertimeNextTargetIndex(0, 5, 15.9D));
+        assertEquals(0, ArcadePortRules.heroesOfGwenOvertimeNextTargetIndex(0, 5, 16.0D));
+        assertEquals(4, ArcadePortRules.heroesOfGwenOvertimeNextTargetIndex(4, 5, 1.0D));
+        assertEquals(-1, ArcadePortRules.heroesOfGwenOvertimeNextTargetIndex(0, 0, 0.0D));
+    }
+
+    @Test
     void witherTargetsHostileLivingEntitiesIncludingNeutralMobsButNotAlliesOrInactivePlayers() {
         assertTrue(ArcadePortRules.heroesOfGwenWitherCanTarget(0, 1, true));
         assertTrue(ArcadePortRules.heroesOfGwenWitherCanTarget(0, -1, true));
