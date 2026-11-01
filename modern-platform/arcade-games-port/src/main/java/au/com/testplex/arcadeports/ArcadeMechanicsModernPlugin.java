@@ -112,6 +112,21 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
     }
 
     public MonsterMazePlugin getMonsterMazeModule() { return monsterMaze; }
+
+    /**
+     * Whether a cleared game can currently enter the weighted automatic rotation.
+     * A game that relies on an archived map is eligible only when its selected map
+     * has actually been imported and validated on this server.
+     */
+    public boolean isRotationCandidateAvailable(String gameId) {
+        ArcadePortGame game = ArcadePortGame.fromId(gameId);
+        if (game == null || !getConfig().getStringList("enabled-games").contains(game.id())) return false;
+        if (!SourceMapCatalog.hasMap(game)) return true;
+        String selectedResource = getConfig().getString("selected-maps." + game.id(),
+                SourceMapCatalog.selectedResource(this, game));
+        return selectedResource != null && SourceMapCatalog.isInstalledResource(this, game, selectedResource);
+    }
+
     public void returnPlayerToArcadeLobby(Player player) {
         if (manager != null && player != null && player.isOnline()) {
             manager.returnPlayerToLobby(player);
