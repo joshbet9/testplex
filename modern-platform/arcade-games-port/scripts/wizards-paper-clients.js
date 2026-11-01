@@ -32,6 +32,9 @@ function connect(username) {
     clients.push(client);
     let loggedIn = false;
     let settled = false;
+    let clientTickTimer = null;
+    let tickEndErrorLogged = false;
+    let lastPlayerLoadedAt = 0;
 
     const timeout = setTimeout(() => {
       if (!settled) {
@@ -42,6 +45,11 @@ function connect(username) {
     }, 90_000);
 
     function sendPlayerLoaded(reason) {
+      // The library emits both a packet event and a convenience respawn event;
+      // acknowledge each actual load once rather than duplicating the packet.
+      const now = Date.now();
+      if (now - lastPlayerLoadedAt < 100) return;
+      lastPlayerLoadedAt = now;
       try {
         // Vanilla sends the empty player_loaded packet once its terrain-loading
         // screen closes. Paper keeps ServerPlayer invulnerable until this
@@ -108,6 +116,23 @@ function connect(username) {
       settled = true;
       clearTimeout(timeout);
       log('BOT_LOGIN|PASS|' + username + '|protocol=' + client.protocolVersion);
+
+      // Paper 26.3 tracks whether a position-bearing movement packet has been
+      // received in the current client tick. A second move before tick_end is
+      // rejected as "Invalid move player packet received". Vanilla emits
+      // client_tick_end once per tick; this raw protocol client has no game loop,
+      // so mirror it explicitly while the Play connection is alive.
+      clientTickTimer = setInterval(() => {
+        try {
+          client.write('tick_end', {});
+        } catch (error) {
+          if (!tickEndErrorLogged) {
+            tickEndErrorLogged = true;
+            log('BOT_TICK_END|FAIL|' + username + '|' + String(error));
+          }
+        }
+      }, 50);
+      clientTickTimer.unref?.();
       resolve(client);
     });
 
@@ -126,14 +151,9 @@ function connect(username) {
       }
     });
 
-    client.on('respawn', () => {
-      setImmediate(() => sendPlayerLoaded('respawn'));
-    });
-    client.on('packet', (_data, meta) => {
-      if (meta && meta.state === 'play' && meta.name === 'respawn') {
-        setImmediate(() => sendPlayerLoaded('respawn-packet'));
-      }
-    });
+    // The packet event above is the single source of respawn load acknowledgements.
+    // Do not also listen to the library's convenience respawn event: some versions
+    // emit both for the same Play packet.
 
     let respawnPending = false;
     client.on('update_health', (packet) => {
@@ -166,6 +186,10 @@ function connect(username) {
 
     client.once('end', (reason) => {
       clearTimeout(timeout);
+      if (clientTickTimer) {
+        clearInterval(clientTickTimer);
+        clientTickTimer = null;
+      }
       if (loggedIn) {
         finished.add(username);
         log('BOT_END|' + username + '|' + String(reason || 'server closed connection'));
