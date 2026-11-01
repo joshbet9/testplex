@@ -357,6 +357,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 mapMenu.openMapSelection(player, ArcadePortGame.fromId(args[1]));
                 return true;
             case "start":
+                if (!hasAdminAccess(sender)) {
+                    sender.sendMessage(ChatColor.RED + "Operator permission required to start a queued Arcade game.");
+                    return true;
+                }
                 if (args.length < 2) {
                     sender.sendMessage(ChatColor.YELLOW + "Usage: /arcadeport start <game-id>");
                     return true;
