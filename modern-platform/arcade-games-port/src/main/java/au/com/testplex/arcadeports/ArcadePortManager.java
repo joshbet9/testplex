@@ -18978,6 +18978,45 @@ public final class ArcadePortManager implements Listener {
         return material != null && ArcadePortRules.isQuiverBreakableGlassMaterial(material.name());
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSkyWarsBlockBurn(org.bukkit.event.block.BlockBurnEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.SKY_WARS
+                && event.getBlock().getWorld() == session.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSkyWarsLeavesDecay(org.bukkit.event.block.LeavesDecayEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.SKY_WARS
+                && event.getBlock().getWorld() == session.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSkyWarsBlockFade(org.bukkit.event.block.BlockFadeEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.SKY_WARS
+                && event.getBlock().getWorld() == session.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onSkyWarsBlockSpread(org.bukkit.event.block.BlockSpreadEvent event) {
+        Session session = active;
+        if (session != null && session.type == ArcadePortGame.SKY_WARS
+                && event.getBlock().getWorld() == session.world) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onSkyWarsEnchant(org.bukkit.event.enchantment.EnchantItemEvent event) {
+        Session session = active;
+        if (session == null || session.type != ArcadePortGame.SKY_WARS
+                || event.getEnchanter().getWorld() != session.world) return;
+        if (event.getEnchantsToAdd().containsKey(org.bukkit.enchantments.Enchantment.FIRE_ASPECT)) {
+            event.getEnchanter().sendMessage(ChatColor.RED + "You cannot enchant with Fire Aspect.");
+            event.setCancelled(true);
+        }
+    }
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
         if (cancelPrepareAction(event.getPlayer(), event)) return;
