@@ -180,7 +180,9 @@ final class SessionTimestampShifter {
             for (int index = 0; index < components.length; index++) {
                 RecordComponent component = components[index];
                 parameterTypes[index] = component.getType();
-                Object value = component.getAccessor().invoke(record);
+                java.lang.reflect.Method accessor = component.getAccessor();
+                accessor.setAccessible(true);
+                Object value = accessor.invoke(record);
                 String componentName = component.getName().toLowerCase(Locale.ROOT);
                 if (component.getType() == long.class && isTimestampField(componentName)) {
                     value = ArcadeLobbyLifecycleRules.shiftPausedTimestamp((long) value, pausedMillis);
