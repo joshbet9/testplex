@@ -906,7 +906,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         addStoreEntry("Hunter", Material.ENDER_PEARL, "Ender Pearl", 750, "Legacy Hunter store item.");
     }
 
-    private String heroesOfGwenStoreItemDescription(String role, String name) {
+    private String heroesOfGwenStoreItemDescription(String role, Material material, String name) {
+        String descriptionName = name;
+        if ("Warrior".equals(role)) {
+            String suffix = switch (material) {
+                case IRON_HELMET, DIAMOND_HELMET -> " Helmet";
+                case IRON_CHESTPLATE, DIAMOND_CHESTPLATE -> " Chestplate";
+                case IRON_LEGGINGS, DIAMOND_LEGGINGS -> " Leggings";
+                case IRON_BOOTS, DIAMOND_BOOTS -> " Boots";
+                default -> "";
+            };
+            descriptionName += suffix;
+        }
         return switch (role) {
             case "Assassin" -> switch (name) {
                 case "Sword of Time" -> "Killing a player heals you for 3 HP.";
@@ -953,7 +964,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 case "Battle Mage Leggings" -> "Basic attack damage +5%.";
                 default -> "";
             };
-            case "Warrior" -> switch (name) {
+            case "Warrior" -> switch (descriptionName) {
                 case "Stone Sword", "Swift Blade" -> "Grants immunity to Slowness effects.";
                 case "Frostbound Sword" -> "Melee hits apply Slowness I for 3 seconds; grants Slowness immunity.";
                 case "Archer's Bane Helmet" -> "Projectile Protection I; HP regeneration +3%.";
@@ -978,7 +989,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     private void addStoreEntry(String role, Material material, String name, int cost, String description) {
         String resolvedDescription = description != null && description.startsWith("Legacy ")
-                ? heroesOfGwenStoreItemDescription(role, name) : description;
+                ? heroesOfGwenStoreItemDescription(role, material, name) : description;
         storeEntries.add(new StoreEntry(role, material, name, cost,
                 resolvedDescription == null ? "" : resolvedDescription));
     }
