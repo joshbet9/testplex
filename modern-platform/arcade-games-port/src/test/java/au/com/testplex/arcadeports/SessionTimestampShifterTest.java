@@ -24,6 +24,8 @@ class SessionTimestampShifterTest {
         fixture.microCombatContributors.put(player, new HashMap<>(Map.of(player, 1_100L)));
         fixture.evolutionDamageContributors.put(player, new HashMap<>(Map.of(player, 1_200L)));
         fixture.bombDamageContributors.put(player, new HashMap<>(Map.of(player, 1_300L)));
+        fixture.dragonEscapeRunSplitMillis.put(player, new HashMap<>(Map.of(1, 250L)));
+        fixture.dragonEscapeBlockRestoreTokens.put("block", 99L);
 
         List<String> failures = SessionTimestampShifter.shift(fixture, 10_000L);
 
@@ -39,6 +41,8 @@ class SessionTimestampShifterTest {
         assertEquals(11_100L, fixture.microCombatContributors.get(player).get(player));
         assertEquals(11_200L, fixture.evolutionDamageContributors.get(player).get(player));
         assertEquals(11_300L, fixture.bombDamageContributors.get(player).get(player));
+        assertEquals(250L, fixture.dragonEscapeRunSplitMillis.get(player).get(1));
+        assertEquals(99L, fixture.dragonEscapeBlockRestoreTokens.get("block"));
     }
 
     @Test
@@ -95,6 +99,8 @@ class SessionTimestampShifterTest {
         final Map<UUID, Map<UUID, Long>> microCombatContributors = new HashMap<>();
         final Map<UUID, Map<UUID, Long>> evolutionDamageContributors = new HashMap<>();
         final Map<UUID, Map<UUID, Long>> bombDamageContributors = new HashMap<>();
+        final Map<UUID, Map<Integer, Long>> dragonEscapeRunSplitMillis = new HashMap<>();
+        final Map<String, Long> dragonEscapeBlockRestoreTokens = new HashMap<>();
     }
 
     private static final class TimerCarrier {
