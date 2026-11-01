@@ -51,11 +51,42 @@ class SneakyAssassinsParityTest {
         assertEquals(5, SneakyAssassinsRules.nextPowerUpCount(5));
     }
 
-    @Test void townNpcsRemainUntilMissingOrInvalidRatherThanBeingRandomlyCulled() {
+    @Test void sourceStartsTwoHundredTownNpcsAndCullsOneEveryFourSecondsDuringLive() {
         assertEquals(200, SneakyAssassinsRules.sourceNpcCount());
+        assertEquals(4_000L, SneakyAssassinsRules.npcCullIntervalMillis());
+        assertFalse(SneakyAssassinsRules.shouldCullTownNpc(false, 5_000L, 4_000L, 200));
+        assertFalse(SneakyAssassinsRules.shouldCullTownNpc(true, 3_999L, 4_000L, 200));
+        assertFalse(SneakyAssassinsRules.shouldCullTownNpc(true, 4_000L, 4_000L, 0));
+        assertTrue(SneakyAssassinsRules.shouldCullTownNpc(true, 4_000L, 4_000L, 200));
         assertFalse(SneakyAssassinsRules.shouldPruneTownNpc(true, true));
         assertTrue(SneakyAssassinsRules.shouldPruneTownNpc(false, false));
         assertTrue(SneakyAssassinsRules.shouldPruneTownNpc(true, false));
+    }
+
+    @Test void sourceNpcPatrolSelectionUsesSixteenBlockSpawnWindowAndOneInFortyChecks() {
+        assertTrue(SneakyAssassinsRules.isNpcPatrolAnchorNearby(0.0D, 0.0D, 16.0D, -16.0D));
+        assertTrue(SneakyAssassinsRules.isNpcPatrolAnchorNearby(3.0D, 4.0D, -13.0D, 20.0D));
+        assertFalse(SneakyAssassinsRules.isNpcPatrolAnchorNearby(0.0D, 0.0D, 16.01D, 0.0D));
+        assertFalse(SneakyAssassinsRules.isNpcPatrolAnchorNearby(0.0D, 0.0D, 0.0D, -16.01D));
+        assertTrue(SneakyAssassinsRules.shouldIssueNpcPatrolOrder(0));
+        assertTrue(SneakyAssassinsRules.shouldIssueNpcPatrolOrder(39));
+        assertFalse(SneakyAssassinsRules.shouldIssueNpcPatrolOrder(40));
+        assertFalse(SneakyAssassinsRules.shouldIssueNpcPatrolOrder(-1));
+    }
+
+    @Test void sourceNpcPatrolTargetsRequireSolidNonLiquidFloorAndTwoClearBlocks() {
+        assertTrue(SneakyAssassinsRules.isSafeNpcPatrolDestination(true, false, true, true));
+        assertFalse(SneakyAssassinsRules.isSafeNpcPatrolDestination(false, false, true, true));
+        assertFalse(SneakyAssassinsRules.isSafeNpcPatrolDestination(true, true, true, true));
+        assertFalse(SneakyAssassinsRules.isSafeNpcPatrolDestination(true, false, false, true));
+        assertFalse(SneakyAssassinsRules.isSafeNpcPatrolDestination(true, false, true, false));
+    }
+
+    @Test void bribedNpcStuckRecoveryUsesTheSourceEightHundredMillisecondWindow() {
+        assertFalse(SneakyAssassinsRules.shouldRecoverBribedNpc(1_799L, 1_000L));
+        assertTrue(SneakyAssassinsRules.shouldRecoverBribedNpc(1_800L, 1_000L));
+        assertFalse(SneakyAssassinsRules.shouldRecoverBribedNpc(999L, 1_000L));
+        assertFalse(SneakyAssassinsRules.shouldRecoverBribedNpc(2_000L, 0L));
     }
 
     @Test void matchesSourceTimingAndEffectRadii() {
