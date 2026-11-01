@@ -321,7 +321,7 @@ public final class ArcadeCatalog {
                 win("last-assassin-standing", "Last Assassin Standing",
                         "A simple survivor podium; no additional game-specific cosmetics are claimed yet.")));
 
-        register(game("camera-shy", "Camera Shy", "SPYGLASS",
+        register(game("camera-shy", "Snap", "SPYGLASS",
                 "Photograph opponents with a spyglass while avoiding five exposures. Last photographer standing wins.",
                 GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
