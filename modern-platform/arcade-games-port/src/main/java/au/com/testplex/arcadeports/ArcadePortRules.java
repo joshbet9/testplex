@@ -2919,6 +2919,18 @@ public final class ArcadePortRules {
         return ownerTeam >= 0 && activeTarget && targetTeam != ownerTeam;
     }
 
+    /** Source Wither accepts damage only from active enemy players inside its polygon after both towers fall. */
+    public static boolean heroesOfGwenWitherCanTakeDamage(int ownerTeam, int attackerTeam,
+            boolean activeAttacker, boolean insideBoundary, boolean damageable, double damage) {
+        return ownerTeam >= 0 && attackerTeam >= 0 && attackerTeam != ownerTeam
+                && activeAttacker && insideBoundary && damageable && damage > 0.0D;
+    }
+
+    /** Source Wither warns its owning team at most once every 30 seconds; zero means never warned. */
+    public static boolean heroesOfGwenWitherShouldInform(long now, long lastInformAt) {
+        return now >= lastInformAt && now - lastInformAt >= 30_000L;
+    }
+
     /** Source MobaDirectAIMethod interprets speed as ticks per block, then divides by 20. */
     public static double heroesOfGwenWitherStepPerTick(double sourceSpeed) {
         return Math.max(0.0D, sourceSpeed) / 20.0D;
