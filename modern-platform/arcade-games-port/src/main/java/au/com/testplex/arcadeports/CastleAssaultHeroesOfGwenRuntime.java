@@ -175,6 +175,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, Long> heroInfinityEndsAt = new HashMap<>();
     private final Map<UUID, Integer> heroInfinityOriginalEnchant = new HashMap<>();
     private final List<AnathMeteorZone> anathMeteorZones = new ArrayList<>();
+    private final Map<UUID, Long> anathFlameDashEndsAt = new HashMap<>();
+    private final Map<UUID, AnathBurnBeamState> anathBurnBeams = new HashMap<>();
+    private final Map<UUID, AnathFlameEmberState> anathFlameEmbers = new HashMap<>();
+    private final Map<UUID, Map<UUID, Long>> anathBurnBeamNextHitAt = new HashMap<>();
+    private final Map<Block, AnathFireTrailState> anathFireTrailBlocks = new HashMap<>();
     private final List<LarissaFountainZone> larissaFountainZones = new ArrayList<>();
     private final Map<UUID, Long> larissaWaterDashEndsAt = new HashMap<>();
     private final Map<UUID, Long> larissaStormBlessingEndsAt = new HashMap<>();
@@ -1275,6 +1280,14 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 throwPlayerTnt(player);
             }
         } else if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            if ("anath".equals(selectedHeroesOfGwen.get(player.getUniqueId()))
+                    && player.getInventory().getHeldItemSlot() == 0
+                    && (event.getAction().isLeftClick() || event.getAction().isRightClick())
+                    && event.getItem() != null && event.getItem().getType() == Material.BLAZE_ROD) {
+                event.setCancelled(true);
+                fireAnathFlameWand(player);
+                return;
+            }
             if (isRowenaBombardmentItem(event.getItem())
                     && rowenaBombardments.containsKey(player.getUniqueId())) {
                 event.setCancelled(true);
@@ -1355,6 +1368,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             ItemStack skill = player.getInventory().getItem(2);
             if ("ivy.floral_leap".equals(heroSkillId(skill))) {
                 activateHeroesOfGwenSkill(player, "ivy.floral_leap");
+            }
+        } else if ("anath".equals(hero)) {
+            ItemStack skill = player.getInventory().getItem(2);
+            if ("anath.flame_dash".equals(heroSkillId(skill))) {
+                activateHeroesOfGwenSkill(player, "anath.flame_dash");
             }
         }
     }
@@ -2716,15 +2734,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
             case "anath" -> {
                 player.getInventory().setItem(0, namedItem(Material.BLAZE_ROD,
-                        ChatColor.GREEN + "Flame Wand", "Anath's primary weapon; basic wand attack parity still needs source validation."));
+                        ChatColor.GREEN + "Flame Wand", "Fire 5-damage embers; four charges, replenished every second."));
                 giveHeroesOfGwenSkillItem(player, 1, "anath.burn_beam", Material.FIRE_CHARGE,
-                        "Burn Beam", "10-block-high flame wall; 20 blocks forward; 14 damage. 10-second cooldown.");
-                player.getInventory().setItem(2, namedItem(Material.FEATHER,
-                        ChatColor.GREEN + "Flame Dash", "Movement ability; its archived movement values still need source validation."));
+                        "Burn Beam", "Send a 9-block horizontal beam through blocks and enemies. 11 damage; 9-second cooldown.");
+                giveHeroesOfGwenSkillItem(player, 2, "anath.flame_dash", Material.FEATHER,
+                        "Flame Dash", "Dash horizontally for 600 ms, leaving fire for 5 seconds. 12-second cooldown.");
                 giveHeroesOfGwenSkillItem(player, 3, "anath.meteor_shower", Material.NETHER_STAR,
                         "Meteor Shower", "Throw to mark a 10-block radius for 7 seconds. 60-second cooldown.");
                 player.getInventory().setItem(7, namedItem(Material.BLAZE_POWDER,
-                        ChatColor.GOLD + "Embers", "Anath mage resource."));
+                        ChatColor.GOLD + "Embers", "Flame Wand ammunition; one charge replenishes every second."));
+                player.getInventory().getItem(7).setAmount(ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_CAPACITY);
+                heroAmmoNextAt.put(id, System.currentTimeMillis()
+                        + ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_AMMO_RELOAD_MILLIS);
             }
             case "ivy" -> {
                 player.getInventory().setItem(0, namedItem(Material.WOODEN_SWORD,
@@ -2917,6 +2938,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             }
             case "devon.infinity" -> activateDevonInfinity(player);
             case "anath.burn_beam" -> activateAnathBurnBeam(player);
+            case "anath.flame_dash" -> activateAnathFlameDash(player);
             case "anath.meteor_shower" -> launchAnathMeteor(player);
             case "larissa.dancing_fountain" -> launchLarissaFountain(player);
             case "larissa.water_dash" -> activateLarissaWaterDash(player);
