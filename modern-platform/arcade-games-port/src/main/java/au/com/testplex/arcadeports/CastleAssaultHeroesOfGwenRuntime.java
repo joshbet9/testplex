@@ -1928,9 +1928,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (event.getDamager() instanceof Projectile projectile) {
             String projectileType = projectile.getPersistentDataContainer()
                     .get(heroProjectileTypeKey, PersistentDataType.STRING);
-            // Source-ability projectiles are adjusted in the dedicated projectile
-            // handler, after its source damage value has been assigned.
-            if (projectileType != null) return;
+            if (projectileType != null) {
+                event.setDamage(heroesOfGwenStoreAbilityDamage(attacker, event.getDamage()));
+                return;
+            }
             if (event.getDamager() instanceof Arrow) {
                 event.setDamage(ArcadePortRules.heroesOfGwenStoreBasicAttackDamage(
                         event.getDamage(), heroesOfGwenOwnedStoreItemNames(attacker)));
@@ -2145,7 +2146,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             if (owner != null && event.getEntity() instanceof LivingEntity target
                     && activePlayers.contains(owner.getUniqueId())
                     && heroesOfGwenEntityTeam(target) != teams.getOrDefault(owner.getUniqueId(), -1)) {
-                event.setDamage(heroesOfGwenStoreAbilityDamage(owner, event.getDamage()));
                 if (target instanceof Player playerTarget) {
                     playerTarget.addPotionEffect(new PotionEffect(PotionEffectType.WITHER, 3 * 20, 0, true, true, true));
                 }
@@ -2233,7 +2233,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                     wither.setHealth(wither.getHealth() - damage);
                 }
             } else {
-                target.damage(damage, owner);
+                damageHeroesOfGwenAbility(target, owner, damage);
             }
             Vector knockback = target.getLocation().toVector().subtract(center.toVector());
             if (knockback.lengthSquared() > 0.001D) {
@@ -3876,7 +3876,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 Integer minionTeam = heroesOfGwenMinionTeams.get(target.getUniqueId());
                 if (minionTeam != null && target instanceof Mob minion) {
                     if (minionTeam == ownerTeam) continue;
-                    minion.damage(ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE, owner);
+                    damageHeroesOfGwenAbility(minion, owner, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE);
                     minion.setFireTicks(Math.max(minion.getFireTicks(),
                             ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS));
                     hit = true;
@@ -3884,7 +3884,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 }
                 if (target instanceof Player victim && activePlayers.contains(victim.getUniqueId())) {
                     if (teams.getOrDefault(victim.getUniqueId(), -1) == ownerTeam) continue;
-                    victim.damage(ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE, owner);
+                    damageHeroesOfGwenAbility(victim, owner, ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_DAMAGE);
                     victim.setFireTicks(Math.max(victim.getFireTicks(),
                             ArcadePortRules.HEROES_OF_GWEN_ANATH_FLAME_WAND_FIRE_TICKS));
                     hit = true;
@@ -3972,7 +3972,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             wither.setHealth(wither.getHealth() - damage);
                         }
                     } else {
-                        target.damage(ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE, owner);
+                        damageHeroesOfGwenAbility(target, owner, ArcadePortRules.HEROES_OF_GWEN_ANATH_BURN_BEAM_DAMAGE);
                     }
                     world.playSound(target.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 0.35F, 0.8F);
                 }
@@ -4257,7 +4257,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         wither.setHealth(wither.getHealth() - damage);
                     }
                 } else {
-                    target.damage(ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE, player);
+                    damageHeroesOfGwenAbility(target, player, ArcadePortRules.HEROES_OF_GWEN_HATTORI_NINJA_DASH_DAMAGE);
                 }
             }
             if (!point.getBlock().isPassable() && distance > 1.0D) break;
@@ -4336,7 +4336,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 Integer minionTeam = heroesOfGwenMinionTeams.get(entity.getUniqueId());
                 if (minionTeam != null) {
                     if (minionTeam != team && entity instanceof Mob minion) {
-                        minion.damage(ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE, player);
+                        damageHeroesOfGwenAbility(minion, player, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE);
                         hit = true;
                         break;
                     }
@@ -4345,7 +4345,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 if (entity instanceof Player target && !target.equals(player)
                         && activePlayers.contains(target.getUniqueId())) {
                     if (teams.getOrDefault(target.getUniqueId(), -1) == team) continue;
-                    target.damage(ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE, player);
+                    damageHeroesOfGwenAbility(target, player, ArcadePortRules.HEROES_OF_GWEN_LARISSA_AQUA_CANNON_DAMAGE);
                     hit = true;
                     break;
                 }
@@ -4452,8 +4452,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             target.setHealth(Math.min(target.getMaxHealth(), target.getHealth()
                                     + ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND));
                         } else {
-                            target.damage(ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND,
-                                    owner);
+                            damageHeroesOfGwenAbility(target, owner,
+                                    ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND);
                         }
                         continue;
                     }
@@ -4480,8 +4480,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             minion.setHealth(Math.min(maximum, minion.getHealth()
                                     + ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_HEAL_PER_SECOND));
                         } else {
-                            minion.damage(ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND,
-                                    owner);
+                            damageHeroesOfGwenAbility(minion, owner,
+                                    ArcadePortRules.HEROES_OF_GWEN_LARISSA_DANCING_FOUNTAIN_DAMAGE_PER_SECOND);
                         }
                     }
                 }
@@ -4800,7 +4800,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         if (now >= nextAllowed) {
                             lastAttacks.put(target.getUniqueId(),
                                     now + ArcadePortRules.HEROES_OF_GWEN_BARDOLF_ATTACK_INTERVAL_MILLIS);
-                            target.damage(ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_ATTACK_DAMAGE, owner);
+                            damageHeroesOfGwenAbility(target, owner, ArcadePortRules.HEROES_OF_GWEN_BARDOLF_WOLF_ATTACK_DAMAGE);
                         }
                     }
                     continue;
@@ -4951,11 +4951,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                                 ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_SLOW_AMPLIFIER,
                                 false, false, true));
                         victim.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
-                        victim.damage(ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_PLAYER_DAMAGE, owner);
+                        damageHeroesOfGwenAbility(victim, owner, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_PLAYER_DAMAGE);
                         victim.sendMessage(ChatColor.GREEN + owner.getName() + " has hooked you!");
                         break;
                     }
-                    target.damage(ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_MINION_DAMAGE, owner);
+                    damageHeroesOfGwenAbility(target, owner, ArcadePortRules.HEROES_OF_GWEN_IVY_VINE_PULL_MINION_DAMAGE);
                 }
                 if (state.targetId != null) break;
             }
@@ -5016,7 +5016,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                             ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_TICKS,
                             ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_SLOW_AMPLIFIER,
                             false, false, true));
-                    target.damage(ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE, owner);
+                    damageHeroesOfGwenAbility(target, owner, ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE);
                 }
                 state.nextDamageAt = now + ArcadePortRules.HEROES_OF_GWEN_IVY_FLORAL_LEAP_DAMAGE_INTERVAL_MILLIS;
             }
@@ -5061,7 +5061,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 } else {
                     long nextDamage = state.nextDamageAt.getOrDefault(target.getUniqueId(), 0L);
                     if (now >= nextDamage) {
-                        target.damage(ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE, owner);
+                        damageHeroesOfGwenAbility(target, owner, ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE);
                         state.nextDamageAt.put(target.getUniqueId(),
                                 now + ArcadePortRules.HEROES_OF_GWEN_IVY_THORN_WALL_ENEMY_DAMAGE_RECHARGE_MILLIS);
                     }
@@ -5210,7 +5210,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         wither.setHealth(wither.getHealth() - damage);
                     }
                 } else {
-                    target.damage(damage, player);
+                    damageHeroesOfGwenAbility(target, player, damage);
                 }
                 player.playSound(player.getLocation(), Sound.ENTITY_ARROW_HIT_PLAYER, 0.7F, 1.3F);
             }
@@ -5470,12 +5470,12 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 nextHitAt.put(target.getUniqueId(),
                         now + ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_TARGET_RECHARGE_MILLIS);
                 if (target instanceof Player) {
-                    target.damage(ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_DAMAGE, player);
+                    damageHeroesOfGwenAbility(target, player, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_DAMAGE);
                     target.setVelocity(new Vector(Math.random() / 2.0D - 0.25D,
                             ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_PLAYER_LIFT,
                             Math.random() / 2.0D - 0.25D));
                 } else {
-                    target.damage(ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_DAMAGE, player);
+                    damageHeroesOfGwenAbility(target, player, ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_DAMAGE);
                     target.setVelocity(new Vector(Math.random() - 0.5D,
                             ArcadePortRules.HEROES_OF_GWEN_DANA_KNOCK_UP_MINION_LIFT,
                             Math.random() - 0.5D));
@@ -5671,7 +5671,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         damageMobaTower(tower, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE, player);
                     }
                 } else {
-                    target.damage(ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE, player);
+                    damageHeroesOfGwenAbility(target, player, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE);
                 }
                 target.setVelocity(new Vector(0.0D,
                         ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_KNOCK_UP
@@ -5705,7 +5705,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                         || state.nextRootAt.getOrDefault(target.getUniqueId(), 0L) > now) continue;
                 state.nextRootAt.put(target.getUniqueId(),
                         now + ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_RECHARGE_MILLIS);
-                target.damage(ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DAMAGE, owner);
+                damageHeroesOfGwenAbility(target, owner, ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DAMAGE);
                 target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
                         (int) (ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_DURATION_MILLIS / 50L),
                         10, true, true, true));
