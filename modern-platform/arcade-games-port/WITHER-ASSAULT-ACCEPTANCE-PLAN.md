@@ -12,7 +12,7 @@ Wither Assault remains MECHANICS_IN_PROGRESS. The Mineplex Reborn source archive
 
 ## Still required before enabling
 
-1. Port and validate the source Human Archer Smoke Arrow and the remaining Human/Medic/Editor passives and ability timing.
+1. Finish source comparison of Human/Medic/Editor passives and ability timing; Archer Smoke Arrow is now wired to every fired Human Archer arrow, blinds on direct hit, blinds every Wither within six blocks of the arrow path, and is covered by strict-boundary rule tests.
 2. Compare Wither flight, immunity, Fire Storm, Wither Skull, minions, scent, down/revive and all role loadouts against Reborn source behaviour.
 3. Replace the generated arena only when authentic archived map data becomes available; until then validate the test arena separately and do not describe it as source-map parity.
 4. Add meaningful gameplay award paths for Eye Candy and SPLIT UP!, and map-tracked wins for Wither World and It's a man's world only if the source map set is available.
