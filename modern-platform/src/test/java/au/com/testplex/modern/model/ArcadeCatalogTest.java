@@ -265,12 +265,22 @@ class ArcadeCatalogTest {
             assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus(), id);
             assertTrue(game.isReadyForTest(), id);
         }
-        for (String id : List.of("heroes-of-gwen")) {
+        for (String id : List.of("heroes-of-gwen", "hoops-remastered")) {
             GameDefinition game = catalog.getGame(id);
             assertNotNull(game, id);
             assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus(), id);
             assertTrue(game.isReadyForTest(), id);
         }
+    }
+
+    @Test
+    void hoopsRemasteredIsAvailableForControlledTwoToSixteenPlayerTesting() {
+        GameDefinition game = new ArcadeCatalog().getGame("hoops-remastered");
+        assertNotNull(game);
+        assertEquals("Hoops Remastered", game.getName());
+        assertEquals(GameDefinition.PortStatus.READY_FOR_TEST, game.getPortStatus());
+        assertTrue(game.isReadyForTest());
+        assertTrue(game.getCosmeticLines().isEmpty());
     }
 
     @Test
