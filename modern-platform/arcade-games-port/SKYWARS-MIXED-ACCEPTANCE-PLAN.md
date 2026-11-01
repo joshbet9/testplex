@@ -5,8 +5,9 @@ SkyWars Mixed is a separate 16-player free-for-all implementation. It does not r
 ## Automated archive gate
 
 - Confirm the exact 50 original ZIP filenames in `update/maps/Skywars` are also packaged under `source-maps/Skywars`.
-- Parse every packaged `WorldConfig.dat` and require player `TEAM_SPAWNS`, RED Zombie Guardian spawns, LIME Throwable TNT generator location, BROWN Island chests, GRAY Connector chests and BLACK Middle chests.
-- Do not invent substitute spawns, loot markers or guardian points when an archive is incomplete.
+- Parse every packaged `WorldConfig.dat` and require authored player `TEAM_SPAWNS` (or the source GREEN start fallback), map bounds and the LIME Throwable TNT generator location.
+- Record the presence of RED Zombie Guardian markers and BROWN/GRAY/BLACK chest families exactly as authored. RED is optional in the legacy source; maps with no RED points correctly spawn no Zombie Guardians.
+- Do not invent substitute player spawns, generator locations or chest markers when an archive is incomplete.
 
 ## Required live acceptance
 
