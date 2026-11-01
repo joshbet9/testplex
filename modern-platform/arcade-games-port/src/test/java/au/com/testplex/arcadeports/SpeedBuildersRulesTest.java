@@ -119,23 +119,42 @@ class SpeedBuildersRulesTest {
     }
 
     @Test
-    void highestCumulativeScoreWinsAndTiedPlayersShareTheWin() {
-        assertEquals(List.of("builder-b", "builder-c"),
-                SpeedBuildersRules.highestScorers(Map.of(
-                        "builder-a", 280,
-                        "builder-b", 410,
-                        "builder-c", 410,
-                        "builder-d", 95)));
-        assertEquals(List.of("only"), SpeedBuildersRules.highestScorers(Map.of("only", 0)));
-        assertEquals(List.of(), SpeedBuildersRules.highestScorers(Map.of()));
+    void higherCumulativeAccuracyAlwaysBeatsAPlayerWithMoreBuildTime() {
+        assertEquals(List.of("accurate-slower"),
+                SpeedBuildersRules.winnersByScoreThenBuildTime(
+                        Map.of("accurate-slower", 410, "fast-but-less-accurate", 390),
+                        Map.of("accurate-slower", 2400L, "fast-but-less-accurate", 900L)));
     }
 
     @Test
-    void cumulativeWinnerCalculationRejectsMalformedScores() {
+    void tiedCumulativeAccuracyIsBrokenByLowestCumulativeBuildTime() {
+        assertEquals(List.of("fastest"),
+                SpeedBuildersRules.winnersByScoreThenBuildTime(
+                        Map.of("slow", 410, "fastest", 410, "middle", 410, "lower-score", 390),
+                        Map.of("slow", 2500L, "fastest", 1800L, "middle", 2100L, "lower-score", 400L)));
+    }
+
+    @Test
+    void exactAccuracyAndCumulativeBuildTimeTieRemainsShared() {
+        assertEquals(List.of("builder-b", "builder-c"),
+                SpeedBuildersRules.winnersByScoreThenBuildTime(
+                        Map.of("builder-a", 280, "builder-b", 410, "builder-c", 410, "builder-d", 95),
+                        Map.of("builder-a", 100L, "builder-b", 1800L, "builder-c", 1800L, "builder-d", 50L)));
+        assertEquals(List.of("only"),
+                SpeedBuildersRules.winnersByScoreThenBuildTime(Map.of("only", 0), Map.of("only", 0L)));
+        assertEquals(List.of(), SpeedBuildersRules.winnersByScoreThenBuildTime(Map.of(), Map.of()));
+    }
+
+    @Test
+    void scoreTimeWinnerCalculationRejectsMalformedOrMismatchedRosters() {
         assertThrows(IllegalArgumentException.class,
-                () -> SpeedBuildersRules.highestScorers(Map.of("", 10)));
+                () -> SpeedBuildersRules.winnersByScoreThenBuildTime(Map.of("", 10), Map.of("", 20L)));
         assertThrows(IllegalArgumentException.class,
-                () -> SpeedBuildersRules.highestScorers(Map.of("builder", -1)));
+                () -> SpeedBuildersRules.winnersByScoreThenBuildTime(Map.of("builder", -1), Map.of("builder", 20L)));
+        assertThrows(IllegalArgumentException.class,
+                () -> SpeedBuildersRules.winnersByScoreThenBuildTime(Map.of("builder", 10), Map.of("builder", -1L)));
+        assertThrows(IllegalArgumentException.class,
+                () -> SpeedBuildersRules.winnersByScoreThenBuildTime(Map.of("builder-a", 10), Map.of("builder-b", 20L)));
     }
 
     @Test
