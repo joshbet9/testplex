@@ -1722,7 +1722,8 @@ public final class ArcadePortManager implements Listener {
                 plugin.getConfig().getInt("game-preferences.automatic-rotation.vote-seconds", 60)));
         final int[] remaining = {-1};
         automaticRotationTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            if (active != null || monsterMazeRunning() || manualStartCountdown != null
+            if (!plugin.getConfig().getBoolean("game-preferences.automatic-rotation.enabled", false)
+                    || active != null || monsterMazeRunning() || manualStartCountdown != null
                     || postGameEndsAtMillis > System.currentTimeMillis()) {
                 cancelAutomaticRotationVote();
                 return;
