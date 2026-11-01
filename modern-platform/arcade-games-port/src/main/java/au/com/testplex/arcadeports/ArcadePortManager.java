@@ -795,13 +795,17 @@ public final class ArcadePortManager implements Listener {
             selectEvolutionKit(player, value);
             return;
         }
-        boolean explicitCameraShyKit = value.startsWith("camera-shy-");
-        boolean cameraShyLobby = "camera-shy".equals(
-                plugin.getConfig().getString("lobby-selected-game", "bacon-brawl"));
-        if (explicitCameraShyKit || cameraShyLobby) {
+        boolean explicitSnapKit = value.startsWith("snap-") || value.startsWith("camera-shy-");
+        String selectedLobbyGame = plugin.getConfig().getString("lobby-selected-game", "bacon-brawl");
+        boolean snapLobby = "snap".equalsIgnoreCase(selectedLobbyGame)
+                || "camera-shy".equalsIgnoreCase(selectedLobbyGame);
+        if (explicitSnapKit || snapLobby) {
             if (cameraShyModule != null) {
-                cameraShyModule.selectKit(player, explicitCameraShyKit
-                        ? value.substring("camera-shy-".length()) : value);
+                String selectedKit = value.startsWith("snap-")
+                        ? value.substring("snap-".length())
+                        : value.startsWith("camera-shy-")
+                                ? value.substring("camera-shy-".length()) : value;
+                cameraShyModule.selectKit(player, selectedKit);
                 return;
             }
         }
