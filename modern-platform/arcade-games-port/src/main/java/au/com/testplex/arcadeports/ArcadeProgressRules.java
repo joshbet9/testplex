@@ -1,0 +1,39 @@
+package au.com.testplex.arcadeports;
+
+import java.util.Set;
+import org.bukkit.Material;
+
+/** Deterministic threshold helpers for achievements used by the modern Arcade ports. */
+public final class ArcadeProgressRules {
+    private ArcadeProgressRules() { }
+
+    public static boolean isDrawMyThingPixelLinguist(int perfectRounds, int expectedRounds, boolean failedAnyRound) {
+        return expectedRounds > 0 && !failedAnyRound && perfectRounds >= expectedRounds;
+    }
+
+    public static boolean shouldAwardDrawMyThingTripleThreat(int consecutiveFirstGuesses) {
+        return consecutiveFirstGuesses >= 3;
+    }
+
+    public static boolean shouldAwardDrawMyThingFastGuesser(long elapsedMillis) {
+        return elapsedMillis >= 0L && elapsedMillis <= 5_000L;
+    }
+
+    public static boolean isMasterBuildersPurist(Set<Material> placedTypes) {
+        return placedTypes != null && placedTypes.size() == 1;
+    }
+
+    public static boolean shouldAwardMasterBuildersArchitect(int winnerScore, int runnerUpScore) {
+        return runnerUpScore != Integer.MIN_VALUE && winnerScore - runnerUpScore >= 20;
+    }
+
+    public static int masterBuildersScoreIfVoteChangedToOne(int voteSum, int voteCount, int originalVote) {
+        if (voteCount <= 0 || originalVote < 1 || originalVote > 6 || originalVote == 1) return Integer.MIN_VALUE;
+        return (int) Math.round((voteSum - originalVote + 1.0D) / voteCount * 100.0D);
+    }
+
+    public static boolean shouldAwardMasterBuildersGreaterGood(int ownScore, int hypotheticalWinnerScore,
+            int highestOtherScore) {
+        return ownScore > hypotheticalWinnerScore && ownScore > highestOtherScore;
+    }
+}

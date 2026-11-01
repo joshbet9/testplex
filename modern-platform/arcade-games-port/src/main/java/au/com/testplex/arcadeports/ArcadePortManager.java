@@ -6521,6 +6521,28 @@ public final class ArcadePortManager implements Listener {
             drawer.setFlying(false);drawer.setAllowFlight(false);drawer.setFlySpeed(0.1F);
             Location start=session.drawStartLocations.get(drawerId);if(start!=null)drawer.teleport(start);
         }
+        // Disconnected guessers no longer block the all-guessed award.
+        List<UUID> eligibleGuessers = session.players.keySet().stream()
+                .filter(id -> !id.equals(drawerId))
+                .filter(id -> {
+                    Player guesser = session.players.get(id);
+                    return guesser != null && guesser.isOnline();
+                }).toList();
+        if (!eligibleGuessers.isEmpty()
+                && session.drawCorrectGuessers.containsAll(eligibleGuessers)
+                && drawer != null && drawer.isOnline()) {
+            awardCatalogAchievement(drawer, "draw-my-thing", "for-the-people");
+        }
+        for (UUID guesserId : eligibleGuessers) {
+            int attempts = session.drawGuessAttempts.getOrDefault(guesserId, 0);
+            boolean correctInOne = attempts == 1 && session.drawCorrectGuessers.contains(guesserId);
+            if (correctInOne) {
+                session.drawLinguistPerfectRounds.merge(guesserId, 1, Integer::sum);
+            } else {
+                session.drawLinguistFailed.add(guesserId);
+            }
+            if (!correctInOne) session.drawFirstGuessStreaks.put(guesserId, 0);
+        }
         resetDrawCanvas(session);session.drawCurrentDrawer=null;session.drawWord=null;
         session.drawRoundEndsAt=0L;
         boolean hasRemainingDrawer = session.drawTurnOrder.subList(session.drawTurnIndex, session.drawTurnOrder.size())
@@ -6580,9 +6602,50 @@ public final class ArcadePortManager implements Listener {
         if(guess.equals(answer)){
             boolean first=session.drawCorrectGuessers.isEmpty();
             session.drawCorrectGuessers.add(playerId);session.scores.merge(playerId,first?3:1,Integer::sum);
-            if(first){Player d=session.players.get(session.drawCurrentDrawer);if(d!=null&&d.isOnline())session.scores.merge(d.getUniqueId(),2,Integer::sum);}
+            if (!testPlayers.isTestPlayer(playerId)) {
+                String path = localStatsPath(playerId, "draw-my-thing");
+                plugin.getConfig().set(path + "correct-guesses",
+                        plugin.getConfig().getInt(path + "correct-guesses", 0) + 1);
+                if (first) {
+                    plugin.getConfig().set(path + "first-guesses",
+                            plugin.getConfig().getInt(path + "first-guesses", 0) + 1);
+                }
+                plugin.saveConfig();
+            }
+            if(first){
+                if (used == 0) {
+                    int streak = session.drawFirstGuessStreaks.merge(playerId, 1, Integer::sum);
+                    if (ArcadeProgressRules.shouldAwardDrawMyThingTripleThreat(streak)) {
+                        awardCatalogAchievement(player, "draw-my-thing", "triple-threat");
+                    }
+                } else {
+                    session.drawFirstGuessStreaks.put(playerId, 0);
+                }
+                if (ArcadeProgressRules.shouldAwardDrawMyThingFastGuesser(System.currentTimeMillis() - session.drawRoundStartedAt)) {
+                    session.drawFastGuessRounds++;
+                }
+                Player d=session.players.get(session.drawCurrentDrawer);
+                if(d!=null&&d.isOnline())session.scores.merge(d.getUniqueId(),2,Integer::sum);
+            } else {
+                session.drawFirstGuessStreaks.put(playerId, 0);
+            }
+            int bestOtherScore = session.scores.entrySet().stream()
+                    .filter(entry -> !entry.getKey().equals(playerId))
+                    .mapToInt(Map.Entry::getValue).max().orElse(0);
+            if (bestOtherScore - session.scores.getOrDefault(playerId, 0) >= 10) {
+                session.drawComebackCandidates.add(playerId);
+            }
             announce(session,ChatColor.GREEN+player.getName()+" guessed the word"+(first?" first!":"!"));
-        }else player.sendMessage(ChatColor.GRAY+"Not quite. "+(DRAW_MY_THING_MAX_GUESSES-used-1)+" guesses remain.");
+        }else {
+            int bestOtherScore = session.scores.entrySet().stream()
+                    .filter(entry -> !entry.getKey().equals(playerId))
+                    .mapToInt(Map.Entry::getValue).max().orElse(0);
+            if (bestOtherScore - session.scores.getOrDefault(playerId, 0) >= 10) {
+                session.drawComebackCandidates.add(playerId);
+            }
+            session.drawFirstGuessStreaks.put(playerId, 0);
+            player.sendMessage(ChatColor.GRAY+"Not quite. "+(DRAW_MY_THING_MAX_GUESSES-used-1)+" guesses remain.");
+        }
     }
 
     private void handleDrawMyThingInteract(Session session,PlayerInteractEvent event) {
@@ -6693,6 +6756,52 @@ public final class ArcadePortManager implements Listener {
         }
         if(winner==null&&session.participantsAtStart==1)
             winner=session.players.values().stream().filter(p->p!=null&&p.isOnline()).findFirst().orElse(null);
+        if (winner != null) {
+            UUID winningId = winner.getUniqueId();
+            int highest = session.scores.getOrDefault(winningId, Integer.MIN_VALUE);
+            List<UUID> tiedFirst = session.scores.entrySet().stream()
+                    .filter(entry -> entry.getValue() == highest)
+                    .map(Map.Entry::getKey).toList();
+            if (tiedFirst.size() > 1) {
+                for (UUID tiedId : tiedFirst) {
+                    Player tiedPlayer = session.players.get(tiedId);
+                    if (tiedPlayer != null) awardCatalogAchievement(tiedPlayer, "master-builders", "sharing-is-caring");
+                }
+            }
+            Map<UUID, Integer> winnerVotes = session.masterBuilderVotes.getOrDefault(winningId, Map.of());
+            int winnerVoteSum = winnerVotes.values().stream().mapToInt(Integer::intValue).sum();
+            int winnerVoteCount = winnerVotes.size();
+            if (winnerVoteCount > 0) {
+                for (Map.Entry<UUID, Integer> scoreEntry : session.scores.entrySet()) {
+                    UUID voterId = scoreEntry.getKey();
+                    if (voterId.equals(winningId) || scoreEntry.getValue() >= highest) continue;
+                    Integer voteForWinner = winnerVotes.get(voterId);
+                    if (voteForWinner == null || voteForWinner <= 1) continue;
+                    int hypotheticalWinnerScore = ArcadeProgressRules.masterBuildersScoreIfVoteChangedToOne(
+                            winnerVoteSum, winnerVoteCount, voteForWinner);
+                    int ownScore = scoreEntry.getValue();
+                    int highestOtherScore = session.scores.entrySet().stream()
+                            .filter(other -> !other.getKey().equals(voterId)
+                                    && !other.getKey().equals(winningId))
+                            .mapToInt(Map.Entry::getValue).max().orElse(Integer.MIN_VALUE);
+                    if (ArcadeProgressRules.shouldAwardMasterBuildersGreaterGood(
+                            ownScore, hypotheticalWinnerScore, highestOtherScore)) {
+                        Player voter = session.players.get(voterId);
+                        if (voter != null) awardCatalogAchievement(voter, "master-builders", "for-the-greater-good");
+                    }
+                }
+            }
+            if (ArcadeProgressRules.isMasterBuildersPurist(
+                    session.masterBuilderPlacedBlockTypes.getOrDefault(winningId, Set.of()))) {
+                awardCatalogAchievement(winner, "master-builders", "purist");
+            }
+            int runnerUp = session.scores.entrySet().stream()
+                    .filter(entry -> !entry.getKey().equals(winningId))
+                    .mapToInt(Map.Entry::getValue).max().orElse(Integer.MIN_VALUE);
+            if (ArcadeProgressRules.shouldAwardMasterBuildersArchitect(highest, runnerUp)) {
+                awardCatalogAchievement(winner, "master-builders", "architect");
+            }
+        }
         finish(session,winner,true);
     }
 
@@ -12633,6 +12742,21 @@ public final class ArcadePortManager implements Listener {
             recordDeathTagRewards(session);
         }
         if (session.type != ArcadePortGame.PLEXBALL) recordLocalStats(session, winner, announceWinner);
+        if (announceWinner && session.type == ArcadePortGame.DRAW_MY_THING && winner != null) {
+            UUID winnerId = winner.getUniqueId();
+            int expectedGuessRounds = Math.max(0, session.participantsAtStart - 1);
+            if (ArcadeProgressRules.isDrawMyThingPixelLinguist(
+                    session.drawLinguistPerfectRounds.getOrDefault(winnerId, 0),
+                    expectedGuessRounds, session.drawLinguistFailed.contains(winnerId))) {
+                awardCatalogAchievement(winner, "draw-my-thing", "pixel-linguist");
+            }
+            if (session.drawFastGuessRounds >= 2) {
+                awardCatalogAchievement(winner, "draw-my-thing", "why-cant-we-have-nice-things");
+            }
+            if (session.drawComebackCandidates.contains(winnerId)) {
+                awardCatalogAchievement(winner, "draw-my-thing", "doubted-but-not-in-doubt");
+            }
+        }
         if (session.type == ArcadePortGame.MICRO_BATTLES) {
             removeAllMicroBorderWarnings(session);
             for (Player player : session.players.values()) restoreMicroMiddleGlassCosmetic(session, player);
@@ -13037,6 +13161,35 @@ public final class ArcadePortManager implements Listener {
             awardEvolutionAchievement(winner, EvolutionAchievement.OVERKILL.configKey(id),
                     "Overkill — got 2 kills before each evolution.");
         }
+    }
+
+    private void awardCatalogAchievement(Player player, String gameId, String achievementId) {
+        if (player == null || !player.isOnline() || testPlayers.isTestPlayer(player)
+                || gameId == null || achievementId == null) return;
+        Set<String> valid = switch (gameId) {
+            case "draw-my-thing" -> Set.of("pixel-linguist", "why-cant-we-have-nice-things",
+                    "doubted-but-not-in-doubt", "triple-threat", "for-the-people");
+            case "master-builders" -> Set.of("purist", "sharing-is-caring", "for-the-greater-good", "architect");
+            default -> Set.of();
+        };
+        if (!valid.contains(achievementId)) return;
+        String key = "local-achievements." + player.getUniqueId() + "." + gameId + "." + achievementId;
+        if (plugin.getConfig().getBoolean(key, false)) return;
+        plugin.getConfig().set(key, true);
+        String label = switch (achievementId) {
+            case "pixel-linguist" -> "Pixel Linguist";
+            case "why-cant-we-have-nice-things" -> "Why can't we have nice things";
+            case "doubted-but-not-in-doubt" -> "Doubted but not in doubt";
+            case "triple-threat" -> "Triple Threat";
+            case "for-the-people" -> "For the people";
+            case "purist" -> "Purist";
+            case "sharing-is-caring" -> "Sharing is Caring";
+            case "for-the-greater-good" -> "For the greater good";
+            case "architect" -> "Architect";
+            default -> achievementId.replace('-', ' ');
+        };
+        plugin.saveConfig();
+        player.sendMessage(ChatColor.GOLD + "Achievement unlocked: " + ChatColor.YELLOW + label);
     }
 
     private void awardEvolutionAchievement(Player player, String key, String description) {
@@ -17831,7 +17984,12 @@ public final class ArcadePortManager implements Listener {
                     && System.currentTimeMillis() < session.masterBuilderBuildEndsAt
                     && session.alive.contains(event.getPlayer().getUniqueId())
                     && isInsideMasterBuilderPlot(session, event.getPlayer().getUniqueId(), event.getBlockPlaced());
-            if (!allowed) event.setCancelled(true);
+            if (!allowed) {
+                event.setCancelled(true);
+            } else {
+                session.masterBuilderPlacedBlockTypes.computeIfAbsent(
+                        event.getPlayer().getUniqueId(), ignored -> new HashSet<>()).add(event.getBlockPlaced().getType());
+            }
             return;
         }
         if (session.type == ArcadePortGame.DRAGON_ESCAPE) {
@@ -19886,6 +20044,11 @@ public final class ArcadePortManager implements Listener {
         final Set<UUID> drawCorrectGuessers = new HashSet<>();
         final Map<UUID, Integer> drawGuessAttempts = new HashMap<>();
         final Set<Integer> drawRevealedLetters = new HashSet<>();
+        final Set<UUID> drawLinguistFailed = new HashSet<>();
+        final Map<UUID, Integer> drawLinguistPerfectRounds = new HashMap<>();
+        final Map<UUID, Integer> drawFirstGuessStreaks = new HashMap<>();
+        final Set<UUID> drawComebackCandidates = new HashSet<>();
+        int drawFastGuessRounds;
         final Set<String> drawUsedWords = new HashSet<>();
         UUID drawCurrentDrawer;
         String drawWord;
@@ -19898,6 +20061,7 @@ public final class ArcadePortManager implements Listener {
         final Map<UUID, Integer> masterBuilderPlots = new LinkedHashMap<>();
         final List<UUID> masterBuilderReviewOrder = new ArrayList<>();
         final Map<UUID, Map<UUID, Integer>> masterBuilderVotes = new HashMap<>();
+        final Map<UUID, Set<Material>> masterBuilderPlacedBlockTypes = new HashMap<>();
         MasterBuildersPhase masterBuilderPhase = MasterBuildersPhase.BUILDING;
         String masterBuilderTheme;
         UUID masterBuilderCurrentTarget;
