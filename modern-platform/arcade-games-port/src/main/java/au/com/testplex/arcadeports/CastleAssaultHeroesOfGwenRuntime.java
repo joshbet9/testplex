@@ -172,6 +172,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private long heroesOfGwenSidequestNextStartAt;
     private long heroesOfGwenMonochromeEndsAt;
     private long heroesOfGwenNextHpRegenAt;
+    private long heroesOfGwenLiveStartedAt;
+    private boolean heroesOfGwenOvertime;
+    private List<Location> heroesOfGwenOvertimePathBlueToRed = List.of();
+    private final Map<Integer, List<Location>> heroesOfGwenOvertimePaths = new HashMap<>();
+    private final Map<Integer, Integer> witherOvertimeTargetIndex = new HashMap<>();
     private final Set<UUID> heroesOfGwenMonochromeSkeletons = new HashSet<>();
     private final int[] heroesOfGwenMonochromeKills = new int[2];
     private final Map<UUID, Long> heroesOfGwenPumpkinBuffEndsAt = new HashMap<>();
@@ -329,7 +334,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         Bukkit.getPluginManager().registerEvents(this, plugin);
         listenersRegistered = true;
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
-            heroesOfGwenNextHpRegenAt = System.currentTimeMillis()
+            heroesOfGwenLiveStartedAt = System.currentTimeMillis();
+            heroesOfGwenNextHpRegenAt = heroesOfGwenLiveStartedAt
                     + ArcadePortRules.HEROES_OF_GWEN_HP_REGEN_INTERVAL_MILLIS;
         }
         if (game == ArcadePortGame.HEROES_OF_GWEN
@@ -434,6 +440,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 heroesOfGwenPumpkinBoundary = orderBoundaryPoints(pumpkinBoundary);
             }
         }
+
+        prepareHeroesOfGwenOvertimePath();
 
         int found = 0;
         for (Map.Entry<String, List<Location>> group : map.customLocationGroups().entrySet()) {
@@ -667,7 +675,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private boolean damageHeroesOfGwenWither(Player attacker, int ownerTeam, double damage, String reason) {
         if (attacker == null || !attacker.isOnline() || !activePlayers.contains(attacker.getUniqueId())) return false;
         int attackerTeam = teams.getOrDefault(attacker.getUniqueId(), -1);
-        boolean insideBoundary = isInsideWitherBoundary(ownerTeam, attacker.getLocation());
+        boolean insideBoundary = heroesOfGwenOvertime
+                || isInsideWitherBoundary(ownerTeam, attacker.getLocation());
         boolean damageable = Boolean.TRUE.equals(witherDamageable.get(ownerTeam));
         if (!ArcadePortRules.heroesOfGwenWitherCanTakeDamage(
                 ownerTeam, attackerTeam, activePlayers.contains(attacker.getUniqueId()),
@@ -734,12 +743,90 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         for (BossBar bar : witherTeamBars.values()) bar.removePlayer(player);
     }
 
+    private void prepareHeroesOfGwenOvertimePath() {
+        Location start = first(map.dataLocations("WHITE"));
+        List<Location> remaining = new ArrayList<>(map.dataLocations("BROWN").stream()
+                .map(Location::clone).toList());
+        if (start == null || remaining.size() < 2) {
+            plugin.getLogger().warning("Heroes of Gwen map " + map.mapName()
+                    + " is missing WHITE/BROWN minion-lane path markers; overtime Wither movement cannot be prepared.");
+            heroesOfGwenOvertimePathBlueToRed = List.of();
+            return;
+        }
+        Location cursor = start.clone();
+        List<Location> ordered = new ArrayList<>(remaining.size());
+        while (!remaining.isEmpty()) {
+            Location next = remaining.stream()
+                    .min(java.util.Comparator.comparingDouble(point -> point.distanceSquared(cursor)))
+                    .orElseThrow();
+            ordered.add(next.clone());
+            remaining.remove(next);
+            cursor = next;
+        }
+        heroesOfGwenOvertimePathBlueToRed = List.copyOf(ordered);
+        for (int team = 0; team < 2; team++) {
+            List<Location> teamPath = new ArrayList<>(heroesOfGwenOvertimePathBlueToRed);
+            // Source getPath(true) reverses the blue-to-red path for the RED team.
+            if (team == 0) java.util.Collections.reverse(teamPath);
+            int pathLength = ArcadePortRules.heroesOfGwenOvertimePathLength(teamPath.size());
+            if (pathLength > 0) {
+                heroesOfGwenOvertimePaths.put(team,
+                        List.copyOf(teamPath.subList(0, pathLength)));
+            }
+        }
+    }
+
+    private void updateHeroesOfGwenOvertime(long now) {
+        if (heroesOfGwenOvertime || game != ArcadePortGame.HEROES_OF_GWEN
+                || !ArcadePortRules.heroesOfGwenOvertimeHasStarted(heroesOfGwenLiveStartedAt, now)) return;
+        heroesOfGwenOvertime = true;
+        for (int team = 0; team < 2; team++) {
+            witherDamageable.put(team, true);
+            witherOvertimeTargetIndex.put(team, 0);
+        }
+        announce(ChatColor.RED + "OVERTIME! " + ChatColor.GOLD
+                + "Victory or Death — Withers are moving to the centre!");
+        for (Player player : activeMatchPlayers()) {
+            player.sendTitle(ChatColor.RED + "OVERTIME",
+                    ChatColor.GOLD + "Victory or Death, Withers are moving to the centre!", 5, 60, 10);
+            player.playSound(player.getLocation(), Sound.ENTITY_ENDER_DRAGON_GROWL, 1.0F, 1.2F);
+        }
+        if (heroesOfGwenOvertimePaths.values().stream().anyMatch(List::isEmpty)
+                || heroesOfGwenOvertimePaths.size() < 2) {
+            plugin.getLogger().warning("Heroes of Gwen overtime started without complete lane paths; Withers remain at their current targets.");
+        }
+    }
+
+    private void updateOvertimeWither(int team, Wither wither, long now) {
+        List<Location> path = heroesOfGwenOvertimePaths.getOrDefault(team, List.of());
+        if (path.isEmpty()) {
+            updateWitherTeamHud(team, wither, now);
+            return;
+        }
+        int currentIndex = witherOvertimeTargetIndex.getOrDefault(team, 0);
+        Location target = path.get(Math.max(0, Math.min(currentIndex, path.size() - 1)));
+        int nextIndex = ArcadePortRules.heroesOfGwenOvertimeNextTargetIndex(
+                currentIndex, path.size(), wither.getLocation().distanceSquared(target));
+        if (nextIndex >= 0 && nextIndex != currentIndex) {
+            currentIndex = nextIndex;
+            witherOvertimeTargetIndex.put(team, currentIndex);
+            target = path.get(currentIndex);
+        }
+        // The source overtime AI advances through the first half of the lane at 2 ticks/block.
+        moveWitherDirectly(wither, target, ArcadePortRules.HEROES_OF_GWEN_OVERTIME_WITHER_SPEED);
+        updateWitherTeamHud(team, wither, now);
+    }
+
     private void updateMobaWithers(long now) {
         for (int team = 0; team < 2; team++) {
             final int ownerTeam = team;
             Wither wither = withers.get(team);
             Location home = witherHomes.get(team);
             if (wither == null || !wither.isValid() || home == null) continue;
+            if (heroesOfGwenOvertime) {
+                updateOvertimeWither(team, wither, now);
+                continue;
+            }
 
             Entity currentTargetEntity = witherTargets.containsKey(team)
                     ? Bukkit.getEntity(witherTargets.get(team)) : null;
@@ -1487,6 +1574,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     }
 
     private void tickHeroesOfGwen(long now) {
+        updateHeroesOfGwenOvertime(now);
         updateHeroesOfGwenHealthRegen(now);
         updateMobaWithers(now);
         updateHeroesOfGwenSidequest(now);
@@ -6060,6 +6148,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         witherTeamBars.clear();
         witherNextHudAt.clear();
         witherLastInformAt.clear();
+        witherOvertimeTargetIndex.clear();
+        heroesOfGwenOvertimePaths.clear();
+        heroesOfGwenOvertimePathBlueToRed = List.of();
+        heroesOfGwenLiveStartedAt = 0L;
+        heroesOfGwenOvertime = false;
         for (Entity entity : new ArrayList<>(entities)) if (entity != null && entity.isValid()) entity.remove();
         for (Map.Entry<Block, BlockData> block : changedBlocks.entrySet()) {
             if (block.getKey() != null && block.getKey().getWorld() == world) block.getKey().setBlockData(block.getValue(), false);
