@@ -1331,7 +1331,6 @@ public final class ArcadePortRules {
             case "mama", "mama-pig", "mama-piggles" -> "mama-piggles";
             case "pig", "sneaky-pig", "sheep", "sheep-pig", "pig-cloak", "cloak-pig" -> "pig";
             case "brutus", "brutus-bacon", "bacon-brutus", "brutus-pig" -> "brutus-bacon";
-            case "chris-p-bacon", "chris-p", "chris", "crispy-bacon" -> "chris-p-bacon";
             default -> null;
         };
     }

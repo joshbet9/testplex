@@ -434,13 +434,13 @@ class ArcadePortGameTest {
         assertTrue(ArcadePortRules.areBombLobbersEnemies(1, ArcadePortRules.opposingBombLobbersTeam(1)));
     }
 
-    @Test void bombLobbersPowerupSpawnRateAndCapacityScaleWithLobbySize() {
-        assertEquals(30_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(1));
-        assertEquals(30_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(2));
-        assertEquals(25_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(4));
-        assertEquals(20_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(8));
-        assertEquals(15_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(12));
-        assertEquals(12_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(16));
+    @Test void bombLobbersPowerupUsesIndependentTeamLocalOneMinuteAverageTimers() {
+        assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(1));
+        assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(2));
+        assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(4));
+        assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(8));
+        assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(12));
+        assertEquals(60_000L, ArcadePortRules.bombLobbersPowerupSpawnIntervalMillis(16));
         assertEquals(1, ArcadePortRules.bombLobbersPowerupMaxActive(2));
         assertEquals(2, ArcadePortRules.bombLobbersPowerupMaxActive(6));
         assertEquals(3, ArcadePortRules.bombLobbersPowerupMaxActive(10));
