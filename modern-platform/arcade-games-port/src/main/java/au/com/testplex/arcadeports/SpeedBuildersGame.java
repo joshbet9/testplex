@@ -682,7 +682,9 @@ public final class SpeedBuildersGame implements Listener {
             state.player.sendMessage(ChatColor.GREEN + "Round " + round + ": "
                     + state.roundPoints + "/100 accuracy points ("
                     + state.score + "/" + currentTemplate.expectedScore()
-                    + " matching pieces). Match total: " + state.totalPoints + ".");
+                    + " matching pieces), build time " + formatBuildTime(state.roundBuildTimeTicks)
+                    + ". Match total: " + state.totalPoints + " points in "
+                    + formatBuildTime(state.totalBuildTimeTicks) + " build time.");
             state.player.sendTitle(ChatColor.GOLD + "ROUND " + round + " RESULT",
                     ChatColor.YELLOW.toString() + state.roundPoints + "/100 points · "
                             + state.totalPoints + " total", 0, 50, 10);
@@ -848,7 +850,8 @@ public final class SpeedBuildersGame implements Listener {
             if (player.isOnline()) {
                 if (winnerIds.contains(player.getUniqueId())) {
                     player.sendTitle(ChatColor.GOLD + "VICTORY!",
-                            ChatColor.YELLOW.toString() + state.totalPoints + " accuracy points", 5, 70, 15);
+                            ChatColor.YELLOW.toString() + state.totalPoints + " points · "
+                                    + formatBuildTime(state.totalBuildTimeTicks), 5, 70, 15);
                 }
                 restoreAfterReturningToLobby(player, state.snapshot);
             }
