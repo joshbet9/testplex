@@ -1888,6 +1888,28 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
     }
 
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onHeroesOfGwenPurchasedGearDeath(PlayerDeathEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
+        Map<String, Map<String, ItemStack>> byRole =
+                heroesOfGwenPurchasedEquipment.get(event.getEntity().getUniqueId());
+        String hero = selectedHeroesOfGwen.get(event.getEntity().getUniqueId());
+        String role = ArcadePortRules.heroesOfGwenHeroRole(hero);
+        Map<String, ItemStack> owned = role == null || byRole == null ? null : byRole.get(role);
+        if (owned == null || owned.isEmpty()) return;
+        Set<String> protectedNames = new HashSet<>();
+        for (ItemStack item : owned.values()) {
+            if (item == null || !item.hasItemMeta() || !item.getItemMeta().hasDisplayName()) continue;
+            String displayName = ChatColor.stripColor(item.getItemMeta().getDisplayName());
+            if (displayName != null) protectedNames.add(displayName);
+        }
+        event.getDrops().removeIf(drop -> {
+            if (drop == null || !drop.hasItemMeta() || !drop.getItemMeta().hasDisplayName()) return false;
+            String displayName = ChatColor.stripColor(drop.getItemMeta().getDisplayName());
+            return displayName != null && protectedNames.contains(displayName);
+        });
+    }
+
     @EventHandler
     public void onHeroesOfGwenBardolfPlayerDeath(PlayerDeathEvent event) {
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
