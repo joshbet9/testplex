@@ -650,10 +650,13 @@ public final class SpeedBuildersGame implements Listener {
             state.score = score(state);
             boolean wasAlreadyPerfect = state.perfect;
             boolean perfectBuild = state.score == currentTemplate.expectedScore();
-            if (perfectBuild && !wasAlreadyPerfect) markPerfectBuild(state);
-            else {
-                state.perfect = perfectBuild;
-                recordBuildTime(state, Math.max(0L, tick - buildPhaseStartedTick));
+            if (perfectBuild && !wasAlreadyPerfect) {
+                markPerfectBuild(state);
+            } else if (!perfectBuild) {
+                state.perfect = false;
+                state.perfectedEveryBuild = false;
+                state.roundBuildTimeTicks = 0L;
+                state.totalBuildTimeTicks = 0L;
             }
             state.player.getInventory().clear();
             state.player.setGameMode(GameMode.SPECTATOR);
@@ -682,9 +685,7 @@ public final class SpeedBuildersGame implements Listener {
             state.player.sendMessage(ChatColor.GREEN + "Round " + round + ": "
                     + state.roundPoints + "/100 accuracy points ("
                     + state.score + "/" + currentTemplate.expectedScore()
-                    + " matching pieces), build time " + formatBuildTime(state.roundBuildTimeTicks)
-                    + ". Match total: " + state.totalPoints + " points in "
-                    + formatBuildTime(state.totalBuildTimeTicks) + " build time.");
+                    + " matching pieces). Match total: " + state.totalPoints + " points.");
             state.player.sendTitle(ChatColor.GOLD + "ROUND " + round + " RESULT",
                     ChatColor.YELLOW.toString() + state.roundPoints + "/100 points · "
                             + state.totalPoints + " total", 0, 50, 10);
@@ -700,7 +701,7 @@ public final class SpeedBuildersGame implements Listener {
         refreshHud();
     }
 
-    /** Arcade match end: accuracy first, cumulative build time as the tie-breaker. */
+    /** Arcade match end: accuracy first; only all-round perfect builds qualify for the time tie-break. */
     private void finishScoredMatch() {
         if (phase != Phase.RESULTS && phase != Phase.INTERMISSION) return;
         List<PlayerState> builders = activePlayers();
@@ -709,14 +710,16 @@ public final class SpeedBuildersGame implements Listener {
             return;
         }
         Map<String, Integer> totals = new LinkedHashMap<>();
-        Map<String, Long> buildTimes = new LinkedHashMap<>();
+        Map<String, Long> eligibleBuildTimes = new LinkedHashMap<>();
         for (PlayerState state : builders) {
             String id = state.player.getUniqueId().toString();
             totals.put(id, state.totalPoints);
-            buildTimes.put(id, state.totalBuildTimeTicks);
+            if (state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit) {
+                eligibleBuildTimes.put(id, state.totalBuildTimeTicks);
+            }
         }
         Set<String> winnerIds = new LinkedHashSet<>(
-                SpeedBuildersRules.winnersByScoreThenBuildTime(totals, buildTimes));
+                SpeedBuildersRules.winnersByScoreThenBuildTime(totals, eligibleBuildTimes));
         List<PlayerState> winners = builders.stream()
                 .filter(state -> winnerIds.contains(state.player.getUniqueId().toString()))
                 .sorted(java.util.Comparator.comparing(state -> state.player.getName(),
@@ -724,14 +727,23 @@ public final class SpeedBuildersGame implements Listener {
                 .toList();
         String scoreboard = builders.stream()
                 .sorted(java.util.Comparator.comparingInt((PlayerState state) -> state.totalPoints).reversed()
-                        .thenComparingLong(state -> state.totalBuildTimeTicks)
+                        .thenComparing((PlayerState state) ->
+                                !(state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit))
+                        .thenComparingLong(state -> state.perfectedEveryBuild
+                                && state.perfectBuilds == matchRoundLimit
+                                ? state.totalBuildTimeTicks : Long.MAX_VALUE)
                         .thenComparing(state -> state.player.getName(), String.CASE_INSENSITIVE_ORDER))
-                .map(state -> state.player.getName() + " " + state.totalPoints + " pts / "
-                        + formatBuildTime(state.totalBuildTimeTicks))
+                .map(state -> {
+                    String result = state.player.getName() + " " + state.totalPoints + " pts";
+                    if (state.perfectedEveryBuild && state.perfectBuilds == matchRoundLimit) {
+                        result += " / " + formatBuildTime(state.totalBuildTimeTicks);
+                    }
+                    return result;
+                })
                 .collect(java.util.stream.Collectors.joining(ChatColor.GRAY + " · " + ChatColor.WHITE));
-        Bukkit.broadcastMessage(ChatColor.GOLD + "Final Speed Builders scores (accuracy, then cumulative build time): "
+        Bukkit.broadcastMessage(ChatColor.GOLD + "Final Speed Builders scores (build time shown only for players who perfected every build): "
                 + ChatColor.WHITE + scoreboard);
-        finishMatchWithWinners(winners, "Highest cumulative accuracy; fastest cumulative build time breaks score ties.");
+        finishMatchWithWinners(winners, "Highest cumulative accuracy; only players who perfected every build qualify for the cumulative-time tie-break.");
     }
 
     private String formatBuildTime(long ticks) {
@@ -850,8 +862,7 @@ public final class SpeedBuildersGame implements Listener {
             if (player.isOnline()) {
                 if (winnerIds.contains(player.getUniqueId())) {
                     player.sendTitle(ChatColor.GOLD + "VICTORY!",
-                            ChatColor.YELLOW.toString() + state.totalPoints + " points · "
-                                    + formatBuildTime(state.totalBuildTimeTicks), 5, 70, 15);
+                            ChatColor.YELLOW.toString() + state.totalPoints + " points", 5, 70, 15);
                 }
                 restoreAfterReturningToLobby(player, state.snapshot);
             }
@@ -1121,8 +1132,7 @@ public final class SpeedBuildersGame implements Listener {
                         + (phase == Phase.REVIEWING || phase == Phase.RESULTS ? percent(state.score) + "%" : "—"),
                 ChatColor.YELLOW + "Round points: " + ChatColor.WHITE.toString() + state.roundPoints,
                 ChatColor.YELLOW + "Total points: " + ChatColor.WHITE.toString() + state.totalPoints,
-                ChatColor.YELLOW + "Build time: " + ChatColor.WHITE + formatBuildTime(state.totalBuildTimeTicks),
-                ChatColor.YELLOW + "Perfect builds: " + ChatColor.WHITE + state.perfectBuilds,
+                    ChatColor.YELLOW + "Perfect builds: " + ChatColor.WHITE + state.perfectBuilds,
                 ChatColor.YELLOW + "Builders: " + ChatColor.WHITE + activePlayers().size()
         );
         for (int i = 0; i < lines.size(); i++) {
@@ -1436,7 +1446,7 @@ public final class SpeedBuildersGame implements Listener {
         }
         plugin.saveConfig();
         Bukkit.broadcastMessage(ChatColor.GOLD + state.player.getName()
-                + ChatColor.YELLOW + " got a perfect build in " + (elapsedMillis / 1_000L) + " seconds!");
+                + ChatColor.YELLOW + " got a perfect build!");
         state.player.sendTitle(ChatColor.GREEN + "PERFECT BUILD!",
                 ChatColor.YELLOW + "You've recreated every block.",
                 0, 40, 10);
@@ -1707,6 +1717,7 @@ public final class SpeedBuildersGame implements Listener {
         private long roundBuildTimeTicks;
         private long totalBuildTimeTicks;
         private boolean buildTimeRecorded;
+        private boolean perfectedEveryBuild = true;
         private int perfectBuilds;
         private int blocksPlaced;
         private int blocksBroken;
