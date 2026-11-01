@@ -54,6 +54,9 @@ class SneakyAssassinsParityTest {
     @Test void matchesSourceTimingAndEffectRadii() {
         assertEquals(200, SneakyAssassinsRules.sourceNpcCount());
         assertEquals(60_000L, SneakyAssassinsRules.globalRevealCycleMillis());
+        assertEquals(4_000L, SneakyAssassinsMechanics.GLOBAL_REVEAL_DURATION_MILLIS);
+        assertEquals(20_000L, SneakyAssassinsMechanics.FIRST_POWERUP_DELAY_MILLIS);
+        assertEquals(10_000L, SneakyAssassinsMechanics.NEXT_POWERUP_DELAY_MILLIS);
         assertEquals(5_000L, SneakyAssassinsRules.revealerDurationMillis());
         assertEquals(1_200L, SneakyAssassinsRules.smokeCloakDurationMillis());
         assertEquals(8_000L, SneakyAssassinsRules.bribeCooldownMillis());
