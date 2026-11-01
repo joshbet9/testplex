@@ -247,7 +247,7 @@ The current branch now contains separate source-map sidequest paths, matching th
 - The source attack cadence is `UpdateType.FAST` (500 ms), confirmed from the archived updater enum. The regression test asserts 500 ms.
 - Added tests for source timing, boss combat values and Monochrome winner/draw rules.
 
-**Validation boundary:** latest Paper 26.3 run #4413 passed. This confirms compilation and deterministic rules tests, not live sidequest acceptance. The 3×5 custom boss visual/representation and its source presentation effects still need comparison; Heroes of Gwen remains gated.
+**Validation boundary:** Paper 26.3 run #4482 passed compilation and deterministic rules tests. This confirms controlled-test readiness, not live sidequest acceptance. The 3×5 custom boss visual/representation and its source presentation effects still need comparison; Heroes of Gwen is available for controlled Arcade testing.
 
 
 ### Shop passive implementation — current validated slice
