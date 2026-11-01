@@ -13,14 +13,12 @@ import org.bukkit.block.Sign;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Mob;
+import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Bisected;
 import org.bukkit.block.data.type.Bed;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.inventory.EquipmentSlot;
-import org.bukkit.block.data.Bisected;
-import org.bukkit.block.data.type.Bed;
 import org.bukkit.WorldCreator;
-import org.bukkit.WorldType;
 
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.potion.PotionEffect;
@@ -31,6 +29,20 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.block.BlockFromToEvent;
+import org.bukkit.event.block.BlockPhysicsEvent;
+import org.bukkit.event.block.BlockSpreadEvent;
+import org.bukkit.event.block.BlockFormEvent;
+import org.bukkit.event.block.BlockFadeEvent;
+import org.bukkit.event.block.BlockBurnEvent;
+import org.bukkit.event.block.BlockGrowEvent;
+import org.bukkit.event.block.LeavesDecayEvent;
+import org.bukkit.event.block.BlockCanBuildEvent;
+import org.bukkit.event.world.StructureGrowEvent;
+import org.bukkit.event.entity.EntityChangeBlockEvent;
+import org.bukkit.event.entity.EntityCombustEvent;
+import org.bukkit.event.player.PlayerBucketEmptyEvent;
+import org.bukkit.event.player.PlayerBucketFillEvent;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
@@ -338,7 +350,7 @@ public final class SpeedBuildersGame implements Listener {
         List<Location> authoredPlots = mapData.dataLocations("YELLOW");
         if (mapData.dataLocations("RED").isEmpty() || authoredPlots.size() < SpeedBuildersRules.MAX_PLAYERS) {
             throw new IllegalStateException("The original Speed Builders map is missing its RED centre or 16 YELLOW plots "
-                    + "(found " + playerPlots + ").");
+                    + "(found " + authoredPlots.size() + ").");
         }
 
         reviewPlot = createPlot(mapData.dataLocations("RED").getFirst());
@@ -346,7 +358,7 @@ public final class SpeedBuildersGame implements Listener {
                 .map(this::createPlot).toList();
         playerSpawns = mapData.spawnLocations().stream().map(Location::clone).toList();
         if (playerSpawns.isEmpty()) {
-            throw new IllegalStateException("The original Speed Builders map has no authored team spawn locations.");
+            plugin.getLogger().warning("Original Speed Builders map has no TEAM_SPAWNS markers; using per-plot fallback spawns.");
         }
 
         if (mapData.hasBounds()) {
@@ -1027,6 +1039,107 @@ public final class SpeedBuildersGame implements Listener {
         player.setFlying(false);
         player.playSound(player.getEyeLocation(), org.bukkit.Sound.ENTITY_GHAST_SHOOT, 1.0F, 1.0F);
         player.setVelocity(new org.bukkit.util.Vector(0.0D, 1.0D, 0.0D));
+    }
+
+    private boolean isWithinAnyPlot(Block block) {
+        if (block == null || block.getWorld() != arena) return false;
+        if (isWithinPlot(reviewPlot, block)) return true;
+        return playerPlots.stream().anyMatch(plot -> isWithinPlot(plot, block));
+    }
+
+    private boolean isWithinPlot(Plot plot, Block block) {
+        return plot != null && block.getWorld() == arena
+                && block.getX() >= plot.centerX() - 3 && block.getX() <= plot.centerX() + 3
+                && block.getY() >= plot.baseY() - 1 && block.getY() <= plot.baseY() + 6
+                && block.getZ() >= plot.centerZ() - 3 && block.getZ() <= plot.centerZ() + 3;
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onLiquidLeak(BlockFromToEvent event) {
+        if (event.getBlock().getWorld() != arena) return;
+        boolean from = isWithinAnyPlot(event.getBlock());
+        boolean to = isWithinAnyPlot(event.getToBlock());
+        if (from != to) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBuildPhysics(BlockPhysicsEvent event) {
+        if (event.getBlock().getWorld() == arena && !event.getBlock().isLiquid()) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBuildGrowth(BlockGrowEvent event) {
+        if (event.getBlock().getWorld() == arena) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBuildSpread(BlockSpreadEvent event) {
+        if (event.getBlock().getWorld() == arena || event.getSource().getWorld() == arena) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBuildForm(BlockFormEvent event) {
+        if (event.getBlock().getWorld() == arena) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBuildFade(BlockFadeEvent event) {
+        if (event.getBlock().getWorld() == arena) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBuildBurn(BlockBurnEvent event) {
+        if (event.getBlock().getWorld() == arena) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBuildLeavesDecay(LeavesDecayEvent event) {
+        if (event.getBlock().getWorld() == arena) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBuildStructureGrow(StructureGrowEvent event) {
+        if (event.getWorld() == arena) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBuildEntityChangeBlock(EntityChangeBlockEvent event) {
+        if (event.getBlock().getWorld() == arena) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBuildCombust(EntityCombustEvent event) {
+        if (event.getEntity().getWorld() == arena) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBucketEmpty(PlayerBucketEmptyEvent event) {
+        PlayerState state = players.get(event.getPlayer().getUniqueId());
+        if (state == null || phase != Phase.BUILDING || state.eliminated || state.perfect) {
+            if (players.containsKey(event.getPlayer().getUniqueId())) event.setCancelled(true);
+            return;
+        }
+        Block target = event.getBlockClicked().getRelative(event.getBlockFace());
+        if (!isInBuildVolume(state, target)) {
+            event.setCancelled(true);
+            return;
+        }
+        if (target.isLiquid()) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onBucketFill(PlayerBucketFillEvent event) {
+        PlayerState state = players.get(event.getPlayer().getUniqueId());
+        if (state == null || phase != Phase.BUILDING || state.eliminated || state.perfect) {
+            if (players.containsKey(event.getPlayer().getUniqueId())) event.setCancelled(true);
+            return;
+        }
+        Block target = event.getBlockClicked().getRelative(event.getBlockFace());
+        if (!isInBuildVolume(state, target)) event.setCancelled(true);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
