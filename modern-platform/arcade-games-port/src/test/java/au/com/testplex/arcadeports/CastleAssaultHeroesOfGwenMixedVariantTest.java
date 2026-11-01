@@ -451,6 +451,34 @@ class CastleAssaultHeroesOfGwenMixedVariantTest {
     }
 
     @Test
+    void heroesOfGwenStoreCooldownReductionMatchesOriginalEquipmentEffects() {
+        assertEquals(0.15D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Ninja's Chestcloth"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Ninja's Leggings"), 0.00001D);
+        assertEquals(0.03D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Helm of Focus"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Chestplate of Focus"), 0.00001D);
+        assertEquals(0.05D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Leggings of Focus"), 0.00001D);
+        assertEquals(0.05D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Focused Cap"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Specialist's Bow"), 0.00001D);
+        assertEquals(0.07D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Superior Archer's Bane Leggings"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Prince's Plate Leggings"), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.heroesOfGwenStoreCooldownReduction("Leather Cap of Holding"), 0.00001D);
+    }
+
+    @Test
+    void heroesOfGwenHunterNimbleFingersReducesOnlyAmmoReloads() {
+        assertEquals(0.05D, ArcadePortRules.heroesOfGwenStoreAmmoCooldownReduction(
+                "Leather Cap of Nimble Fingers"), 0.00001D);
+        assertEquals(0.15D, ArcadePortRules.heroesOfGwenStoreAmmoCooldownReduction(
+                "Leather Chestplate of Nimble Fingers"), 0.00001D);
+        assertEquals(0.10D, ArcadePortRules.heroesOfGwenStoreAmmoCooldownReduction(
+                "Leather Leggings of Nimble Fingers"), 0.00001D);
+        assertEquals(0.05D, ArcadePortRules.heroesOfGwenStoreAmmoCooldownReduction(
+                "Leather Boots of Nimble Fingers"), 0.00001D);
+        assertEquals(0.0D, ArcadePortRules.heroesOfGwenStoreAmmoCooldownReduction(
+                "Focused Cap"), 0.00001D);
+    }
+
+    @Test
     void monochromeSidequestAwardsOnlyTheHigherScoringTeam() {
         assertEquals(0, ArcadePortRules.heroesOfGwenMonochromeWinner(3, 2));
         assertEquals(1, ArcadePortRules.heroesOfGwenMonochromeWinner(1, 4));
