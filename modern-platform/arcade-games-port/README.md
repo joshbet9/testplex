@@ -14,7 +14,7 @@ Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Gladiators, Micro Battl
 
 - **Milk the Cow**: the original BobsFarm archive is checked at package time for the WHITE/PINK/PURPLE animal spawn groups used by the runtime. The full multi-player play/score/role/achievement checklist is in `MILK-THE-COW-ACCEPTANCE-PLAN.md`.
 - **Castle Assault**: all 11 original maps are checked for King, crystal and objective-TNT markers. The live map-by-map objective and five-kit checklist is in `CASTLE-ASSAULT-ACCEPTANCE-PLAN.md`.
-- **Wither Assault**: Human Archer, Medic and Editor are now selectable and persisted; the round applies their loadouts, connects Wither Skull/minion/scent controls and revival potions, and tracks/restores Editor blocks. Source-map parity is unavailable and Archer Smoke Arrow / remaining passives and live acceptance are still outstanding. See `WITHER-ASSAULT-ACCEPTANCE-PLAN.md`.
+- **Wither Assault**: Human Archer, Medic and Editor are now selectable and persisted; the round applies their loadouts, connects Wither Skull/minion/scent controls and revival potions, tracks/restores Editor blocks, and now implements Archer Smoke Arrow on direct impact and against every Wither inside the strict six-block proximity radius. Source-map parity, remaining source comparisons and live acceptance are still outstanding. See `WITHER-ASSAULT-ACCEPTANCE-PLAN.md`.
 - **Sneaky Assassins**: removed a test-runtime bug that randomly deleted one of the 200 town NPCs every four seconds; only missing/invalid or killed NPCs now leave the roster. Its generated town and authored NPC movement remain stand-ins because the source archive and patrol paths are absent. See `SNEAKY-ASSASSINS-ACCEPTANCE-PLAN.md`.
 
 None of these four is promoted by PR #88. The allow-list remains exactly 20 until CI, packaged-map checks and the relevant in-game acceptance sessions are completed.
@@ -164,7 +164,7 @@ Live acceptance still needs to check the three achievement thresholds, the 90-se
 The catalogue and renderer contract are covered by unit tests. Spleef, Dragon Escape, Dragons (Solo), Runner, Sheep Quest and Turf Wars are now `READY_FOR_TEST`, not gameplay-accepted; their source acceptance checklists are in `SPLEEF-ACCEPTANCE-PLAN.md`, `DRAGON-ESCAPE-ACCEPTANCE-PLAN.md`, `DRAGONS-ACCEPTANCE-PLAN.md`, `RUNNER-ACCEPTANCE-PLAN.md`, `SHEEP-QUEST-ACCEPTANCE-PLAN.md` and `TURF-WARS-ACCEPTANCE-PLAN.md`. Both `Speef` and `Super Spleef` source folders are one Spleef map catalogue (37 legacy archive files), not separate game modes. CI verifies that every enabled game's complete 1.8 map filename set is present in the packaged JAR; see [the global map parity register](LEGACY-MAP-PARITY.md).
 
 
-## Wither Assault: Human kits and remaining parity
+## Wither Assault: Smoke Arrow parity and remaining gates
 
 The controlled-port branch exposes the three source Human kits (Archer, Medic and Editor), persists each player's choice, provides the corresponding loadouts, connects Wither Skull/minion/scent abilities, and revives a downed Human with the custom Revival Potion. Editor blocks are tracked, temporarily removable, constrained by the four-block floor rule and restored at round teardown. See WITHER-ASSAULT-ACCEPTANCE-PLAN.md.
 
