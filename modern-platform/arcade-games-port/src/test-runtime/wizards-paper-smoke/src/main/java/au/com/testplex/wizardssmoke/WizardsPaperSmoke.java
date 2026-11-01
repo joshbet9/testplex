@@ -694,9 +694,12 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
             result.append(",handle.isAlive=").append(invokeNoArgs(handle, "isAlive"));
             result.append(",handle.isSpectator=").append(invokeNoArgs(handle, "isSpectator"));
             result.append(",handle.isCreative=").append(invokeNoArgs(handle, "isCreative"));
+            result.append(",handle.isInvulnerable=").append(invokeNoArgs(handle, "isInvulnerable"));
             Object damageSources = handle.getClass().getMethod("damageSources").invoke(handle);
             Object generic = damageSources.getClass().getMethod("generic").invoke(damageSources);
             Object level = handle.getClass().getMethod("level").invoke(handle);
+            result.append(",handle.isInvulnerableToBaseGeneric=")
+                    .append(invokeSingleArgument(handle, "isInvulnerableToBase", generic));
             Method query = null;
             for (Class<?> cursor = handle.getClass(); cursor != null && query == null; cursor = cursor.getSuperclass()) {
                 for (Method method : cursor.getDeclaredMethods()) {
@@ -745,6 +748,25 @@ public final class WizardsPaperSmoke extends JavaPlugin implements Listener {
             return method.invoke(target);
         } catch (Throwable failure) {
             return "error:" + failure.getClass().getSimpleName();
+        }
+    }
+
+    private static Object invokeSingleArgument(Object target, String name, Object argument) {
+        try {
+            Class<?> cursor = target.getClass();
+            while (cursor != null) {
+                for (Method method : cursor.getDeclaredMethods()) {
+                    if (method.getName().equals(name) && method.getParameterCount() == 1
+                            && method.getParameterTypes()[0].isInstance(argument)) {
+                        method.setAccessible(true);
+                        return method.invoke(target, argument);
+                    }
+                }
+                cursor = cursor.getSuperclass();
+            }
+            return "missing";
+        } catch (Throwable failure) {
+            return "error:" + failure.getClass().getSimpleName() + ":" + failure.getMessage();
         }
     }
 
