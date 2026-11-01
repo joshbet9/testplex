@@ -201,7 +201,7 @@ jobs:
               turf-wars) map_folders=("Turf Wars") ;;
               camera-shy) map_folders=(); echo "Snap uses its procedural modern maze; no legacy 1.8 map archive folder exists." ;;
               spleef) map_folders=("Speef" "Super Spleef") ;;
-              monster-maze) map_folders=(); echo "Monster Maze uses its dedicated bundled source worlds; deployment readiness verifies its embedded Arcade registration." ;;
+              monster-maze|monster-maze-speed|monster-maze-modern) map_folders=(); echo "Monster Maze uses its dedicated bundled source worlds; deployment readiness verifies its embedded Arcade registration." ;;
               snake) map_folders=(); echo "Snake's three original map archives are packaged and checked in SnakeModern.jar." ;;
               draw-my-thing) map_folders=("Draw My Thing") ;;
               master-builders) map_folders=(); echo "Master Builders uses generated isolated build plots; no legacy map archive folder exists." ;;
@@ -279,7 +279,7 @@ jobs:
             echo "- Monster Maze port baseline: the 1.21 source implementation, compiled against Paper 26.3"
             echo "- Monster Maze modern UI: first-pad ding, floating +2/+1/-2 heart feedback, per-player kit icons and ability values, Slowballer Cryo Blitz seconds/READY display"
             echo "- Gameplay ports: 30 Arcade catalogue entries are packaged; the controlled READY_FOR_TEST queue now contains 29 game IDs, including Monster Maze (Original), Monster Maze (Speed) and Monster Maze (Modern), Evolution and Speed Builders (2–16 players), SkyWars Mixed, Wither Assault and Sneaky Assassins; Wizards remains separate and disabled, while Hoops Remastered remains outside the enabled queue"
-            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Evolution, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze (Original), Monster Maze (Speed), Monster Maze (Modern), Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault, Sneaky Assassins and Speed Builders (dedicated 16-player queue); Heroes of Gwen remains gated; Wizards and Hoops Remastered remain outside the enabled catalogue queue
+            echo "- Playable allow-list: Death Tag, One in the Quiver, Bomb Lobbers, Bacon Brawl, Castle Assault, Gladiators, Micro Battles, Milk the Cow, Paintball, Plexball, Spleef, Super Sploor, Dragon Escape, Dragons, Evolution, Runner, Sheep Quest, Turf Wars, Snap, Monster Maze (Original), Monster Maze (Speed), Monster Maze (Modern), Snake, Draw My Thing, Master Builders, SkyWars Mixed, Wither Assault, Sneaky Assassins and Speed Builders (dedicated 16-player queue); Heroes of Gwen remains gated; Wizards and Hoops Remastered remain outside the enabled catalogue queue"
             echo "- Deployment: successful pushes to feat/testplex-modern-26.3-platform automatically deploy through the isolated modern Hyper-V workflow"
           } >> "$GITHUB_STEP_SUMMARY"
 
