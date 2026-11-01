@@ -80,7 +80,7 @@ function connect(username) {
           client.write('position_look', {
             x: Number(latest.x), y: Number(latest.y), z: Number(latest.z),
             yaw: Number(latest.yaw || 0), pitch: Number(latest.pitch || 0),
-            // Protocol 777 (Minecraft 26.3) requires the structured MovementFlags value.
+            // Protocol 777 (Minecraft 26.3) requires the structured MovementFlags value; preserve its bitmask and per-axis flags.
             flags: latest.flags || {
               _value: 0,
               x: false, y: false, z: false,
