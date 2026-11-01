@@ -197,3 +197,15 @@ The hero kit source ports do not by themselves make the game ready. The followin
 - Confirm objective lifecycle, team spawns, minion waves and second-tower minion upgrade together with the final hero kit.
 
 Keep the game at `MECHANICS_IN_PROGRESS` and outside `enabled-games` until the remaining automated, both-map and multiplayer acceptance gates pass.
+
+
+### Wither source-target correction — current implementation slice
+
+The modern runtime now follows the original `MobaAI` target contract more closely:
+
+- Withers retain a valid target and acquire the nearest hostile living entity to their home point inside the team's source boundary, rather than considering only active enemy players.
+- Enemy minions and neutral living entities can be targeted; allies, inactive/spectating players, dead entities and entities outside the polygon are rejected.
+- Earthquake damage/knockback now applies to eligible hostile living entities in its radius, not just players, while preserving the source distance falloff and the existing four-second runtime cadence.
+- Added deterministic target-filter and direct-movement-step tests.
+
+**Validation boundary:** this is a source-parity correction, not Wither acceptance. The Wither is still represented by a native Paper Wither rather than the original disguised 3×5 ArmorStand, and patrol, boundary, boss/tower damage interactions and both-map behaviour still require live comparison.
