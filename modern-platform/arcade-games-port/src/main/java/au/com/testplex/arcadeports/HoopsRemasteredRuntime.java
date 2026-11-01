@@ -254,13 +254,15 @@ public final class HoopsRemasteredRuntime implements Listener {
             player.setFoodLevel(20);
             player.setSaturation(20.0F);
             player.setFallDistance(0.0F);
-            player.setAllowFlight(true);
-            player.setFlying(false);
             player.getInventory().clear();
             player.getInventory().setHeldItemSlot(0);
             equipTeamUniform(player, team);
             player.setWalkSpeed(0.2F);
             player.setGameMode(org.bukkit.GameMode.ADVENTURE);
+            // Paper reapplies Adventure's flight defaults when the mode changes,
+            // so grant the Hops ability afterwards for every match participant.
+            player.setAllowFlight(true);
+            player.setFlying(false);
             player.sendMessage(ChatColor.GOLD + "" + ChatColor.BOLD + "HOOPS REMASTERED");
             player.sendMessage(ChatColor.GRAY + "Left-click " + ChatColor.WHITE + "to pass / steal"
                     + ChatColor.GRAY + "  •  Right-click " + ChatColor.WHITE + "to shoot / contest");
