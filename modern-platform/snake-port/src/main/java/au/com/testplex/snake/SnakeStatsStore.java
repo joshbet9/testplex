@@ -56,6 +56,19 @@ public final class SnakeStatsStore {
         return true;
     }
 
+    public boolean awardAchievement(UUID playerId, String achievement) {
+        if (playerId == null || achievement == null || !Set.of(
+                "Cannibal", "ChooChoo", "SlimySheep",
+                "dont-want-none", "resilience-snakeified", "busted",
+                "one-of-the-ogs", "flawless", "bots-everywhere").contains(achievement)) return false;
+        String path = base(playerId) + ".achievements." + achievement;
+        if (data.getBoolean(path)) return false;
+        data.set(path, true);
+        plugin.getLogger().info("Snake achievement " + achievement + " awarded to " + playerId + ".");
+        save();
+        return true;
+    }
+
     public void recordGameEnd(UUID player, boolean won, int killsThisRound) {
         String path = base(player);
         data.set(path + ".games-played", data.getInt(path + ".games-played") + 1);
@@ -83,7 +96,9 @@ public final class SnakeStatsStore {
     public int bestTailLength(UUID player) { return data.getInt(base(player) + ".best-tail-length"); }
     public Set<String> achievements(UUID player) {
         Set<String> result = new LinkedHashSet<>();
-        for (String stat : Set.of("Cannibal", "ChooChoo", "SlimySheep")) {
+        for (String stat : Set.of("Cannibal", "ChooChoo", "SlimySheep",
+                "dont-want-none", "resilience-snakeified", "busted",
+                "one-of-the-ogs", "flawless", "bots-everywhere")) {
             if (data.getBoolean(base(player) + ".achievements." + stat)) result.add(stat);
         }
         return Set.copyOf(result);
