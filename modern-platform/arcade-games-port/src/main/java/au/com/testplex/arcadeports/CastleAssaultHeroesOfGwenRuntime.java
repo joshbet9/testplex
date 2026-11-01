@@ -156,6 +156,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private int castleKillCountBlue;
     private boolean ready;
     private boolean stopped;
+    private boolean listenersRegistered;
 
     CastleAssaultHeroesOfGwenRuntime(
             JavaPlugin plugin,
@@ -192,7 +193,6 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 : game == ArcadePortGame.HEROES_OF_GWEN && prepareHeroesOfGwen();
         this.ready = prepared;
         if (prepared) {
-            Bukkit.getPluginManager().registerEvents(this, plugin);
             long now = System.currentTimeMillis();
             objectiveRespawnAt = now + objectiveDelay();
             nextChestRefillAt = now + 120_000L;
@@ -215,6 +215,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
 
     boolean isReady() {
         return ready && !stopped;
+    }
+
+    /** Activate the mixed-mode event handlers only after the parent match enters Live. */
+    void startLive() {
+        if (!isReady() || listenersRegistered) return;
+        Bukkit.getPluginManager().registerEvents(this, plugin);
+        listenersRegistered = true;
     }
 
     private boolean prepareCastleAssault() {
