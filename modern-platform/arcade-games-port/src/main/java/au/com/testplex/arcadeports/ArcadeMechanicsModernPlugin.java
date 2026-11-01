@@ -233,7 +233,8 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
         if (!(panel instanceof JavaPlugin modernPanel)) return false;
         String uuid = player.getUniqueId().toString();
         return modernPanel.getConfig().getStringList("panel-cohosts").stream()
-                .anyMatch(record -> record.equals(uuid) || record.startsWith(uuid + "|"));
+                .anyMatch(record -> record != null
+                        && (record.equals(uuid) || record.startsWith(uuid + "|")));
     }
 
     /** Shared admin check for the Game Panel, Arcade commands and embedded game settings. */
