@@ -229,6 +229,13 @@ public final class SpeedBuildersGame implements Listener {
             queueDeadlineTick = queue.isEmpty() ? -1L : tick + NORMAL_QUEUE_TICKS;
             return;
         }
+        if (!plugin.canStartSpeedBuilders()) {
+            for (Player player : participants) {
+                player.sendMessage(ChatColor.RED + "Another Arcade game is currently active. Your Speed Builders queue is retained; an operator can start it after that match ends.");
+            }
+            queueDeadlineTick = -1L;
+            return;
+        }
         queue.clear();
         queueDeadlineTick = -1L;
         startMatch(participants);
