@@ -3066,6 +3066,12 @@ public final class ArcadePortRules {
     public static final double HEROES_OF_GWEN_ANATH_METEOR_PULSE_DAMAGE = 2.0D;
     public static final double HEROES_OF_GWEN_ANATH_METEOR_FIREBALL_DAMAGE = 20.0D;
 
+    /** Matches MobaUtil.scaleDamageWithBow(bow, 5) used by Devon's TNT Arrows. */
+    public static double heroesOfGwenDevonTntArrowDamage(int powerLevel) {
+        double scaled = HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE + 5.0D;
+        return scaled * (1.0D + Math.max(0, powerLevel) * 0.25D);
+    }
+
     public static final double HEROES_OF_GWEN_ROWENA_BOW_BASE_DAMAGE = 5.0D;
     public static final double HEROES_OF_GWEN_ROWENA_BOW_POWER_DAMAGE_PER_LEVEL = 0.25D;
 
