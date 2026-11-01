@@ -1669,26 +1669,55 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             projectile.remove();
             return;
         }
+
         if (!"devon.tnt_arrow".equals(type)) return;
         Player owner = heroProjectileOwner(projectile);
         if (owner == null) return;
-        Location center = projectile.getLocation();
+        Location center = projectile.getLocation().clone();
         world.spawnParticle(Particle.EXPLOSION, center, 3, 0.25D, 0.25D, 0.25D, 0.02D);
         world.playSound(center, Sound.ENTITY_GENERIC_EXPLODE, 0.8F, 1.1F);
         ItemStack bow = owner.getInventory().getItem(0);
-        double damageAtCenter = 10.0D + (bow == null ? 0.0D : bow.getEnchantmentLevel(Enchantment.POWER) * 2.5D);
-        for (Entity entity : world.getNearbyEntities(center, 5.0D, 5.0D, 5.0D)) {
-            if (!(entity instanceof Player target) || target.equals(owner)
-                    || !activePlayers.contains(target.getUniqueId())
-                    || teams.getOrDefault(target.getUniqueId(), -1) == teams.getOrDefault(owner.getUniqueId(), -2)) continue;
-            double distance = Math.min(center.distance(target.getLocation()), center.distance(target.getEyeLocation()));
-            if (distance >= 5.0D) continue;
-            double falloff = 1.0D - distance / 5.0D;
-            double damage = damageAtCenter * falloff;
-            if (target.getHealth() <= damage) hooks.eliminate(target, owner, "was hit by a TNT-infused arrow");
-            else target.damage(damage, owner);
+        int power = bow == null ? 0 : bow.getEnchantmentLevel(Enchantment.ARROW_DAMAGE);
+        double baseDamage = ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_BOW_BASE_DAMAGE;
+        double damageAtCenter = baseDamage * 2.0D * (1.0D + Math.max(0, power) * 0.25D);
+        int ownerTeam = teams.getOrDefault(owner.getUniqueId(), -1);
+        double radius = ArcadePortRules.HEROES_OF_GWEN_DEVON_TNT_EXPLOSION_RADIUS;
+        for (Entity entity : world.getNearbyEntities(center, radius, radius, radius)) {
+            if (!(entity instanceof LivingEntity target) || target.equals(owner)
+                    || !target.isValid() || target.isDead()) continue;
+            if (target instanceof Player victim && !activePlayers.contains(victim.getUniqueId())) continue;
+            double distance = center.distance(target.getLocation());
+            if (distance >= radius) continue;
+            int targetTeam = heroesOfGwenEntityTeam(target);
+            if (targetTeam >= 0 && targetTeam == ownerTeam) continue;
+            double falloff = Math.max(0.0D, 1.0D - distance / radius);
+            double damage = falloff * damageAtCenter;
+            TowerState tower = towerFor(target);
+            if (tower != null) {
+                if (tower.owner != ownerTeam && canDamageMobaTower(tower, ownerTeam)
+                        && owner.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                    damageMobaTower(tower, damage, owner);
+                }
+            } else if (target instanceof Wither wither) {
+                Integer enemyTeam = withers.entrySet().stream()
+                        .filter(witherEntry -> witherEntry.getValue().equals(wither))
+                        .map(Map.Entry::getKey).findFirst().orElse(null);
+                if (enemyTeam != null && enemyTeam != ownerTeam
+                        && witherDamageable.getOrDefault(enemyTeam, false)) {
+                    if (wither.getHealth() <= damage) {
+                        finishHeroesOfGwen(ownerTeam, "enemy Wither defeated by Devon's TNT arrow");
+                        projectile.remove();
+                        return;
+                    }
+                    wither.setHealth(wither.getHealth() - damage);
+                }
+            } else {
+                target.damage(damage, owner);
+            }
             Vector knockback = target.getLocation().toVector().subtract(center.toVector());
-            if (knockback.lengthSquared() > 0.001D) target.setVelocity(knockback.normalize().multiply(0.8D * falloff).setY(0.25D));
+            if (knockback.lengthSquared() > 0.001D) {
+                target.setVelocity(knockback.normalize().multiply(0.8D * falloff).setY(0.25D));
+            }
         }
         projectile.remove();
     }
