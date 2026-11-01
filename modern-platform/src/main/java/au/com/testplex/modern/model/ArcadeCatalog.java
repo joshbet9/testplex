@@ -265,8 +265,8 @@ public final class ArcadeCatalog {
                 win("sentry-shatter", "Sentry Shatter", "The last sentry crystal breaks in a burst of red sparks.")));
 
         register(game("heroes-of-gwen", "Heroes of Gwen", "PRISMARINE_BRICKS",
-                "Choose a hero role, capture beacons, destroy enemy towers and defeat the Wither. Mixed Arcade removes middle towers and halves store prices.",
-                GameDefinition.PortStatus.MECHANICS_IN_PROGRESS,
+                "Choose a hero, capture beacons, destroy enemy towers and defeat the opposing Wither in the original Heroes of Gwen Arcade battle.",
+                GameDefinition.PortStatus.READY_FOR_TEST,
                 List.of(),
                 win("gwen-throne", "Gwen Throne", "A crystal throne rises above the winning hero."),
                 win("beacon-crown", "Beacon Crown", "Captured beacons form a crown around the victor."),
