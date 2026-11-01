@@ -29,6 +29,7 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.Vector;
 
 import java.lang.reflect.Field;
+import java.util.List;
 
 /** Solo/admin game pause. */
 public class PauseCommand implements CommandExecutor, Listener {
