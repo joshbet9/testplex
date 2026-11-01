@@ -976,7 +976,8 @@ public final class MenuService implements Listener {
     private boolean isMechanicsPortGame(String gameId) {
         return List.of("bacon-brawl", "bomb-lobbers", "death-tag", "dragon-escape", "dragons",
                 "evolution", "gladiators", "micro-battles", "one-in-the-quiver", "paintball",
-                "runner", "sheep-quest", "spleef", "turf-wars", "draw-my-thing", "master-builders", "monster-maze").contains(gameId);
+                "runner", "sheep-quest", "spleef", "turf-wars", "draw-my-thing", "master-builders",
+                "monster-maze", "monster-maze-speed", "monster-maze-modern").contains(gameId);
     }
 
     private boolean isCohost(Player player) {
