@@ -1474,6 +1474,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     @EventHandler
     public void onHeroesOfGwenBardolfPlayerDeath(PlayerDeathEvent event) {
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            removeBiffState(event.getEntity().getUniqueId());
             removeBardolfPack(event.getEntity().getUniqueId());
             removeRowenaState(event.getEntity().getUniqueId());
             removeDanaState(event.getEntity().getUniqueId());
@@ -1483,9 +1484,31 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     @EventHandler
     public void onHeroesOfGwenBardolfPlayerQuit(PlayerQuitEvent event) {
         if (game == ArcadePortGame.HEROES_OF_GWEN) {
+            removeBiffState(event.getPlayer().getUniqueId());
             removeBardolfPack(event.getPlayer().getUniqueId());
             removeRowenaState(event.getPlayer().getUniqueId());
             removeDanaState(event.getPlayer().getUniqueId());
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onHeroesOfGwenBiffHorseDamage(EntityDamageEvent event) {
+        if (game != ArcadePortGame.HEROES_OF_GWEN || !(event.getEntity() instanceof Horse horse)) return;
+        if (horse.getPersistentDataContainer().has(biffHorseOwnerKey, PersistentDataType.STRING)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onHeroesOfGwenBiffHorseDeath(EntityDeathEvent event) {
+        if (game != ArcadePortGame.HEROES_OF_GWEN || !(event.getEntity() instanceof Horse horse)) return;
+        if (!horse.getPersistentDataContainer().has(biffHorseOwnerKey, PersistentDataType.STRING)) return;
+        event.getDrops().clear();
+        event.setDroppedExp(0);
+        String owner = horse.getPersistentDataContainer().get(biffHorseOwnerKey, PersistentDataType.STRING);
+        if (owner != null) {
+            try { removeBiffHorse(UUID.fromString(owner)); }
+            catch (IllegalArgumentException ignored) { entities.remove(horse); }
         }
     }
 
@@ -2635,6 +2658,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (!hero.equals(previous) && "bardolf".equals(previous)) removeBardolfPack(player.getUniqueId());
         if (!hero.equals(previous) && "rowena".equals(previous)) removeRowenaState(player.getUniqueId());
         if (!hero.equals(previous) && "dana".equals(previous)) removeDanaState(player.getUniqueId());
+        if (!hero.equals(previous) && "biff".equals(previous)) removeBiffState(player.getUniqueId());
         if (!hero.equals(previous) && previous != null) {
             int team = teams.getOrDefault(player.getUniqueId(), -1);
             boolean ownTowerLost = towers.getOrDefault(team, List.of()).stream().anyMatch(tower -> tower.dead);
@@ -3449,6 +3473,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (tower != null) return tower.owner;
         for (Map.Entry<Integer, Wither> entry : withers.entrySet()) {
             if (entry.getValue().equals(entity)) return entry.getKey();
+        }
+        if (entity instanceof Horse horse) {
+            String owner = horse.getPersistentDataContainer().get(biffHorseOwnerKey, PersistentDataType.STRING);
+            if (owner != null) {
+                try { return teams.getOrDefault(UUID.fromString(owner), -1); }
+                catch (IllegalArgumentException ignored) { return -1; }
+            }
         }
         if (entity instanceof Wolf wolf) {
             UUID ownerId = bardolfOwnerId(wolf);
@@ -4375,6 +4406,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         updateLarissaFountains(now);
         updateBardolfWolves(now);
         updateDanaAbilities(now);
+        updateBiffAbilities(now);
         updateRowenaAbilities(now);
         for (Map.Entry<UUID, BardolfPounceState> entry : new HashMap<>(bardolfPounces).entrySet()) {
             if (now >= entry.getValue().expiresAt) bardolfPounces.remove(entry.getKey());
@@ -4458,6 +4490,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         for (UUID id : new ArrayList<>(rowenaBombardments.keySet())) endRowenaBombardment(id, false);
         for (UUID id : new ArrayList<>(danaRallies.keySet())) endDanaRally(id);
+        for (UUID id : new ArrayList<>(biffHorses.keySet())) removeBiffHorse(id);
         for (Entity entity : new ArrayList<>(entities)) if (entity != null && entity.isValid()) entity.remove();
         for (Map.Entry<Block, BlockData> block : changedBlocks.entrySet()) {
             if (block.getKey() != null && block.getKey().getWorld() == world) block.getKey().setBlockData(block.getValue(), false);
@@ -4503,6 +4536,9 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         danaKnockUpEndsAt.clear();
         danaKnockUpNextHitAt.clear();
         danaRallies.clear();
+        biffTetherTargets.clear();
+        biffBattleLeapStartedAt.clear();
+        biffHorses.clear();
         castleAssaultPlayerKits.clear();
         castleArcherNextArrowAt.clear();
         castleDemolitionistNextTntAt.clear();
@@ -4546,6 +4582,25 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             this.colour = colour;
             this.center = center;
             this.wool = wool;
+        }
+    }
+
+    private static final class BiffTetherTarget {
+        final UUID targetId;
+        final long startedAt;
+        BiffTetherTarget(UUID targetId, long startedAt) {
+            this.targetId = targetId;
+            this.startedAt = startedAt;
+        }
+    }
+
+    private static final class BiffHorseState {
+        final Horse horse;
+        final long expiresAt;
+        final Map<UUID, Long> nextRootAt = new HashMap<>();
+        BiffHorseState(Horse horse, long expiresAt) {
+            this.horse = horse;
+            this.expiresAt = expiresAt;
         }
     }
 
