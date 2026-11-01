@@ -11892,7 +11892,6 @@ public final class ArcadePortManager implements Listener {
         UUID id = player.getUniqueId();
         if (active != session || !session.alive.contains(id)
                 || !session.evolutionAvailable.remove(id) || !session.evolving.add(id)) return;
-        session.evolutionManualEvolved.add(id);
         session.evolutionStartedAtMillis.put(id, System.currentTimeMillis());
         session.evolutionLevelAtAttempt.put(id, session.evolutionLevels.getOrDefault(id, 0));
         boolean quickEvolver = "quick-evolver".equals(
