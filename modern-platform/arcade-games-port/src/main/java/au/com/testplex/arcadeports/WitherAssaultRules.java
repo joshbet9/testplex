@@ -26,4 +26,16 @@ public final class WitherAssaultRules {
         if (!Double.isFinite(witherSpawnY) || underOtherPlayer) return false;
         return blockY >= Math.ceil(witherSpawnY - 4.0D);
     }
+
+    /** Only a living Human Archer owns the source Smoke Arrow perk. */
+    public static boolean isHumanArcherSmokeArrowEligible(int teamId, String kitId, boolean alive) {
+        return alive && teamId == 0 && "archer".equals(normalizeHumanKit(kitId));
+    }
+
+    /** Reborn's proximity check is a strict six-block radius around the Wither's eye-height offset. */
+    public static boolean shouldSmokeArrowBlindAtDistanceSquared(double distanceSquared, double radius) {
+        if (!Double.isFinite(distanceSquared) || !Double.isFinite(radius)
+                || distanceSquared < 0.0D || radius <= 0.0D) return false;
+        return distanceSquared < radius * radius;
+    }
 }
