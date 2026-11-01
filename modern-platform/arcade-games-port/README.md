@@ -84,7 +84,7 @@ Mixed Arcade commands accept both `<game-id>-mixed` and `mixed-<game-id>` for Tu
 - `/arcadeport ghost <on|off|toggle>` — enable or hide your Dragon Escape translucent PB player ghost.
 - `/arcadeport status`, `/arcadeport stop` (operator only).
 
-Game IDs include `camera-shy` and `super-sploor` alongside `bacon-brawl`, `bomb-lobbers`, `castle-assault`, `death-tag`, `dragon-escape`, `dragons`, `draw-my-thing`, `evolution`, `gladiators`, `heroes-of-gwen`, `master-builders`, `micro-battles`, `one-in-the-quiver`, `paintball`, `plexball`, `runner`, `sheep-quest`, `spleef`, `turf-wars`. Mixed Arcade aliases use `<game-id>-mixed` or `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Castle Assault and Heroes of Gwen remain disabled pending acceptance.
+Game IDs include `camera-shy`, `super-sploor`, `skywars`, `wither-assault` and `sneaky-assassins` alongside `bacon-brawl`, `bomb-lobbers`, `castle-assault`, `death-tag`, `dragon-escape`, `dragons`, `draw-my-thing`, `evolution`, `gladiators`, `heroes-of-gwen`, `master-builders`, `micro-battles`, `milk-the-cow`, `monster-maze`, `one-in-the-quiver`, `paintball`, `plexball`, `runner`, `sheep-quest`, `snake`, `spleef` and `turf-wars`. Mixed Arcade aliases use `<game-id>-mixed` or `mixed-<game-id>` for Turf Wars, Castle Assault and Heroes of Gwen. Castle Assault is enabled for controlled testing; Heroes of Gwen and Evolution remain gated.
 
 See `GLADIATORS-ACCEPTANCE-PLAN.md` and `MICRO-BATTLES-ACCEPTANCE-PLAN.md` for combined-session live checks and known caveats.
 
