@@ -780,7 +780,7 @@ class ArcadePortGameTest {
     }
 
     @Test void quiverAchievementSetMatchesTheUpdatedRequirements() {
-        assertEquals(4, QuiverAchievement.values().length);
+        assertEquals(6, QuiverAchievement.values().length);
         assertEquals("The Perfect Game", QuiverAchievement.THE_PERFECT_GAME.displayName());
         assertEquals("Achieve a Perfect Run killstreak in a game.",
                 QuiverAchievement.THE_PERFECT_GAME.requirement());
@@ -789,6 +789,8 @@ class ArcadePortGameTest {
         assertEquals("Win a game in under 1:30.", QuiverAchievement.SPEEDRUNNER.requirement());
         assertEquals("Get 3 kills with fist/bow punch.",
                 QuiverAchievement.THATS_NOT_A_SWORD.requirement());
+        assertEquals("Kill a player with a high-arced bow shot.", QuiverAchievement.HEADS.requirement());
+        assertEquals("Win with 10 separate two-kill streaks.", QuiverAchievement.RHYTHM_HEAVEN.requirement());
     }
 
     @Test void dragonsSourceKitsSpawnLoopSparklerAndFallRulesAreExplicit() {
