@@ -1472,6 +1472,19 @@ public final class ArcadePortRules {
         };
     }
 
+    /**
+     * Fall-damage multiplier for the five Evolution forms:
+     * Blaze and Chicken are immune; Slime takes half damage.
+     * Iron Golem and Creeper retain normal fall damage.
+     */
+    public static double evolutionFallDamageMultiplier(int level) {
+        return switch (Math.max(0, Math.min(4, level))) {
+            case 1, 4 -> 0.0D;
+            case 3 -> 0.5D;
+            default -> 1.0D;
+        };
+    }
+
     public static double evolutionChargePerTick(int killsThisLife) {
         int extraKills = Math.max(0, killsThisLife - 1);
         return Math.min(0.022D, 0.012D + 0.003D * extraKills);
