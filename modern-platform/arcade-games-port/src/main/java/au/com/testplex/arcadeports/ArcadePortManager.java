@@ -5205,7 +5205,7 @@ public final class ArcadePortManager implements Listener {
             player.getInventory().setItem(0, namedItem(Material.GOLDEN_SWORD,
                     "Wither Skull", "Left-click to launch a Wither Skull. Recharges every 2 seconds."));
             player.getInventory().setItem(1, namedItem(Material.DIAMOND_SWORD,
-                    "Wither Minions", "Left-click to summon two skeletal minions. Recharges every 10 seconds."));
+                    "Wither Minions", "Left-click to summon three skeletal minions. Recharges every 10 seconds."));
             player.getInventory().setItem(2, namedItem(Material.COMPASS,
                     "Smell Humans", "Right-click to reveal every living Human. Recharges every 30 seconds."));
             return;
