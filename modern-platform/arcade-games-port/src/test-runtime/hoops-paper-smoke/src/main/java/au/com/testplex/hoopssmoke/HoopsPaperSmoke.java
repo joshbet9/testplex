@@ -282,6 +282,13 @@ public final class HoopsPaperSmoke extends JavaPlugin {
         require(((Integer) field(shot, "points")) == 2, "eight-block release was not scored as two points");
         require(((Boolean) field(shot, "reboundEligible")), "missed-shot recovery was not enabled");
         require(passerId.equals(field(shot, "passerId")), "shot lost its pass/assist attribution");
+        Location actualEye = shooter.getEyeLocation();
+        getLogger().info("HOOPS_SHOT_DIAGNOSTIC|launch|team=" + team + "|defendingTeam="
+                + field(shot, "defendingTeam") + "|hoopX=" + hoopX + "|hoopY=66.2"
+                + "|eye=" + actualEye + "|direction=" + actualEye.getDirection()
+                + "|velocity=" + field(shot, "velocity") + "|origin=" + field(shot, "origin")
+                + "|points=" + field(shot, "points") + "|aimMiss="
+                + actualEye.getDirection().normalize().getX() + "/" + actualEye.getDirection().normalize().getY());
         stage = 3;
         ticks = 0L;
         getLogger().info("HOOPS_SMOKE|SHOT_LAUNCHED|type=two-point|shooter=" + shooter.getName());
@@ -289,6 +296,16 @@ public final class HoopsPaperSmoke extends JavaPlugin {
 
     private void waitForTwoPointWinAndStartSecondMatch() throws Exception {
         int[] scores = (int[]) field(firstMatch, "teamScore");
+        if (ticks > 0 && ticks % 20 == 0) {
+            Object liveBall = field(firstMatch, "ball");
+            getLogger().info("HOOPS_SHOT_DIAGNOSTIC|progress|ticks=" + ticks
+                    + "|score=" + scores[0] + "-" + scores[1]
+                    + "|holder=" + field(firstMatch, "holderId")
+                    + "|ball=" + (liveBall == null ? "null" : field(liveBall, "mode") + "@"
+                            + field(liveBall, "location") + "|v=" + field(liveBall, "velocity")
+                            + "|bounces=" + field(liveBall, "bounces"))
+                    + "|lastTouch=" + (liveBall == null ? "n/a" : field(liveBall, "lastToucher")));
+        }
         if (firstScoringTeam >= 0 && scores[firstScoringTeam] >= 21) {
             @SuppressWarnings("unchecked")
             Map<UUID, Object> stats = (Map<UUID, Object>) field(firstMatch, "playerStats");
