@@ -14,6 +14,9 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.Chest;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.ArmorStand;
+import org.bukkit.entity.Ageable;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Mob;
 import org.bukkit.entity.EnderCrystal;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.FallingBlock;
@@ -31,6 +34,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
@@ -84,7 +88,13 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private static final int CASTLE_KING_HEALTH = 600;
     private static final int CASTLE_CRYSTAL_COUNT = 2;
     private static final long CASTLE_NORMAL_TNT_DELAY = 60_000L;
-    private static final long MOBA_PASSIVE_GOLD_INTERVAL = 5_000L;
+    private static final long MOBA_PASSIVE_GOLD_INTERVAL = ArcadePortRules.HEROES_OF_GWEN_GOLD_INTERVAL_MILLIS;
+    private static final int MOBA_BASE_GOLD = ArcadePortRules.HEROES_OF_GWEN_BASE_GOLD_PER_INTERVAL;
+    private static final int MOBA_CAPTURE_GOLD = ArcadePortRules.HEROES_OF_GWEN_CAPTURE_POINT_GOLD_PER_INTERVAL;
+    private static final int MOBA_CAPTURE_REWARD = ArcadePortRules.HEROES_OF_GWEN_CAPTURE_POINT_REWARD_GOLD;
+    private static final long MOBA_MINION_WAVE_INTERVAL = ArcadePortRules.HEROES_OF_GWEN_MINION_WAVE_INTERVAL_MILLIS;
+    private static final long MOBA_MINION_UPDATE_INTERVAL = ArcadePortRules.HEROES_OF_GWEN_MINION_TARGET_UPDATE_MILLIS;
+    private static final double MOBA_MINION_TARGET_RANGE_SQUARED = ArcadePortRules.HEROES_OF_GWEN_MINION_TARGET_RANGE_SQUARED;
     private static final long MOBA_TOWER_UPDATE_INTERVAL = 1_000L;
     private static final long MOBA_CAPTURE_UPDATE_INTERVAL = 1_000L;
     private static final double MOBA_TOWER_RANGE_SQUARED = 100.0D;
@@ -109,6 +119,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final NamespacedKey shopRoleKey;
     private final NamespacedKey kingKey;
     private final NamespacedKey towerKey;
+    private final NamespacedKey minionTeamKey;
     private final NamespacedKey heroSkillKey;
     private final NamespacedKey heroProjectileTypeKey;
     private final NamespacedKey heroProjectileOwnerKey;
@@ -116,6 +127,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private final Map<UUID, Integer> playerGold = new HashMap<>();
     private final Map<UUID, ItemStack> carriedTntOldHelmet = new HashMap<>();
     private final Map<Integer, List<TowerState>> towers = new HashMap<>();
+    private final Map<UUID, Integer> heroesOfGwenMinionTeams = new HashMap<>();
+    private final Set<Integer> heroesOfGwenIronMinionTeams = new HashSet<>();
     private final List<CapturePointState> capturePoints = new ArrayList<>();
     private final Map<Integer, Wither> withers = new HashMap<>();
     private final Map<Integer, Boolean> witherDamageable = new HashMap<>();
@@ -163,6 +176,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private long nextGoldAt;
     private long nextStructureUpdateAt;
     private long nextCapturePointUpdateAt;
+    private long nextMinionWaveAt;
+    private long nextMinionUpdateAt;
     private long nextKingCageUpdateAt;
     private int objectiveKillsEnabled;
     private int castleKillCountRed;
@@ -192,6 +207,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         this.shopRoleKey = new NamespacedKey(plugin, "heroes-gwen-store-role");
         this.kingKey = new NamespacedKey(plugin, "castle-king-team");
         this.towerKey = new NamespacedKey(plugin, "heroes-gwen-tower");
+        this.minionTeamKey = new NamespacedKey(plugin, "heroes-gwen-minion-team");
         this.heroSkillKey = new NamespacedKey(plugin, "heroes-gwen-skill");
         this.heroProjectileTypeKey = new NamespacedKey(plugin, "heroes-gwen-projectile-type");
         this.heroProjectileOwnerKey = new NamespacedKey(plugin, "heroes-gwen-projectile-owner");
@@ -213,6 +229,10 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
             objectiveRespawnAt = now + objectiveDelay();
             nextChestRefillAt = now + 120_000L;
             nextGoldAt = now + MOBA_PASSIVE_GOLD_INTERVAL;
+            if (game == ArcadePortGame.HEROES_OF_GWEN) {
+                nextMinionWaveAt = now + MOBA_MINION_WAVE_INTERVAL;
+                nextMinionUpdateAt = now + MOBA_MINION_UPDATE_INTERVAL;
+            }
             nextStructureUpdateAt = now + MOBA_TOWER_UPDATE_INTERVAL;
             plugin.getLogger().info("Prepared " + game.displayName() + (mixedArcade ? " Mixed Arcade" : "")
                     + " source runtime using " + map.mapName() + ".");
@@ -363,6 +383,136 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         towers.computeIfAbsent(owner, ignored -> new ArrayList<>())
                 .add(new TowerState(owner, location.clone(), sourceMarker, first, first ? 500.0D : 1_000.0D,
                         guardian, crystal));
+    }
+
+    private void spawnHeroesOfGwenMinionWave(int team) {
+        List<Location> starts = map.teamSpawnLocationsForTeam(team, 2);
+        if (starts.isEmpty()) {
+            Location home = witherHomes.get(team);
+            if (home != null) starts = List.of(home.clone());
+        }
+        if (starts.isEmpty()) {
+            plugin.getLogger().warning("Heroes of Gwen cannot spawn the " + teamName(team)
+                    + " minion wave: the source map has no team spawn markers.");
+            return;
+        }
+        EntityType type = team == 0 ? EntityType.ZOMBIE : EntityType.ZOMBIFIED_PIGLIN;
+        for (int i = 0; i < ArcadePortRules.HEROES_OF_GWEN_MINIONS_PER_WAVE; i++) {
+            Location spawn = starts.get(i % starts.size()).clone();
+            spawn.add(ThreadLocalRandom.current().nextDouble(-1.25D, 1.25D), 0.0D,
+                    ThreadLocalRandom.current().nextDouble(-1.25D, 1.25D));
+            Location enemyHome = witherHomes.get(1 - team);
+            if (enemyHome != null) {
+                Vector facing = enemyHome.toVector().subtract(spawn.toVector());
+                if (facing.lengthSquared() > 0.001D) spawn.setDirection(facing);
+            }
+            Entity entity = world.spawnEntity(spawn, type);
+            if (!(entity instanceof Mob minion)) {
+                entity.remove();
+                continue;
+            }
+            if (minion instanceof Ageable ageable) ageable.setBaby();
+            minion.setAware(true);
+            minion.setRemoveWhenFarAway(false);
+            minion.setCanPickupItems(false);
+            minion.setTarget(null);
+            minion.setPersistent(false);
+            minion.getPersistentDataContainer().set(minionTeamKey, PersistentDataType.INTEGER, team);
+            heroesOfGwenMinionTeams.put(minion.getUniqueId(), team);
+            entities.add(minion);
+            if (heroesOfGwenIronMinionTeams.contains(team)) applyHeroesOfGwenIronMinionArmour(minion);
+        }
+    }
+
+    private void applyHeroesOfGwenIronMinionArmour(Mob minion) {
+        var equipment = minion.getEquipment();
+        if (equipment == null) return;
+        equipment.setHelmet(new ItemStack(Material.IRON_HELMET));
+        equipment.setChestplate(new ItemStack(Material.IRON_CHESTPLATE));
+        equipment.setLeggings(new ItemStack(Material.IRON_LEGGINGS));
+        equipment.setBoots(new ItemStack(Material.IRON_BOOTS));
+        equipment.setHelmetDropChance(0.0F);
+        equipment.setChestplateDropChance(0.0F);
+        equipment.setLeggingsDropChance(0.0F);
+        equipment.setBootsDropChance(0.0F);
+    }
+
+    private List<Mob> liveHeroesOfGwenMinions() {
+        List<Mob> live = new ArrayList<>();
+        for (UUID id : new ArrayList<>(heroesOfGwenMinionTeams.keySet())) {
+            Entity entity = Bukkit.getEntity(id);
+            if (!(entity instanceof Mob minion) || !minion.isValid() || minion.isDead()) {
+                heroesOfGwenMinionTeams.remove(id);
+                if (entity != null) entities.remove(entity);
+                continue;
+            }
+            live.add(minion);
+        }
+        return live;
+    }
+
+    private LivingEntity nextHeroesOfGwenMinionTarget(Mob minion, int team, List<Mob> minions) {
+        Mob enemyMinion = minions.stream()
+                .filter(other -> other != minion)
+                .filter(other -> heroesOfGwenMinionTeams.getOrDefault(other.getUniqueId(), -1) == 1 - team)
+                .filter(other -> other.getWorld() == world
+                        && other.getLocation().distanceSquared(minion.getLocation())
+                                <= MOBA_MINION_TARGET_RANGE_SQUARED)
+                .min(java.util.Comparator
+                        .comparingDouble((Mob other) -> other.getHealth())
+                        .thenComparingDouble(other -> other.getLocation().distanceSquared(minion.getLocation())))
+                .orElse(null);
+        if (enemyMinion != null) return enemyMinion;
+        return towers.getOrDefault(1 - team, List.of()).stream()
+                .filter(tower -> !tower.dead && tower.guardian != null && tower.guardian.isValid())
+                .sorted(java.util.Comparator.comparingInt(tower -> tower.first ? 0 : 1))
+                .map(tower -> (LivingEntity) tower.guardian)
+                .findFirst().orElse(null);
+    }
+
+    private void updateHeroesOfGwenMinions(long now) {
+        if (game != ArcadePortGame.HEROES_OF_GWEN || stopped) return;
+        if (now >= nextMinionWaveAt) {
+            spawnHeroesOfGwenMinionWave(0);
+            spawnHeroesOfGwenMinionWave(1);
+            nextMinionWaveAt = now + MOBA_MINION_WAVE_INTERVAL;
+        }
+        if (now < nextMinionUpdateAt) return;
+        nextMinionUpdateAt = now + MOBA_MINION_UPDATE_INTERVAL;
+        List<Mob> minions = liveHeroesOfGwenMinions();
+        for (Mob minion : minions) {
+            int team = heroesOfGwenMinionTeams.getOrDefault(minion.getUniqueId(), -1);
+            if (team < 0) continue;
+            LivingEntity target = nextHeroesOfGwenMinionTarget(minion, team, minions);
+            if (minion.getTarget() != target) minion.setTarget(target);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onHeroesOfGwenMinionDamage(EntityDamageByEntityEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
+        Integer victimTeam = heroesOfGwenMinionTeams.get(event.getEntity().getUniqueId());
+        if (victimTeam == null) return;
+        Integer attackerTeam = heroesOfGwenMinionTeams.get(event.getDamager().getUniqueId());
+        Player attackerPlayer = resolveAttacker(event);
+        if (attackerPlayer != null) {
+            attackerTeam = teams.getOrDefault(attackerPlayer.getUniqueId(), -1);
+            if (!activePlayers.contains(attackerPlayer.getUniqueId())) {
+                event.setCancelled(true);
+                return;
+            }
+        }
+        if (attackerTeam != null && attackerTeam == victimTeam) event.setCancelled(true);
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onHeroesOfGwenMinionDeath(EntityDeathEvent event) {
+        if (stopped || game != ArcadePortGame.HEROES_OF_GWEN) return;
+        UUID id = event.getEntity().getUniqueId();
+        if (heroesOfGwenMinionTeams.remove(id) == null) return;
+        entities.remove(event.getEntity());
+        event.getDrops().clear();
+        event.setDroppedExp(0);
     }
 
     private void spawnMobaWither(int team, Location location) {
@@ -809,13 +959,15 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
     private void tickHeroesOfGwen(long now) {
         updateMobaWithers(now);
         updateHeroesOfGwenAbilities(now);
+        updateHeroesOfGwenMinions(now);
+        recordMobaTowerEntries(now);
         if (now >= nextGoldAt) {
-            for (Player player : activeMatchPlayers()) addGold(player, 20, "Passive gold");
+            for (Player player : activeMatchPlayers()) addGold(player, MOBA_BASE_GOLD, "Passive gold");
             for (CapturePointState point : capturePoints) {
                 if (point.owner < 0) continue;
                 for (Player player : activeMatchPlayers()) {
                     if (teams.getOrDefault(player.getUniqueId(), -1) == point.owner) {
-                        addGold(player, 5, "Captured beacon");
+                        addGold(player, MOBA_CAPTURE_GOLD, "Captured beacon");
                     }
                 }
             }
@@ -1452,7 +1604,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         setCapturePointBeacon(point, owner);
         for (Player player : activeMatchPlayers()) {
             if (teams.getOrDefault(player.getUniqueId(), -1) == owner) {
-                addGold(player, 25, "Capturing " + point.name);
+                addGold(player, MOBA_CAPTURE_REWARD, "Capturing " + point.name);
             }
         }
         announce(ChatColor.GOLD + teamName(owner) + " captured the " + point.colour + " " + point.name + " Beacon!");
@@ -1485,16 +1637,47 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         return team == 0 ? Material.RED_WOOL : team == 1 ? Material.LIGHT_BLUE_WOOL : Material.WHITE_WOOL;
     }
 
+    private void recordMobaTowerEntries(long now) {
+        List<Mob> minions = liveHeroesOfGwenMinions();
+        List<Player> matchPlayers = activeMatchPlayers();
+        for (Map.Entry<Integer, List<TowerState>> entry : towers.entrySet()) {
+            int owner = entry.getKey();
+            for (TowerState tower : entry.getValue()) {
+                if (tower.dead) continue;
+                Set<UUID> inRange = new HashSet<>();
+                for (Mob minion : minions) {
+                    if (heroesOfGwenMinionTeams.getOrDefault(minion.getUniqueId(), -1) != 1 - owner
+                            || minion.getLocation().distanceSquared(tower.location) > MOBA_TOWER_RANGE_SQUARED) continue;
+                    UUID id = minion.getUniqueId();
+                    inRange.add(id);
+                    tower.targetEnteredAt.putIfAbsent(id, now);
+                }
+                for (Player player : matchPlayers) {
+                    if (teams.getOrDefault(player.getUniqueId(), -1) != 1 - owner
+                            || player.getLocation().distanceSquared(tower.location) > MOBA_TOWER_RANGE_SQUARED) continue;
+                    UUID id = player.getUniqueId();
+                    inRange.add(id);
+                    tower.targetEnteredAt.putIfAbsent(id, now);
+                }
+                tower.targetEnteredAt.keySet().removeIf(id -> !inRange.contains(id));
+            }
+        }
+    }
+
     private void updateMobaTowers() {
         for (Map.Entry<Integer, List<TowerState>> entry : towers.entrySet()) {
             int owner = entry.getKey();
             for (TowerState tower : entry.getValue()) {
                 if (tower.dead) continue;
-                Player target = nearestEnemy(tower.location, owner);
-                if (target != null) {
-                    if (target.getHealth() <= MOBA_TOWER_DAMAGE) hooks.eliminate(target, null, "was defeated by a tower guardian");
-                    else target.setHealth(target.getHealth() - MOBA_TOWER_DAMAGE);
-                    target.getWorld().spawnParticle(Particle.CRIT, target.getLocation().add(0, 1, 0),
+                Entity target = mobaTowerTarget(tower, owner);
+                if (target instanceof Mob minion) {
+                    minion.damage(MOBA_TOWER_DAMAGE);
+                    minion.getWorld().spawnParticle(Particle.CRIT, minion.getLocation().add(0, 0.7D, 0),
+                            4, 0.2D, 0.25D, 0.2D, 0.02D);
+                } else if (target instanceof Player player) {
+                    if (player.getHealth() <= MOBA_TOWER_DAMAGE) hooks.eliminate(player, null, "was defeated by a tower guardian");
+                    else player.setHealth(player.getHealth() - MOBA_TOWER_DAMAGE);
+                    player.getWorld().spawnParticle(Particle.CRIT, player.getLocation().add(0, 1, 0),
                             4, 0.2D, 0.3D, 0.2D, 0.02D);
                 }
                 for (Player teammate : activeMatchPlayers()) {
@@ -1504,6 +1687,31 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
                 }
             }
         }
+    }
+
+    private Entity mobaTowerTarget(TowerState tower, int owner) {
+        List<Mob> minions = liveHeroesOfGwenMinions().stream()
+                .filter(minion -> heroesOfGwenMinionTeams.getOrDefault(minion.getUniqueId(), -1) == 1 - owner)
+                .filter(minion -> tower.targetEnteredAt.containsKey(minion.getUniqueId()))
+                .toList();
+        List<Player> playersInRange = activeMatchPlayers().stream()
+                .filter(player -> teams.getOrDefault(player.getUniqueId(), -1) == 1 - owner)
+                .filter(player -> tower.targetEnteredAt.containsKey(player.getUniqueId()))
+                .toList();
+        Mob firstMinion = minions.stream()
+                .min(java.util.Comparator.comparingLong(minion ->
+                        tower.targetEnteredAt.getOrDefault(minion.getUniqueId(), Long.MAX_VALUE)))
+                .orElse(null);
+        Player firstPlayer = playersInRange.stream()
+                .min(java.util.Comparator.comparingLong(player ->
+                        tower.targetEnteredAt.getOrDefault(player.getUniqueId(), Long.MAX_VALUE)))
+                .orElse(null);
+        if (firstMinion == null) return firstPlayer;
+        if (firstPlayer == null) return firstMinion;
+        long minionEnteredAt = tower.targetEnteredAt.getOrDefault(firstMinion.getUniqueId(), Long.MAX_VALUE);
+        long playerEnteredAt = tower.targetEnteredAt.getOrDefault(firstPlayer.getUniqueId(), Long.MAX_VALUE);
+        return ArcadePortRules.heroesOfGwenTowerTargetsPlayer(playerEnteredAt, minionEnteredAt)
+                ? firstPlayer : firstMinion;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
@@ -1534,8 +1742,18 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         if (tower != null) {
             event.setCancelled(true);
             if (!(event instanceof EntityDamageByEntityEvent byEntity)) return;
+            Integer minionTeam = heroesOfGwenMinionTeams.get(byEntity.getDamager().getUniqueId());
+            if (minionTeam != null) {
+                if (minionTeam == tower.owner || !canDamageMobaTower(tower, minionTeam)) return;
+                damageMobaTower(tower, event.getFinalDamage(), null);
+                return;
+            }
             Player attacker = resolveAttacker(byEntity);
             if (attacker == null || teams.getOrDefault(attacker.getUniqueId(), -1) == tower.owner) return;
+            if (attacker.getLocation().distanceSquared(tower.location) > MOBA_TOWER_RANGE_SQUARED) {
+                attacker.sendMessage(ChatColor.RED + "You must enter the tower's 10-block range to damage it.");
+                return;
+            }
             if (!canDamageMobaTower(tower, teams.getOrDefault(attacker.getUniqueId(), -1))) {
                 attacker.sendMessage(ChatColor.RED + "Destroy the enemy outer tower before attacking this tower.");
                 return;
@@ -1617,6 +1835,11 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         int remaining = (int) towers.getOrDefault(tower.owner, List.of()).stream().filter(t -> !t.dead).count();
         if (remaining == 0) {
             witherDamageable.put(tower.owner, true);
+            int attackingTeam = 1 - tower.owner;
+            if (heroesOfGwenIronMinionTeams.add(attackingTeam)) {
+                announce(ChatColor.GOLD + teamName(attackingTeam)
+                        + " minion waves will now spawn with iron armour!");
+            }
             announce(ChatColor.GOLD + teamName(tower.owner) + " towers are destroyed. Their Wither is now vulnerable!");
         }
     }
@@ -2496,6 +2719,8 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         }
         witherDebris.clear();
         witherTargets.clear();
+        heroesOfGwenMinionTeams.clear();
+        heroesOfGwenIronMinionTeams.clear();
         witherHomes.clear();
         witherBoundaries.clear();
         witherNextEarthquakeAt.clear();
@@ -2560,6 +2785,7 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         final boolean first;
         final ArmorStand guardian;
         final EnderCrystal crystal;
+        final Map<UUID, Long> targetEnteredAt = new HashMap<>();
         double health;
         boolean dead;
         TowerState(int owner, Location location, String marker, boolean first, double health,
