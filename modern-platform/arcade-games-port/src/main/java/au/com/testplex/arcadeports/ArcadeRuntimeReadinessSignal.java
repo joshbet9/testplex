@@ -18,9 +18,12 @@ final class ArcadeRuntimeReadinessSignal {
     private ArcadeRuntimeReadinessSignal() { }
 
     static boolean publish(Path pluginDataFolder, String invocationId, long processId,
-                           boolean monsterMazeRegistered) throws IOException {
+                           boolean monsterMazeRegistered, boolean wizardsRegistered) throws IOException {
         if (!monsterMazeRegistered) {
             throw new IOException("The integrated Monster Maze game is not registered with Testplex Arcade.");
+        }
+        if (!wizardsRegistered) {
+            throw new IOException("The Wizards Arcade game is not registered with Testplex Arcade.");
         }
         Path identity = pluginDataFolder.resolve(IDENTITY_FILE);
         if (!Files.isRegularFile(identity)) return false;
@@ -48,6 +51,7 @@ final class ArcadeRuntimeReadinessSignal {
         signal.setProperty("status", "READY");
         signal.setProperty("module", "arcade-runtime");
         signal.setProperty("monster_maze", "READY");
+        signal.setProperty("wizards", "READY");
         signal.setProperty("manager", "testplex-arcade");
         signal.setProperty("world", ModernArcadeLobby.WORLD_NAME);
         signal.setProperty("plane", "100x100");
