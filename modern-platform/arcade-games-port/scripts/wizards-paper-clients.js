@@ -54,6 +54,30 @@ function connect(username) {
       }
     }
 
+    const acknowledgedTeleports = new Set();
+    function acknowledgeServerPosition(packet, reason) {
+      if (!packet || !Number.isFinite(Number(packet.teleportId))) return;
+      const teleportId = Number(packet.teleportId);
+      if (acknowledgedTeleports.has(teleportId)) return;
+      acknowledgedTeleports.add(teleportId);
+      try {
+        // Mirror the vanilla client after ServerPlayer changes worlds: accept
+        // the server's teleport id, then confirm our authoritative position.
+        // Paper clears ServerPlayer.isChangingDimension on this movement path;
+        // until then it rejects all ordinary damage sources.
+        client.write('teleport_confirm', { teleportId });
+        client.write('position', {
+          x: Number(packet.x), y: Number(packet.y), z: Number(packet.z),
+          flags: { onGround: false, hasHorizontalCollision: false },
+        });
+        log('BOT_TELEPORT_ACK|PASS|' + username + '|id=' + teleportId
+          + '|reason=' + reason + '|pos=' + packet.x + ',' + packet.y + ',' + packet.z);
+        sendPlayerLoaded('teleport-' + teleportId);
+      } catch (error) {
+        log('BOT_TELEPORT_ACK|FAIL|' + username + '|id=' + teleportId + '|' + String(error));
+      }
+    }
+
     client.once('login', () => {
       loggedIn = true;
       settled = true;
@@ -65,6 +89,19 @@ function connect(username) {
 
     // Cross-world arena teleports and death respawns restart Paper's client
     // load state. Mirror the vanilla client acknowledgement after each one.
+    client.on('position', (packet) => {
+      acknowledgeServerPosition(packet, 'position-event');
+    });
+
+    client.on('packet', (data, meta) => {
+      if (meta && meta.state === 'play' && meta.name === 'position') {
+        acknowledgeServerPosition(data, 'packet-event');
+      }
+      if (meta && meta.state === 'play' && meta.name === 'respawn') {
+        setImmediate(() => sendPlayerLoaded('respawn-packet'));
+      }
+    });
+
     client.on('respawn', () => {
       setImmediate(() => sendPlayerLoaded('respawn'));
     });
