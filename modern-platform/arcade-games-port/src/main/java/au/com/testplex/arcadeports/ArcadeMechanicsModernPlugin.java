@@ -256,6 +256,10 @@ public final class ArcadeMechanicsModernPlugin extends JavaPlugin implements Com
                 || normalized.equals("mixed-skywars") || normalized.equals("mixed-sky-wars");
     }
 
+    private static boolean isSnapStatsArgument(String argument) {
+        return "snap".equalsIgnoreCase(argument) || "camera-shy".equalsIgnoreCase(argument);
+    }
+
     private boolean handleStatsCommand(CommandSender sender, String[] args) {
         if (!(sender instanceof Player viewer)) {
             sender.sendMessage("Players only.");
