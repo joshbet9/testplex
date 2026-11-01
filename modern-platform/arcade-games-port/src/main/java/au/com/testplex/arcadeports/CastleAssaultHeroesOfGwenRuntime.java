@@ -4133,6 +4133,200 @@ final class CastleAssaultHeroesOfGwenRuntime implements Listener {
         endDanaRally(ownerId);
     }
 
+
+    private void activateBiffTether(Player player) {
+        UUID ownerId = player.getUniqueId();
+        if (!isHeroSkillReady(player, "biff.tether")
+                || !biffTetherTargets.getOrDefault(ownerId, List.of()).isEmpty()) return;
+        double radius = ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_RANGE;
+        int team = teams.getOrDefault(ownerId, -1);
+        List<BiffTetherTarget> targets = new ArrayList<>();
+        for (Entity entity : world.getNearbyEntities(player.getLocation(), radius, radius, radius)) {
+            if (!(entity instanceof Player target) || !target.isOnline()
+                    || !activePlayers.contains(target.getUniqueId())
+                    || target.equals(player) || teams.getOrDefault(target.getUniqueId(), -2) == team
+                    || player.getLocation().distanceSquared(target.getLocation()) > radius * radius) continue;
+            target.setVelocity(new Vector(0.0D, 0.0D, 0.0D));
+            target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                    (int) (ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_SLOW_DURATION_MILLIS / 50L),
+                    ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_SLOW_AMPLIFIER, true, true, true));
+            target.sendMessage(ChatColor.RED + player.getName() + " has tethered you!");
+            target.playSound(target.getLocation(), Sound.BLOCK_IRON_DOOR_CLOSE, 1.0F, 1.0F);
+            targets.add(new BiffTetherTarget(target.getUniqueId(), System.currentTimeMillis()));
+        }
+        if (targets.isEmpty()) {
+            player.sendActionBar(ChatColor.YELLOW + "No enemy heroes are close enough to tether.");
+            return;
+        }
+        biffTetherTargets.put(ownerId, targets);
+        setHeroSkillCooldown(player, "biff.tether", ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_REUSE_DELAY_MILLIS);
+        player.playSound(player.getLocation(), Sound.BLOCK_IRON_DOOR_CLOSE, 1.0F, 1.0F);
+        player.sendMessage(ChatColor.GOLD + "Tethered " + targets.size() + " enemy hero(es).");
+    }
+
+    private void activateBiffBattleLeap(Player player) {
+        String skill = "biff.battle_leap";
+        if (!isHeroSkillReady(player, skill) || biffBattleLeapStartedAt.containsKey(player.getUniqueId())) return;
+        Vector direction = player.getLocation().getDirection();
+        direction.setY(ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_VERTICAL_VELOCITY);
+        player.setVelocity(direction);
+        biffBattleLeapStartedAt.put(player.getUniqueId(), System.currentTimeMillis());
+        setHeroSkillCooldown(player, skill, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_COOLDOWN_MILLIS);
+        player.playSound(player.getLocation(), Sound.ENTITY_IRON_GOLEM_ATTACK, 1.0F, 1.0F);
+        world.spawnParticle(Particle.CLOUD, player.getLocation().clone().add(0.0D, 0.6D, 0.0D),
+                15, 0.5D, 0.5D, 0.5D, 0.08D);
+    }
+
+    private void activateBiffCavalryCharge(Player player) {
+        UUID ownerId = player.getUniqueId();
+        if (!isHeroSkillReady(player, "biff.cavalry_charge") || biffHorses.containsKey(ownerId)) return;
+        Horse horse = world.spawn(player.getLocation(), Horse.class);
+        var maxHealth = horse.getAttribute(Attribute.MAX_HEALTH);
+        if (maxHealth != null) maxHealth.setBaseValue(20.0D);
+        horse.setHealth(20.0D);
+        horse.setTamed(true);
+        horse.setJumpStrength(ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_JUMP_STRENGTH);
+        horse.setInvulnerable(true);
+        horse.setRemoveWhenFarAway(false);
+        horse.getInventory().setArmor(new ItemStack(Material.IRON_HORSE_ARMOR));
+        horse.getInventory().setSaddle(new ItemStack(Material.SADDLE));
+        horse.getPersistentDataContainer().set(biffHorseOwnerKey, PersistentDataType.STRING, ownerId.toString());
+        horse.setCustomName(teamColour(teams.getOrDefault(ownerId, 0)) + player.getName() + "'s Cavalry");
+        horse.setCustomNameVisible(true);
+        entities.add(horse);
+        horse.addPassenger(player);
+        biffHorses.put(ownerId, new BiffHorseState(horse,
+                System.currentTimeMillis() + ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DURATION_MILLIS));
+        setHeroSkillCooldown(player, "biff.cavalry_charge",
+                ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_REUSE_DELAY_MILLIS);
+        world.strikeLightningEffect(horse.getLocation());
+        world.spawnParticle(Particle.CLOUD, horse.getLocation().clone().add(0.0D, 1.0D, 0.0D),
+                35, 0.8D, 0.8D, 0.8D, 0.08D);
+        world.playSound(horse.getLocation(), Sound.ENTITY_HORSE_DEATH, 1.0F, 1.1F);
+        player.sendMessage(ChatColor.GOLD + "Cavalry Charge!");
+    }
+
+    private void updateBiffAbilities(long now) {
+        for (Map.Entry<UUID, List<BiffTetherTarget>> entry : new HashMap<>(biffTetherTargets).entrySet()) {
+            UUID ownerId = entry.getKey();
+            Player owner = players.get(ownerId);
+            List<BiffTetherTarget> list = entry.getValue();
+            java.util.Iterator<BiffTetherTarget> iterator = list.iterator();
+            while (iterator.hasNext()) {
+                BiffTetherTarget tether = iterator.next();
+                Player target = players.get(tether.targetId);
+                if (owner == null || !owner.isOnline() || !activePlayers.contains(ownerId)
+                        || target == null || !target.isOnline() || !activePlayers.contains(tether.targetId)
+                        || !"biff".equals(selectedHeroesOfGwen.get(ownerId))
+                        || now - tether.startedAt >= ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_ACTIVE_MILLIS
+                        || owner.getLocation().distanceSquared(target.getLocation())
+                                >= ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_BREAK_DISTANCE_SQUARED
+                        || owner.getLocation().distanceSquared(target.getLocation())
+                                <= ArcadePortRules.HEROES_OF_GWEN_BIFF_TETHER_PULL_STOP_DISTANCE_SQUARED) {
+                    if (target != null && target.isOnline()) target.removePotionEffect(PotionEffectType.SLOWNESS);
+                    iterator.remove();
+                    continue;
+                }
+                Vector pull = owner.getLocation().toVector().subtract(target.getLocation().toVector());
+                pull.setY(0.25D);
+                if (pull.lengthSquared() > 0.001D) target.setVelocity(pull.normalize().multiply(0.75D));
+                Location middle = target.getLocation().clone().add(
+                        owner.getLocation().toVector().subtract(target.getLocation().toVector()).multiply(0.5D));
+                world.spawnParticle(Particle.CRIT, middle, 1, 0.04D, 0.04D, 0.04D, 0.0D);
+            }
+            if (list.isEmpty()) biffTetherTargets.remove(ownerId);
+        }
+
+        for (Map.Entry<UUID, Long> entry : new HashMap<>(biffBattleLeapStartedAt).entrySet()) {
+            UUID id = entry.getKey();
+            Player player = players.get(id);
+            if (player == null || !player.isOnline() || !activePlayers.contains(id)
+                    || !"biff".equals(selectedHeroesOfGwen.get(id))) {
+                biffBattleLeapStartedAt.remove(id);
+                continue;
+            }
+            if (now - entry.getValue() < ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_FLIGHT_MILLIS
+                    || !player.isOnGround()) continue;
+            double radius = ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_LANDING_RADIUS;
+            int team = teams.getOrDefault(id, -1);
+            for (Entity entity : world.getNearbyEntities(player.getLocation(), radius, radius, radius)) {
+                if (!(entity instanceof LivingEntity target) || target.equals(player)
+                        || !target.isValid() || target.isDead()
+                        || player.getLocation().distanceSquared(target.getLocation()) > radius * radius
+                        || heroesOfGwenEntityTeam(target) == team) continue;
+                if (target instanceof Player targetPlayer && !activePlayers.contains(targetPlayer.getUniqueId())) continue;
+                TowerState tower = towerFor(target);
+                if (tower != null) {
+                    if (tower.owner != team && canDamageMobaTower(tower, team)
+                            && player.getLocation().distanceSquared(tower.location) <= MOBA_TOWER_RANGE_SQUARED) {
+                        damageMobaTower(tower, ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE, player);
+                    }
+                } else {
+                    target.damage(ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_DAMAGE, player);
+                }
+                target.setVelocity(new Vector(0.0D,
+                        ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_MINIMUM_KNOCK_UP
+                                + Math.random() * ArcadePortRules.HEROES_OF_GWEN_BIFF_BATTLE_LEAP_RANDOM_KNOCK_UP,
+                        0.0D));
+                world.spawnParticle(Particle.CLOUD, target.getLocation().clone().add(0.0D, 0.7D, 0.0D),
+                        12, 0.45D, 0.45D, 0.45D, 0.08D);
+            }
+            biffBattleLeapStartedAt.remove(id);
+            world.playSound(player.getLocation(), Sound.ENTITY_GENERIC_EXPLODE, 1.0F, 0.7F);
+            world.spawnParticle(Particle.EXPLOSION, player.getLocation().clone().add(0.0D, 1.0D, 0.0D),
+                    3, 0.4D, 0.4D, 0.4D, 0.04D);
+        }
+
+        for (Map.Entry<UUID, BiffHorseState> entry : new HashMap<>(biffHorses).entrySet()) {
+            UUID ownerId = entry.getKey();
+            Player owner = players.get(ownerId);
+            BiffHorseState state = entry.getValue();
+            Horse horse = state.horse;
+            if (owner == null || !owner.isOnline() || !activePlayers.contains(ownerId)
+                    || !"biff".equals(selectedHeroesOfGwen.get(ownerId)) || now >= state.expiresAt
+                    || !horse.isValid() || horse.isDead()) {
+                removeBiffHorse(ownerId);
+                continue;
+            }
+            double radius = ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_RADIUS;
+            for (Player target : players.values()) {
+                if (!target.isOnline() || !activePlayers.contains(target.getUniqueId())
+                        || teams.getOrDefault(target.getUniqueId(), -2) == teams.getOrDefault(ownerId, -1)
+                        || horse.getLocation().distanceSquared(target.getLocation()) > radius * radius
+                        || state.nextRootAt.getOrDefault(target.getUniqueId(), 0L) > now) continue;
+                state.nextRootAt.put(target.getUniqueId(),
+                        now + ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_RECHARGE_MILLIS);
+                target.damage(ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_DAMAGE, owner);
+                target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS,
+                        (int) (ArcadePortRules.HEROES_OF_GWEN_BIFF_CAVALRY_CHARGE_ROOT_DURATION_MILLIS / 50L),
+                        10, true, true, true));
+                owner.sendActionBar(ChatColor.GOLD + "Cavalry hit " + target.getName() + "!");
+            }
+        }
+    }
+
+    private void removeBiffHorse(UUID ownerId) {
+        BiffHorseState state = biffHorses.remove(ownerId);
+        if (state == null) return;
+        if (state.horse != null) {
+            state.horse.eject();
+            state.horse.remove();
+            entities.remove(state.horse);
+        }
+    }
+
+    private void removeBiffState(UUID ownerId) {
+        List<BiffTetherTarget> leashed = biffTetherTargets.remove(ownerId);
+        if (leashed != null) {
+            for (BiffTetherTarget tether : leashed) {
+                Player target = players.get(tether.targetId);
+                if (target != null && target.isOnline()) target.removePotionEffect(PotionEffectType.SLOWNESS);
+            }
+        }
+        biffBattleLeapStartedAt.remove(ownerId);
+        removeBiffHorse(ownerId);
+    }
+
     private void markHeroProjectile(Projectile projectile, Player owner, String type) {
         projectile.getPersistentDataContainer().set(heroProjectileTypeKey, PersistentDataType.STRING, type);
         projectile.getPersistentDataContainer().set(heroProjectileOwnerKey, PersistentDataType.STRING,
